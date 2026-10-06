@@ -973,6 +973,11 @@ pub struct RawWeapon {
     /// any not already chased; otherwise they share one.
     #[serde(default)]
     pub split: bool,
+    /// With `split`: under an attack order too the salvo opens on the mark and spreads the
+    /// rest over the targets round it (the Strider's seekers). False (the default): an
+    /// ordered salvo stays whole on its mark.
+    #[serde(default)]
+    pub split_ordered: bool,
     #[serde(default)]
     pub proximity: f64,
     /// Seconds the ground burns where a round lands; zero: it does not.
@@ -1085,10 +1090,11 @@ pub struct RawWeapon {
     /// default): not a plasma weapon.
     #[serde(default)]
     pub plasma_grade: Option<PlasmaGrade>,
-    /// A Gravitic Seeker carried in a solid casing (the Sower's cluster seekers): drawn as a
-    /// faceted Regency body, not as its bare charge. Cosmetic. False (the default): bare.
+    /// A Gravitic Seeker whose charge is pinch fusion (the Strider's): it strikes as a
+    /// Pinch-fusion shot does, a small supernova, not as the gravity cage letting go.
+    /// Cosmetic. False (the default): a seeker's own strike.
     #[serde(default)]
-    pub cased: bool,
+    pub fusion_strike: bool,
     /// A held pinch-fusion beam (`beam` and the `PinchFusion` grade) drawn as the power
     /// generator's star, not as an excavation lance: a white-hot core in a broad prism
     /// sheath, and where it lands it melts the ground to glass and digs no crater.
@@ -1610,6 +1616,16 @@ impl Unit {
                     "{ctx}: round_span needs rounds above one"
                 )));
             }
+            if w.split_ordered && !w.split {
+                return Err(DataError::Invalid(format!(
+                    "{ctx}: split_ordered needs split"
+                )));
+            }
+            if w.fusion_strike && !(w.missile && w.plasma_grade == Some(PlasmaGrade::Gravitic)) {
+                return Err(DataError::Invalid(format!(
+                    "{ctx}: fusion_strike is for a Gravitic Seeker"
+                )));
+            }
             if w.braid > 0
                 && (w.trajectory != Trajectory::Ballistic
                     || w.missile
@@ -1758,6 +1774,7 @@ impl Unit {
                 boost_ticks: ticks(w.boost.min(w.cold_launch)).min(600) as u16,
                 hatch_ticks: ticks(w.hatch).min(600) as u16,
                 split: w.split,
+                split_ordered: w.split_ordered,
                 proximity: fx(w.proximity),
                 burn_ticks: ticks(w.burn).min(600) as u16,
                 burn_dps: fx(w.burn_dps.max(0.0)),
@@ -1797,7 +1814,7 @@ impl Unit {
                 bombard_radius: fx(w.bombard.clamp(crate::weapon::BOMBARD_RADIUS, 6000.0)),
                 caliber: w.caliber.clamp(0.0, 20.0) as f32,
                 plasma_grade: w.plasma_grade,
-                cased: w.cased,
+                fusion_strike: w.fusion_strike,
                 star_beam: w.star_beam,
                 depression: Angle(steps(w.depression.clamp(0.0, 89.0)).round() as i64 as u16),
                 sway: Angle(steps(w.sway.clamp(0.0, 60.0)).round() as i64 as u16),

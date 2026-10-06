@@ -26,12 +26,15 @@ Off the lines, measured the same way:
   unit of mass, near the Paladin's. What puts it over is the AEB-2's channel: 2000 damage to
   everything within 7 m of it, which a column or a clump pays for many times. Raised on a
   lot by Mason IIIs (build power 150: one takes about 135 s); it has no factory.
-- Strider (Regency T4 assault tripod, 3400 mass, the Fulgur's price): 72000 health and no
-  shield, about 1040 direct dps from two Pinch-fusion Cannons (2400 a shot, taking turns
-  half a reload apart) out to 1000 m, and about 230 more from eight Gravitic Seekers thrown
-  up and spread over the ground targets within 900 m. Shorter reach than the Fulgur's
-  AEB-2 and nothing against aircraft. Raised on a lot by Artificer IIIs or the Exarch's
-  Engineering Suite III.
+- Strider (Regency T4 assault tripod, 3400 mass, the Fulgur's price): 60000 health and no
+  shield, about 1830 direct dps from two Pinch-fusion Cannons (4200 a shot with 24 m of
+  splash, taking turns half a reload apart) out to 1250 m, and about 420 more from eight
+  Gravitic Seekers thrown up and spread over the ground targets within 1250 m, each going
+  off as a small supernova. Built to be a Breacher's match one on one (user, 2026-10-06):
+  less tanky, but it outranges the Breacher's rockets a little, so met from range it wins
+  and caught inside the gatlings' 750 m it loses, either way badly hurt
+  (mc-sim `tests/strider.rs`). Shorter reach than the Fulgur's AEB-2 and nothing against
+  aircraft. Raised on a lot by Artificer IIIs or the Exarch's Engineering Suite III.
 - Breacher (T4 assault walker, 3800 mass): 72000 health plus a 16000 hull field, about 2000
   dps from its two gatling-breach cannons at full spin (300 a shot, 0.3 s) and 430 from the
   thermobaric launchers (32 rockets of 240 every 18 s), so about 3.9 per unit of mass, a little

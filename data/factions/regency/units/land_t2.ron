@@ -129,10 +129,10 @@
             muzzles: [(2.0, -0.62, 6.2), (2.0, 0.62, 6.2)],
             spread: 1,
             targets: ["Structure", "Land", "Naval"], prefer: ["Structure"], color: Orange, red: 1.0,
-            // Seekers in solid casings (`cased`): a faceted body with violet line work and
-            // forward-swept fins that fit the launcher's 0.60 m mouth, black smoke behind.
-            // The cluster pieces are smaller casings.
-            missile: true, intercept: 240, caliber: 0.44, plasma_grade: Some(Gravitic), cased: true,
+            // Seekers in solid casings, as every Regency missile: a faceted body with violet line
+            // work and forward-swept fins that fit the launcher's 0.60 m mouth, black smoke
+            // behind. The cluster pieces are smaller casings.
+            missile: true, intercept: 240, caliber: 0.44, plasma_grade: Some(Gravitic),
             flash: 1.0, impact: 1.6, shockwave: 0.0,
             sounds: (fire: "regency_seeker_launch", split: "regency_seeker_split", impact: "regency_seeker_hit", ground: "regency_seeker_hit"),
         )],

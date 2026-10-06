@@ -105,7 +105,9 @@ impl World {
     /// Lays weapon `w` of `row` on the target in range the fewest of its own missiles are
     /// chasing, the nearest of those first; with every one already chased, on the least.
     /// Nothing else in range: it stays on what it has. A unit ordered onto a mark
-    /// (`OrderKind::Attack`) keeps the whole volley on it.
+    /// (`OrderKind::Attack`) keeps the whole volley on it, unless the battery spreads under
+    /// an order too (`Weapon::split_ordered`): then it opens on the mark and spreads the
+    /// rest of the volley over what is round it.
     pub(crate) fn split_target(&mut self, row: usize, w: usize) {
         let weapon = &self.bp(row).weapons[w];
         let units = &self.state.units;
@@ -114,7 +116,7 @@ impl World {
             .orders
             .front(units, row)
             .is_some_and(|o| o.kind == crate::tables::OrderKind::Attack);
-        if ordered {
+        if ordered && !(weapon.split_ordered && self.fires_at_will(row)) {
             return;
         }
         let (at, id) = (units.pos[row], units.id(row));

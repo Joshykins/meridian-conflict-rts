@@ -1695,7 +1695,8 @@ impl Blueprints {
                     w.cold_launch_ticks as u64
                         | (w.boost_ticks as u64) << 16
                         | (w.hatch_ticks as u64) << 32
-                        | (w.split as u64) << 48,
+                        | (w.split as u64) << 48
+                        | (w.split_ordered as u64) << 49,
                 );
                 h.write_i64(w.proximity.0);
                 h.write_i64(w.burn_dps.0);

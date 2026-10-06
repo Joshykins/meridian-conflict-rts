@@ -219,3 +219,208 @@ fn it_has_no_anti_air() {
     let bp = w.blueprints.unit(w.blueprints.id_of(STRIDER).unwrap());
     assert!(bp.weapons.iter().all(|w| w.target_mask & cat::AIR == 0));
 }
+
+/// How a Strider and a Breacher, each ordered onto the other from `gap` metres apart,
+/// come out: each one's health share left (shield included) when the first falls or
+/// time runs out, and the seconds it took.
+fn duel(gap: i32) -> (f32, f32, u32) {
+    let mut w = world();
+    let (strider, breacher) = (
+        w.blueprints.id_of(STRIDER).unwrap(),
+        w.blueprints.id_of("aster_t4_breacher").unwrap(),
+    );
+    let at = |w: &World, owner: u8, key: &str, x: i32| PlayerCommand {
+        player: owner,
+        command: Command::DebugSpawn {
+            owner,
+            blueprint: w.blueprints.id_of(key).unwrap(),
+            pos: FxVec2::from_ints(x, 1000),
+            heading: if owner == 0 {
+                Angle::ZERO
+            } else {
+                Angle::from_degrees(180)
+            },
+            count: 1,
+            flags: 0,
+            build: 1000,
+        },
+    };
+    w.tick(&[
+        at(&w, 0, STRIDER, 1000 - gap / 2),
+        at(&w, 1, "aster_t4_breacher", 1000 + gap / 2),
+    ])
+    .unwrap();
+    let row = |w: &World, id| {
+        let u = &w.state.units;
+        (0..u.blueprint.len()).find(|&r| u.slots.is_alive(r) && u.blueprint[r] == id)
+    };
+    let (s, b) = (row(&w, strider).unwrap(), row(&w, breacher).unwrap());
+    let (sid, bid) = (w.state.units.id(s), w.state.units.id(b));
+    let attack = |player: u8, unit, target| PlayerCommand {
+        player,
+        command: Command::Attack {
+            units: vec![unit],
+            target,
+            queue: false,
+        },
+    };
+    // Both sides powered, so the Breacher's hull field is up as it is in a game.
+    for p in &mut w.state.players {
+        p.free_build = true;
+    }
+    // The Breacher walks in to its gatlings' reach, then turns on the Strider; the Strider
+    // stands and shoots.
+    let close = PlayerCommand {
+        player: 1,
+        command: Command::Move {
+            units: vec![bid],
+            target: FxVec2::from_ints(1000 - gap / 2 + 650, 1000),
+            queue: false,
+        },
+    };
+    let mut queued = attack(1, bid, sid);
+    if let Command::Attack { queue, .. } = &mut queued.command {
+        *queue = true;
+    }
+    w.tick(&[attack(0, sid, bid), close, queued]).unwrap();
+    let full = |w: &World, id| {
+        let bp = w.blueprints.unit(id);
+        bp.health.to_f32() + bp.shield.as_ref().map_or(0.0, |s| s.health.to_f32())
+    };
+    let left = |w: &World, r: Option<usize>, id| {
+        r.map_or(0.0, |r| {
+            let u = &w.state.units;
+            (u.health[r] + u.shield_hp[r]).to_f32() / full(w, id)
+        })
+    };
+    let mut ticks = 0;
+    while ticks < seconds(240) {
+        w.tick(&[]).unwrap();
+        ticks += 1;
+        if row(&w, strider).is_none() || row(&w, breacher).is_none() {
+            break;
+        }
+    }
+    (
+        left(&w, row(&w, strider), strider),
+        left(&w, row(&w, breacher), breacher),
+        (ticks / seconds(1)) as u32,
+    )
+}
+
+fn seconds(s: u32) -> usize {
+    (s * mc_core::TICKS_PER_SECOND) as usize
+}
+
+/// A Strider and a Breacher are a fair fight one on one (user, 2026-10-06): the Strider less
+/// tanky but outranging it a little. Met from past the Breacher's reach the Strider wins,
+/// caught inside its gatlings' the Breacher does, and either way the winner comes out
+/// badly hurt.
+#[test]
+fn a_strider_and_a_breacher_are_a_close_fight() {
+    let w = world();
+    let unit = |key: &str| w.blueprints.unit(w.blueprints.id_of(key).unwrap());
+    let reach = |key: &str| unit(key).weapons.iter().map(|w| w.range_max).max().unwrap();
+    assert!(
+        reach(STRIDER) > reach("aster_t4_breacher"),
+        "the Strider outranges it"
+    );
+    assert!(
+        unit(STRIDER).health < unit("aster_t4_breacher").health,
+        "less tanky"
+    );
+    let (strider, breacher, secs) = duel(1300);
+    assert!(
+        breacher == 0.0 && strider < 0.6,
+        "from range: Strider {strider:.2} left, Breacher {breacher:.2} after {secs} s"
+    );
+    let (strider, breacher, secs) = duel(900);
+    assert!(
+        strider == 0.0 && breacher < 0.6,
+        "up close: Strider {strider:.2} left, Breacher {breacher:.2} after {secs} s"
+    );
+}
+
+/// Ordered onto one mark among several, the seekers open on it and spread the rest of the
+/// volley over the others in reach (user, 2026-10-06); the cannons stay on the mark.
+#[test]
+fn seekers_spread_over_the_marks_in_reach() {
+    let mut w = world();
+    let id = w.blueprints.id_of(STRIDER).unwrap();
+    let bot = w.blueprints.id_of("aster_t3_assault_bot").unwrap();
+    let mut spawns = vec![spawn(&w, 0, STRIDER, 500, 0)];
+    for k in 0..4 {
+        spawns.push(PlayerCommand {
+            player: 0,
+            command: Command::DebugSpawn {
+                owner: 1,
+                blueprint: bot,
+                pos: FxVec2::from_ints(1300, 400 + 80 * k),
+                heading: Angle::ZERO,
+                count: 1,
+                flags: flag::PASSIVE | flag::INVULNERABLE,
+                build: 1000,
+            },
+        });
+    }
+    w.tick(&spawns).unwrap();
+    let u = &w.state.units;
+    let rows: Vec<usize> = (0..u.blueprint.len())
+        .filter(|&r| u.slots.is_alive(r))
+        .collect();
+    let strider = *rows.iter().find(|&&r| u.blueprint[r] == id).unwrap();
+    let mark = *rows.iter().find(|&&r| u.blueprint[r] == bot).unwrap();
+    let (sid, mid) = (u.id(strider), u.id(mark));
+    w.tick(&[PlayerCommand {
+        player: 0,
+        command: Command::Attack {
+            units: vec![sid],
+            target: mid,
+            queue: false,
+        },
+    }])
+    .unwrap();
+    // Each seeker's mark as it leaves its cell (by its serial, the first tick it is seen).
+    let mut launched = std::collections::BTreeMap::new();
+    for _ in 0..seconds(30) {
+        w.tick(&[]).unwrap();
+        let p = &w.state.projectiles;
+        for i in 0..p.len() {
+            if p.source[i] == sid && p.weapon[i] == 2 {
+                launched.entry(p.serial[i]).or_insert(p.target[i]);
+            }
+        }
+    }
+    let chased: std::collections::BTreeSet<_> = launched.values().collect();
+    let on_mark = launched.values().filter(|&&t| t == mid).count();
+    assert!(on_mark > 0, "no seeker went at the mark");
+    assert!(
+        chased.len() >= 3,
+        "the seekers chased {} marks",
+        chased.len()
+    );
+}
+
+/// No Regency missile is drawn as a bare ball of plasma (user, 2026-10-06: "no energy balls
+/// for rockets"): each is a missile body with the seeker's look, the Strider's included.
+#[test]
+fn every_regency_missile_has_a_body() {
+    use mc_sim::mirror::{plasma_look, PLASMA_LOOK_GRAVITIC_SEEKER};
+    let w = world();
+    let mut seekers = 0;
+    for unit in &w.blueprints.units {
+        for weapon in unit.weapons.iter().filter(|w| w.seeker()) {
+            seekers += 1;
+            assert_eq!(
+                plasma_look(weapon),
+                PLASMA_LOOK_GRAVITIC_SEEKER,
+                "{}: {}",
+                unit.key,
+                weapon.name
+            );
+        }
+    }
+    assert!(seekers >= 8, "Regency missiles: {seekers}");
+    let bp = w.blueprints.unit(w.blueprints.id_of(STRIDER).unwrap());
+    assert!(bp.weapons[2].seeker() && bp.weapons[2].fusion_strike);
+}

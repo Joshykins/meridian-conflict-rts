@@ -5,24 +5,24 @@
 //!
 //! - **The seeker** (the Pavise's battery and heavy seeker, the silos): it leaves its cell
 //!   the moment it is fired, with a hard red flash and a snap of filaments, no motor flame,
-//!   nothing gathered or held first. In flight every Regency missile is its charge (sprites.wgsl
-//!   `gravitic_seeker`, `PLASMA_LOOK_GRAVITIC_SEEKER`, any plasma `missile`): a
-//!   lavender-white heart in a violet body in a faint shimmering lens, and behind it a black
+//!   nothing gathered or held first. In flight every Regency missile (`Weapon::seeker`) is a
+//!   solid faceted body (sprites.wgsl `vs_missile`), graphite with violet line work, its
+//!   charge glowing violet at the tail, never a bare ball of plasma; and behind it a black
 //!   smoke tube (`seeker_smoke`). Violet and black are how a Regency missile reads as one a
-//!   missile defence can take, apart from ARC's white smoke. A cased seeker (the Sower's,
-//!   `Weapon::cased_seeker`) is drawn as its faceted body instead (sprites.wgsl `vs_missile`),
-//!   its charge glowing violet at the tail, with the same smoke, launch and strike. Where it
-//!   strikes the lens lets go: it snaps in, then a hard
-//!   red burst over a white heart, filaments torn out, globs and spatter thrown out low, the
-//!   ground glassed under it; a heavy one's many times bigger, by its damage and `impact`.
+//!   missile defence can take, apart from ARC's white smoke. Where it strikes the lens lets
+//!   go: it snaps in, then a hard red burst over a white heart, filaments torn out, globs
+//!   and spatter thrown out low, the ground glassed under it; a heavy one's many times
+//!   bigger, by its damage and `impact`. A seeker carrying pinch fusion
+//!   (`Weapon::fusion_strike`, the Strider's) goes off as a Pinch-fusion shot does instead:
+//!   a small supernova (`regency_guns_fx::fusion`).
 //!
 //! Nothing is wound round a middle (no spiral arms, no rings), and nothing hangs as a mist.
 //! Presentation only; the renderer's own clock.
 
 use super::nuke_fx::PUFF_STRATEGIC_TRAIL;
-use super::regency_guns_fx::{cased_seeker, drawn_look};
+use super::regency_guns_fx::cased_seeker;
 use super::Renderer;
-use crate::gpu_consts::{plasma_look, puff};
+use crate::gpu_consts::puff;
 use glam::Vec3;
 use mc_data::{BlueprintId, Weapon};
 use mc_sim::mirror::{
@@ -170,6 +170,11 @@ impl Renderer {
         // A cluster's piece bursts at its share's size (`Weapon::landed_damage`).
         let s = charge_size_of(w, w.landed_damage(splash)) * 1.4 * w.impact.max(0.5);
         let height = at.z - self.ground_height(at.truncate());
+        if w.fusion_strike {
+            let (impact, splash) = (w.impact.max(0.3), splash.to_f32());
+            self.fusion_nova(at, impact, s * 0.5, splash, height < 4.0, start);
+            return true;
+        }
         let ground = height < s * 0.5 && !on_unit;
         self.gravitic_burst(at, s, ground, start);
         true
@@ -316,17 +321,10 @@ impl Renderer {
     /// piece lit as the charge passes it. A cased seeker's leaves from its tail.
     fn seeker_trails(&mut self, projectiles: &[ProjectileInstance], time: f32) {
         for p in projectiles {
-            let cased = cased_seeker(p);
-            if p.color & PROJECTILE_FADE_BEAM != 0
-                || !(cased || drawn_look(p) == plasma_look::GRAVITIC_SEEKER)
-            {
+            if p.color & PROJECTILE_FADE_BEAM != 0 || !cased_seeker(p) {
                 continue;
             }
-            let behind = if cased {
-                super::missile_half_length(p.size, p.aim[3])
-            } else {
-                p.size * 0.5
-            };
+            let behind = super::missile_half_length(p.size, p.aim[3]);
             let ends = ((p.color >> PROJECTILE_ENDS_SHIFT) & 0xFF) as f32 / 255.0;
             let span = if ends > 0.0 { ends } else { 1.0 };
             let starts = (p.color >> PROJECTILE_STARTS_SHIFT) as f32 / 255.0;
@@ -338,9 +336,10 @@ impl Renderer {
 
     /// A seeker's smoke down `from` to `to`, flown from `starts` to `span` of the tick, laid
     /// `behind` metres back of where the charge is drawn: the missile's smoke tube
-    /// (puffs.wgsl `strategic_trail`) in black, a little violet glow where the charge has
-    /// just passed, spreading and going grey as it hangs. Puffs a step apart, each a tent a
-    /// step either side, add up to an unbroken column.
+    /// (puffs.wgsl `strategic_trail`) in black, hot violet-white for a few metres behind
+    /// the charge, then a bold dark column that thickens a little as it hangs, never a
+    /// thin haze. Puffs a step apart, each a tent a step either side, add up to an
+    /// unbroken column.
     fn seeker_smoke(
         &mut self,
         from: Vec3,
@@ -353,11 +352,12 @@ impl Renderer {
     ) {
         let tick = self.tick_seconds.max(0.02);
         let dir = (to - from).normalize_or_zero();
-        let width = (0.8 + size * 0.35).min(2.6);
-        let life = (2.2 + size * 0.6).min(5.0);
+        let width = (1.6 + size * 0.5).min(4.0);
+        let life = (3.0 + size * 0.6).min(6.0);
         // The tube's radius is 0.28 of a puff's size; a negative end size cools the glow
-        // fast, over a few tens of metres.
-        let tube = (width * 1.8, -width * 4.5 * 1.8);
+        // fast, over a few tens of metres. It only doubles as it hangs: spread wider, the
+        // column thins to a haze.
+        let tube = (width * 1.8, -width * 2.2 * 1.8);
         // A deliberate cosmetic cap on one stretch: a tick's flight is far under this many.
         let n = (from.distance(to) / SMOKE_STEP).ceil().clamp(1.0, 8.0) as u32;
         let step = from.distance(to) / n as f32;

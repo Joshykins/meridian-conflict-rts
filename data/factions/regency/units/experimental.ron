@@ -95,7 +95,7 @@
         role: "Assault Tripod",
         tech: 4,
         categories: ["Land", "DirectFire", "Experimental"],
-        health: 72000,
+        health: 60000,
         cost: (mass: 3400, energy: 34000, time: 20000),
         radius: 36.0, height: 96.0,
         footprint: (6, 6),
@@ -105,13 +105,14 @@
             (
                 name: "Pinch-fusion Cannon",
                 // The left cannon. Its charge is squeezed until it fuses, then launched as one
-                // shot, laid a little up so it arcs over a low rise (`flat_fire`).
-                damage: 2400, splash: 8, range: 1000, reload: 4.6, speed: 1350, trajectory: Ballistic,
+                // shot, laid a little up so it arcs over a low rise (`flat_fire`). It lands as
+                // a supernova a building wide, and reaches a little past a Breacher's rockets.
+                damage: 4200, splash: 24, range: 1250, reload: 4.6, speed: 1350, trajectory: Ballistic,
                 loft: 0.6, flat_fire: true,
                 turret_turn: 40, muzzle: (30.0, 11.4, 74.7), pivot: (3.6, 0, 74.7),
                 targets: ["Land", "Naval"], color: Orange, red: 1.0,
                 plasma_grade: Some(PinchFusion),
-                flash: 0.8, impact: 2.6, tracer: 2.4,
+                flash: 1.2, impact: 4.5, tracer: 2.4,
                 sounds: (
                     fire: "regency_sunspear_fire", charge: "regency_sunspear_charge", charge_time: 1.6,
                     charge_volume: 1.6,
@@ -121,12 +122,12 @@
             (
                 name: "Pinch-fusion Cannon",
                 // The right cannon: half a reload behind the left (`twins.rs`).
-                damage: 2400, splash: 8, range: 1000, reload: 4.6, speed: 1350, trajectory: Ballistic,
+                damage: 4200, splash: 24, range: 1250, reload: 4.6, speed: 1350, trajectory: Ballistic,
                 loft: 0.6, flat_fire: true,
                 turret_turn: 40, muzzle: (30.0, -11.4, 74.7), pivot: (3.6, 0, 74.7),
                 targets: ["Land", "Naval"], color: Orange, red: 1.0,
                 plasma_grade: Some(PinchFusion),
-                flash: 0.8, impact: 2.6, tracer: 2.4,
+                flash: 1.2, impact: 4.5, tracer: 2.4,
                 sounds: (
                     fire: "regency_sunspear_fire", charge: "regency_sunspear_charge", charge_time: 1.6,
                     charge_volume: 1.6,
@@ -136,10 +137,12 @@
             (
                 name: "Gravitic Seeker Battery",
                 // Eight cells in two rows on the head's back, front pair first. The launcher
-                // rides the head (`mount` on a vertical launcher): the seekers leave straight
-                // up out of their cells, climb to `apogee` and fall on their marks, spread
-                // over the targets in reach. Ground only.
-                damage: 260, splash: 14, range_min: 120, range: 900, reload: 9.0, speed: 240,
+                // rides the head (`mount` on a vertical launcher): the seekers, solid cased
+                // bodies as every Regency missile, leave straight up out of their cells, climb
+                // to `apogee` and fall on their marks, spread over the targets in reach even
+                // under an attack order (`split_ordered`). Each carries pinch fusion and goes off as
+                // a small supernova (`fusion_strike`). Ground only.
+                damage: 420, splash: 20, range_min: 120, range: 1250, reload: 8.0, speed: 260,
                 trajectory: Direct, turret_turn: 0, arc: 360, mount: true,
                 muzzle: (-8.4, 1.86, 93.0), pivot: (-13.35, 0, 93.0),
                 muzzles: [
@@ -148,10 +151,10 @@
                 ],
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
                 missile: true, guided: true, vertical_launch: true, apogee: 300,
-                salvo: 8, salvo_delay: 0.15, split: true,
-                intercept: 60, caliber: 1.0, flash: 1.2, impact: 2.2, shockwave: 1.0,
-                plasma_grade: Some(Gravitic),
-                sounds: (fire: "regency_gravitic_throw", impact: "regency_gravitic_hit", ground: "regency_gravitic_hit"),
+                salvo: 8, salvo_delay: 0.15, split: true, split_ordered: true,
+                intercept: 60, caliber: 1.0, flash: 1.2, impact: 1.2, shockwave: 1.0,
+                plasma_grade: Some(Gravitic), fusion_strike: true,
+                sounds: (fire: "regency_gravitic_throw", impact: "regency_sunspear_hit", ground: "regency_sunspear_hit"),
             ),
         ],
         mesh: "regency_strider", icon: Bot,

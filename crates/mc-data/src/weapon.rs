@@ -81,6 +81,8 @@ pub struct Weapon {
     pub hatch_ticks: u16,
     /// A salvo's missiles spread over the targets in range (`combat::split_target`).
     pub split: bool,
+    /// A `split` salvo spreads under an attack order too (`RawWeapon::split_ordered`).
+    pub split_ordered: bool,
     pub proximity: Fx,
     pub burn_ticks: u16,
     /// Damage a second its burning ground does to each enemy standing in it.
@@ -138,8 +140,9 @@ pub struct Weapon {
     pub caliber: f32,
     /// A Regency plasma weapon's grade (`RawWeapon::plasma_grade`). Cosmetic. None: not plasma.
     pub plasma_grade: Option<PlasmaGrade>,
-    /// A Gravitic Seeker carried in a solid casing (`RawWeapon::cased`, `cased_seeker`).
-    pub cased: bool,
+    /// A Gravitic Seeker that strikes as a Pinch-fusion shot (`RawWeapon::fusion_strike`).
+    /// Cosmetic.
+    pub fusion_strike: bool,
     /// A held pinch-fusion beam drawn as the star, melting the ground without a crater
     /// (`RawWeapon::star_beam`). Cosmetic.
     pub star_beam: bool,
@@ -232,17 +235,17 @@ impl Weapon {
     }
 
     /// A Gravitic Seeker: a missile whose plasma charge is held and steered in gravity
-    /// containment. Drawn as its charge (`renderer::gravitic_fx`), never as a rocket: no
-    /// motor, plume or white smoke.
+    /// containment. It launches, smokes and strikes as its charge (`renderer::gravitic_fx`),
+    /// never as a rocket: no motor, plume or white smoke.
     pub fn gravitic_seeker(&self) -> bool {
         self.missile && self.plasma_grade == Some(PlasmaGrade::Gravitic)
     }
 
-    /// A Gravitic Seeker in a solid casing (`Weapon::cased`): its charge rides in a faceted
-    /// Regency body with violet line work, glowing violet at the tail, and it launches,
-    /// smokes and strikes as any seeker does.
-    pub fn cased_seeker(&self) -> bool {
-        self.gravitic_seeker() && self.cased
+    /// Any Regency missile (a plasma `missile`: a Gravitic Seeker, or the Vane's Plasmeric
+    /// one): drawn as a solid faceted Regency body with violet line work, its charge glowing
+    /// violet at the tail. Never a bare ball of plasma, never a rocket's flame.
+    pub fn seeker(&self) -> bool {
+        self.missile && self.plasma_grade.is_some()
     }
 
     /// Whether a missile `age` ticks out flies with no motor burning: tossed out of its

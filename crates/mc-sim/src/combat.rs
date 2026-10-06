@@ -809,7 +809,15 @@ impl World {
                     let strike = this.striking(row);
                     let mut targets = units.weapon_target[row];
                     for (w, weapon) in bp.weapons.iter().enumerate() {
-                        if let Some(t) = ordered.filter(|t| this.is_valid_target(row, *t, weapon)) {
+                        // A volley that spreads under an order (`Weapon::split_ordered`),
+                        // once begun on the mark, goes on over what is round it, unless it
+                        // holds its fire but for the mark.
+                        let spreading = units.weapon_salvo_left[row][w] > 0
+                            && weapon.split_ordered
+                            && this.fires_at_will(row);
+                        if let Some(t) =
+                            ordered.filter(|t| !spreading && this.is_valid_target(row, *t, weapon))
+                        {
                             targets[w] = units.id(t);
                             continue;
                         }

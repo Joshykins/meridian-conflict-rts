@@ -1081,8 +1081,8 @@ fn glow_of(p: &ProjectileInstance) -> Option<Glow> {
         }
         // The motor's flame, behind the nose; a booster's is bigger, a skimmer's a little brighter.
         let back = (from - to).normalize_or_zero() * 1.5;
-        // A cased Gravitic Seeker (`mirror::plasma_look` in `_pad[0]` beside the missile bit):
-        // no flame, its charge glowing violet at the tail.
+        // A Regency seeker (`mirror::plasma_look` in `_pad[0]` beside the missile bit): no
+        // flame, its charge glowing violet at the tail.
         let look = ((p._pad[0] - 1.0) * 0.5).floor();
         if p._pad[0] > 2.5 && look == crate::gpu_consts::plasma_look::GRAVITIC_SEEKER as f32 {
             return Some(Glow {
@@ -1115,20 +1115,6 @@ fn glow_of(p: &ProjectileInstance) -> Option<Glow> {
             to,
             color: Vec3::new(0.35, 0.66, 1.0) * 60.0 * k,
             range: 12.0 + 4.0 * k,
-            line: false,
-        });
-    }
-    // A seeker's charge (`mirror::plasma_look`, twice over in `_pad[0]` past one and its
-    // redness): a violet light round it, a heavy one's wide.
-    let look = ((p._pad[0] - 1.0) * 0.5).floor();
-    let seeker = look == crate::gpu_consts::plasma_look::GRAVITIC_SEEKER as f32;
-    if p._pad[0] > 2.5 && seeker {
-        let size = p.size.clamp(0.3, 4.0);
-        return Some(Glow {
-            from,
-            to,
-            color: Vec3::new(0.55, 0.1, 1.0) * 40.0 * size,
-            range: 8.0 + 5.0 * size,
             line: false,
         });
     }

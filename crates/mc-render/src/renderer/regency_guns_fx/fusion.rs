@@ -27,7 +27,7 @@ const REACH_FULL: f32 = 30.0;
 impl Renderer {
     /// A Pinch-fusion shot of ball `size` striking at `at`: the strike's size from its
     /// splash and `impact`; `ground` when it lands on or near the ground (the pool).
-    pub(super) fn fusion_nova(
+    pub(in crate::renderer) fn fusion_nova(
         &mut self,
         at: Vec3,
         impact: f32,
@@ -36,7 +36,8 @@ impl Renderer {
         ground: bool,
         start: f32,
     ) {
-        let pool = (size * 1.6).max(splash * 1.3) * impact;
+        // The pool and its knot grow with the shell, and stop where it stops.
+        let pool = ((size * 1.6).max(splash * 1.3) * impact).min(REACH_MAX / 0.6);
         let reach = (pool * 0.6).clamp(5.0, REACH_MAX);
         // How full the strike is drawn, 0..1, by its reach.
         let k = (reach / REACH_FULL).min(1.0);

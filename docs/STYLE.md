@@ -417,34 +417,34 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
   - **Guided: the Gravitic Seeker.** The Regency's missiles: a gravity
     containment holds a plasma charge and steers it onto its target. No
     exhaust plume. It launches the moment it is fired (user call
-    2026-10-03): no toss, no booster and coast, no charge gathered first. Drawn as its charge, not a rocket (renderer/gravitic_fx.rs,
-    sprites.wgsl `gravitic_seeker`; any missile with a `plasma_grade`): no
-    body or motor flame. It leaves its cell with a hard red flash and
-    filaments snapping in on it; in flight it is a hard-edged lavender-white
-    heart in a violet body, drawn out a little behind, held in a faint gravity
-    lens that shimmers at its edge, and it leaves a black smoke tube that
-    glows violet just behind the charge, spreads and goes grey as it hangs.
+    2026-10-03): no toss, no booster and coast, no charge gathered first.
+    Every one is drawn with a solid body, never as a bare ball of plasma
+    (user call 2026-10-06, "no energy balls"; `Weapon::seeker`, any missile
+    with a `plasma_grade`; renderer/gravitic_fx.rs, sprites.wgsl `vs_missile`):
+    a small strategic warhead, eight graphite facets in steel courses, a long
+    faceted prow with violet chevrons, a violet ring and seams, and four small
+    fins swept forward on the diagonals. The charge glows violet out of the
+    tail in place of a motor flame. It leaves its cell with a hard red flash
+    and filaments snapping in on it, and lays a bold black smoke tube that
+    burns hot violet-white for a few metres behind the tail and then stays a
+    dense dark column as it hangs, never a thin violet haze.
     Violet and black smoke are the sign of a Regency missile a defence can
     take, set apart from ARC's white smoke; only the missiles are violet, so
     the lenses that crush them stay red. Where it strikes the lens snaps in and lets
     go: a hard red burst over a white heart, filaments torn out, globs and
     sparks thrown out low, the ground glassed under it; sized by its damage
     and `impact`, so a heavy seeker's is many times a battery seeker's, and
-    it throws red lightning into the ground. The family covers every role
+    it throws red lightning into the ground. A seeker carrying pinch fusion
+    (`fusion_strike`, the Strider's battery) goes off as a Pinch-fusion shot
+    does instead: a small supernova. The family covers every role
     ARC's missiles do:
     - **Gravitic Seeker Pod:** salvos.
     - **Gravitic Seeker Battery:** AA.
     - **Heavy Gravitic Seeker:** tactical and cruise strikes.
-      The Sower's are cased (`cased: true`, `Weapon::cased_seeker`): the charge
-      rides in a solid body drawn as a small strategic warhead, eight graphite
-      facets in steel courses, a long faceted prow with violet chevrons, a
-      violet ring and seams, and four small fins swept forward on the
-      diagonals. The charge glows violet out of the tail in place of a motor
-      flame, and it lays the seekers' black smoke. Its 0.44 m body and fins fit
-      the pod's 0.60 m mouth. Lobbed high, it parts over the mark into six
-      smaller cased seekers (`Weapon::cluster`): a hard white heart in a red
-      flash and sparks, each piece striking as a seeker at the size of its
-      share.
+      The Sower's body is 0.44 m across, and with its fins fits the pod's
+      0.60 m mouth. Lobbed high, it parts over the mark into six smaller cased
+      seekers (`Weapon::cluster`): a hard white heart in a red flash and
+      sparks, each piece striking as a seeker at the size of its share.
     - **Gravitic Lens:** missile defence (a faction's `anti_missile_look:
       Gravitic`; ARC's is the laser), on the Rondel and the warships. Each tick a
       lens holds a missile, a thin red tether ripples from the emitter to it and a
