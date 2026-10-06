@@ -1002,6 +1002,19 @@ shared! {
         /// The platform, authored docked: raised by `deploy` x (`SKY_Z` - `CAR_DOCK`).
         pub const PART_CAR: u32 = 77;
         pub const CAR_DOCK: f32 = 0.0;
+        /// Shared with the effects (renderer `elevator_fx`) and audio: where things are on
+        /// the model. The deck's top and radius when docked; the platform's underside
+        /// (its braking thrusters fire down from a ring of `THRUSTER_R` there).
+        pub const DECK_Z: f32 = 6.0;
+        pub const DECK_R: f32 = 96.0;
+        pub const CAR_UNDER_Z: f32 = -4.0;
+        pub const THRUSTER_R: f32 = 70.0;
+        /// Where the jaws close on the cable (height, and the cable's radius there).
+        pub const GRIP_Z: f32 = 200.0;
+        pub const CABLE_R: f32 = 7.0;
+        /// The warning beacons on each tower's crown: height and distance from the middle.
+        pub const BEACON_Z: f32 = 236.0;
+        pub const BEACON_R: f32 = 112.0;
     }
 
     /// Work-beam kinds (beams.wgsl) that the sim writes into `BeamInstance::kind`
