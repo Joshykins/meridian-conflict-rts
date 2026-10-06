@@ -1184,7 +1184,8 @@ pub struct LineUp {
     pub stranded: usize,
 }
 
-/// How wide a line-up row runs before it wraps, metres.
+/// How wide a line-up row runs before it wraps, metres, unless the block would then
+/// be taller than the map (`fitted_block`).
 const LINE_UP_WIDTH: f32 = 900.0;
 
 /// Half the ground a unit takes in a line-up, metres: its lot, or its hull.
@@ -1196,9 +1197,29 @@ fn line_up_half(bp: &UnitBlueprint) -> f32 {
     }
 }
 
-/// Lays `units` out in rows from the origin: one band per list, a new row at each tech.
-/// Returns each unit's centre and the block's size.
-fn line_up_block(bands: &[Vec<&UnitBlueprint>]) -> (Vec<(BlueprintId, [f32; 2])>, [f32; 2]) {
+/// [`line_up_block`] with rows wide enough that the block stands no taller than `tall`
+/// metres (while it fits the map's width, `wide`): a long roster runs wider rows.
+fn fitted_block(
+    bands: &[Vec<&UnitBlueprint>],
+    tall: f32,
+    wide: f32,
+) -> (Vec<(BlueprintId, [f32; 2])>, [f32; 2]) {
+    let mut row = LINE_UP_WIDTH;
+    loop {
+        let block = line_up_block(bands, row);
+        if block.1[1] <= tall || row * 1.25 > wide {
+            return block;
+        }
+        row *= 1.25;
+    }
+}
+
+/// Lays `units` out in rows from the origin, each row up to `row` metres wide: one band
+/// per list, a new row at each tech. Returns each unit's centre and the block's size.
+fn line_up_block(
+    bands: &[Vec<&UnitBlueprint>],
+    row: f32,
+) -> (Vec<(BlueprintId, [f32; 2])>, [f32; 2]) {
     let mut out = Vec::new();
     let (mut y, mut width) = (0.0f32, 0.0f32);
     for band in bands.iter().filter(|b| !b.is_empty()) {
@@ -1211,7 +1232,7 @@ fn line_up_block(bands: &[Vec<&UnitBlueprint>]) -> (Vec<(BlueprintId, [f32; 2])>
                 12.0
             };
             let cell = 2.0 * line_up_half(bp) + gap;
-            if x > 0.0 && (bp.tech != tech || x + cell > LINE_UP_WIDTH) {
+            if x > 0.0 && (bp.tech != tech || x + cell > row) {
                 y += row_h;
                 x = 0.0;
                 row_h = 0.0;
@@ -1285,12 +1306,12 @@ impl Range {
                 });
             }
         };
-        let (cells, size) = line_up_block(&land);
+        let (cells, size) = fitted_block(&land, h - 60.0, w - 60.0);
         let corner = place(self.pad, size);
         spawn(cells, corner, size);
         let at_sea = match sea {
             Some(sea) if wet_count > 0 => {
-                let (cells, size) = line_up_block(&sea_units);
+                let (cells, size) = fitted_block(&sea_units, h - 60.0, w - 60.0);
                 spawn(cells, place(sea, size), size);
                 wet_count
             }
