@@ -236,7 +236,7 @@
                 // it could carry: an air wing is what brings a Behemoth down. A wing of hover
                 // gunships held in one spot over it still dies to it, burst after burst.
                 name: "Heavy Twin Flak",
-                damage: 100, splash: 24, proximity: 16, range: 1200, reload: 0.9, speed: 380, trajectory: Direct,
+                damage: 100, splash: 25, proximity: 16, range: 1200, reload: 0.9, speed: 380, trajectory: Direct,
                 turret_turn: 160, mount: true, pivot: (-24, 132, 456), muzzle: (16, 132, 456),
                 muzzles: [(16, 128.6, 456), (16, 135.4, 456)],
                 targets: ["Air"], color: Orange, flak: true, casings: 3,
@@ -244,7 +244,7 @@
             ),
             (
                 name: "Heavy Twin Flak",
-                damage: 100, splash: 24, proximity: 16, range: 1200, reload: 0.9, speed: 380, trajectory: Direct,
+                damage: 100, splash: 25, proximity: 16, range: 1200, reload: 0.9, speed: 380, trajectory: Direct,
                 turret_turn: 160, mount: true, pivot: (-24, -132, 456), muzzle: (16, -132, 456),
                 muzzles: [(16, -135.4, 456), (16, -128.6, 456)],
                 targets: ["Air"], color: Orange, flak: true, casings: 3,

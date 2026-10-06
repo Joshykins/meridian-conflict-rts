@@ -57,7 +57,7 @@ Off the lines, measured the same way:
   health and a 200000 hull field (600/s), about 12 health per mass, half a T4's. Rank
   adds up to half again and 1600/s of mending, and a Behemoth in a fight ranks fast. Its
   guns outrange the ground and its feet crush what gets under it, but against aircraft it
-  has only two Heavy Twin Flak (100 a shell, 24 m burst). Measured (40 aircraft attacking
+  has only two Heavy Twin Flak (100 a shell, 25 m burst). Measured (40 aircraft attacking
   it from one side, it fighting back): Thunderheads kill it in 105 s and lose 4, Eclipses
   in 240 s and lose 13, Regency strategic bombers in 180 s and lose 13. 25 Thunderheads
   never get through. A wing of hover gunships (Kestrels, the Regency assault craft) held
