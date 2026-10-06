@@ -34,8 +34,9 @@ use std::sync::mpsc::{self, Receiver};
 use std::sync::Arc;
 
 /// Everything here against the rest of the weather volume: the rain loops
-/// peak near this level at a moderate shower seen from close by.
-const LEVEL: f32 = 1.0;
+/// peak near this level at a moderate shower seen from close by. The beds sit
+/// under them, about 3 dB down, so the world is felt more than heard.
+const LEVEL: f32 = 0.7;
 
 /// What the ambience listens to each frame, besides the map.
 #[derive(Clone, Copy)]
@@ -503,11 +504,12 @@ impl Ambience {
         }
         let s = self.surround;
 
-        // Close by, 1; a few hundred metres up, a half; from strategic zoom, nothing.
-        let detail = 1.0 / (1.0 + (cues.distance / 650.0).powi(2));
+        // Close by, 1; 400 m up, a half; gone by the time a base is seen whole.
+        let detail = 1.0 / (1.0 + (cues.distance / 400.0).powi(2))
+            * (1.0 - smoothstep(900.0, 2000.0, cues.distance));
         let far = smoothstep(250.0, 2500.0, cues.distance);
         // The sea is a wide sound and carries higher up, but not to strategic zoom.
-        let wide = detail.sqrt() * (1.0 - smoothstep(2000.0, 5000.0, cues.distance));
+        let wide = detail.sqrt() * (1.0 - smoothstep(1200.0, 3000.0, cues.distance));
         let day = 1.0 - smoothstep(0.35, 0.75, cues.darkness);
         let night = smoothstep(0.45, 0.85, cues.darkness);
         let dry = (1.0 - cues.rain).powi(2);
@@ -740,7 +742,7 @@ impl Ambience {
         (windy, duck): (f32, f32),
     ) {
         // Nothing to hear from strategic zoom, so no looking for the shore either.
-        if cues.distance > 5000.0 {
+        if cues.distance > 3000.0 {
             return;
         }
         let ids = self.ids.as_ref().expect("looked up above");
