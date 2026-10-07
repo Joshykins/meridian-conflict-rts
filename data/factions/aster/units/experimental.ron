@@ -179,7 +179,7 @@
                 // salvo ripples down them in turn, twice round.
                 muzzles: [(2.6, 62.4, 461.6), (2.6, 80, 461.6), (2.6, 97.6, 461.6), (-2.6, 62.4, 478.4), (-2.6, 80, 478.4), (-2.6, 97.6, 478.4),
                           (2.6, -62.4, 461.6), (2.6, -80, 461.6), (2.6, -97.6, 461.6), (-2.6, -62.4, 478.4), (-2.6, -80, 478.4), (-2.6, -97.6, 478.4)],
-                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, missile: true,
+                targets: ["Land", "Naval", "Structure"], color: Orange, missile: true,
                 intercept: 400, spread: 7, trail: true, wake: 8, tracer: 4, impact: 4.5, shockwave: 2.5,
                 // A heavy rocket in each tube: 6 m across in the 9.6 m mouth, 43 m long in the 60 m pod.
                 caliber: 6,
@@ -203,7 +203,7 @@
                 damage: 5400, splash: 60, range_min: 900, range: 2600, reload: 0.5, speed: 1000, trajectory: Direct,
                 turret_turn: 20, pivot: (0, 0, 392), muzzle: (256, -144, 315.6), spread: 0.7, spin_up: 2.5, spin_ramp: 3.0,
                 barrels: 6, sway: 15,
-                targets: ["Land", "Naval", "Structure", "Space"], color: Orange,
+                targets: ["Land", "Naval", "Structure"], color: Orange,
                 flash: 4.5, impact: 4.2, shockwave: 2.6, tracer: 0.7,
                 // Each shot kicks its one spent casing out of the port in the gun's flank (`port`,
                 // the model's `titan::EJECT` at 4x; it turns and pitches with the gun), every
@@ -222,7 +222,7 @@
                 name: "AEB-3 Cataclysm Bore",
                 damage: 40000, splash: 150, range_min: 1200, range: 3800, reload: 45.0, speed: 12000, trajectory: Direct,
                 turret_turn: 20, pivot: (0, 0, 392), muzzle: (280, 144, 296), spread: 0.8, sway: 15,
-                targets: ["Land", "Naval", "Structure", "Space"], color: Blue, flash: 0.6, impact: 3.0, shockwave: 9.0,
+                targets: ["Land", "Naval", "Structure"], color: Blue, flash: 0.6, impact: 3.0, shockwave: 9.0,
                 tracer: 0, trail: false, wake: 0, bolts: 0,
                 bore: (width: 60, damage: 20000, cool: 150, storm: (radius: 440, seconds: 9, damage: 6000)),
                 sounds: (fire: "titan_bore_fire", charge: "titan_bore_charge", charge_time: 6.0, impact: "titan_bore_strike", ground: "titan_bore_strike", far: "titan_bore_far"),

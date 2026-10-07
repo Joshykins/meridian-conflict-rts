@@ -377,7 +377,7 @@ fn casings_fall_like_thrown_steel() {
 }
 
 #[test]
-fn it_brings_down_a_starship() {
+fn it_cannot_target_a_starship() {
     let mut w = world();
     w.state.players[0].free_build = true;
     let _titan = add(&mut w, TITAN, 0, 1000, 3000, 0);
@@ -395,8 +395,8 @@ fn it_brings_down_a_starship() {
         .row(frigate)
         .map_or(0.0, |r| w.state.units.z[r].to_f32());
     assert!(
-        left < full * 0.5,
-        "the frigate ({z} m up) only lost {} of {full}",
+        left == full,
+        "the frigate ({z} m up) lost {} of {full}",
         full - left
     );
 }
