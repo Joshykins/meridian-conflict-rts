@@ -187,21 +187,27 @@ fn the_burn_takes_a_base_wide_patch() {
 #[test]
 fn the_rockets_scatter() {
     let mut w = world();
-    w.tick(&[spawn(&w, 0, COLOSSUS, (500, 512), 0)]).unwrap();
-    w.tick(&[spawn(
-        &w,
-        1,
-        "aster_t3_assault_bot",
-        (2100, 512),
-        flag::PASSIVE | flag::INVULNERABLE,
-    )])
+    // Both on one tick, so the first rocket of the ripple is not missed by the log.
+    w.tick(&[
+        spawn(&w, 0, COLOSSUS, (500, 512), 0),
+        spawn(
+            &w,
+            1,
+            "aster_t3_assault_bot",
+            (2100, 512),
+            flag::PASSIVE | flag::INVULNERABLE,
+        ),
+    ])
     .unwrap();
     let rocket_splash = Fx::from_int(55);
     let mut landed = Vec::new();
     let mut fired = Vec::new();
     let colossus = w.blueprints.id_of(COLOSSUS).unwrap();
-    for _ in 0..200 {
-        w.tick(&[]).unwrap();
+    // The spawn tick's own events count too: the first rocket may leave on it.
+    for k in 0..=200 {
+        if k > 0 {
+            w.tick(&[]).unwrap();
+        }
         let tick = w.tick_count();
         for e in &w.events {
             match e {
