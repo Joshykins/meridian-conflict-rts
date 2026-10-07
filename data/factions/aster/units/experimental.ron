@@ -234,10 +234,12 @@
     (
         // The second tier 5: a space elevator. Three great clamp towers stand round a
         // receiving well; once they are finished a cable is let down out of orbit into
-        // the well and they close on it. From then on a cargo platform rides down the
-        // cable every `period`, sirens sounding as it comes, lets off what was queued on
-        // the elevator, free, up to its `payload` of mass, and goes back up. Whatever of
-        // the payload the queue leaves is brought down as plain mass for the store.
+        // the well and they close on it. From then on three cargo crates fall down the
+        // cable every `period`, sirens sounding as they come, land in the ways out between
+        // the towers and open; what was queued on the elevator drives out of them as
+        // groups, free, up to the `payload` of mass and the crates' seats, and the empty
+        // crates sink into the ground. Whatever of the payload the queue leaves is brought
+        // down as plain mass for the store.
         key: "aster_t5_space_elevator",
         name: "Skyhook",
         role: "Space Elevator", title: "Space Elevator",
@@ -249,7 +251,7 @@
         vision: 600,
         // 20 000 mass every 30 s: about 670 mass a second once it is running, so it
         // pays for itself in four minutes if nothing touches it.
-        elevator: (period: 30, payload: 20000, tether: 24, descent: 9, dock: 9, ascent: 9),
+        elevator: (period: 30, payload: 20000, tether: 24, descent: 7, dock: 18, sink: 4),
         // What it brings down: everything ARC's land and air factories make, and the
         // tech 4 land experimentals; nothing that floats.
         builder: (power: 0, range: 0, builds: [

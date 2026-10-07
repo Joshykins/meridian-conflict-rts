@@ -109,6 +109,7 @@ impl World {
                     h.write_u64(r.factory.0 as u64);
                     h.write_i64(r.exit.x.0);
                     h.write_i64(r.exit.y.0);
+                    h.write_u64(r.delay as u64 | (r.held as u64) << 16);
                 }
                 h.write_u64(s.batches.len() as u64 | (s.next_batch as u64) << 32);
                 for (&g, b) in &s.batches {

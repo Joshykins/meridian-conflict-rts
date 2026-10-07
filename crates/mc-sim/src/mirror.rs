@@ -36,7 +36,7 @@ mod wrecks;
 
 pub use batch::{BatchView, UNIT_BATCH};
 pub use destruct::DestructView;
-pub use elevator::{platform_load, ElevatorPhase, ElevatorView};
+pub use elevator::{crate_load, ElevatorPhase, ElevatorView};
 pub use fog::VisionDisc;
 pub use links::LinkView;
 pub use walls::{join_walls, WALL_JOINS};
@@ -446,14 +446,14 @@ pub enum SimEvent {
         pos: FxVec3,
         owner: u8,
     },
-    /// A platform has started down the cable; it docks `Elevator::descent_ticks` later.
+    /// Cargo crates have started down the cable; they land `Elevator::descent_ticks` later.
     ElevatorInbound {
         unit: UnitId,
         pos: FxVec3,
         owner: u8,
     },
-    /// A platform docked: `units` came off it, and `mass` of its payload went into the
-    /// store.
+    /// The crates landed: `units` were set down in them, and `mass` of their payload went
+    /// into the store.
     ElevatorDocked {
         unit: UnitId,
         pos: FxVec3,
@@ -461,8 +461,8 @@ pub enum SimEvent {
         units: u16,
         mass: Fx,
     },
-    /// The platform let go and is going back up.
-    ElevatorDeparting {
+    /// The empty crates start to sink into the ground.
+    ElevatorSinking {
         unit: UnitId,
         pos: FxVec3,
         owner: u8,
@@ -583,7 +583,7 @@ pub struct UnitInstance {
     /// A weapon on a turret of its own (`Weapon::mount`): its yaw off the torso last tick
     /// and this, then its pitch last tick and this (radians). A space elevator: its
     /// cable's drop last tick and this, then its clamps' grip (`elevator::pose`); its
-    /// platform's height is in `deploy`.
+    /// crates' height is in `deploy`.
     pub mount: [f32; 4],
     /// A rotary gun's barrels, turned last tick and this (radians, unwrapped between the
     /// two); then the mounted weapon's kick-back, last tick and this (1 the instant it fires).

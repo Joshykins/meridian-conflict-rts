@@ -14,30 +14,29 @@
 //!   breathing off a little steam. The jaws swinging in vent hydraulic steam at each tower,
 //!   and when they bite (`ElevatorTethered`), sparks and a white flash where each one meets
 //!   the cable, a flare, and a purge of steam off every tower.
-//! - **Each platform.** While it moves, and in the seconds before it leaves, amber beacons
-//!   turn on the three tower crowns, sweeping real light round the lot. The towers' floods
-//!   light the deck while the platform is low or docked (and at night their beams are seen
-//!   through the air). High up it is still fast, and heated: a re-entry glow under it and
-//!   a glowing wake, vapour trails off its rim, white strobes on it. Through the cloud
-//!   deck it tears wisps off the cloud and punches a hole. Over its last third it brakes:
-//!   thruster plumes off its underside ring, the guide sleeves on the cable glowing and
-//!   shedding sparks, the deck under it heated and dust driven out from under its rim.
-//!   Docking (`ElevatorDocked`): a pressure ring and dust across the lot, lock clamps
-//!   flashing shut round the rim, steam purged from the vents and the towers, and the
-//!   vents breathing steam while it stands. Leaving (`ElevatorDeparting`): the clamps let
-//!   go in steam, the thrusters roar it off the deck in a ring of dust, and it climbs away
-//!   up the cable, heating as it goes until it is a glowing point that vanishes.
+//! - **Each fall of crates.** While they move, and in the seconds before they sink, amber
+//!   beacons turn on the three tower crowns, sweeping real light round the lot. The towers'
+//!   floods light the pad while the crates are low or landed (and at night their beams are
+//!   seen through the air). High up they are still fast, and heated: a re-entry glow under
+//!   each and a glowing wake, vapour trails off their corners, white strobes on their roofs.
+//!   Through the cloud deck they tear wisps off the cloud and punch a hole. Over their last
+//!   third they brake: thruster plumes off the bells under each crate's corners, the pad
+//!   under them heated and dust driven out from under them across the lot. Landing
+//!   (`ElevatorDocked`): a pressure ring and dust across the lot, lock clamps flashing at
+//!   each crate's door posts, steam purged from the doors and the towers, and the doors
+//!   breathing steam while the crates stand. Sinking (`ElevatorSinking`): the empty crates
+//!   go down into the ground in steam and a ring of dust.
 //! - **Always.** Red obstruction lamps blink up the whole cable every `LAMP_STEP` metres,
 //!   and once the cable is clamped a slow pulse of light climbs it every `PULSE_EVERY`.
 //!
 //! Flares and glows keep a floor size in pixels, so the lamps and pulses read from far
-//! off up a 6 km cable. Close work (dust, steam, sparks, wisps) is laid only near the eye.
+//! off up a cable that runs far past the clouds. Close work (dust, steam, sparks, wisps) is laid only near the eye.
 //! A site, a wreck, a ghost or a radar blip has none of it.
 //!
 //! Budget: steady emissions share `TICK_BUDGET` puffs a tick across every elevator (a
 //! deliberate cosmetic cap: past it the rest go without for that tick, so a field of
 //! elevators cannot flush the shared puff ring). The one-shots (seating, clamps, docking,
-//! leaving) are fixed-size bursts, each a few hundred puffs at most, once in 30 s.
+//! sinking) are fixed-size bursts, each a few hundred puffs at most, once in 30 s.
 //! Presentation only; the renderer's own clock.
 
 use std::collections::BTreeMap;
@@ -94,17 +93,19 @@ const PULSE_EVERY: f32 = 5.0;
 const PULSE_SPEED: f32 = 420.0;
 /// Seconds the coupling glows after the cable seats.
 const COUPLING_COOL: f32 = 10.0;
-/// Ticks before the platform leaves that the beacons start turning.
+/// Ticks before the crates sink that the beacons start turning.
 const WARN_AHEAD: u32 = 25;
-/// Thrusters round the platform's underside ring.
-const NOZZLES: usize = 8;
-/// Height (m) over the deck at which the thrusters' wash begins to reach it.
+/// Thrusters under the crates: one at each corner of each of the three.
+const NOZZLES: usize = 12;
+/// Distance from the cable's axis to a bay's middle, along its bearing.
+const BAY_MID: f32 = geo::BAY_FROM + geo::BAY_LENGTH * 0.5;
+/// Height (m) over the pad at which the thrusters' wash begins to reach it.
 const WASH_REACH: f32 = 170.0;
-/// Platform speed (m/s) at which it starts to glow with heat, and the span over which
+/// Crate speed (m/s) at which they start to glow with heat, and the span over which
 /// that glow comes to full.
 const HEAT_FROM: f32 = 650.0;
 const HEAT_SPAN: f32 = 1100.0;
-/// Vapour trails off the platform's rim: laid above this height, at least this fast,
+/// Vapour trails off the crates: laid above this height, at least this fast,
 /// this many metres apart, hanging this long.
 const TRAIL_FLOOR: f32 = 1200.0;
 const TRAIL_SPEED: f32 = 300.0;
@@ -116,13 +117,13 @@ const TICK_BUDGET: usize = 900;
 /// What one elevator has been doing, as of the last tick it was seen.
 #[derive(Clone, Copy)]
 struct Track {
-    /// The cable's drop and the platform's height last seen (0..1).
+    /// The cable's drop and the crates' height last seen.
     drop: f32,
     car: f32,
-    /// When the cable seated (render clock), and ticks the platform has stood docked.
+    /// When the cable seated (render clock), and ticks the crates have stood landed.
     seated_at: Option<f32>,
     docked: Option<u32>,
-    /// Height (world z) the platform's vapour trails are laid to.
+    /// Height (world z) the crates' vapour trails are laid to.
     trail: Option<f32>,
     seen: f32,
 }
@@ -190,10 +191,21 @@ impl Site {
     fn axis(&self, z: f32) -> Vec3 {
         self.base + Vec3::Z * z
     }
+
+    /// A point in bay `k`'s frame: `along` its bearing from the cable's axis, `across` it
+    /// (left positive), `z` up.
+    fn bay(&self, k: usize, along: f32, across: f32, z: f32) -> Vec3 {
+        let a = EXITS[k];
+        self.base
+            + self.dir(a) * along
+            + self.dir(a + std::f32::consts::FRAC_PI_2) * across
+            + Vec3::Z * z
+    }
 }
 
 /// The elevator's pose last tick and this (`mc_sim::elevator::pose`): the cable's drop,
-/// the jaws' grip, the platform's height up the cable (0 docked, 1 at the top, over 1 away).
+/// the jaws' grip, the crates' height up the cable (1 at the top, 0 landed, below 0 open
+/// and sinking, over 1 away).
 #[derive(Clone, Copy)]
 struct Pose {
     drop: [f32; 2],
@@ -216,9 +228,9 @@ fn tip_z(drop: f32) -> f32 {
     geo::CABLE_FOOT + (1.0 - drop) * (geo::SKY_Z - geo::CABLE_FOOT)
 }
 
-/// How far the platform is raised over its docked place at height `car`.
+/// How far the crates are raised over where they land at height `car` (none once landed).
 fn car_lift(car: f32) -> f32 {
-    car * (geo::SKY_Z - geo::CAR_DOCK)
+    car.max(0.0) * (geo::SKY_Z - geo::CAR_DOCK)
 }
 
 fn smoothstep(a: f32, b: f32, x: f32) -> f32 {
@@ -315,7 +327,7 @@ impl Renderer {
             let (unit, cue): (u32, fn(&mut Renderer, &Site, f32)) = match event {
                 SimEvent::ElevatorTethered { unit, .. } => (unit.0, Renderer::elevator_clamped),
                 SimEvent::ElevatorDocked { unit, .. } => (unit.0, Renderer::elevator_docked),
-                SimEvent::ElevatorDeparting { unit, .. } => (unit.0, Renderer::elevator_leaving),
+                SimEvent::ElevatorSinking { unit, .. } => (unit.0, Renderer::elevator_sinking),
                 _ => continue,
             };
             let found = self.elevator_fx.sites.iter().find(|(id, _)| *id == unit);
@@ -397,7 +409,7 @@ impl Renderer {
         self.elevator_fx.lit.push(lit);
     }
 
-    /// The platform's tick: beacons, floods, and whatever its flight throws off.
+    /// The crates' tick: beacons, floods, and whatever their fall throws off.
     fn platform(
         &mut self,
         site: &Site,
@@ -410,15 +422,15 @@ impl Renderer {
         lit: &mut Lit,
     ) {
         let [c0, c1] = pose.car;
-        let moving = (c1 - c0).abs() > 1e-7 && c0.min(c1) < 1.0;
-        // Docked, the beacons start turning a moment before it leaves.
+        let moving = (c1 - c0).abs() > 1e-7 && c0.min(c1) < 1.0 && c0.abs().max(c1.abs()) < 2.0;
+        // Landed, the beacons start turning a moment before they sink.
         let leaving_soon = match (docked_for, self.dock_ticks(u)) {
             (Some(n), Some(dock)) => n + WARN_AHEAD >= dock,
             _ => false,
         };
         lit.beacons = moving || leaving_soon;
-        // The floods light the deck while the platform is low or docked, and at night
-        // the pad stays lit at a working level.
+        // The floods light the pad while the crates are low or landed, and at night the
+        // pad stays lit at a working level.
         let low = 1.0 - smoothstep(0.03, 0.09, c1.min(1.0));
         lit.floods = low.max(view.dark * 0.45);
         if lit.beacons {
@@ -427,18 +439,28 @@ impl Renderer {
         if lit.floods > 0.01 && near {
             self.deck_floods(site, lit.floods, time, view);
         }
-        if moving {
+        if c0.max(c1) > 0.0 {
             lit.thrust = self.platform_flight(u.unit_id, site, pose, time, near, view);
-        } else if c1 <= 0.0 && near && self.scatter.unit() < 0.35 && self.elevator_fx.spend(1) {
-            // Docked: the vents breathe a little steam while it stands.
-            let a = EXITS[(self.scatter.unit() * 3.0) as usize % 3] + self.scatter.signed() * 0.3;
-            let at = site.at(a, geo::DECK_R * 0.97, geo::DECK_Z + 1.0);
-            let vel = site.dir(a) * 4.0 + Vec3::Z * 3.0;
+        } else if c1 <= 0.0
+            && c1 > -1.0
+            && near
+            && self.scatter.unit() < 0.35
+            && self.elevator_fx.spend(1)
+        {
+            // Landed: the doors breathe a little steam while the crates stand.
+            let k = (self.scatter.unit() * 3.0) as usize % 3;
+            let at = site.bay(
+                k,
+                geo::BAY_FROM + geo::BAY_LENGTH,
+                self.scatter.signed() * geo::BAY_WIDTH * 0.4,
+                geo::DECK_Z + 1.0,
+            );
+            let vel = site.dir(EXITS[k]) * 4.0 + Vec3::Z * 3.0;
             self.push_puff(PUFF_STEAM, at, vel, time, 3.5, (3.0, 14.0));
         }
     }
 
-    /// Ticks a docked elevator's platform stands before it leaves.
+    /// Ticks an elevator's crates stand landed before they sink.
     fn dock_ticks(&self, u: &UnitInstance) -> Option<u32> {
         let bp = self.blueprints.units.get(u.blueprint as usize)?;
         Some(bp.elevator?.dock_ticks)
@@ -713,6 +735,27 @@ impl Renderer {
             );
             h += LAMP_STEP;
         }
+        // Above the sky the cable runs on far out of sight: lamps thin out up it, each
+        // a little further than the last, so its length reads from any height.
+        let mut h = geo::SKY_Z;
+        while h < geo::TOP_Z * 0.8 {
+            h *= 1.3;
+            if !self.elevator_fx.spend(1) {
+                return;
+            }
+            let at = site.axis(h) + toward;
+            let size = view.floor(at, 4.0, 4.5);
+            self.push_drive(
+                PUFF_LAMP,
+                at,
+                color,
+                time,
+                dt * 1.6,
+                (size, size),
+                Vec3::ZERO,
+                0.0,
+            );
+        }
     }
 
     /// The slow pulses of light climbing the clamped cable.
@@ -861,9 +904,9 @@ impl Renderer {
                 let car = l.pose.car[0] + (l.pose.car[1] - l.pose.car[0]) * alpha;
                 let mouth = car_lift(car.min(1.0)) + geo::CAR_UNDER_Z;
                 let reach = (mouth - 60.0).max(geo::DECK_Z);
-                for a in [0.0, std::f32::consts::PI] {
-                    let from = s.at(a, geo::THRUSTER_R, mouth - 4.0);
-                    let to = s.at(a, geo::THRUSTER_R, reach);
+                for k in 0..EXITS.len() {
+                    let from = s.bay(k, BAY_MID, 0.0, mouth - 4.0);
+                    let to = s.bay(k, BAY_MID, 0.0, reach);
                     self.lights.beam(from, to, JET * 4000.0 * l.thrust, 150.0);
                 }
             }

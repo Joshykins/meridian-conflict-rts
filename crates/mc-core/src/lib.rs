@@ -3,6 +3,7 @@
 //! Nothing in here uses floating point on a path that feeds the simulation.
 //! `to_f32`/`from_f32` exist for the renderer, UI and offline tools only.
 
+pub mod elevator_bay;
 pub mod fx;
 pub mod hash;
 pub mod perf;

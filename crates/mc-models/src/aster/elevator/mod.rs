@@ -5,21 +5,24 @@
 //! A clamp with three sides: three heavy clamp towers at 0, 120 and 240 degrees round a
 //! central receiving well, the ways out between them (60, 180 and 300 degrees) kept
 //! open, each with a marked apron to the lot edge. A cable comes down out of orbit into
-//! the well, the three jaws swing in and grip it, and a cargo platform rides down it
-//! every half minute, docks flush in the well, lets its units off and goes back up.
+//! the well, the three jaws swing in and grip it, and every half minute three cargo
+//! crates fall down it and land in the ways out, open their doors and roofs and let their
+//! units drive out, then sink into the ground. The crates only ever come down.
 //!
 //! What moves (`gpu_consts::elevator`, entity.wgsl `ELEVATOR_PART_*`):
 //! - The jaws (`part::ELEVATOR_ARM`), authored shut on the cable: each swings out
 //!   about its own tower's hinge ([`HINGE`]) while the clamps are open.
 //! - The cable (`part::ELEVATOR_CABLE`), from its coupling seated in the well up to just
 //!   over `CABLE_SPLIT`; what is above the split is drawn up into orbit.
-//! - The platform (`part::ELEVATOR_CAR`), authored docked: its deck flush with the
-//!   well's rim, its girder frame and braking thrusters sunk below ground.
+//! - The crates: a shell (`part::ELEVATOR_CRATE`: walls, frame, braking thruster bells)
+//!   authored landed, two door leaves (`part::ELEVATOR_DOOR`) shut on its outer end and
+//!   two roof halves (`part::ELEVATOR_ROOF`) shut over it. Each stands in a bay, a box
+//!   on the bearing of a way out (`BAY_*`, the same numbers the sim seats units by).
 //!
-//! Everything else stands still (`part::HULL`): the foundation, the well, the aprons
-//! and the towers. The towers keep out of the jaws' swing (the gap between a tower's
-//! cheeks, and everything over and behind its hinge out of reach), and nothing but the
-//! jaws stands inside the platform's run (`DECK_R` round the cable) above the deck.
+//! Everything else stands still (`part::HULL`): the foundation, the well, the landing
+//! pad round the cable, the aprons and the towers. The towers keep out of the jaws'
+//! swing (the gap between a tower's cheeks, and everything over and behind its hinge out
+//! of reach), and nothing stands in the bays above the pad.
 //!
 //! The towers and jaws are the `pylon` design: armoured A-frames with straight
 //! ram-driven jaws over a fortified well (picked over a knuckle-boom gantry and a
@@ -51,18 +54,17 @@ const WELL_R: f32 = DECK_R + 2.5;
 const RIM_R: f32 = WELL_R + 10.0;
 const RIM_TOP: f32 = 2.6;
 /// Half the angle each exit takes out of the rim, about its bearing.
-const EXIT_HALF: f32 = 0.42;
+const EXIT_HALF: f32 = 0.62;
 /// The aprons' half width at the well and at the lot edge, and how far out they run.
 const APRON_IN: f32 = 34.0;
 const APRON_OUT: f32 = 46.0;
 const APRON_END: f32 = 168.0;
 const APRON_TOP: f32 = 0.6;
 
-// ---- the platform -------------------------------------------------------------------
+// ---- the landing pad ----------------------------------------------------------------
 
-/// The deck plate's underside, the girder frame's foot under it.
-const DECK_FOOT: f32 = DECK_Z - 3.0;
-const FRAME_FOOT: f32 = CAR_UNDER_Z + 3.4;
+/// The landing pad plate's underside.
+const DECK_FOOT: f32 = SLAB_TOP - 0.1;
 /// The guide sleeve round the cable: bore, outer radius, top and foot.
 const SLEEVE_IN: f32 = 14.5;
 const SLEEVE_OUT: f32 = 19.5;
@@ -102,11 +104,12 @@ fn build(b: &mut MeshBuilder, tower: fn(&mut MeshBuilder), jaw: fn(&mut MeshBuil
         b.with_part(part::ELEVATOR_ARM, jaw);
     });
     cable(b);
-    platform(b);
+    landing_pad(b);
+    crates(b);
 }
 
-/// Far off: the slab, three tower blocks, three jaws as spikes, the cable and the deck,
-/// and the owner's colour on a crown. Under 60 triangles.
+/// Far off: the slab, three tower blocks, three jaws as spikes, the cable and the
+/// crates, and the owner's colour on a crown. Under 60 triangles.
 fn coarse(b: &mut MeshBuilder) {
     b.paint(PLATING_DARK);
     b.decal(v3(0.0, 0.0, SLAB_TOP), v2(2.0 * SLAB, 2.0 * SLAB));
@@ -132,7 +135,7 @@ fn coarse(b: &mut MeshBuilder) {
                 v3(HINGE_R + 6.0, 10.0, HINGE_Z),
                 v3(HINGE_R - 10.0, 0.0, HINGE_Z + 8.0),
             ];
-            b.loft(&[root, vec![v3(CABLE_R, 0.0, GRIP_Z); 3]], true, false);
+            b.loft(&[root, vec![v3(CABLE_R, 0.0, GRIP_Z); 3]], false, false);
         });
     });
     b.paint(TEAM);
@@ -142,15 +145,17 @@ fn coarse(b: &mut MeshBuilder) {
         let ring = |z: f32| disc(3, CABLE_R, z);
         b.loft(&[ring(CABLE_FOOT), ring(CABLE_TOP)], false, false);
     });
-    b.with_part(part::ELEVATOR_CAR, |b| {
-        b.paint(PLATING_DARK);
-        b.frustum_open(
-            v3(0.0, 0.0, CAR_UNDER_Z),
-            v2(1.0 * DECK_R, 1.0 * DECK_R),
-            v2(1.4 * DECK_R, 1.4 * DECK_R),
-            DECK_Z - CAR_UNDER_Z,
-            Vec2::ZERO,
-        );
+    b.yawed(Vec3::ZERO, BAY_BEARING_DEG.to_radians(), |b| {
+        b.radial(3, |b| {
+            b.with_part(part::ELEVATOR_CRATE, |b| {
+                b.paint(PLATING_DARK);
+                let (x0, x1, hw) = (BAY_FROM, BAY_FROM + BAY_LENGTH, BAY_WIDTH / 2.0);
+                // A wedge standing for the box: three corners, a flat top.
+                let foot = [v3(x0, -hw, 0.3), v3(x1, 0.0, 0.3), v3(x0, hw, 0.3)];
+                let top = foot.map(|p| v3(p.x, p.y, BAY_HEIGHT));
+                b.loft(&[foot.to_vec(), top.to_vec()], false, false);
+            });
+        });
     });
 }
 
@@ -391,21 +396,18 @@ fn cable(b: &mut MeshBuilder) {
 
 // ---- the platform -----------------------------------------------------------------
 
-/// The platform (`part::ELEVATOR_CAR`), docked: a heavy armoured deck with a hazard
-/// edge, the guide sleeve round the cable, the girder frame under the deck, the ring
-/// of braking thrusters under that, latches and lamps round the edge.
-fn platform(b: &mut MeshBuilder) {
-    b.with_part(part::ELEVATOR_CAR, |b| {
-        deck(b);
-        sleeve(b);
-        under_frame(b);
-    });
+/// The landing pad (`part::HULL`): a heavy armoured plate round the cable's guide sleeve
+/// with a hazard edge, flush with the well's rim, and the owner's colour and lane lines
+/// on it. The crates land over it.
+fn landing_pad(b: &mut MeshBuilder) {
+    deck(b);
+    sleeve(b);
 }
 
 fn deck(b: &mut MeshBuilder) {
     let fine = b.fine();
     let sides = b.sides(24);
-    // The deck plate: a ring round the sleeve, its edge armoured down to the frame.
+    // The deck plate: a ring round the sleeve.
     b.paint(ACCENT).pattern(pattern::DECK);
     annulus(
         b,
@@ -428,15 +430,7 @@ fn deck(b: &mut MeshBuilder) {
         0.0,
         TAU,
     );
-    b.paint(PLATING);
-    let edge = [
-        (DECK_R, DECK_FOOT),
-        (DECK_R - 6.0, FRAME_FOOT),
-        (DECK_R - 14.0, FRAME_FOOT),
-        (DECK_R - 3.0, DECK_FOOT),
-    ];
-    sweep_ring(b, sides, &edge);
-    // The owner's colour in three bands across the deck, between the ways out.
+    // The owner's colour in three bands across the deck, by the towers.
     b.radial(3, |b| {
         b.paint(TEAM).pattern(pattern::PLAIN);
         b.decal(v3(38.0, 0.0, DECK_Z + 0.03), v2(10.0, 22.0));
@@ -454,8 +448,7 @@ fn deck(b: &mut MeshBuilder) {
     if !fine {
         return;
     }
-    // Flush edge lamps round the rim: the deck is driven on from 30 m out, so nothing
-    // stands on it there.
+    // Flush edge lamps round the rim.
     b.radial(12, |b| {
         b.paint(GLOW_AMBER);
         b.decal(v3(DECK_R - 1.6, 0.0, DECK_Z + 0.08), v2(1.2, 3.0));
@@ -472,8 +465,8 @@ fn sleeve(b: &mut MeshBuilder) {
         b,
         sides,
         &[
-            (SLEEVE_IN, FRAME_FOOT),
-            (SLEEVE_OUT + 4.0, FRAME_FOOT),
+            (SLEEVE_IN, DECK_FOOT),
+            (SLEEVE_OUT + 4.0, DECK_FOOT),
             (SLEEVE_OUT + 4.0, DECK_Z + 3.0),
             (SLEEVE_OUT, DECK_Z + 8.0),
             (SLEEVE_OUT, SLEEVE_TOP - 3.0),
@@ -533,63 +526,152 @@ fn sleeve(b: &mut MeshBuilder) {
     });
 }
 
-/// Under the deck: radial girders and a ring girder, diagonal bracing, and the braking
-/// thrusters on a ring of `THRUSTER_R`, their bells opening at `CAR_UNDER_Z`.
-fn under_frame(b: &mut MeshBuilder) {
-    let fine = b.fine();
-    let spokes = if fine { 12 } else { 6 };
-    b.radial(spokes, |b| {
-        b.paint(ACCENT);
-        b.block(
-            v3(SLEEVE_OUT + 3.0, -1.4, FRAME_FOOT),
-            v3(DECK_R - 8.0, 1.4, DECK_FOOT),
-        );
+// ---- the crates -------------------------------------------------------------------
+
+/// A crate's frame: x out along its bay's bearing, y to the left, z up from the foot.
+const WALL_FOOT: f32 = 0.3;
+/// The door leaves' and roof halves' thickness.
+const LEAF: f32 = 3.0;
+const ROOF_T: f32 = 2.5;
+/// A crate's ribs: how far they stand off the walls, and their pitch.
+const RIB: f32 = 2.0;
+const RIB_PITCH: f32 = 20.0;
+
+/// The three cargo crates, one in each way out, landed: each its own shell, door leaves
+/// and roof halves (the shader swings and sinks them by the crates' height, see
+/// `gpu_consts::elevator`).
+fn crates(b: &mut MeshBuilder) {
+    b.yawed(Vec3::ZERO, BAY_BEARING_DEG.to_radians(), |b| {
+        b.radial(3, |b| {
+            b.with_part(part::ELEVATOR_CRATE, shell);
+            b.with_part(part::ELEVATOR_DOOR, doors);
+            b.with_part(part::ELEVATOR_ROOF, roof);
+        });
     });
-    let sides = b.sides(24);
-    b.paint(PLATING_DARK);
-    annulus(
-        b,
-        sides,
-        THRUSTER_R - 4.0,
-        THRUSTER_R + 4.0,
-        FRAME_FOOT,
-        FRAME_FOOT + 2.0,
-        0.0,
-        TAU,
-    );
-    b.paint(ACCENT);
-    annulus(b, sides, 28.0, 31.0, FRAME_FOOT, DECK_FOOT, 0.0, TAU);
+}
+
+/// The bay's outer end (where the doors are) and half its width.
+fn bay_end() -> f32 {
+    BAY_FROM + BAY_LENGTH
+}
+
+/// The shell: an end wall at the cable side, two side walls with ribs and belts, door
+/// posts, a hazard sill, and a braking thruster bell under each corner.
+fn shell(b: &mut MeshBuilder) {
+    let fine = b.fine();
+    let (x0, x1) = (BAY_FROM, bay_end());
+    let (hw, t, top) = (BAY_WIDTH / 2.0, BAY_WALL, BAY_HEIGHT - ROOF_T);
+    b.paint(PLATING);
+    b.block(v3(x0, -hw, WALL_FOOT), v3(x0 + t, hw, top));
+    b.mirror_y(|b| {
+        b.paint(PLATING);
+        b.block(v3(x0, hw - t, WALL_FOOT), v3(x1, hw, top));
+        // Belts round the wall, a dark foot rail and a hazard-marked sill.
+        b.paint(ACCENT).pattern(pattern::PLAIN);
+        for z in [22.0f32, 46.0] {
+            b.block(v3(x0, hw, z), v3(x1, hw + 1.0, z + 3.0));
+        }
+        b.paint(PLATING_DARK);
+        b.block(v3(x0, hw, WALL_FOOT), v3(x1, hw + 2.5, WALL_FOOT + 5.0));
+        b.block(v3(x0, hw, top - 4.0), v3(x1, hw + 2.5, top));
+        // Door post: a heavy dark column the leaf hangs from.
+        b.block(
+            v3(x1 - 7.0, hw - 4.0, WALL_FOOT),
+            v3(x1 + 1.5, hw + 3.0, top),
+        );
+        if fine {
+            // Vertical ribs between the belts.
+            b.paint(PLATING_DARK);
+            let mut x = x0 + RIB_PITCH * 0.5;
+            while x < x1 - 12.0 {
+                b.block(v3(x, hw, WALL_FOOT + 5.0), v3(x + 4.0, hw + RIB, top - 4.0));
+                x += RIB_PITCH;
+            }
+        }
+    });
+    // The inner end wall's ribs and a cargo-number block on it.
+    if fine {
+        b.paint(PLATING_DARK);
+        let mut y = -hw + 12.0;
+        while y < hw - 8.0 {
+            b.block(v3(x0 - RIB, y, WALL_FOOT + 5.0), v3(x0, y + 4.0, top - 4.0));
+            y += RIB_PITCH;
+        }
+    }
+    // The braking thrusters under the corners: a housing in the wall's foot, a bell
+    // opening down at `CAR_UNDER_Z`.
     let bells = b.sides(12);
-    b.yawed(Vec3::ZERO, TAU / 24.0, |b| {
-        b.radial(12, |b| {
-            let at = v3(THRUSTER_R, 0.0, FRAME_FOOT);
+    for x in [x0 + THRUSTER_INSET, x1 - THRUSTER_INSET] {
+        b.mirror_y(|b| {
+            let y = hw - THRUSTER_INSET;
             b.paint(PLATING);
-            b.chamfered_box(at + v3(0.0, 0.0, -0.6), v3(7.0, 7.0, 2.6), 1.6);
+            b.chamfered_box(v3(x, y, 3.0), v3(12.0, 12.0, 8.0), 2.0);
             b.paint(METAL).pattern(pattern::PLAIN);
-            b.prism(
-                v3(at.x, 0.0, CAR_UNDER_Z),
-                bells,
-                2.9,
-                1.7,
-                at.z - 1.9 - CAR_UNDER_Z,
-            );
+            b.prism(v3(x, y, CAR_UNDER_Z), bells, 5.2, 3.2, 3.0 - CAR_UNDER_Z);
             if fine {
                 b.paint(ACCENT).pattern(pattern::PLAIN);
-                b.prism(v3(at.x, 0.0, CAR_UNDER_Z + 0.01), bells, 2.2, 2.2, 0.05);
+                b.prism(v3(x, y, CAR_UNDER_Z + 0.01), bells, 4.0, 4.0, 0.05);
             }
         });
-    });
-    if fine {
-        b.radial(12, |b| {
-            b.paint(ACCENT);
-            b.beam(
-                v3(SLEEVE_OUT + 5.0, 0.0, DECK_FOOT - 0.2),
-                v3(THRUSTER_R - 4.0, 4.0, FRAME_FOOT + 1.0),
-                v2(1.0, 1.0),
-                v2(1.0, 1.0),
-            );
-        });
     }
+}
+
+/// The door leaves, shut across the outer end: two heavy plates hung from the posts,
+/// meeting in the middle, braced across their outer faces, hazard bands at the foot.
+fn doors(b: &mut MeshBuilder) {
+    let fine = b.fine();
+    let x1 = bay_end();
+    let (hw, top) = (BAY_WIDTH / 2.0, BAY_HEIGHT - ROOF_T);
+    b.mirror_y(|b| {
+        b.paint(PLATING);
+        b.block(v3(x1 - LEAF, 1.0, WALL_FOOT), v3(x1, hw - 3.0, top));
+        b.paint(PLATING).pattern(pattern::HAZARD);
+        b.block(
+            v3(x1 - LEAF - 0.1, 1.0, WALL_FOOT),
+            v3(x1 + 0.1, hw - 3.0, WALL_FOOT + 6.0),
+        );
+        b.paint(ACCENT).pattern(pattern::PLAIN);
+        for z in [22.0f32, 46.0] {
+            b.block(v3(x1, 1.0, z), v3(x1 + 1.0, hw - 3.0, z + 3.0));
+        }
+        if fine {
+            b.paint(PLATING_DARK);
+            for y in [10.0f32, 24.0] {
+                b.block(v3(x1, y, WALL_FOOT + 6.0), v3(x1 + RIB, y + 4.0, top - 4.0));
+            }
+            // The lock bars where the leaves meet.
+            b.paint(METAL).pattern(pattern::PLAIN);
+            for z in [14.0f32, 36.0, 58.0] {
+                b.block(v3(x1 + 0.2, 0.0, z), v3(x1 + 1.6, 6.0, z + 2.0));
+            }
+        }
+    });
+}
+
+/// The roof halves, shut: a plate over each side, hinged at the side wall's top, the
+/// owner's colour on each, ribs across.
+fn roof(b: &mut MeshBuilder) {
+    let fine = b.fine();
+    let (x0, x1) = (BAY_FROM, bay_end());
+    let hw = BAY_WIDTH / 2.0;
+    let z = BAY_HEIGHT - ROOF_T;
+    b.mirror_y(|b| {
+        b.paint(PLATING);
+        b.block(v3(x0, 0.4, z), v3(x1, hw, BAY_HEIGHT));
+        b.paint(TEAM).pattern(pattern::PLAIN);
+        b.decal(
+            v3((x0 + x1) * 0.5, hw * 0.5, BAY_HEIGHT + 0.04),
+            v2(34.0, 22.0),
+        );
+        if fine {
+            b.paint(PLATING_DARK);
+            let mut x = x0 + 8.0;
+            while x < x1 - 8.0 {
+                b.block(v3(x, 0.4, BAY_HEIGHT), v3(x + 3.0, hw, BAY_HEIGHT + 1.2));
+                x += RIB_PITCH * 1.5;
+            }
+        }
+    });
 }
 
 // ---- kit --------------------------------------------------------------------------

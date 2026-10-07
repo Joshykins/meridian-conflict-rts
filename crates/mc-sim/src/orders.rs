@@ -63,6 +63,12 @@ pub(crate) struct FormationLayout {
 pub struct Rollout {
     pub factory: UnitId,
     pub exit: FxVec2,
+    /// Ticks it still waits before it starts out (a space elevator's crates: the doors
+    /// open first, and each row of the crate takes its turn).
+    pub delay: u16,
+    /// Cleared of the bay it stays where it stopped, to leave with its group
+    /// (`elevator::Squad`), instead of taking the factory's orders on its own.
+    pub held: bool,
 }
 
 fn leg_heading(from: FxVec2, to: FxVec2, fallback: Angle) -> Angle {
@@ -2968,7 +2974,15 @@ impl World {
         }
         // It drives itself off the pad (`run_rollouts`); the factory is free
         // for the next as soon as it is clear.
-        self.state.rollouts.insert(id, Rollout { factory, exit });
+        self.state.rollouts.insert(
+            id,
+            Rollout {
+                factory,
+                exit,
+                delay: 0,
+                held: false,
+            },
+        );
         self.release_product(row, o)
     }
 
@@ -3001,12 +3015,21 @@ impl World {
                 self.state.rollouts.remove(&id);
                 continue;
             };
+            if r.delay > 0 {
+                if let Some(wait) = self.state.rollouts.get_mut(&id) {
+                    wait.delay -= 1;
+                }
+                continue;
+            }
             let motion = self.bp(t).motion;
             if !self.roll_out_of_factory(t, r.exit, motion) {
                 continue;
             }
             self.state.rollouts.remove(&id);
             self.state.units.flags[t] &= !flag::IN_FACTORY;
+            if r.held {
+                continue;
+            }
             // A factory lost meanwhile gives no orders: the hull waits where it stopped.
             if let Some(row) = self.state.units.row(r.factory) {
                 self.send_off(row, t, r.exit)?;
@@ -3112,7 +3135,7 @@ impl World {
         false
     }
 
-    fn ground_z(&self, row: usize, pos: FxVec2) -> Fx {
+    pub(crate) fn ground_z(&self, row: usize, pos: FxVec2) -> Fx {
         // A submarine rides as far under as its dive has taken it.
         if let Some(z) = self.dive_z(row, pos) {
             return z;

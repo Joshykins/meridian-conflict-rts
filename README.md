@@ -251,7 +251,7 @@ or an engineer (building is free on the range unless FREE BUILD is switched off)
 | STAGE: UNDER FIRE | two hostiles spawn inside their weapon range and open fire on the pad. Switch CANNOT DIE on first to watch it take hits for as long as you like |
 | STAGE: TARGETS | dummies at short, medium and long range of the subject's first weapon |
 | STAGE: BUILD IT | whatever builds the subject (a factory, or an engineer for a structure) appears and builds it |
-| STAGE: ELEVATOR | a space elevator subject has a mixed batch queued (its heaviest tanks, gunships and tech-4 machines): its cable comes down, and its first platform lands them and they roll off east. `--range --unit aster_t5_space_elevator --scenario elevator --ticks 360` |
+| STAGE: ELEVATOR | a space elevator subject has a mixed batch queued (its heaviest tanks, gunships and tech-4 machines): its cable comes down, and its first crates land with them and they drive out of the doors in groups. `--range --unit aster_t5_space_elevator --scenario elevator --ticks 360` |
 | RESET (F5) | clears units, wrecks, shots and scorch marks and puts the subject back on the pad |
 | COMMANDING: BLUE / RED | which side your orders go to. Selecting a unit of the other side switches too, so red units can be told to attack like any of yours |
 | CLOSE / MID / FAR (F2 / F3 / F4) | the three zoom levels everything has to read at |

@@ -1871,17 +1871,14 @@ fn vs_main(in: VsIn) -> VsOut {
         let half = (model.pit.y - 0.4) * 0.70710678;
         let travel = select(half * 0.5, half, abs(p.y) < half * 0.5);
         p.y += sign(p.y) * open * travel;
-    } else if in.part == ELEVATOR_PART_ARM || in.part == ELEVATOR_PART_CABLE || in.part == ELEVATOR_PART_CAR {
+    } else if in.part == ELEVATOR_PART_ARM || in.part == ELEVATOR_PART_CABLE || in.part == ELEVATOR_PART_CRATE
+        || in.part == ELEVATOR_PART_DOOR || in.part == ELEVATOR_PART_ROOF {
         // A space elevator (`gpu_consts::elevator`, `mc_sim::elevator::pose`). A site, a
-        // ghost or a wreck: clamps open, no cable, no platform.
+        // ghost or a wreck: clamps open, no cable, no crates.
         let live = (e.owner_flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u;
         let drop = select(0.0, mix(e.mount.x, e.mount.y, t), live);
         let car = select(2.0, mix(e.prev_deploy, e.deploy, t), live);
-        // The jaws hold the cable over the platform's path: they swing clear while it
-        // passes them, shut on the cable again once it is docked under them or gone above.
-        let car_z = car * (ELEVATOR_SKY_Z - ELEVATOR_CAR_DOCK);
-        let passing = select(0.0, smoothstep(900.0, 320.0, car_z) * smoothstep(5.0, 70.0, car_z), car < 1.0);
-        let grip = select(0.0, mix(e.mount.z, e.mount.w, t), live) * (1.0 - passing);
+        let grip = select(0.0, mix(e.mount.z, e.mount.w, t), live);
         if in.part == ELEVATOR_PART_ARM {
             // Each jaw swings out about its own tower's hinge, tangent to the well.
             let third = 2.0943951;
@@ -1903,20 +1900,69 @@ fn vs_main(in: VsIn) -> VsOut {
                 hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
                 return hidden;
             }
-            // The top of the authored cable reaches up into orbit; all of it hangs that
-            // much higher while it is still being let down.
+            // The top of the authored cable reaches up to far above any camera; all the
+            // rest of it hangs that much higher while it is still being let down.
             if p.z > ELEVATOR_CABLE_SPLIT {
-                p.z = ELEVATOR_SKY_Z;
+                p.z = ELEVATOR_TOP_Z;
+            } else {
+                p.z = p.z + (1.0 - drop) * (ELEVATOR_SKY_Z - ELEVATOR_CABLE_FOOT);
             }
-            p.z = min(p.z + (1.0 - drop) * (ELEVATOR_SKY_Z - ELEVATOR_CABLE_FOOT), ELEVATOR_SKY_Z);
         } else {
-            // The platform runs only on a seated cable, and is gone while it is away.
-            if car >= 1.0 || drop < 0.999 {
+            // The crates fall only on a seated cable, are gone while away (and the tick
+            // they come back from it), and are never drawn up again.
+            let away = car >= 1.0 || abs(e.deploy - e.prev_deploy) > 1.2;
+            if away || drop < 0.999 {
                 var hidden: VsOut;
                 hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
                 return hidden;
             }
-            p.z += car * (ELEVATOR_SKY_Z - ELEVATOR_CAR_DOCK);
+            // Which bay (they stand a third of a turn apart, the first a sixth off the
+            // first tower), and its frame: x out along it, y to the left.
+            let third = 2.0943951;
+            let sixth = radians(ELEVATOR_BAY_BEARING_DEG);
+            let k = round((atan2(p.y, p.x) - sixth) / third);
+            let dir = vec2<f32>(cos(sixth + k * third), sin(sixth + k * third));
+            let side = vec2<f32>(-dir.y, dir.x);
+            var lx = dot(p.xy, dir);
+            var ly = dot(p.xy, side);
+            var lz = p.z;
+            var nx = dot(n.xy, dir);
+            var ny = dot(n.xy, side);
+            var nz = n.z;
+            let open = clamp(-car / ELEVATOR_DOORS_OPEN, 0.0, 1.0);
+            if in.part == ELEVATOR_PART_DOOR {
+                // A leaf swings out about its outer post, the left one turning one way and
+                // the right the other.
+                let sgn = select(-1.0, 1.0, ly > 0.0);
+                let a = sgn * ELEVATOR_DOOR_SWING * smoothstep(0.0, 1.0, open);
+                let c = cos(a);
+                let s = sin(a);
+                let rx = lx - (ELEVATOR_BAY_FROM + ELEVATOR_BAY_LENGTH);
+                let ry = ly - sgn * ELEVATOR_BAY_WIDTH * 0.5;
+                lx = ELEVATOR_BAY_FROM + ELEVATOR_BAY_LENGTH + rx * c - ry * s;
+                ly = sgn * ELEVATOR_BAY_WIDTH * 0.5 + rx * s + ry * c;
+                let tx = nx * c - ny * s;
+                ny = nx * s + ny * c;
+                nx = tx;
+            } else if in.part == ELEVATOR_PART_ROOF {
+                // A half lifts about the top of its side wall, like a clamshell.
+                let sgn = select(-1.0, 1.0, ly > 0.0);
+                let a = -sgn * ELEVATOR_ROOF_SWING * smoothstep(0.0, 1.0, open);
+                let c = cos(a);
+                let s = sin(a);
+                let ry = ly - sgn * ELEVATOR_BAY_WIDTH * 0.5;
+                let rz = lz - ELEVATOR_BAY_HEIGHT;
+                ly = sgn * ELEVATOR_BAY_WIDTH * 0.5 + ry * c - rz * s;
+                lz = ELEVATOR_BAY_HEIGHT + ry * s + rz * c;
+                let ty = ny * c - nz * s;
+                nz = ny * s + nz * c;
+                ny = ty;
+            }
+            // Falling: raised up the cable. Landed and opened, sinking: down into the ground.
+            lz = lz + max(car, 0.0) * (ELEVATOR_SKY_Z - ELEVATOR_CAR_DOCK)
+                - clamp((-car - ELEVATOR_DOORS_OPEN) / (1.0 - ELEVATOR_DOORS_OPEN), 0.0, 1.0) * ELEVATOR_SINK_DEPTH;
+            p = vec3<f32>(dir * lx + side * ly, lz);
+            n = vec3<f32>(dir * nx + side * ny, nz);
         }
     } else {
         rest = true;

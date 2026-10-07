@@ -801,11 +801,12 @@ impl Hud {
                         x += pw + GAP;
                     }
                 }
-                // A space elevator's platform and next payload, beside its build menu
-                // (`elevator.rs`).
+                // A space elevator's crates and next payload, beside its build menu
+                // (`elevator.rs`): the menu keeps its room first, so on a narrow screen the
+                // panel shrinks, and then goes.
                 if let Some((lift, v, count)) = elevator::elevator_of(s, &units) {
-                    let pw = elevator::WIDTH.min(w - EDGE - x);
-                    if pw > 220.0 {
+                    let pw = elevator::width_for(w - EDGE - x);
+                    if pw > 0.0 {
                         let r = Rect::new(x, deck_y, pw, DECK_H);
                         elevator::panel(self, ui, s, lift, &v, count, r);
                         x += pw + GAP;

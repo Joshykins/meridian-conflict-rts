@@ -1,16 +1,18 @@
 //! A space elevator (the Skyhook) in the HUD (`mc_sim::elevator`, `docs/ELEVATOR.md`).
 //!
 //! - Its panel, right of the order card, beside its build menu: its tier, where the
-//!   platform's cycle stands, and how much of the next platform's payload the queue
-//!   fills, the rest coming down as materials (`ElevatorView`, `UnitOrders::elevator`).
-//! - The queue strip over the build menu counts down to the next platform instead of a
+//!   crates' cycle stands, and how much of the next fall's payload the queue fills, the
+//!   rest coming down as materials (`ElevatorView`, `UnitOrders::elevator`). The build menu
+//!   keeps its room first: on a narrow screen the panel shrinks to a compact one, and
+//!   then gives way (`width_for`), the queue strip over the menu saying the same.
+//! - The queue strip over the build menu counts down to the next crates instead of a
 //!   build's progress (`strip`): nothing on an elevator's queue is ever built.
 //! - Calls: an enemy elevator sighted or its lot spotted, ours online once its cable is
 //!   clamped, each with its own sound (`data/sounds/elevator_alerts.ron`) and a card that
-//!   stays up a while; a platform docking is a quiet note.
+//!   stays up a while; the crates landing is a quiet note.
 
 use super::notices::{Glyph, Live};
-use super::{Hud, Scene, MASS};
+use super::{Hud, Scene, GAP, MASS};
 use crate::titan_marks::SIGHTED_CARD_SECONDS;
 use crate::ui::{ink, palette, rgb, type_scale, Rect, Ui};
 use glam::Vec2;
@@ -19,8 +21,25 @@ use mc_sim::tables::{flag, OrderKind};
 use mc_sim::SimEvent;
 use std::collections::HashMap;
 
-/// Width of the elevator panel, right of the order card.
+/// Width of the elevator panel, right of the order card, and of its compact form.
 pub const WIDTH: f32 = 318.0;
+const COMPACT: f32 = 190.0;
+/// The room the build menu keeps before the panel gives way: about four cards and the
+/// queue strip over them.
+const MENU_MIN: f32 = 380.0;
+
+/// The width the panel takes of the `room` left of the order card, or none (0): the
+/// build menu keeps `MENU_MIN` of it, and the panel shrinks to its compact form before
+/// it goes.
+pub fn width_for(room: f32) -> f32 {
+    if room - WIDTH - GAP >= MENU_MIN {
+        WIDTH
+    } else if room - COMPACT - GAP >= MENU_MIN {
+        COMPACT
+    } else {
+        0.0
+    }
+}
 /// A space elevator's own mark: the pale sky-cyan of its cable.
 pub const CABLE: u32 = 0x8FE3FF;
 
@@ -198,13 +217,13 @@ pub fn alerts(hud: &mut Hud, ui: &mut Ui, s: &Scene, dt: f32) {
             ),
             (_, 1) => (
                 format!("{name} online"),
-                "Cable clamped  \u{b7}  platforms bring the queue down free".to_owned(),
+                "Cable clamped  \u{b7}  crates bring the queue down free".to_owned(),
                 CABLE,
                 false,
             ),
             _ => (
                 format!("{n} space elevators online"),
-                "Cables clamped  \u{b7}  platforms bring their queues down free".to_owned(),
+                "Cables clamped  \u{b7}  crates bring their queues down free".to_owned(),
                 CABLE,
                 false,
             ),
@@ -235,14 +254,14 @@ pub fn alerts(hud: &mut Hud, ui: &mut Ui, s: &Scene, dt: f32) {
     }
 }
 
-/// A platform's docking note: what came off it.
+/// The crates' landing note: what came off them.
 fn docked_title(units: u16, mass: f32) -> String {
     let what = match units {
         0 => "no units".to_owned(),
         1 => "1 unit".to_owned(),
         n => format!("{n} units"),
     };
-    format!("Platform docked: {what}, {} materials", super::whole(mass))
+    format!("Crates landed: {what}, {} materials", super::whole(mass))
 }
 
 /// The first of our own finished elevators among the selection, its view, and how many
@@ -264,29 +283,29 @@ pub(super) fn phase_line(v: &ElevatorView) -> (String, u32) {
     let secs = |t: f32| format!("{:.0} s", t.ceil().max(0.0));
     match v.phase {
         ElevatorPhase::Tethering => (format!("Lowering cable  {}", secs(v.left)), palette::WARN),
-        ElevatorPhase::Inbound => (format!("Platform inbound  {}", secs(v.left)), CABLE),
-        ElevatorPhase::Docked => ("Docked \u{2014} unloading".to_owned(), 0xFFFFFF),
-        ElevatorPhase::Ascending => ("Platform ascending".to_owned(), palette::TEXT),
+        ElevatorPhase::Inbound => (format!("Crates inbound  {}", secs(v.left)), CABLE),
+        ElevatorPhase::Docked => ("Landed \u{2014} unloading".to_owned(), 0xFFFFFF),
+        ElevatorPhase::Sinking => ("Crates sinking".to_owned(), palette::TEXT),
         ElevatorPhase::Away => (
-            format!("Next platform in {}", secs(v.to_touchdown)),
+            format!("Next crates in {}", secs(v.to_touchdown)),
             palette::TEXT,
         ),
     }
 }
 
 /// The queue strip's head for an elevator: what it is doing, how far along the wait for
-/// the next platform is, and the seconds to it (in place of a build's progress and time).
+/// the next crates is, and the seconds to it (in place of a build's progress and time).
 pub(super) fn strip(v: &ElevatorView) -> (&'static str, f32, f32) {
     let doing = match v.phase {
         ElevatorPhase::Tethering => "Lowering Cable",
-        ElevatorPhase::Inbound => "Platform Inbound",
-        ElevatorPhase::Docked => "Platform Docked",
-        ElevatorPhase::Ascending | ElevatorPhase::Away => "Next Platform",
+        ElevatorPhase::Inbound => "Crates Inbound",
+        ElevatorPhase::Docked => "Crates Landed",
+        ElevatorPhase::Sinking | ElevatorPhase::Away => "Next Crates",
     };
     (doing, v.approach, v.to_touchdown)
 }
 
-/// The mass of each unit riding the next platform, in order: the front of the queue, as
+/// The mass of each unit riding the next crates, in order: the front of the queue, as
 /// many as the view says ride.
 fn riders(s: &Scene, u: &UnitInstance, v: &ElevatorView) -> Vec<f32> {
     s.queue_of(u)
@@ -298,7 +317,8 @@ fn riders(s: &Scene, u: &UnitInstance, v: &ElevatorView) -> Vec<f32> {
         .collect()
 }
 
-/// An elevator's panel over `r`: its tier, the platform's cycle, and the next payload.
+/// An elevator's panel over `r`: its tier, the crates' cycle, and the next payload; in
+/// its compact form (`r` narrower than `WIDTH`) only the cycle and what rides.
 pub fn panel(
     hud: &mut Hud,
     ui: &mut Ui,
@@ -313,35 +333,45 @@ pub fn panel(
     let t = ui.time;
     let (x, cw) = (r.x + 16.0, r.w - 32.0);
     let mut y = r.y + 22.0;
+    let compact = r.w < WIDTH - 40.0;
 
     // Header: its name, the tier-5 plate, and how many are picked.
     ui.text(x, y, type_scale::ITEM, rgb(palette::TEXT, 1.0), &bp.name);
-    let nx = x + ui.text_width(type_scale::ITEM, &bp.name) + 10.0;
-    let tier = format!("Tier {}", bp.tech);
-    let tw = ui.text_width(type_scale::MICRO, &tier) + 16.0;
-    let plate = Rect::new(nx, y - 10.0, tw, 17.0);
-    ui.fill(plate, rgb(CABLE, 0.92));
-    ui.brackets(plate.inset(-3.0), 4.0, rgb(CABLE, 0.7));
-    ui.text_centred(
-        plate.x + plate.w * 0.5,
-        plate.mid_y(),
-        type_scale::MICRO,
-        ink(1.0),
-        &tier,
-    );
-    let right = if count > 1 {
-        format!("{count} picked")
-    } else {
-        bp.role.clone()
-    };
-    ui.text_right(x + cw, y, type_scale::MICRO, rgb(palette::DIM, 1.0), &right);
-    y += 24.0;
+    if compact {
+        y += 24.0;
+    }
+    if !compact {
+        let nx = x + ui.text_width(type_scale::ITEM, &bp.name) + 10.0;
+        let tier = format!("Tier {}", bp.tech);
+        let tw = ui.text_width(type_scale::MICRO, &tier) + 16.0;
+        let plate = Rect::new(nx, y - 10.0, tw, 17.0);
+        ui.fill(plate, rgb(CABLE, 0.92));
+        ui.brackets(plate.inset(-3.0), 4.0, rgb(CABLE, 0.7));
+        ui.text_centred(
+            plate.x + plate.w * 0.5,
+            plate.mid_y(),
+            type_scale::MICRO,
+            ink(1.0),
+            &tier,
+        );
+        let right = if count > 1 {
+            format!("{count} picked")
+        } else {
+            bp.role.clone()
+        };
+        ui.text_right(x + cw, y, type_scale::MICRO, rgb(palette::DIM, 1.0), &right);
+        y += 24.0;
+    }
 
-    // The cycle: what the platform is doing, and a bar of the whole period split into its
+    // The cycle: what the crates are doing, and a bar of the whole period split into its
     // descent, dock, ascent and time away, filled to where it stands.
     let (label, tone) = phase_line(v);
-    ui.text(x, y, type_scale::MICRO, rgb(palette::DIM, 1.0), "Platform");
-    ui.text_right(x + cw, y, type_scale::VALUE, rgb(tone, 1.0), &label);
+    if compact {
+        ui.text_fit_left(x, y, cw, type_scale::MICRO, rgb(tone, 1.0), &label);
+    } else {
+        ui.text(x, y, type_scale::MICRO, rgb(palette::DIM, 1.0), "Crates");
+        ui.text_right(x + cw, y, type_scale::VALUE, rgb(tone, 1.0), &label);
+    }
     y += 10.0;
     let bar = Rect::new(x, y, cw, 10.0);
     ui.fill_cut(bar, 3.0, ink(0.6));
@@ -352,7 +382,7 @@ pub fn panel(
         let fill = Rect::new(inner.x, inner.y, inner.w * v.cycle, inner.h);
         ui.gradient_h(fill, rgb(palette::WARN, 0.45), rgb(palette::WARN, 0.95));
     } else {
-        // The trip's spans, faint, so the fill reads against where the platform will be.
+        // The trip's spans, faint, so the fill reads against where the crates will be.
         let period = v.period.max(0.1);
         let [down, dock, up] = v.trip.map(|s| s / period);
         ui.fill(
@@ -380,7 +410,7 @@ pub fn panel(
             0.0
         };
         ui.fill(fill, rgb(0xFFFFFF, shimmer.max(0.0)));
-        // Touchdown and lift-off ticks.
+        // Touchdown and sinking ticks.
         for k in [down, down + dock, down + dock + up] {
             ui.vline(at(k), bar.y + 1.0, bar.h - 2.0, rgb(0xFFFFFF, 0.5));
         }
@@ -392,7 +422,7 @@ pub fn panel(
     ui.frame(bar, rgb(tone, 0.4));
     y += 28.0;
 
-    // The next platform: what of the queue rides it, a block per unit, and the rest of
+    // The next crates: what of the queue rides them, a block per unit, and the rest of
     // its payload, which comes down as materials.
     let riders = riders(s, u, v);
     let queued = s.queue_of(u).map_or(0, |q| {
@@ -401,25 +431,28 @@ pub fn panel(
             .filter(|o| o.kind == OrderKind::Produce)
             .count()
     });
-    ui.text(
-        x,
-        y,
-        type_scale::MICRO,
-        rgb(palette::DIM, 1.0),
-        "Next platform",
-    );
+    let label = if compact { 0.0 } else { 96.0 };
+    if !compact {
+        ui.text(
+            x,
+            y,
+            type_scale::MICRO,
+            rgb(palette::DIM, 1.0),
+            "Next crates",
+        );
+    }
     let rides = match (v.riding, queued) {
         (0, q) if q > 0 && u.paused() => {
             "Paused  \u{b7}  the queue waits, all materials".to_owned()
         }
         (0, 0) => "Queue units to bring them down".to_owned(),
-        (n, q) if n as usize >= q => format!("{n} of {q} queued ride it"),
-        (n, q) => format!("{n} of {q} queued ride it  \u{b7}  rest wait"),
+        (n, q) if n as usize >= q => format!("{n} of {q} queued ride them"),
+        (n, q) => format!("{n} of {q} queued ride them  \u{b7}  rest wait"),
     };
     ui.text_fit_left(
-        x + 96.0,
+        x + label,
         y,
-        cw - 96.0,
+        cw - label,
         type_scale::MICRO,
         rgb(palette::TEXT, 0.9),
         &rides,
@@ -440,6 +473,9 @@ pub fn panel(
     ui.gradient_h(rest, rgb(MASS, 0.55), rgb(MASS, 0.3));
     ui.frame(bar, rgb(CABLE, 0.35));
     y += 32.0;
+    if compact {
+        return;
+    }
 
     // Its figures, a column each: label over value.
     let materials = (v.payload - v.riding_mass).max(0.0);
@@ -476,12 +512,12 @@ mod tests {
     fn a_docking_note_names_what_came_off() {
         assert_eq!(
             docked_title(6, 5600.0),
-            "Platform docked: 6 units, 5,600 materials"
+            "Crates landed: 6 units, 5,600 materials"
         );
-        assert_eq!(docked_title(1, 0.0), "Platform docked: 1 unit, 0 materials");
+        assert_eq!(docked_title(1, 0.0), "Crates landed: 1 unit, 0 materials");
         assert_eq!(
             docked_title(0, 20000.0),
-            "Platform docked: no units, 20,000 materials"
+            "Crates landed: no units, 20,000 materials"
         );
     }
 

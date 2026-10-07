@@ -1,7 +1,7 @@
 //! The Skyhook space elevator: once finished its cable comes down and is clamped, and
-//! then every period a platform brings down its queue free, as much as fits in its
-//! payload, and pays the rest of the payload into the store. Its units drive off the deck
-//! between the towers and on to the rally point.
+//! then every period three cargo crates fall down it with its queue, free, as much as
+//! fits in their payload and their seats, and pay the rest of the payload into the store.
+//! Each crate's units drive out of its doors between the towers and leave as one group.
 
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
@@ -78,7 +78,7 @@ fn produce(w: &World, id: UnitId, key: &str, count: u8) -> PlayerCommand {
     }
 }
 
-/// Ticks until the first platform docks, counted from the tick after it was spawned.
+/// Ticks until the first crates land, counted from the tick after it was spawned.
 fn first_dock(w: &World) -> u32 {
     let e = spec(w);
     // The clock starts the tick after it is finished (at 0), and counts from there.
@@ -107,7 +107,7 @@ fn count_of(w: &World, key: &str) -> usize {
 }
 
 #[test]
-fn the_cable_comes_down_then_platforms_run_on_the_period() {
+fn the_cable_comes_down_then_crates_fall_on_the_period() {
     let mut w = world();
     let id = elevator(&mut w);
     let e = spec(&w);
@@ -133,15 +133,15 @@ fn the_cable_comes_down_then_platforms_run_on_the_period() {
         .collect();
     assert_eq!(tethering.len(), 1, "the cable comes down once");
     assert_eq!(tethered.len(), 1, "and is clamped once");
-    assert_eq!(inbound.len(), 2, "a platform each period");
-    assert_eq!(docked.len(), 2, "each one docks");
+    assert_eq!(inbound.len(), 2, "crates each period");
+    assert_eq!(docked.len(), 2, "each fall lands");
     assert!(docked.iter().all(|&(u, _)| u == id));
     // With nothing queued the whole payload comes down as mass.
     assert!(docked.iter().all(|&(_, m)| m == e.payload));
 }
 
 #[test]
-fn an_empty_platform_pays_its_payload_into_the_store() {
+fn empty_crates_pay_their_payload_into_the_store() {
     let mut w = world();
     elevator(&mut w);
     let e = spec(&w);
@@ -157,24 +157,27 @@ fn an_empty_platform_pays_its_payload_into_the_store() {
 }
 
 #[test]
-fn queued_units_come_down_free_up_to_the_payload_in_order() {
+fn queued_units_come_down_free_up_to_the_payload_and_seats_in_order() {
     let mut w = world();
     let id = elevator(&mut w);
     let e = spec(&w);
-    // Breachers first (3800 each: five fit in 20 000), then tanks behind them; the
-    // sixth Breacher does not fit, so nothing behind it comes down on this platform.
-    let breacher = w
-        .blueprints
-        .unit(w.blueprints.id_of("aster_t4_breacher").unwrap())
-        .cost_mass;
-    let fits = (e.payload.0 / breacher.0) as usize;
+    // Breachers first, then tanks behind them. Each fills a crate, so three ride and the
+    // fourth does not fit: nothing behind it comes down on this fall.
+    let breacher = w.blueprints.id_of("aster_t4_breacher").unwrap();
+    let (cost, radius) = {
+        let bp = w.blueprints.unit(breacher);
+        (bp.cost_mass, bp.radius)
+    };
+    let (fits, mass) =
+        mc_sim::mirror::crate_load(std::iter::repeat_n((radius, cost), 6), e.payload);
+    assert_eq!(fits, 3, "a Breacher to a crate");
     let cmds = [
         produce(&w, id, "aster_t4_breacher", fits as u8 + 1),
         produce(&w, id, "aster_t1_tank", 4),
     ];
     let n = first_dock(&w);
     let events = run(&mut w, n, &cmds);
-    assert_eq!(count_of(&w, "aster_t4_breacher"), fits);
+    assert_eq!(count_of(&w, "aster_t4_breacher"), fits as usize);
     assert_eq!(
         count_of(&w, "aster_t1_tank"),
         0,
@@ -187,11 +190,11 @@ fn queued_units_come_down_free_up_to_the_payload_in_order() {
             _ => None,
         })
         .unwrap();
-    assert_eq!(paid.0 as usize, fits);
-    assert_eq!(paid.1, e.payload - breacher * Fx::from_int(fits as i32));
-    // The next platform takes the last Breacher and the tanks.
+    assert_eq!(paid.0, fits);
+    assert_eq!(paid.1, e.payload - mass);
+    // The next fall takes the last Breacher and the tanks.
     run(&mut w, e.period_ticks, &[]);
-    assert_eq!(count_of(&w, "aster_t4_breacher"), fits + 1);
+    assert_eq!(count_of(&w, "aster_t4_breacher"), fits as usize + 1);
     assert_eq!(count_of(&w, "aster_t1_tank"), 4);
 }
 
@@ -209,7 +212,7 @@ fn nothing_is_built_while_waiting_and_nothing_is_paid_for() {
 }
 
 #[test]
-fn its_units_drive_off_the_deck_between_the_towers_and_away() {
+fn its_units_drive_out_of_the_crates_between_the_towers_and_away() {
     let mut w = world();
     let id = elevator(&mut w);
     let cmds = [
@@ -240,7 +243,7 @@ fn its_units_drive_off_the_deck_between_the_towers_and_away() {
 }
 
 #[test]
-fn a_repeated_queue_comes_down_on_every_platform() {
+fn a_repeated_queue_comes_down_on_every_fall() {
     let mut w = world();
     let id = elevator(&mut w);
     let e = spec(&w);
@@ -258,7 +261,7 @@ fn a_repeated_queue_comes_down_on_every_platform() {
     assert_eq!(
         count_of(&w, "aster_t4_assault_tank"),
         6,
-        "two a platform, three platforms"
+        "two a fall, three falls"
     );
 }
 
@@ -311,7 +314,7 @@ fn a_paused_elevator_holds_its_queue_and_brings_down_mass() {
 }
 
 #[test]
-fn nothing_is_set_down_on_the_cable_collar() {
+fn nothing_is_set_down_by_the_cable() {
     let mut w = world();
     let id = elevator(&mut w);
     let order = produce(&w, id, "aster_t1_scout", 60);
@@ -329,4 +332,104 @@ fn nothing_is_set_down_on_the_cable_collar() {
         .map(|r| w.state.units.pos[r].distance(centre))
         .fold(Fx::from_int(9999), |a, b| a.min(b));
     assert!(near >= Fx::from_int(30), "nearest {near:?}");
+}
+
+/// Counts the units of `key` that are still in their crates (not yet rolled out).
+fn in_crates(w: &World) -> usize {
+    w.state.rollouts.len()
+}
+
+#[test]
+fn units_wait_for_the_doors_then_leave_a_crate_together() {
+    let mut w = world();
+    let id = elevator(&mut w);
+    let order = produce(&w, id, "aster_t1_tank", 5);
+    w.tick(&[order]).unwrap();
+    let n = first_dock(&w) - 2;
+    run(&mut w, n, &[]);
+    assert_eq!(count_of(&w, "aster_t1_tank"), 0);
+    run(&mut w, 1, &[]);
+    assert_eq!(
+        count_of(&w, "aster_t1_tank"),
+        5,
+        "set down as the crates land"
+    );
+    let tanks = in_crates(&w);
+    assert_eq!(tanks, 5, "all of them are in the crates");
+    // The doors take a while to open: nothing has moved yet.
+    let at: Vec<_> = w
+        .state
+        .rollouts
+        .keys()
+        .map(|&u| {
+            let r = w.state.units.row(u).unwrap();
+            w.state.units.pos[r]
+        })
+        .collect();
+    run(&mut w, 20, &[]);
+    for (&u, p) in w.state.rollouts.keys().zip(&at) {
+        let r = w.state.units.row(u).unwrap();
+        assert_eq!(w.state.units.pos[r], *p, "held while the doors open");
+    }
+    // They are one group: a squad stands for them until the last is out, and then goes.
+    assert_eq!(w.state.elevators.squads.len(), 1);
+    let mut ticks = 0;
+    while !w.state.elevators.squads.is_empty() && ticks < 400 {
+        run(&mut w, 1, &[]);
+        ticks += 1;
+    }
+    assert_eq!(in_crates(&w), 0, "all are out");
+    assert!(
+        w.state.elevators.squads.is_empty(),
+        "the group has been sent off"
+    );
+    let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
+    let moving = w
+        .state
+        .units
+        .slots
+        .iter()
+        .filter(|&r| w.state.units.blueprint[r] == tank)
+        .filter(|&r| w.state.orders.front(&w.state.units, r).is_some())
+        .count();
+    assert_eq!(moving, 5, "and each has its orders");
+}
+
+#[test]
+fn a_batch_overrides_the_crates_groups() {
+    let mut w = world();
+    let id = elevator(&mut w);
+    let batch = PlayerCommand {
+        player: 0,
+        command: Command::SetBatch {
+            factories: vec![id],
+            batch: true,
+        },
+    };
+    let order = produce(&w, id, "aster_t1_tank", 4);
+    w.tick(&[batch, order]).unwrap();
+    let n = first_dock(&w) - 1;
+    run(&mut w, n + 1, &[]);
+    assert!(
+        w.state.elevators.squads.is_empty(),
+        "no crate group is made"
+    );
+    run(&mut w, 400, &[]);
+    assert_eq!(in_crates(&w), 0);
+    assert!(
+        !w.state.batches.is_empty(),
+        "the tanks muster in the batch instead"
+    );
+}
+
+#[test]
+fn units_still_inside_when_the_crates_sink_are_put_out() {
+    let mut w = world();
+    let id = elevator(&mut w);
+    let e = spec(&w);
+    let order = produce(&w, id, "aster_t3_assault_bot", 12);
+    w.tick(&[order]).unwrap();
+    let sink = first_dock(&w) - 1 + e.dock_ticks;
+    run(&mut w, sink + 2, &[]);
+    assert_eq!(in_crates(&w), 0, "nothing is left in a sinking crate");
 }

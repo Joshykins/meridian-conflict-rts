@@ -1337,9 +1337,10 @@ impl Blueprints {
                     || made.motion.is_none()
                     || naval
                     || made.cost_mass > e.payload
+                    || !mc_core::elevator_bay::seats(made.radius)
                 {
                     return Err(DataError::Invalid(format!(
-                        "{}: brings down {}, which is not a land or air unit within one payload",
+                        "{}: brings down {}, which is not a land or air unit within one payload that fits a crate",
                         u.key, made.key
                     )));
                 }

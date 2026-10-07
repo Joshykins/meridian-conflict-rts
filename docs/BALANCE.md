@@ -64,7 +64,7 @@ Off the lines, measured the same way:
   40 Thunderheads kill it in 85 s, 25 in 140 s, 15 in 240 s; 40 Eclipses in 125 s; 100
   Kestrels in 120 s.
 - The Skyhook space elevator (ARC T5, 160000 mass / 1.6 M energy, `docs/ELEVATOR.md`):
-  once its cable is clamped (24 s after it is finished) a platform docks every 30 s with
+  once its cable is clamped (24 s after it is finished) three crates land every 30 s with
   20000 mass: the front of its queue, free, then the rest as plain mass. That is about
   670 mass a second, more than a whole late-game economy (about 250 a second at 20
   minutes), so it pays for itself in four minutes if left alone. It is the reason to

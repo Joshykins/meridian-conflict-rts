@@ -107,7 +107,7 @@
         },
     ),
     "aster_t5_space_elevator": (
-        lore: "The Reach never stopped building in orbit. The Skyhook is how the yards up there reach the ground: a cable out of the sky, three towers to hold it, and every half minute a platform of armour coming down it to the sound of the sirens.",
+        lore: "The Reach never stopped building in orbit. The Skyhook is how the yards up there reach the ground: a cable out of the sky, three towers to hold it, and every half minute three crates of armour dropping down it to the sound of the sirens.",
     ),
     "aster_t2_sensor_ship": (
         lore: "A light hull built round one great search radar, so the Reach's picture of the field travels with its army. It carries no guns; its crews say the dome is the weapon.",

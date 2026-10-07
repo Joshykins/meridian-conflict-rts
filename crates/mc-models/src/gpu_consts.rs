@@ -982,10 +982,13 @@ shared! {
 
     /// A space elevator (`mc_models::aster::elevator`, entity.wgsl `elevator_pose`,
     /// `mc_sim::elevator`). Model space, metres, +x the first clamp tower; towers stand at
-    /// 0, 120 and 240 degrees round the well and units leave between them. The mirror
-    /// gives the cable's drop and the clamps' grip in `UnitInstance::mount` (last tick and
-    /// this, each 0 to 1) and the platform's height in `deploy` / `prev_deploy` (0 docked,
-    /// 1 at `SKY_Z`, more: away in orbit, not drawn).
+    /// 0, 120 and 240 degrees round the well and the cargo crates stand between them, at
+    /// 60, 180 and 300 degrees (`mc_core::elevator_bay`, kept equal to `BAY_*` by a test).
+    /// The mirror gives the cable's drop and the clamps' grip in `UnitInstance::mount`
+    /// (last tick and this, each 0 to 1) and the crates' height in `deploy` /
+    /// `prev_deploy`: 1 at `SKY_Z` falling to 0 landed, then down to `-DOORS_OPEN` as the
+    /// doors and roofs open and to -1 as the empty crates sink into the ground; 1 and over
+    /// away, not drawn.
     pub mod elevator as "ELEVATOR_" {
         /// The three clamp jaws: each turns about a horizontal hinge tangent to the circle
         /// of `HINGE_R` at `HINGE_Z` over its own tower's bearing, swung out by `OPEN`
@@ -995,23 +998,47 @@ shared! {
         pub const HINGE_Z: f32 = 120.0;
         pub const OPEN: f32 = 0.65;
         /// The cable: authored from its collar up to `CABLE_SPLIT`; what is above the split
-        /// is stretched up to `SKY_Z`, and the whole of it rides up out of sight by the
-        /// share of the drop not yet made (it hangs in orbit before the elevator is done).
+        /// is stretched up to `TOP_Z`, far above the highest camera, so a view from any
+        /// height finds the cable still going up. The whole of its lower part rides up out
+        /// of sight by the share of the drop not yet made (its foot hangs at `SKY_Z`
+        /// before the elevator is done).
         pub const PART_CABLE: u32 = 76;
         pub const CABLE_SPLIT: f32 = 286.0;
         /// The lowest point of the cable as authored (its collar's foot, seated in the well).
         pub const CABLE_FOOT: f32 = 0.4;
         pub const SKY_Z: f32 = 6000.0;
-        /// The platform, authored docked: raised by `deploy` x (`SKY_Z` - `CAR_DOCK`).
-        pub const PART_CAR: u32 = 77;
+        pub const TOP_Z: f32 = 240000.0;
+        /// The cargo crates, authored landed: raised by `deploy` x (`SKY_Z` - `CAR_DOCK`).
+        /// The shell (walls, frame, floor beams and braking thruster bells) is `PART_CRATE`.
+        /// The two door leaves are `PART_DOOR`, authored shut across the bay's outer end and
+        /// swung out `DOOR_SWING` radians about their outer posts. The two roof halves are
+        /// `PART_ROOF`, swung up `ROOF_SWING` radians about their side walls' tops.
+        pub const PART_CRATE: u32 = 77;
+        pub const PART_DOOR: u32 = 78;
+        pub const PART_ROOF: u32 = 79;
         pub const CAR_DOCK: f32 = 0.0;
+        pub const DOOR_SWING: f32 = 1.75;
+        pub const ROOF_SWING: f32 = 1.3;
+        /// How far `deploy` goes below zero while the doors and roofs open, and where the
+        /// empty crates sink to (metres below where they landed).
+        pub const DOORS_OPEN: f32 = 0.5;
+        pub const SINK_DEPTH: f32 = 84.0;
+        /// The bays (`mc_core::elevator_bay`): from the cable's axis to the inner wall, long
+        /// to the doors, wide between the side walls, and tall; the walls' thickness. The
+        /// first bay's bearing is `BAY_BEARING_DEG` degrees off the first tower.
+        pub const BAY_FROM: f32 = 32.0;
+        pub const BAY_LENGTH: f32 = 100.0;
+        pub const BAY_WIDTH: f32 = 72.0;
+        pub const BAY_HEIGHT: f32 = 72.0;
+        pub const BAY_WALL: f32 = 3.0;
+        pub const BAY_BEARING_DEG: f32 = 60.0;
         /// Shared with the effects (renderer `elevator_fx`) and audio: where things are on
-        /// the model. The deck's top and radius when docked; the platform's underside
-        /// (its braking thrusters fire down from a ring of `THRUSTER_R` there).
+        /// the model. The landing pad's top and radius; the crates' underside (their braking
+        /// thrusters fire down from bells at its corners, `THRUSTER_INSET` in from the walls).
         pub const DECK_Z: f32 = 0.6;
         pub const DECK_R: f32 = 60.0;
-        pub const CAR_UNDER_Z: f32 = -12.0;
-        pub const THRUSTER_R: f32 = 46.0;
+        pub const CAR_UNDER_Z: f32 = -9.0;
+        pub const THRUSTER_INSET: f32 = 9.0;
         /// Where the jaws close on the cable (height, and the cable's radius there).
         pub const GRIP_Z: f32 = 232.0;
         pub const CABLE_R: f32 = 11.0;

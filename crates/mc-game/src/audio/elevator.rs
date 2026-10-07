@@ -3,18 +3,17 @@
 //! (the unit's `moving` sound name) where the library has it, else `elevator_<part>`.
 //!
 //! - The towers' sirens, on the sim's events: they wind up as the cable starts down out of
-//!   orbit (`ElevatorTethering`) and as each platform starts down (`ElevatorInbound`), wail
-//!   hi-lo through the descent, and wind down as the cable seats or the platform docks.
+//!   orbit (`ElevatorTethering`) and as the crates start down (`ElevatorInbound`), wail
+//!   hi-lo through the descent, and wind down as the cable seats or the crates land.
 //!   One loop voice per tower crown, each a little detuned with its horn turning, heard
 //!   across much of the map like a nuclear launch.
-//! - One-shots on the events: the cable falling, the platform docking (and its deck horn
-//!   when units ride it), the platform leaving.
+//! - One-shots on the events: the cable falling, the crates landing (and the deck horn
+//!   when units ride them), the crates sinking.
 //! - One-shots off the pose the mirror publishes (`UnitInstance::mount`, `deploy`), as the
 //!   renderer draws it: the cable's foot passing the clouds, seating in the well, the jaws
-//!   closing on it, the platform's thrusters lighting to brake.
-//! - Loops off the pose: the platform's roar as it comes down (louder as it nears, higher
-//!   the faster it goes), its thrusters braking and lifting it away, its collars grinding
-//!   through the guide sleeves, and the running elevator's hum.
+//!   closing on it, the crates' thrusters lighting to brake.
+//! - Loops off the pose: the crates' roar as they come down (louder as they near, higher
+//!   the faster they go), their thrusters braking, and the running elevator's hum.
 //!
 //! Heard the moment it happens, however far, like the giants' far sounds (`titan.rs`).
 
@@ -31,9 +30,7 @@ use std::f32::consts::TAU;
 const TICK: f32 = 0.1;
 /// The cloud deck the cable's foot breaks through, metres up.
 const CLOUD_Z: f32 = 1800.0;
-/// The guide sleeves: the platform's collars run in them below this height, metres.
-const SLEEVE_Z: f32 = 260.0;
-/// The platform's height share (0 docked, 1 at the top) under which its thrusters brake:
+/// The crates' height share (0 landed, 1 at the top) under which its thrusters brake:
 /// the last third of the descent, whose height goes as (1 - x)^3 (mc-sim `elevator::pose`).
 const BRAKE_H: f32 = 1.0 / 27.0;
 /// The jaws' grip at which their slams start (`elevator_jaws` times the three to land as
@@ -65,11 +62,10 @@ const BOOM_FAR: f32 = 0.35;
 const FALL_FAR: f32 = 0.25;
 
 /// The parts, by `Part`: `elevator_<part>` in the library.
-const PARTS: [&str; 13] = [
+const PARTS: [&str; 12] = [
     "siren",
     "platform_roar",
     "thrusters",
-    "sleeve_screech",
     "hum",
     "cable_fall",
     "cloud_thump",
@@ -78,16 +74,15 @@ const PARTS: [&str; 13] = [
     "brake_ignite",
     "dock",
     "deck_horn",
-    "depart",
+    "sink",
 ];
 
-/// Indices into `PARTS`. The first five are loops.
+/// Indices into `PARTS`. The first four are loops.
 #[derive(Clone, Copy)]
 enum Part {
     Siren,
     Roar,
     Thrusters,
-    Screech,
     Hum,
     CableFall,
     CloudThump,
@@ -96,7 +91,7 @@ enum Part {
     BrakeIgnite,
     Dock,
     DeckHorn,
-    Depart,
+    Sink,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -129,14 +124,7 @@ pub(crate) fn gliding(library: &SoundLibrary, blueprints: &Blueprints) -> Vec<So
         .chain([None])
         .flat_map(|bp| {
             let ids = Ids::of(library, bp);
-            [
-                Part::Siren,
-                Part::Roar,
-                Part::Thrusters,
-                Part::Screech,
-                Part::Hum,
-            ]
-            .map(|p| ids.get(p))
+            [Part::Siren, Part::Roar, Part::Thrusters, Part::Hum].map(|p| ids.get(p))
         })
         .flatten()
         .collect();
@@ -157,7 +145,7 @@ struct Siren {
     limit: u32,
 }
 
-/// What an elevator in view looked like when last heard: cable drop, grip, platform height.
+/// What an elevator in view looked like when last heard: cable drop, grip, crates' height.
 #[derive(Clone, Copy)]
 struct Seen {
     pose: [f32; 3],
@@ -231,7 +219,7 @@ impl ElevatorSounds {
                 | SimEvent::ElevatorInbound { unit, pos, .. } => (unit.0, pos, true),
                 SimEvent::ElevatorTethered { unit, pos, .. }
                 | SimEvent::ElevatorDocked { unit, pos, .. }
-                | SimEvent::ElevatorDeparting { unit, pos, .. } => (unit.0, pos, false),
+                | SimEvent::ElevatorSinking { unit, pos, .. } => (unit.0, pos, false),
                 _ => continue,
             };
             let at = Vec3::from(pos.to_f32());
@@ -269,9 +257,9 @@ impl ElevatorSounds {
                         play(audio, ids.get(Part::DeckHorn), gain * 0.8, pan, 1.0, 1.6);
                     }
                 }
-                SimEvent::ElevatorDeparting { .. } => {
+                SimEvent::ElevatorSinking { .. } => {
                     let (gain, pan) = hear(at);
-                    play(audio, ids.get(Part::Depart), gain, pan, pitch, 0.0);
+                    play(audio, ids.get(Part::Sink), gain, pan, pitch, 0.0);
                 }
                 _ => {}
             }
@@ -314,15 +302,15 @@ impl ElevatorSounds {
             if now[0] >= 1.0 {
                 push(&mut loops, ids.get(Part::Hum), near * 0.45, pan, 1.0);
             }
-            // The platform, by its height share and speed (shares a second).
+            // The crates, by their height share and speed (shares a second).
             let (h_was, h) = (was[2], now[2]);
             let speed = (h - h_was) / (ticks * TICK);
-            if h < h_was && h <= 1.0 {
+            if h < h_was && h_was > 0.0 && h_was <= 1.0 {
                 if h_was > BRAKE_H && h <= BRAKE_H {
                     play(audio, ids.get(Part::BrakeIgnite), near, pan, pitch, 0.0);
                 }
                 let descent = e.descent_ticks as f32 * TICK;
-                let (roar, brake, screech) = descending(h, -speed, descent);
+                let (roar, brake) = descending(h.max(0.0), -speed, descent);
                 push(&mut loops, ids.get(Part::Roar), near * roar.0, pan, roar.1);
                 push(
                     &mut loops,
@@ -330,29 +318,6 @@ impl ElevatorSounds {
                     near * brake.0,
                     pan,
                     brake.1,
-                );
-                push(
-                    &mut loops,
-                    ids.get(Part::Screech),
-                    near * screech.0,
-                    pan,
-                    screech.1,
-                );
-            } else if h > h_was && h_was < 1.0 {
-                let (lift, screech) = ascending(h, speed);
-                push(
-                    &mut loops,
-                    ids.get(Part::Thrusters),
-                    near * lift.0,
-                    pan,
-                    lift.1,
-                );
-                push(
-                    &mut loops,
-                    ids.get(Part::Screech),
-                    near * screech.0,
-                    pan,
-                    screech.1,
                 );
             }
         }
@@ -435,10 +400,9 @@ fn siren(since: f32, ended: Option<f32>) -> (f32, f32) {
     }
 }
 
-/// A platform coming down at height share `h`, `speed` shares a second, on a descent of
-/// `descent` seconds: (gain, pitch) for its roar, its braking thrusters and its collars in
-/// the guide sleeves.
-fn descending(h: f32, speed: f32, descent: f32) -> ((f32, f32), (f32, f32), (f32, f32)) {
+/// Crates coming down at height share `h`, `speed` shares a second, on a descent of
+/// `descent` seconds: (gain, pitch) for their roar and their braking thrusters.
+fn descending(h: f32, speed: f32, descent: f32) -> ((f32, f32), (f32, f32)) {
     // Fastest at the top (3 shares over the descent); `x` how far through it is.
     let pace = (speed * descent / 3.0).clamp(0.0, 1.0).sqrt();
     let x = 1.0 - h.max(0.0).cbrt();
@@ -447,34 +411,11 @@ fn descending(h: f32, speed: f32, descent: f32) -> ((f32, f32), (f32, f32), (f32
         (0.2 + 0.8 * near * near) * (0.4 + 0.6 * pace),
         0.8 + 0.35 * pace,
     );
-    // Braking over the last third, throttled back as it settles on the deck.
+    // Braking over the last third, throttled back as they settle on the pad.
     let brake = smooth((x - 0.62) / 0.08);
     let settle = smooth((x - 0.95) / 0.05);
     let thrust = (0.9 * brake * (1.0 - 0.6 * settle), 0.95 + 0.1 * brake);
-    (roar, thrust, sleeve(h, speed))
-}
-
-/// A platform going up at height share `h`, `speed` shares a second: (gain, pitch) for
-/// its thrusters and its collars in the sleeves. The
-/// thrusters come in as the departure's ignition roar hands over (a third of the way
-/// through, as `elevator_depart` lights) and fade and sink as it climbs away.
-fn ascending(h: f32, speed: f32) -> ((f32, f32), (f32, f32)) {
-    let x = h.clamp(0.0, 1.0).cbrt();
-    let lift = smooth((x - 0.3) / 0.12) * (1.0 - 0.85 * x);
-    ((lift, 1.05 - 0.2 * x), sleeve(h, speed))
-}
-
-/// The collars grinding in the guide sleeves at height share `h`, `speed` shares a second
-/// either way: louder and higher the faster they run.
-fn sleeve(h: f32, speed: f32) -> (f32, f32) {
-    let metres = speed.abs() * SKY_Z;
-    if h * SKY_Z > SLEEVE_Z {
-        return (0.0, 1.0);
-    }
-    (
-        0.6 * (metres / 40.0).min(1.0),
-        0.85 + 0.3 * (metres / 120.0).min(1.0),
-    )
+    (roar, thrust)
 }
 
 fn smooth(x: f32) -> f32 {
@@ -535,7 +476,7 @@ mod tests {
             let looped = library.sound(id).looped;
             assert_eq!(looped, k <= Part::Hum as usize, "{part} loops: {looped}");
         }
-        assert_eq!(gliding(&library, &blueprints).len(), 5);
+        assert_eq!(gliding(&library, &blueprints).len(), 4);
     }
 
     #[test]
@@ -560,7 +501,7 @@ mod tests {
     }
 
     #[test]
-    fn the_platform_roars_nearer_and_brakes_late() {
+    fn the_crates_roar_nearer_and_brake_late() {
         let descent = 9.0;
         // The descent's height is (1 - x)^3 over x = t / descent.
         let at = |x: f32| {
@@ -568,18 +509,13 @@ mod tests {
             let speed = 3.0 * (1.0 - x).powi(2) / descent;
             descending(h, speed, descent)
         };
-        let (top, high, _) = at(0.05);
-        let (mid, middle, _) = at(0.5);
-        let (low, late, sleeve) = at(0.85);
+        let (top, high) = at(0.05);
+        let (mid, middle) = at(0.5);
+        let (low, late) = at(0.85);
         assert!(mid.0 > top.0, "the roar grows as it nears: {top:?} {mid:?}");
         assert!(top.1 > low.1, "and sinks as it slows");
         assert!(high.0 == 0.0 && middle.0 == 0.0, "no braking early");
         assert!(late.0 > 0.5, "the thrusters brake late: {late:?}");
-        assert!(sleeve.0 > 0.0, "the collars grind in the sleeves");
-        // Going away: the thrusters come in after the ignition and fade as it climbs.
-        let up = |x: f32| ascending(x * x * x, 3.0 * x * x / descent);
-        assert_eq!(up(0.1).0 .0, 0.0);
-        assert!(up(0.5).0 .0 > up(0.95).0 .0);
     }
 
     #[test]

@@ -26,10 +26,10 @@ fn swung(p: Vec3, open: f32) -> Vec3 {
     (dir * (HINGE_R + r * c + z * s) + side * along).extend(HINGE_Z - r * s + z * c)
 }
 
-/// Every level carries the jaws, the cable and the platform, and the unit file's size
+/// Every level carries the jaws, the cable and the crates, and the unit file's size
 /// is the model's own (the shader's constants are in model metres).
 #[test]
-fn every_level_has_jaws_cable_and_platform() {
+fn every_level_has_jaws_cable_and_crates() {
     let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
     let blueprints = mc_data::Blueprints::load(&data).unwrap();
     let bp = blueprints.unit(blueprints.id_of("aster_t5_space_elevator").unwrap());
@@ -37,7 +37,11 @@ fn every_level_has_jaws_cable_and_platform() {
     for key in DESIGNS {
         let model = build_model_scaled(key, SIZE.0, SIZE.1, SIZE.2).unwrap();
         for (l, lod) in model.lods.iter().enumerate() {
-            for p in [part::ELEVATOR_ARM, part::ELEVATOR_CABLE, part::ELEVATOR_CAR] {
+            for p in [
+                part::ELEVATOR_ARM,
+                part::ELEVATOR_CABLE,
+                part::ELEVATOR_CRATE,
+            ] {
                 assert!(
                     lod.vertices.iter().any(|v| v.part == p),
                     "{key} lod {l}: no part {p}"
@@ -103,63 +107,97 @@ fn contract_points_match_the_shader_constants() {
                 of(part::ELEVATOR_CABLE).all(|p| p.z < CABLE_SPLIT || p.z > CABLE_SPLIT + 0.5),
                 "{name}: cable detail at the split"
             );
-            // The platform.
-            let car: Vec<Vec3> = of(part::ELEVATOR_CAR).collect();
-            let deck = car.iter().map(|p| p.z).fold(f32::MIN, f32::max);
-            let under = car.iter().map(|p| p.z).fold(f32::MAX, f32::min);
-            let reach = car
-                .iter()
-                .map(|p| p.truncate().length())
-                .fold(0.0, f32::max);
-            assert!(
-                (under - CAR_UNDER_Z).abs() < 0.01,
-                "{name}: underside {under}"
-            );
-            assert!(
-                reach <= DECK_R * 1.42 + 0.01,
-                "{name}: platform reach {reach}"
-            );
+            // The crates: in their bays, on the ground, their thruster bells opening at
+            // `CAR_UNDER_Z`, no taller than a bay and no wider than its walls.
+            let shell: Vec<Vec3> = of(part::ELEVATOR_CRATE).collect();
+            let under = shell.iter().map(|p| p.z).fold(f32::MAX, f32::min);
             if l < 2 {
                 assert!(
-                    (reach - DECK_R).abs() < 0.5,
-                    "{name}: platform reach {reach}"
+                    (under - CAR_UNDER_Z).abs() < 0.01,
+                    "{name}: underside {under}"
                 );
-                let edge = car
-                    .iter()
-                    .filter(|p| p.truncate().length() > DECK_R - 0.3)
-                    .map(|p| p.z)
-                    .fold(f32::MIN, f32::max);
-                assert!((edge - DECK_Z).abs() < 0.2, "{name}: deck edge at {edge}");
-                assert!(deck <= 32.0, "{name}: platform top {deck}");
             }
+            for p in &shell {
+                let (x, y) = bay_frame(*p);
+                assert!(
+                    x > BAY_FROM - 2.5 && x < BAY_FROM + BAY_LENGTH + 2.5,
+                    "{name}: crate vertex {p} {x} m out"
+                );
+                assert!(
+                    y.abs() < BAY_WIDTH / 2.0 + 3.5 && p.z <= BAY_HEIGHT,
+                    "{name}: crate vertex {p} across {y}"
+                );
+            }
+            // The door leaves close the outer end; the roof halves close the top.
+            // (Far off, the crate is one block.)
+            for (part, name_of) in [(part::ELEVATOR_DOOR, "door"), (part::ELEVATOR_ROOF, "roof")] {
+                assert!(l >= 2 || of(part).count() > 0, "{name}: no {name_of}");
+            }
+            assert!(
+                of(part::ELEVATOR_DOOR).all(|p| bay_frame(p).0 > BAY_FROM + BAY_LENGTH - 4.0),
+                "{name}: a door vertex off the outer end"
+            );
+            assert!(
+                of(part::ELEVATOR_ROOF).all(|p| p.z > BAY_HEIGHT - 3.0),
+                "{name}: a roof vertex off the top"
+            );
         }
     }
 }
 
-/// Swung open, every jaw stands clear of the platform's run up the cable, so the
-/// platform can pass them while they are open.
+/// A point in its bay's frame: out along the bay's bearing and across it (the shader
+/// finds the bay the same way, by the nearest of the three bearings).
+fn bay_frame(p: Vec3) -> (f32, f32) {
+    let third = TAU / 3.0;
+    let first = BAY_BEARING_DEG.to_radians();
+    let k = ((p.y.atan2(p.x) - first) / third).round();
+    let dir = Vec2::from_angle(first + k * third);
+    (p.truncate().dot(dir), p.truncate().dot(dir.perp()))
+}
+
+/// The bays' numbers are the sim's (`mc_core::elevator_bay`), which seats units in them.
 #[test]
-fn open_jaws_clear_the_platform() {
+fn the_bays_are_the_sims() {
+    use mc_core::elevator_bay as sim;
+    assert_eq!(BAY_FROM, sim::FROM as f32);
+    assert_eq!(BAY_LENGTH, sim::LENGTH as f32);
+    assert_eq!(BAY_WIDTH, sim::WIDTH as f32);
+    assert_eq!(BAY_HEIGHT, sim::HEIGHT as f32);
+    assert_eq!(DOORS_OPEN, sim::DOORS_OPEN);
+    assert_eq!(sim::COUNT, 3);
+}
+
+/// With its jaws swung open, a jaw never reaches a bay, and no tower or foundation piece
+/// stands in one above the pad (the units walk out of it and the crates land in it).
+#[test]
+fn nothing_stands_in_the_bays() {
     for key in DESIGNS {
         let model = build_model_scaled(key, SIZE.0, SIZE.1, SIZE.2).unwrap();
         let lod = &model.lods[0];
-        let nearest = lod
+        let jaw = lod
             .vertices
             .iter()
             .filter(|v| v.part == part::ELEVATOR_ARM)
-            .map(|v| swung(pos(v), OPEN).truncate().length())
-            .fold(f32::MAX, f32::min);
-        assert!(nearest > DECK_R + 4.0, "{key}: open jaws {nearest} m out");
-        // Nothing standing still reaches into the platform's run over the deck.
-        let intruder = lod.vertices.iter().find(|v| {
-            v.part == part::HULL
-                && v.pos[2] > DECK_Z + 0.5
-                && pos(v).truncate().length() < DECK_R + 1.0
-        });
+            .map(|v| swung(pos(v), OPEN))
+            .find(|&p| in_bay(p));
+        assert!(jaw.is_none(), "{key}: an open jaw in a bay at {jaw:?}");
+        let intruder = lod
+            .vertices
+            .iter()
+            .find(|v| v.part == part::HULL && v.pos[2] > DECK_Z + 0.5 && in_bay(pos(v)));
         assert!(
             intruder.is_none(),
-            "{key}: {:?} in the platform's way",
+            "{key}: {:?} in a crate's bay",
             intruder.map(pos)
         );
     }
+}
+
+/// Inside a bay's box, a little in from its walls and past the well's rim.
+fn in_bay(p: Vec3) -> bool {
+    let (x, y) = bay_frame(p);
+    x > BAY_FROM + 1.0
+        && x < BAY_FROM + BAY_LENGTH - 1.0
+        && y.abs() < BAY_WIDTH / 2.0 - BAY_WALL
+        && p.z < BAY_HEIGHT
 }
