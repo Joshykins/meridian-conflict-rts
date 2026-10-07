@@ -165,7 +165,7 @@
             (
                 name: "Redstorm Rocket Volley",
                 damage: 120, splash: 7, range: 360, reload: 8.0, speed: 210,
-                trajectory: Ballistic, loft: 1.2, spread: 7.0,
+                trajectory: Direct, spread: 7.0,
                 missile: true, guided: false, intercept: 30, caliber: 0.28,
                 plasma_grade: Some(Gravitic), salvo: 6, salvo_delay: 0,
                 turret_turn: 95, muzzle: (0.6, 3.6, 6.0), pivot: (0, 0, 5.3),

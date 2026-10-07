@@ -802,9 +802,17 @@ fn strategic_trail(in: PuffOut) -> vec4<f32> {
     let lamp = in.lamp / (1.0 + in.lamp * 0.08);
     color += color * lamp * 0.1;
     color *= strength;
-    // The newest stretch still glows from the exhaust, or a seeker's red thrust.
-    color += select(vec3<f32>(1.0, 0.55, 0.2) * 5.0, vec3<f32>(1.0, 0.025, 0.008) * 7.0, soot)
-        * exp(-in.state.z * select(1.0, 9.0, soot));
+    // The newest stretch still glows from the exhaust.
+    if soot {
+        // A seeker's engine plume: a thin fusion-hot jet down the middle of the smoke, white
+        // at its heart through pink to red as it cools, never a wide red smear round it.
+        let heat = exp(-in.state.z * 12.0);
+        let jet = exp(-dot(off, off) / (0.16 * r * r));
+        let plume = mix(vec3<f32>(1.0, 0.03, 0.015), vec3<f32>(1.0, 0.72, 0.78), heat * heat);
+        color += plume * 9.0 * heat * jet;
+    } else {
+        color += vec3<f32>(1.0, 0.55, 0.2) * 5.0 * exp(-in.state.z);
+    }
     color = apply_haze(apply_fog_of_war(color, axis_p.xy), axis_p, eye);
     return vec4<f32>(color * alpha, alpha);
 }
