@@ -1021,9 +1021,10 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
             let burst = exp(-pow(fract(cell) - 0.5, 2.0) * 60.0) * step(0.35, hash11(floor(cell) + 3.7));
             let drift = value_noise2(vec2<f32>(run * 0.04 - t * 6.0, in.uv.y * 2.0), 1.0);
             let hue = prism(run * 0.012 + drift * 0.7 - t * PRISM_RATE * 3.0);
-            let sheath = mix(vec3<f32>(0.8, 0.62, 1.0), hue, 0.85) * pow(across, 0.8)
+            let warm = mix(hue, vec3<f32>(1.0, 0.16, 0.2), 0.5);
+            let sheath = mix(vec3<f32>(0.8, 0.62, 1.0), warm, 0.9) * pow(across, 0.8)
                 * (3.4 + 3.0 * burst);
-            let core = vec3<f32>(1.0, 0.97, 1.0) * pow(across, mix(12.0, 5.0, burst)) * (6.0 + 14.0 * burst);
+            let core = vec3<f32>(1.0, 0.95, 0.96) * pow(across, mix(9.0, 4.5, burst)) * (11.0 + 20.0 * burst);
             return vec4<f32>((sheath + core) * in.color.r, 1.0);
         }
         if in.shape.y > 6.1 {

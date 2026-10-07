@@ -851,27 +851,20 @@
                 Roll(at: 2.52, from: 360, to: 70, glide: 0.6, attack: 0.04, decay: 0.2, gain: 0.4, swell: 5, depth: 0.5, seed: 122),
             ],
         ),
-        // The lance held, heard as this loop while it burns down onto the ground: a star
-        // being poured through a pipe. A sub-bass that shudders rather than hums (no pure
-        // tone above it, nothing that reads as an appliance), a huge slow-breathing roar of
-        // the stream rolling in the low mids, torn air tearing past in broad gusts that
-        // never sit on one pitch. No crackle. Every
-        // wobble is a whole number of cycles in the 4 s loop.
+        // The lance held, heard as this loop while it burns down onto the ground: a furnace
+        // roar. Only low-passed rolling noise, a heavy sub-bass shudder and a slow surge of
+        // body in the low mids. Nothing above about 400 Hz and no steady tone, so it never
+        // reads as static, a hiss or an appliance. Every wobble is a whole number of cycles
+        // in the 4 s loop.
         "regency_lance_hold": (
             length: 4.0, peak: 0.7, room: 0.3, looped: true,
             layers: [
-                Fm(from: 38, to: 38, glide: 1, ratio: 0.5, index: 3.4, fade: 1000, attack: 0.01, decay: 100000, gain: 0.4),
-                Fm(from: 57, to: 57, glide: 1, ratio: 1.5, index: 2.6, fade: 1000, attack: 0.01, decay: 100000, gain: 0.22, pan: -0.2),
-                Drone(freq: 38.25, gain: 0.2, wobble: 0.5, depth: 0.5),
-                Drive(2.2),
-                // The stream's roar, huge and slow.
-                Rumble(freq: 70, q: 0.6, gain: 3.0, wobble: 0.25, depth: 0.5),
-                Rumble(freq: 140, q: 0.6, gain: 2.4, wobble: 0.5, depth: 0.45),
-                Wind(freq: 320, q: 0.5, gain: 3.2, swell: 1, depth: 0.7, sway: 0.25, pan: -0.35, seed: 131),
-                Wind(freq: 450, q: 0.5, gain: 2.8, swell: 1.5, depth: 0.7, sway: 0.25, pan: 0.35, seed: 132),
-                // Air torn past, wide and never on a pitch.
-                Wind(freq: 1400, q: 0.35, gain: 1.4, swell: 5, depth: 1.0, sway: 0.75, pan: -0.5, seed: 135),
-                Wind(freq: 2100, q: 0.35, gain: 0.9, swell: 7, depth: 1.0, sway: 0.5, pan: 0.5, seed: 136),
+                Fm(from: 41, to: 41, glide: 1, ratio: 0.5, index: 2.0, fade: 1000, attack: 0.01, decay: 100000, gain: 0.45),
+                Drive(1.6),
+                Rumble(freq: 55, q: 0.6, gain: 3.6, wobble: 0.25, depth: 0.5, seed: 141),
+                Rumble(freq: 95, q: 0.6, gain: 3.2, wobble: 0.5, depth: 0.55, pan: -0.2, seed: 142),
+                Rumble(freq: 150, q: 0.6, gain: 2.4, wobble: 0.75, depth: 0.5, pan: 0.2, seed: 143),
+                Rumble(freq: 240, q: 0.5, gain: 1.4, wobble: 0.25, depth: 0.6, seed: 144),
             ],
         ),
         // The lance going out with nothing left to burn: the core venting. The pinch lets go

@@ -38,19 +38,19 @@ const GLASS_STEP: f32 = 2.4;
 /// How many times wider than the star beam its halo is.
 const HALO: f32 = 4.5;
 /// How far, in beam widths, the plasma thrown out where a star beam strikes flows away.
-const FLOW_REACH: f32 = 22.0;
+const FLOW_REACH: f32 = 6.0;
 /// Seconds a glassed pool takes to crust over and cool.
 const GLASS_COOL: f32 = 9.0;
 
-/// The colour of the `i`th sheet thrown out where a star beam strikes: pink-white near
-/// the strike, lavender further round.
+/// The colour of the `i`th sheet thrown out where a star beam strikes: white-hot, then
+/// the beam's rose and red.
 fn mix_hot(i: usize) -> Vec3 {
     if i.is_multiple_of(3) {
         WHITE * 3.0
     } else if i % 3 == 1 {
         ROSE * 3.0
     } else {
-        LAVENDER * 3.0
+        Vec3::new(1.0, 0.18, 0.2) * 3.0
     }
 }
 
@@ -288,7 +288,7 @@ impl Renderer {
                 ROSE * 8.0,
                 0.0,
             );
-            for _ in 0..4 {
+            for _ in 0..if star { 0 } else { 4 } {
                 let spray = Vec3::new(
                     self.scatter.signed(),
                     self.scatter.signed(),
@@ -331,8 +331,8 @@ impl Renderer {
     }
 
     /// Plasma flowing away from where a star beam strikes: a hot dome over the strike, and
-    /// sheets of it rolling out along the ground in every direction, far wider than the beam,
-    /// cooling from white through rose to lavender as they go. Every tick the beam holds.
+    /// a few sheets of it rolling out along the ground, a little wider than the beam,
+    /// cooling from white through rose to red as they go. Every tick the beam holds.
     fn star_outflow(&mut self, at: Vec3, width: f32, on_unit: bool, time: f32) {
         let reach = width * FLOW_REACH;
         self.push_lit(
@@ -341,16 +341,16 @@ impl Renderer {
             Vec3::ZERO,
             time,
             0.25,
-            (reach * 0.35, reach * 0.6),
-            ROSE * 3.0,
+            (reach * 0.3, reach * 0.45),
+            ROSE * 2.5,
             0.0,
         );
-        for i in 0..10 {
-            let a = (i as f32 + self.scatter.unit()) * std::f32::consts::TAU / 10.0;
+        for i in 0..6 {
+            let a = (i as f32 + self.scatter.unit()) * std::f32::consts::TAU / 6.0;
             let speed = reach * (0.9 + self.scatter.unit() * 0.9);
             let dir = Vec3::new(a.cos(), a.sin(), 0.0);
             let lift = if on_unit { 0.5 } else { 0.12 };
-            let size = width * (3.0 + self.scatter.unit() * 3.0);
+            let size = width * (1.6 + self.scatter.unit() * 1.4);
             let life = 0.9 + self.scatter.unit() * 0.5;
             self.push_lit(
                 puff::WARP_GLOW as f32,
@@ -360,22 +360,6 @@ impl Renderer {
                 life,
                 (size, size * 2.6),
                 mix_hot(i) * 1.4,
-                0.0,
-            );
-        }
-        // Streamers thrown out low and fast, trailing plasma.
-        for _ in 0..3 {
-            let a = self.scatter.unit() * std::f32::consts::TAU;
-            let dir =
-                Vec3::new(a.cos(), a.sin(), 0.25 + self.scatter.unit() * 0.3).normalize_or(Vec3::X);
-            self.push_lit(
-                puff::WARP_STREAK as f32,
-                at + Vec3::Z * width * 0.4,
-                dir * reach * 1.6,
-                time,
-                0.5,
-                (width * 0.5, width * 0.12),
-                LAVENDER * 5.0,
                 0.0,
             );
         }
