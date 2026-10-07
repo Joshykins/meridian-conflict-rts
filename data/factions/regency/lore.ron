@@ -63,6 +63,14 @@
             "Gravitic Seeker Battery": "Eight seekers thrown straight up out of the back of its head; they climb high and fall on whatever stands near it.",
         },
     ),
+    "regency_t5_colossus": (
+        lore: "A fortress on four legs, so tall that hills pass under it. Its whole head is a lance: the nose parts along its seam, the star inside is pinched for three seconds and then held on the ground for five, and a base-wide patch of the field runs to lava.",
+        weapons: {
+            "Heavy Pinch-fusion Lance": "The head opens and a held star of fusion is laid on the mark, vaporising everything within a base's breadth and glassing the ground; it drags slowly from mark to mark while it burns.",
+            "Rapid Pinch-fusion Gun": "A fast pinch-fusion gun slung under the head on a turret of its own; the two take turns.",
+            "Ruin Rocket Battery": "Eight rockets thrown high out of its back in one ripple. Unguided and wild, they fall across the field and burst as pinch-fusion strikes.",
+        },
+    ),
     "regency_t1_engineer": (
         lore: "A construction craft that rides a gravity lift over land and sea alike and builds with the nanite emitter on its arm.",
         weapons: {},

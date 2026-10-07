@@ -160,4 +160,96 @@
         mesh: "regency_strider", icon: Bot,
         sounds: (death: "blast_large", moving: "regency_crawl", step: "regency_footfall"),
     ),
+    // The colossus: the Regency's tech 5, a four-legged siege walker as big as a fortress,
+    // its body carried a hundred and fifty metres up on legs that step over hills and
+    // houses alike (`stride`). Its head is one Heavy Pinch-fusion Lance: the nose opens
+    // along its seam, the bore inside pinches a star of fusion for three seconds and then
+    // holds it for five, laid on whatever stands there and glassing a base-wide patch of
+    // ground to lava (`star_beam`, a salvo of ticks so the beam burns for a time and then
+    // closes). Two Rapid Pinch-fusion Guns hang under the head on turrets of their own,
+    // each picking its own mark, and eight Ruin Rockets stand in tubes on its back: lofted
+    // high, unguided, they scatter over the field and come down as fusion strikes.
+    // A hull field lies over its plates. No anti-air: it wants an escort.
+    //
+    // Model: `regency_colossus` (`models::regency::colossus`), authored at 20 x 50 m and
+    // built 6 times authored size: every mount follows it.
+    (
+        key: "regency_t5_colossus",
+        name: "Colossus",
+        role: "Siege Walker",
+        tech: 5,
+        categories: ["Land", "DirectFire", "Experimental"],
+        health: 900000,
+        cost: (mass: 90000, energy: 900000, time: 330000),
+        radius: 192.0, height: 342.0,
+        footprint: (32, 32),
+        vision: 2000, radar: 3600,
+        shield: (kind: Hull, health: 150000, regen: 500),
+        economy: (energy_upkeep: 3000),
+        motion: (layer: Land, size: 5, speed: 22, accel: 5, turn: 10, aim_arc: 80, stride: true),
+        // One footfall each half stride, planted ahead of the middle on alternate sides.
+        stomp: (pace: 42, reach: 60, gauge: 66, radius: 48, damage: 16000),
+        weapons: [
+            (
+                name: "Heavy Pinch-fusion Lance",
+                // Charged for three seconds with the head opening, then fifty ticks of beam
+                // over five seconds, each a hit on everything within a base's breadth of the
+                // mark. It slews slowly while it burns (`sweep`), dragging a trench of glass
+                // from mark to mark.
+                damage: 600, splash: 140, range_min: 250, range: 1500, reload: 40.0,
+                salvo: 50, salvo_delay: 0.1,
+                hitscan: true, beam: true, star_beam: true, trajectory: Direct,
+                turret_turn: 14, sweep: 6, muzzle: (237.6, 0.0, 271.2), pivot: (60.0, 0.0, 271.2),
+                targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
+                plasma_grade: Some(PinchFusion), flash: 2.0, impact: 5.0, tracer: 12.0,
+                sounds: (
+                    charge: "regency_lance_charge", charge_time: 3.0,
+                    hold: "regency_lance_hold", spindown: "regency_lance_vent",
+                ),
+            ),
+            (
+                name: "Rapid Pinch-fusion Gun",
+                // The left gun under the head, on a turret of its own.
+                damage: 900, splash: 18, range: 1400, reload: 0.8, speed: 1500, trajectory: Ballistic,
+                loft: 0.3, flat_fire: true, mount: true, turret_turn: 70, arc: 200,
+                muzzle: (124.8, 51.6, 253.8), pivot: (97.2, 51.6, 253.8),
+                targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
+                plasma_grade: Some(PinchFusion),
+                flash: 1.4, impact: 3.0, tracer: 2.0,
+                sounds: (fire: "regency_sunspear_fire", impact: "regency_sunspear_hit", ground: "regency_sunspear_hit"),
+            ),
+            (
+                name: "Rapid Pinch-fusion Gun",
+                // The right gun: half a reload behind the left (`twins.rs`).
+                damage: 900, splash: 18, range: 1400, reload: 0.8, speed: 1500, trajectory: Ballistic,
+                loft: 0.3, flat_fire: true, mount: true, turret_turn: 70, arc: 200,
+                muzzle: (124.8, -51.6, 253.8), pivot: (97.2, -51.6, 253.8),
+                targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
+                plasma_grade: Some(PinchFusion),
+                flash: 1.4, impact: 3.0, tracer: 2.0,
+                sounds: (fire: "regency_sunspear_fire", impact: "regency_sunspear_hit", ground: "regency_sunspear_hit"),
+            ),
+            (
+                name: "Ruin Rocket Battery",
+                // Eight cased rockets out of the back, lofted high and not guided: they leave
+                // in a ripple, scatter wide (`spread`) and fall where they will over the
+                // field, each a small supernova of pinch fusion (`fusion_strike`).
+                damage: 2400, splash: 55, range_min: 500, range: 2800, reload: 24.0,
+                salvo: 8, salvo_delay: 0.2, speed: 380, trajectory: Ballistic, rake: 65, loft: 9,
+                mount: true, turret_turn: 60, arc: 360, spread: 6,
+                muzzle: (-33.0, 0.0, 288.6), pivot: (-39.0, 0.0, 272.4),
+                muzzles: [
+                    (-25.6856, 18.0000, 285.8909), (-25.6856, -18.0000, 285.8909), (-25.6856, 6.0000, 285.8909), (-25.6856, -6.0000, 285.8909),
+                    (-40.3144, 18.0000, 291.3091), (-40.3144, -18.0000, 291.3091), (-40.3144, 6.0000, 291.3091), (-40.3144, -6.0000, 291.3091),
+                ],
+                targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
+                missile: true, intercept: 200, caliber: 7.0, trail: true, wake: 6, tracer: 3,
+                flash: 2.0, impact: 3.2, shockwave: 1.6,
+                plasma_grade: Some(Gravitic), fusion_strike: true,
+                sounds: (fire: "regency_gravitic_throw", impact: "regency_sunspear_hit", ground: "regency_sunspear_hit"),
+            ),
+        ],
+        mesh: "regency_colossus", icon: Titan,
+        sounds: (death: "titan_death", moving: "regency_crawl", step: "regency_footfall", step_far: "titan_step_far"),
+    ),
 ]

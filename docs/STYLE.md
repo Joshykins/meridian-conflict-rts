@@ -219,6 +219,7 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 | Reclaim tower (T1 to T3, upgrades in place) | Crucible (II, III) |
 | Wake tank (T3) | Wake |
 | Battle scorpion, assault tripod (T4) | Harrow, Strider |
+| Four-legged siege walker (T5) | Colossus |
 | Raider, light tank, mobile anti-air (T1) | Marauder, Sledge, Brazier |
 | Light artillery (T1) | Mattock |
 | Battle tank / mobile anti-air (T2) | Glaive / Vane |

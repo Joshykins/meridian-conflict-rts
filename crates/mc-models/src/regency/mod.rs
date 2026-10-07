@@ -18,6 +18,7 @@ mod bombard;
 mod brood;
 mod carillon;
 mod chassis;
+mod colossus;
 mod commander;
 mod condenser;
 mod crucible;
@@ -130,6 +131,21 @@ pub(super) const MODELS: &[ModelDef] = &[
         strider::RADIUS,
         strider::HEIGHT,
         strider::strider,
+    ),
+    // The tech 5 siege walker: a carapace on four long legs, a jawed Heavy Pinch-fusion
+    // Lance for a head, two chin guns and a rocket battery on its back (`colossus`).
+    ModelDef::new(
+        "regency_colossus",
+        colossus::RADIUS,
+        colossus::HEIGHT,
+        colossus::colossus,
+    ),
+    // A look to choose from: heavier, lower legs on the same hull (`colossus::variant_b`).
+    ModelDef::new(
+        "regency_colossus~b",
+        colossus::RADIUS,
+        colossus::HEIGHT,
+        colossus::colossus_b,
     ),
     // Factories: the land press works (`brood`), the air launch frame (`hatchery`), the
     // one-sided quay (`tidebrood`). All three upgrade in place to tech 3, the land one's
@@ -306,6 +322,9 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_reclaimer" | "regency_mattock" => 3400,
         // Three long walking legs and a plated head with two cannons.
         "regency_strider" => 7000,
+        // Four long legs, a plated carapace, the lance's jaws and coils, two chin guns and
+        // a pack of eight rocket tubes.
+        "regency_colossus" => 11000,
         "regency_wake_tank" => 5000,
         // Three belts, fusion rails and core, coaxial gun and six rocket cells.
         "regency_executioner" => 7000,
@@ -369,7 +388,7 @@ pub(super) fn reduced_share(key: &str) -> Option<f32> {
         // Faceted plates and skirts that keep their sides when reduced.
         "regency_skyspear" | "regency_fusion_howitzer" => Some(0.52),
         // Plated hulls, heads and legs: faceted solids that keep their sides when reduced.
-        "regency_strider" | "regency_wake_tank" => Some(0.5),
+        "regency_strider" | "regency_wake_tank" | "regency_colossus" => Some(0.5),
         // Bunkers, pylons and casemates of faceted plate that keep their sides reduced.
         "regency_nuke_silo" | "regency_nuke_defense" => Some(0.58),
         // Octagonal stages and prongs that keep their sides when reduced.

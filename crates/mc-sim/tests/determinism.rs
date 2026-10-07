@@ -215,6 +215,11 @@ fn setup(w: &mut World) {
                 // snapshot, its first platform docks after it with what was queued
                 // (`elevator.rs`).
                 add("aster_t5_space_elevator", 1, 250, 1600);
+                // The Regency siege walker: a lance that charges and burns a salvo of ticks, twin
+                // mounts turning on their own, unguided lofted rockets and a hull field.
+                add("regency_t5_colossus", 1, 1500, 900);
+                // Its hull field runs on power: a plant for it, or the Courier's warp has none left.
+                add("aster_t3_power", 1, 600, 150);
             }
             _ => {
                 add("aster_t4_assault_tank", 2, 1000, 900);

@@ -142,4 +142,5 @@ fn every_test_file_is_listed() {
     }
 }
 
+mod colossus;
 mod executioner;
