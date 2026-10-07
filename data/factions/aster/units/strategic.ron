@@ -21,8 +21,10 @@
         strategic: (
             kind: Nuke,
             // One warhead: about five minutes on the silo's own assembly line.
-            missile: (mass: 6000, energy: 120000, time: 18000),
-            power: 60,
+            // Its own power is high and the round long, so engineers assisting add little: a
+            // nuke is hard to rush (user, 2026-10-07).
+            missile: (mass: 6000, energy: 120000, time: 720000),
+            power: 2400,
             stock: 2,
             // Metres a second along its path once the boost is done (it comes in faster),
             // and the highest the arc goes over a long shot (`nukes::WarheadPath`).
@@ -52,8 +54,8 @@
         economy: (energy_upkeep: 25),
         strategic: (
             kind: Interceptor,
-            missile: (mass: 1500, energy: 30000, time: 4500),
-            power: 45,
+            missile: (mass: 1500, energy: 30000, time: 180000),
+            power: 1800,
             stock: 4,
             speed: 900,
             apogee: 0,

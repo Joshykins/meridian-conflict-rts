@@ -109,8 +109,8 @@ fn engineers_on_area_assist_speed_up_a_silo_in_their_ring() {
         until(&mut w, 5000, |e| matches!(e, SimEvent::RoundReady { .. })).unwrap()
     };
     assert!(
-        helped * 2 < alone,
-        "three Mason IIIs guarding a ring round the silo at least halve it: {helped} vs {alone}"
+        helped < alone && helped * 5 > alone * 4,
+        "three Mason IIIs guarding a ring round the silo speed it up only a little: {helped} vs {alone}"
     );
 }
 
@@ -440,8 +440,8 @@ fn engineers_assisting_a_silo_speed_up_its_warhead() {
         until(&mut w, 5000, |e| matches!(e, SimEvent::RoundReady { .. })).unwrap()
     };
     assert!(
-        helped * 2 < alone,
-        "three Mason IIIs (power 180) beside a silo (60) at least halve it: {helped} vs {alone}"
+        helped < alone && helped * 5 > alone * 4,
+        "three Mason IIIs (power 180) beside a silo (2400) speed it up only a little: {helped} vs {alone}"
     );
 }
 
