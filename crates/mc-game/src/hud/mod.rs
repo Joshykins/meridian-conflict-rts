@@ -46,6 +46,7 @@ pub mod survival;
 pub(crate) use build::batch::batch_linked;
 pub use selection::ordered_as;
 mod match_state;
+mod real_clock;
 pub mod style;
 pub mod thumbs;
 mod titan;
@@ -263,6 +264,8 @@ pub struct Hud {
     covered: Vec<Rect>,
     /// Toasts, launch warnings and event notes, merged (`notices`).
     notices: notices::Notices,
+    /// Real time in the match, for the mission time's hover tip (`real_clock`).
+    real_clock: real_clock::RealClock,
     /// The economy's build-first switches and stall notes (`focus`).
     focus_ui: focus::FocusUi,
     actions: Vec<HudAction>,

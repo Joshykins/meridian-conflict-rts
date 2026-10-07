@@ -35,6 +35,12 @@ impl Hud {
             rgb(palette::TEXT, 1.0),
             &clock(view.status.tick as f32 * 0.1),
         );
+        let clock_area = Rect::new(r.x, r.y, 132.0, r.h);
+        let real = self.real_clock.elapsed(ui.time, view.status.tick);
+        if ui.interact(id("hud-clock", 0), clock_area, true).hovered {
+            let text = format!("Real time  {}", clock(real));
+            super::build::tip(ui, r.x, r.bottom() + 6.0, &text);
+        }
         ui.vline(r.x + 132.0, r.y + 9.0, r.h - 18.0, rgb(palette::LINE, 0.14));
 
         let sx = r.x + 196.0;
