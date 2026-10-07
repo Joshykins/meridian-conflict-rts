@@ -36,9 +36,9 @@ const CUT: f32 = 0.12;
 /// Metres apart the pools a beam glasses the ground with are laid.
 const GLASS_STEP: f32 = 2.4;
 /// How many times wider than the star beam its halo is.
-const HALO: f32 = 3.2;
+const HALO: f32 = 4.5;
 /// Radius, in beam widths, of the plasma spreading over the ground where a star beam strikes.
-const SPILL_RADIUS: f32 = 2.8;
+const SPILL_RADIUS: f32 = 9.0;
 /// Seconds a glassed pool takes to crust over and cool.
 const GLASS_COOL: f32 = 9.0;
 
@@ -55,7 +55,6 @@ struct Held {
     dir: Vec3,
     range: f32,
     width: f32,
-    splash: f32,
     fusion: bool,
     /// Drawn as the star, and melts the ground without digging (`Weapon::star_beam`).
     star: bool,
@@ -65,7 +64,7 @@ struct Held {
     struck: bool,
     new: bool,
     /// Where it last glassed the ground.
-    glassed: Option<(Vec2, f32)>,
+    glassed: Option<Vec2>,
 }
 
 /// A thrown charge swelling at its muzzle.
@@ -202,7 +201,6 @@ impl Renderer {
                 dir,
                 range,
                 width,
-                splash: w.splash.to_f32(),
                 fusion,
                 star,
                 last: time,
@@ -244,32 +242,15 @@ impl Renderer {
         let fusion = h.fusion;
         let star = h.star;
         // It glasses the ground where it lands, a pool at a time as the strike walks.
-        let glass = (star || !on_unit)
-            && h.glassed.is_none_or(|(g, last)| {
-                g.distance(at.truncate()) > GLASS_STEP || (star && time - last >= 1.0)
-            });
+        let glass = !on_unit
+            && h.glassed
+                .is_none_or(|g| g.distance(at.truncate()) > GLASS_STEP);
         if glass {
-            h.glassed = Some((at.truncate(), time));
+            h.glassed = Some(at.truncate());
         }
         if glass {
-            if star {
-                // A narrow white-hot contact inside a broad, slower red melt. Heating
-                // the entire splash white every second obscures both terrain and units.
-                self.ground_melt.burn(super::ground_melt::Burn {
-                    pos: at.truncate(),
-                    radius: self.blueprints.unit(blueprint).weapons[weapon as usize]
-                        .splash
-                        .to_f32(),
-                    peak: 0.52,
-                    start: time,
-                    rise: 1.6,
-                    cool: 12.0,
-                });
-                self.ground_melt.melt(at.truncate(), width * 0.9, time, 4.0);
-            } else {
-                self.ground_melt
-                    .melt(at.truncate(), width * 2.8, time, GLASS_COOL);
-            }
+            self.ground_melt
+                .melt(at.truncate(), width * 2.8, time, GLASS_COOL);
             // The excavation lance digs as it glasses; the star only melts.
             if fusion && !star {
                 self.impact_craters.dig(at.truncate(), width * 2.2, time);
@@ -349,8 +330,8 @@ impl Renderer {
             Vec3::ZERO,
             time,
             0.12,
-            (width * 0.45, width * 0.7),
-            Vec3::new(1.0, 0.92, 0.85) * 4.0,
+            (width * 1.1, width * 1.5),
+            Vec3::new(1.0, 0.92, 0.85) * 7.0,
             0.0,
         );
         self.push_lit(
@@ -365,22 +346,15 @@ impl Renderer {
         );
         // Droplets of melt: out in a ring and up, falling back under gravity.
         let up = if on_unit { 0.6 } else { 1.0 };
-        for _ in 0..12 {
+        for _ in 0..5 {
             let a = self.scatter.unit() * std::f32::consts::TAU;
-            let out = width * (0.7 + self.scatter.unit() * 1.2);
+            let out = 7.0 + self.scatter.unit() * 13.0;
             let vel = Vec3::new(
                 a.cos() * out,
                 a.sin() * out,
-                width * (0.6 + self.scatter.unit() * 0.9) * up,
+                (10.0 + self.scatter.unit() * 16.0) * up,
             );
-            self.push_puff(
-                PUFF_SPARK,
-                at + Vec3::Z * 0.4,
-                vel,
-                time,
-                1.8,
-                (width * 0.035, width * 0.006),
-            );
+            self.push_puff(PUFF_SPARK, at + Vec3::Z * 0.4, vel, time, 0.9, (0.34, 0.07));
         }
     }
 
@@ -538,7 +512,7 @@ impl Renderer {
                     let fade = 1.0 - ((time - h.last - tick * 1.5) / CUT).clamp(0.0, 1.0);
                     fx.spills.push(StainInstance {
                         pos: h.to[1].truncate().to_array(),
-                        radius: h.splash.min(h.width * SPILL_RADIUS).max(h.width * 1.4),
+                        radius: h.width * SPILL_RADIUS,
                         strength_seed: (fade * 255.0) as u32 | stain::SPILL,
                     });
                 }

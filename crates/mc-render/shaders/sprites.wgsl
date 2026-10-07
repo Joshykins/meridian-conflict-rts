@@ -994,29 +994,38 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
             return vec4<f32>(in.color * (thread + sheath) * alive, 1.0);
         }
         if in.shape.y > 6.5 {
-            // Siege confinement: a narrow, continuous red corona with fine moving
-            // striations. End taper keeps the muzzle and impact silhouettes readable.
-            let u = in.uv.x * 0.5 + 0.5;
-            let run = u * -in.shape.x;
-            let t = globals.camera.w;
-            let flow = value_noise2(vec2<f32>(run * 0.06 - t * 12.0, in.uv.y * 6.0), 1.0);
-            let envelope = smoothstep(0.0, 0.035, u) * (1.0-smoothstep(0.96, 1.0, u));
-            let glow = pow(across, 4.5) * (0.14 + 0.12 * flow) * envelope;
-            return vec4<f32>(vec3<f32>(1.0, 0.025, 0.015) * glow * in.color.r, 1.0);
-        }
-        if in.shape.y > 6.4 {
-            // A dense white-red cutting filament, edged by fine helical confinement
-            // threads. Smooth pressure waves move outward without strobing.
+            // The star's halo: a broad translucent veil round the beam. Slow ragged sheets of
+            // plasma stream down it along the beam, twisting about it, so it reads as a
+            // flowing envelope of gas and never a solid tube; it thins to nothing at its
+            // rim and is faint everywhere, laid over what it hides rather than blotting it.
             let run = (in.uv.x * 0.5 + 0.5) * -in.shape.x;
             let t = globals.camera.w;
-            let pressure = 0.85 + 0.15 * sin(run * 0.04 - t * 8.0);
-            let braid = sin(run * 0.075 - t * 9.0) * 0.24;
-            let strands = exp(-pow(in.uv.y - braid, 2.0) * 220.0)
-                + exp(-pow(in.uv.y + braid, 2.0) * 220.0);
-            let sheath = vec3<f32>(1.0, 0.025, 0.018) * pow(across, 2.6) * 1.8;
-            let core = vec3<f32>(1.0, 0.79, 0.70) * pow(across, 18.0) * 5.5;
-            let threads = vec3<f32>(1.0, 0.16, 0.07) * strands * 0.65;
-            return vec4<f32>((sheath + core + threads) * pressure * in.color.r, 1.0);
+            let twist = in.uv.y * 2.2 + run * 0.006;
+            let sheets = value_noise2(vec2<f32>(run * 0.018 - t * 26.0, twist + t * 0.9), 1.0) * 0.6
+                + value_noise2(vec2<f32>(run * 0.05 - t * 40.0, twist * 2.3 - t * 1.7), 1.0) * 0.4;
+            let veil = smoothstep(0.25, 0.85, sheets);
+            let hue = prism(run * 0.008 + sheets * 0.8 - t * PRISM_RATE * 2.0);
+            let body = pow(across, 1.7);
+            let haze = mix(vec3<f32>(0.62, 0.42, 1.0), hue, 0.6);
+            return vec4<f32>(haze * body * (0.25 + 1.3 * veil) * in.color.r, 1.0);
+        }
+        if in.shape.y > 6.4 {
+            // The star (`Weapon::star_beam`): pinch fusion held as one beam, drawn as the
+            // power generator's star is. A white-hot core of fusing plasma in a broad sheath
+            // of the prism's pinks, drifting patches of colour run down it and cool to
+            // lavender at its rim (never red), and fusion events strobe along it, each
+            // swelling the core and flaring the sheath for an instant.
+            let run = (in.uv.x * 0.5 + 0.5) * -in.shape.x;
+            let t = globals.camera.w;
+            let cell = run * 0.03 - t * 14.0;
+            let burst = exp(-pow(fract(cell) - 0.5, 2.0) * 60.0) * step(0.35, hash11(floor(cell) + 3.7));
+            let drift = value_noise2(vec2<f32>(run * 0.04 - t * 6.0, in.uv.y * 2.0), 1.0);
+            let hue = prism(run * 0.012 + drift * 0.7 - t * PRISM_RATE * 3.0);
+            let warm = mix(hue, vec3<f32>(1.0, 0.1, 0.14), 0.7);
+            let sheath = mix(vec3<f32>(0.8, 0.62, 1.0), warm, 0.9) * pow(across, 0.8)
+                * (3.4 + 3.0 * burst);
+            let core = vec3<f32>(1.0, 0.95, 0.96) * pow(across, mix(9.0, 4.5, burst)) * (11.0 + 20.0 * burst);
+            return vec4<f32>((sheath + core) * in.color.r, 1.0);
         }
         if in.shape.y > 6.1 {
             // Excavation fusion: the Sunspear/shield prism around a white-hot core.
