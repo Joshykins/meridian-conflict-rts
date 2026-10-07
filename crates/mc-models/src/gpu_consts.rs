@@ -69,9 +69,9 @@ impl Literal for f32 {
 }
 
 shared! {
-    /// Graphite assault armour and red inlaid optics, shared by authored models.
-    pub mod sentry as "SENTRY_" {
-        pub const PATTERN: u32 = 40;
+    /// Standard Regency plate with recessed red lamps, not a separate armour finish.
+    pub mod ember_plate as "EMBER_PLATE_" {
+        // Retired pattern 40: the Executioner's separate graphite finish.
         pub const SLOT: u32 = 41;
         pub const RIM: u32 = 42;
     }

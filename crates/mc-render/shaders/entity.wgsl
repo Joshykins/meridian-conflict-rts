@@ -3002,7 +3002,7 @@ fn material_of(id: u32, owner: u32) -> Pbr {
         case 15u: { m.albedo = vec3<f32>(0.28, 0.03, 0.03); m.emissive = vec3<f32>(1.0, 0.08, 0.06) * 5.0; m.roughness = 0.28; }
         // Regency construction: a violet with red in it (their counterpart to ARC's amber).
         case 16u: { m.albedo = vec3<f32>(0.18, 0.05, 0.3); m.emissive = vec3<f32>(0.66, 0.12, 1.0) * 5.0; m.roughness = 0.25; }
-        case 17u: { m.albedo = vec3<f32>(0.3, 0.02, 0.02); m.emissive = vec3<f32>(1.0, 0.07, 0.05) * 5.5; m.roughness = 0.25; }
+        case 17u: { m.albedo = vec3<f32>(0.3, 0.02, 0.02); m.emissive = regency_lamp_light(); m.roughness = 0.25; }
         // Precursor alloy, its dark joints, and its cold blue-white light.
         // Precursor alloy: aged metal, not paint. Weathered on props below.
         case 18u: { m.albedo = vec3<f32>(0.44, 0.45, 0.46); m.metallic = 0.55; m.roughness = 0.5; }
@@ -3291,7 +3291,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         for (var k = 0u; k < 4u; k++) {
             ri.grads[k] = reg_face_grad(df1[k], df2[k], dl1, dl2);
         }
-        ri.sentry = (in.model_class >> 16u) & 0xFFu;
+        ri.optic = (in.model_class >> 16u) & 0xFFu;
         ri.nanite = ((in.model_class >> 16u) & 0xFFu) == NANITE_PATTERN_SLOT;
         ri.time = time;
         ri.unit = in.state.w;
@@ -3829,12 +3829,8 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             // machinery (regency.wgsl). The film's hue follows the plate's own shape, not
             // its scan relief: each bump would flip it between colours.
             let face_seed = f32((in.model_class >> 24u) & 0xFFu) / 255.0;
-            if in.material != MAT_TREAD && in.material != MAT_TEAM {
-                m = regency_paint(m, in.material == MAT_METAL, in.material == MAT_PLATING, regency,
-                    dot(normalize(in.normal), v), face_seed,
-                    ((in.model_class >> 16u) & 0xFFu) >= SENTRY_PATTERN
-                    && ((in.model_class >> 16u) & 0xFFu) <= SENTRY_RIM);
-            }
+            m = regency_paint(m, in.material == MAT_METAL, in.material == MAT_PLATING, regency,
+                dot(normalize(in.normal), v), face_seed);
         }
         let unit_at = vec3<f32>(in.state.w * 131.0, in.state.w * 71.0, in.state.w * 17.0);
         let rise = in.state.z / max(line, 0.02);
@@ -4342,11 +4338,7 @@ fn fs_hull(in: VsOut) -> @location(0) vec4<f32> {
     // Clear glass face-on: the lattice and the current carry the field, the
     // rim carries the shape. A personal field at rest is a faint sheen on the
     // plates — hits, the unfold and the peel carry it at full strength.
-    // Graphite assault armour carries its resting field beneath the plates.
-    // Hits, opening and collapse keep their full intensity above this quiet skin.
-    let skin_pattern = (in.model_class >> 16u) & 0xFFu;
-    let quiet = HULL_IDLE * select(1.0, 0.12,
-        skin_pattern >= SENTRY_PATTERN && skin_pattern <= SENTRY_RIM);
+    let quiet = HULL_IDLE;
     var color = rim_c * (fres * 0.62 * live + stress * 0.18 + 0.08 * live) * quiet;
     color += seam_c * (seam * 0.55 * live + current * 1.25 + stress * seam * 0.4) * quiet;
     color += energy * (plate * 0.1 * breathe + flow * 0.18 + folds * 0.9) * quiet;

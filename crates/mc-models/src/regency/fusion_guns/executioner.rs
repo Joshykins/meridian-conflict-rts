@@ -57,7 +57,7 @@ fn turret(b: &mut MeshBuilder) {
         if !b.coarse() {
             // The visor is the front bevel itself, carrying a recessed red slot.
             plate(b);
-            b.pattern(pattern::REG_SENTRY_SLOT);
+            b.pattern(pattern::EMBER_SLOT);
             b.face(&[
                 v3(1.42, 0.08, 5.9),
                 v3(0.75, 1.65, 5.99),
@@ -106,7 +106,7 @@ fn cannon(b: &mut MeshBuilder) {
         );
         if !b.coarse() && i % 2 == 1 {
             // A real jacket end face with a hot gasket drawn in its surface.
-            b.pattern(pattern::REG_SENTRY_RIM);
+            b.pattern(pattern::EMBER_RIM);
             b.face(&barrel_ring(x + length + 0.006, 0.0, w * 0.86, w * 0.86));
         }
     }
@@ -122,7 +122,7 @@ fn cannon(b: &mut MeshBuilder) {
     // Recessed muzzle: a black cavity, bounded by an armoured octagonal lip.
     let outer = barrel_ring(8.5, 0.0, 0.58, 0.55);
     let inner = barrel_ring(8.5, 0.0, 0.36, 0.34);
-    b.pattern(pattern::REG_SENTRY_RIM);
+    b.pattern(pattern::EMBER_RIM);
     for k in 0..8 {
         let n = (k + 1) % 8;
         b.face(&[outer[k], outer[n], inner[n], inner[k]]);

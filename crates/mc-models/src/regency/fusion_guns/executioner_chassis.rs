@@ -1,17 +1,11 @@
 //! Three separate armoured track sponsons: broad flanks and a long central prow.
 use super::super::kit::v3;
 use crate::builder::{MeshBuilder, Section};
-use crate::material::{METAL, PLATING_DARK, TEAM, TREAD};
+use crate::material::{TEAM, TREAD};
 use crate::{part, pattern};
 use glam::Vec3;
 
-pub(super) fn metal(b: &mut MeshBuilder) {
-    b.paint(METAL).pattern(pattern::REG_SENTRY);
-}
-
-pub(super) fn plate(b: &mut MeshBuilder) {
-    b.paint(PLATING_DARK).pattern(pattern::REG_SENTRY);
-}
+pub(super) use super::super::kit::{dark_plate as plate, metal};
 
 pub(super) fn body(b: &mut MeshBuilder) {
     b.set_treads(5.0, 2.3, -10.6);
@@ -40,7 +34,7 @@ pub(super) fn body(b: &mut MeshBuilder) {
                 true,
             );
             b.with_part(part::LOCOMOTION, |b| {
-                b.paint(TREAD).pattern(pattern::REG_SENTRY);
+                b.paint(TREAD);
                 b.face(&[
                     v3(nose + 0.01, y - half * 0.8, 0.0),
                     v3(nose + 0.01, y + half * 0.8, 0.0),
@@ -77,7 +71,7 @@ pub(super) fn body(b: &mut MeshBuilder) {
         wedge(b, 1.4, -10.7, 4.3, 1.12, 3.05, 1.5, false);
         wedge(b, 5.1, -5.2, 2.35, 0.7, 2.5, 1.1, false);
         // The reference's blue slash stays team-coloured for army readability.
-        b.paint(TEAM).pattern(pattern::REG_SENTRY);
+        b.paint(TEAM);
         let a = v3(-9.127, 5.207, 3.92);
         let c = v3(-10.7, 4.588, 4.55);
         let d = v3(-4.892, 4.154, 4.55);
@@ -133,7 +127,7 @@ pub(super) fn wedge(
             // Only the short physical tip panel carries a running light.
             let a = upper[0].lerp(ridge, 0.28);
             let c = upper[1].lerp(ridge, 0.28);
-            b.pattern(pattern::REG_SENTRY_SLOT);
+            b.pattern(pattern::EMBER_SLOT);
             b.face(&[upper[0], upper[1], c, a]);
             plate(b);
             b.face(&[a, c, ridge]);
@@ -145,7 +139,7 @@ pub(super) fn wedge(
 
 fn track(b: &mut MeshBuilder, y: f32, nose: f32, tail: f32, half: f32) {
     b.with_part(part::LOCOMOTION, |b| {
-        b.paint(TREAD).pattern(pattern::REG_SENTRY);
+        b.paint(TREAD);
         let outline = [
             [tail + 0.7, 0.0],
             [nose - 0.65, 0.0],

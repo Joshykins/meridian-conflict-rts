@@ -54,7 +54,7 @@ struct RegencyIn {
     seed: f32,
     // A nanite face (`nanite::PATTERN_SLOT`): a lit slot down its middle.
     nanite: bool,
-    sentry: u32,
+    optic: u32,
     // Seconds, and the unit's own random, zero to one.
     time: f32,
     unit: f32,
@@ -73,6 +73,12 @@ struct RegencyLook {
     glow: vec3<f32>,
 }
 
+// The red lamp colour used by both the existing GLOW_LASER material and
+// surface-inlaid optics, so their hue and brightness cannot drift apart.
+fn regency_lamp_light() -> vec3<f32> {
+    return vec3<f32>(1.0, 0.07, 0.05) * 5.5;
+}
+
 fn regency_none() -> RegencyLook {
     return RegencyLook(vec3<f32>(0.0), 1.0, 0.0, 0.0, vec3<f32>(0.0));
 }
@@ -80,7 +86,7 @@ fn regency_none() -> RegencyLook {
 // Regency plate, or Regency plate with nanite slots let in (both are coloured here).
 fn regency_pattern(p: u32) -> bool {
     return p == PAT_EMBER || p == NANITE_PATTERN_SLOT
-        || p == SENTRY_PATTERN || p == SENTRY_SLOT || p == SENTRY_RIM;
+        || p == EMBER_PLATE_SLOT || p == EMBER_PLATE_RIM;
 }
 
 // A nanite face's slot, down the middle of the face the long way: how far across from
@@ -380,41 +386,23 @@ fn regency_plate(i: RegencyIn) -> RegencyLook {
     out.tone *= 1.0 + 0.15 * surf_fbm3(i.local + vec3<f32>(21.0, 4.0, 13.0), i.scale * 1.6, fw);
     // Grime in the seams dulls them.
     out.rough += 0.3 * (1.0 - smoothstep(w, w * 5.0, min(seams.d.x, line.x))) * seen;
-    if i.sentry >= SENTRY_PATTERN && i.sentry <= SENTRY_RIM {
-        // Small triangular laminates within the large authored armour facets.
-        // Project onto the plate's dominant plane, in model space, without swim.
-        let an = abs(i.n);
-        var uv = select(select(i.local.xy, i.local.xz, an.y > an.z),
-            i.local.yz, an.x > max(an.y, an.z)) / (i.scale * 0.32);
-        uv += vec2<f32>(sin(dot(uv, vec2<f32>(1.7, 0.9))),
-            sin(dot(uv, vec2<f32>(0.8, 1.3)))) * 0.13;
-        let cell = floor(uv);
-        let q = fract(uv);
-        let diagonal = select(q.x + q.y - 1.0, q.x - q.y,
-            hash11(dot(cell, vec2<f32>(17.1, 93.7))) > 0.5);
-        let seed = hash11(dot(cell, vec2<f32>(71.3, 29.7)) + select(0.0, 5.8, diagonal > 0.0));
-        let cut = min(min(min(q.x, q.y), min(1.0-q.x, 1.0-q.y)), abs(diagonal)*0.707);
-        let line = 1.0 - smoothstep(0.006, max(0.014, fw/i.scale), cut);
-        out.tone = (0.78 + 0.32 * seed) * (1.0 - 0.22 * line) * (1.0 + steel.tone * 0.25);
-        out.lift *= 0.25;
-        out.slope *= 0.22;
-        out.rough = 0.1 + 0.08 * seed;
-        if i.sentry == SENTRY_SLOT {
-            var optic = i;
-            optic.scale = min(i.scale, 0.8);
-            let slot = reg_nanite_slot(optic);
-            if slot.z > 0.0 {
-                let half = max(slot.z * 0.32, 0.035);
-                let d = max(slot.x - half, slot.z * 2.1 - slot.y);
-                let lit = 1.0 - smoothstep(-fw, fw, d);
-                out.tone *= 1.0 - 0.9 * (1.0-smoothstep(-fw, fw, d-half));
-                out.glow = vec3<f32>(7.0, 0.035, 0.015) * lit;
-            }
-        } else if i.sentry == SENTRY_RIM {
-            let inset = max(i.scale * 0.028, o.small * 0.18);
-            let lit = surf_band(o.e - inset, i.scale * 0.013, fw);
-            out.glow = vec3<f32>(3.5, 0.025, 0.012) * lit;
+    // Lamps alter only their inset and emission. All the surrounding plate uses
+    // the same scanned steel, relief and iridescent film as every Regency unit.
+    if i.optic == EMBER_PLATE_SLOT {
+        var optic = i;
+        optic.scale = min(i.scale, 0.8);
+        let slot = reg_nanite_slot(optic);
+        if slot.z > 0.0 {
+            let half = max(slot.z * 0.32, 0.035);
+            let d = max(slot.x - half, slot.z * 2.1 - slot.y);
+            let lit = 1.0 - smoothstep(-fw, fw, d);
+            out.tone *= 1.0 - 0.9 * (1.0-smoothstep(-fw, fw, d-half));
+            out.glow = regency_lamp_light() * lit;
         }
+    } else if i.optic == EMBER_PLATE_RIM {
+        let inset = max(i.scale * 0.028, o.small * 0.18);
+        let lit = surf_band(o.e - inset, i.scale * 0.013, fw);
+        out.glow = regency_lamp_light() * lit;
     }
     if i.nanite {
         out = reg_nanite(i, out, fw);
@@ -477,7 +465,7 @@ fn reg_film(cos_v: f32, seed: f32, pale: bool) -> vec3<f32> {
 // Regency colours over the shared palette's (`lum` keeps the model's own light and
 // shade): plate (`PLATING_DARK`, and the paler `PLATING`), the darker trim (`ACCENT`) and
 // the dark graphite machinery (`METAL`).
-fn regency_paint(m_in: Pbr, works: bool, pale: bool, look: RegencyLook, cos_v: f32, seed: f32, sentry: bool) -> Pbr {
+fn regency_paint(m_in: Pbr, works: bool, pale: bool, look: RegencyLook, cos_v: f32, seed: f32) -> Pbr {
     var m = m_in;
     let lum = dot(m.albedo, vec3<f32>(0.3, 0.59, 0.11));
     if works {
@@ -494,13 +482,6 @@ fn regency_paint(m_in: Pbr, works: bool, pale: bool, look: RegencyLook, cos_v: f
         m.albedo = mix(reg_film(cos_v, seed, pale) * tone, REG_STEEL_LIT, saturate(look.lift) * 0.5);
         m.metallic = 0.55;
         m.roughness = clamp(0.42 + look.rough - 0.1 * saturate(look.lift), 0.24, 0.8);
-    }
-    if sentry && !works {
-        let red = smoothstep(0.35, 0.95, 1.0 - saturate(cos_v)) * 0.65;
-        m.albedo = mix(vec3<f32>(0.065, 0.069, 0.073), vec3<f32>(0.22, 0.009, 0.014), red) * look.tone;
-        m.albedo += REG_STEEL_LIT * saturate(look.lift) * 0.12;
-        m.metallic = 0.42;
-        m.roughness = clamp(0.48 + look.rough, 0.4, 0.72);
     }
     return m;
 }
