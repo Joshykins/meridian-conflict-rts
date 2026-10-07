@@ -69,6 +69,13 @@ impl Literal for f32 {
 }
 
 shared! {
+    /// Graphite assault armour and red inlaid optics, shared by authored models.
+    pub mod sentry as "SENTRY_" {
+        pub const PATTERN: u32 = 40;
+        pub const SLOT: u32 = 41;
+        pub const RIM: u32 = 42;
+    }
+
     /// Courier stern door leaves: the side is attached to the whole leaf, including
     /// vertices on its centre seam. Only used on `part::HOLD_DOOR`.
     pub mod hold_door as "HOLD_DOOR_" {

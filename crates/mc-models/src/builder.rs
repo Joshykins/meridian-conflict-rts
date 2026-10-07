@@ -1739,7 +1739,14 @@ impl MeshBuilder {
         };
         // A Regency face no rectangle fits still gets its outline: its own edges.
         let edges = (frame.is_none()
-            && matches!(self.pattern, pattern::EMBER | pattern::NANITE_SLOT)
+            && matches!(
+                self.pattern,
+                pattern::EMBER
+                    | pattern::NANITE_SLOT
+                    | pattern::REG_SENTRY
+                    | pattern::REG_SENTRY_SLOT
+                    | pattern::REG_SENTRY_RIM
+            )
             && matches!(self.framing, Framing::Flat))
         .then(|| FaceEdges::of(points, normal))
         .flatten();

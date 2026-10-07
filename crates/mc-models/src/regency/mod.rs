@@ -319,7 +319,7 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         // a pack of eight rocket tubes.
         "regency_colossus" => 11000,
         "regency_wake_tank" => 5000,
-        // Three belts, fusion rails and core, coaxial gun and six rocket cells.
+        // Three armoured belts, layered crown, segmented lance and six rocket cells.
         "regency_executioner" => 7000,
         "regency_bombard" => 4500,
         // Tech 3's kit: the ram, skirts, fin ring and two more lifts.

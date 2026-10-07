@@ -181,7 +181,13 @@ pub mod pattern {
     /// along it in violet (`gpu_consts::nanite`, regency.wgsl): where a model shows its
     /// nanites, the light is in the plate, not a lit piece.
     pub const NANITE_SLOT: u32 = crate::gpu_consts::nanite::PATTERN_SLOT;
-    pub const LAST: u32 = NANITE_SLOT;
+    /// Faceted graphite assault armour with restrained crimson side reflections.
+    pub const REG_SENTRY: u32 = crate::gpu_consts::sentry::PATTERN;
+    /// The same armour with a red optic recessed into its face.
+    pub const REG_SENTRY_SLOT: u32 = crate::gpu_consts::sentry::SLOT;
+    /// The same armour with a hot red gasket inside the face perimeter.
+    pub const REG_SENTRY_RIM: u32 = crate::gpu_consts::sentry::RIM;
+    pub const LAST: u32 = REG_SENTRY_RIM;
 }
 
 /// Which rigid part of the model a vertex belongs to. The vertex shader
