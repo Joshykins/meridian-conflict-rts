@@ -304,7 +304,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     } else if look == 3u {
         trace = length(stride) * 0.85;
     } else if look == 4u {
-        trace = min(length(stride) * 0.45, max(p.size, 0.5) * 6.5);
+        trace = min(length(stride) * 0.65, max(p.size, 0.5) * 10.0);
     }
     if (p.color & 0x200u) != 0u {
         trace = min(trace, distance(head, shot_muzzle(p)));
@@ -937,11 +937,11 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
                 }
                 let body = pow(1.0 - y, 0.9);
                 let inner = pow(max(1.0 - y * 2.0, 0.0), 2.0) * smoothstep(0.3, 0.8, u);
-                let heart = pow(max(1.0 - y * 4.0, 0.0), 2.0) * smoothstep(0.55, 0.85, u);
+                let heart = pow(max(1.0 - y * 3.2, 0.0), 1.6) * smoothstep(0.25, 0.78, u);
                 let flicker = 0.85 + 0.15 * sin(time * 53.0 + u * 13.0 + in.uv.y * 3.0);
                 let rgb = vec3<f32>(1.0, 0.035, 0.03) * body * 4.5 * flicker
                     + vec3<f32>(1.0, 0.25, 0.22) * inner * 2.2
-                    + vec3<f32>(1.0, 0.62, 0.56) * heart * 3.6;
+                    + white * heart * 7.5;
                 return vec4<f32>(rgb * smoothstep(0.0, 0.2, u) * in.color.r, 1.0);
             }
             if in.shape.y > 9.1 {

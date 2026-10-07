@@ -15,7 +15,7 @@
 use glam::Vec3;
 
 use super::super::Renderer;
-use super::{Glow, BURST, GLOB, GLOW, HOT, MOTE, RED, WHITE};
+use super::{Glow, BURST, GLOB, GLOW, HOT, MOTE, RED, STREAK, WHITE};
 
 impl Renderer {
     /// Plasmeric bolts leaving the mouth at `at` down `dir`: `rounds` of them
@@ -37,16 +37,28 @@ impl Renderer {
         for k in 0..rounds {
             let when = time + k as f32 * round_gap;
             let mouth = at + dir * 0.3;
-            let s = 1.8 * flash;
+            let s = 2.4 * flash;
             // The snap: the field letting go, white-hot and gone in a blink.
             self.push_lit(
                 GLOW,
                 mouth,
                 Vec3::ZERO,
                 when,
-                0.06,
-                (s * 0.3, s * 0.55),
-                HOT * 3.2,
+                0.075,
+                (s * 0.35, s * 0.65),
+                WHITE * 4.5,
+                0.0,
+            );
+            // A directional core makes the discharge read as a gun firing even
+            // when the round has already crossed the muzzle between frames.
+            self.push_lit(
+                STREAK,
+                mouth,
+                dir * s * 2.8,
+                when,
+                0.09,
+                (s * 0.13, s * 0.025),
+                HOT * 5.5,
                 0.0,
             );
             // The bloom thrown forward off the mouth with the bolt.
@@ -55,8 +67,8 @@ impl Renderer {
                 mouth + dir * s * 0.45,
                 dir * s * 6.0,
                 when,
-                0.13,
-                (s * 0.35, s * 1.25),
+                0.14,
+                (s * 0.3, s * 1.05),
                 RED * 3.0,
                 0.0,
             );
@@ -95,7 +107,7 @@ impl Renderer {
             }
             self.plasma_fx.guns.light(Glow {
                 pos: mouth,
-                color: RED.lerp(HOT, 0.2) * 95.0 * flash,
+                color: RED.lerp(HOT, 0.25) * 125.0 * flash,
                 range: 16.0 * flash.max(0.6),
                 start: when,
                 life: 0.12,

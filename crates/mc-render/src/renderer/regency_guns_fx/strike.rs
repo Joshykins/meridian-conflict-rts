@@ -45,15 +45,15 @@ impl Renderer {
     /// thrown, the ground seared to a glowing spot. Hard-edged and short, no mist: a stream
     /// of them lands.
     fn bolt_splash(&mut self, at: Vec3, impact: f32, ground: bool, start: f32) {
-        let s = 2.8 * impact;
+        let s = 3.6 * impact;
         self.push_lit(
             GLOW,
             at,
             Vec3::ZERO,
             start,
-            0.07,
+            0.085,
             (s * 0.4, s * 0.7),
-            HOT * 3.4,
+            WHITE * 4.8,
             0.0,
         );
         self.push_lit(
@@ -61,8 +61,8 @@ impl Renderer {
             at,
             Vec3::ZERO,
             start,
-            0.3,
-            (s * 0.35, s * 1.15),
+            0.24,
+            (s * 0.3, s * 1.1),
             RED * 3.4,
             0.0,
         );
@@ -77,6 +77,28 @@ impl Renderer {
             RED.lerp(HOT, 0.45) * 2.6,
             0.0,
         );
+        // Short jagged fragments show the containment breaking apart, before
+        // the slower molten droplets spread. Bounded to five per bolt.
+        for _ in 0..5 {
+            let rise = if ground {
+                0.25 + self.scatter.unit()
+            } else {
+                self.scatter.signed()
+            };
+            let out =
+                Vec3::new(self.scatter.signed(), self.scatter.signed(), rise).normalize_or(Vec3::Z);
+            let reach = s * (0.8 + 0.7 * self.scatter.unit());
+            self.push_lit(
+                STREAK,
+                at,
+                out * reach,
+                start,
+                0.14,
+                (s * 0.045, s * 0.012),
+                HOT * 5.0,
+                0.0,
+            );
+        }
         for _ in 0..6 {
             let rise = if ground {
                 0.45 + self.scatter.unit()
@@ -122,12 +144,12 @@ impl Renderer {
         }
         if ground {
             self.ground_melt
-                .melt(at.truncate(), 0.9 * impact, start, 3.0);
+                .melt(at.truncate(), 1.25 * impact, start, 3.0);
         }
         self.plasma_fx.guns.light(Glow {
             pos: at + Vec3::Z,
-            color: RED.lerp(HOT, 0.15) * 110.0 * impact,
-            range: 13.0 * impact,
+            color: RED.lerp(HOT, 0.15) * 145.0 * impact,
+            range: 16.0 * impact,
             start,
             life: 0.35,
             pulse: 0.0,
