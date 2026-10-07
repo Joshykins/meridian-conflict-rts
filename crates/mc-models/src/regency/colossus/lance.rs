@@ -2,7 +2,11 @@
 use super::super::commander::form::{blade, ring, sleeve, OCT};
 use super::super::kit::{dark_plate, metal, seam, v3};
 use super::super::machine::hoop_on;
-use super::super::turrets::sunspear::coil_light;
+use crate::material::GLOW_LASER;
+
+fn coil_light(b: &mut MeshBuilder, stage: u32) {
+    b.paint(GLOW_LASER).pattern(pattern::COIL + stage);
+}
 use super::LANCE_PIVOT;
 use crate::builder::MeshBuilder;
 use crate::gpu_consts::charge_gear::{EXTEND, SPREAD};
@@ -37,11 +41,11 @@ fn cheek(b: &mut MeshBuilder) {
     // The sloping brow, hard chine and undercut jaw form a helmet rather than a barrel.
     let cross = |x: f32, w: f32, h: f32| {
         vec![
-            v3(x, 0.12, h * 0.85),
-            v3(x, w * 0.6, h),
+            v3(x, 1.9, h * 0.85),
+            v3(x, (w * 0.6).max(2.3), h),
             v3(x, w, h * 0.25),
             v3(x, w * 0.88, -h * 0.65),
-            v3(x, 0.12, -h * 0.75),
+            v3(x, 1.9, -h * 0.75),
         ]
     };
     dark_plate(b);
@@ -100,10 +104,10 @@ fn cheek(b: &mut MeshBuilder) {
             dark_plate(b);
             b.pattern(pattern::COIL + i);
             b.face(&[
-                v3(3.0 + i as f32 * 2.6, 0.11, -1.5),
-                v3(5.0 + i as f32 * 2.6, 0.11, -1.5),
-                v3(5.0 + i as f32 * 2.6, 0.11, 1.5),
-                v3(3.0 + i as f32 * 2.6, 0.11, 1.5),
+                v3(3.0 + i as f32 * 2.6, 1.89, -1.5),
+                v3(5.0 + i as f32 * 2.6, 1.89, -1.5),
+                v3(5.0 + i as f32 * 2.6, 1.89, 1.5),
+                v3(3.0 + i as f32 * 2.6, 1.89, 1.5),
             ]);
         }
     }
@@ -113,9 +117,9 @@ fn core(b: &mut MeshBuilder) {
     metal(b);
     b.cylinder_between(
         v3(3.0, 0.0, 0.0),
-        v3(19.0, 0.0, 0.0),
-        1.25,
-        0.9,
+        v3(21.2, 0.0, 0.0),
+        1.55,
+        1.3,
         b.sides(12),
     );
     let count = if b.fine() { 6 } else { 3 };
@@ -124,18 +128,26 @@ fn core(b: &mut MeshBuilder) {
         dark_plate(b);
         hoop_on(b, v3(x, 0.0, 0.0), Vec3::X, 1.7, 0.6, 0.7, b.sides(12));
         coil_light(b, i as u32);
-        hoop_on(
-            b,
-            v3(x + 0.1, 0.0, 0.0),
-            Vec3::X,
-            1.35,
-            0.16,
-            0.4,
-            b.sides(12),
-        );
+        b.face(&[
+            v3(x + 0.71, -0.8, 1.15),
+            v3(x + 0.71, 0.8, 1.15),
+            v3(x + 0.71, 0.8, 1.5),
+            v3(x + 0.71, -0.8, 1.5),
+        ]);
     }
     b.with_charge_gear(EXTEND, |b| {
-        coil_light(b, 6);
+        metal(b);
         b.cylinder_between(v3(11.0, 0.0, 0.0), v3(16.0, 0.0, 0.0), 0.7, 0.45, 6);
+    });
+    dark_plate(b);
+    hoop_on(b, v3(20.5, 0.0, 0.0), Vec3::X, 1.55, 0.45, 0.8, b.sides(12));
+    b.with_charge_gear(0, |b| {
+        coil_light(b, 6);
+        b.face(&[
+            v3(21.31, -0.55, -0.55),
+            v3(21.31, 0.55, -0.55),
+            v3(21.31, 0.55, 0.55),
+            v3(21.31, -0.55, 0.55),
+        ]);
     });
 }

@@ -493,6 +493,50 @@ impl Renderer {
         self.push_projectiles(&out);
     }
 
+    /// A siege aperture focuses inward. A compact ember and axial filaments keep
+    /// the opening jaws visible throughout the charge instead of burying the head.
+    fn siege_charge(&mut self, at: Vec3, dir: Vec3, size: f32, f: f32, when: f32, span: f32) {
+        let radius = size * (0.22 + 0.40 * f * f);
+        let hot = Vec3::new(1.0, 0.045, 0.025).lerp(Vec3::new(1.0, 0.72, 0.58), f * f);
+        self.push_lit(
+            ORB,
+            at,
+            Vec3::ZERO,
+            when,
+            span * 2.0,
+            (radius, radius),
+            hot * (0.7 + 1.5 * f),
+            0.0,
+        );
+        self.push_lit(
+            GLOW,
+            at,
+            Vec3::ZERO,
+            when,
+            span * 2.0,
+            (radius * 2.2, radius * 2.2),
+            RED * (0.15 + 0.25 * f),
+            0.0,
+        );
+        let side = dir.cross(Vec3::Z).normalize_or(Vec3::Y);
+        let up = side.cross(dir);
+        for k in 0..4 {
+            let a = k as f32 * std::f32::consts::FRAC_PI_2 + when * 1.8;
+            let from =
+                at + (side * a.cos() + up * a.sin()) * size * (0.9 - 0.35 * f) - dir * size * 0.7;
+            self.push_lit(
+                STREAK,
+                from,
+                at - from,
+                when,
+                span * 1.5,
+                (size * 0.022, size * 0.012),
+                hot * (0.5 + f),
+                0.0,
+            );
+        }
+    }
+
     /// `span` seconds of a charge `f` of the way done, at `at`.
     fn regency_charge_step(
         &mut self,
@@ -504,6 +548,10 @@ impl Renderer {
         when: f32,
         span: f32,
     ) {
+        if w.star_beam {
+            self.siege_charge(at, dir, ball(w), f, when, span);
+            return;
+        }
         let size = ball(w) * if fusion { 1.5 } else { 1.0 };
         let life = span * 2.0;
         // Fusion takes over the last part of it, burning whiter and harder.

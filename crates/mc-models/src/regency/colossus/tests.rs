@@ -207,8 +207,8 @@ fn the_feet_swing_in_turn() {
     }
 }
 
-/// The jaws shut on a seam and part clear of the bore: every jaw vertex keeps its side of
-/// the seam (the shader moves them by the sign of y), shut they meet no nearer than the
+/// The recessed jaws frame the exposed bore: every jaw vertex keeps its side of
+/// the seam (the shader moves them by the sign of y), at rest they meet no nearer than the
 /// gap, open the gap is wider than the bore's coils and the prism comes out short of the
 /// charge.
 #[test]
@@ -242,7 +242,7 @@ fn the_jaws_part_round_the_bore() {
     let coil_r = model.lods[0]
         .vertices
         .iter()
-        .filter(|v| gear(v) == 0 && v.material == GLOW_PRISM)
+        .filter(|v| gear(v) == 0 && v.material == GLOW_LASER)
         .map(|v| {
             let p = local(v);
             Vec2::new(p.y, p.z).length()

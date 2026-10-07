@@ -252,18 +252,24 @@ impl Renderer {
             h.glassed = Some((at.truncate(), time));
         }
         if glass {
-            self.ground_melt.melt(
-                at.truncate(),
-                if star {
-                    self.blueprints.unit(blueprint).weapons[weapon as usize]
+            if star {
+                // A narrow white-hot contact inside a broad, slower red melt. Heating
+                // the entire splash white every second obscures both terrain and units.
+                self.ground_melt.burn(super::ground_melt::Burn {
+                    pos: at.truncate(),
+                    radius: self.blueprints.unit(blueprint).weapons[weapon as usize]
                         .splash
-                        .to_f32()
-                } else {
-                    width * 2.8
-                },
-                time,
-                if star { 24.0 } else { GLASS_COOL },
-            );
+                        .to_f32(),
+                    peak: 0.52,
+                    start: time,
+                    rise: 1.6,
+                    cool: 12.0,
+                });
+                self.ground_melt.melt(at.truncate(), width * 0.9, time, 4.0);
+            } else {
+                self.ground_melt
+                    .melt(at.truncate(), width * 2.8, time, GLASS_COOL);
+            }
             // The excavation lance digs as it glasses; the star only melts.
             if fusion && !star {
                 self.impact_craters.dig(at.truncate(), width * 2.2, time);
@@ -532,7 +538,7 @@ impl Renderer {
                     let fade = 1.0 - ((time - h.last - tick * 1.5) / CUT).clamp(0.0, 1.0);
                     fx.spills.push(StainInstance {
                         pos: h.to[1].truncate().to_array(),
-                        radius: h.splash.max(h.width * SPILL_RADIUS),
+                        radius: h.splash.min(h.width * SPILL_RADIUS).max(h.width * 1.4),
                         strength_seed: (fade * 255.0) as u32 | stain::SPILL,
                     });
                 }

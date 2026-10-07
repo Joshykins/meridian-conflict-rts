@@ -13,9 +13,9 @@ use crate::builder::MeshBuilder;
 
 use super::super::commander::form::{ring, sleeve, OCT};
 use super::super::kit::{dark_plate, metal, seam, v3};
-use super::super::machine::{collar, hoop_on, red_slot};
-use super::super::turrets::sunspear::coil_light;
+use super::super::machine::{collar, hoop_on};
 use super::GUN_PIVOT;
+use crate::{material::GLOW_LASER, pattern};
 
 /// From the trunnion to the middle of the barrel's mouth.
 pub(super) const LEN: f32 = 4.6;
@@ -44,12 +44,12 @@ fn gun(b: &mut MeshBuilder) {
     // The cradle: a round plated turntable drum let up into the pod above it, a seam band
     // round it, a red slot either flank.
     dark_plate(b);
+    b.pattern(pattern::EMBER_SLOT);
     let sides = b.sides(14);
     b.prism(v3(0.0, 0.0, -1.3), sides, 2.0, 1.9, 2.9);
     if fine {
         seam(b);
         b.prism(v3(0.0, 0.0, 0.1), sides, 2.06, 2.06, 0.3);
-        b.mirror_y(|b| red_slot(b, v3(-0.2, 1.97, -0.3), Vec3::Y, Vec3::X, 1.8, 0.24));
     }
     b.with_recoil(|b| {
         // The breech between the cheeks, a drum over the trunnion.
@@ -79,8 +79,13 @@ fn gun(b: &mut MeshBuilder) {
         for (x, stage) in [(2.9f32, 3u32), (3.8, 5)] {
             dark_plate(b);
             hoop_on(b, v3(x, 0.0, 0.0), Vec3::X, 0.62, 0.35, 0.7, sides);
-            coil_light(b, stage);
-            hoop_on(b, v3(x + 0.38, 0.0, 0.0), Vec3::X, 0.6, 0.2, 0.12, sides);
+            b.paint(GLOW_LASER).pattern(pattern::COIL + stage);
+            b.face(&[
+                v3(x + 0.71, -0.25, 0.45),
+                v3(x + 0.71, 0.25, 0.45),
+                v3(x + 0.71, 0.25, 0.58),
+                v3(x + 0.71, -0.25, 0.58),
+            ]);
         }
         dark_plate(b);
         hoop_on(b, v3(LEN - 0.1, 0.0, 0.0), Vec3::X, 0.46, 0.22, 0.5, sides);

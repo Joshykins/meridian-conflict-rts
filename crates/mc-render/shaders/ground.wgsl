@@ -99,17 +99,18 @@ fn spill(in: StainOut) -> vec4<f32> {
     let r = length(q);
     let dir = q / max(r, 1e-4);
     let rim = 0.62 + 0.38 * value_noise2(dir * 2.4 + vec2<f32>(seed * 0.01, t * 0.35), 1.0);
-    let sheets = value_noise2(dir * 2.6 + vec2<f32>(r * 5.0 - t * 4.5, seed * 0.02), 1.0) * 0.6
-        + value_noise2(dir * 5.3 + vec2<f32>(r * 11.0 - t * 7.5, 3.1), 1.0) * 0.4;
-    let veil = smoothstep(0.25, 0.8, sheets);
+    // Broken red channels around a small hot contact, with dark crust between.
+    // Brightness stays local so bloom cannot turn the whole splash into a white disc.
+    let cells = value_noise2(q * 12.0 + vec2<f32>(t * 0.12, -t * 0.09), 1.0);
+    let fractures = pow(1.0 - abs(cells * 2.0 - 1.0), 10.0);
     let reach = r / rim;
-    let body = 1.0 - smoothstep(0.2, 1.0, reach);
-    let hot = exp(-r * r * 9.0);
-    let hue = prism(r * 1.6 + sheets * 0.8 - t * PRISM_RATE * 2.0);
-    let warm = mix(vec3<f32>(1.0, 0.2, 0.26), hue, smoothstep(0.1, 0.9, reach));
-    let col = mix(warm, vec3<f32>(1.0, 0.9, 0.85), hot);
-    let alpha = clamp((0.25 + 0.75 * veil) * body * body + hot * 0.8, 0.0, 0.95) * left;
-    return vec4<f32>(col * (1.5 + 3.0 * hot + 1.5 * veil), alpha);
+    let body = 1.0 - smoothstep(0.15, 1.0, reach);
+    let hot = exp(-r * r * 110.0);
+    let red = vec3<f32>(0.85, 0.035, 0.012) * fractures * body * 0.65;
+    let core = vec3<f32>(1.0, 0.52, 0.22) * hot * 1.8;
+    let alpha = (fractures * body * 0.5 + hot * 0.75) * left;
+    return vec4<f32>(red + core, alpha);
+
 }
 
 // A crater: still a decal, but lit as a bowl. The ground slopes down into a

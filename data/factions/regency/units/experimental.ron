@@ -160,19 +160,10 @@
         mesh: "regency_strider", icon: Bot,
         sounds: (death: "blast_large", moving: "regency_crawl", step: "regency_footfall"),
     ),
-    // The colossus: the Regency's tech 5, a four-legged siege walker as big as a fortress,
-    // its body carried a hundred and fifty metres up on legs that step over hills and
-    // houses alike (`stride`). Its head is one Heavy Pinch-fusion Lance: the nose opens
-    // along its seam, the bore inside pinches a star of fusion for three seconds and then
-    // holds it for five, laid on whatever stands there and glassing a base-wide patch of
-    // ground to lava (`star_beam`, a salvo of ticks so the beam burns for a time and then
-    // closes). Two Rapid Pinch-fusion Guns hang under the head on turrets of their own,
-    // each picking its own mark, and eight Ruin Rockets stand in tubes on its back: lofted
-    // high, unguided, they scatter over the field and come down as fusion strikes.
-    // A hull field lies over its plates. No anti-air: it wants an escort.
-    //
-    // Model: `regency_colossus` (`models::regency::colossus`), authored at 32 x 57 m and
-    // built 7.2 times authored size: every mount follows it.
+    // T5 siege quadruped: a low armored hull over four widely planted limbs. The
+    // recessed aperture charges for three seconds, then holds a cutting stream for
+    // five. Two independent chin guns and eight cased Ruin Rockets cover its flanks.
+    // Model and every weapon mount use the same 7.2x authored scale.
     (
         key: "regency_t5_colossus",
         name: "Colossus",
@@ -181,8 +172,8 @@
         categories: ["Land", "DirectFire", "Experimental"],
         health: 900000,
         cost: (mass: 90000, energy: 900000, time: 330000),
-        radius: 230.4, height: 410.4,
-        footprint: (39, 39),
+        radius: 288.0, height: 266.4,
+        footprint: (48, 48),
         vision: 2000, radar: 3600,
         shield: (kind: Hull, health: 150000, regen: 500),
         economy: (energy_upkeep: 3000),
@@ -199,9 +190,9 @@
                 damage: 3600, splash: 210, range_min: 250, range: 1500, reload: 40.0,
                 salvo: 50, salvo_delay: 0.1,
                 hitscan: true, beam: true, star_beam: true, trajectory: Direct,
-                turret_turn: 14, sweep: 10, muzzle: (230.4000, 0.0000, 325.4400), pivot: (72.0000, 0.0000, 325.4400),
+                turret_turn: 14, sweep: 10, muzzle: (230.4000, 0.0000, 188.6400), pivot: (72.0000, 0.0000, 188.6400),
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
-                plasma_grade: Some(PinchFusion), flash: 2.0, impact: 7.0, tracer: 7.0,
+                plasma_grade: Some(PinchFusion), flash: 1.35, impact: 4.0, tracer: 2.7,
                 sounds: (
                     charge: "regency_lance_charge", charge_time: 3.0,
                     hold: "regency_lance_hold", spindown: "regency_lance_vent",
@@ -212,10 +203,10 @@
                 // The left gun under the head, on a turret of its own.
                 damage: 900, splash: 18, range: 1400, reload: 0.8, speed: 1500, trajectory: Ballistic,
                 loft: 0.3, flat_fire: true, mount: true, turret_turn: 70, arc: 200,
-                muzzle: (149.7600, 61.9200, 304.5600), pivot: (116.6400, 61.9200, 304.5600),
+                muzzle: (149.7600, 61.9200, 160.5600), pivot: (116.6400, 61.9200, 160.5600),
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
                 plasma_grade: Some(PinchFusion),
-                flash: 1.4, impact: 3.0, tracer: 2.0,
+                flash: 0.9, impact: 1.6, tracer: 0.9,
                 sounds: (fire: "regency_sunspear_fire", impact: "regency_sunspear_hit", ground: "regency_sunspear_hit"),
             ),
             (
@@ -223,29 +214,30 @@
                 // The right gun: half a reload behind the left (`twins.rs`).
                 damage: 900, splash: 18, range: 1400, reload: 0.8, speed: 1500, trajectory: Ballistic,
                 loft: 0.3, flat_fire: true, mount: true, turret_turn: 70, arc: 200,
-                muzzle: (149.7600, -61.9200, 304.5600), pivot: (116.6400, -61.9200, 304.5600),
+                muzzle: (149.7600, -61.9200, 160.5600), pivot: (116.6400, -61.9200, 160.5600),
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
                 plasma_grade: Some(PinchFusion),
-                flash: 1.4, impact: 3.0, tracer: 2.0,
+                flash: 0.9, impact: 1.6, tracer: 0.9,
                 sounds: (fire: "regency_sunspear_fire", impact: "regency_sunspear_hit", ground: "regency_sunspear_hit"),
             ),
             (
                 name: "Ruin Rocket Battery",
                 // Eight cased rockets out of the back, lofted high and not guided: they leave
                 // in a ripple, scatter wide (`spread`) and fall where they will over the
-                // field, each a small supernova of pinch fusion (`fusion_strike`).
+                // field, with red exhaust, black smoke and a compact red containment burst.
                 damage: 2400, splash: 55, range_min: 500, range: 2800, reload: 24.0,
                 salvo: 8, salvo_delay: 0.2, speed: 380, trajectory: Ballistic, rake: 65, loft: 9,
                 mount: true, turret_turn: 60, arc: 360, spread: 6,
-                muzzle: (-39.6000, 0.0000, 393.8400), pivot: (-46.8000, 0.0000, 374.4000),
+                muzzle: (-39.6000, 0.0000, 249.8400), pivot: (-46.8000, 0.0000, 230.4000),
                 muzzles: [
-                    (-30.8227, 21.6000, 390.5891), (-30.8227, -21.6000, 390.5891), (-30.8227, 7.2000, 390.5891), (-30.8227, -7.2000, 390.5891),
-                    (-48.3773, 21.6000, 397.0909), (-48.3773, -21.6000, 397.0909), (-48.3773, 7.2000, 397.0909), (-48.3773, -7.2000, 397.0909),
+                    (-30.8227, 21.6000, 246.5891), (-30.8227, -21.6000, 246.5891), (-30.8227, 7.2000, 246.5891), (-30.8227, -7.2000, 246.5891),
+                    (-48.3773, 21.6000, 253.0909), (-48.3773, -21.6000, 253.0909), (-48.3773, 7.2000, 253.0909), (-48.3773, -7.2000, 253.0909),
                 ],
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
-                missile: true, intercept: 200, caliber: 7.0, trail: true, wake: 6, tracer: 3,
-                flash: 2.0, impact: 3.2, shockwave: 1.6,
-                plasma_grade: Some(Gravitic), fusion_strike: true,
+                missile: true, intercept: 200, caliber: 7.0, trail: true, wake: 3.2, tracer: 2,
+                flash: 1.4, impact: 1.4, shockwave: 1.6,
+                plasma_grade: Some(Gravitic),
+
                 sounds: (fire: "regency_gravitic_throw", impact: "regency_sunspear_hit", ground: "regency_sunspear_hit"),
             ),
         ],

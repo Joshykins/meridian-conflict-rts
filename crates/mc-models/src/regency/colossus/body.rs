@@ -1,157 +1,127 @@
-//! Sculpted siege carapace: a central reactor keel between swept shoulder shells.
-//! Deep mechanical channels and overlapping armour establish detail at three scales.
-use super::super::commander::form::{blade, ring, sleeve, KEEL, OCT};
+//! Broad interlocking armor over a low mechanical keel. Each panel has a calm
+//! face, a chamfered perimeter and a visible gap to the neighboring course.
+use super::super::commander::form::{ring, sleeve, OCT};
 use super::super::kit::{dark_plate, metal, seam, v3};
 use super::{DECK, LANCE_PIVOT, RACE};
 use crate::builder::{MeshBuilder, Section};
 use crate::{material::*, part, pattern, rig};
 use glam::{Vec2, Vec3};
-
-pub(super) const EMITTER: Vec3 = Vec3::new(-14.0, 0.0, 55.2);
+pub(super) const EMITTER: Vec3 = Vec3::new(-14.0, 0.0, 35.2);
 
 pub(super) fn carapace(b: &mut MeshBuilder) {
-    // A deep central keel physically joins the rotating race to the lance cradle.
+    seam(b);
+    sleeve(
+        b,
+        &[
+            ring(v3(-25.0, 0.0, 23.0), Vec3::Z, 9.0, 2.4),
+            ring(v3(-17.0, 0.0, 24.2), Vec3::Z, 17.0, 5.0),
+            ring(v3(1.0, 0.0, 24.0), Vec3::Z, 18.0, 5.0),
+            ring(v3(16.0, 0.0, 23.0), Vec3::Z, 10.0, 3.8),
+            ring(v3(21.0, 0.0, 23.0), Vec3::Z, 5.0, 2.5),
+        ],
+        &OCT,
+    );
+    b.mirror_y(shoulder);
+    // Central sloping glacis: a clear unbroken wedge leading into the siege head.
+    panel(b, -9.0, 17.0, 0.0, 7.5, 29.2, 3.0, false);
+    // The rear reactor casing is recessed between the dorsal launcher and radiator banks.
     dark_plate(b);
     sleeve(
         b,
         &[
-            ring(v3(-24.0, 0.0, 43.0), Vec3::Z, 3.0, 2.2),
-            ring(v3(-15.0, 0.0, 44.0), Vec3::Z, 9.0, 5.5),
-            ring(v3(-2.0, 0.0, 44.5), Vec3::Z, 11.0, 6.5),
-            ring(v3(10.0, 0.0, 44.5), Vec3::Z, 9.0, 5.0),
-            ring(v3(20.0, 0.0, 44.0), Vec3::Z, 4.5, 3.6),
+            ring(v3(-23.0, 0.0, 27.0), Vec3::Z, 4.2, 1.5),
+            ring(v3(-17.0, 0.0, 31.0), Vec3::Z, 4.8, 3.0),
+            ring(v3(-12.0, 0.0, 31.5), Vec3::Z, 4.3, 3.7),
         ],
-        &KEEL,
+        &OCT,
     );
-    b.mirror_y(shoulder);
-    reactor(b);
-    // Twin recessed cheek gun cradles continue the shoulder's lower edge.
-    b.mirror_y(|b| {
-        dark_plate(b);
-        sleeve(
-            b,
-            &[
-                ring(v3(3.0, 8.2, 44.0), Vec3::Z, 2.6, 2.8),
-                ring(v3(12.0, 8.6, 44.5), Vec3::Z, 3.8, 3.4),
-                ring(v3(19.5, 8.6, 44.5), Vec3::Z, 2.3, 2.4),
-            ],
-            &OCT,
-        );
-    });
+    if b.fine() {
+        b.mirror_y(|b| {
+            seam(b);
+            b.chamfered_box(v3(-15.0, 7.4, 30.0), v3(13.0, 3.0, 1.0), 0.35);
+            for i in 0..7 {
+                metal(b);
+                b.chamfered_box(
+                    v3(-20.5 + i as f32 * 1.6, 7.4, 30.65),
+                    v3(0.45, 2.7, 1.0),
+                    0.12,
+                );
+            }
+        });
+    }
 }
 
 fn shoulder(b: &mut MeshBuilder) {
-    // Swept manta-like shells: broad at the front, long pointed aft corners.
+    // Thick courses wrap the side mechanics instead of thin aircraft-like wings.
+    panel(b, -25.0, -10.0, 12.0, 6.0, 26.8, 3.0, true);
+    panel(b, -9.3, 4.5, 12.0, 7.0, 27.3, 3.4, false);
+    panel(b, 5.2, 16.5, 10.0, 5.4, 26.0, 2.8, true);
+    // The cheek cradles physically meet the independent chin-gun housings.
     dark_plate(b);
     sleeve(
         b,
         &[
-            ring(v3(15.0, 8.2, 46.5), Vec3::Z, 2.2, 2.7),
-            ring(v3(7.0, 12.0, 47.5), Vec3::Z, 6.2, 4.0),
-            ring(v3(-5.0, 13.5, 47.0), Vec3::Z, 6.8, 3.8),
-            ring(v3(-17.0, 13.0, 45.5), Vec3::Z, 4.5, 2.4),
-            ring(v3(-28.0, 10.0, 44.8), Vec3::Z, 0.4, 0.5),
+            ring(v3(7.0, 8.6, 24.0), Vec3::Z, 3.5, 3.5),
+            ring(v3(15.0, 8.6, 24.0), Vec3::Z, 3.0, 3.0),
+            ring(v3(18.0, 8.6, 23.0), Vec3::Z, 2.2, 2.0),
         ],
-        &KEEL,
+        &OCT,
     );
-    // Deliberately separated armour courses, with bronze mechanisms down in the gaps.
-    let count = if b.fine() { 5 } else { 3 };
-    for i in 0..count {
-        let x = 10.0 - i as f32 * if b.fine() { 5.6 } else { 9.0 };
-        dark_plate(b);
-        blade(
-            b,
-            v3(x, 12.5, 49.1),
-            v3(-1.0, 0.16, -0.12),
-            Vec3::Z,
-            10.0,
-            4.9,
-            0.35,
-            0.8,
-        );
-        if b.fine() {
-            metal(b);
-            blade(
-                b,
-                v3(x - 0.5, 12.5, 49.7),
-                v3(-1.0, 0.16, -0.12),
-                Vec3::Z,
-                1.0,
-                3.8,
-                0.0,
-                0.16,
-            );
-        }
-    }
     if b.fine() {
-        // Recessed radiator ribs along the lower outside flank.
         seam(b);
-        b.beam(
-            v3(6.0, 17.3, 46.0),
-            v3(-15.0, 16.1, 44.4),
-            Vec2::new(1.0, 1.7),
-            Vec2::new(0.8, 1.2),
-        );
-        for i in 0..12 {
-            let t = i as f32 / 12.0;
-            let c = v3(5.0, 17.8, 46.0).lerp(v3(-14.0, 16.4, 44.4), t);
+        b.chamfered_box(v3(-4.0, 17.6, 25.0), v3(19.0, 1.3, 3.2), 0.35);
+        for i in 0..9 {
             metal(b);
-            b.beam(
-                c - Vec3::Z * 0.7,
-                c + Vec3::Z * 0.7,
-                Vec2::new(0.28, 0.35),
-                Vec2::new(0.18, 0.25),
+            b.chamfered_box(
+                v3(-12.0 + i as f32 * 2.0, 18.0, 25.0),
+                v3(0.35, 0.9, 2.2),
+                0.1,
             );
         }
-        // Flush identification inlay on each shoulder, not a glowing floating bar.
         b.paint(TEAM).pattern(pattern::PLAIN);
-        blade(
-            b,
-            v3(5.0, 13.0, 50.0),
-            v3(-1.0, 0.16, -0.12),
-            Vec3::Z,
-            4.0,
-            1.2,
-            0.0,
-            0.06,
-        );
+        b.face(&[
+            v3(7.0, 9.0, 28.94),
+            v3(10.0, 8.2, 28.26),
+            v3(10.0, 9.0, 28.26),
+            v3(7.0, 9.8, 28.94),
+        ]);
     }
 }
 
-fn reactor(b: &mut MeshBuilder) {
-    // A low armoured crown replaces the aircraft tail fin. The rocket pack remains
-    // forward of it; alternating heat sinks lead back to a shield-emitter cap.
+/// A raised slab with broad beveled edges and a forward sloping face.
+fn panel(b: &mut MeshBuilder, tail: f32, nose: f32, y: f32, w: f32, z: f32, rise: f32, pale: bool) {
+    let len = nose - tail;
+    let outline = [
+        v3(tail, y - w * 0.72, z),
+        v3(tail + len * 0.18, y - w, z),
+        v3(nose - len * 0.18, y - w * 0.83, z - 0.8),
+        v3(nose, y - w * 0.43, z - 1.5),
+        v3(nose, y + w * 0.43, z - 1.5),
+        v3(nose - len * 0.18, y + w * 0.83, z - 0.8),
+        v3(tail + len * 0.18, y + w, z),
+        v3(tail, y + w * 0.72, z),
+    ];
+    let mid = (tail + nose) * 0.5;
+    let upper: Vec<Vec3> = outline
+        .iter()
+        .map(|p| v3(mid + (p.x - mid) * 0.86, y + (p.y - y) * 0.85, p.z + rise))
+        .collect();
     dark_plate(b);
-    sleeve(
-        b,
-        &[
-            ring(v3(-10.0, 0.0, 50.0), Vec3::Z, 3.8, 2.8),
-            ring(v3(-14.0, 0.0, 51.0), Vec3::Z, 4.4, 4.2),
-            ring(v3(-19.0, 0.0, 49.5), Vec3::Z, 3.4, 3.0),
-            ring(v3(-24.0, 0.0, 46.0), Vec3::Z, 1.4, 1.0),
-        ],
-        &KEEL,
-    );
-    if b.fine() {
-        for i in 0..7 {
-            let x = -11.5 - i as f32 * 1.3;
-            b.mirror_y(|b| {
-                metal(b);
-                blade(
-                    b,
-                    v3(x, 3.4, 50.8 - i as f32 * 0.35),
-                    v3(-0.35, 1.0, -0.3),
-                    Vec3::Z,
-                    3.1,
-                    0.35,
-                    0.0,
-                    0.35,
-                );
-            });
+    let mut bottom = outline.to_vec();
+    bottom.reverse();
+    b.face(&bottom);
+    for i in 0..outline.len() {
+        dark_plate(b);
+        if b.fine() && i == 3 {
+            b.pattern(pattern::EMBER_SLOT);
         }
+        let next = (i + 1) % outline.len();
+        b.face(&[outline[i], outline[next], upper[next], upper[i]]);
     }
+    b.paint(if pale { PLATING } else { PLATING_DARK })
+        .pattern(pattern::EMBER);
+    b.face(&upper);
 }
-
 pub(super) fn coarse(b: &mut MeshBuilder) {
     b.with_part(part::TURRET, |b| {
         dark_plate(b);
@@ -159,27 +129,26 @@ pub(super) fn coarse(b: &mut MeshBuilder) {
             &[
                 [20.0, 0.0],
                 [2.0, 19.0],
-                [-27.0, 10.0],
-                [-21.0, 0.0],
-                [-27.0, -10.0],
+                [-25.0, 12.0],
+                [-25.0, -12.0],
                 [2.0, -19.0],
             ],
-            &[Section::new(RACE, 0.65), Section::new(DECK + 4.0, 1.0)],
+            &[Section::new(RACE, 0.75), Section::new(DECK + 6.0, 1.0)],
         );
         b.paint(TEAM);
         b.face(&[
-            v3(0.0, -4.0, DECK + 4.02),
-            v3(0.0, 4.0, DECK + 4.02),
-            v3(-8.0, 0.0, DECK + 4.02),
+            v3(0.0, -4.0, DECK + 6.02),
+            v3(0.0, 4.0, DECK + 6.02),
+            v3(-8.0, 0.0, DECK + 6.02),
         ]);
         dark_plate(b);
         b.with_limb(rig::ARM_GUN, |b| {
             b.beam(
                 LANCE_PIVOT,
-                LANCE_PIVOT + v3(20.0, 0.0, 0.0),
-                Vec2::new(8.0, 8.0),
-                Vec2::new(6.0, 5.0),
-            );
+                LANCE_PIVOT + v3(21.0, 0.0, 0.0),
+                Vec2::splat(8.0),
+                Vec2::splat(3.0),
+            )
         });
     });
 }

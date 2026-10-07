@@ -994,31 +994,29 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
             return vec4<f32>(in.color * (thread + sheath) * alive, 1.0);
         }
         if in.shape.y > 6.5 {
-            // The siege lance's confinement envelope: separated red collars around
-            // the stream, with a thin turbulent skin between them.
-            let run = (in.uv.x * 0.5 + 0.5) * -in.shape.x;
+            // Siege confinement: a narrow, continuous red corona with fine moving
+            // striations. End taper keeps the muzzle and impact silhouettes readable.
+            let u = in.uv.x * 0.5 + 0.5;
+            let run = u * -in.shape.x;
             let t = globals.camera.w;
-            let axial = (fract(run * 0.012 - t * 2.5) - 0.5) * 83.333;
-            let ellipse = length(vec2<f32>(axial / 9.0, in.uv.y / 0.48));
-            let collar = exp(-pow(ellipse - 1.0, 2.0) * 180.0);
-            let skin = value_noise2(vec2<f32>(run * 0.035 - t * 18.0, in.uv.y * 5.0), 1.0);
-            let red = vec3<f32>(1.0, 0.035, 0.012);
-            let rgb = red * (collar * 1.8 + pow(across, 2.8) * skin * 0.12);
-            return vec4<f32>(rgb * in.color.r, 1.0);
+            let flow = value_noise2(vec2<f32>(run * 0.06 - t * 12.0, in.uv.y * 6.0), 1.0);
+            let envelope = smoothstep(0.0, 0.035, u) * (1.0-smoothstep(0.96, 1.0, u));
+            let glow = pow(across, 4.5) * (0.14 + 0.12 * flow) * envelope;
+            return vec4<f32>(vec3<f32>(1.0, 0.025, 0.015) * glow * in.color.r, 1.0);
         }
         if in.shape.y > 6.4 {
-            // A continuous white cutting core inside red braided plasma. Large,
-            // deliberate pressure knots distinguish it from the rapid small guns.
+            // A dense white-red cutting filament, edged by fine helical confinement
+            // threads. Smooth pressure waves move outward without strobing.
             let run = (in.uv.x * 0.5 + 0.5) * -in.shape.x;
             let t = globals.camera.w;
-            let pulse = exp(-pow(fract(run * 0.012 - t * 2.5) - 0.5, 2.0) * 100.0);
-            let braid = sin(run * 0.025 - t * 11.0) * 0.18;
-            let filament = exp(-pow(in.uv.y - braid, 2.0) * 95.0)
-                + exp(-pow(in.uv.y + braid, 2.0) * 95.0);
-            let sheath = vec3<f32>(1.0, 0.035, 0.008) * pow(across, 1.8) * (2.4 + pulse * 2.0);
-            let core = vec3<f32>(1.0, 0.94, 0.82) * pow(across, 14.0) * 13.0;
-            let strands = vec3<f32>(1.0, 0.25, 0.06) * filament * (1.0 + pulse);
-            return vec4<f32>((sheath + core + strands) * in.color.r, 1.0);
+            let pressure = 0.85 + 0.15 * sin(run * 0.04 - t * 8.0);
+            let braid = sin(run * 0.075 - t * 9.0) * 0.24;
+            let strands = exp(-pow(in.uv.y - braid, 2.0) * 220.0)
+                + exp(-pow(in.uv.y + braid, 2.0) * 220.0);
+            let sheath = vec3<f32>(1.0, 0.025, 0.018) * pow(across, 2.6) * 1.8;
+            let core = vec3<f32>(1.0, 0.79, 0.70) * pow(across, 18.0) * 5.5;
+            let threads = vec3<f32>(1.0, 0.16, 0.07) * strands * 0.65;
+            return vec4<f32>((sheath + core + threads) * pressure * in.color.r, 1.0);
         }
         if in.shape.y > 6.1 {
             // Excavation fusion: the Sunspear/shield prism around a white-hot core.
