@@ -57,7 +57,7 @@
     ),
     // The bomber: a blade of a wing that lays a short stick of three Plasmeric Bombs along
     // its run, each a charge of plasma held in gravity until it lands. Anchored on the
-    // Petrel's pair (260 a pass): 270 a pass in three lighter bombs strung out along the
+    // Petrel's pair (330 a pass): 330 a pass in three lighter bombs strung out along the
     // ground, so a column under it takes more of them. Model: `regency_petard`; the bombs
     // leave its bay.
     (
@@ -73,7 +73,7 @@
         motion: (layer: Air, size: 0, speed: 86, accel: 22, turn: 44, altitude: 200),
         weapons: [(
             name: "Plasmeric Bomb",
-            damage: 90, splash: 18, range: 320, reload: 5.0, salvo: 3, salvo_delay: 0.2,
+            damage: 110, splash: 18, range: 320, reload: 5.0, salvo: 3, salvo_delay: 0.2,
             speed: 90, trajectory: Ballistic, loft: 0.4,
             muzzle: (0.4, 0, 0.5),
             spread: 6,

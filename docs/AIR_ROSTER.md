@@ -415,7 +415,7 @@ rotors, no jet plumes. Each is anchored on ARC's unit of the same job.
 | --- | --- | --- | --- |
 | Flechette (`regency_t1_air_scout`) | Air scout, unarmed | Swift | The fastest thing in the air (270 m/s), a wider turn, thinner skin |
 | Quarrel (`regency_t1_fighter`) | Fighter: Twin Plasmeric Repeater, aircraft only | Shrike | About the same damage a second in heavier bolts, a little less reach; crescent wing |
-| Petard (`regency_t1_bomber`) | Light bomber: a stick of three Plasmeric Bombs | Petrel | 270 a pass in three lighter bombs strung along the run; a cleaver of a flying wing |
+| Petard (`regency_t1_bomber`) | Light bomber: a stick of three Plasmeric Bombs | Petrel | 330 a pass in three lighter bombs strung along the run; a cleaver of a flying wing |
 | Coffer (`regency_t2_transport`, tech 2) | Light transport, eight slots, raised on a 7x5 lot by the Artificer II and III and the Exarch's Engineering Suites | Courier | No warp drive, a little quicker; an open-sterned box hold between two sponsons on six lift bells |
 
 The Skyforge (all three tiers) makes the Quarrel, Petard and Flechette, and the Regency

@@ -102,8 +102,8 @@ a pass; anti-air punishes them over seconds, not in one shot.
   so they catch raids (Shrike 120 against the Petrel's 84, 250 health against 250).
   A higher-tier fighter's shot kills a lower-tier fighter in one or two hits, which is
   where its tier gap shows.
-- **Bombers raid.** The Petrel's one pass (two 130 bombs together, 20 m blast) takes a
-  knot of engineers or light AA but leaves a T1 tank standing; mines and reactors take
+- **Bombers raid.** The Petrel's one pass (two 165 bombs together, 330 a pass, 20 m blast) takes a
+  knot of engineers, light AA or a T1 tank (300 health) that sits under both bombs; mines and reactors take
   several bombers or passes. The Eclipse is a glass hammer: 5000 a bomb (a T2 mine in one,
   a bare commander in three), 6000 health, so two Skyguard volleys or about 9 s of one
   Raptor bring it down.

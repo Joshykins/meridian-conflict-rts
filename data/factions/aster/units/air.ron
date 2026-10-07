@@ -49,7 +49,7 @@
         motion: (layer: Air, size: 0, speed: 84, accel: 22, turn: 42, altitude: 200),
         weapons: [(
             name: "Bomb Bay",
-            damage: 130, splash: 20, range: 320, reload: 5.0, salvo: 2, salvo_batch: 2,
+            damage: 165, splash: 20, range: 320, reload: 5.0, salvo: 2, salvo_batch: 2,
             speed: 90, trajectory: Ballistic, loft: 0.4,
             muzzle: (0.2, 0, 0.36),
             muzzles: [(0.73, -0.27, 0.36), (0.73, 0.27, 0.36)],
