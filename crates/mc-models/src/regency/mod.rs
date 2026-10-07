@@ -140,13 +140,6 @@ pub(super) const MODELS: &[ModelDef] = &[
         colossus::HEIGHT,
         colossus::colossus,
     ),
-    // A look to choose from: heavier, lower legs on the same hull (`colossus::variant_b`).
-    ModelDef::new(
-        "regency_colossus~b",
-        colossus::RADIUS,
-        colossus::HEIGHT,
-        colossus::colossus_b,
-    ),
     // Factories: the land press works (`brood`), the air launch frame (`hatchery`), the
     // one-sided quay (`tidebrood`). All three upgrade in place to tech 3, the land one's
     // lifted ring, the air one's crown and the quay's high boom standing taller.

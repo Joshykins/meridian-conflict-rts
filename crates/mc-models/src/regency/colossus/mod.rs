@@ -36,7 +36,6 @@ mod legs;
 mod rockets;
 #[cfg(test)]
 mod tests;
-mod variant_b;
 
 use glam::Vec3;
 
@@ -44,8 +43,6 @@ use crate::builder::MeshBuilder;
 use crate::part;
 
 use super::kit::v3;
-
-pub(super) use variant_b::colossus_b;
 
 /// Authored size (the unit file's is `SCALE` times it).
 pub(super) const RADIUS: f32 = 32.0;

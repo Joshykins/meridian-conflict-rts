@@ -317,16 +317,3 @@ fn the_cells_are_clear() {
         }
     }
 }
-
-/// The variant is the same model but for its legs: it builds, and fits the library's checks.
-#[test]
-fn the_variant_fits_too() {
-    super::super::check_charge(
-        "regency_colossus~b",
-        RADIUS,
-        HEIGHT,
-        None,
-        &[LANCE_MUZZLE.to_array()],
-        HOLD,
-    );
-}
