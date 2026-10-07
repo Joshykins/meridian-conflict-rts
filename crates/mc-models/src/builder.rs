@@ -1741,7 +1741,11 @@ impl MeshBuilder {
         let edges = (frame.is_none()
             && matches!(
                 self.pattern,
-                pattern::EMBER | pattern::NANITE_SLOT | pattern::EMBER_SLOT | pattern::EMBER_RIM
+                pattern::EMBER
+                    | pattern::NANITE_SLOT
+                    | pattern::EMBER_SLOT
+                    | pattern::EMBER_RIM
+                    | pattern::EMBER_MACHINED
             )
             && matches!(self.framing, Framing::Flat))
         .then(|| FaceEdges::of(points, normal))

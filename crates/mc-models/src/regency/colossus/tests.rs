@@ -93,6 +93,12 @@ fn the_rig_is_the_unit_files() {
     for lod in &model.lods {
         assert!(lod.vertices.iter().all(|v| v.material != GLOW_VIOLET));
     }
+    // Irregular armour faces retain their polygon outlines for panel seams;
+    // falling back to unframed triangles makes the finish look like wireframe.
+    assert!(model.lods[0]
+        .vertices
+        .iter()
+        .any(|v| { v.surface & 0xff == crate::pattern::EMBER_MACHINED && v.face[3] < 0.0 }));
     // The charge coils the renderer feeds the charge to (`renderer.rs`, `titan_charge`).
     assert!(model.lods[0].vertices.iter().any(|v| {
         (crate::pattern::COIL..=crate::pattern::COIL_TURN_BACK).contains(&(v.surface & 0xFF))
