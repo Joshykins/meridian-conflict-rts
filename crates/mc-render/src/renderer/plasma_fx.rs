@@ -35,8 +35,24 @@ const CHARGE: u32 = 8;
 const CUT: f32 = 0.12;
 /// Metres apart the pools a beam glasses the ground with are laid.
 const GLASS_STEP: f32 = 2.4;
+/// How many times wider than the star beam its halo is.
+const HALO: f32 = 4.5;
+/// How far, in beam widths, the plasma thrown out where a star beam strikes flows away.
+const FLOW_REACH: f32 = 22.0;
 /// Seconds a glassed pool takes to crust over and cool.
 const GLASS_COOL: f32 = 9.0;
+
+/// The colour of the `i`th sheet thrown out where a star beam strikes: pink-white near
+/// the strike, lavender further round.
+fn mix_hot(i: usize) -> Vec3 {
+    if i % 3 == 0 {
+        WHITE * 3.0
+    } else if i % 3 == 1 {
+        ROSE * 3.0
+    } else {
+        LAVENDER * 3.0
+    }
+}
 
 /// One held beam: the same gun (owner, blueprint, weapon) from one tick to the next.
 struct Held {
@@ -258,6 +274,9 @@ impl Renderer {
                 (width * 1.2, width * 3.5),
             );
         }
+        if star {
+            self.star_outflow(at, width, on_unit, time);
+        }
         if fusion {
             self.push_lit(
                 puff::WARP_GLOW as f32,
@@ -308,6 +327,57 @@ impl Renderer {
             .normalize_or_zero();
             let speed = 14.0 + self.scatter.unit() * 18.0;
             self.push_puff(PUFF_SPARK, at, spray * speed, time, 0.5, (0.22, 0.08));
+        }
+    }
+
+    /// Plasma flowing away from where a star beam strikes: a hot dome over the strike, and
+    /// sheets of it rolling out along the ground in every direction, far wider than the beam,
+    /// cooling from white through rose to lavender as they go. Every tick the beam holds.
+    fn star_outflow(&mut self, at: Vec3, width: f32, on_unit: bool, time: f32) {
+        let reach = width * FLOW_REACH;
+        self.push_lit(
+            puff::WARP_GLOW as f32,
+            at + Vec3::Z * width * 0.5,
+            Vec3::ZERO,
+            time,
+            0.25,
+            (reach * 0.35, reach * 0.6),
+            ROSE * 3.0,
+            0.0,
+        );
+        for i in 0..10 {
+            let a = (i as f32 + self.scatter.unit()) * std::f32::consts::TAU / 10.0;
+            let speed = reach * (0.9 + self.scatter.unit() * 0.9);
+            let dir = Vec3::new(a.cos(), a.sin(), 0.0);
+            let lift = if on_unit { 0.5 } else { 0.12 };
+            let size = width * (3.0 + self.scatter.unit() * 3.0);
+            let life = 0.9 + self.scatter.unit() * 0.5;
+            self.push_lit(
+                puff::WARP_GLOW as f32,
+                at + dir * width + Vec3::Z * width * 0.6,
+                dir * speed + Vec3::Z * speed * lift,
+                time,
+                life,
+                (size, size * 2.6),
+                mix_hot(i) * 1.4,
+                0.0,
+            );
+        }
+        // Streamers thrown out low and fast, trailing plasma.
+        for _ in 0..3 {
+            let a = self.scatter.unit() * std::f32::consts::TAU;
+            let dir =
+                Vec3::new(a.cos(), a.sin(), 0.25 + self.scatter.unit() * 0.3).normalize_or(Vec3::X);
+            self.push_lit(
+                puff::WARP_STREAK as f32,
+                at + Vec3::Z * width * 0.4,
+                dir * reach * 1.6,
+                time,
+                0.5,
+                (width * 0.5, width * 0.12),
+                LAVENDER * 5.0,
+                0.0,
+            );
         }
     }
 
@@ -454,6 +524,12 @@ impl Renderer {
                 beam.aim[3] = fade_beam::HELD_FUSION;
             }
             out.push(beam);
+            if h.star {
+                // Its halo: the same stroke drawn far wider and faint.
+                let mut halo = held_instance(HELD_BEAM, h.from, h.to, h.width * HALO, start, life);
+                halo.aim[3] = fade_beam::HELD_STAR_HALO;
+                out.push(halo);
+            }
         }
         let legs = &self.legs;
         for c in &mut fx.charges {

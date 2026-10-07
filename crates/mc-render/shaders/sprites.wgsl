@@ -483,6 +483,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
             out.color = vec3<f32>(1.0 - smoothstep(0.72, 1.0, age));
             var look = select(6.0, 6.3, p.aim.w == FADE_BEAM_HELD_FUSION);
             look = select(look, 6.45, p.aim.w == FADE_BEAM_HELD_STAR);
+            look = select(look, 6.55, p.aim.w == FADE_BEAM_HELD_STAR_HALO);
             out.shape = vec2<f32>(-distance(head, tail), look);
         } else if (p.color & 0xFu) == 4u {
             let envelope = smoothstep(0.0, 0.035, age) * (1.0 - smoothstep(0.82, 1.0, age));
@@ -991,6 +992,22 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
             let thread = pow(across, mix(4.0, 9.0, age));
             let sheath = pow(across, 2.2) * 0.3 * (1.0 - age);
             return vec4<f32>(in.color * (thread + sheath) * alive, 1.0);
+        }
+        if in.shape.y > 6.5 {
+            // The star's halo: a broad translucent veil round the beam. Slow ragged sheets of
+            // plasma stream down it along the beam, twisting about it, so it reads as a
+            // flowing envelope of gas and never a solid tube; it thins to nothing at its
+            // rim and is faint everywhere, laid over what it hides rather than blotting it.
+            let run = (in.uv.x * 0.5 + 0.5) * -in.shape.x;
+            let t = globals.camera.w;
+            let twist = in.uv.y * 2.2 + run * 0.006;
+            let sheets = value_noise2(vec2<f32>(run * 0.018 - t * 26.0, twist + t * 0.9), 1.0) * 0.6
+                + value_noise2(vec2<f32>(run * 0.05 - t * 40.0, twist * 2.3 - t * 1.7), 1.0) * 0.4;
+            let veil = smoothstep(0.25, 0.85, sheets);
+            let hue = prism(run * 0.008 + sheets * 0.8 - t * PRISM_RATE * 2.0);
+            let body = pow(across, 1.7);
+            let haze = mix(vec3<f32>(0.62, 0.42, 1.0), hue, 0.6);
+            return vec4<f32>(haze * body * (0.25 + 1.3 * veil) * in.color.r, 1.0);
         }
         if in.shape.y > 6.4 {
             // The star (`Weapon::star_beam`): pinch fusion held as one beam, drawn as the

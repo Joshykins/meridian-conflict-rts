@@ -778,6 +778,9 @@ shared! {
         /// Held pinch-fusion beam drawn as the star (`Weapon::star_beam`): a white-hot core
         /// in a broad prism sheath, fusion bursts strobing down it (`aim.w`).
         pub const HELD_STAR: f32 = 2.0;
+        /// The star beam's halo (`Weapon::star_beam`): a second, much wider beam laid round
+        /// it, translucent, drifting veils of plasma that thin to nothing at its rim (`aim.w`).
+        pub const HELD_STAR_HALO: f32 = 3.0;
         /// A warp dampener's tether (renderer/damper_fx.rs): crimson lightning with a
         /// white-pink core, crackling.
         pub const TETHER: u32 = 10;
