@@ -117,10 +117,12 @@ The graph depends on the map alone, so it is rebuilt after a restore rather than
 Each think a `ZoneView` reads what changes from the world model and contacts: land
 fire, enemy mass, and the mass of our own structures in each zone.
 
-- **Value**: 250 mass per ore field plus the enemy mass remembered in the zone. Raids
-  and the army rank targets by it over the square of the walk (`land_objective`), less
-  the worst fire on the zones between; incursions are answered most valuable first;
-  scouts revisit ground with ore sooner than bare ground.
+- **Value**: 250 mass per ore field plus the enemy mass remembered in the zone;
+  incursions are answered most valuable first. Target choice (`land_objective`) keeps
+  the old "mass within 600 m" value and subtracts the worst fire on the zones between
+  (`fire_along`): ranking by a whole zone's mass or ore sent waves at the strongest
+  ground (decided matches fell from 11 of 16 to 6-9 in the 2x-resource ARC mirror).
+  Scouts revisit ground with ore sooner than bare ground.
 - **Shortfalls**: a defence raised against aircraft, shelling or raiders posts what it
   found missing (`commander.role_need`: anti-air, artillery, raiders, per mille) as a
   floor on that role's share of new units, fading over a few minutes (`solver.rs`).

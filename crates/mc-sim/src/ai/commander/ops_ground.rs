@@ -82,13 +82,16 @@ impl World {
             .filter_map(|c| {
                 let threat = self.enemy_strength_at(ctx, c.pos, Fx::from_int(700), Target::Land);
                 (threat * OUTMATCHED <= mass * 2).then(|| {
-                    // What the zone it stands in is worth (its ore and the enemy
-                    // mass in it), less the fire on the zones between.
+                    // What stands within 600 m of it, less the fire on the zones
+                    // between. (Counting the target's whole zone, or its ore,
+                    // sent waves at the strongest ground: 11 of 16 test matches
+                    // were decided before, 6-9 after.)
                     let zone = ctx.zones.of(c.pos);
-                    let value = zone.map_or_else(
-                        || self.blueprints.unit(c.blueprint).cost_mass,
-                        |z| ctx.zv.value(ctx.zones, z),
-                    );
+                    let value: Fx = contacts
+                        .iter()
+                        .filter(|o| o.pos.distance(c.pos) < Fx::from_int(600))
+                        .map(|o| self.blueprints.unit(o.blueprint).cost_mass)
+                        .sum();
                     let along = zone.map_or(Fx::ZERO, |b| {
                         fire.get(b as usize).copied().unwrap_or(Fx::ZERO)
                     });
