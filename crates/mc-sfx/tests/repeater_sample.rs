@@ -1,4 +1,4 @@
-//! The chosen audition must survive library loading and game synthesis unchanged.
+//! Preserve the chosen waveform while allowing intentional mix-level adjustment.
 use mc_data::{sounds::Layer, SoundLibrary};
 fn library() -> SoundLibrary {
     SoundLibrary::load(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"))
@@ -22,10 +22,15 @@ fn approved_repeater_is_the_selected_waveform_not_a_reconstruction() {
         })
         .collect();
     assert_eq!(frames.len(), expected.len());
+    let source_peak = expected
+        .iter()
+        .flatten()
+        .fold(0.0_f32, |p, s| p.max(s.abs()));
+    let gain = sound.peak / source_peak;
     let error = frames
         .iter()
         .zip(&expected)
-        .flat_map(|(a, b)| (0..2).map(move |ch| (a[ch] - b[ch]).abs()))
+        .flat_map(|(a, b)| (0..2).map(move |ch| (a[ch] - b[ch] * gain).abs()))
         .fold(0.0_f32, f32::max);
     assert!(
         error < 0.000001,

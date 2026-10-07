@@ -6,7 +6,7 @@
         // Three drawn rounds per firing event: the chosen accelerator pulse,
         // at 0.0, 0.1 and 0.2 seconds to match the forearm's burst.
         "regency_stinger": (
-            length: 0.82, peak: 0.52, room: 0.0,
+            length: 0.82, peak: 0.37, room: 0.0,
             layers: [
                 Sample(file: "sounds/samples/regency-repeater-f.wav"),
                 Sample(file: "sounds/samples/regency-repeater-f.wav", at: 0.1),
@@ -358,18 +358,19 @@
         // are not changed by the repeater selection.
         //
         // Audition F, selected by the user: play the actual approved waveform.
-        // Its own short room is baked in; do not add another room or redesign it.
+        // Its own short room is baked in. Playback is about 3 dB below the
+        // audition level to sit alongside the Warden's slower cannon report.
         "regency_repeater": (
-            length: 0.62, peak: 0.6915893555, room: 0.0,
+            length: 0.62, peak: 0.49, room: 0.0,
             layers: [Sample(file: "sounds/samples/regency-repeater-f.wav")],
         ),
         // The same accelerator field breaking on impact, slightly lower and heavier.
-        "regency_repeater_hit": (like: "regency_repeater", size: 1.15, peak: 0.52),
+        "regency_repeater_hit": (like: "regency_repeater", size: 1.15, peak: 0.37),
 
         // The raider's Twin Plasmeric Repeater: the repeater's bolt from a smaller gun,
         // a little tighter and lighter, four a second from each raider.
-        "regency_repeater_light": (like: "regency_repeater", size: 0.82, peak: 0.34),
-        "regency_repeater_light_hit": (like: "regency_repeater_hit", size: 0.82, peak: 0.32),
+        "regency_repeater_light": (like: "regency_repeater", size: 0.82, peak: 0.24),
+        "regency_repeater_light_hit": (like: "regency_repeater_hit", size: 0.82, peak: 0.23),
 
         // The Halberd's Pinched-plasmeric Cannon, heard 1.0 s before its salvo: plasma
         // drawn in and squeezed into a ball by gravity. A field closing with a clunk, a
@@ -541,7 +542,7 @@
         ),
 
         // AA salvo bolts emit one fire event each: one selected pulse per bolt.
-        "regency_canopy_fire": (like: "regency_repeater", size: 0.95, peak: 0.48),
+        "regency_canopy_fire": (like: "regency_repeater", size: 0.95, peak: 0.34),
         // A Canopy round bursting among aircraft, heard from the ground: a sharp hot pop
         // and its report rolling off, soft and low, no crackle.
         "regency_canopy_burst": (
@@ -557,7 +558,7 @@
         ),
 
         // The Brazier's Plasmeric Repeater: the Canopy's launch from a smaller organ.
-        "regency_brazier_fire": (like: "regency_canopy_fire", size: 0.85, peak: 0.34),
+        "regency_brazier_fire": (like: "regency_canopy_fire", size: 0.85, peak: 0.24),
         // The Gorget's airburst repeater: a Halberd's pinch from a smaller bore, and a burst
         // like the Canopy's old one, bigger.
         "regency_gorget_fire": (like: "regency_halberd_fire", size: 0.55, peak: 0.42),
