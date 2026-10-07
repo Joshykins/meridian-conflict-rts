@@ -45,7 +45,7 @@ const GLASS_COOL: f32 = 9.0;
 /// The colour of the `i`th sheet thrown out where a star beam strikes: pink-white near
 /// the strike, lavender further round.
 fn mix_hot(i: usize) -> Vec3 {
-    if i % 3 == 0 {
+    if i.is_multiple_of(3) {
         WHITE * 3.0
     } else if i % 3 == 1 {
         ROSE * 3.0
