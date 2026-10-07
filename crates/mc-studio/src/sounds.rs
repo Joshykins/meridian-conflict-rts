@@ -959,6 +959,12 @@ fn when(at: f32, decay: f32) -> String {
 /// A layer in plain words.
 fn describe(layer: &Layer) -> String {
     match *layer {
+        Layer::Sample {
+            ref file,
+            speed,
+            at,
+            ..
+        } => format!("Sample {file}, speed {speed:.2}x, from {at:.3} s"),
         Layer::Tone {
             at,
             from,

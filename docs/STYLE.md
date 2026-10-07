@@ -323,8 +323,9 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     down the bolt, and short hot fragments mark containment breaking on impact.
     Where one lands it dumps its heat at once: a white flash in a ragged red bloom, a knot of plasma left
     frying, droplets spattered out, sparks, a seared glowing spot. Heard as a
-    snap, a heavy spit with a kick under it and a fizz riding off; it lands as
-    a wet splat, a thud and plasma frying. **Plasmeric AA repeater** ripples the same bolts out of each tube in
+    compact accelerator discharge with a sharp electronic core and weight
+    underneath (selected audition F, stored as regency-repeater-f.wav); its
+    impact uses the same field rupture slightly lower and heavier. **Plasmeric AA repeater** ripples the same bolts out of each tube in
     turn, and each bursts as a wide red bloom flinging sparkles and streaks of plasma.
   - **Pinched-plasmeric:** plasma gathered and squeezed in front of the bore
     (a ball, motes drawn in, red lightning snapping into it), then pinched

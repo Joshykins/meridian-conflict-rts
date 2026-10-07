@@ -7,8 +7,8 @@
 //! blocks; what it leaves out comes from the library's `defaults`. Not all of
 //! it is battle: the sound a unit answers a selection with is here too.
 //!
-//! There are no audio files. A sound is a recipe, a list of layers the game
-//! synthesises at start-up (see `mc-game`'s `audio`), so the library can be
+//! A sound is a recipe of synthesised layers and optional PCM WAV samples,
+//! rendered at start-up (see `mc-game`'s `audio`), so the library can be
 //! tuned in a text editor and reloaded without a rebuild. Nothing here reaches
 //! the simulation, and none of it is in the blueprint content hash.
 
@@ -17,12 +17,28 @@ use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::path::Path;
 
+mod sample;
+pub use sample::SampleClip;
+
 /// One layer of a recipe. Times in seconds, frequencies in hertz, `pan` from
 /// -1 (left) to 1. Every layer sounds from `at` and dies away on its own:
 /// `attack` is the rise to full level, `decay` the time to fall to about a third.
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub enum Layer {
+    /// A validated PCM WAV relative to data/, optionally delayed or repitched.
+    /// The loader fills `clip`; rendering never reads files on the audio thread.
+    Sample {
+        file: String,
+        #[serde(default)]
+        at: f32,
+        #[serde(default = "one")]
+        gain: f32,
+        #[serde(default = "one")]
+        speed: f32,
+        #[serde(skip)]
+        clip: SampleClip,
+    },
     /// A sine gliding from `from` to `to` over `glide` seconds: thumps, booms, whines.
     Tone {
         #[serde(default)]
@@ -371,6 +387,30 @@ impl SoundLibrary {
             };
             let stem = stem.map(|s| s.to_string_lossy().into_owned());
             for (name, mut sound) in library.sounds {
+                for layer in &mut sound.layers {
+                    if let Layer::Sample {
+                        file,
+                        at,
+                        gain,
+                        speed,
+                        clip,
+                    } = layer
+                    {
+                        if !at.is_finite()
+                            || *at < 0.0
+                            || *at > 40.0
+                            || !gain.is_finite()
+                            || !(0.0..=8.0).contains(gain)
+                            || !speed.is_finite()
+                            || !(0.125..=8.0).contains(speed)
+                        {
+                            return Err(DataError::Invalid(format!(
+                                "{name}: invalid sample parameters"
+                            )));
+                        }
+                        *clip = sample::load(data_dir, file)?;
+                    }
+                }
                 sound.file.clone_from(stem.as_ref().unwrap_or(&name));
                 if raw.insert(name.clone(), sound).is_some() {
                     return Err(DataError::Invalid(format!(
@@ -555,6 +595,10 @@ impl Layer {
     fn resize(&mut self, size: f32) {
         let k = 1.0 / size;
         match self {
+            Layer::Sample { at, speed, .. } => {
+                *at *= size;
+                *speed /= size;
+            }
             Layer::Tone {
                 at,
                 from,

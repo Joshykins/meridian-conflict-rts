@@ -150,7 +150,9 @@ uploads the rows that changed. Blending is linear-light into an sRGB target, so 
 
 Controls make their own sounds, so nothing interactive can be mute. Sound is synthesised at
 start-up on a background thread at the device's rate (`audio.rs`: a small mixer behind `cpal`,
-synthesis in `mc-sfx`, which mc-studio's Sounds screen shares); there are no audio files. The tests check that no sound clicks or is cut off.
+synthesis in `mc-sfx`, which mc-studio's Sounds screen shares). Recipes can also layer
+validated 16-bit PCM WAV files from `data/`, decoded at library load and resampled by
+the shared renderer. The tests check that no sound clicks or is cut off.
 
 ## Match HUD (mc-game `hud/`)
 

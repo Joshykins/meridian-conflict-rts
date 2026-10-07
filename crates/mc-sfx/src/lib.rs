@@ -69,6 +69,28 @@ fn build(sound: &Sound, rate: u32, only: Option<usize>, heard: Option<&Levels>) 
             continue;
         }
         match layer {
+            Layer::Sample {
+                at,
+                gain,
+                speed,
+                clip,
+                ..
+            } => {
+                let offset = (*at * rate as f32) as usize;
+                let step = f64::from(clip.rate) * f64::from(*speed) / f64::from(rate);
+                for (i, frame) in b.frames.iter_mut().skip(offset).enumerate() {
+                    let pos = i as f64 * step;
+                    let index = pos as usize;
+                    let Some(a) = clip.frames.get(index) else {
+                        break;
+                    };
+                    let b = clip.frames.get(index + 1).unwrap_or(a);
+                    let fraction = (pos - index as f64) as f32;
+                    for ch in 0..2 {
+                        frame[ch] += (a[ch] + (b[ch] - a[ch]) * fraction) * gain;
+                    }
+                }
+            }
             Layer::Tone {
                 at,
                 from,
