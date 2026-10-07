@@ -1170,17 +1170,18 @@
                 Burst(at: 1.0, low: 50, high: 300, attack: 0.002, decay: 0.05, gain: 4, pan: 0.15),
             ],
         ),
-        // An orb let go: a dull pressure thump as it leaves its place, then a rising rush of
-        // plasma tearing up into the sky, the band climbing and thinning as it goes. Short,
-        // because twenty follow it a tick apart; nothing falls, nothing pews.
+        // An orb let go: a soft pressure thoom as it leaves its place, a short dark push
+        // of air under it and the plasma's low body falling away. A whole battery lets go
+        // twenty a second, so each is short and dark, nothing above the low mids held:
+        // a rising noise band here summed into one long sizzle. Never a pew.
         "regency_carillon_fire": (
-            length: 1.1, peak: 0.5, room: 0.35,
+            length: 0.55, peak: 0.5, room: 0.3,
             layers: [
-                Burst(low: 70, high: 900, attack: 0.0005, decay: 0.03, gain: 8),
-                Tone(from: 110, to: 56, glide: 0.1, attack: 0.001, decay: 0.12, gain: 0.8),
-                Fm(from: 140, to: 210, glide: 0.5, ratio: 0.5, index: 1.8, fade: 0.5, attack: 0.02, decay: 0.3, gain: 0.5),
-                Drive(1.4),
-                Sweep(at: 0.02, from: 500, to: 3200, glide: 0.5, q: 1.0, attack: 0.1, decay: 0.35, gain: 1.1, seed: 9711),
+                Burst(low: 60, high: 500, attack: 0.001, decay: 0.035, gain: 7),
+                Tone(from: 120, to: 58, glide: 0.12, attack: 0.002, decay: 0.14, gain: 0.9),
+                Fm(from: 150, to: 105, glide: 0.25, ratio: 0.5, index: 1.2, fade: 0.25, attack: 0.01, decay: 0.16, gain: 0.45),
+                Drive(1.25),
+                Roll(at: 0.01, from: 260, to: 520, glide: 0.2, attack: 0.03, decay: 0.14, gain: 0.5, swell: 6, depth: 0.5, seed: 9711),
             ],
         ),
         // An orb landing: the Halberd's red strike, heavier and longer in the low end, a

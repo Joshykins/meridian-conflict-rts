@@ -290,10 +290,16 @@ impl Renderer {
                 2,
             );
         }
-        // A skirt of plasma rolling out low over the ground, slowing to a stop.
+        // A skirt of plasma rolling out low over the ground, slowing to a stop; in the air
+        // (a hit on an aircraft or a ship) it rolls out every way.
         for _ in 0..10 {
             let a = self.scatter.unit() * std::f32::consts::TAU;
-            let out = Vec3::new(a.cos(), a.sin(), 0.06);
+            let rise = if ground {
+                0.06
+            } else {
+                self.scatter.signed() * 0.7
+            };
+            let out = Vec3::new(a.cos(), a.sin(), rise);
             let puff = s * (0.14 + 0.1 * self.scatter.unit());
             let when = start + 0.04 + self.scatter.unit() * 0.1;
             let life = 0.9 + 0.5 * self.scatter.unit();
@@ -311,12 +317,18 @@ impl Renderer {
                 2,
             );
         }
-        // Red plasma crackling out over the ground round it as the bind lets go.
+        // Red plasma crackling out over the ground round it as the bind lets go. In the air
+        // it crackles out round the burst: an arc run down to the ground under a hit on an
+        // aircraft would read as lightning striking the ground.
         for _ in 0..7 {
             let a = self.scatter.unit() * std::f32::consts::TAU;
             let r = s * (0.5 + 0.6 * self.scatter.unit());
             let to = at + Vec3::new(a.cos() * r, a.sin() * r, 0.0);
-            let to = to.with_z(self.ground_height(to.truncate()) + 0.2);
+            let to = if ground {
+                to.with_z(self.ground_height(to.truncate()) + 0.2)
+            } else {
+                to + Vec3::Z * self.scatter.signed() * r * 0.6
+            };
             let from = at + Vec3::Z * s * 0.15;
             let when = start + self.scatter.unit() * 0.6;
             let life = 0.12 + 0.08 * self.scatter.unit();
