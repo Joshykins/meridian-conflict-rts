@@ -95,8 +95,8 @@ a pass; anti-air punishes them over seconds, not in one shot.
 - **No AA shell or bullet one-shots a same-tier aircraft.** Flak keeps its wide splash
   (it still takes a whole bunched flight), but a shell does less than a T1 aircraft's health:
   Squall 200 a shell, Barrage 2 x 220; T1 aircraft have 160-300. A T1 AA gun takes about
-  5 s (Gnat) or 2 s (Sparrow) to down a T1 bomber (FAF: 8 s / 3 s).
-- **AA outreaches the ground guns of its tier**, so it can stand behind the line: Gnat 360 m
+  8 s (Gnat) or 3 s (Sparrow) to down a T1 bomber (FAF: 8 s / 3 s).
+- **AA outreaches the ground guns of its tier**, so it can stand behind the line: Gnat 360 m, Canopy 400 m
   and Sparrow 480 m against a T1 tank's 300 m. T3 AA still buys reach, not efficiency.
 - **Fighters are about 1.4x faster than the bombers of their tier** and tougher than them,
   so they catch raids (Shrike 120 against the Petrel's 84, 250 health against 250).

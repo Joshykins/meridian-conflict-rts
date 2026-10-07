@@ -749,7 +749,7 @@
  vision: 520, water_build: true,
  // A rotary gun like the commander's: it spins up on a target, then each 0.2 s shot is
  // seen and heard as eight rounds, and throws out a casing for each on the right.
- weapons: [(name: "Rotary AA Gun", damage: 22, range: 480, reload: 0.2, speed: 800, trajectory: Direct,
+ weapons: [(name: "Rotary AA Gun", damage: 17, range: 480, reload: 0.2, speed: 800, trajectory: Direct,
  turret_turn: 240, muzzle: (5.5, 0, 6), pivot: (0, 0, 6), targets: ["Air"], color: Orange, spin_up: 0.4, rounds: 8, tracer: 0.7, casings: 4.5,
  sounds: (fire: "aster_minigun", impact: "shell_light"), )], mesh: "aa_gun", icon: AntiAir, sounds: (death: "blast_large")),
 

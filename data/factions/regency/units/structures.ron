@@ -586,7 +586,7 @@
     // The tech 1 anti-air: a Plasmeric Repeater, the Picket's gun turned on the sky. An organ
     // of four tubes rippling plasma bolts at aircraft, one out of each tube in turn, each
     // striking the plane it is fired at. Against the Sparrow: a little more damage a second
-    // on one plane, from under three quarters of its reach.
+    // on one plane, from five sixths of its reach.
     (
         key: "regency_t1_aa",
         name: "Canopy",
@@ -599,8 +599,8 @@
         vision: 450, water_build: true,
         weapons: [(
             name: "Plasmeric Repeater",
-            // 4 bolts of 24 every 0.8 s: 120 a second on one plane, to the Sparrow's 110.
-            damage: 24, splash: 1, range: 340, reload: 0.8, speed: 650, trajectory: Direct,
+            // 4 bolts of 18 every 0.8 s: 90 a second on one plane, to the Sparrow's 85.
+            damage: 18, splash: 1, range: 400, reload: 0.8, speed: 650, trajectory: Direct,
             salvo: 4, salvo_delay: 0.1,
             turret_turn: 240, muzzle: (3.8, 0, 5.8), pivot: (0, 0, 5.8),
             muzzles: [(3.8, -1.35, 5.8), (3.8, -0.45, 5.8), (3.8, 0.45, 5.8), (3.8, 1.35, 5.8)],
