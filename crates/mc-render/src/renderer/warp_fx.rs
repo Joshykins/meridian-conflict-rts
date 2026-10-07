@@ -28,10 +28,13 @@
 //! (about 20 puffs while charging, 60 on a jump or exit tick), and ships far from the
 //! camera draw only the glows, streaks, rifts and flashes.
 
+mod nanite;
+
 use super::{Puff, Renderer, PUFF_RING, PUFF_SPARK};
 use crate::camera::Camera;
 use crate::gpu_consts::puff;
 use glam::Vec3;
+use mc_data::WarpStyle;
 use mc_sim::mirror::{RenderFrame, WarpView};
 use mc_sim::tables::WarpPhase;
 use std::mem::size_of;
@@ -41,6 +44,7 @@ const PUFF_WARP_STREAK: f32 = puff::WARP_STREAK as f32;
 const PUFF_WARP_RIFT: f32 = puff::WARP_RIFT as f32;
 const PUFF_WARP_ARC: f32 = puff::WARP_ARC as f32;
 const PUFF_WARP_MOTE: f32 = puff::WARP_MOTE as f32;
+const PUFF_WARP_SWARM: f32 = puff::WARP_SWARM as f32;
 
 /// Radius (m) of the hull the light's brightness is tuned for (the Resolute's).
 const REFERENCE_RADIUS: f32 = 150.0;
@@ -60,13 +64,16 @@ struct Palette {
     edge: Vec3,
     /// Sparks off a torn jump.
     accent: Vec3,
-    /// How torn it looks (`appearance.w`): 0 clean, 1 dampened.
+    /// What `appearance.w` carries: 0 clean, 1 dampened, plus 2 for the Regency's nanite look.
     torn: f32,
     /// The pressure ring's tint.
     shock: [f32; 3],
 }
 
-fn palette(dampened: bool) -> Palette {
+fn palette(dampened: bool, style: WarpStyle) -> Palette {
+    if style == WarpStyle::Nanite {
+        return nanite::palette(dampened);
+    }
     if dampened {
         Palette {
             core: Vec3::new(0.8, 0.55, 1.0),
@@ -147,7 +154,7 @@ impl Renderer {
             };
             let jump = Jump {
                 view: *view,
-                pal: palette(view.dampened),
+                pal: palette(view.dampened, view.style),
                 r,
                 k: r / REFERENCE_RADIUS,
                 fwd,
@@ -157,6 +164,10 @@ impl Renderer {
                 near: at.truncate().distance(focus) < reach && camera.distance < 5000.0,
                 floor: camera.distance * 0.03,
             };
+            if view.style == WarpStyle::Nanite {
+                self.nanite_tick(&jump, frame, time);
+                continue;
+            }
             match view.phase {
                 WarpPhase::Spool => {
                     // Where the hull is now, its nose still coming round.

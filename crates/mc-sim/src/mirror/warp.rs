@@ -14,9 +14,10 @@
 
 use super::{DamperView, SimEvent, UnitInstance, WarpView};
 use crate::tables::WarpPhase;
-use crate::warp::{transit_ticks, warp_rate, EMERGE_DAMPED_TICKS};
+use crate::warp::{transit_ticks, warp_rate, EMERGE_DAMPED_TICKS, EMERGE_TICKS};
 use crate::World;
 use mc_core::TICKS_PER_SECOND;
+use mc_data::WarpStyle;
 
 /// Units' `status[0]`: the jump it is in (spooling, in transit or coming out) is snagged
 /// by a live enemy dampener: torn, slow, and it comes out hurt and stunned.
@@ -24,6 +25,9 @@ pub const UNIT_WARP_DAMPED: u32 = 1 << 12;
 /// Units' `status[0]`: in warp, out of the world. Listed for its own side's interface
 /// (selection, the card), never drawn.
 pub const UNIT_IN_WARP: u32 = 1 << 13;
+/// Units' `status[0]`: its drive's jump is the Regency's (`mc_data::WarpStyle::Nanite`):
+/// the hull comes apart into a swarm instead of stretching into a streak.
+pub const UNIT_WARP_NANITE: u32 = 1 << 15;
 /// Ticks at the end of a stun over which it wears off (`fx[2..4]` fall from 1 to 0): the
 /// ship's systems stutter back on.
 const STUN_FADE: u16 = 3 * TICKS_PER_SECOND as u16;
@@ -74,6 +78,10 @@ impl World {
         let units = &self.state.units;
         let w = &units.warp[row];
         let damped = self.warp_damped(row) && !self.hides_damping(viewer, units.owner[row]);
+        let nanite = self
+            .bp(row)
+            .warp
+            .is_some_and(|d| d.style == WarpStyle::Nanite);
         let stretch = match w.phase {
             // The tick it jumps: from nothing to a full streak.
             WarpPhase::Transit if w.ticks == 0 => [0.0, 1.0],
@@ -83,6 +91,11 @@ impl World {
             WarpPhase::Emerge if damped => {
                 let at = |t: u16| 1.0 - (t as f32 / EMERGE_DAMPED_TICKS as f32).min(1.0);
                 [at(w.ticks.saturating_sub(1)), at(w.ticks)]
+            }
+            // The Regency's swarm takes the whole of the exit to condense into the hull.
+            WarpPhase::Emerge if nanite => {
+                let at = |t: u16| 1.0 - (t as f32 / EMERGE_TICKS as f32).min(1.0);
+                [at(w.ticks), at(w.ticks + 1)]
             }
             WarpPhase::Emerge if w.ticks == 0 => [1.0, 0.0],
             // Charging: below zero, how full the drive is (a tick's full draw back, then now).
@@ -106,6 +119,9 @@ impl World {
         }
         if w.phase == WarpPhase::Transit && w.ticks > 0 {
             marks |= UNIT_IN_WARP;
+        }
+        if nanite {
+            marks |= UNIT_WARP_NANITE;
         }
         (fx, marks)
     }
@@ -192,6 +208,7 @@ impl World {
                     WarpPhase::Spool => warp_rate(w).to_f32() * TICKS_PER_SECOND as f32,
                     _ => 0.0,
                 },
+                style: bp.warp.map_or_else(Default::default, |d| d.style),
             });
         }
     }

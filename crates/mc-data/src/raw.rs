@@ -811,6 +811,9 @@ pub(crate) struct RawWarp {
     pub cooldown: f64,
     /// Metres per second in warp.
     pub speed: f64,
+    /// How the jump looks and sounds ([`crate::WarpStyle`]); ARC's by default.
+    #[serde(default)]
+    pub style: crate::WarpStyle,
 }
 
 /// A nanite repair field: the friendly units within `radius` metres heal `rate` of their
@@ -2151,6 +2154,7 @@ impl Unit {
                     spool_ticks: ticks(d.spool).clamp(1, 600) as u16,
                     cooldown_ticks: ticks(d.cooldown).min(6000) as u16,
                     speed: fx(d.speed / TICKS_PER_SECOND as f64),
+                    style: d.style,
                 }),
                 None => None,
             },

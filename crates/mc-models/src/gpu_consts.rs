@@ -685,7 +685,7 @@ shared! {
         pub const INTERCEPT: u32 = 40;
         /// A capital ship's warp (renderer/warp_fx.rs, warp_puffs.wgsl). Each carries its
         /// colour in `appearance.rgb` (brightness in its size) and how torn a dampened jump
-        /// makes it in `appearance.w` (0 clean, 1 torn).
+        /// makes it in `appearance.w` (0 clean, 1 torn, plus 2 for the Regency's nanite look).
         /// A soft glow that swells and fades: the drive charging, a jump's flash.
         pub const WARP_GLOW: u32 = 44;
         /// A streak of light from `pos` along `vel` (axis times length): its head runs out
@@ -698,6 +698,9 @@ shared! {
         pub const WARP_ARC: u32 = 47;
         /// A mote of charged light carried on `vel` and stopped by the air.
         pub const WARP_MOTE: u32 = 48;
+        /// A speck of the Regency's nanite swarm (renderer/warp_fx/nanite.rs): a hard-edged
+        /// black shard carried on `vel` and stopped by the air, with a red glint at its rim.
+        pub const WARP_SWARM: u32 = 49;
         /// A warp dampener's field edge (renderer/damper_fx.rs): a faint upright curtain
         /// standing on the ground along `vel` (its run), `size` metres tall, coloured
         /// `appearance.xyz` at strength `appearance.w`, swelling in and out over its life.
@@ -1292,6 +1295,8 @@ shared! {
         pub const DAMPED: u32 = 0x1000;
         /// In warp: listed for its own side, never drawn.
         pub const IN_WARP: u32 = 0x2000;
+        /// The drive is the Regency's: the hull comes apart into a nanite swarm.
+        pub const NANITE: u32 = 0x8000;
     }
 
     /// A salvage drone docked on an aircraft (`mc_sim::mirror::UNIT_RIDING`, a test holds

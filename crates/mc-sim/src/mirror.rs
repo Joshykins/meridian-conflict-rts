@@ -40,7 +40,7 @@ pub use elevator::{crate_load, ElevatorPhase, ElevatorView};
 pub use fog::VisionDisc;
 pub use links::LinkView;
 pub use walls::{join_walls, WALL_JOINS};
-pub use warp::{UNIT_IN_WARP, UNIT_WARP_DAMPED};
+pub use warp::{UNIT_IN_WARP, UNIT_WARP_DAMPED, UNIT_WARP_NANITE};
 pub use work::WorkLeft;
 pub use wrecks::WRECK_EXTRA_INSTANCES;
 
@@ -1483,6 +1483,8 @@ pub struct WarpView {
     /// Spooling: energy the grid is asked for each second while it charges at full power
     /// (0 otherwise).
     pub draw: f32,
+    /// How the drive's jump looks and sounds.
+    pub style: mc_data::WarpStyle,
 }
 
 /// A warp dampener and its field.

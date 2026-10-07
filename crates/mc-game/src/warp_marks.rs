@@ -383,6 +383,7 @@ mod tests {
             spool_ticks: (spool * 10.0) as u16,
             cooldown_ticks: 400,
             speed: mc_core::Fx::from_int(300),
+            style: mc_data::WarpStyle::Streak,
         };
         let far = mc_core::Fx::from_f32(distance);
         Jump {

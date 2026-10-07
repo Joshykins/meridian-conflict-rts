@@ -5,10 +5,12 @@
 //
 // Every one is light added to the scene (the rift's heart also hides what is behind it).
 // `appearance.rgb` is its colour, brightness in its size; `appearance.w` how torn a
-// dampened jump makes it: 0 clean, 1 stuttering, jittering and flickering.
+// dampened jump makes it: 0 clean, 1 stuttering, jittering and flickering, plus 2 for the
+// Regency's nanite look (`warp_nanite`: kept in colour, not whitened; a swarm of black shards,
+// and `roll.y` 1 turns the rift into a gravity well).
 
 fn is_warp_puff(kind: u32) -> bool {
-    return kind >= PUFF_WARP_GLOW && kind <= PUFF_WARP_MOTE;
+    return kind >= PUFF_WARP_GLOW && kind <= PUFF_WARP_SWARM;
 }
 
 // Changes `rate` times a second, differently for each `seed`: 0 to 1.
@@ -47,13 +49,13 @@ fn warp_puff_vertex(p: Puff, corner: vec2<f32>, t: f32, age: f32, o: PuffOut) ->
         return out;
     }
     var pos = p.pos;
-    if kind == PUFF_WARP_GLOW || kind == PUFF_WARP_MOTE {
+    if kind == PUFF_WARP_GLOW || kind == PUFF_WARP_MOTE || kind == PUFF_WARP_SWARM {
         // Carried off at `vel`, the air taking it off.
-        let drag = select(1.2, 1.8, kind == PUFF_WARP_MOTE);
+        let drag = select(1.2, 1.8, kind != PUFF_WARP_GLOW);
         pos = p.pos + p.vel * ((1.0 - exp(-drag * t)) / drag);
     }
     let center = globals.view_proj * vec4<f32>(pos, 1.0);
-    let floor_px = select(select(3.0, 1.6, kind == PUFF_WARP_MOTE), 4.0, kind == PUFF_WARP_RIFT);
+    let floor_px = select(select(select(3.0, 1.6, kind == PUFF_WARP_MOTE), 2.4, kind == PUFF_WARP_SWARM), 4.0, kind == PUFF_WARP_RIFT);
     let px = max(size * globals.lod.x / max(center.w, 1.0), floor_px);
     let ndc = center.xy / center.w + corner * px * globals.viewport.zw;
     // A glow round a hull is tested at its near side, so the hull does not slice it.
@@ -72,21 +74,28 @@ fn warp_puff_color(in: PuffOut, d: f32) -> vec4<f32> {
     let age = in.state.x;
     let seed = in.state.z;
     let rgb = in.appearance.rgb;
-    let torn = clamp(in.appearance.w, 0.0, 1.0);
+    let nanite = in.appearance.w > 1.5;
+    let torn = clamp(in.appearance.w - select(0.0, 2.0, nanite), 0.0, 1.0);
     let now = globals.camera.w;
     // A torn jump's light gutters: dropping out and flaring a dozen or more times a second.
     let gutter = mix(1.0, 0.25 + 1.2 * warp_flicker(19.0, seed), torn);
     if kind == PUFF_WARP_STREAK {
-        return warp_streak(in, rgb, torn, age, seed) * gutter;
+        return warp_streak(in, rgb, torn, nanite, age, seed) * gutter;
     }
     if kind == PUFF_WARP_ARC {
-        return warp_arc(in, rgb, age, seed);
+        return warp_arc(in, rgb, nanite, age, seed);
     }
     if d > 1.0 {
         return vec4<f32>(0.0);
     }
     if kind == PUFF_WARP_RIFT {
+        if nanite {
+            return warp_well(in, d, rgb, torn, age, seed);
+        }
         return warp_rift(in, d, rgb, torn, age, seed);
+    }
+    if kind == PUFF_WARP_SWARM {
+        return warp_swarm(in, rgb, torn, age, seed);
     }
     if kind == PUFF_WARP_MOTE {
         let glow = pow(max(1.0 - d, 0.0), 1.6);
@@ -98,14 +107,14 @@ fn warp_puff_color(in: PuffOut, d: f32) -> vec4<f32> {
     let fade = smoothstep(0.0, 0.08, age) * (1.0 - smoothstep(0.3, 1.0, age));
     let halo = pow(max(1.0 - d, 0.0), 2.2);
     let core = pow(max(1.0 - d * 1.7, 0.0), 2.6);
-    let white = mix(rgb, vec3<f32>(length(rgb) * 0.6), 0.7);
+    let white = mix(rgb, vec3<f32>(length(rgb) * 0.6), select(0.7, 0.12, nanite));
     return vec4<f32>((rgb * halo * 0.7 + white * core * 2.4) * fade * gutter, 0.0);
 }
 
 // A streak: its head runs out along the ribbon in the first part of its life, brightest at
 // the head, a thin line left behind it that fades. Torn, it jitters off its line in steps
 // and breaks up.
-fn warp_streak(in: PuffOut, rgb: vec3<f32>, torn: f32, age: f32, seed: f32) -> vec4<f32> {
+fn warp_streak(in: PuffOut, rgb: vec3<f32>, torn: f32, nanite: bool, age: f32, seed: f32) -> vec4<f32> {
     let now = globals.camera.w;
     let x = (in.uv.x + 1.0) * 0.5;
     let cell = floor(x * 26.0);
@@ -123,7 +132,7 @@ fn warp_streak(in: PuffOut, rgb: vec3<f32>, torn: f32, age: f32, seed: f32) -> v
     let halo = exp(-y * y / 0.2) * 0.4;
     let gap = mix(1.0, step(0.3, hash11(floor(x * 34.0 + now * 24.0) + seed * 5.0)), torn);
     let fade = 1.0 - smoothstep(0.4, 1.0, age);
-    let white = mix(rgb, vec3<f32>(length(rgb) * 0.6), 0.75);
+    let white = mix(rgb, vec3<f32>(length(rgb) * 0.6), select(0.75, 0.15, nanite));
     let light = (white * core * 3.0 + rgb * halo) * (lead + left + knot * 3.0) * fade * gap;
     return vec4<f32>(light, 0.0);
 }
@@ -131,7 +140,7 @@ fn warp_streak(in: PuffOut, rgb: vec3<f32>, torn: f32, age: f32, seed: f32) -> v
 // A bolt of lightning along the ribbon, re-struck fifteen times a second: a kinked
 // channel, thick in the middle and thinning to nothing at both ends, with a fork
 // breaking off it part way.
-fn warp_arc(in: PuffOut, rgb: vec3<f32>, age: f32, seed: f32) -> vec4<f32> {
+fn warp_arc(in: PuffOut, rgb: vec3<f32>, nanite: bool, age: f32, seed: f32) -> vec4<f32> {
     let now = globals.camera.w;
     let x = (in.uv.x + 1.0) * 0.5;
     let strike = floor(now * 15.0) * 17.0 + seed * 97.0;
@@ -155,7 +164,7 @@ fn warp_arc(in: PuffOut, rgb: vec3<f32>, age: f32, seed: f32) -> vec4<f32> {
     let halo = (exp(-y * y / (0.05 * taper + 0.001)) + exp(-yf * yf / 0.02) * branch) * 0.3;
     let on = step(0.22, warp_flicker(31.0, seed));
     let fade = 1.0 - age;
-    let white = mix(rgb, vec3<f32>(length(rgb) * 0.6), 0.6);
+    let white = mix(rgb, vec3<f32>(length(rgb) * 0.6), select(0.6, 0.12, nanite));
     return vec4<f32>((white * core * 3.0 + rgb * halo * taper) * on * fade, 0.0);
 }
 
@@ -212,4 +221,66 @@ fn warp_rift(in: PuffOut, d: f32, rgb: vec3<f32>, torn: f32, age: f32, seed: f32
         light *= 0.35 + 1.1 * warp_flicker(17.0, seed);
     }
     return vec4<f32>(light * fade, heart * 0.85 * fade);
+}
+
+// A speck of the Regency's swarm: a hard-edged black shard, turned its own way, that hides
+// what is behind it, with a glint of `rgb` along its rim that twinkles. A torn jump's
+// specks gutter. It fades out over the last quarter of its life.
+fn warp_swarm(in: PuffOut, rgb: vec3<f32>, torn: f32, age: f32, seed: f32) -> vec4<f32> {
+    let now = globals.camera.w;
+    let turn = seed * 6.28318;
+    let c = cos(turn);
+    let s = sin(turn);
+    let p = vec2<f32>(c * in.uv.x - s * in.uv.y, s * in.uv.x + c * in.uv.y);
+    // A sliver: long one way, a kinked diamond.
+    let m = abs(p.x) * 0.8 + abs(p.y) * 1.7;
+    if m > 1.0 {
+        return vec4<f32>(0.0);
+    }
+    let rim = smoothstep(0.55, 1.0, m);
+    let twinkle = step(0.35, fract(sin(now * 11.0 + seed * 90.0) * 43.7));
+    let fade = (1.0 - smoothstep(0.75, 1.0, age)) * smoothstep(0.0, 0.06, age);
+    let gutter = mix(1.0, step(0.4, warp_flicker(21.0, seed)), torn);
+    let glint = rgb * rim * (0.4 + 1.6 * twinkle) * gutter * (1.0 - age * 0.6);
+    return vec4<f32>(glint * fade, 0.92 * fade * gutter);
+}
+
+// The Regency's rift, turned to the eye: a gravity well. Rings of bent space run in to a
+// dark heart, thin and red, brightening as they near it; beads of the swarm fall in along
+// fixed lines; a hard red ring marks the well's edge with a violet one just inside it. Open
+// (`roll.x` 1) the heart is black with a violet point in it; closed (0) only the rings run in,
+// faint. Nothing turns. Torn, the ring is jagged and it gutters.
+fn warp_well(in: PuffOut, d: f32, rgb: vec3<f32>, torn: f32, age: f32, seed: f32) -> vec4<f32> {
+    let now = globals.camera.w;
+    let open = clamp(in.roll.x, 0.0, 1.0);
+    let angle = atan2(in.uv.y, in.uv.x);
+    let fade = smoothstep(0.0, 0.15, age) * (1.0 - smoothstep(0.6, 1.0, age));
+    let jag = (hash11(floor(angle * 5.0 + now * 23.0) + seed * 31.0) - 0.5) * 0.12 * torn;
+    let r0 = mix(0.5, 0.32, open) + jag;
+    let violet = vec3<f32>(0.55, 0.2, 1.0) * length(rgb) * 0.7;
+    // Rings running in: three at a time, each a ring that shrinks to the heart.
+    var rings = 0.0;
+    for (var k = 0; k < 3; k = k + 1) {
+        let f = fract(now * 0.8 + seed + f32(k) / 3.0);
+        let rr = mix(0.98, r0, f * f);
+        rings += exp(-pow((d - rr) / 0.016, 2.0)) * sin(3.14159 * f) * (0.3 + 1.2 * f);
+    }
+    // Beads of the swarm falling in along twenty fixed lines.
+    let sectors = 20.0;
+    let turn = angle / 6.28318 * sectors + seed * 5.0;
+    let i = floor(turn) - sectors * floor(floor(turn) / sectors);
+    let across = (fract(turn) - 0.5) * 6.0;
+    let slide = fract(d * 2.2 + now * (0.6 + 0.8 * hash11(i + seed * 3.0)) + hash11(i * 7.0));
+    let bead = exp(-across * across * 2.0) * exp(-pow((slide - 0.5) * 7.0, 2.0)) * smoothstep(r0, r0 + 0.1, d) * (1.0 - smoothstep(0.6, 1.0, d));
+    let ring = exp(-pow((d - r0) / mix(0.04, 0.012, open), 2.0));
+    let inner = exp(-pow((d - r0 * 0.86) / 0.018, 2.0)) * open;
+    let halo = pow(max(1.0 - d, 0.0), 3.5) * mix(1.0, smoothstep(r0 * 0.8, r0 * 1.1, d), open);
+    let point = exp(-d * d / (0.0005 + 0.002 * open)) * open;
+    let heart = (1.0 - smoothstep(r0 * 0.55, r0 * 0.97, d)) * open;
+    var light = rgb * (ring * (0.5 + 1.8 * open) + rings * (0.25 + 0.4 * open) + bead * 0.9 * open + halo * 0.2)
+        + violet * (inner * 1.2 + point * 4.0);
+    if torn > 0.0 {
+        light *= 0.35 + 1.1 * warp_flicker(17.0, seed);
+    }
+    return vec4<f32>(light * fade, heart * 0.95 * fade);
 }

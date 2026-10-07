@@ -11,7 +11,8 @@
 //!
 //! A ship is heard by its size, never its tier: lower and louder the bigger its hull.
 //! Each sound is looked up per blueprint as `<moving>_<name>` (its `moving` sound's
-//! name), falling back to `<name>`, so a ship may carry its own.
+//! name), then `<style>_<name>` (`mc_data::WarpStyle::sound_prefix`: the Regency's drive
+//! is heard as `regency_warp_jump`), falling back to `<name>`, so a ship may carry its own.
 
 use super::Audio;
 use glam::Vec3;
@@ -43,8 +44,10 @@ struct Ids {
 impl Ids {
     fn of(library: &SoundLibrary, bp: &UnitBlueprint) -> Ids {
         let own = bp.sounds.moving.as_deref();
+        let style = bp.warp.and_then(|d| d.style.sound_prefix());
         let part = |name: &str| {
             own.and_then(|m| library.id_of(&format!("{m}_{name}")))
+                .or_else(|| style.and_then(|s| library.id_of(&format!("{s}_{name}"))))
                 .or_else(|| library.id_of(name))
         };
         Ids {
@@ -361,6 +364,33 @@ mod tests {
             "warp_damper_surge",
         ] {
             assert!(library.id_of(name).is_some(), "no {name}");
+        }
+    }
+
+    /// The Regency's drive is heard as its own (`regency_warp_*`): every part a ship asks
+    /// for by name has one, but the snag and the stun, which are ARC's.
+    #[test]
+    fn the_nanite_drive_has_its_own_sounds() {
+        let library = SoundLibrary::load(
+            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"),
+        )
+        .unwrap();
+        let prefix = mc_data::WarpStyle::Nanite.sound_prefix().unwrap();
+        for name in [
+            "warp_spool",
+            "warp_charge",
+            "warp_charge_arcs",
+            "warp_jump",
+            "warp_jump_damped",
+            "warp_rift",
+            "warp_rift_damped",
+            "warp_arrive",
+            "warp_arrive_damped",
+        ] {
+            assert!(
+                library.id_of(&format!("{prefix}_{name}")).is_some(),
+                "no {prefix}_{name}"
+            );
         }
     }
 }

@@ -528,6 +528,33 @@ pub struct Warp {
     pub cooldown_ticks: u16,
     /// Metres a tick the ship covers in warp: the transit lasts as long as the jump is far.
     pub speed: Fx,
+    /// How the jump looks and sounds.
+    pub style: WarpStyle,
+}
+
+/// The look and sound of a warp jump. The numbers cross into the shaders (`warp_status`
+/// in `mc-models/src/gpu_consts.rs` carries `Nanite` as a mark), so never renumber one.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Deserialize)]
+#[repr(u8)]
+pub enum WarpStyle {
+    /// ARC's: the hull stretches into a streak of blue-white light and a lens of bent light
+    /// opens where it comes out.
+    #[default]
+    Streak = 0,
+    /// The Regency's: the hull comes apart into a black swarm of nanites, red and violet
+    /// through it, that streams to the mark and condenses back into the ship.
+    Nanite = 1,
+}
+
+impl WarpStyle {
+    /// The prefix of this style's own sounds (`regency_warp_jump`), none for ARC's, whose
+    /// are the plain `warp_*` ones.
+    pub fn sound_prefix(self) -> Option<&'static str> {
+        match self {
+            WarpStyle::Streak => None,
+            WarpStyle::Nanite => Some("regency"),
+        }
+    }
 }
 
 impl Warp {

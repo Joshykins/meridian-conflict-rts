@@ -290,6 +290,7 @@ mod tests {
             aligned: true,
             energy: 1.0,
             draw: 1.0,
+            style: mc_data::WarpStyle::Streak,
         };
         assert_eq!(tether_pull(&w), 1.0);
         w.phase = WarpPhase::Emerge;

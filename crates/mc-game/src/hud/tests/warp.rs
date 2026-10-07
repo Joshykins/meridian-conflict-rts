@@ -41,6 +41,7 @@ fn spooling(charge: f32) -> WarpView {
         // 4 km at the Courier's 1,500 a kilometre.
         energy: 6000.0,
         draw: 1500.0,
+        style: mc_data::WarpStyle::Streak,
     }
 }
 

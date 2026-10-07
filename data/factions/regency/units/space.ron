@@ -6,6 +6,8 @@
         cost: (mass: 2800, energy: 46000, time: 16000),
         radius: 150, height: 100, footprint: (25, 13), hull: (150, 75), vision: 700,
         motion: (layer: Air, size: 0, speed: 92, accel: 22, turn: 32, altitude: 440, hover: true, deploy: 1.4),
+        // Warp: the Regency's drives take the hull apart into a nanite swarm (`style: Nanite`).
+        warp: (per_km: 8000, spool: 4, cooldown: 60, speed: 3500, style: Nanite),
         transport: (capacity: 96, descent: 85, hold: (40, 0), ramp: (-10, -86), width: 44, floor: 38, clearance: 36, unload: 0.4),
         weapons: [], mesh: "regency_ark", icon: Transport,
         shield: (kind: Hull, health: 4000, regen: 45), economy: (energy_upkeep: 80),
@@ -17,6 +19,7 @@
         cost: (mass: 600, energy: 11000, time: 3600),
         radius: 48, height: 16, footprint: (9, 5), hull: (50, 28), vision: 900,
         motion: (layer: Air, size: 0, speed: 130, accel: 32, turn: 48, altitude: 400, hover: true),
+        warp: (per_km: 4000, spool: 3, cooldown: 50, speed: 3200, style: Nanite),
         hull_mounts: true,
         weapons: [
             (name: "Escort Plasma Cannon", damage: 90, splash: 5, range: 750, reload: 1.4,
@@ -38,6 +41,7 @@
         cost: (mass: 5600, energy: 96000, time: 30000),
         radius: 96, height: 30, footprint: (18, 15), hull: (102, 87), vision: 1300,
         motion: (layer: Air, size: 0, speed: 72, accel: 16, turn: 24, altitude: 520, hover: true),
+        warp: (per_km: 20000, spool: 5, cooldown: 75, speed: 4000, style: Nanite),
         hull_mounts: true,
         weapons: [
             (name: "Heavy Anti-ship Plasma Cannon", damage: 650, splash: 18, range: 1400, reload: 3.0,
@@ -95,6 +99,7 @@
         // Shots meet the long hull along its length, not a disc of its radius.
         body: (fore: 320, aft: -320, beam: 110),
         motion: (layer: Air, size: 0, speed: 40, accel: 4, turn: 6, altitude: 700, hover: true, hangs: true),
+        warp: (per_km: 45000, spool: 7, cooldown: 110, speed: 4000, style: Nanite),
         hull_mounts: true,
         weapons: [
             // One held beam laid from the lower lens of the energy core in the drum through

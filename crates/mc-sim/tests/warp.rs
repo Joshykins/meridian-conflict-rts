@@ -552,3 +552,28 @@ fn a_ship_in_a_fight_still_turns_onto_its_jump_and_goes() {
     warp(&mut w, ship, 3000, 9000);
     until(&mut w, ship, WarpPhase::Transit, seconds(30)).expect("it never jumped");
 }
+
+/// The Regency's drive condenses its hull over the whole exit, and marks the ship for the
+/// nanite look; ARC's snaps in on the first tick.
+#[test]
+fn a_regency_ship_condenses_out_of_its_swarm_over_the_whole_exit() {
+    let mut w = world();
+    let ship = add(&mut w, "regency_t2_space_frigate", 0, 3000, 3000);
+    run(&mut w, seconds(10));
+    warp(&mut w, ship, 7000, 3000);
+    until(&mut w, ship, WarpPhase::Emerge, seconds(60)).unwrap();
+    let mut frame = RenderFrame::default();
+    let find =
+        |frame: &RenderFrame, id: UnitId| frame.units.iter().find(|u| u.unit_id == id.0).copied();
+    w.write_render_frame(Some(0), &mut frame);
+    let u = find(&frame, ship).unwrap();
+    assert_ne!(u.status[0] & mc_sim::mirror::UNIT_WARP_NANITE, 0);
+    assert!(frame
+        .warps
+        .iter()
+        .any(|v| v.unit_id == ship.0 && v.style == mc_data::WarpStyle::Nanite));
+    // Its first tick back it has begun to re-form, a twelfth of the way (ARC's drive has
+    // collapsed whole by then: the Courier's test above).
+    assert_eq!(u.fx[0], 1.0);
+    assert!(u.fx[1] > 0.9 && u.fx[1] < 1.0, "fx {:?}", u.fx);
+}

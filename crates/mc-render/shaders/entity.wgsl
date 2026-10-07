@@ -2367,7 +2367,8 @@ fn vs_main(in: VsIn) -> VsOut {
     let warp_seed = hash11(f32(e.unit_id & 0xFFFFu));
     let warp_reach = max(model.bounds_radius * scale, 1.0);
     let warp = warp_state(e.fx, t, warp_damped, warp_seed, time);
-    world = warp_stretch(world, origin, fwd, left, up, local.x, warp_reach, warp, warp_damped, warp_seed, time);
+    let warp_nanite = (e.status[0] & WARP_STATUS_NANITE) != 0u;
+    world = warp_stretch(world, origin, fwd, left, up, local, warp_reach, warp, warp_damped, warp_nanite, warp_seed, time);
     // A standing tree bends over its foot with the wind and away from blasts
     // (`tree_air`). The stem is a bending pole: stiff at the foot, curving most
     // low down and running straight through the crown, so the crown tips over
@@ -2446,7 +2447,7 @@ fn vs_main(in: VsIn) -> VsOut {
     }
     out.world = world;
     out.normal = world_n;
-    out.warp = vec4<f32>(warp, select(0.0, 1.0, warp_damped), clamp(0.5 + 0.5 * local.x / warp_reach, 0.0, 1.0));
+    out.warp = vec4<f32>(warp, select(0.0, 1.0, warp_damped) + select(0.0, 2.0, warp_nanite), clamp(0.5 + 0.5 * local.x / warp_reach, 0.0, 1.0));
     // A walker's rubber is its soles, not a belt: no links, nothing crawls (hover skirts
     // likewise). `model_class` bit 9 carries the same test to the fragment stage.
     let belt = (model.icon & 0x20000u) == 0u && model.leg_hip.w <= 0.0;
@@ -4066,10 +4067,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             color += select(AMBER, NANITE_VIOLET * 0.15, nanite_refit) * (1.7 * exp(-off * off) + 0.25 * seam * (0.5 + 0.5 * sin(time * 6.0 + in.local.z)));
         }
     }
-    color = warp_hull_light(color, in.warp, time, in.state.w);
+    color = warp_hull_light(color, in.warp, in.local, time, in.state.w);
     // Arcs crawling over a stunned hull, or a charging drive's gathering over the plating.
     color += emp_arcs(in.local, in.weld.z, local_px, stun, time, in.state.w);
-    color += warp_charge_arcs(in.local, in.weld.z, local_px, charge, in.warp.w, time, in.state.w);
+    color += warp_charge_arcs(in.local, in.weld.z, local_px, charge, in.warp.w, in.warp.z > 1.5, time, in.state.w);
     if (flags & KIND_GHOST) != 0u {
         let pulse = 0.6 + 0.4 * sin(time * 5.0);
         let rim = pow(1.0 - max(dot(n, v), 0.0), 2.0);
