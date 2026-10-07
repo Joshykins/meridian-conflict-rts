@@ -179,7 +179,11 @@ impl World {
                 (Some(aim + moving * lead - at), false)
             } else if let Some(s) = spire {
                 let home = units.pos[s].extend(units.z[s] + self.bp(s).height / 2);
-                let near = units.pos[s].distance_sq(at.xy()) <= HOME_REACH * HOME_REACH;
+                // Home this tick, too, when it is within a stride: a fleck a little
+                // further out than `HOME_REACH` would otherwise fly past the axis, turn and
+                // fly past again every tick, swinging across the spire until it gutters.
+                let near = units.pos[s].distance_sq(at.xy()) <= HOME_REACH * HOME_REACH
+                    || (home - at).length() <= p.vel[i].length();
                 (Some(home - at), near)
             } else {
                 (None, false)

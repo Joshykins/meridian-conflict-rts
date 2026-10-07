@@ -123,8 +123,9 @@ fn flecks_home_on_an_aircraft() {
     let spire = full_spire(&mut w);
     let full = stock(&w, spire);
     let plane = spawn(&mut w, "aster_t1_interceptor", 1, (AT.0, AT.1 + 800));
-    run(&mut w, 120);
+    run(&mut w, 8);
     assert!(stock(&w, spire) < full, "orbs were spent");
+    run(&mut w, 112);
     let hurt = w.state.units.row(plane).is_none_or(|r| {
         w.state.units.health[r] < w.blueprints.unit(w.state.units.blueprint[r]).health
     });
@@ -161,7 +162,9 @@ fn flecks_with_no_mark_left_return_to_the_spire() {
     assert!(spent < full && flecks(&w) > 0);
     let row = w.state.units.row(tank).unwrap();
     w.state.units.health[row] = Fx::ZERO;
-    run(&mut w, 400);
+    // Home from 900 m out is a few seconds' flight, well short of the flecks' lifetime:
+    // one swinging back and forth across the spire instead of landing would still be up.
+    run(&mut w, 100);
     assert_eq!(flecks(&w), 0, "no fleck is left flying");
     assert!(
         stock(&w, spire) > spent,
