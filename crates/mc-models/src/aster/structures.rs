@@ -8,7 +8,7 @@ use glam::{Vec2, Vec3};
 use super::parts::*;
 use crate::builder::{chamfered_rect, ngon, MeshBuilder, Section};
 use crate::material::*;
-use crate::{part, rig};
+use crate::part;
 
 /// Emits `f` if kit `tier` is fitted at `tech`. The next tier's kit is an
 /// upgrade piece, rising at `at` of the way through the refit (full detail
@@ -831,7 +831,7 @@ pub(super) fn turret_heavy(b: &mut MeshBuilder, _tech: u8) {
 /// Gun pit on a plus-shaped lot: magazine wings, a low berm the
 /// tube fires over, a black race the mount sits in. The octagon is only
 /// the well — the lot is a magazine, not a casemate.
-fn howitzer_bunker(b: &mut MeshBuilder) {
+pub(super) fn howitzer_bunker(b: &mut MeshBuilder) {
     let height = 4.2;
     if b.coarse() {
         b.paint(ACCENT);
@@ -949,100 +949,6 @@ fn howitzer_bunker(b: &mut MeshBuilder) {
         // Blast trough down the berm.
         b.block(v3(5.4, -0.38, 1.05), v3(8.7, 0.38, 1.2));
     }
-}
-
-/// Onager: tech 2 static howitzer. An open gun on a magazine bunker —
-/// poured lot, wing magazines, a berm the tube fires over. An arch
-/// rises from the race; the A-frame sits on the crown and the tube
-/// pitches about a trunnion there. Same barrel family as the rail
-/// (shroud, taper, jacket) but a closed tube with a dark bore. No glow.
-pub(super) fn artillery_static(b: &mut MeshBuilder, _tech: u8) {
-    howitzer_bunker(b);
-    // Authored at 14 / 12, fitted to the 10.5 / 9 lot (×0.75). Pivot and
-    // muzzle here must stay on that ratio so the sim and the mesh agree.
-    let (breech, muzzle) = (v3(-2.4, 0.0, 7.2), v3(13.6, 0.0, 11.6));
-    let elevation = (muzzle - breech).z.atan2((muzzle - breech).x);
-    let pivot = v3(-0.4, 0.0, 7.8);
-    let deck_z = 4.2;
-    let half_width = 1.95;
-    b.set_turret_pivot(v3(0.0, 0.0, deck_z));
-    b.set_arm_pivot(pivot);
-    b.set_recoil(breech, muzzle, 2.6);
-    b.with_part(part::TURRET, |b| {
-        b.with_limb(rig::ARM_GUN, |b| {
-            b.with_recoil(|b| howitzer(b, breech, muzzle, 0.78));
-            if !b.coarse() {
-                siege_counterweight(b, v3(-4.35, 0.0, 7.15), v3(2.35, 2.4, 2.0));
-                b.paint(ACCENT);
-                b.mirror_y(|b| {
-                    b.beam(
-                        v3(-1.15, 0.68, 7.65),
-                        v3(-3.35, 0.82, 7.05),
-                        v2(0.20, 0.18),
-                        v2(0.26, 0.22),
-                    );
-                });
-            }
-        });
-        if b.coarse() {
-            b.paint(PLATING);
-            b.frustum_open(
-                v3(-0.35, 0.0, deck_z),
-                v2(5.6, 2.4),
-                v2(1.15, 0.7),
-                pivot.z - deck_z,
-                v2(-0.05, 0.0),
-            );
-            team_panel(b, v3(pivot.x, 0.0, pivot.z + 0.35), v2(1.4, 0.7));
-            return;
-        }
-        // Turntable the arch stands on — yaws with the gun.
-        b.paint(ACCENT);
-        b.prism(v3(0.0, 0.0, deck_z), b.sides(8), 2.15, 2.08, 0.14);
-        b.paint(PLATING);
-        b.prism(v3(0.0, 0.0, deck_z + 0.14), b.sides(8), 2.02, 1.96, 0.12);
-        team_panel(b, v3(0.0, 0.0, deck_z + 0.26), v2(1.45, 1.45));
-        // Wide circular arch; the A-frame is a smaller saddle on the crown.
-        siege_arch(b, deck_z + 0.26, pivot, half_width, 3.0, -3.8, 1.22);
-        let crown = pivot.z;
-        siege_a_frame(
-            b,
-            crown - 0.02,
-            pivot,
-            half_width * 0.72,
-            pivot.x + 0.85,
-            pivot.x - 0.85,
-            pivot.x,
-            crown + 0.38,
-            0.92,
-        );
-        if b.fine() {
-            // Cradle and recuperators pitch with the tube; only the tube slides.
-            b.with_limb(rig::ARM_GUN, |b| {
-                b.pitched(breech, elevation, |b| {
-                    b.paint(ACCENT);
-                    b.mirror_y(|b| {
-                        b.cylinder_between(v3(0.4, 1.08, 0.74), v3(6.4, 1.08, 0.74), 0.20, 0.20, 6);
-                    });
-                    b.block(v3(-0.45, -1.2, -0.6), v3(1.9, 1.2, 0.6));
-                });
-                b.with_recoil(|b| {
-                    b.pitched(breech, elevation, |b| {
-                        b.paint(ACCENT);
-                        b.mirror_y(|b| {
-                            b.cylinder_between(
-                                v3(-0.3, 1.08, 0.74),
-                                v3(0.55, 1.08, 0.74),
-                                0.12,
-                                0.12,
-                                6,
-                            )
-                        });
-                    });
-                });
-            });
-        }
-    });
 }
 
 // ---- Watchtower: radar --------------------------------------------------------------

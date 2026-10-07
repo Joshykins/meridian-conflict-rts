@@ -747,7 +747,7 @@ mod tests {
 
     #[test]
     fn howitzer_is_a_plus() {
-        let (tex, _) = baked("artillery_static", 10.5, 9.0, 2, 2);
+        let (tex, _) = baked("artillery_static", 17.85, 15.3, 2, 2);
         assert!(inside(&tex, [0.5, 0.0]), "spine");
         assert!(inside(&tex, [0.0, 0.55]), "magazine wing");
         assert!(!inside(&tex, [0.68, 0.68]), "plus corner is dirt");

@@ -27,6 +27,7 @@ mod mine;
 mod missile_defense;
 mod mobile_shield;
 mod naval;
+mod onager;
 pub(crate) use naval::{MEGALODON_RAIL, NARWHAL_RAIL};
 mod parts;
 mod reactor;
@@ -174,7 +175,7 @@ pub(super) const MODELS: &[ModelDef] = &[
     ),
     ModelDef::new("turret", 7.0, 9.0, structures::turret),
     ModelDef::new("turret_heavy", 14.0, 13.0, structures::turret_heavy),
-    ModelDef::new("artillery_static", 14.0, 12.0, structures::artillery_static),
+    ModelDef::new("artillery_static", 14.0, 12.0, |b, _| onager::onager(b)),
     // The tech 3 rail point defence, at blueprint scale (`citadel::TRUNNION` is its pivot).
     ModelDef::new("citadel", 20.0, 28.0, citadel::citadel),
     ModelDef::new("citadel_casing", 2.2, 1.3, citadel::casing),
