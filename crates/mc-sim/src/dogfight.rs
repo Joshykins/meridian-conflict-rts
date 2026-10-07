@@ -136,7 +136,9 @@ impl World {
         if extend == 0 && gap < close && (off > bears || nose.dot(to) <= Fx::ZERO) {
             // Out past the far side to the guns' reach and a little more: the
             // reversal is flown out there, and it comes back in already on the line.
-            let room = hull + self.bp(row).max_weapon_range() * Fx::ratio(6, 5) - gap;
+            let reach = self.bp(row).max_weapon_range();
+            // Each fighter reverses at its own distance, so a flight on one hull spreads.
+            let room = hull + reach * Fx::ratio(5 + (row % 3) as i64, 5) - gap;
             let step = (motion.speed / DT).max(Fx::ONE);
             extend = (room / step).ceil_int().clamp(1, u16::MAX as i32) as u16;
         }

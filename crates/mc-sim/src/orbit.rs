@@ -35,6 +35,12 @@ pub(crate) fn circle_radius(o: &Order, orbits: bool) -> Fx {
     }
 }
 
+/// An aircraft's own lane on the circle, so those circling alone drift apart
+/// instead of flying one line: one of five, outward from the circle by up to an eighth.
+fn lane(row: usize, radius: Fx) -> Fx {
+    radius * Fx::ratio((row % 5) as i64, 32)
+}
+
 /// The angle a distance `arc` sweeps on a circle of `radius`.
 fn sweep(arc: Fx, radius: Fx) -> i32 {
     (arc / radius.max(Fx::ONE))
@@ -230,7 +236,13 @@ impl World {
         let goal = self.clamp_to_map(
             centre
                 + FxVec2::from_angle(bearing + lead)
-                    * chase_radius(circle_radius(o, self.bp(row).orbit.is_some()), lead),
+                    * chase_radius(
+                        {
+                            let radius = circle_radius(o, self.bp(row).orbit.is_some());
+                            radius + lane(row, radius)
+                        },
+                        lead,
+                    ),
         );
         self.ensure_moving(row, goal, goal)?;
         self.state.units.flags[row] |= flag::AIR_RUN;

@@ -2015,8 +2015,11 @@ impl World {
             .max()
             .unwrap_or(0);
         // Finish the reversal before the next release line, including half the carpet.
-        (motion.speed * 4 + Fx::from_int(48))
-            .max(turn_radius * 2 + motion.speed / DT * (fall + rack) + Fx::from_int(48))
+        let run = (motion.speed * 4 + Fx::from_int(48))
+            .max(turn_radius * 2 + motion.speed / DT * (fall + rack) + Fx::from_int(48));
+        // Each aircraft flies its own length of run, up to a third more, so a
+        // flight on one target comes round out of step instead of in a bunch.
+        run + run * Fx::ratio((row % 4) as i64, 12)
     }
 
     /// Ticks from opening the bay to the middle of the carpet landing on `aim`.

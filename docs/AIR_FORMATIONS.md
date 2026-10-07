@@ -65,6 +65,11 @@ Orders run before movement in the tick, where `prev_pos == pos`: target velocity
 there comes from `air_velocity` (last tick's displacement, kept for every hull).
 Regressions are in `crates/mc-sim/tests/air_bombing.rs`.
 
+Aircraft that fight or circle alone are kept from bunching by staggering them
+by sim row: each flies its own length of bombing run (up to a third longer), its
+own gun-run reversal distance, and its own lane on a guard circle (up to an
+eighth outward), so a flight on one mark or one circle comes apart over time.
+
 Height stays in the unit blueprint's motion.altitude, above the local land/water
 surface. Both T1 interceptors and bombers cruise at 200 m, above the tallest dome (about 108 m). Future fighter tiers
 and recon can each specify their own altitude. Aircraft can overlap in plan view
