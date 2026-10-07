@@ -37,6 +37,9 @@ const CUT: f32 = 0.12;
 const GLASS_STEP: f32 = 2.4;
 /// How many times wider than the star beam its halo is.
 const HALO: f32 = 4.5;
+/// How many arms of plasma spread out from a star beam's strike, and how far, in beam widths.
+const SPLASH_ARMS: usize = 7;
+const SPLASH_REACH: f32 = 16.0;
 /// Seconds a glassed pool takes to crust over and cool.
 const GLASS_COOL: f32 = 9.0;
 
@@ -502,6 +505,25 @@ impl Renderer {
                 let mut halo = held_instance(HELD_BEAM, h.from, h.to, h.width * HALO, start, life);
                 halo.aim[3] = fade_beam::HELD_STAR_HALO;
                 out.push(halo);
+                if h.struck {
+                    // Plasma spreading out along the ground from the strike, turning slowly.
+                    let at = h.to[1] + Vec3::Z * h.width * 0.6;
+                    for i in 0..SPLASH_ARMS {
+                        let a =
+                            (i as f32 / SPLASH_ARMS as f32) * std::f32::consts::TAU + time * 0.4;
+                        let end = at + Vec3::new(a.cos(), a.sin(), 0.0) * h.width * SPLASH_REACH;
+                        let mut arm = held_instance(
+                            HELD_BEAM,
+                            [at, at],
+                            [end, end],
+                            h.width * HALO * 0.8,
+                            start,
+                            life,
+                        );
+                        arm.aim[3] = fade_beam::HELD_STAR_SPLASH;
+                        out.push(arm);
+                    }
+                }
             }
         }
         let legs = &self.legs;

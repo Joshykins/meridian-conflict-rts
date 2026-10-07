@@ -784,6 +784,10 @@ shared! {
         /// The star beam's halo (`Weapon::star_beam`): a second, much wider beam laid round
         /// it, translucent, drifting veils of plasma that thin to nothing at its rim (`aim.w`).
         pub const HELD_STAR_HALO: f32 = 3.0;
+        /// Plasma spreading out along the ground from where a star beam strikes
+        /// (`Weapon::star_beam`): the halo's flowing veil, tapering at both ends and hotter
+        /// at its root (`aim.w`).
+        pub const HELD_STAR_SPLASH: f32 = 4.0;
         /// A warp dampener's tether (renderer/damper_fx.rs): crimson lightning with a
         /// white-pink core, crackling.
         pub const TETHER: u32 = 10;

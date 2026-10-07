@@ -852,10 +852,10 @@
             ],
         ),
         // The lance held, heard as this loop while it burns down onto the ground: a furnace
-        // roar. Only low-passed rolling noise, a heavy sub-bass shudder and a slow surge of
-        // body in the low mids. Nothing above about 400 Hz and no steady tone, so it never
-        // reads as static, a hiss or an appliance. Every wobble is a whole number of cycles
-        // in the 4 s loop.
+        // roar. A heavy sub-bass shudder, rolling low noise, and above it a rough growl and
+        // wide roaring bands up to about 1 kHz that surge slowly. Nothing higher and no pure
+        // tone, so it never reads as static, a hiss or an appliance. Every wobble is a whole
+        // number of cycles in the 4 s loop.
         "regency_lance_hold": (
             length: 4.0, peak: 0.7, room: 0.3, looped: true,
             layers: [
@@ -865,6 +865,13 @@
                 Rumble(freq: 95, q: 0.6, gain: 3.2, wobble: 0.5, depth: 0.55, pan: -0.2, seed: 142),
                 Rumble(freq: 150, q: 0.6, gain: 2.4, wobble: 0.75, depth: 0.5, pan: 0.2, seed: 143),
                 Rumble(freq: 240, q: 0.5, gain: 1.4, wobble: 0.25, depth: 0.6, seed: 144),
+                // The stream's body above the bass: a rough growl and a torch-like roar rolling
+                // in the mids, surging slowly. Wide bands that never settle on a pitch.
+                Fm(from: 110, to: 110, glide: 1, ratio: 0.5, index: 1.6, fade: 1000, attack: 0.01, decay: 100000, gain: 0.2, pan: -0.15),
+                Fm(from: 165, to: 165, glide: 1, ratio: 1.5, index: 1.2, fade: 1000, attack: 0.01, decay: 100000, gain: 0.1, pan: 0.15),
+                Wind(freq: 420, q: 0.4, gain: 3.0, swell: 1, depth: 0.7, sway: 0.4, pan: -0.3, seed: 145),
+                Wind(freq: 650, q: 0.4, gain: 2.4, swell: 1.5, depth: 0.7, sway: 0.4, pan: 0.3, seed: 146),
+                Wind(freq: 1000, q: 0.4, gain: 1.2, swell: 2, depth: 0.8, sway: 0.5, seed: 147),
             ],
         ),
         // The lance going out with nothing left to burn: the core venting. The pinch lets go
