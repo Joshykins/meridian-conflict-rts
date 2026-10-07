@@ -16,7 +16,7 @@ use crate::material::TEAM;
 
 use super::super::kit::{dark_plate, metal, seam, v3};
 use super::super::machine::hoop;
-use super::{DECK, ROCKET_MUZZLE, ROCKET_PIVOT};
+use super::{ROCKET_MUZZLE, ROCKET_PIVOT};
 
 /// The cells' mouths across (y) and up the face (z), in the order the rockets fire: the
 /// front row, outside pair first, then the rear row.
@@ -53,17 +53,30 @@ pub(super) fn pack(b: &mut MeshBuilder) {
     // The coaming: a low plated ring round the turntable, flush with the deck.
     dark_plate(b);
     let segs = if b.fine() { 28 } else { 12 };
-    hoop(b, v3(ROCKET_PIVOT.x, 0.0, DECK - 0.1), 6.15, 0.8, 0.7, segs);
+    hoop(
+        b,
+        v3(ROCKET_PIVOT.x, 0.0, ROCKET_PIVOT.z + 1.5),
+        6.15,
+        0.8,
+        0.7,
+        segs,
+    );
     b.with_house(3, ROCKET_PIVOT, KICK, |b| {
         // The turntable, a round plate flush with the deck, a seam round its edge.
         dark_plate(b);
         let sides = b.sides(20);
-        b.prism(v3(ROCKET_PIVOT.x, 0.0, DECK - 0.5), sides, 5.85, 5.8, 0.75);
+        b.prism(
+            v3(ROCKET_PIVOT.x, 0.0, ROCKET_PIVOT.z + 1.1),
+            sides,
+            5.85,
+            5.8,
+            0.75,
+        );
         // The owner's colour in a ring on the turntable.
         b.paint(TEAM);
         hoop(
             b,
-            v3(ROCKET_PIVOT.x, 0.0, DECK + 0.26),
+            v3(ROCKET_PIVOT.x, 0.0, ROCKET_PIVOT.z + 1.86),
             5.2,
             0.5,
             0.05,
@@ -71,7 +84,13 @@ pub(super) fn pack(b: &mut MeshBuilder) {
         );
         if b.fine() {
             seam(b);
-            b.prism(v3(ROCKET_PIVOT.x, 0.0, DECK - 0.1), sides, 5.9, 5.9, 0.16);
+            b.prism(
+                v3(ROCKET_PIVOT.x, 0.0, ROCKET_PIVOT.z + 1.5),
+                sides,
+                5.9,
+                5.9,
+                0.16,
+            );
         }
         let (theta, _) = axis();
         b.pitched(ROCKET_PIVOT, theta, |b| b.with_recoil(battery));

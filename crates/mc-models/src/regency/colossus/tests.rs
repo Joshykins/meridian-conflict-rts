@@ -176,7 +176,7 @@ fn strides_grow_with_the_build() {
         .legs
         .unwrap();
     assert!(
-        (built.stride - legs::STRIDE * SCALE).abs() < 0.01,
+        (built.stride - MeshBuilder::fitted_stride(legs::STRIDE * SCALE)).abs() < 0.01,
         "stride {} at {SCALE}x",
         built.stride
     );

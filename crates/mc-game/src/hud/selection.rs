@@ -75,6 +75,15 @@ pub fn weapon_rows(w: &Weapon) -> (String, Vec<(&'static str, String)>) {
         ),
         ("Reload", format!("{:.1} s", w.reload_ticks as f32 * 0.1)),
     ];
+    if w.star_beam {
+        rows.push(("Full burn", whole(w.damage.to_f32() * shots as f32)));
+        rows.push((
+            "Burn time",
+            format!("{:.1} s", shots as f32 * w.salvo_delay_ticks as f32 * 0.1),
+        ));
+        rows.push(("Melt width", format!("{:.0} m", w.splash.to_f32() * 2.0)));
+        rows.push(("Charge", format!("{:.1} s", w.charge_ticks as f32 * 0.1)));
+    }
     if w.splash.to_f32() > 0.0 {
         rows.push(("Splash", format!("{:.0} m", w.splash.to_f32())));
     }

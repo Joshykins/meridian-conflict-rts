@@ -15,9 +15,9 @@ use crate::builder::{MeshBuilder, Section};
 use crate::material::*;
 use crate::{part, rig};
 
-use super::super::commander::form::{ring, sleeve, KEEL, OCT};
+use super::super::commander::form::{blade, ring, sleeve, KEEL, OCT};
 use super::super::kit::{dark_plate, metal, seam, v3};
-use super::super::machine::{collar, shaft};
+use super::super::machine::collar;
 use super::RACE;
 
 /// A leg's rest joints (hip, knee, foot's tip) and the cycle's share at which it lifts.
@@ -46,14 +46,14 @@ pub(super) struct Style {
 
 /// The main legs: high and arched, the knee well above and outside the hull.
 pub(super) const ARCHED: Style = Style {
-    hip_z: 29.0,
+    hip_z: 33.0,
     hip_r: 7.2,
-    knee_out: 20.5,
-    knee_up: 8.0,
-    front_foot: (15.0, 29.0),
-    rear_foot: (-17.0, 29.0),
-    thigh: [5.0, 4.2, 3.4, 3.0],
-    shin: [3.6, 3.6, 2.1, 2.2],
+    knee_out: 14.0,
+    knee_up: -7.0,
+    front_foot: (22.0, 25.0),
+    rear_foot: (-23.0, 25.0),
+    thigh: [5.8, 4.8, 4.2, 3.8],
+    shin: [4.6, 4.0, 2.8, 2.8],
     knee_r: 4.6,
     foot_r: 4.2,
 };
@@ -131,31 +131,24 @@ pub(super) fn coarse(b: &mut MeshBuilder, legs: &[Joints; 2]) {
 pub(super) fn pelvis(b: &mut MeshBuilder, s: &Style) {
     dark_plate(b);
     let z = s.hip_z;
-    sleeve(
-        b,
+    b.loft_z(
         &[
-            ring(v3(0.0, 0.0, z - 5.0), Vec3::X, 0.6, 0.6),
-            ring(v3(0.0, 0.0, z - 2.8), Vec3::X, 4.6, 4.6),
-            ring(v3(0.0, 0.0, z - 0.6), Vec3::X, 8.0, 8.0),
-            ring(v3(0.0, 0.0, z + 3.2), Vec3::X, 8.6, 8.6),
-            ring(v3(0.0, 0.0, RACE - 0.7), Vec3::X, 7.4, 7.4),
+            [1.0, 0.65],
+            [0.65, 1.0],
+            [-0.65, 1.0],
+            [-1.0, 0.65],
+            [-1.0, -0.65],
+            [-0.65, -1.0],
+            [0.65, -1.0],
+            [1.0, -0.65],
         ],
-        &OCT,
+        &[
+            Section::new(z - 3.5, 6.5),
+            Section::new(z - 2.0, 9.2),
+            Section::new(z + 3.5, 9.2),
+            Section::new(RACE - 0.7, 7.6),
+        ],
     );
-    if b.fine() {
-        // Plates lapped round it, each a ring a little proud of the drum.
-        for (z0, r) in [(z - 1.6, 8.5f32), (z + 1.2, 8.9)] {
-            sleeve(
-                b,
-                &[
-                    ring(v3(0.0, 0.0, z0), Vec3::X, r * 0.94, r * 0.94),
-                    ring(v3(0.0, 0.0, z0 + 0.6), Vec3::X, r, r),
-                    ring(v3(0.0, 0.0, z0 + 2.4), Vec3::X, r * 0.97, r * 0.97),
-                ],
-                &OCT,
-            );
-        }
-    }
     // The race the hull turns on.
     metal(b);
     let sides = b.sides(20);
@@ -213,72 +206,113 @@ pub(super) fn leg(b: &mut MeshBuilder, s: &Style, (hip, knee, foot, _): Joints) 
                 s.thigh[0] * 2.0 + 0.8,
             );
             bone(b, hip, knee, up, &s.thigh, 1.1);
-        });
-        b.with_limb(rig::SHIN, |b| {
-            // The knee: a plated drum across the leg, banded, capped in bronze.
+            // Broad swept pauldrons bury the hip bearing and continue the hull silhouette.
             dark_plate(b);
-            let sides = b.sides(12);
-            let half = s.thigh[2] + 0.5;
-            b.cylinder_between(
-                knee - across * half,
-                knee + across * half,
-                s.knee_r,
-                s.knee_r,
-                sides,
+            sleeve(
+                b,
+                &[
+                    ring(hip - along * 1.5 + up * 1.0, up, 4.8, 4.8),
+                    ring(hip.lerp(knee, 0.3) + up * 2.0, up, 6.8, 5.2),
+                    ring(hip.lerp(knee, 0.75) + up * 1.0, up, 5.4, 3.8),
+                    ring(knee + along * 2.0, up, 2.5, 1.8),
+                ],
+                &KEEL,
             );
             if b.fine() {
-                seam(b);
-                for k in [-0.35f32, 0.35] {
-                    b.cylinder_between(
-                        knee + across * (half * k - 0.15),
-                        knee + across * (half * k + 0.15),
-                        s.knee_r * 1.04,
-                        s.knee_r * 1.04,
-                        sides,
-                    );
+                for i in 0..4 {
+                    let c = hip.lerp(knee, 0.18 + i as f32 * 0.16) + up * 5.0;
+                    metal(b);
+                    blade(b, c, along, up, 0.65, 4.0, 0.0, 0.18);
                 }
             }
-            metal(b);
-            for sgn in [-1.0f32, 1.0] {
+        });
+        b.with_limb(rig::SHIN, |b| {
+            // A compact joint enclosed by a chamfered armour housing. Only the
+            // recessed bearing cap is exposed; the knee never reads as a wheel.
+            dark_plate(b);
+            let half = s.thigh[2] + 0.3;
+            sleeve(
+                b,
+                &[
+                    ring(
+                        knee - across * half,
+                        Vec3::Z,
+                        s.knee_r * 0.78,
+                        s.knee_r * 0.9,
+                    ),
+                    ring(knee - across * (half - 0.7), Vec3::Z, s.knee_r, s.knee_r),
+                    ring(knee + across * (half - 0.7), Vec3::Z, s.knee_r, s.knee_r),
+                    ring(
+                        knee + across * half,
+                        Vec3::Z,
+                        s.knee_r * 0.78,
+                        s.knee_r * 0.9,
+                    ),
+                ],
+                &OCT,
+            );
+            seam(b);
+            for side in [-1.0, 1.0] {
                 b.cylinder_between(
-                    knee + across * (sgn * half),
-                    knee + across * (sgn * (half + 0.5)),
-                    s.knee_r * 0.55,
-                    s.knee_r * 0.45,
-                    sides,
+                    knee + across * (side * half),
+                    knee + across * (side * (half + 0.08)),
+                    s.knee_r * 0.38,
+                    s.knee_r * 0.38,
+                    8,
                 );
             }
-            let ankle = foot + Vec3::Z * (s.foot_r + 1.6);
-            let drop = (ankle - knee).normalize();
-            bone(b, knee, ankle, out, &s.shin, 1.12);
+            let ankle = foot + Vec3::Z * (3.6);
+            bone(b, knee, ankle, out, &s.shin, 1.08);
+            // Long swept greaves break the stick-leg outline; a dark mechanical channel
+            // and inset overlapping plates give detail without freestanding struts.
+            let down = (ankle - knee).normalize();
+            let face = (out - down * out.dot(down)).normalize();
+            dark_plate(b);
+            sleeve(
+                b,
+                &[
+                    ring(knee + face * 1.0, face, 4.5, 3.6),
+                    ring(knee.lerp(ankle, 0.28) + face * 2.0, face, 5.4, 4.0),
+                    ring(knee.lerp(ankle, 0.72) + face * 0.8, face, 3.5, 2.5),
+                    ring(ankle, face, 2.8, 2.0),
+                ],
+                &KEEL,
+            );
             if b.fine() {
-                // Hydraulic rods down either side of the shin, bronze, collared along it.
-                seam(b);
-                for sgn in [-1.0f32, 1.0] {
-                    let off = across * (sgn * (s.shin[0] + 0.9)) + out * 0.2;
-                    let (p, q) = (knee.lerp(ankle, 0.1) + off, knee.lerp(ankle, 0.72) + off);
-                    shaft(b, p, q, 0.34);
-                    for t in [0.0f32, 0.5, 1.0] {
-                        collar(b, p.lerp(q, t), drop, 0.6, 0.8);
-                    }
-                    dark_plate(b);
-                    b.cylinder_between(p, p.lerp(q, 0.45), 0.6, 0.55, b.sides(8));
+                for i in 0..6 {
+                    let c = knee.lerp(ankle, 0.18 + i as f32 * 0.105) + face * 2.8;
+                    seam(b);
+                    blade(b, c, down, face, 0.55, 2.0, 0.0, 0.18);
                 }
             }
+            // The actuators live inside the shin armour: no detached parallel struts.
             // The foot: a collar at the ankle, then a heavy armoured block down to the ground.
             collar(b, ankle, Vec3::Z, s.shin[2] * 0.8, 0.8);
             dark_plate(b);
             let r = s.foot_r;
-            sleeve(
-                b,
-                &[
-                    ring(ankle - Vec3::Z * 0.4, across, s.shin[2], s.shin[3]),
-                    ring(foot + Vec3::Z * (r * 0.6), across, r, r * 1.15),
-                    ring(foot + Vec3::Z * 0.3, across, r * 0.92, r * 1.08),
-                    ring(foot, across, r * 0.7, r * 0.85),
-                ],
-                &OCT,
-            );
+            // A broad, flat load-bearing sole with a bevelled toe, not a ball joint.
+            let sole = [
+                [-0.85, -1.25],
+                [0.85, -1.25],
+                [1.0, -0.8],
+                [1.0, 1.15],
+                [0.6, 1.5],
+                [-0.6, 1.5],
+                [-1.0, 1.15],
+                [-1.0, -0.8],
+            ];
+            b.at(foot, |b| {
+                b.loft_z(
+                    &sole,
+                    &[
+                        Section::new(0.0, r),
+                        Section::new(0.7, r),
+                        Section::new(1.7, r * 0.92),
+                        Section::new(2.8, r * 0.54),
+                        Section::new(3.6, r * 0.44),
+                    ],
+                );
+            });
         });
     });
 }

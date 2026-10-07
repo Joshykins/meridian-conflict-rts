@@ -1,261 +1,185 @@
-//! The Colossus's hull, one swept form from stern to prow: cross-sections lofted along x, a
-//! keeled belly, flanks widest below the shoulder, a deck with a low ridge, narrowing aft to
-//! a point and forward to the prow the lance grows out of. Lames of plate lap over it, each
-//! band a little proud of the one behind; a pod of plate bulges from each front flank round a
-//! chin gun's turntable; a dorsal fin rises off the stern to the point the hull field is
-//! thrown from. The whole hull turns on the crown.
-
-use glam::Vec3;
-
-use crate::builder::MeshBuilder;
-use crate::material::*;
-use crate::{part, rig};
-
-use super::super::commander::form::OCT;
+//! Sculpted siege carapace: a central reactor keel between swept shoulder shells.
+//! Deep mechanical channels and overlapping armour establish detail at three scales.
+use super::super::commander::form::{blade, ring, sleeve, KEEL, OCT};
 use super::super::kit::{dark_plate, metal, seam, v3};
-use super::super::machine::red_slot;
 use super::{DECK, LANCE_PIVOT, RACE};
+use crate::builder::{MeshBuilder, Section};
+use crate::{material::*, part, pattern, rig};
+use glam::{Vec2, Vec3};
 
-/// The tip of the dorsal fin, where the hull field is thrown from.
-pub(super) const EMITTER: Vec3 = Vec3::new(-22.6, 0.0, 55.2);
+pub(super) const EMITTER: Vec3 = Vec3::new(-14.0, 0.0, 55.2);
 
-/// A hull cross-section: half width, belly height, deck height and the ridge's height over
-/// the deck, at `x`.
-#[derive(Clone, Copy)]
-struct Station {
-    x: f32,
-    w: f32,
-    belly: f32,
-    deck: f32,
-    ridge: f32,
-}
-
-const fn st(x: f32, w: f32, belly: f32, deck: f32, ridge: f32) -> Station {
-    Station {
-        x,
-        w,
-        belly,
-        deck,
-        ridge,
-    }
-}
-
-/// The hull's stations, prow first.
-const HULL: [Station; 9] = [
-    st(18.4, 3.6, 41.6, 46.4, 0.2),
-    st(14.0, 6.4, 40.4, 47.2, 0.5),
-    st(8.0, 8.4, 39.7, 47.5, 0.6),
-    st(0.0, 9.2, 39.5, DECK, 0.4),
-    st(-7.0, 8.7, 39.7, DECK, 0.3),
-    st(-13.0, 7.0, 40.2, 46.6, 0.3),
-    st(-17.5, 4.4, 41.0, 45.8, 0.2),
-    st(-20.5, 1.8, 41.9, 45.0, 0.1),
-    st(-22.0, 0.5, 42.6, 44.4, 0.0),
-];
-
-/// The hull's section at `x`, interpolated between stations.
-fn station(x: f32) -> Station {
-    for p in HULL.windows(2) {
-        if x <= p[0].x && x >= p[1].x {
-            let t = (p[0].x - x) / (p[0].x - p[1].x);
-            let l = |a: f32, b: f32| a + (b - a) * t;
-            return st(
-                x,
-                l(p[0].w, p[1].w),
-                l(p[0].belly, p[1].belly),
-                l(p[0].deck, p[1].deck),
-                l(p[0].ridge, p[1].ridge),
-            );
-        }
-    }
-    if x > HULL[0].x {
-        HULL[0]
-    } else {
-        HULL[HULL.len() - 1]
-    }
-}
-
-/// How far out the hull's flank stands at `x`.
-pub(super) fn flank(x: f32) -> f32 {
-    station(x).w
-}
-
-/// The hull's section as a ring at `x`; `grow` swells the flank and belly (a lame lapped over
-/// the hull) without lifting the deck.
-fn hull_ring(x: f32, grow: f32) -> Vec<Vec3> {
-    let s = station(x);
-    let (w, h) = (s.w * grow, s.deck - s.belly);
-    let (zb, zt) = (s.belly - (grow - 1.0) * h, s.deck);
-    let pts: [(f32, f32); 11] = [
-        (-0.38 * w, zb),
-        (0.38 * w, zb),
-        (0.92 * w, zb + 0.3 * h),
-        (w, zb + 0.62 * h),
-        (0.9 * w, zt - 0.14 * h),
-        (0.72 * w, zt),
-        (0.0, zt + s.ridge),
-        (-0.72 * w, zt),
-        (-0.9 * w, zt - 0.14 * h),
-        (-w, zb + 0.62 * h),
-        (-0.92 * w, zb + 0.3 * h),
-    ];
-    pts.iter().map(|&(y, z)| v3(x, y, z)).collect()
-}
-
-/// The shell: the hull's own loft, the lames over it, the pods, the fin.
 pub(super) fn carapace(b: &mut MeshBuilder) {
-    let fine = b.fine();
+    // A deep central keel physically joins the rotating race to the lance cradle.
     dark_plate(b);
-    let rings: Vec<Vec<Vec3>> = HULL.iter().map(|s| hull_ring(s.x, 1.0)).collect();
-    b.with_facets(|b| b.loft(&rings, true, true));
-    // Lames: a band of plate round the belly and flanks, its leading edge stepping up off
-    // the hull and easing back down to it, each one lapping over the next aft of it.
-    let bands: &[f32] = if fine {
-        &[15.5, 10.0, 4.5, -1.0, -6.5, -12.0, -17.0]
-    } else {
-        &[12.0, 2.0, -9.0]
-    };
-    for &x in bands {
-        let len = if fine { 6.4 } else { 11.0 };
-        let rings = [
-            hull_ring(x, 1.0),
-            hull_ring(x - 0.5, 1.05),
-            hull_ring(x - len * 0.55, 1.04),
-            hull_ring(x - len, 1.0),
-        ];
-        dark_plate(b);
-        b.with_facets(|b| b.loft(&rings, true, true));
-    }
-    if fine {
-        // A seam all along the shoulder, red optics either side of the prow and lines of heat
-        // down the flanks.
-        b.mirror_y(|b| {
-            red_slot(
-                b,
-                v3(16.0, flank(16.0) * 0.96 + 0.15, 44.0),
-                v3(0.5, 0.86, 0.0),
-                v3(-0.86, 0.5, 0.0),
-                2.4,
-                0.36,
-            );
-            red_slot(
-                b,
-                v3(-2.0, flank(-2.0) * 1.04 + 0.1, 39.4),
-                Vec3::Y,
-                Vec3::X,
-                9.0,
-                0.3,
-            );
-        });
-        seam(b);
-    }
-    pods(b);
-    fin(b);
-}
-
-/// A pod of plate off each front flank, bulging from the hull's shoulder to round the chin
-/// gun's turntable: an octagonal loft growing from the flank, swept forward to a blunt nose.
-fn pods(b: &mut MeshBuilder) {
-    let stations: [(f32, f32, f32, f32); 5] = [
-        (3.0, 7.9, 1.2, 1.4),
-        (8.0, 8.2, 2.3, 2.5),
-        (13.0, 8.5, 2.8, 2.8),
-        (17.0, 8.6, 2.8, 2.7),
-        (19.2, 8.6, 1.9, 1.9),
-    ];
+    sleeve(
+        b,
+        &[
+            ring(v3(-24.0, 0.0, 43.0), Vec3::Z, 3.0, 2.2),
+            ring(v3(-15.0, 0.0, 44.0), Vec3::Z, 9.0, 5.5),
+            ring(v3(-2.0, 0.0, 44.5), Vec3::Z, 11.0, 6.5),
+            ring(v3(10.0, 0.0, 44.5), Vec3::Z, 9.0, 5.0),
+            ring(v3(20.0, 0.0, 44.0), Vec3::Z, 4.5, 3.6),
+        ],
+        &KEEL,
+    );
+    b.mirror_y(shoulder);
+    reactor(b);
+    // Twin recessed cheek gun cradles continue the shoulder's lower edge.
     b.mirror_y(|b| {
         dark_plate(b);
-        let rings: Vec<Vec<Vec3>> = stations
-            .iter()
-            .map(|&(x, y, w, h)| {
-                OCT.iter()
-                    .map(|&[s, t]| v3(x, y + s * w, 44.9 + t * h))
-                    .collect()
-            })
-            .collect();
-        b.with_facets(|b| b.loft(&rings, true, true));
-        if b.fine() {
-            seam(b);
-            let rings: Vec<Vec<Vec3>> = [(12.6, 2.86), (13.1, 2.86)]
-                .iter()
-                .map(|&(x, r)| {
-                    OCT.iter()
-                        .map(|&[s, t]| v3(x, 8.5 + s * r, 44.9 + t * r))
-                        .collect()
-                })
-                .collect();
-            b.with_facets(|b| b.loft(&rings, true, true));
-        }
+        sleeve(
+            b,
+            &[
+                ring(v3(3.0, 8.2, 44.0), Vec3::Z, 2.6, 2.8),
+                ring(v3(12.0, 8.6, 44.5), Vec3::Z, 3.8, 3.4),
+                ring(v3(19.5, 8.6, 44.5), Vec3::Z, 2.3, 2.4),
+            ],
+            &OCT,
+        );
     });
 }
 
-/// The dorsal fin: a thin ridge off the stern's deck that grows into a tall swept blade, its
-/// point raked back over the tail, the hull field's emitter at its tip; a bronze rib runs up
-/// its front edge.
-fn fin(b: &mut MeshBuilder) {
+fn shoulder(b: &mut MeshBuilder) {
+    // Swept manta-like shells: broad at the front, long pointed aft corners.
     dark_plate(b);
-    let sections: [(f32, f32, f32); 5] = [
-        // (x, base z, height)
-        (-14.4, 46.6, 0.9),
-        (-16.4, 46.1, 4.2),
-        (-18.6, 45.6, 7.4),
-        (-20.8, 45.1, 9.6),
-        (-22.6, 44.8, 10.4),
-    ];
-    let rings: Vec<Vec<Vec3>> = sections
-        .iter()
-        .map(|&(x, z, h)| {
-            vec![
-                v3(x, 0.0, z + h),
-                v3(x, 0.55, z + h * 0.45),
-                v3(x, 0.7, z),
-                v3(x, -0.7, z),
-                v3(x, -0.55, z + h * 0.45),
-            ]
-        })
-        .collect();
-    b.with_facets(|b| b.loft(&rings, true, true));
+    sleeve(
+        b,
+        &[
+            ring(v3(15.0, 8.2, 46.5), Vec3::Z, 2.2, 2.7),
+            ring(v3(7.0, 12.0, 47.5), Vec3::Z, 6.2, 4.0),
+            ring(v3(-5.0, 13.5, 47.0), Vec3::Z, 6.8, 3.8),
+            ring(v3(-17.0, 13.0, 45.5), Vec3::Z, 4.5, 2.4),
+            ring(v3(-28.0, 10.0, 44.8), Vec3::Z, 0.4, 0.5),
+        ],
+        &KEEL,
+    );
+    // Deliberately separated armour courses, with bronze mechanisms down in the gaps.
+    let count = if b.fine() { 5 } else { 3 };
+    for i in 0..count {
+        let x = 10.0 - i as f32 * if b.fine() { 5.6 } else { 9.0 };
+        dark_plate(b);
+        blade(
+            b,
+            v3(x, 12.5, 49.1),
+            v3(-1.0, 0.16, -0.12),
+            Vec3::Z,
+            10.0,
+            4.9,
+            0.35,
+            0.8,
+        );
+        if b.fine() {
+            metal(b);
+            blade(
+                b,
+                v3(x - 0.5, 12.5, 49.7),
+                v3(-1.0, 0.16, -0.12),
+                Vec3::Z,
+                1.0,
+                3.8,
+                0.0,
+                0.16,
+            );
+        }
+    }
     if b.fine() {
-        metal(b);
-        b.cylinder_between(
-            v3(-14.6, 0.0, 47.4),
-            v3(EMITTER.x + 0.5, 0.0, EMITTER.z - 0.7),
-            0.3,
-            0.2,
-            b.sides(6),
+        // Recessed radiator ribs along the lower outside flank.
+        seam(b);
+        b.beam(
+            v3(6.0, 17.3, 46.0),
+            v3(-15.0, 16.1, 44.4),
+            Vec2::new(1.0, 1.7),
+            Vec2::new(0.8, 1.2),
+        );
+        for i in 0..12 {
+            let t = i as f32 / 12.0;
+            let c = v3(5.0, 17.8, 46.0).lerp(v3(-14.0, 16.4, 44.4), t);
+            metal(b);
+            b.beam(
+                c - Vec3::Z * 0.7,
+                c + Vec3::Z * 0.7,
+                Vec2::new(0.28, 0.35),
+                Vec2::new(0.18, 0.25),
+            );
+        }
+        // Flush identification inlay on each shoulder, not a glowing floating bar.
+        b.paint(TEAM).pattern(pattern::PLAIN);
+        blade(
+            b,
+            v3(5.0, 13.0, 50.0),
+            v3(-1.0, 0.16, -0.12),
+            Vec3::Z,
+            4.0,
+            1.2,
+            0.0,
+            0.06,
         );
     }
 }
 
-/// Far off: the hull a wedge with the team colour on it, the lance's jaw halves two bars.
+fn reactor(b: &mut MeshBuilder) {
+    // A low armoured crown replaces the aircraft tail fin. The rocket pack remains
+    // forward of it; alternating heat sinks lead back to a shield-emitter cap.
+    dark_plate(b);
+    sleeve(
+        b,
+        &[
+            ring(v3(-10.0, 0.0, 50.0), Vec3::Z, 3.8, 2.8),
+            ring(v3(-14.0, 0.0, 51.0), Vec3::Z, 4.4, 4.2),
+            ring(v3(-19.0, 0.0, 49.5), Vec3::Z, 3.4, 3.0),
+            ring(v3(-24.0, 0.0, 46.0), Vec3::Z, 1.4, 1.0),
+        ],
+        &KEEL,
+    );
+    if b.fine() {
+        for i in 0..7 {
+            let x = -11.5 - i as f32 * 1.3;
+            b.mirror_y(|b| {
+                metal(b);
+                blade(
+                    b,
+                    v3(x, 3.4, 50.8 - i as f32 * 0.35),
+                    v3(-0.35, 1.0, -0.3),
+                    Vec3::Z,
+                    3.1,
+                    0.35,
+                    0.0,
+                    0.35,
+                );
+            });
+        }
+    }
+}
+
 pub(super) fn coarse(b: &mut MeshBuilder) {
-    use glam::Vec2;
     b.with_part(part::TURRET, |b| {
         dark_plate(b);
-        let top = DECK + 3.0;
         b.loft_z(
-            &[[18.0, 0.0], [-20.0, 9.0], [-20.0, -9.0]],
             &[
-                crate::builder::Section::new(RACE, 0.8),
-                crate::builder::Section::new(top, 0.7),
+                [20.0, 0.0],
+                [2.0, 19.0],
+                [-27.0, 10.0],
+                [-21.0, 0.0],
+                [-27.0, -10.0],
+                [2.0, -19.0],
             ],
+            &[Section::new(RACE, 0.65), Section::new(DECK + 4.0, 1.0)],
         );
         b.paint(TEAM);
         b.face(&[
-            v3(0.0, 0.0, top + 0.02),
-            v3(-7.0, 2.4, top + 0.02),
-            v3(-7.0, -2.4, top + 0.02),
+            v3(0.0, -4.0, DECK + 4.02),
+            v3(0.0, 4.0, DECK + 4.02),
+            v3(-8.0, 0.0, DECK + 4.02),
         ]);
+        dark_plate(b);
         b.with_limb(rig::ARM_GUN, |b| {
-            dark_plate(b);
-            b.mirror_y(|b| {
-                b.beam(
-                    LANCE_PIVOT + v3(8.0, 3.0, 0.0),
-                    LANCE_PIVOT + v3(26.0, 2.0, 0.0),
-                    Vec2::new(3.0, 8.0),
-                    Vec2::new(2.4, 4.0),
-                );
-            });
+            b.beam(
+                LANCE_PIVOT,
+                LANCE_PIVOT + v3(20.0, 0.0, 0.0),
+                Vec2::new(8.0, 8.0),
+                Vec2::new(6.0, 5.0),
+            );
         });
     });
 }

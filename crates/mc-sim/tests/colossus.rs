@@ -261,3 +261,35 @@ fn the_twin_guns_take_turns() {
     assert!(left.len() >= 5 && right.len() >= 5, "{left:?} {right:?}");
     assert!(left.iter().all(|t| !right.contains(t)), "never on one tick");
 }
+
+/// Durable structures across the footprint must be destroyed during the first burn,
+/// while a control structure outside the footprint survives that burn.
+#[test]
+fn first_burn_demolishes_a_spread_out_base() {
+    let mut w = world();
+    w.tick(&[spawn(&w, 0, COLOSSUS, (500, 512), 0)]).unwrap();
+    w.tick(&[spawn(
+        &w,
+        1,
+        "aster_t3_assault_bot",
+        (1100, 512),
+        flag::PASSIVE | flag::INVULNERABLE,
+    )])
+    .unwrap();
+    let key = "aster_t3_land_factory";
+    for at in [(1100, 352), (1100, 672), (1250, 512), (1450, 850)] {
+        w.tick(&[spawn(&w, 1, key, at, flag::PASSIVE)]).unwrap();
+    }
+    for _ in 0..160 {
+        w.tick(&[]).unwrap();
+    }
+    let u = &w.state.units;
+    let factory = w.blueprints.id_of(key).unwrap();
+    let survivors = (0..u.blueprint.len())
+        .filter(|&r| u.blueprint[r] == factory && u.health[r] > Fx::ZERO)
+        .count();
+    assert_eq!(
+        survivors, 1,
+        "the three buildings in the burn must fall; the distant control survives"
+    );
+}

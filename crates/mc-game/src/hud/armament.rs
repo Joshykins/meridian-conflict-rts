@@ -103,7 +103,9 @@ pub fn height(groups: &[Group]) -> f32 {
 }
 
 fn kind(w: &Weapon) -> &'static str {
-    if w.intercepts {
+    if w.star_beam {
+        "Cataclysm"
+    } else if w.intercepts {
         "Interceptor"
     } else if w.torpedo {
         "Torpedo"

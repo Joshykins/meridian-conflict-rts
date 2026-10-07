@@ -8,7 +8,7 @@
 //!
 //! - `legs`: the crown the hips meet at, and the four legs (a thigh out to a knee under
 //!   its guard, a long keeled shin, an armoured hoof).
-//! - `body`: the hull the head turns on (one swept loft with lames), the chin pods, the dorsal fin.
+//! - `body`: the swept layered carapace, recessed cheek mounts and reactor crown.
 //! - `lance`: the cannon head in its trunnion at the carapace's front, the jaws, the
 //!   bore's pinch coils and prism.
 //! - `guns`: the two chin guns (weapons 1 and 2, `rig::HOUSE`).
@@ -25,7 +25,7 @@
 //! Finish (docs/STYLE.md "The Regency look"): dark plates, seam-dark joints, graphite
 //! machinery, red optics, fusion lit in the prism. No violet: it does not build.
 //!
-//! Authored 32 m by 50 m and built [`SCALE`] times bigger: every number for it in
+//! Authored 32 m by 57 m and built [`SCALE`] times bigger: every number for it in
 //! `data/factions/regency/units/experimental.ron` (`regency_t5_colossus`) is this
 //! file's times `SCALE` (tests).
 
@@ -49,7 +49,7 @@ pub(super) const RADIUS: f32 = 32.0;
 pub(super) const HEIGHT: f32 = 57.0;
 /// How much bigger the unit file builds it.
 #[cfg(test)]
-const SCALE: f32 = 6.0;
+const SCALE: f32 = 7.2;
 
 /// Where the carapace turns on the crown: the top of the race, the carapace's belly.
 const RACE: f32 = 39.2;
@@ -74,8 +74,8 @@ const GUN_MUZZLE: Vec3 = Vec3::new(GUN_PIVOT.x + guns::LEN, GUN_PIVOT.y, GUN_PIV
 /// The rocket pack's hinge, the middle of its face and its eight tube mouths, as drawn at
 /// rest (level, facing forward): the unit file's weapon 3 `pivot`, `muzzle` and `muzzles`.
 /// The sim raises it to the weapon's `rake` about the hinge.
-const ROCKET_PIVOT: Vec3 = Vec3::new(-6.5, 0.0, 45.4);
-const ROCKET_MUZZLE: Vec3 = Vec3::new(-5.5, 0.0, 48.1);
+const ROCKET_PIVOT: Vec3 = Vec3::new(-6.5, 0.0, 52.0);
+const ROCKET_MUZZLE: Vec3 = Vec3::new(-5.5, 0.0, 54.7);
 
 pub(super) fn colossus(b: &mut MeshBuilder, _tech: u8) {
     build(b, &legs::ARCHED);
