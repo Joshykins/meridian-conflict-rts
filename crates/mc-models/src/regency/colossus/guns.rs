@@ -9,10 +9,11 @@
 
 use glam::{Affine3A, Vec2, Vec3};
 
+use super::detail::armor as dark_plate;
 use crate::builder::MeshBuilder;
 
 use super::super::commander::form::{ring, sleeve, OCT};
-use super::super::kit::{dark_plate, metal, seam, v3};
+use super::super::kit::{metal, seam, v3};
 use super::super::machine::{collar, hoop_on};
 use super::GUN_PIVOT;
 use crate::{material::GLOW_LASER, pattern};

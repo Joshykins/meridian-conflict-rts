@@ -185,7 +185,9 @@ pub mod pattern {
     pub const EMBER_SLOT: u32 = crate::gpu_consts::ember_plate::SLOT;
     /// Standard Regency armour with a red gasket inside the face perimeter.
     pub const EMBER_RIM: u32 = crate::gpu_consts::ember_plate::RIM;
-    pub const LAST: u32 = EMBER_RIM;
+    /// Precision Regency armour with finer scanned grain and recessed fasteners.
+    pub const EMBER_MACHINED: u32 = crate::gpu_consts::ember_plate::MACHINED;
+    pub const LAST: u32 = EMBER_MACHINED;
 }
 
 /// Which rigid part of the model a vertex belongs to. The vertex shader

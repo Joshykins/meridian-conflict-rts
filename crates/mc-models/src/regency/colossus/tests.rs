@@ -171,7 +171,7 @@ fn the_head_sweeps_clear_of_the_legs() {
 fn strides_grow_with_the_build() {
     let authored = model().legs.expect("the colossus walks");
     assert_eq!(authored.stride, legs::STRIDE);
-    let built = build_model_scaled("regency_colossus", RADIUS * SCALE, HEIGHT * SCALE, 5)
+    let built = build_model_scaled("regency_colossus", RADIUS * SCALE, HEIGHT * SCALE, 4)
         .unwrap()
         .legs
         .unwrap();

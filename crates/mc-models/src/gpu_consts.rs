@@ -74,6 +74,8 @@ shared! {
         // Retired pattern 40: the Executioner's separate graphite finish.
         pub const SLOT: u32 = 41;
         pub const RIM: u32 = 42;
+        /// Precision armour with finer plate courses and recessed fasteners.
+        pub const MACHINED: u32 = 43;
     }
 
     /// Courier stern door leaves: the side is attached to the whole leaf, including

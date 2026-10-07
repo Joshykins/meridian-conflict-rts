@@ -64,9 +64,9 @@
         },
     ),
     "regency_t5_colossus": (
-        lore: "A walking cataclysm on four armoured siege legs. Its whole head is a lance: the nose parts along its seam, the star inside is pinched for three seconds and then held on the ground for five, and a base-wide patch of the field runs to lava.",
+        lore: "A walking cataclysm on four armoured siege legs. Its whole head is a lance: the nose parts along its seam, the star inside is pinched for three seconds and then held on the ground for five, and the ground beneath a fortified position runs to lava.",
         weapons: {
-            "Heavy Pinch-fusion Lance": "The head opens and a held star of fusion is laid on the mark, delivering 180,000 damage over five seconds across a 420-metre-wide impact zone and melting the ground beneath structures; it drags slowly from mark to mark while it burns.",
+            "Heavy Pinch-fusion Lance": "The head opens and a held star of fusion is laid on the mark, delivering 60,000 damage over five seconds across a 160-metre-wide impact zone and melting the ground beneath structures; it drags slowly from mark to mark while it burns.",
             "Rapid Pinch-fusion Gun": "A fast pinch-fusion gun slung under the head on a turret of its own; the two take turns.",
             "Ruin Rocket Battery": "Eight rockets thrown high out of its back in one ripple. Unguided and wild, they fall across the field and burst as pinch-fusion strikes.",
         },

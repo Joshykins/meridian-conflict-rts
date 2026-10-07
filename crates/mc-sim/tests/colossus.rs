@@ -1,5 +1,5 @@
-//! The Colossus, the Regency's tech 5 walker: its lance burns for a few seconds and closes,
-//! the burn takes a base-wide patch of the field, its twin guns fire on their own turrets
+//! The Colossus, the Regency's tech 4 walker: its lance burns for a few seconds and closes,
+//! the burn takes a position-wide patch of the field, its twin guns fire on their own turrets
 //! and its rockets fall scattered over the field.
 
 use mc_core::{Angle, Fx, FxVec2};
@@ -85,10 +85,12 @@ fn fired_on(world: &mut World, weapon: u8, ticks: u32) -> Vec<u32> {
 }
 
 #[test]
-fn it_is_a_shielded_striding_tech_5() {
+fn it_is_a_shielded_striding_tech_4() {
     let w = world();
     let bp = w.blueprints.unit(w.blueprints.id_of(COLOSSUS).unwrap());
-    assert_eq!(bp.tech, 5);
+    assert_eq!(bp.tech, 4);
+    assert_eq!(bp.radius, Fx::from_int(144));
+    assert_eq!(bp.health, Fx::from_int(90000));
     assert!(bp.shield.is_some_and(|s| s.is_hull()), "a hull field");
     let motion = bp.motion.unwrap();
     assert!(
@@ -148,7 +150,7 @@ fn the_lance_burns_a_few_seconds_then_closes() {
 /// A base's worth of tanks round the mark: the burn takes the lot, though only one is
 /// aimed at.
 #[test]
-fn the_burn_takes_a_base_wide_patch() {
+fn the_burn_takes_a_position_wide_patch() {
     let mut w = world();
     w.tick(&[spawn(&w, 0, COLOSSUS, (500, 512), 0)]).unwrap();
     let mark = (1000, 512);
@@ -194,12 +196,12 @@ fn the_rockets_scatter() {
             &w,
             1,
             "aster_t3_assault_bot",
-            (2100, 512),
+            (2000, 512),
             flag::PASSIVE | flag::INVULNERABLE,
         ),
     ])
     .unwrap();
-    let rocket_splash = Fx::from_int(55);
+    let rocket_splash = Fx::from_int(35);
     let mut landed = Vec::new();
     let mut fired = Vec::new();
     let colossus = w.blueprints.id_of(COLOSSUS).unwrap();
@@ -277,7 +279,7 @@ fn first_burn_demolishes_a_spread_out_base() {
     )])
     .unwrap();
     let key = "aster_t3_land_factory";
-    for at in [(1100, 352), (1100, 672), (1250, 512), (1450, 850)] {
+    for at in [(1100, 462), (1100, 562), (1160, 512), (1450, 850)] {
         w.tick(&[spawn(&w, 1, key, at, flag::PASSIVE)]).unwrap();
     }
     for _ in 0..160 {

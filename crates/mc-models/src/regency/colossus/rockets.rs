@@ -10,11 +10,12 @@
 
 use glam::Affine3A;
 
+use super::detail::armor as dark_plate;
 use crate::builder::MeshBuilder;
 
 use crate::material::TEAM;
 
-use super::super::kit::{dark_plate, metal, seam, v3};
+use super::super::kit::{metal, seam, v3};
 use super::super::machine::hoop;
 use super::{ROCKET_MUZZLE, ROCKET_PIVOT};
 

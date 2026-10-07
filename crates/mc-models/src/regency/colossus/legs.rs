@@ -1,8 +1,9 @@
 //! Four load-bearing limbs: recessed rotary bearings, broad shield-shaped greaves,
 //! short plated ankles and bevelled soles. Three feet remain planted through the gait.
 use super::super::commander::form::{ring, sleeve, OCT};
-use super::super::kit::{dark_plate, metal, seam, v3};
+use super::super::kit::{metal, seam, v3};
 use super::super::machine::hoop_on;
+use super::detail::armor as dark_plate;
 use super::RACE;
 use crate::builder::{MeshBuilder, Section};
 use crate::{material::*, part, pattern, rig};
@@ -71,7 +72,7 @@ fn bearing(b: &mut MeshBuilder, at: Vec3, across: Vec3, radius: f32, half: f32) 
         at + across * half,
         radius,
         radius,
-        b.sides(10),
+        b.sides(8),
     );
     for sign in [-1.0, 1.0] {
         let cap = at + across * (half * sign);
@@ -83,7 +84,7 @@ fn bearing(b: &mut MeshBuilder, at: Vec3, across: Vec3, radius: f32, half: f32) 
             radius * 0.88,
             radius * 0.17,
             0.35,
-            b.sides(10),
+            b.sides(8),
         );
         b.cylinder_between(
             cap,
@@ -164,7 +165,7 @@ pub(super) fn leg(b: &mut MeshBuilder, s: &Style, (hip, knee, foot, _): Joints) 
                 &OCT,
             );
             // The inset armored spine owns the red slit, with a chamfer at each end.
-            b.paint(PLATING).pattern(pattern::EMBER);
+            b.paint(PLATING).pattern(pattern::EMBER_MACHINED);
             sleeve(
                 b,
                 &[
@@ -203,6 +204,7 @@ pub(super) fn leg(b: &mut MeshBuilder, s: &Style, (hip, knee, foot, _): Joints) 
                     );
                 }
             }
+            super::detail::shin(b, a, c, face, across);
             bearing(b, ankle, across, 1.9, 2.8 * k);
             b.at(foot, |b| {
                 let sole = [

@@ -1,12 +1,13 @@
 //! Recessed bifurcated siege head: broad angular cheeks frame a protected pinch chamber.
 use super::super::commander::form::{blade, ring, sleeve, OCT};
-use super::super::kit::{dark_plate, metal, seam, v3};
+use super::super::kit::{metal, seam, v3};
 use super::super::machine::hoop_on;
 use crate::material::GLOW_LASER;
 
 fn coil_light(b: &mut MeshBuilder, stage: u32) {
     b.paint(GLOW_LASER).pattern(pattern::COIL + stage);
 }
+use super::detail::armor as dark_plate;
 use super::LANCE_PIVOT;
 use crate::builder::MeshBuilder;
 use crate::gpu_consts::charge_gear::{EXTEND, SPREAD};

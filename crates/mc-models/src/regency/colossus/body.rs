@@ -1,7 +1,8 @@
 //! Broad interlocking armor over a low mechanical keel. Each panel has a calm
 //! face, a chamfered perimeter and a visible gap to the neighboring course.
 use super::super::commander::form::{ring, sleeve, OCT};
-use super::super::kit::{dark_plate, metal, seam, v3};
+use super::super::kit::{metal, seam, v3};
+use super::detail::armor as dark_plate;
 use super::{DECK, LANCE_PIVOT, RACE};
 use crate::builder::{MeshBuilder, Section};
 use crate::{material::*, part, pattern, rig};
@@ -119,8 +120,11 @@ fn panel(b: &mut MeshBuilder, tail: f32, nose: f32, y: f32, w: f32, z: f32, rise
         b.face(&[outline[i], outline[next], upper[next], upper[i]]);
     }
     b.paint(if pale { PLATING } else { PLATING_DARK })
-        .pattern(pattern::EMBER);
+        .pattern(pattern::EMBER_MACHINED);
     b.face(&upper);
+    if b.fine() {
+        super::detail::panel_inlay(b, &upper);
+    }
 }
 pub(super) fn coarse(b: &mut MeshBuilder) {
     b.with_part(part::TURRET, |b| {

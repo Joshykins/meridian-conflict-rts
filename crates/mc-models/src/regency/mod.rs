@@ -132,7 +132,7 @@ pub(super) const MODELS: &[ModelDef] = &[
         strider::HEIGHT,
         strider::strider,
     ),
-    // The tech 5 siege walker: a carapace on four long legs, a jawed Heavy Pinch-fusion
+    // The tech 4 siege walker: a carapace on four long legs, a jawed Heavy Pinch-fusion
     // Lance for a head, two chin guns and a rocket battery on its back (`colossus`).
     ModelDef::new(
         "regency_colossus",

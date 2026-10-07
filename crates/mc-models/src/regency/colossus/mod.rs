@@ -1,13 +1,14 @@
-//! Regency T5 siege quadruped: a broad, low carapace on four outward-set armored
+//! Regency T4 siege quadruped: a broad, low carapace on four outward-set armored
 //! limbs. Recessed rotary bearings and broad greaves carry its mass; charcoal and
 //! pale iridescent plates, red surface insets and exposed graphite machinery keep
 //! the established faction finish. The jawed siege aperture pitches independently,
 //! with two chin guns and an eight-cell dorsal rocket pack on separate mounts.
 //!
-//! Authored at 40 m radius by 37 m high and built 7.2 times larger. The blueprint's
+//! Authored at 40 m radius by 37 m high and built 3.6 times larger. The blueprint's
 //! dimensions and weapon origins are checked against this model's rig.
 
 mod body;
+mod detail;
 mod guns;
 mod lance;
 mod legs;
@@ -27,7 +28,7 @@ pub(super) const RADIUS: f32 = 40.0;
 pub(super) const HEIGHT: f32 = 37.0;
 /// How much bigger the unit file builds it.
 #[cfg(test)]
-const SCALE: f32 = 7.2;
+const SCALE: f32 = 3.6;
 
 /// Where the carapace turns on the crown: the top of the race, the carapace's belly.
 const RACE: f32 = 19.2;

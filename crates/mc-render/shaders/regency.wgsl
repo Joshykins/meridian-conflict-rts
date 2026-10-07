@@ -86,7 +86,7 @@ fn regency_none() -> RegencyLook {
 // Regency plate, or Regency plate with nanite slots let in (both are coloured here).
 fn regency_pattern(p: u32) -> bool {
     return p == PAT_EMBER || p == NANITE_PATTERN_SLOT
-        || p == EMBER_PLATE_SLOT || p == EMBER_PLATE_RIM;
+        || p == EMBER_PLATE_SLOT || p == EMBER_PLATE_RIM || p == EMBER_PLATE_MACHINED;
 }
 
 // A nanite face's slot, down the middle of the face the long way: how far across from
@@ -448,6 +448,35 @@ fn regency_works(i: RegencyIn) -> RegencyLook {
 fn regency_look(i: RegencyIn, works: bool) -> RegencyLook {
     if works {
         return regency_works(i);
+    }
+    if i.optic == EMBER_PLATE_MACHINED {
+        var machined = i;
+        machined.scale = i.scale * 0.48;
+        var out = regency_plate(machined);
+        let o = reg_outline(machined);
+        let fw = max(i.px, 1e-4);
+        // Recessed circular fasteners follow a rectangular panel's corners. They
+        // are surface relief, filtered out when their diameter is subpixel.
+        if i.face.w > 0.0 && i.face.z > machined.scale && i.face.w > machined.scale {
+            let inset = machined.scale * 0.24;
+            let q = i.face.zw - abs(i.face.xy) - vec2<f32>(inset);
+            let radius = machined.scale * 0.065;
+            let d = length(q);
+            let seen = surf_resolved(radius * 2.0, fw);
+            let socket = (1.0 - smoothstep(radius - fw, radius + fw, d)) * seen;
+            let rim = surf_band(d - radius * 1.5, radius * 0.22, fw) * seen;
+            out.tone *= 1.0 - socket * 0.7;
+            out.lift += rim * 0.45;
+            out.rough += socket * 0.14;
+        }
+        // Fine directional machining in the coating, strongest on broad faces.
+        let pitch = machined.scale * 0.055;
+        let axis = normalize(cross(i.n, o.dir) + vec3<f32>(1e-6));
+        let grain = sin(dot(i.local, axis) * 6.283185 / pitch);
+        let resolved = surf_resolved(pitch, fw);
+        out.rough += grain * 0.035 * resolved;
+        out.tone *= 1.0 + grain * 0.025 * resolved;
+        return out;
     }
     return regency_plate(i);
 }
