@@ -26,12 +26,6 @@
                 Sweep(at: 0.008, from: 1300, to: 420, glide: 0.12, q: 0.9, attack: 0.006, decay: 0.06, gain: 0.2),
                 Sweep(at: 0.108, from: 1300, to: 420, glide: 0.12, q: 0.9, attack: 0.006, decay: 0.06, gain: 0.2, pan: 0.1),
                 Sweep(at: 0.208, from: 1300, to: 420, glide: 0.12, q: 0.9, attack: 0.006, decay: 0.06, gain: 0.2, pan: -0.1),
-                Fm(at: 0.006, from: 360, to: 310, glide: 0.10, ratio: 0.5, index: 1.5, fade: 0.10, attack: 0.006, decay: 0.055, gain: 0.32),
-                Sweep(at: 0.012, from: 2200, to: 1100, glide: 0.12, q: 0.65, attack: 0.012, decay: 0.06, gain: 0.45),
-                Fm(at: 0.106, from: 360, to: 310, glide: 0.10, ratio: 0.5, index: 1.5, fade: 0.10, attack: 0.006, decay: 0.055, gain: 0.32),
-                Sweep(at: 0.112, from: 2200, to: 1100, glide: 0.12, q: 0.65, attack: 0.012, decay: 0.06, gain: 0.45),
-                Fm(at: 0.206, from: 360, to: 310, glide: 0.10, ratio: 0.5, index: 1.5, fade: 0.10, attack: 0.006, decay: 0.055, gain: 0.32),
-                Sweep(at: 0.212, from: 2200, to: 1100, glide: 0.12, q: 0.65, attack: 0.012, decay: 0.06, gain: 0.45),
             ],
         ),
         // The battle scorpion's walk. Eight heavy legs working under a tonne-heavy armoured body: the drive's growl,
@@ -391,7 +385,7 @@
         // with a kick under it, all body), and the hot plasma riding off with it (a throat
         // of air that settles into a short rolling report).
         "regency_repeater": (
-            length: 0.5, peak: 0.50, room: 0.12,
+            length: 0.5, peak: 0.46, room: 0.12,
             layers: [
                 // The snap of the field letting go: bright, a few milliseconds.
                 Burst(low: 700, high: 4800, attack: 0.0003, decay: 0.004, gain: 4, seed: 41),
@@ -405,18 +399,13 @@
                 Sweep(at: 0.004, from: 1500, to: 480, glide: 0.12, q: 1.2, attack: 0.005, decay: 0.08, gain: 0.75, seed: 44),
                 // A short rolling report behind it.
                 Roll(at: 0.02, from: 520, to: 160, glide: 0.3, attack: 0.02, decay: 0.12, gain: 0.4, swell: 8, depth: 0.5, seed: 46),
-                // The original punch stays underneath. A restrained field rasp and
-                // pressurised plasma release add an energy-weapon layer over it.
-                Fm(at: 0.006, from: 360, to: 310, glide: 0.10, ratio: 0.5, index: 1.5, fade: 0.10, attack: 0.006, decay: 0.055, gain: 0.40),
-                Sweep(at: 0.012, from: 2200, to: 1100, glide: 0.12, q: 0.65, attack: 0.012, decay: 0.07, gain: 0.55, seed: 47),
-                Hiss(at: 0.018, freq: 2900, q: 0.65, attack: 0.014, decay: 0.065, gain: 0.2, seed: 48),
             ],
         ),
         // A repeater bolt splashing: a wet hard splat and a low thud as it dumps its heat
         // into what it hit, then the plasma searing on it under a
         // short low rumble of air. A stream of them lands, so it is gone inside 0.7 s.
         "regency_repeater_hit": (
-            length: 0.7, peak: 0.48, room: 0.16,
+            length: 0.7, peak: 0.44, room: 0.16,
             layers: [
                 Burst(low: 250, high: 2600, attack: 0.0004, decay: 0.006, gain: 5, seed: 51),
                 Burst(low: 70, high: 650, attack: 0.001, decay: 0.035, gain: 6.5, seed: 52),
@@ -427,10 +416,6 @@
                 Hiss(at: 0.03, freq: 1800, q: 0.7, attack: 0.03, decay: 0.16, gain: 0.25, seed: 55),
                 // A short low rumble of the air it heated.
                 Roll(at: 0.01, from: 420, to: 120, glide: 0.4, attack: 0.02, decay: 0.15, gain: 0.45, swell: 6, depth: 0.5, seed: 56),
-                // Retain the weight of the rupture, with a field tearing open
-                // and a brief searing tail layered over the original impact.
-                Fm(at: 0.008, from: 270, to: 240, glide: 0.10, ratio: 0.5, index: 1.6, fade: 0.08, attack: 0.005, decay: 0.055, gain: 0.32),
-                Sweep(at: 0.014, from: 2300, to: 900, glide: 0.12, q: 0.65, attack: 0.01, decay: 0.075, gain: 0.5, seed: 57),
             ],
         ),
 
@@ -608,9 +593,24 @@
             ],
         ),
 
-        // One fire event per salvo bolt: share the layered repeater discharge.
-        // A baked-in second thump would add a phantom shot to every real bolt.
-        "regency_canopy_fire": (like: "regency_repeater", size: 0.95, peak: 0.44),
+        // The Canopy's launch: two rounds a 0.5 s shot (`rounds: 2`), 0.25 s apart, so
+        // both are in the one sound. Each a short hot plasma thump up out of the mount,
+        // a rough growl inside it and a breath of noise rising as the round climbs.
+        "regency_canopy_fire": (
+            length: 0.55, peak: 0.4, room: 0.15,
+            layers: [
+                Burst(low: 120, high: 900, attack: 0.0008, decay: 0.018, gain: 6),
+                Fm(from: 150, to: 84, glide: 0.04, ratio: 0.5, index: 1.8, fade: 0.03, attack: 0.001, decay: 0.05, gain: 0.8),
+                Tone(from: 105, to: 60, glide: 0.04, attack: 0.001, decay: 0.05, gain: 0.35),
+                Burst(at: 0.25, low: 120, high: 900, attack: 0.0008, decay: 0.018, gain: 6, pan: 0.12),
+                Fm(at: 0.25, from: 146, to: 82, glide: 0.04, ratio: 0.5, index: 1.8, fade: 0.03, attack: 0.001, decay: 0.05, gain: 0.8, pan: 0.12),
+                Tone(at: 0.25, from: 102, to: 58, glide: 0.04, attack: 0.001, decay: 0.05, gain: 0.35, pan: 0.12),
+                Drive(1.45),
+                // The rounds climbing: a noise band rising, not a tone.
+                Sweep(at: 0.008, from: 500, to: 1300, glide: 0.1, q: 1.1, attack: 0.01, decay: 0.05, gain: 0.5),
+                Sweep(at: 0.258, from: 480, to: 1250, glide: 0.1, q: 1.1, attack: 0.01, decay: 0.05, gain: 0.46, pan: 0.12),
+            ],
+        ),
         // A Canopy round bursting among aircraft, heard from the ground: a sharp hot pop
         // and its report rolling off, soft and low, no crackle.
         "regency_canopy_burst": (

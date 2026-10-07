@@ -22,7 +22,7 @@
             turret_turn: 240, muzzle: (1.6, 0, 2.3), spread: 1.0,
             targets: ["Land", "Naval"], color: Orange, tracer: 0.6,
             plasma_grade: Some(Plasmeric),
-            sounds: (fire: "regency_repeater_light", impact: "regency_repeater_light_hit", ground: "regency_repeater_light_hit"),
+            sounds: (fire: "regency_stinger", impact: "shell_light"),
         )],
         mesh: "regency_scout", icon: Scout,
         sounds: (death: "blast_small", moving: "regency_skitter"),

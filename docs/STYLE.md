@@ -321,13 +321,10 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     Each is spat out hard: a white-hot directional snap at the mouth, a red bloom
     thrown forward, droplets and sparks flung after it. The core stays readable
     down the bolt, and short hot fragments mark containment breaking on impact.
-    Where one lands it dumps its
-    heat at once: a white flash in a ragged red bloom, a knot of plasma left
+    Where one lands it dumps its heat at once: a white flash in a ragged red bloom, a knot of plasma left
     frying, droplets spattered out, sparks, a seared glowing spot. Heard as a
-    deep, aggressive energy pulse: the original heavy pressure report stays
-    underneath a restrained field rasp and turbulent plasma release. The
-    impact keeps its weight, with a tearing field and brief searing tail
-    layered over it. No metallic ringing or cartoon laser sweep. **Plasmeric AA repeater** ripples the same bolts out of each tube in
+    snap, a heavy spit with a kick under it and a fizz riding off; it lands as
+    a wet splat, a thud and plasma frying. **Plasmeric AA repeater** ripples the same bolts out of each tube in
     turn, and each bursts as a wide red bloom flinging sparkles and streaks of plasma.
   - **Pinched-plasmeric:** plasma gathered and squeezed in front of the bore
     (a ball, motes drawn in, red lightning snapping into it), then pinched
