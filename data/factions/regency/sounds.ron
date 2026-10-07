@@ -692,7 +692,7 @@
         // never sit on one pitch. No crackle. Every
         // wobble is a whole number of cycles in the 4 s loop.
         "regency_lance_hold": (
-            length: 4.0, peak: 0.7, room: 0.3,
+            length: 4.0, peak: 0.7, room: 0.3, looped: true,
             layers: [
                 Fm(from: 38, to: 38, glide: 1, ratio: 0.5, index: 3.4, fade: 1000, attack: 0.01, decay: 100000, gain: 0.4),
                 Fm(from: 57, to: 57, glide: 1, ratio: 1.5, index: 2.6, fade: 1000, attack: 0.01, decay: 100000, gain: 0.22, pan: -0.2),
