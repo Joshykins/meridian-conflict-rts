@@ -368,7 +368,7 @@ mod tests {
     }
 
     /// The Regency's drive is heard as its own (`regency_warp_*`): every part a ship asks
-    /// for by name has one, but the snag and the stun, which are ARC's.
+    /// for by name has one, including a snag; stun effects remain shared.
     #[test]
     fn the_nanite_drive_has_its_own_sounds() {
         let library = SoundLibrary::load(
@@ -378,6 +378,7 @@ mod tests {
         let prefix = mc_data::WarpStyle::Nanite.sound_prefix().unwrap();
         for name in [
             "warp_spool",
+            "warp_snag",
             "warp_charge",
             "warp_charge_arcs",
             "warp_jump",

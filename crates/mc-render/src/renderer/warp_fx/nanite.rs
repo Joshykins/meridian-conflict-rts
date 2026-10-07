@@ -1,31 +1,14 @@
 //! The Regency's warp (`WarpStyle::Nanite`): the hull comes apart into the swarm its
 //! builders are made of, and the swarm goes where the ship is going.
 //!
-//! - **Charging**: red heat builds in the hull and at its drives, the plating bleeds red
-//!   arcs (`warp_charge_arcs`) and flakes: black specks lift off the hull and drift away,
-//!   more as it fills. Energy is drawn in as red motes, and ahead of the nose the space the
-//!   jump will cross dimples into rings that run in (the gravity well's closed form).
-//! - **Going in** (the one tick the hull is still drawn): the hull cut into cells that
-//!   leave stern first, flung down the bearing, each at its own speed (`warp_unmake` in
-//!   warp_hull.wgsl); a dark cloud of specks goes with it, a few red filaments run ahead,
-//!   a red ring spreads round the bearing. Nothing white: the swarm eats the light.
-//! - **In warp**: the well opens where it will come out: a dark heart with a hard red ring,
-//!   rings of bent space running in, beads of swarm falling along fixed lines, a violet
-//!   point. Specks stream in from the way it came, and on the last tick the whole swarm
-//!   arrives together.
-//! - **Coming out** (all of `Emerge`, the hull condensing over `WarpView::length` ticks):
-//!   the swarm runs in from behind and the hull re-forms cell by cell, nose first, violet
-//!   at the edge of the join. A dampened exit is torn: the cells shudder, the light gutters
-//!   and hot debris is thrown off, as the ARC drive's is.
-//!
-//! The specks are `PUFF_WARP_SWARM` (warp_puffs.wgsl): black shards with a glint at the rim.
-//! Every size is scaled by the hull's radius. Emitters are capped per ship per tick (about
-//! 14 specks while charging, 110 on the jump and 80 on the exit tick), and ships far from the
-//! camera draw only the glows, rifts and a thin swarm.
+//! Red scanning bands charge the intact hull. Departure dissolves its plating in place;
+//! a compact swarm carries the motion. At arrival a dark aperture gathers the swarm and
+//! the hull reconstructs at its original size. No hull vertices move independently.
+//! Particle counts remain capped per ship, with reduced emission at distance.
 
 use super::{
     Glow, Jump, Palette, MOTE_REACH, PUFF_WARP_ARC, PUFF_WARP_GLOW, PUFF_WARP_MOTE, PUFF_WARP_RIFT,
-    PUFF_WARP_STREAK, PUFF_WARP_SWARM,
+    PUFF_WARP_SWARM,
 };
 use crate::renderer::{Renderer, PUFF_SPARK};
 use glam::Vec3;
@@ -52,7 +35,7 @@ pub(super) fn palette(dampened: bool) -> Palette {
         Palette {
             core: Vec3::new(1.0, 0.32, 0.5),
             edge: Vec3::new(1.0, 0.07, 0.04),
-            accent: Vec3::new(0.6, 0.2, 1.0),
+            accent: Vec3::new(1.0, 0.16, 0.09),
             torn: 2.0,
             shock: [0.9, 0.1, 0.12],
         }
@@ -142,7 +125,7 @@ impl Renderer {
                 pal.torn,
             );
         }
-        // The space ahead of the nose dimples: rings of bent air running in.
+        // The space ahead of the nose dimples: nested facets closing in.
         if c > 0.2 {
             let size = r * (0.5 + 0.9 * c);
             let ahead = j.fwd * (1.4 + 0.6 * c) * r;
@@ -163,7 +146,7 @@ impl Renderer {
             range: (2.5 + 1.5 * c) * r,
             start: time,
             life,
-            pulse: 3.0 + 12.0 * c * c,
+            pulse: 0.0,
         });
         if !j.near {
             return;
@@ -215,14 +198,12 @@ impl Renderer {
         }
     }
 
-    /// Going in: the hull flung down the bearing as a dark cloud, a few filaments of red
-    /// light running ahead of it, a ring spreading round the bearing.
+    /// Departure: a compact cloud carries the dissolved hull, with a restrained red pulse.
     fn nanite_leave(&mut self, j: &Jump, time: f32) {
         let dt = self.tick_seconds.max(0.02);
         let (r, k, pal) = (j.r, j.k, j.pal);
         let from = j.from;
         let distance = from.distance(j.to);
-        let gone = time + dt * 0.9;
         // A small hot flash at the break, red, and the ring.
         let flash = (0.4 * r).max(j.floor);
         self.push_warp(
@@ -237,44 +218,28 @@ impl Renderer {
         );
         let saved = self.effect_settings;
         self.effect_settings.shockwave_color = Some(pal.shock);
-        self.push_shockwave(from.to_array(), time, 3.6 * r, 0.9, 0.8, 0.0, j.fwd);
+        self.push_shockwave(from.to_array(), time, 1.5 * r, 0.65, 0.3, 0.0, j.fwd);
         self.effect_settings = saved;
         self.warp_fx.light(Glow {
             pos: from,
-            color: pal.edge * 26_000.0 * k * k,
-            range: 5.0 * r,
+            color: pal.edge * 10_000.0 * k * k,
+            range: 2.5 * r,
             start: time,
             life: 0.5,
             pulse: 0.0,
         });
-        // Filaments of red running out along the bearing: the hot edge of the break.
-        let bright = (distance - r).clamp(r, 36.0 * r);
-        for side in [-0.4_f32, 0.0, 0.4] {
-            let long = 0.5 + 0.5 * self.scatter.unit();
-            let roll = self.scatter.unit();
-            self.push_warp(
-                PUFF_WARP_STREAK,
-                from + j.fwd * r * 0.6 + j.left * side * r,
-                j.fwd * bright * long,
-                gone - dt * (0.6 + 0.4 * roll),
-                0.7,
-                (0.03 * r, 0.012 * r),
-                pal.edge * 3.0,
-                pal.torn,
-            );
-        }
         // The swarm: specks thrown from all through the hull, down the bearing, each as far
-        // as its own speed takes it, the farthest almost to the mark.
+        // as its own speed takes it, bounded to four hull radii.
         let count = if j.near { 110 } else { 28 };
         for _ in 0..count {
             let at = self.in_hull(from, j, j.fwd, j.left);
             let reach =
-                (distance * (0.15 + 0.85 * self.scatter.unit().powi(2))).clamp(4.0 * r, 36.0 * r);
+                (distance * (0.15 + 0.85 * self.scatter.unit().powi(2))).clamp(1.5 * r, 4.0 * r);
             let speed = reach / MOTE_REACH;
             let side = (j.left * self.scatter.signed() + Vec3::Z * 0.5 * self.scatter.signed())
                 * speed
                 * 0.04;
-            let size = 0.03 * r * (0.6 + self.scatter.unit());
+            let size = 0.015 * r * (0.6 + self.scatter.unit());
             let roll_1 = self.scatter.unit();
             let roll_2 = self.scatter.unit();
             self.speck(
@@ -316,7 +281,7 @@ impl Renderer {
         let p = (v.ticks as f32 / v.length.max(1) as f32).clamp(0.0, 1.0);
         let life = dt * 1.8;
         let to = j.to;
-        let size = (r * (0.3 + 1.4 * p.powf(1.3))).max(j.floor * (0.6 + p));
+        let size = (r * (0.3 + 0.8 * p.powf(1.3))).max(j.floor * (0.6 + p));
         let open = super::smoothstep(0.1, 0.85, p);
         self.push_warp(
             PUFF_WARP_RIFT,
@@ -334,12 +299,12 @@ impl Renderer {
             range: (1.5 + 2.0 * p) * r,
             start: time,
             life,
-            pulse: if v.dampened { -1.0 } else { 2.0 + 5.0 * p },
+            pulse: if v.dampened { -1.0 } else { 0.0 },
         });
         let last = v.ticks + 1 >= v.length;
         if last {
             // The whole swarm comes in along the bearing, reaching the well as the tick ends.
-            let run = j.from.distance(to).clamp(4.0 * r, 36.0 * r);
+            let run = j.from.distance(to).clamp(1.5 * r, 4.0 * r);
             let flight = dt * 0.95;
             let count = if j.near { 90 } else { 24 };
             for _ in 0..count {
@@ -348,7 +313,7 @@ impl Renderer {
                     + j.left * self.scatter.signed() * 0.35 * r
                     + Vec3::Z * self.scatter.signed() * 0.2 * r;
                 let vel = (to - start) / reach_in(flight);
-                let size = 0.03 * r * (0.6 + self.scatter.unit());
+                let size = 0.015 * r * (0.6 + self.scatter.unit());
                 self.speck(start, vel, time, dt * 1.3, size, pal.edge * 3.0, pal.torn);
             }
         }
@@ -408,7 +373,7 @@ impl Renderer {
     }
 
     /// Coming out, every tick the hull condenses (the first also the blow of arrival): the
-    /// swarm runs in from behind and the hull re-forms, violet along the join.
+    /// swarm runs in from behind and the hull re-forms, red along the join.
     fn nanite_condense(&mut self, j: &Jump, time: f32) {
         let dt = self.tick_seconds.max(0.02);
         let (r, k, pal) = (j.r, j.k, j.pal);
@@ -416,7 +381,7 @@ impl Renderer {
         let to = j.to;
         let left_over = 1.0 - (v.ticks as f32 / v.length.max(1) as f32).clamp(0.0, 1.0);
         if v.ticks == 0 {
-            // A soft violet flash as the first of it lands, and a ring round the bearing.
+            // A soft red flash as the first of it lands, and a ring round the bearing.
             let flash = (0.5 * r).max(j.floor);
             self.push_warp(
                 PUFF_WARP_GLOW,
@@ -429,10 +394,9 @@ impl Renderer {
                 pal.torn,
             );
             let saved = self.effect_settings;
-            self.effect_settings.shockwave_color = Some([0.55, 0.2, 1.0]);
-            self.push_shockwave(to.to_array(), time, 4.4 * r, 0.9, 0.8, 0.0, j.fwd);
+            self.effect_settings.shockwave_color = Some(pal.shock);
+            self.push_shockwave(to.to_array(), time, 1.6 * r, 0.8, 0.3, 0.0, j.fwd);
             self.effect_settings = saved;
-            self.sky.blast(to, 3.0 * r, 0.8, time);
         }
         // The hull lit as the swarm lands on it, easing off as it is whole.
         self.warp_fx.light(Glow {
@@ -457,12 +421,12 @@ impl Renderer {
             let target = to
                 + j.fwd * self.scatter.signed() * 0.8 * r
                 + j.left * self.scatter.signed() * 0.35 * r;
-            let back = r * (2.0 + 9.0 * self.scatter.unit());
+            let back = r * (0.6 + 1.4 * self.scatter.unit());
             let start = target - j.fwd * back
                 + j.left * self.scatter.signed() * 0.4 * r
                 + Vec3::Z * self.scatter.signed() * 0.25 * r;
             let vel = (target - start) / reach_in(flight);
-            let size = 0.03 * r * (0.6 + self.scatter.unit());
+            let size = 0.015 * r * (0.6 + self.scatter.unit());
             let roll_1 = self.scatter.unit();
             self.speck(
                 start,

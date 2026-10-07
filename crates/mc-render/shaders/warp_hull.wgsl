@@ -12,13 +12,11 @@
 // and collapses forward into the hull. A dampened jump (`WARP_STATUS_DAMPED`) stutters:
 // the streak catches and slips, and the hull is torn sideways in jagged bands.
 
-// The Regency's drive (`WARP_STATUS_NANITE`) does not stretch the hull: it comes apart. The
-// hull is cut into cells of a few metres, each leaving at its own moment (the stern first
-// going in, the nose first coming back) and its own speed along the jump, so the triangles
-// that span two cells are drawn as slivers streaming out; the shards darken to black with
-// red heat at the edge of the break, and the swarm re-condenses in violet (`warp_unmake`).
+// Regency hulls retain their exact geometry throughout warp. A fragment-space cellular
+// dissolve reveals the original plating; independent particles carry the loose swarm.
+// Moving individual vertices tears triangles spanning cells into enormous sheets.
 
-// Metres across a cell of a hull coming apart (the vertex and fragment shaders cut it alike).
+// Metres across a cell in the hull dissolve, shared by all fragment passes.
 const WARP_CELL: f32 = 6.0;
 
 // A full streak reaches this many hull radii ahead of (or behind) the ship.
@@ -45,13 +43,10 @@ fn warp_stretch(world: vec3<f32>, origin: vec3<f32>, fwd: vec3<f32>, left: vec3<
                 local: vec3<f32>, reach: f32, state: vec2<f32>, damped: bool, nanite: bool,
                 seed: f32, time: f32) -> vec3<f32> {
     let e = state.x;
-    if e <= 0.0 {
+    if e <= 0.0 || nanite {
         return world;
     }
     let x = local.x;
-    if nanite {
-        return warp_unmake(world, origin, fwd, left, up, local, reach, e, state.y > 0.5, damped, seed, time);
-    }
     // 0 at the stern, 1 at the nose.
     let u = clamp((x + reach) / (2.0 * reach), 0.0, 1.0);
     let length = WARP_STREAK_RADII * reach * e;
@@ -81,30 +76,10 @@ fn warp_cell(local: vec3<f32>, u: f32, s: f32, seed: f32) -> vec2<f32> {
     return vec2<f32>(clamp((s - th) / 0.28, 0.0, 1.0), h);
 }
 
-// A Regency hull coming apart (`s` through the swarm, `going` in): each cell flies off along
-// the jump, forward as it leaves and back along the way it came as it returns, at its own
-// speed, thrown a little sideways.
-fn warp_unmake(world: vec3<f32>, origin: vec3<f32>, fwd: vec3<f32>, left: vec3<f32>, up: vec3<f32>,
-               local: vec3<f32>, reach: f32, e: f32, going: bool, damped: bool, seed: f32,
-               time: f32) -> vec3<f32> {
-    let s = sqrt(e);
-    let u = clamp((local.x + reach) / (2.0 * reach), 0.0, 1.0);
-    let c = warp_cell(local, u, s, seed);
-    let p = c.x * c.x * (3.0 - 2.0 * c.x);
-    if p <= 0.0 {
-        return world;
-    }
-    let dir = select(-1.0, 1.0, going);
-    let speed = 3.0 + 13.0 * hash11(c.y * 91.0 + seed * 7.0);
-    var out = world + fwd * dir * p * p * speed * reach * 0.5;
-    let spread = vec2<f32>(hash11(c.y * 17.0 + 3.0) - 0.5, hash11(c.y * 29.0 + 5.0) - 0.5);
-    out += (left * spread.x + up * spread.y * 0.6) * reach * 1.1 * p;
-    if damped {
-        // Torn, the swarm shudders: each cell re-thrown a dozen times a second.
-        let beat = floor(time * 13.0) * 7.0 + c.y * 40.0;
-        out += (left * (hash11(beat) - 0.5) + up * (hash11(beat + 3.7) - 0.5)) * reach * 0.25 * p;
-    }
-    return out;
+// Shared by colour, depth and shadow passes: clipped cells cannot occlude other hulls.
+fn warp_swarm_missing(local: vec3<f32>, warp: vec4<f32>, seed: f32) -> bool {
+    if warp.z < 1.5 || warp.x <= 0.0 { return false; }
+    return warp_cell(local, warp.w, sqrt(warp.x), seed).x >= 0.55;
 }
 
 // A hull's colour as it goes into or comes out of a streak: it whitens into the light of
@@ -134,7 +109,7 @@ fn warp_hull_light(color: vec3<f32>, warp: vec4<f32>, local: vec3<f32>, time: f3
 }
 
 // A Regency hull as it comes apart or condenses: the plating going to black soot where the
-// swarm has it, a seam of red heat at the edge of the break (violet where it is reforming),
+// swarm has it, a seam of red heat at the edge of the break,
 // and sparse red glints in the dark. Nothing here is white: the swarm eats the light.
 fn warp_swarm_light(color: vec3<f32>, local: vec3<f32>, u: f32, e: f32, going: bool,
                     damped: bool, time: f32, seed: f32) -> vec3<f32> {
@@ -146,14 +121,14 @@ fn warp_swarm_light(color: vec3<f32>, local: vec3<f32>, u: f32, e: f32, going: b
     let soot = vec3<f32>(0.010, 0.008, 0.012);
     let seam = smoothstep(0.0, 0.2, p) * (1.0 - smoothstep(0.3, 0.9, p));
     let red = vec3<f32>(1.0, 0.1, 0.05);
-    let violet = vec3<f32>(0.55, 0.2, 1.0);
-    var heat = select(violet, red, going) * (0.4 + 1.8 * seam) * seam;
+    let ember = vec3<f32>(1.0, 0.18, 0.12);
+    var heat = select(ember, red, going) * (0.4 + 1.8 * seam) * seam;
     if damped {
         // A torn jump flares and gutters.
         heat *= 0.3 + 1.4 * hash11(floor(time * 19.0) + c.y * 60.0 + seed * 11.0);
     }
     // Glints in the soot, each cell's own.
-    let glint = step(0.93, hash11(c.y * 53.0 + floor(time * 9.0))) * 1.6 * p;
+    let glint = pow(0.5 + 0.5 * sin(time * 3.0 + c.y * 53.0), 12.0) * 0.6 * p;
     return mix(color, soot, smoothstep(0.0, 0.45, p)) + heat + red * glint * (1.0 - p * 0.5);
 }
 
@@ -174,9 +149,17 @@ fn warp_charge_arcs(local: vec3<f32>, reach: f32, px: f32, charge: f32, u: f32, 
     if charge <= 0.0 {
         return vec3<f32>(0.0);
     }
-    // The Regency's drive burns red through the plating, violet at the hot centre.
-    let arc = select(vec3<f32>(0.3, 0.6, 1.0), vec3<f32>(1.0, 0.1, 0.06), nanite);
-    let core = select(vec3<f32>(0.85, 0.94, 1.0), vec3<f32>(0.75, 0.4, 1.0), nanite);
+    // Ordered scanning bands, distinct from ARC's branching electrical discharge.
+    if nanite {
+        let scan = fract(u * 3.0 + time * (0.25 + charge * 0.5));
+        let band = exp(-pow((scan - 0.5) / 0.055, 2.0));
+        let cells = floor(local / WARP_CELL);
+        let chosen = 0.35 + 0.65 * hash11(dot(cells, vec3<f32>(1.0, 7.3, 13.1)) + seed * 50.0);
+        return vec3<f32>(1.0, 0.075, 0.035) * band * chosen * charge * 2.0;
+    }
+    // ARC's electrical charge.
+    let arc = vec3<f32>(0.3, 0.6, 1.0);
+    let core = vec3<f32>(0.85, 0.94, 1.0);
     // Finer than a stun's arcs: more of them, each smaller.
     let cell = clamp(reach * 0.08, 0.6, 12.0);
     let q = local / cell;

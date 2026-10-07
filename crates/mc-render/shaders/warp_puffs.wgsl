@@ -247,21 +247,26 @@ fn warp_swarm(in: PuffOut, rgb: vec3<f32>, torn: f32, age: f32, seed: f32) -> ve
 
 // The Regency's rift, turned to the eye: a gravity well. Rings of bent space run in to a
 // dark heart, thin and red, brightening as they near it; beads of the swarm fall in along
-// fixed lines; a hard red ring marks the well's edge with a violet one just inside it. Open
-// (`roll.x` 1) the heart is black with a violet point in it; closed (0) only the rings run in,
+// fixed lines; a hard red ring marks the well's edge with a ember one just inside it. Open
+// (`roll.x` 1) the heart is black with a ember point in it; closed (0) only the rings run in,
 // faint. Nothing turns. Torn, the ring is jagged and it gutters.
-fn warp_well(in: PuffOut, d: f32, rgb: vec3<f32>, torn: f32, age: f32, seed: f32) -> vec4<f32> {
+fn warp_well(in: PuffOut, radial: f32, rgb: vec3<f32>, torn: f32, age: f32, seed: f32) -> vec4<f32> {
     let now = globals.camera.w;
+    // A six-sided aperture with nested closing facets, unlike ARC's circular lens.
+    let sector = 1.04719755;
+    let theta = atan2(in.uv.y, in.uv.x);
+    let facet = theta - sector * floor(theta / sector + 0.5);
+    let d = radial * cos(facet) / 0.8660254;
     let open = clamp(in.roll.x, 0.0, 1.0);
     let angle = atan2(in.uv.y, in.uv.x);
     let fade = smoothstep(0.0, 0.15, age) * (1.0 - smoothstep(0.6, 1.0, age));
     let jag = (hash11(floor(angle * 5.0 + now * 23.0) + seed * 31.0) - 0.5) * 0.12 * torn;
     let r0 = mix(0.5, 0.32, open) + jag;
-    let violet = vec3<f32>(0.55, 0.2, 1.0) * length(rgb) * 0.7;
+    let ember = vec3<f32>(1.0, 0.16, 0.09) * length(rgb) * 0.45;
     // Rings running in: three at a time, each a ring that shrinks to the heart.
     var rings = 0.0;
     for (var k = 0; k < 3; k = k + 1) {
-        let f = fract(now * 0.8 + seed + f32(k) / 3.0);
+        let f = fract(now * 0.55 + f32(k) / 3.0);
         let rr = mix(0.98, r0, f * f);
         rings += exp(-pow((d - rr) / 0.016, 2.0)) * sin(3.14159 * f) * (0.3 + 1.2 * f);
     }
@@ -278,7 +283,7 @@ fn warp_well(in: PuffOut, d: f32, rgb: vec3<f32>, torn: f32, age: f32, seed: f32
     let point = exp(-d * d / (0.0005 + 0.002 * open)) * open;
     let heart = (1.0 - smoothstep(r0 * 0.55, r0 * 0.97, d)) * open;
     var light = rgb * (ring * (0.5 + 1.8 * open) + rings * (0.25 + 0.4 * open) + bead * 0.9 * open + halo * 0.2)
-        + violet * (inner * 1.2 + point * 4.0);
+        + ember * (inner * 1.2 + point * 4.0);
     if torn > 0.0 {
         light *= 0.35 + 1.1 * warp_flicker(17.0, seed);
     }

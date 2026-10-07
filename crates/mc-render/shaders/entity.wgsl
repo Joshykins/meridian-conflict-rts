@@ -2928,6 +2928,7 @@ fn vapor_edge(in: VsOut) -> f32 {
 
 @fragment
 fn fs_prepass(in: VsOut) {
+    if warp_swarm_missing(in.local, in.warp, in.state.w) { discard; }
     let flags = in.owner_flags;
     // A wreck goes in, cut as `fs_main` cuts it: worn from the top, and a broken hull's
     // section only its own stretch. Left out, every layer of a capital ship's wreck (its
@@ -2949,6 +2950,7 @@ fn fs_prepass(in: VsOut) {
 
 @fragment
 fn fs_shadow(in: VsOut) {
+    if warp_swarm_missing(in.local, in.warp, in.state.w) { discard; }
     if in.material == MAT_FOLIAGE && foliage_missing(in, foliage_sample(in)) { discard; }
     // A broken hull's section shadows only its own stretch.
     if in.wreck.w > 0.5 && !wreck_keeps(in.local, in.wreck.x, in.wreck.y, in.weld.z) { discard; }
@@ -3126,6 +3128,7 @@ fn tread_link(link: f32, q: f32, flank: bool, shade: f32) -> TreadLink {
 
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
+    if warp_swarm_missing(in.local, in.warp, in.state.w) { discard; }
     if precursor_cutaway(in) { discard; }
     let flags = in.owner_flags;
 
