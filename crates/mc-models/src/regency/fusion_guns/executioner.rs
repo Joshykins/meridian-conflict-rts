@@ -134,6 +134,8 @@ fn cannon(b: &mut MeshBuilder) {
         // aligned with the existing gameplay weapon coordinates.
         metal(b);
         b.cylinder_between(v3(0.2, -2.4, 0.0), v3(4.3, -2.4, 0.0), 0.32, 0.24, 8);
+        b.paint(crate::material::ACCENT).pattern(pattern::NONE);
+        b.cylinder_between(v3(4.3, -2.4, 0.0), v3(4.31, -2.4, 0.0), 0.18, 0.18, 8);
         for &x in if b.fine() {
             &[0.45, 1.5, 2.6, 3.6][..]
         } else {
@@ -158,6 +160,12 @@ fn rockets(b: &mut MeshBuilder) {
         for y in [3.1, 3.6, 4.1] {
             metal(b);
             b.cylinder_between(v3(-0.6, y, 6.0), v3(0.6, y, 6.0), 0.24, 0.23, 6);
+            b.paint(crate::material::ACCENT).pattern(pattern::NONE);
+            let mouth: Vec<Vec3> = barrel_ring(0.61, y, 0.18, 0.18)
+                .into_iter()
+                .map(|v| v + Vec3::Z * 6.0)
+                .collect();
+            b.face(&mouth);
         }
     });
 }

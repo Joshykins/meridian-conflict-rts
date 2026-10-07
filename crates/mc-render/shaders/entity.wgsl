@@ -3829,7 +3829,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             // machinery (regency.wgsl). The film's hue follows the plate's own shape, not
             // its scan relief: each bump would flip it between colours.
             let face_seed = f32((in.model_class >> 24u) & 0xFFu) / 255.0;
-            if in.material != MAT_TREAD {
+            if in.material != MAT_TREAD && in.material != MAT_TEAM {
                 m = regency_paint(m, in.material == MAT_METAL, in.material == MAT_PLATING, regency,
                     dot(normalize(in.normal), v), face_seed,
                     ((in.model_class >> 16u) & 0xFFu) >= SENTRY_PATTERN
