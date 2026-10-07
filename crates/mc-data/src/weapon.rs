@@ -254,8 +254,8 @@ impl Weapon {
     }
 
     /// Any Regency missile (a plasma `missile`: a Gravitic Seeker, or the Vane's Plasmeric
-    /// one): drawn as a solid faceted Regency body with violet line work, its charge glowing
-    /// violet at the tail. Never a bare ball of plasma, never a rocket's flame.
+    /// one): drawn as a solid faceted Regency body with red line work and bright red
+    /// thrust at the tail, cooling rapidly into a black smoke arc.
     pub fn seeker(&self) -> bool {
         self.missile && self.plasma_grade.is_some()
     }

@@ -757,7 +757,7 @@ fn tube_ray(world: vec3<f32>, pos: vec3<f32>, tangent: vec3<f32>) -> TubeRay {
 
 // `appearance.w` is the tube's strength; below zero, black smoke (a Regency seeker's,
 // renderer/gravitic_fx.rs `seeker_smoke`): a dense column that stays dark as it spreads,
-// burning hot violet-white for a few metres right behind the charge and no further, so
+// burning hot red-white for a few metres right behind the charge and no further, so
 // it never hangs as a violet haze.
 fn strategic_trail(in: PuffOut) -> vec4<f32> {
     let age = in.state.x;
@@ -802,8 +802,8 @@ fn strategic_trail(in: PuffOut) -> vec4<f32> {
     let lamp = in.lamp / (1.0 + in.lamp * 0.08);
     color += color * lamp * 0.1;
     color *= strength;
-    // The newest stretch still glows from the exhaust, or a seeker's violet charge.
-    color += select(vec3<f32>(1.0, 0.55, 0.2) * 5.0, vec3<f32>(0.85, 0.4, 1.0) * 7.0, soot)
+    // The newest stretch still glows from the exhaust, or a seeker's red thrust.
+    color += select(vec3<f32>(1.0, 0.55, 0.2) * 5.0, vec3<f32>(1.0, 0.025, 0.008) * 7.0, soot)
         * exp(-in.state.z * select(1.0, 9.0, soot));
     color = apply_haze(apply_fog_of_war(color, axis_p.xy), axis_p, eye);
     return vec4<f32>(color * alpha, alpha);

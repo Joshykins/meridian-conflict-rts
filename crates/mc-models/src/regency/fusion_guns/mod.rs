@@ -14,6 +14,9 @@
 //! Both ride the same tracked body under lapped armour skirts (`chassis`).
 
 mod chassis;
+mod executioner;
+mod executioner_chassis;
+pub(super) use executioner::executioner;
 mod howitzer;
 mod skyspear;
 #[cfg(test)]

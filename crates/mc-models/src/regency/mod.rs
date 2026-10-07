@@ -65,6 +65,7 @@ pub(super) const COMMANDER_TRIANGLES: usize = 9000;
 const RONDEL: [(f32, f32); 3] = [(5.25, 12.0), (5.25, 12.0), (5.25, 15.0)];
 
 pub(super) const MODELS: &[ModelDef] = &[
+    ModelDef::new("regency_executioner", 10.5, 7.0, fusion_guns::executioner),
     // The commander: a tall walker, fusion cannon forearm and taloned hand (`commander`).
     ModelDef::new("regency_commander", 10.4, 25.0, commander::commander),
     // The tech 4 battle scorpion: the old commander's scorpion, built bigger (`scorpion`).
@@ -306,6 +307,8 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         // Three long walking legs and a plated head with two cannons.
         "regency_strider" => 7000,
         "regency_wake_tank" => 5000,
+        // Three belts, fusion rails and core, coaxial gun and six rocket cells.
+        "regency_executioner" => 7000,
         "regency_bombard" => 4500,
         // Tech 3's kit: the ram, skirts, fin ring and two more lifts.
         "regency_engineer" => 3600,

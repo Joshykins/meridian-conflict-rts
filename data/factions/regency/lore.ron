@@ -1,6 +1,15 @@
 // In-world lore for the Regency's own units and the weapons they carry. One short sentence
 // each; weapon names must match the unit file's `name:` exactly.
 {
+    "regency_t3_assault_tank": (
+        lore: "The Executioner carries a star into the breach. Its shield buys the pinch coils time to gather; the lance then empties them down one blinding line. A coaxial repeater keeps lighter armour back while six unguided rockets rake the ground ahead.",
+        weapons: {
+            "Pinch-fusion Lance": "A compact fusion launch: charge, pinch, discharge. The long recovery leaves a window for a counterattack.",
+            "Plasmeric Repeater": "A steady plasma gun mounted beside the lance in the same turret.",
+            "Redstorm Rocket Volley": "Six rockets released together. Red thrust, black smoke, broad dispersion: most effective against a crowded approach.",
+        },
+    ),
+
     "regency_commander": (
         lore: "A walking command machine that comes ashore alone and puts up a stronghold with the nanite emitter in its taloned hand; ARC crews call it the Exarch.",
         weapons: {

@@ -130,4 +130,53 @@
         mesh: "regency_wake_tank", icon: Tank,
         sounds: (death: "blast_large", moving: "aster_hover"),
     ),
+    // Executioner: Paladin-class assault tank. 11,400 combined hull/shield versus
+    // 10,787; 475 precise DPS plus up to 90 rocket DPS, paid for with 13% more mass
+    // and slower movement. Rocket scatter makes the extra damage situational.
+    (
+        key: "regency_t3_assault_tank", name: "Executioner",
+        role: "Heavy Fusion Assault Tank", title: "Heavy Tank",
+        tech: 3, categories: ["Land", "DirectFire"],
+        health: 8400, shield: (kind: Hull, health: 3000, regen: 30),
+        economy: (energy_upkeep: 65),
+        cost: (mass: 950, energy: 7600, time: 5400),
+        radius: 10.5, height: 7.0, vision: 650,
+        motion: (layer: Land, size: 2, speed: 25, accel: 20, turn: 85),
+        weapons: [
+            (
+                name: "Pinch-fusion Lance",
+                damage: 1800, splash: 3, range: 410, reload: 4.0,
+                speed: 4000, trajectory: Direct, rounds: 8, round_span: 0.12,
+                turret_turn: 95, muzzle: (10.0, 0, 5.3), pivot: (1.5, 0, 5.3),
+                targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
+                plasma_grade: Some(PinchFusion), flash: 0.6, impact: 1.0, tracer: 1.2,
+                sounds: (fire: "regency_sunspear_fire", charge: "regency_sunspear_charge",
+                    charge_time: 1.5, impact: "regency_sunspear_hit", ground: "regency_sunspear_hit"),
+            ),
+            (
+                name: "Plasmeric Repeater",
+                damage: 10, splash: 1, range: 340, reload: 0.4, speed: 600,
+                trajectory: Direct, turret_turn: 95,
+                muzzle: (5.8, -2.4, 5.3), pivot: (1.5, 0, 5.3),
+                targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
+                plasma_grade: Some(Plasmeric), tracer: 0.9, flash: 0.8, impact: 0.8,
+                sounds: (fire: "regency_repeater", impact: "regency_repeater_hit", ground: "regency_repeater_hit"),
+            ),
+            (
+                name: "Redstorm Rocket Volley",
+                damage: 120, splash: 7, range: 360, reload: 8.0, speed: 210,
+                trajectory: Ballistic, loft: 1.2, spread: 7.0,
+                missile: true, guided: false, intercept: 30, caliber: 0.28,
+                plasma_grade: Some(Gravitic), salvo: 6, salvo_delay: 0,
+                turret_turn: 95, muzzle: (0.6, 3.6, 6.0), pivot: (0, 0, 5.3),
+                muzzles: [(0.6, 3.1, 6.0), (0.6, 3.6, 6.0), (0.6, 4.1, 6.0),
+                          (0.6, -3.1, 6.0), (0.6, -3.6, 6.0), (0.6, -4.1, 6.0)],
+                targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
+                tracer: 0.8, flash: 0.7, impact: 1.0,
+                sounds: (fire: "regency_seeker_launch", impact: "regency_seeker_burst", ground: "regency_seeker_burst"),
+            ),
+        ],
+        mesh: "regency_executioner", icon: Tank,
+        sounds: (death: "blast_large", moving: "tracks_heavy"),
+    ),
 ]

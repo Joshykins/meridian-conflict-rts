@@ -336,7 +336,7 @@ impl Renderer {
 
     /// A seeker's smoke down `from` to `to`, flown from `starts` to `span` of the tick, laid
     /// `behind` metres back of where the charge is drawn: the missile's smoke tube
-    /// (puffs.wgsl `strategic_trail`) in black, hot violet-white for a few metres behind
+    /// (puffs.wgsl `strategic_trail`) in black, hot red-white for a few metres behind
     /// the charge, then a bold dark column that thickens a little as it hangs, never a
     /// thin haze. Puffs a step apart, each a tent a step either side, add up to an
     /// unbroken column.

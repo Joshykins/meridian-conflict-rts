@@ -128,7 +128,7 @@ fn plasma_look(p: Projectile) -> u32 {
 }
 
 // A Regency seeker (`Weapon::seeker`): a missile that carries the seeker's look in extras.z
-// as well. Drawn as a faceted Regency body (`vs_missile`) with its charge glowing violet
+// as well. Drawn as a faceted Regency body (`vs_missile`) with its charge glowing red
 // out of the tail in place of a motor flame; never a bare ball of plasma.
 fn cased_seeker(p: Projectile) -> bool {
     return (p.color & 0x100u) != 0u && p.extras.z > 2.5
@@ -136,7 +136,7 @@ fn cased_seeker(p: Projectile) -> bool {
 }
 
 // A cased seeker's charge and line work, as the strategic warhead's (nova.wgsl `NOVA_VIOLET`).
-const SEEKER_VIOLET: vec3<f32> = vec3<f32>(0.62, 0.12, 1.0);
+const SEEKER_RED: vec3<f32> = vec3<f32>(1.0, 0.035, 0.012);
 
 struct SpritePush {
     // SPRITE_LAYER_*: which side of the clouds this draw of the shots is.
@@ -461,8 +461,8 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
             out.shape.y = 6.6 + f32(look);
         }
         if cased_seeker(p) {
-            // Its charge out of the tail, violet right through: no flame.
-            out.color = SEEKER_VIOLET * 9.0;
+            // Its charge out of the tail, red right through: no flame.
+            out.color = SEEKER_RED * 9.0;
         }
     }
     if fade_beam {
@@ -1293,7 +1293,7 @@ fn fs_missile_lit(in: MissileOut) -> vec4<f32> {
     return vec4<f32>(look[0] * light + look[1], 1.0);
 }
 
-// A cased seeker's surface at `s` (`MissileOut::surface`): its base colour and the violet
+// A cased seeker's surface at `s` (`MissileOut::surface`): its base colour and the red
 // light of its line work and charge (added unlit). Graphite in steel courses, as the
 // strategic warhead (nova.wgsl `nova_missile_color`): chevrons cut into the prow's facets,
 // a ring at its foot, seams down every other edge, and the charge seen through the tail.
@@ -1304,7 +1304,7 @@ fn cased_seeker_color(s: vec3<f32>) -> array<vec3<f32>, 2> {
     let piece = u32(s.z + 0.5);
     if piece == 2u {
         // The tail: the charge, held, seen through it.
-        return array<vec3<f32>, 2>(graphite, SEEKER_VIOLET * 6.0 * pulse);
+        return array<vec3<f32>, 2>(graphite, SEEKER_RED * 6.0 * pulse);
     }
     if piece == 3u {
         // A fin: plate, its tip edge steel.
@@ -1330,7 +1330,7 @@ fn cased_seeker_color(s: vec3<f32>) -> array<vec3<f32>, 2> {
         let edge = (u32(floor(s.y * 8.0 + 0.5)) & 1u) == 0u;
         line = max(line, step(0.46, d) * step(0.05, s.x) * step(s.x, 0.34) * select(0.0, 1.0, edge));
     }
-    return array<vec3<f32>, 2>(base, SEEKER_VIOLET * line * 4.0 * pulse);
+    return array<vec3<f32>, 2>(base, SEEKER_RED * line * 4.0 * pulse);
 }
 
 // fs_shot, seen through the water from under it (bindings.wgsl `under_sea_seen`).
