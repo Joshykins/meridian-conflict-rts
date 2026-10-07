@@ -3232,7 +3232,15 @@ impl Renderer {
                 bytemuck::cast_slice(craters),
             );
         }
-        let crater_count = craters.len();
+        let spills = &self.plasma_fx.spills;
+        let spills = &spills[..spills.len().min(MAX_STAINS - stains.len() - craters.len())];
+        if !spills.is_empty() {
+            self.stains.write(
+                ((stains.len() + craters.len()) * size_of::<StainInstance>()) as u64,
+                bytemuck::cast_slice(spills),
+            );
+        }
+        let crater_count = craters.len() + spills.len();
         let stained = stains.len() + crater_count;
         self.stain_runs = [stains.len() as u32, crater_count as u32];
         let pads = self.structure_pads(units, &frame.pads, MAX_STAINS.saturating_sub(stained));

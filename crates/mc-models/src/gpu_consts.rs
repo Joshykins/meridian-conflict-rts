@@ -784,10 +784,6 @@ shared! {
         /// The star beam's halo (`Weapon::star_beam`): a second, much wider beam laid round
         /// it, translucent, drifting veils of plasma that thin to nothing at its rim (`aim.w`).
         pub const HELD_STAR_HALO: f32 = 3.0;
-        /// Plasma spreading out along the ground from where a star beam strikes
-        /// (`Weapon::star_beam`): the halo's flowing veil, tapering at both ends and hotter
-        /// at its root (`aim.w`).
-        pub const HELD_STAR_SPLASH: f32 = 4.0;
         /// A warp dampener's tether (renderer/damper_fx.rs): crimson lightning with a
         /// white-pink core, crackling.
         pub const TETHER: u32 = 10;
@@ -1184,6 +1180,9 @@ shared! {
     pub mod stain as "STAIN_" {
         /// A crater where a blast struck the ground (renderer/impact_craters.rs).
         pub const CRATER: u32 = 1 << 31;
+        /// Plasma spread over the ground where a star beam strikes (renderer/plasma_fx.rs):
+        /// the strength byte is how much of it is left.
+        pub const SPILL: u32 = 1 << 29;
         // retired: 1 << 30 (molten ground as stains; now the melt field, `melt_field`)
     }
 

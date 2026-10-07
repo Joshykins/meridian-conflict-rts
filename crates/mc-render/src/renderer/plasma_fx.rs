@@ -19,11 +19,11 @@
 //! Presentation only; the renderer's own clock.
 
 use super::star_core_fx::{LAVENDER, ROSE, WHITE};
-use crate::gpu_consts::{fade_beam, puff};
+use crate::gpu_consts::{fade_beam, puff, stain};
 use crate::models::Crawl;
 use glam::{Vec2, Vec3};
 use mc_data::{BlueprintId, PlasmaGrade, Trajectory, Weapon};
-use mc_sim::mirror::{ProjectileInstance, UnitInstance, PROJECTILE_FADE_BEAM};
+use mc_sim::mirror::{ProjectileInstance, StainInstance, UnitInstance, PROJECTILE_FADE_BEAM};
 use std::mem::size_of;
 
 use super::{beam_score, rail_fx, Renderer, MAX_PROJECTILES, PUFF_SPARK, PUFF_TREE_SMOKE};
@@ -37,9 +37,8 @@ const CUT: f32 = 0.12;
 const GLASS_STEP: f32 = 2.4;
 /// How many times wider than the star beam its halo is.
 const HALO: f32 = 4.5;
-/// How many arms of plasma spread out from a star beam's strike, and how far, in beam widths.
-const SPLASH_ARMS: usize = 7;
-const SPLASH_REACH: f32 = 16.0;
+/// Radius, in beam widths, of the plasma spreading over the ground where a star beam strikes.
+const SPILL_RADIUS: f32 = 9.0;
 /// Seconds a glassed pool takes to crust over and cool.
 const GLASS_COOL: f32 = 9.0;
 
@@ -85,6 +84,8 @@ struct Charge {
 #[derive(Default)]
 pub(super) struct PlasmaFx {
     held: Vec<Held>,
+    /// The plasma spread over the ground at each star beam's strike, drawn as stains.
+    pub(super) spills: Vec<StainInstance>,
     charges: Vec<Charge>,
     /// The direct-fire guns' charges and lights (`regency_guns_fx`).
     pub(super) guns: super::regency_guns_fx::RegencyGunFx,
@@ -478,6 +479,7 @@ impl Renderer {
         fx.charges
             .retain(|c| time < c.due + tick * if c.left > 1 { 3.0 } else { 1.0 });
         let mut out: Vec<ProjectileInstance> = Vec::new();
+        fx.spills.clear();
         for h in &mut fx.held {
             let fed = time - h.last < tick * 0.5;
             if fed && !h.struck {
@@ -506,23 +508,13 @@ impl Renderer {
                 halo.aim[3] = fade_beam::HELD_STAR_HALO;
                 out.push(halo);
                 if h.struck {
-                    // Plasma spreading out along the ground from the strike, turning slowly.
-                    let at = h.to[1] + Vec3::Z * h.width * 0.6;
-                    for i in 0..SPLASH_ARMS {
-                        let a =
-                            (i as f32 / SPLASH_ARMS as f32) * std::f32::consts::TAU + time * 0.4;
-                        let end = at + Vec3::new(a.cos(), a.sin(), 0.0) * h.width * SPLASH_REACH;
-                        let mut arm = held_instance(
-                            HELD_BEAM,
-                            [at, at],
-                            [end, end],
-                            h.width * HALO * 0.8,
-                            start,
-                            life,
-                        );
-                        arm.aim[3] = fade_beam::HELD_STAR_SPLASH;
-                        out.push(arm);
-                    }
+                    // Plasma spreading out over the ground from the strike (ground.wgsl).
+                    let fade = 1.0 - ((time - h.last - tick * 1.5) / CUT).clamp(0.0, 1.0);
+                    fx.spills.push(StainInstance {
+                        pos: h.to[1].truncate().to_array(),
+                        radius: h.width * SPILL_RADIUS,
+                        strength_seed: (fade * 255.0) as u32 | stain::SPILL,
+                    });
                 }
             }
         }

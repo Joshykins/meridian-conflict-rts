@@ -484,7 +484,6 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
             var look = select(6.0, 6.3, p.aim.w == FADE_BEAM_HELD_FUSION);
             look = select(look, 6.45, p.aim.w == FADE_BEAM_HELD_STAR);
             look = select(look, 6.55, p.aim.w == FADE_BEAM_HELD_STAR_HALO);
-            look = select(look, 6.52, p.aim.w == FADE_BEAM_HELD_STAR_SPLASH);
             out.shape = vec2<f32>(-distance(head, tail), look);
         } else if (p.color & 0xFu) == 4u {
             let envelope = smoothstep(0.0, 0.035, age) * (1.0 - smoothstep(0.82, 1.0, age));
@@ -1008,16 +1007,6 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
             let hue = prism(run * 0.008 + sheets * 0.8 - t * PRISM_RATE * 2.0);
             let body = pow(across, 1.7);
             let haze = mix(vec3<f32>(0.62, 0.42, 1.0), hue, 0.6);
-            if in.shape.y < 6.53 {
-                // Plasma spreading out from the strike: the same veil, hot red-pink at its
-                // root, taking the beam's colours as it cools, thinning to nothing at its far
-                // end and rising out of the strike at its root.
-                let u = clamp(in.uv.x * 0.5 + 0.5, 0.0, 1.0);
-                let reach = (1.0 - smoothstep(0.1, 1.0, u)) * smoothstep(0.0, 0.08, u);
-                let warm = mix(vec3<f32>(1.0, 0.25, 0.3), hue, smoothstep(0.0, 0.8, u));
-                let hot = mix(vec3<f32>(1.0, 0.85, 0.8), warm, smoothstep(0.0, 0.35, u));
-                return vec4<f32>(hot * pow(across, 1.4) * (0.6 + 2.4 * veil) * reach * 2.2 * in.color.r, 1.0);
-            }
             return vec4<f32>(haze * body * (0.25 + 1.3 * veil) * in.color.r, 1.0);
         }
         if in.shape.y > 6.4 {

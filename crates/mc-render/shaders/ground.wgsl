@@ -51,6 +51,9 @@ fn fs_stain(in: StainOut) -> @location(0) vec4<f32> {
     if (in.strength_seed & STAIN_CRATER) != 0u {
         return crater(in);
     }
+    if (in.strength_seed & STAIN_SPILL) != 0u {
+        return spill(in);
+    }
     let strength = f32(in.strength_seed & 0xFFu) / 255.0;
     let seed = f32(in.strength_seed >> 8u);
     // Each scorch is a different ragged blot. A shared bowl made a carpet of
@@ -82,6 +85,31 @@ fn fs_stain(in: StainOut) -> @location(0) vec4<f32> {
     lit += local_lights(m, in.world, nrm, normalize(eye - in.world));
     lit = mix(lit, vec3<f32>(0.01, 0.009, 0.008), 0.55 + lobe * 0.2);
     return vec4<f32>(apply_haze(lit, in.world, eye), alpha);
+}
+
+// Plasma spread over the ground where a star beam strikes: the beam halo's flowing veil,
+// run outward from the centre in rolling sheets, white-hot and rose at the root and
+// turning to the prism's colours as it goes. The rim wanders, so it is never a round
+// pool. The radius is the rim's mean.
+fn spill(in: StainOut) -> vec4<f32> {
+    let left = f32(in.strength_seed & 0xFFu) / 255.0;
+    let seed = f32((in.strength_seed >> 8u) & 0x7FFFu);
+    let t = globals.camera.w;
+    let q = in.uv * 1.35;
+    let r = length(q);
+    let dir = q / max(r, 1e-4);
+    let rim = 0.62 + 0.38 * value_noise2(dir * 2.4 + vec2<f32>(seed * 0.01, t * 0.35), 1.0);
+    let sheets = value_noise2(dir * 2.6 + vec2<f32>(r * 5.0 - t * 4.5, seed * 0.02), 1.0) * 0.6
+        + value_noise2(dir * 5.3 + vec2<f32>(r * 11.0 - t * 7.5, 3.1), 1.0) * 0.4;
+    let veil = smoothstep(0.25, 0.8, sheets);
+    let reach = r / rim;
+    let body = 1.0 - smoothstep(0.2, 1.0, reach);
+    let hot = exp(-r * r * 9.0);
+    let hue = prism(r * 1.6 + sheets * 0.8 - t * PRISM_RATE * 2.0);
+    let warm = mix(vec3<f32>(1.0, 0.2, 0.26), hue, smoothstep(0.1, 0.9, reach));
+    let col = mix(warm, vec3<f32>(1.0, 0.9, 0.85), hot);
+    let alpha = clamp((0.25 + 0.75 * veil) * body * body + hot * 0.8, 0.0, 0.95) * left;
+    return vec4<f32>(col * (1.5 + 3.0 * hot + 1.5 * veil), alpha);
 }
 
 // A crater: still a decal, but lit as a bowl. The ground slopes down into a
