@@ -289,20 +289,21 @@
 
         // ---- weapons -------------------------------------------------------------------
         // Every Regency turret throws plasma, and every one is heard as plasma: a hot,
-        // wet thump of the bolt leaving the pinch and a sizzle riding on it, never a
+        // wet thump of the bolt leaving the pinch and a smooth rush of air riding on it, never a
         // laser pew, never a slug's crack (docs/STYLE.md "The Regency suite"). The tiers
         // are told apart by what the gun does before and after, not by pitch alone: the
         // Picket spits, the Halberd squeezes and pinches out one roaring jet, the Sunspear draws
-        // the air in until it goes critical and roars. Every sizzle is noise (`Foam`,
-        // `Roll`), and no tone above the low mids ever falls: that is the pew.
+        // the air in until it goes critical and roars. No crackle, no sizzle, no snapping sparks
+        // anywhere in the suite (fast-fluttering `Roll`, `Foam` and tick `Burst`s are the
+        // crackle): the plasma is a smooth band of air (`Sweep`, `Hiss`, a slow `Roll`), and
+        // no tone above the low mids ever falls: that is the pew.
         //
         // The Plasmeric Repeater (the Picket's, the Sledge's, the navy's): one bolt a
         // play, up to five a second from one gun and several guns at once, so it is
         // finished inside half a second. Three stages, none of them a tone that falls
-        // above the low mids: the containment snapping open (a hard bright snap and a
-        // crackle of discharge), the bolt spat out (a heavy push of air and a deep growl
-        // with a kick under it, all body), and the hot plasma riding off with it (a fizz
-        // and a throat of air that settle into a short rolling report).
+        // above the low mids: the containment snapping open (a hard bright snap), the bolt spat out (a heavy push of air and a deep growl
+        // with a kick under it, all body), and the hot plasma riding off with it (a throat
+        // of air that settles into a short rolling report).
         "regency_repeater": (
             length: 0.5, peak: 0.46, room: 0.12,
             layers: [
@@ -314,18 +315,14 @@
                 Tone(from: 115, to: 52, glide: 0.06, attack: 0.001, decay: 0.08, gain: 0.75),
                 Fm(from: 250, to: 118, glide: 0.07, ratio: 0.5, index: 2.4, fade: 0.05, attack: 0.002, decay: 0.09, gain: 0.95),
                 Drive(1.6),
-                // The discharge crackling as the bolt tears out of the mouth.
-                Roll(at: 0.002, from: 3600, to: 1500, glide: 0.1, attack: 0.002, decay: 0.05, gain: 0.55, swell: 95, depth: 1.0, seed: 43),
                 // The plasma's throat: a wide band of air dropping as the bolt leaves.
                 Sweep(at: 0.004, from: 1500, to: 480, glide: 0.12, q: 1.2, attack: 0.005, decay: 0.08, gain: 0.75, seed: 44),
-                // The fizz riding off with the bolt.
-                Foam(at: 0.01, from: 2600, to: 1700, glide: 0.2, q: 1.0, attack: 0.008, decay: 0.11, gain: 2.3, swell: 45, depth: 0.8, seed: 45),
                 // A short rolling report behind it.
                 Roll(at: 0.02, from: 520, to: 160, glide: 0.3, attack: 0.02, decay: 0.12, gain: 0.4, swell: 8, depth: 0.5, seed: 46),
             ],
         ),
         // A repeater bolt splashing: a wet hard splat and a low thud as it dumps its heat
-        // into what it hit, then the plasma frying on it, crackling and searing, under a
+        // into what it hit, then the plasma searing on it under a
         // short low rumble of air. A stream of them lands, so it is gone inside 0.7 s.
         "regency_repeater_hit": (
             length: 0.7, peak: 0.44, room: 0.16,
@@ -335,10 +332,6 @@
                 Tone(from: 96, to: 48, glide: 0.07, attack: 0.001, decay: 0.1, gain: 0.65),
                 Fm(from: 185, to: 84, glide: 0.07, ratio: 0.5, index: 2.2, fade: 0.05, attack: 0.002, decay: 0.08, gain: 0.7),
                 Drive(1.5),
-                // The plasma spattering and frying on what it hit.
-                Foam(at: 0.004, from: 2600, to: 1400, glide: 0.4, q: 0.9, attack: 0.005, decay: 0.17, gain: 1.7, swell: 50, depth: 0.9, seed: 53),
-                // Its crackle, quick and fierce.
-                Roll(at: 0.01, from: 4200, to: 2000, glide: 0.3, attack: 0.003, decay: 0.1, gain: 0.45, swell: 100, depth: 1.0, seed: 54),
                 // Searing.
                 Hiss(at: 0.03, freq: 1800, q: 0.7, attack: 0.03, decay: 0.16, gain: 0.25, seed: 55),
                 // A short low rumble of the air it heated.
@@ -370,8 +363,6 @@
                 Sweep(at: 0.05, from: 2600, to: 650, glide: 0.9, q: 1.1, attack: 0.88, decay: 0.035, gain: 0.7, seed: 11),
                 // The pressure throbbing at random, harder as it fills.
                 Roll(at: 0.15, from: 320, to: 520, glide: 0.8, attack: 0.8, decay: 0.035, gain: 0.8, swell: 9, depth: 0.85, seed: 12),
-                // The ball's skin sizzling.
-                Foam(at: 0.3, from: 1700, to: 2300, glide: 0.7, q: 1.0, attack: 0.67, decay: 0.035, gain: 1.0, swell: 34, depth: 0.9, seed: 13),
                 // The pinch snapping shut, swelling into the shot.
                 Burst(at: 0.955, low: 150, high: 1000, attack: 0.03, decay: 0.012, gain: 3, seed: 14),
             ],
@@ -392,9 +383,6 @@
                 Fm(from: 96, to: 82, glide: 0.25, ratio: 0.5, index: 2.4, fade: 0.4, attack: 0.004, decay: 0.2, gain: 0.75),
                 Fm(at: 0.01, from: 190, to: 172, glide: 0.25, ratio: 0.5, index: 1.6, fade: 0.4, attack: 0.02, decay: 0.18, gain: 0.45),
                 Drive(1.55),
-                // Plasma roaring out of the bore: rough, throbbing at random, then cut.
-                Roll(at: 0.004, from: 1300, to: 800, glide: 0.25, attack: 0.015, decay: 0.19, gain: 0.85, swell: 26, depth: 0.75, seed: 21),
-                Foam(at: 0.006, from: 2400, to: 1900, glide: 0.25, q: 0.9, attack: 0.015, decay: 0.19, gain: 2.0, swell: 36, depth: 0.6, seed: 22),
                 // The pinch shutting on the tail of the jet.
                 Burst(at: 0.24, low: 80, high: 700, attack: 0.002, decay: 0.035, gain: 6, seed: 23),
                 Tone(at: 0.24, from: 105, to: 52, glide: 0.08, attack: 0.002, decay: 0.12, gain: 0.7),
@@ -406,8 +394,8 @@
         // wall that rolls out over 400 m of ground. Not a gun: the pinch dumping its pressure
         // (a soft-edged whoomp with a rough growl in it, no crack), then the wave surging away
         // as a roaring, searing rush that holds for most of a second, spreads across the
-        // stereo field as the front widens, and recedes as it runs out, its plasma crackling
-        // as it breaks and cools. The weight sits in the low mids, not the sub, so it carries
+        // stereo field as the front widens, and recedes as it runs out, cooling as
+        // it breaks. The weight sits in the low mids, not the sub, so it carries
         // on small speakers; done well before the next shot 2.6 s later. No tone falls above
         // the low mids, no pitched layer rings out.
         "regency_wake_fire": (
@@ -423,17 +411,10 @@
                 Fm(at: 0.02, from: 104, to: 86, glide: 1.4, ratio: 0.5, index: 2.4, fade: 1.6, attack: 0.08, decay: 0.65, gain: 0.55),
                 Fm(at: 0.05, from: 212, to: 176, glide: 1.4, ratio: 0.5, index: 1.6, fade: 1.6, attack: 0.15, decay: 0.6, gain: 0.4),
                 Drive(1.5),
-                // The surge: a rushing roar swelling in behind the whoomp and holding.
-                Roll(at: 0.01, from: 1700, to: 700, glide: 1.6, attack: 0.08, decay: 0.65, gain: 0.8, swell: 22, depth: 0.7, seed: 63),
                 Sweep(at: 0.02, from: 2200, to: 600, glide: 1.8, q: 0.8, attack: 0.12, decay: 0.7, gain: 1.1, seed: 64),
                 // The front widening either side as it runs out.
                 Roll(at: 0.15, from: 1400, to: 500, glide: 1.6, attack: 0.3, decay: 0.6, gain: 0.55, swell: 18, depth: 0.75, pan: -0.45, seed: 65),
                 Roll(at: 0.2, from: 1350, to: 480, glide: 1.6, attack: 0.3, decay: 0.6, gain: 0.55, swell: 18, depth: 0.75, pan: 0.45, seed: 66),
-                // The plasma searing over the ground.
-                Foam(at: 0.02, from: 2400, to: 1400, glide: 1.6, q: 0.9, attack: 0.1, decay: 0.65, gain: 1.8, swell: 38, depth: 0.7, seed: 67),
-                // Its crackle, thicker as the wall breaks up and cools.
-                Roll(at: 0.1, from: 3400, to: 1800, glide: 1.6, attack: 0.35, decay: 0.5, gain: 0.35, swell: 100, depth: 1.0, pan: -0.2, seed: 68),
-                Roll(at: 0.4, from: 3000, to: 1500, glide: 1.4, attack: 0.4, decay: 0.45, gain: 0.4, swell: 110, depth: 1.0, pan: 0.25, seed: 69),
                 // The ground shaking under the front as it goes.
                 Roll(at: 0.05, from: 420, to: 110, glide: 1.8, attack: 0.15, decay: 0.55, gain: 0.35, swell: 6, depth: 0.55, seed: 70),
             ],
@@ -441,7 +422,7 @@
         // The Halberd's jet striking: the squeezed plasma lets go all at once. A hard crack
         // and a heavy slam, a deep boom that holds, a rough growl inside it; the rest of the
         // jet pouring in after its head, a searing roar a quarter of a second long; the blast
-        // rolling off and slapping back off the ground; the ground sizzling as it cools.
+        // rolling off and slapping back off the ground.
         "regency_halberd_hit": (
             length: 2.8, peak: 0.85, room: 0.45,
             layers: [
@@ -456,17 +437,12 @@
                 // A rough plasma growl inside it.
                 Fm(from: 125, to: 72, glide: 0.2, ratio: 0.5, index: 2.4, fade: 0.15, attack: 0.002, decay: 0.22, gain: 0.7),
                 Drive(1.6),
-                // The rest of the jet pouring in: a searing roar, then cut.
-                Roll(at: 0.01, from: 1400, to: 700, glide: 0.25, attack: 0.02, decay: 0.2, gain: 0.7, swell: 30, depth: 0.8, seed: 31),
-                Foam(at: 0.01, from: 2600, to: 1800, glide: 0.25, q: 0.9, attack: 0.02, decay: 0.2, gain: 1.6, swell: 40, depth: 0.7, seed: 32),
                 // The blast rolling off, close and rough, then long and low.
                 Roll(at: 0.02, from: 900, to: 120, glide: 0.8, attack: 0.02, decay: 0.5, gain: 0.5, swell: 8, depth: 0.6, seed: 33),
                 Roll(at: 0.12, from: 280, to: 50, glide: 1.6, attack: 0.1, decay: 1.0, gain: 0.32, swell: 3, depth: 0.55, seed: 34),
                 // The slam coming back off the ground to one side.
                 Burst(at: 0.28, low: 60, high: 500, attack: 0.003, decay: 0.12, gain: 2.4, pan: 0.35, seed: 35),
                 Tone(at: 0.28, from: 58, to: 32, glide: 0.3, attack: 0.005, decay: 0.35, gain: 0.35, pan: 0.35),
-                // The ground searing, cooling over a second.
-                Foam(at: 0.25, from: 2200, to: 1000, glide: 1.4, q: 0.9, attack: 0.05, decay: 0.55, gain: 0.6, swell: 32, depth: 0.85, seed: 36),
                 Hiss(at: 0.1, freq: 1500, q: 0.7, attack: 0.05, decay: 0.4, gain: 0.08),
             ],
         ),
@@ -474,9 +450,7 @@
         // The Sunspear's Pinch-fusion Cannon, heard 2.2 s before its one shot: the plasma
         // squeezed until it fuses. It starts low and quiet so the end can be big: a deep
         // field clunk, the air drawn in, a gravity heave throbbing slowly under a growl
-        // that fills and only leans up, then the core going white: a fizz spreading up
-        // into the highs, crackle thickening at random (never on an even beat) and an
-        // overload growl an octave up, until the pinch slams shut on the launch.
+        // that fills and only leans up, then the core going white: an overload growl an octave up, until the pinch slams shut on the launch.
         "regency_sunspear_charge": (
             length: 2.4, peak: 0.48, room: 0.3,
             layers: [
@@ -494,25 +468,14 @@
                 Sweep(at: 0.05, from: 2800, to: 500, glide: 1.4, q: 0.9, attack: 0.9, decay: 0.5, gain: 0.6, seed: 21),
                 // The gravity heave: a slow random throb that grows.
                 Roll(at: 0.1, from: 240, to: 460, glide: 2.0, attack: 2.04, decay: 0.035, gain: 0.9, swell: 5, depth: 0.9, seed: 22),
-                // The core going white: a fizz spreading upward, then crackle thickening.
-                Foam(at: 0.9, from: 1500, to: 2800, glide: 1.3, q: 0.9, attack: 1.25, decay: 0.035, gain: 1.4, swell: 42, depth: 0.9, seed: 23),
-                Roll(at: 1.3, from: 2300, to: 3000, glide: 0.9, attack: 0.86, decay: 0.03, gain: 0.8, swell: 60, depth: 1.0, seed: 24),
-                Burst(at: 1.37, low: 900, high: 2800, attack: 0.0002, decay: 0.003, gain: 1.0, pan: -0.3, seed: 31),
-                Burst(at: 1.58, low: 900, high: 2800, attack: 0.0002, decay: 0.004, gain: 1.3, pan: 0.35, seed: 32),
-                Burst(at: 1.64, low: 900, high: 2800, attack: 0.0002, decay: 0.003, gain: 1.1, pan: 0.1, seed: 33),
-                Burst(at: 1.83, low: 900, high: 2800, attack: 0.0002, decay: 0.004, gain: 1.6, pan: -0.25, seed: 34),
-                Burst(at: 1.91, low: 900, high: 2800, attack: 0.0002, decay: 0.003, gain: 1.4, pan: 0.3, seed: 35),
-                Burst(at: 2.03, low: 900, high: 2800, attack: 0.0002, decay: 0.004, gain: 1.9, pan: -0.1, seed: 36),
-                Burst(at: 2.07, low: 900, high: 2800, attack: 0.0002, decay: 0.003, gain: 1.5, pan: 0.2, seed: 37),
-                Burst(at: 2.14, low: 900, high: 2800, attack: 0.0002, decay: 0.004, gain: 2.0, pan: -0.2, seed: 38),
                 // The pinch slamming shut into the launch.
                 Burst(at: 2.15, low: 90, high: 1100, attack: 0.04, decay: 0.012, gain: 4, seed: 39),
             ],
         ),
         // The Sunspear launching its one fusion bolt: thunderous, but a roar, not a
         // cannon's boom. A hard crack and a blast, a deep boom that holds, a rough growl
-        // that stays rough for a long beat, and the plasma roaring off, fluttering like
-        // a flame, a fizz streaming with it and the air rolling away low.
+        // that stays rough for a long beat, and the plasma roaring off as a smooth falling rush
+        // and the air rolling away low.
         "regency_sunspear_fire": (
             length: 2.6, peak: 0.8, room: 0.45,
             layers: [
@@ -525,21 +488,17 @@
                 Fm(from: 82, to: 54, glide: 0.3, ratio: 0.5, index: 2.6, fade: 0.25, attack: 0.002, decay: 0.42, gain: 0.75),
                 Fm(at: 0.004, from: 165, to: 120, glide: 0.25, ratio: 0.5, index: 1.8, fade: 0.15, attack: 0.003, decay: 0.22, gain: 0.35),
                 Drive(1.5),
-                // The roar: fluttering like a torch, its band falling as the bolt goes.
-                Roll(at: 0.006, from: 1700, to: 260, glide: 1.3, attack: 0.02, decay: 0.75, gain: 0.8, swell: 22, depth: 0.7, seed: 41),
-                // The plasma streaming off.
-                Foam(at: 0.01, from: 2400, to: 900, glide: 1.2, q: 0.9, attack: 0.015, decay: 0.5, gain: 1.0, swell: 30, depth: 0.6, seed: 42),
+                // The plasma roaring off: a smooth band falling with the bolt.
+                Sweep(at: 0.006, from: 1300, to: 240, glide: 1.3, q: 0.8, attack: 0.02, decay: 0.75, gain: 0.7, seed: 41),
                 // The air rolling away low.
                 Roll(at: 0.05, from: 320, to: 60, glide: 1.6, attack: 0.06, decay: 0.75, gain: 0.32, swell: 4, depth: 0.5, seed: 43),
             ],
         ),
         // A Sunspear bolt detonating: the fusion lets go. A white crack, a huge whump,
-        // a deep boom and growl, the ground roaring as it melts. Then for three seconds
-        // the core lets out what is left: white lightning snapping out at random, each
-        // a crack with a short buzz, further apart and softer as it goes, over a
-        // sizzle cooling and sinking.
+        // a deep boom and growl, then the ground roaring as it melts and the air rolling
+        // away low; nothing snaps or crackles.
         "regency_sunspear_hit": (
-            length: 4.8, peak: 0.85, room: 0.45,
+            length: 3.0, peak: 0.85, room: 0.45,
             layers: [
                 Burst(low: 500, high: 2800, attack: 0.0003, decay: 0.008, gain: 14),
                 Burst(low: 70, high: 600, attack: 0.001, decay: 0.08, gain: 20),
@@ -551,27 +510,6 @@
                 // The ground roaring as it melts.
                 Roll(at: 0.01, from: 1400, to: 150, glide: 1.2, attack: 0.02, decay: 0.65, gain: 0.55, swell: 14, depth: 0.6, seed: 51),
                 Roll(at: 0.1, from: 300, to: 50, glide: 2.0, attack: 0.1, decay: 1.1, gain: 0.3, swell: 3, depth: 0.5, seed: 52),
-                // The molten pool sizzling, cooling and sinking for seconds.
-                Foam(at: 0.1, from: 2600, to: 800, glide: 3.5, q: 0.9, attack: 0.2, decay: 1.1, gain: 1.2, swell: 28, depth: 0.7, seed: 53),
-                // The core letting go: lightning snapping out at random, thinning.
-                Burst(at: 0.42, low: 900, high: 3000, attack: 0.0002, decay: 0.005, gain: 5, pan: -0.4, seed: 60),
-                Roll(at: 0.42, from: 2600, to: 1200, glide: 0.08, attack: 0.002, decay: 0.05, gain: 0.35, swell: 70, depth: 1.0, pan: -0.4, seed: 61),
-                Burst(at: 0.66, low: 900, high: 3000, attack: 0.0002, decay: 0.004, gain: 4, pan: 0.45, seed: 62),
-                Burst(at: 0.71, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 3, pan: 0.3, seed: 63),
-                Fm(at: 0.66, from: 130, to: 120, glide: 0.05, ratio: 0.5, index: 3.0, fade: 0.05, attack: 0.001, decay: 0.035, gain: 0.25, pan: 0.4),
-                Burst(at: 1.04, low: 900, high: 3000, attack: 0.0002, decay: 0.005, gain: 4.5, pan: -0.15, seed: 64),
-                Roll(at: 1.04, from: 2600, to: 1200, glide: 0.08, attack: 0.002, decay: 0.06, gain: 0.3, swell: 70, depth: 1.0, pan: -0.15, seed: 65),
-                Burst(at: 1.37, low: 900, high: 3000, attack: 0.0002, decay: 0.004, gain: 3.5, pan: 0.35, seed: 66),
-                Burst(at: 1.45, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 2.6, pan: 0.2, seed: 67),
-                Fm(at: 1.37, from: 125, to: 115, glide: 0.05, ratio: 0.5, index: 3.0, fade: 0.05, attack: 0.001, decay: 0.035, gain: 0.2, pan: 0.3),
-                Burst(at: 1.86, low: 900, high: 3000, attack: 0.0002, decay: 0.005, gain: 3.4, pan: -0.45, seed: 68),
-                Roll(at: 1.86, from: 2500, to: 1100, glide: 0.08, attack: 0.002, decay: 0.05, gain: 0.22, swell: 70, depth: 1.0, pan: -0.45, seed: 69),
-                Burst(at: 2.31, low: 900, high: 3000, attack: 0.0002, decay: 0.004, gain: 2.6, pan: 0.15, seed: 70),
-                Burst(at: 2.79, low: 900, high: 3000, attack: 0.0002, decay: 0.004, gain: 2.4, pan: -0.25, seed: 71),
-                Burst(at: 2.84, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.6, pan: -0.1, seed: 72),
-                Fm(at: 2.79, from: 120, to: 112, glide: 0.05, ratio: 0.5, index: 3.0, fade: 0.05, attack: 0.001, decay: 0.03, gain: 0.14, pan: -0.2),
-                Burst(at: 3.38, low: 900, high: 3000, attack: 0.0002, decay: 0.004, gain: 1.8, pan: 0.4, seed: 73),
-                Burst(at: 3.97, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.1, pan: -0.35, seed: 74),
             ],
         ),
 
@@ -590,14 +528,11 @@
                 Drive(1.45),
                 // The rounds climbing: a noise band rising, not a tone.
                 Sweep(at: 0.008, from: 500, to: 1300, glide: 0.1, q: 1.1, attack: 0.01, decay: 0.05, gain: 0.5),
-                Foam(at: 0.006, from: 1900, to: 2400, glide: 0.1, q: 1.0, attack: 0.005, decay: 0.05, gain: 0.8, swell: 40, depth: 0.85),
                 Sweep(at: 0.258, from: 480, to: 1250, glide: 0.1, q: 1.1, attack: 0.01, decay: 0.05, gain: 0.46, pan: 0.12),
-                Foam(at: 0.256, from: 1900, to: 2400, glide: 0.1, q: 1.0, attack: 0.005, decay: 0.05, gain: 0.75, swell: 40, depth: 0.85, pan: 0.12),
             ],
         ),
-        // A Canopy round bursting among aircraft, heard from the ground: a sharp hot pop,
-        // the plasma scattering out of it in crackles to either side, a fizz as it
-        // spends itself, and the pop's report rolling off.
+        // A Canopy round bursting among aircraft, heard from the ground: a sharp hot pop
+        // and its report rolling off, soft and low, no crackle.
         "regency_canopy_burst": (
             length: 0.8, peak: 0.45, room: 0.4,
             layers: [
@@ -606,13 +541,6 @@
                 Tone(from: 210, to: 100, glide: 0.03, attack: 0.001, decay: 0.04, gain: 0.5),
                 Fm(from: 130, to: 80, glide: 0.05, ratio: 0.5, index: 2.0, fade: 0.04, attack: 0.001, decay: 0.07, gain: 0.5),
                 Drive(1.4),
-                Burst(at: 0.016, low: 800, high: 2800, attack: 0.0002, decay: 0.002, gain: 2.0, pan: 0.35, seed: 81),
-                Burst(at: 0.029, low: 800, high: 2800, attack: 0.0002, decay: 0.003, gain: 1.6, pan: -0.4, seed: 82),
-                Burst(at: 0.047, low: 800, high: 2800, attack: 0.0002, decay: 0.002, gain: 1.7, pan: 0.15, seed: 83),
-                Burst(at: 0.061, low: 800, high: 2800, attack: 0.0002, decay: 0.002, gain: 1.2, pan: -0.25, seed: 84),
-                Burst(at: 0.094, low: 800, high: 2800, attack: 0.0002, decay: 0.003, gain: 1.0, pan: 0.45, seed: 85),
-                Burst(at: 0.13, low: 800, high: 2800, attack: 0.0002, decay: 0.002, gain: 0.7, pan: -0.5, seed: 86),
-                Foam(at: 0.004, from: 2400, to: 1300, glide: 0.25, q: 0.9, attack: 0.004, decay: 0.1, gain: 0.9, swell: 40, depth: 0.9),
                 Roll(at: 0.01, from: 700, to: 150, glide: 0.5, attack: 0.015, decay: 0.2, gain: 0.25, swell: 7, depth: 0.5),
             ],
         ),
@@ -714,8 +642,7 @@
         // rough hum the gravity clamp makes as it bears down, a growl that fills in over it
         // and only leans up, the plasma's pressure heaving at random and rising, the air
         // drawn in. In the last second the core overloads: a rougher growl an octave up,
-        // a fizz and crackle thickening at random (never on an even beat), arcs snapping
-        // out, and the pinch drawing in on itself until the lance lights at 2.5 s with a
+        // and the pinch drawing in on itself until the lance lights at 2.5 s with a
         // crack, a slam and a deep boom, its roar rolling off over half a second.
         "regency_lance_charge": (
             length: 3.2, peak: 0.8, room: 0.3,
@@ -743,10 +670,6 @@
                 Sweep(at: 0.05, from: 2400, to: 500, glide: 1.5, q: 0.9, attack: 0.9, decay: 0.55, gain: 0.45, seed: 105),
                 // The plasma's pressure: a slow random heave that grows and brightens.
                 Roll(at: 0.08, from: 220, to: 700, glide: 2.4, attack: 2.4, decay: 0.03, gain: 0.8, swell: 6, depth: 0.4, seed: 306),
-                // The core going white: a fizz spreading up, then crackle thickening either side.
-                Foam(at: 0.9, from: 1100, to: 2000, glide: 1.6, q: 0.9, attack: 1.58, decay: 0.03, gain: 1.3, swell: 40, depth: 0.9, seed: 107),
-                Roll(at: 1.2, from: 1800, to: 2600, glide: 1.3, attack: 1.28, decay: 0.03, gain: 0.45, swell: 95, depth: 1.0, pan: -0.3, seed: 108),
-                Roll(at: 1.55, from: 1700, to: 2500, glide: 0.95, attack: 0.93, decay: 0.03, gain: 0.45, swell: 105, depth: 1.0, pan: 0.3, seed: 109),
                 // Arcs snapping out, at random, harder as it goes.
                 Burst(at: 1.31, low: 700, high: 2600, attack: 0.0002, decay: 0.004, gain: 0.9, pan: 0.3, seed: 111),
                 Burst(at: 1.62, low: 700, high: 2600, attack: 0.0002, decay: 0.003, gain: 1.1, pan: -0.35, seed: 112),
@@ -759,10 +682,7 @@
                 Burst(at: 2.38, low: 700, high: 2600, attack: 0.0002, decay: 0.005, gain: 2.2, pan: 0.35, seed: 119),
                 // The pinch drawing in on itself into the ignition.
                 Sweep(at: 2.2, from: 500, to: 1600, glide: 0.3, q: 0.8, attack: 0.29, decay: 0.02, gain: 0.8, seed: 120),
-                // The lance's roar rolling off, close and rough, then low.
-                Roll(at: 2.505, from: 1600, to: 300, glide: 0.5, attack: 0.01, decay: 0.17, gain: 1.1, swell: 24, depth: 0.7, seed: 121),
                 Roll(at: 2.52, from: 360, to: 70, glide: 0.6, attack: 0.04, decay: 0.2, gain: 0.4, swell: 5, depth: 0.5, seed: 122),
-                Foam(at: 2.51, from: 2000, to: 900, glide: 0.5, q: 0.9, attack: 0.01, decay: 0.14, gain: 0.9, swell: 34, depth: 0.7, seed: 123),
             ],
         ),
         // The lance held, heard as this loop while it burns down onto the ground: a fusion
@@ -785,9 +705,6 @@
                 Wind(freq: 560, q: 0.7, gain: 3.4, swell: 3, depth: 0.55, sway: 0.5, pan: -0.25, seed: 131),
                 Wind(freq: 600, q: 0.7, gain: 3.4, swell: 3.4, depth: 0.55, sway: 0.5, pan: 0.25, seed: 132),
                 Rumble(freq: 1100, q: 1.0, gain: 2.6, wobble: 1.75, depth: 0.45),
-                // The sizzle where it bites.
-                Foam(from: 1700, to: 1700, glide: 1, q: 0.9, attack: 0.01, decay: 100000, gain: 2.4, swell: 34, depth: 0.85, seed: 133),
-                Wind(freq: 1900, q: 1.2, gain: 0.6, swell: 14, depth: 1.0, sway: 0.4, seed: 134),
             ],
         ),
         // The lance going out with nothing left to burn: the core venting. The pinch lets go
@@ -805,7 +722,6 @@
                 // The pressure blown off: a broad rush, falling.
                 Roll(at: 0.01, from: 1500, to: 300, glide: 1.0, attack: 0.03, decay: 0.38, gain: 0.8, swell: 14, depth: 0.7, seed: 142),
                 Sweep(at: 0.02, from: 1600, to: 380, glide: 1.1, q: 0.8, attack: 0.04, decay: 0.42, gain: 0.9, seed: 143),
-                Foam(at: 0.02, from: 1500, to: 520, glide: 1.0, q: 0.9, attack: 0.04, decay: 0.3, gain: 0.8, swell: 26, depth: 0.75, seed: 144),
                 // Cooling, low.
                 Roll(at: 0.05, from: 380, to: 90, glide: 1.4, attack: 0.08, decay: 0.55, gain: 0.35, swell: 4, depth: 0.5, seed: 145),
                 // The ring settling.
@@ -1084,7 +1000,6 @@
                 Roll(at: 2.13, from: 200, to: 80, glide: 5.0, attack: 0.25, decay: 2.0, gain: 1.4, swell: 4, depth: 0.5, seed: 9203),
                 Sweep(at: 2.14, from: 260, to: 100, glide: 5.0, q: 0.7, attack: 0.3, decay: 1.7, gain: 1.0, pan: -0.2, seed: 9204),
                 Sweep(at: 2.16, from: 240, to: 95, glide: 5.0, q: 0.7, attack: 0.35, decay: 1.8, gain: 1.0, pan: 0.2, seed: 9205),
-                Foam(at: 2.12, from: 1400, to: 450, glide: 4.0, q: 0.8, attack: 0.05, decay: 1.3, gain: 0.9, swell: 34, depth: 0.8, seed: 9206),
             ],
         ),
         // The warhead's drive while it climbs, looped (the game swaps to
@@ -1144,7 +1059,6 @@
                 Fm(at: 0.05, from: 100, to: 45, glide: 0.4, ratio: 0.5, index: 2.2, fade: 0.3, attack: 0.01, decay: 0.4, gain: 0.6),
                 Tone(at: 0.1, from: 60, to: 26, glide: 1.4, attack: 0.01, decay: 1.6, gain: 1.4),
                 Drive(1.4),
-                Foam(at: 0.08, from: 1200, to: 400, glide: 1.2, q: 0.8, attack: 0.03, decay: 0.5, gain: 0.4, swell: 30, depth: 0.8, seed: 9602),
                 // The boom rolling down.
                 Roll(at: 0.15, from: 360, to: 70, glide: 3.0, attack: 0.1, decay: 1.6, gain: 1.5, swell: 2.5, depth: 0.6, seed: 9603),
                 Roll(at: 0.9, from: 200, to: 50, glide: 3.5, attack: 0.6, decay: 1.6, gain: 0.6, swell: 1.8, depth: 0.7, pan: 0.3, seed: 9604),
@@ -1169,7 +1083,6 @@
                 Fm(at: 0.01, from: 110, to: 106, glide: 1.0, ratio: 1.41, index: 1.0, fade: 1.0, attack: 0.004, decay: 1.7, gain: 0.3, pan: -0.2),
                 Drive(1.3),
                 Roll(at: 0.05, from: 500, to: 1100, glide: 0.7, attack: 0.5, decay: 0.7, gain: 0.7, swell: 7, depth: 0.8, seed: 9701),
-                Foam(at: 0.2, from: 1400, to: 2400, glide: 0.8, q: 0.9, attack: 0.5, decay: 0.6, gain: 0.8, swell: 28, depth: 0.8, seed: 9702),
                 Burst(at: 0.55, low: 50, high: 300, attack: 0.002, decay: 0.05, gain: 4, pan: -0.4),
                 Burst(at: 0.7, low: 50, high: 300, attack: 0.002, decay: 0.05, gain: 4, pan: 0.4),
                 Burst(at: 0.85, low: 50, high: 300, attack: 0.002, decay: 0.05, gain: 4, pan: -0.15),
@@ -1187,7 +1100,6 @@
                 Fm(from: 140, to: 210, glide: 0.5, ratio: 0.5, index: 1.8, fade: 0.5, attack: 0.02, decay: 0.3, gain: 0.5),
                 Drive(1.4),
                 Sweep(at: 0.02, from: 500, to: 3200, glide: 0.5, q: 1.0, attack: 0.1, decay: 0.35, gain: 1.1, seed: 9711),
-                Foam(at: 0.03, from: 1500, to: 3000, glide: 0.5, q: 0.9, attack: 0.1, decay: 0.35, gain: 1.4, swell: 30, depth: 0.7, seed: 9712),
             ],
         ),
         // An orb landing: the Halberd's red strike, heavier and longer in the low end, a
