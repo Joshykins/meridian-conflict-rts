@@ -1494,6 +1494,51 @@ shared! {
         pub const LIGHTS_DOTS: u32 = 2;
     }
 
+    /// Surface marks (`Model::marks`, `MeshBuilder::mark`, docs/STANDARD.md): boxes in a
+    /// model's own space that say what its surface carries there, scene set binding 35,
+    /// found through `ModelInfo::marks` (first | count << 24). Later marks lie over
+    /// earlier ones. Never renumber a kind.
+    pub mod surface_mark as "SMARK_" {
+        /// Zones: what sort of surface lies there. Armour: big quiet plates, bolts along
+        /// their edges.
+        pub const ARMOUR: u32 = 1;
+        /// Engine decking: louvres, grilles and vents, heat-stained.
+        pub const ENGINE: u32 = 2;
+        /// Machinery: access panels, ribs and bolts, close together.
+        pub const MACHINERY: u32 = 3;
+        /// Walkway: non-slip tread plate.
+        pub const WALKWAY: u32 = 4;
+        /// Hazard stripes over the box.
+        pub const HAZARD: u32 = 5;
+        /// A stencilled number (`arg`) on the box's broad face.
+        pub const STENCIL: u32 = 6;
+        /// Fittings, drawn on the face the box crosses, filling the box (`arg` their own
+        /// pitch in metres, or 0 for the standard). A grille of square holes.
+        pub const GRILLE: u32 = 7;
+        /// Louvres: slats raked down.
+        pub const LOUVRES: u32 = 8;
+        /// A perforated vent: round holes in staggered rows.
+        pub const VENT: u32 = 9;
+        /// Raised stiffening ribs along the box's long side.
+        pub const RIBS: u32 = 10;
+        /// A bolted access cover with a recessed handle.
+        pub const ACCESS: u32 = 11;
+        /// A round hatch: its seam, a hinge and a bolt ring.
+        pub const HATCH: u32 = 12;
+        /// A row of bolt heads along the box's long side.
+        pub const BOLTS: u32 = 13;
+        /// An applique plate: a raised bevelled plate with a bolt ring.
+        pub const PANEL: u32 = 14;
+        /// A weld bead along the box's long side.
+        pub const SEAM: u32 = 15;
+        /// Paint: a warning sign, a yellow triangle edged black.
+        pub const WARNING: u32 = 16;
+        /// Paint: lines of small stencilled lettering (`arg` picks the words' lengths).
+        pub const LABEL: u32 = 17;
+        /// Marks a model may carry at most.
+        pub const MAX: u32 = 48;
+    }
+
     /// Bits of `UnitInstance::owner_flags` (`owner | flags << 8`) the shaders read that the
     /// older hand-written `FLAG_*` list in common.wgsl does not hold.
     pub mod unit_flag as "UNIT_FLAG_" {

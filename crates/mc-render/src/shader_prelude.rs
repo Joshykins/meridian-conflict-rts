@@ -12,12 +12,13 @@
 //! then `emp` (an EMP stun's look on a model) and `wreck` (how a wreck lies and looks).
 
 /// Files put in front of shaders, never compiled on their own.
-pub(crate) const PRELUDES: [&str; 20] = [
+pub(crate) const PRELUDES: [&str; 21] = [
     "common",
     "bindings",
     "regions",
     "shore",
     "surface",
+    "greebles",
     "metal",
     "regency",
     "lights",
@@ -73,7 +74,8 @@ impl Preludes {
             ),
             regions: read("regions"),
             shore: read("shore"),
-            surface: read("surface"),
+            // The texture detail drawn inside a unit's plates rides with the surface.
+            surface: format!("{}\n{}", read("surface"), read("greebles")),
             metal: read("metal"),
             regency: read("regency"),
             habitat: read("habitat"),

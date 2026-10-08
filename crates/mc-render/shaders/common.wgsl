@@ -273,9 +273,20 @@ struct ModelInfo {
     leg_sway: vec4<f32>,
     // Its skin: the index into `skins` (bindings.wgsl).
     skin: u32,
-    _skin_pad0: u32,
+    // Its surface marks in `surface_marks` (bindings.wgsl): first | count << 24.
+    marks: u32,
     _skin_pad1: u32,
     _skin_pad2: u32,
+}
+
+// A box on a model's surface saying what is drawn there (`mc_models::Mark`,
+// `SMARK_*`), in its own space.
+//!rust crate::renderer::surface_marks::GpuMark
+struct SurfaceMark {
+    min: vec3<f32>,
+    kind: u32,
+    max: vec3<f32>,
+    arg: f32,
 }
 
 // What each surface slot of a model looks like (`mc_data::skins`, renderer/skins.rs).
@@ -290,8 +301,11 @@ struct Skin {
     // How its plated faces are finished (`SKIN_FINISH_*`), and the lights in its dark
     // plating (`SKIN_LIGHTS_*`); zw 0.
     finish: vec4<u32>,
-    // Its plates' size and its edges' wear, each times the standard; zw 0.
+    // Its plates' size and its edges' wear, each times the standard; its texture detail
+    // (0 to 1); its seams' depth and darkness, times the standard.
     plates: vec4<f32>,
+    // How much grime it gathers, times its tier's; yzw 0.
+    weather: vec4<f32>,
     // The dark plating's lights' colour, rgb.
     lights: vec4<f32>,
 }

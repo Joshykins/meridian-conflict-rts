@@ -234,6 +234,8 @@ struct VsOut {
     @location(17) @interpolate(flat) wreck: vec4<f32>,
     // Its skin (`ModelInfo::skin`): what its surface slots look like.
     @location(18) @interpolate(flat) skin: u32,
+    // Its surface marks (`ModelInfo::marks`).
+    @location(19) @interpolate(flat) marks: u32,
 }
 
 struct Weld {
@@ -2497,6 +2499,7 @@ fn vs_main(in: VsIn) -> VsOut {
     out.face = in.face;
     out.unit_id = e.unit_id;
     out.skin = model.skin;
+    out.marks = model.marks;
     // A spacecraft's drives burn with its speed over the ground; its lift jets with its
     // climb or descent. The glow on each knows its drive's or jet's mouth.
     out.drive = vec4<f32>(-1.0, 0.0, 0.0, 0.0);
@@ -2681,6 +2684,7 @@ fn vs_prop(in: VsIn) -> VsOut {
     out.face = in.face;
     out.unit_id = e.unit_id;
     out.skin = model.skin;
+    out.marks = model.marks;
     out.drive = vec4<f32>(-1.0, 0.0, 0.0, 0.0);
     out.drive_at = vec4<f32>(0.0);
     out.dust = select(0.62, model.surface.y / max(model.height, 0.1), model.surface.y > 0.0);
@@ -3177,6 +3181,12 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // The face's normal in model space, from the surface itself (the tread tells a belt's
     // flank from its running face by it). Out here, where derivatives are defined.
     let face_n = cross(dpdx(in.local), dpdy(in.local));
+    // One pixel right and down on screen, in model space and the world: which way text
+    // on the model reads, and how a mark's relief turns the normal (`reg_to_world`).
+    let screen_right = dpdx(in.local);
+    let screen_down = dpdy(in.local);
+    let world_right = dpdx(in.world);
+    let world_down = dpdy(in.world);
     // A pixel's footprint on the model, for the EMP arcs' width (emp.wgsl).
     let local_px = length(fwidth(in.local));
 
@@ -3189,7 +3199,13 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     var seam = 0.0;
     var lights = vec3<f32>(0.0);
     let precursor = in.material == MAT_PRECURSOR || in.material == MAT_PRECURSOR_DARK;
-    if ((in.material < MAT_METAL && in.material != MAT_GLOW) || in.material == MAT_PLATING_DARK || precursor)
+    // What the model's author marked here: its zone and any placed mark (`SMARK_*`).
+    let here = marks_at(in.marks, in.local);
+    // How a placed fitting shades the paint here (1 none).
+    var fit_shade = 1.0;
+    // Working metal is machined only when its skin draws texture detail.
+    let machined = in.material == MAT_METAL && skins[in.skin].plates.z > 0.0;
+    if ((in.material < MAT_METAL && in.material != MAT_GLOW) || in.material == MAT_PLATING_DARK || precursor || machined)
         && (flags & KIND_GHOST) == 0u && !wreck {
         var si: SurfaceIn;
         // The edge form of a face (negative w, Regency faces no rectangle fits) is
@@ -3198,6 +3214,13 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         si.st = select(vec2<f32>(0.0), in.face.xy, framed);
         si.half = select(vec2<f32>(0.0), abs(in.face.zw), framed);
         si.wraps = in.face.z < 0.0 && framed;
+        // A face the mesh gave no frame (a sliver, a cap): when its skin draws texture
+        // detail, panels laid on the model's own axes run on across it, no outline.
+        if all(in.face == vec4<f32>(0.0)) && skins[in.skin].plates.z > 0.0 && !precursor {
+            let an = abs(face_n);
+            si.st = select(select(in.local.xy, in.local.xz, an.y >= an.z), in.local.yz, an.x >= an.y && an.x >= an.z);
+            si.half = vec2<f32>(64.0);
+        }
         si.dark = in.material == MAT_ACCENT || in.material == MAT_PRECURSOR_DARK;
         si.pattern = (in.model_class >> 16u) & 0xFFu;
         // Precursor alloy is always precursor plate unless the model asks for something else.
@@ -3210,6 +3233,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         // Plates as big as the model and its skin say.
         si.scale = clamp(0.55 * pow(in.weld.z, 0.6), 0.7, 6.0) * skins[in.skin].plates.x;
         si.lights = skins[in.skin].finish.y;
+        si.detail = skins[in.skin].plates.z;
+        si.seams = skins[in.skin].plates.w;
+        si.zone = here.zone;
+        si.metal = machined;
         si.lights_rgb = skins[in.skin].lights.rgb;
         si.time = time;
         si.working = select(0.0, 1.0, (flags & FLAG_BUILDING) != 0u && in.refit.z <= 0.0
@@ -3266,6 +3293,22 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             n = normalize(n - reg_to_world(arc.slope, dl1, dl2, dp1, dp2));
         }
         lights = sf.emissive;
+        // A fitting the model's author placed here (`SMARK_GRILLE` .. `SMARK_SEAM`): its
+        // relief turns the normal and shades the paint.
+        if smark_fitting(here.kind) && !machined {
+            let plane = mark_plane(here, normalize(face_n + vec3<f32>(0.0, 0.0, 1e-9)), screen_right);
+            let e = max(local_px * 0.75, 0.002);
+            let f0 = fitting_h(here.kind, plane.q, plane.half, here.arg, local_px);
+            let fx = fitting_h(here.kind, plane.q + vec2<f32>(e, 0.0), plane.half, here.arg, local_px).x;
+            let fy = fitting_h(here.kind, plane.q + vec2<f32>(0.0, e), plane.half, here.arg, local_px).x;
+            let depth = 0.04 * skins[in.skin].plates.w;
+            let slope = (plane.right * (fx - f0.x) + plane.up * (fy - f0.x)) * (depth / e);
+            n = normalize(n - reg_to_world(slope, screen_right, screen_down, world_right, world_down));
+            // Hollows darken with their depth (laid on after a finish that repaints the
+            // plate, below); dirt packs into them.
+            fit_shade = f0.y * mix(0.6, 1.0, saturate(f0.x));
+            seam = max(seam, saturate(1.5 * (1.0 - f0.y)));
+        }
         soot = sf.soot;
         if precursor && (flags & KIND_PROP) != 0u {
             // Precursor architecture is mostly unlit: its plates' light slots lie
@@ -3829,7 +3872,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         // Plain tech 1 kit is the dirtiest; the higher tiers stay closer to parade white.
         // A capital ship is a spacecraft kept clean at any tier: no dust, no grime.
         let tech = f32(max(in.model_class & 0xFFu, 1u));
-        let amount = select(1.25 / tech, 0.0, (in.model_class & 0x2000u) != 0u);
+        let amount = select(1.25 / tech, 0.0, (in.model_class & 0x2000u) != 0u) * skins[in.skin].weather.x;
         var line = in.dust;
         var kick = 1.0;
         var grit = 1.0;
@@ -3858,13 +3901,15 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             m = regency_paint(m, in.skin, in.material == MAT_METAL, in.material == MAT_PLATING, regency,
                 dot(normalize(in.normal), v), face_seed);
         }
+        m.albedo *= fit_shade;
         let unit_at = vec3<f32>(in.state.w * 131.0, in.state.w * 71.0, in.state.w * 17.0);
         let rise = in.state.z / max(line, 0.02);
         let dirt = surf_dirt(in.local + unit_at, rise, n.z, kick, grit, seam, local_px);
         let dust = clamp(dirt.x * amount * tread, 0.0, 0.9);
         // Dry dust is pale and dull; wet mud dark, with a little sheen.
         let dirt_rgb = mix(vec3<f32>(0.24, 0.205, 0.155), vec3<f32>(0.1, 0.078, 0.055), dirt.y);
-        m.albedo = mix(m.albedo, dirt_rgb * (1.0 + dirt.z * 0.6), dust);
+        // Its grain only a little: at full strength it mottled a dusty deck into squares.
+        m.albedo = mix(m.albedo, dirt_rgb * (1.0 + dirt.z * 0.2), dust);
         m.roughness = mix(m.roughness, mix(0.95, 0.72, dirt.y), dust);
         m.metallic *= 1.0 - dust;
         m.emissive *= 1.0 - dust;
@@ -3872,6 +3917,14 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         lights *= 1.0 - dust * 0.45;
     }
     m.emissive += lights;
+    // Placed marks paint over the plate: hazard stripes, stencilled numbers.
+    if smark_paint(here.kind)
+        && !machined && !wreck && (flags & KIND_GHOST) == 0u
+        && (in.material == MAT_PLATING || in.material == MAT_PLATING_DARK || in.material == MAT_ACCENT) {
+        let plane = mark_plane(here, normalize(face_n + vec3<f32>(0.0, 0.0, 1e-9)), screen_right);
+        let mark = mark_paint(here, plane, local_px, m.albedo);
+        m.albedo = mix(m.albedo, mark.rgb, mark.a);
+    }
     // An EMP stun (emp.wgsl): lamps, glows and drives dead, stuttering back as it wears
     // off; the paint a shade darker.
     // A wreck's `crackle` carries reclaim instead.
@@ -3907,6 +3960,8 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         si.seed = f32((in.model_class >> 24u) & 0xFFu) / 255.0;
         si.unit = in.state.w;
         si.scale = clamp(0.55 * pow(in.weld.z, 0.6), 0.7, 6.0);
+        // A wreck's buckled plates are cut to the standard depth whatever its skin.
+        si.seams = 1.0;
         si.local = in.local;
         si.reach = in.weld.z;
         si.height = in.weld.w;

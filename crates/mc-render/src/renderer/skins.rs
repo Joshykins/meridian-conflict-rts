@@ -23,8 +23,11 @@ pub(crate) struct GpuSkin {
     /// How its plated faces are finished (`gpu_consts::skin::FINISH_*`), and the
     /// lights in its dark plating (`LIGHTS_*`); zw 0.
     pub(crate) finish: [u32; 4],
-    /// Its plates' size and its edges' wear, each times the standard; zw 0.
+    /// Its plates' size and its edges' wear, each times the standard; its texture
+    /// detail (0 to 1); its seams' depth and darkness, times the standard.
     pub(crate) plates: [f32; 4],
+    /// How much grime it gathers, times its tier's; yzw 0.
+    pub(crate) weather: [f32; 4],
     /// The dark plating's lights' colour, rgb.
     pub(crate) lights: [f32; 4],
 }
@@ -67,21 +70,27 @@ impl GpuSkin {
             Finish::Regency => gs::FINISH_REGENCY,
         };
         g.finish = [kind, style, 0, 0];
-        g.plates = [f.plate, f.wear, 0.0, 0.0];
+        g.plates = [f.plate, f.wear, f.detail, f.seams];
+        g.weather = [f.grime, 0.0, 0.0, 0.0];
         g.lights = [lr, lg, lb, 0.0];
         g
     }
 }
 
-/// The skins' buffer.
+/// The skins' buffer, and the models' surface marks (`surface_marks`).
 pub(crate) struct Skins {
     buffer: Buffer,
+    marks: Buffer,
     /// Each skin as it was loaded, in `Blueprints::skins` order.
     table: Vec<GpuSkin>,
 }
 
 impl Skins {
-    pub(crate) fn new(gpu: &Gpu, bps: &Blueprints) -> Result<Skins, GpuError> {
+    pub(crate) fn new(
+        gpu: &Gpu,
+        bps: &Blueprints,
+        marks: &super::surface_marks::MarkList,
+    ) -> Result<Skins, GpuError> {
         let mut table: Vec<GpuSkin> = bps.skins.iter().map(GpuSkin::of).collect();
         // A scene with no skins (blueprints made in a test) still binds one.
         if table.is_empty() {
@@ -90,7 +99,11 @@ impl Skins {
         let bytes: &[u8] = bytemuck::cast_slice(&table);
         let buffer = gpu.host_buffer(bytes.len() as u64, vk::BufferUsageFlags::STORAGE_BUFFER)?;
         buffer.write(0, bytes);
-        Ok(Skins { buffer, table })
+        Ok(Skins {
+            buffer,
+            marks: marks.upload(gpu)?,
+            table,
+        })
     }
 
     /// Dresses every model in skin `worn` (an index into `Blueprints::skins`), or each in
@@ -113,10 +126,16 @@ impl Skins {
         &self.buffer
     }
 
-    /// Frees the buffer. The renderer calls this from its `Drop`, after the device has
+    /// What the scene set's binding 35 reads.
+    pub(crate) fn marks(&self) -> &Buffer {
+        &self.marks
+    }
+
+    /// Frees the buffers. The renderer calls this from its `Drop`, after the device has
     /// gone idle.
     pub(crate) fn destroy(&mut self, gpu: &Gpu) {
         gpu.destroy_buffer(std::mem::replace(&mut self.buffer, Buffer::null()));
+        gpu.destroy_buffer(std::mem::replace(&mut self.marks, Buffer::null()));
     }
 }
 

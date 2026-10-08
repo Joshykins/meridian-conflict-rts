@@ -130,6 +130,7 @@ pub struct MeshBuilder {
     star_core: Option<[f32; 4]>,
     beam_core: Option<[f32; 4]>,
     exhausts: Vec<super::Exhaust>,
+    marks: Vec<super::Mark>,
     lifts: Vec<super::Lift>,
     discharge: Option<super::Discharge>,
     vtol: Option<super::Vtol>,
@@ -196,6 +197,7 @@ impl MeshBuilder {
             star_core: None,
             beam_core: None,
             exhausts: Vec::new(),
+            marks: Vec::new(),
             lifts: Vec::new(),
             discharge: None,
             vtol: None,
@@ -529,6 +531,37 @@ impl MeshBuilder {
                 .to_array(),
             radius: radius * scale,
         });
+    }
+
+    /// Says what the surface carries inside the box `min`..`max` (current frame): a
+    /// zone or a placed mark (`gpu_consts::surface_mark`), `arg` the kind's own number. Recorded
+    /// at the full level of detail only; the box is the transformed corners' bounds.
+    pub fn mark(&mut self, min: Vec3, max: Vec3, kind: u32, arg: f32) {
+        if self.lod != 0 {
+            return;
+        }
+        let (mut lo, mut hi) = (Vec3::splat(f32::MAX), Vec3::splat(f32::MIN));
+        for k in 0..8 {
+            let c = Vec3::new(
+                if k & 1 == 0 { min.x } else { max.x },
+                if k & 2 == 0 { min.y } else { max.y },
+                if k & 4 == 0 { min.z } else { max.z },
+            );
+            let p = self.transform.transform_point3(c);
+            lo = lo.min(p);
+            hi = hi.max(p);
+        }
+        self.marks.push(super::Mark {
+            min: lo.to_array(),
+            max: hi.to_array(),
+            kind,
+            arg,
+        });
+    }
+
+    /// The marks laid so far (`mark`).
+    pub fn marks(&self) -> Vec<super::Mark> {
+        self.marks.clone()
     }
 
     /// The exhaust ports marked so far (`add_exhaust`).
@@ -1732,24 +1765,23 @@ impl MeshBuilder {
         }
         let base = self.mesh.vertices.len() as u32;
         let abs = normal.abs();
+        let regency = matches!(
+            self.pattern,
+            pattern::EMBER
+                | pattern::NANITE_SLOT
+                | pattern::EMBER_SLOT
+                | pattern::EMBER_RIM
+                | pattern::EMBER_MACHINED
+        );
         let frame = match self.framing {
-            Framing::Flat => FaceFrame::flat(points, normal),
+            Framing::Flat => FaceFrame::flat(points, normal, if regency { 0.62 } else { 0.45 }),
             Framing::Tube(tube) => Some(tube.frame(points)),
             Framing::Bare => None,
         };
         // A Regency face no rectangle fits still gets its outline: its own edges.
-        let edges = (frame.is_none()
-            && matches!(
-                self.pattern,
-                pattern::EMBER
-                    | pattern::NANITE_SLOT
-                    | pattern::EMBER_SLOT
-                    | pattern::EMBER_RIM
-                    | pattern::EMBER_MACHINED
-            )
-            && matches!(self.framing, Framing::Flat))
-        .then(|| FaceEdges::of(points, normal))
-        .flatten();
+        let edges = (frame.is_none() && regency && matches!(self.framing, Framing::Flat))
+            .then(|| FaceEdges::of(points, normal))
+            .flatten();
         let seed = match (&frame, &edges) {
             (Some(f), _) => f.seed(),
             (None, Some(e)) => e.seed,

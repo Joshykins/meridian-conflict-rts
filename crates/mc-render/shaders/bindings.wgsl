@@ -872,6 +872,51 @@ struct CraterList {
 // What each skin's surface slots look like (renderer/skins.rs), by `ModelInfo::skin`.
 @group(0) @binding(34) var<storage, read> skins: array<Skin>;
 
+// Every model's surface marks (renderer/surface_marks.rs), by `ModelInfo::marks`.
+@group(0) @binding(35) var<storage, read> surface_marks: array<SurfaceMark>;
+
+// The marks over a point of a model: the zone it lies in (0 none) and the placed mark
+// on it (hazard stripes, a stencil; kind 0 none), with the point's place in that mark's
+// box (`at`, metres from its middle) and the box's half size.
+struct MarksHere {
+    zone: u32,
+    kind: u32,
+    arg: f32,
+    at: vec3<f32>,
+    half: vec3<f32>,
+}
+
+// Whether a mark kind is a fitting (relief, `fitting_h`) or paint (`mark_paint`).
+fn smark_fitting(kind: u32) -> bool {
+    return kind >= SMARK_GRILLE && kind <= SMARK_SEAM;
+}
+
+fn smark_paint(kind: u32) -> bool {
+    return kind == SMARK_HAZARD || kind == SMARK_STENCIL || kind == SMARK_WARNING || kind == SMARK_LABEL;
+}
+
+// `marks` is `ModelInfo::marks` (first | count << 24); later marks lie over earlier.
+fn marks_at(marks: u32, p: vec3<f32>) -> MarksHere {
+    var here = MarksHere(0u, 0u, 0.0, vec3<f32>(0.0), vec3<f32>(0.0));
+    let first = marks & 0xFFFFFFu;
+    let count = min(marks >> 24u, SMARK_MAX);
+    for (var k = 0u; k < count; k++) {
+        let m = surface_marks[first + k];
+        if any(p < m.min) || any(p > m.max) {
+            continue;
+        }
+        if m.kind <= SMARK_WALKWAY {
+            here.zone = m.kind;
+        } else {
+            here.kind = m.kind;
+            here.arg = m.arg;
+            here.at = p - 0.5 * (m.min + m.max);
+            here.half = 0.5 * (m.max - m.min);
+        }
+    }
+    return here;
+}
+
 // A skin slot's look (`SKIN_*`): albedo, metallic, emissive and roughness.
 fn skin_slot(skin: u32, slot: u32) -> Pbr {
     let a = skins[skin].slots[2u * slot];

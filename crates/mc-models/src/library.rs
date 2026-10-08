@@ -232,6 +232,7 @@ fn build_fitted_made(
     let mut beam_core = None;
     let mut scans = false;
     let mut exhausts = Vec::new();
+    let mut marks = Vec::new();
     let mut lifts = Vec::new();
     let mut discharge = None;
     let mut vtol = None;
@@ -264,6 +265,7 @@ fn build_fitted_made(
             star_core = builder.star_core();
             beam_core = builder.beam_core();
             exhausts = builder.exhausts();
+            marks = builder.marks();
             lifts = builder.lifts();
             discharge = builder.discharge();
             vtol = builder.vtol();
@@ -328,6 +330,7 @@ fn build_fitted_made(
         star_core,
         beam_core,
         exhausts,
+        marks,
         lifts,
         discharge,
         vtol,
@@ -483,6 +486,19 @@ pub fn prop_model_key(kind_raw: u16) -> &'static str {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn no_model_carries_more_surface_marks_than_the_gpu_reads() {
+        for def in super::catalogue() {
+            let model = super::build_model(def.key).unwrap();
+            assert!(
+                model.marks.len() <= crate::gpu_consts::surface_mark::MAX as usize,
+                "{}: {} surface marks",
+                def.key,
+                model.marks.len()
+            );
+        }
+    }
+
     #[test]
     fn exhausts_are_recorded_once_per_port_mirrored_and_scaled() {
         let model = super::build_model("assault_tank").expect("the Fulgur");

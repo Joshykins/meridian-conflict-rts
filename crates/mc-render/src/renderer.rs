@@ -104,6 +104,7 @@ mod star_core_fx;
 mod structure_pads;
 mod stun_fx;
 mod supernova_fx;
+pub(crate) mod surface_marks;
 mod survival_fx;
 mod terrain_lit;
 mod trail_fx;
@@ -445,7 +446,8 @@ pub(crate) struct ModelInfo {
     pub(crate) leg_sway: [f32; 4],
     /// Its skin (`Blueprints::skins`, renderer/skins.rs): its faction's, for a unit.
     pub(crate) skin: u32,
-    pub(crate) _skin_pad0: u32,
+    /// Its surface marks in scene set 35 (renderer/surface_marks.rs): first | count << 24.
+    pub(crate) marks: u32,
     pub(crate) _skin_pad1: u32,
     pub(crate) _skin_pad2: u32,
 }
@@ -983,7 +985,8 @@ pub struct Renderer {
     map_info: mc_map::MapInfo,
     /// The first faction's shield colour (`Globals::shield`).
     shield_color: [f32; 4],
-    /// What each skin's slots look like (renderer/skins.rs, scene set 34).
+    /// What each skin's slots look like (renderer/skins.rs, scene set 34), and what
+    /// each model's surface carries where (scene set 35).
     skins: skins::Skins,
     team_colors: [[f32; 4]; crate::gpu_consts::owner::COLORS as usize],
     slot_count: u32,
@@ -1126,6 +1129,7 @@ fn fallback_model(key: &str, radius: f32, height: f32) -> Model {
         star_core: None,
         beam_core: None,
         exhausts: Vec::new(),
+        marks: Vec::new(),
         lifts: Vec::new(),
         discharge: None,
         vtol: None,
@@ -1384,6 +1388,8 @@ impl Renderer {
         // Per blueprint: its ground stakes' scale, if it plants any (`stake_fx`).
         let mut stake_scales: Vec<Option<f32>> = Vec::new();
         let mut model_draws: Vec<[u32; 2]> = Vec::new();
+        // What each model's surface carries where.
+        let mut surface_marks = surface_marks::MarkList::default();
         let mut first_slot: Vec<u32> = Vec::new();
         for (at, (model, _)) in model_list.iter().enumerate() {
             first_slot.push(slots.len() as u32);
@@ -1440,7 +1446,7 @@ impl Renderer {
                 .map_or(0, |f| u32::from(f.skin.0));
             infos.push(ModelInfo {
                 skin,
-                _skin_pad0: 0,
+                marks: surface_marks.add(&model.marks),
                 _skin_pad1: 0,
                 _skin_pad2: 0,
                 slot: first_slot[at],
@@ -2260,7 +2266,13 @@ impl Renderer {
             vk::DescriptorType::STORAGE_BUFFER,
             &[craters.buffer()],
         );
-        let skins = skins::Skins::new(&gpu, bps)?;
+        let skins = skins::Skins::new(&gpu, bps, &surface_marks)?;
+        write_buffers(
+            scene_set,
+            35,
+            vk::DescriptorType::STORAGE_BUFFER,
+            &[skins.marks()],
+        );
         write_buffers(
             scene_set,
             34,

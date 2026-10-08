@@ -33,8 +33,12 @@ pub(super) struct FaceFrame {
 
 impl FaceFrame {
     /// The frame of a planar polygon, or none for one that fills too little of
-    /// its rectangle for an outline along the rectangle to mean anything.
-    pub(super) fn flat(points: &[Vec3], normal: Vec3) -> Option<FaceFrame> {
+    /// its rectangle for an outline along the rectangle to mean anything. A triangle
+    /// (half its rectangle) and a chamfered corner's trapezoid are framed: left bare,
+    /// they were the only flat patches on a detailed hull. `min_fill` is the least share
+    /// of its rectangle a framed face fills: a Regency face that fills less gets its own
+    /// edges instead (`FaceEdges`), so it asks for more.
+    pub(super) fn flat(points: &[Vec3], normal: Vec3, min_fill: f32) -> Option<FaceFrame> {
         let extent = |u: Vec3, v: Vec3| {
             points.iter().fold(
                 (Vec2::splat(f32::MAX), Vec2::splat(f32::MIN)),
@@ -73,7 +77,7 @@ impl FaceFrame {
         let (lo, hi) = extent(a, b);
         let area = (hi.x - lo.x) * (hi.y - lo.y);
         let covered = newell_normal(points).length() * 0.5;
-        if area <= 1e-8 || covered < area * 0.62 {
+        if area <= 1e-8 || covered < area * min_fill {
             return None;
         }
         // On a wall t runs up it, so "horizontal" means the same thing on every
@@ -301,8 +305,9 @@ mod tests {
         }
         let right = triangle(pattern::EMBER, -2.0);
         assert_eq!(left[0].surface >> 8, right[0].surface >> 8);
+        // Any other triangle fills half its rectangle: framed like a plate.
         for v in triangle(pattern::GENERIC, 2.0) {
-            assert_eq!(v.face, [0.0; 4]);
+            assert!(v.face[2] > 0.0 && v.face[3] > 0.0, "{v:?}");
         }
     }
 }

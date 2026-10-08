@@ -508,6 +508,9 @@ pub(super) fn tank_light(b: &mut MeshBuilder, _tech: u8) {
         },
     );
     let (breech, muzzle) = (v3(1.5, 0.0, 2.82), v3(5.2, 0.0, 2.82));
+    // What its surface carries where (docs/STANDARD.md, marks): every fitting placed,
+    // nothing left to chance. `warden_marks` lays them.
+    warden_marks(b);
 
     b.set_turret_pivot(v3(0.0, 0.0, 2.1));
     b.set_recoil(breech, muzzle, 0.7);
@@ -705,6 +708,113 @@ pub(super) fn tank_light(b: &mut MeshBuilder, _tech: u8) {
             );
         }
     }
+}
+
+/// The Warden's surface (docs/STANDARD.md, marks): heavy armour forward with bolted
+/// applique on the glacis and turret cheeks, the engine deck aft with louvre banks and a
+/// grille, machinery on the hull's tail and the turret's bustle, walkways along the
+/// fenders, and its markings: hazard paint on the nose, the hull number, warnings and
+/// stencilled lettering.
+fn warden_marks(b: &mut MeshBuilder) {
+    use crate::gpu_consts::surface_mark as mark;
+    // Zones.
+    b.mark(v3(1.2, -3.3, 0.0), v3(4.6, 3.3, 2.3), mark::ARMOUR, 0.0);
+    b.mark(
+        v3(-3.6, -1.75, 1.98),
+        v3(-1.5, 1.75, 2.3),
+        mark::ENGINE,
+        0.0,
+    );
+    b.mark(
+        v3(-4.6, -2.4, 0.4),
+        v3(-3.9, 2.4, 1.9),
+        mark::MACHINERY,
+        0.0,
+    );
+    b.mark(
+        v3(-3.0, -1.3, 2.1),
+        v3(-1.4, 1.3, 3.4),
+        mark::MACHINERY,
+        0.0,
+    );
+    b.mark(v3(-0.4, -1.3, 2.1), v3(1.2, 1.3, 3.4), mark::ARMOUR, 0.0);
+    // Down the middle: the glacis's weld, the driver's hatch, the engine deck's grille,
+    // the turret roof's seam and vent, the bustle's grille.
+    b.mark(v3(2.3, -0.03, 1.35), v3(4.4, 0.03, 2.2), mark::SEAM, 0.0);
+    b.mark(v3(1.55, 0.55, 1.95), v3(2.15, 1.15, 2.25), mark::HATCH, 0.0);
+    b.mark(
+        v3(-3.2, -0.25, 1.95),
+        v3(-1.6, 0.25, 2.25),
+        mark::GRILLE,
+        0.0,
+    );
+    b.mark(
+        v3(-1.45, -0.03, 3.05),
+        v3(0.75, 0.03, 3.35),
+        mark::SEAM,
+        0.0,
+    );
+    b.mark(
+        v3(-1.5, -0.95, 3.05),
+        v3(-0.9, -0.35, 3.35),
+        mark::VENT,
+        0.0,
+    );
+    b.mark(
+        v3(-2.45, -0.75, 2.3),
+        v3(-2.0, 0.75, 3.0),
+        mark::GRILLE,
+        0.0,
+    );
+    b.mark(
+        v3(-4.45, -0.35, 1.72),
+        v3(-3.95, 0.35, 1.95),
+        mark::LABEL,
+        3.0,
+    );
+    // A warning on the tail, by the engine's exhaust.
+    b.mark(
+        v3(-4.45, -1.95, 1.25),
+        v3(-3.95, -1.5, 1.7),
+        mark::WARNING,
+        0.0,
+    );
+    b.mirror_y(|b| {
+        b.mark(v3(-4.4, 1.8, 1.25), v3(3.6, 3.3, 1.6), mark::WALKWAY, 0.0);
+        // Glacis applique, bolted.
+        b.mark(v3(2.7, 0.3, 1.4), v3(3.95, 1.5, 2.2), mark::PANEL, 0.0);
+        // Hull sides: bolts along the deck edge, two access covers, ribs over the engine.
+        b.mark(v3(-3.0, 1.7, 1.98), v3(2.0, 2.5, 2.1), mark::BOLTS, 0.0);
+        b.mark(v3(-1.0, 1.7, 1.55), v3(-0.1, 2.5, 1.92), mark::ACCESS, 0.0);
+        b.mark(v3(0.3, 1.7, 1.55), v3(1.1, 2.5, 1.92), mark::ACCESS, 0.0);
+        b.mark(v3(-3.1, 1.7, 1.55), v3(-1.8, 2.5, 1.92), mark::RIBS, 0.0);
+        // Engine deck louvre banks.
+        b.mark(
+            v3(-3.2, 0.35, 1.95),
+            v3(-1.9, 1.45, 2.25),
+            mark::LOUVRES,
+            0.0,
+        );
+        // Hull tail: access covers either side of the lettering.
+        b.mark(
+            v3(-4.45, 0.45, 1.1),
+            v3(-3.95, 1.45, 1.75),
+            mark::ACCESS,
+            0.0,
+        );
+        // Turret cheeks: bolted applique.
+        b.mark(v3(0.95, 0.45, 2.25), v3(1.95, 1.55, 3.1), mark::PANEL, 0.0);
+        // Turret flanks: the hull number, lettering under it.
+        b.mark(
+            v3(-1.7, 1.1, 2.4),
+            v3(-0.1, 1.75, 3.05),
+            mark::STENCIL,
+            17.0,
+        );
+        b.mark(v3(-1.7, 1.2, 2.2), v3(-0.3, 1.75, 2.36), mark::LABEL, 1.0);
+        // Hazard paint on the bars the tow hooks hang from.
+        b.mark(v3(4.0, 0.55, 0.85), v3(4.6, 1.25, 1.2), mark::HAZARD, 0.0);
+    });
 }
 
 // ---- Ballista: light artillery ---------------------------------------------

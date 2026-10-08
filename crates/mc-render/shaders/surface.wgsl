@@ -58,6 +58,14 @@ struct SurfaceIn {
     // The lights let into dark plating (`SKIN_LIGHTS_*`) and their colour: the skin's.
     lights: u32,
     lights_rgb: vec3<f32>,
+    // The skin's texture detail (0 none, greebles.wgsl) and how deep and dark its
+    // seams are (1 the standard).
+    detail: f32,
+    seams: f32,
+    // The zone the point lies in (`SMARK_*` armour, engine, machinery, walkway; 0 none).
+    zone: u32,
+    // Working metal (`MAT_METAL`): machined, not plated.
+    metal: bool,
     // Per face and per unit, zero to one.
     seed: f32,
     unit: f32,
@@ -301,6 +309,10 @@ fn surf_relief_plates(i: SurfaceIn, st: vec2<f32>, bevel: f32, gap: f32) -> f32 
     let cell = surf_courses(i, st, vec2<f32>(i.scale * 1.5, i.scale));
     let d = surf_edge(cell.p, cell.half);
     var h = surf_rise(d, gap, bevel) * (0.78 + 0.22 * cell.id);
+    if i.detail > 0.0 {
+        // The skin's texture detail in place of the plates' few fittings.
+        return min(h, surf_greeble(i, cell, surf_face_edge(i, st), gap, bevel, 0.0).h);
+    }
     let roomy = min(cell.half.x, cell.half.y) > i.scale * 0.3;
     let style = hash11(cell.id * 91.0 + 0.37);
     if roomy && style > 0.45 && style <= 0.75 {
@@ -865,11 +877,16 @@ fn surf_relief(i: SurfaceIn, st: vec2<f32>) -> f32 {
             h = min(h, mix(1.0, 0.25 + 0.75 * surf_rise(slot, 0.0, bevel * 0.5), cut.lit));
         }
         default: {
-            if i.dark {
+            if i.metal {
+                // Machined metal: its outline only.
+            } else if i.dark {
                 // Long plates, shallow seams, and the lights sit in slots.
                 let cell = surf_dark_cell(i, st);
                 if small > i.scale * 0.3 {
                     h = min(h, 0.45 + 0.55 * surf_rise(surf_edge(cell.p, cell.half), gap * 0.7, bevel * 0.8) * (0.85 + 0.15 * cell.id));
+                    if i.detail > 0.0 {
+                        h = min(h, surf_greeble(i, cell, surf_face_edge(i, st), gap, bevel, 0.0).h);
+                    }
                 }
                 let dash = surf_dashes(i, st, cell);
                 let slot = surf_band(dash.d, i.scale * 0.022, 0.0) * step(0.0, dash.along) * dash.on;
@@ -1031,8 +1048,9 @@ fn surf_dirt(p_model: vec3<f32>, rise: f32, up: f32, kick: f32, grit: f32, seam:
     let run_cell = 0.05;
     let run = surf_noise3(vec3<f32>(hz.x / run_cell, hz.y / run_cell, hz.z / 0.9) + vec3<f32>(3.0, 19.0, 7.0));
     let runs = surf_blot(run, 0.62, run_cell, px) * steep;
-    // A thin, even dust on what faces the sky.
-    let deck = smoothstep(0.55, 0.9, up) * (0.7 + grain * 0.8);
+    // A thin, even dust on what faces the sky. Barely varied: the grain at full strength
+    // mottled a sunlit deck into a checker of 5 cm squares.
+    let deck = smoothstep(0.55, 0.9, up) * (0.85 + grain * 0.25);
     // Grime packed into the plate seams and round the rivets.
     let packed = saturate(seam * 2.2);
     let weather = max(max(runs * 0.5, deck * 0.25), packed * 0.8) * grit;
@@ -1063,13 +1081,19 @@ fn surface_at(i: SurfaceIn) -> Surface {
     let framed = i.pattern != PAT_NONE && (max(abs(i.half.x), i.half.y) > 0.0 || i.pattern == PAT_HULL);
     // Lights earn their brightness by tier.
     let lamp = 1.2 + 0.9 * i.tech;
+    // Occlusion in the relief's own hollows, as deep as the skin's seams are cut.
+    var hollow = 1.0;
 
     if framed {
         let st = i.st;
         // Relief, differenced over about a pixel: the normal is filtered with the zoom.
         let e = max(fw * 0.75, i.scale * 0.002);
         let h0 = surf_relief(i, st);
-        let depth = bevel * 0.85;
+        // Only what lies below a plate's face is a hollow: a plate's own face sits from
+        // 0.78 to 1 (`surf_relief_plates`), and darkening it all packed grime over it.
+        hollow = mix(1.0, mix(0.4, 1.0, smoothstep(0.2, 0.72, h0)), saturate(i.seams - 1.0));
+        // Seams cut as deep as the skin says.
+        let depth = bevel * 0.85 * i.seams;
         out.slope = vec2<f32>(surf_relief(i, st + vec2<f32>(e, 0.0)) - h0, surf_relief(i, st + vec2<f32>(0.0, e)) - h0) * (depth / e);
         // Nothing to resolve once a bevel is a small part of a pixel.
         out.slope *= 1.0 - smoothstep(bevel * 3.0, bevel * 9.0, fw);
@@ -1475,7 +1499,15 @@ fn surface_at(i: SurfaceIn) -> Surface {
             // Regency plate: plain, coloured and lined in regency.wgsl.
             case PAT_EMBER, NANITE_PATTERN_SLOT, EMBER_PLATE_MACHINED: {}
             default: {
-                if i.dark {
+                if i.metal {
+                    // Machined metal: a fine grain along its length, darker where it
+                    // meets another part, polished at its edges by handling.
+                    let along = select(st.x, st.y, i.half.y > i.half.x || i.wraps);
+                    let grain = surf_noise3(vec3<f32>(along * 0.4, st.x * 0.05 + st.y * 9.0, i.seed * 11.0) / (i.scale * 0.05));
+                    out.rough = (grain - 0.5) * 0.2;
+                    out.cavity = (1.0 - 0.45 * surf_band(d_face, gap * 1.2, fw) * outlined) * (0.94 + 0.08 * grain);
+                    out.bare = max(out.bare, 0.4 * (1.0 - smoothstep(0.0, bevel * 1.5, d_face)) * outlined);
+                } else if i.dark {
                     // Little level lights let into the black.
                     let cell = surf_dark_cell(i, st);
                     let dash = surf_dashes(i, st, cell);
@@ -1508,6 +1540,11 @@ fn surface_at(i: SurfaceIn) -> Surface {
                     // Unlit on a tech 1 line unit: paint in the lights' colour.
                     out.paint = vec4<f32>(select(saturate(i.lights_rgb), SURF_SAFETY, vein), lit * (1.0 - i.lit));
                     out.cavity = 1.0 - 0.5 * surf_band(dash.d, w * 1.9, fw) * surf_step(dash.along, -w, fw) * dash.on * outlined * veined;
+                    if i.detail > 0.0 && small > i.scale * 0.3 {
+                        let g = surf_greeble(i, cell, d_face, gap, bevel, fw);
+                        out.cavity *= g.cavity;
+                        out.paint = mix(out.paint, vec4<f32>(g.paint.rgb, 1.0), g.paint.a);
+                    }
                     // Scuffed edges read lighter on black, which is what draws its forms.
                     out.bare = max(out.bare, 0.55 * (1.0 - smoothstep(0.0, bevel * 0.9, d_face)) * outlined);
                 } else if small > i.scale * 0.3 {
@@ -1517,8 +1554,13 @@ fn surface_at(i: SurfaceIn) -> Surface {
                     // No two plates quite the same paint or polish: a patchwork of greys.
                     out.cavity *= 0.84 + 0.3 * cell.id;
                     out.rough = (hash11(cell.id * 53.0) - 0.5) * 0.16;
-                    let style = hash11(cell.id * 91.0 + 0.37);
+                    let style = select(hash11(cell.id * 91.0 + 0.37), 0.0, i.detail > 0.0);
                     let roomy = min(cell.half.x, cell.half.y) > i.scale * 0.3;
+                    if i.detail > 0.0 {
+                        let g = surf_greeble(i, cell, d_face, gap, bevel, fw);
+                        out.cavity *= g.cavity;
+                        out.paint = mix(out.paint, vec4<f32>(g.paint.rgb, 1.0), g.paint.a);
+                    }
                     if roomy && style > 0.75 && style <= 0.9 {
                         let e = surf_edge(cell.p, cell.half * vec2<f32>(0.5, 0.46));
                         out.cavity *= 1.0 - 0.55 * surf_band(e, gap * 0.9, fw);
@@ -1549,6 +1591,7 @@ fn surface_at(i: SurfaceIn) -> Surface {
     // Large, soft variation, so a big roof is never one flat value.
     let macro_tone = surf_noise3((i.local + vec3<f32>(i.unit * 91.0)) / (i.scale * 2.2));
     out.cavity *= 0.94 + 0.1 * macro_tone;
+    out.cavity *= hollow;
 
     let burn = surf_damage(i);
     out.soot = burn.x;

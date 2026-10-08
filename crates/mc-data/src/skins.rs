@@ -123,6 +123,13 @@ pub struct Plates {
     /// How much paint the edges lose, times the standard.
     pub wear: f32,
     pub lights: Lights,
+    /// Texture detail inside each plate, 0 (none) to 1 (dense): panels, grilles,
+    /// louvres, ribs, access panels, bolt rings, vents and hazard stripes.
+    pub detail: f32,
+    /// How deep and dark seams and recesses are, times the standard.
+    pub seams: f32,
+    /// How much field dirt and grime a unit gathers, times its tier's.
+    pub grime: f32,
 }
 
 impl Default for Plates {
@@ -132,6 +139,9 @@ impl Default for Plates {
             plate: 1.0,
             wear: 1.0,
             lights: Lights::Off,
+            detail: 0.0,
+            seams: 1.0,
+            grime: 1.0,
         }
     }
 }
@@ -234,10 +244,20 @@ impl Skin {
             return Err("finish Regency needs its film's colours (`film`)".into());
         }
         let p = &self.finish;
-        for (what, v) in [("finish plate", p.plate), ("finish wear", p.wear)] {
+        for (what, v) in [
+            ("finish plate", p.plate),
+            ("finish wear", p.wear),
+            ("finish seams", p.seams),
+        ] {
             if !(v.is_finite() && (0.25..=4.0).contains(&v)) {
                 return Err(format!("{what} {v}: 0.25 to 4"));
             }
+        }
+        if !(p.detail.is_finite() && (0.0..=1.0).contains(&p.detail)) {
+            return Err(format!("finish detail {}: 0 to 1", p.detail));
+        }
+        if !(p.grime.is_finite() && (0.0..=4.0).contains(&p.grime)) {
+            return Err(format!("finish grime {}: 0 to 4", p.grime));
         }
         if let Lights::Dashes(c) | Lights::Dots(c) = p.lights {
             colour("finish lights", c)?;

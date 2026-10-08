@@ -651,6 +651,8 @@ pub struct Model {
     /// Engine exhaust ports whose hot air shimmers above them (`MeshBuilder::add_exhaust`,
     /// renderer `heat_haze.rs`).
     pub exhausts: Vec<Exhaust>,
+    /// What its surface carries where (`MeshBuilder::mark`).
+    pub marks: Vec<Mark>,
     /// Plasma lift bells that cast red plasma under the craft (`MeshBuilder::add_lift`,
     /// renderer `lift_fx.rs`).
     pub lifts: Vec<Lift>,
@@ -711,6 +713,19 @@ pub fn vtol_tilt(pitch: f32, turn: f32, left: bool, front: bool) -> f32 {
     let lead = if front { 1.0 } else { FRONT_LEAD };
     (std::f32::consts::FRAC_PI_2 + pitch * TILT_GAIN * lead + turn * side * YAW_GAIN)
         .clamp(TILT_MIN, TILT_MAX)
+}
+
+/// A box on a model's surface saying what is drawn there (`gpu_consts::surface_mark`, docs/
+/// STANDARD.md): a zone (armour, engine, machinery, walkway) or a placed mark (hazard
+/// stripes, a stencilled number). Model space, at the blueprint's size.
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Mark {
+    pub min: [f32; 3],
+    pub max: [f32; 3],
+    /// `gpu_consts::surface_mark` kind.
+    pub kind: u32,
+    /// The kind's own number: a stencil's digits.
+    pub arg: f32,
 }
 
 /// An engine exhaust port: the hot air rising off it bends the scene behind it (renderer

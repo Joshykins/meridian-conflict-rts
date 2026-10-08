@@ -5,6 +5,9 @@
 (
     // Its light: the emitters' hue, a placement ghost's, a charge band's.
     highlight: (0.55, 0.85, 1.0),
+    // How its plates are finished (docs/STANDARD.md): dense texture detail, deep seams,
+    // plates a little smaller than the standard, edges worn, field grime.
+    finish: (detail: 1.0, seams: 2.8, plate: 0.65, wear: 2.0, grime: 1.4),
     slots: (
         plate: (color: Rgb((0.16, 0.185, 0.225)), metal: 0.3, rough: 0.6),
         // Armour painted dark: the plating taken down to graphite.

@@ -10,9 +10,12 @@ and brought up to it.
 says how any faction's look is put together. Where the two disagree, STYLE.md
 wins on taste and this file wins on structure.
 
-Status (2026-10-08): skins carry every model's surface slots and the Regency
-film (`data/skins`, below). The rest is a plan: nothing marked *planned* exists in
-the tree yet.
+Status (2026-10-08):
+- Built: skins carry every model's surface slots, its finish (texture detail,
+  seams, wear, grime) and the Regency film (`data/skins`, below).
+- Built: models carry authored surface marks: zones, fittings and painted marks
+  (below). The ARC Warden (`tank_light`) is the first unit marked.
+- Everything marked *planned* does not exist in the tree yet.
 
 ## Why: the 2026-10-08 audit
 
@@ -89,28 +92,38 @@ ARC's `parts.rs` and the Regency's `kit.rs`/`machine.rs`/`chassis.rs` are where
 these live today. The work is to fill the gaps and remove the copies, not to
 start over.
 
-### 3. Finish (skins, *planned*)
+### 3. Finish (skins and marks)
 
-All fine detail, colour and light are drawn by the surface from a **skin**:
-rivets, seams, louvres, scratches, wear, dirt, lit slots. The mesh never
-carries a lit piece (CLAUDE.md §9), and no Rust or WGSL code holds a colour.
+All fine detail, colour and light are drawn by the surface: rivets, seams,
+louvres, grilles, scratches, wear, dirt, lit slots. The mesh never carries a lit
+piece or a small fitting (CLAUDE.md §9), and no Rust or WGSL code holds a colour.
 
-A model paints **slots**, which say what a surface is, never what colour it is:
+Two things feed the surface:
+- **The skin** (below): what each slot looks like and how plates are finished.
+- **The model's marks** ("Texture detail and marks", below): what the surface
+  carries where, placed by the model's author.
 
-| Slot | Meaning |
-|---|---|
-| `plate` | main armour |
-| `plate_dark` | secondary armour, recesses |
-| `trim` | edges, frames, rails |
-| `metal` | bare working metal: barrels, pistons, joints |
-| `rubber` | tracks, tyres, seals |
-| `bore` | barrel mouths, intakes, holes |
-| `emitter` | a lit slot or line (its pattern decides the shape) |
-| `team` | the owner's colour |
-| `glass` | canopies, lenses, windows |
+A model paints **slots** (`mc_models::material`, `gpu_consts::skin`), which say
+what a surface is, never what colour it is:
 
-(The final list comes from the materials in `mc-models/src/lib.rs` and
-`gpu_consts.rs`. A slot replaces a material id, not the other way round.)
+| Slot | Material | Meaning |
+|---|---|---|
+| `plate` | `PLATING` | main armour |
+| `plate_dark` | `PLATING_DARK` | armour painted dark |
+| `trim` | `ACCENT` | frames, joints, recesses |
+| `metal` | `METAL` | working metal: barrels, pistons |
+| `rubber` | `TREAD` | tracks, tyres, feet |
+| `glass` | `GLASS` | sensors, canopies |
+| `emitter` | `GLOW` | the faction's own lights |
+| `gun_glow` | `GLOW_ORANGE` | conventional weapons' light |
+| `build_glow` | `GLOW_AMBER` | construction's light |
+| `beacon` | `GLOW_RED` | obstruction lamps |
+| `nanite` | `GLOW_VIOLET` | nanite light |
+| `laser` | `GLOW_LASER` | missile defence, Regency lamps |
+| `visor` | `VISOR` | helmet visor glass |
+
+Team colour (`TEAM`) and shield colour are not skin slots: a skin may not change
+whose a unit is.
 
 ## Skins
 
@@ -128,13 +141,21 @@ also carries its `film`, the colours regency.wgsl finishes Regency plate in.
   each `ModelInfo` carries a skin index. `scripts/shot.sh unit KEY --skin KEY`
   dresses every model in another skin with no rebuild.
 - Skins are presentation only and never reach `State` (determinism unaffected).
-- A skin's `finish` says how plated faces are finished: `kind` (`Arc`, paint
-  over scanned steel scratched at the edges, or `Regency`, steel under the film),
-  `plate` (plate size), `wear` (paint lost at the edges) and `lights`, the lights
-  let into dark plating: `Off`, `Dashes(colour)` or `Dots(colour)`. A plain
-  plated face takes its skin's finish whatever model it is on, so an ARC tank in
-  the Regency skin wears the film. A face with a specific pattern (an airframe,
-  a warship hull, a deck) keeps it.
+- A skin's `finish` says how plated faces are finished:
+  - `kind`: `Arc` (paint over scanned steel, scratched at the edges) or
+    `Regency` (steel under the film)
+  - `plate`: plate size, times the standard
+  - `wear`: paint lost at the edges, times the standard
+  - `lights`: the lights let into dark plating, `Off`, `Dashes(colour)` or
+    `Dots(colour)`
+  - `detail`: texture detail, 0 (none) to 1 (dense panelling and zones)
+  - `seams`: how deep and dark seams and fittings are cut, times the standard
+  - `grime`: field dirt, times its tier's
+- A plain plated face takes its skin's finish whatever model it is on, so an ARC
+  tank in the Regency skin wears the film. A face with a specific pattern (an
+  airframe, a warship hull, a deck) keeps it.
+- ARC's finish (`arc.ron`): detail 1, seams 2.8, plate 0.65, wear 2, grime 1.4.
+  Grime above about 2 reads as camouflage blotches (STYLE.md).
 - Not yet in a skin (*planned*): the lights drawn by specific patterns (windows,
   strips, decks, lamps), the foundations' graphite, and per-unit slot overrides.
 
@@ -160,6 +181,70 @@ or made by modders. So from the start:
 
 The loader clamps these values. A skin that would make a weapon invisible is
 refused.
+
+## Texture detail and marks
+
+A real machine's surface is not random, and neither is ours. Detail comes in two
+layers, both laid out on purpose; only weathering (wear, scratches, dirt) varies
+by chance.
+
+**Panelling, by zone.** Plates are cut into a regular grid of panels, as dense as
+the skin's `detail`. The zone a point lies in sets the grid
+(greebles.wgsl `surf_greeble`):
+
+| Zone (`surface_mark`) | Panelling | Where it goes |
+|---|---|---|
+| none | plain panels, a medium grid | anywhere not marked |
+| `ARMOUR` | few, large panels; quiet | glacis, turret front, anything that takes hits |
+| `MACHINERY` | small panels, a bolt in each corner | engine bays, bustles, hull tails, mechanisms |
+| `ENGINE` | grating over every panel | engine decks, intakes |
+| `WALKWAY` | tread plate | fender tops, decks crews walk on |
+
+**Fittings and paint, placed.** A model's author lays marks with
+`MeshBuilder::mark(min, max, kind, arg)`: a box in the model's own space, drawn
+on whichever face it crosses and filling the box (greebles.wgsl `fitting_h`,
+`mark_paint`):
+
+| Kind | What | `arg` |
+|---|---|---|
+| `GRILLE` | square holes in a frame | hole pitch, 0 standard |
+| `LOUVRES` | slats raked down | slat pitch |
+| `VENT` | round holes, staggered | hole pitch |
+| `RIBS` | raised stiffeners along the long side | rib pitch |
+| `ACCESS` | a bolted cover with a handle | |
+| `HATCH` | a round lid, its hinge | |
+| `BOLTS` | a row of bolt heads along the long side | bolt pitch |
+| `PANEL` | bolted applique plate | |
+| `SEAM` | a weld bead along the long side | |
+| `HAZARD` | yellow and black stripes (paint) | |
+| `STENCIL` | a number (paint) | the number |
+| `WARNING` | a warning triangle (paint) | |
+| `LABEL` | lines of stencilled lettering (paint) | which words |
+
+Fittings carry relief and darken their hollows; paint goes on after dirt, as
+fresh paint. Later marks lie over earlier ones. A model carries at most 48
+(`surface_mark::MAX`, a test holds every model to it).
+
+**Authoring rules.** The Warden (`vehicles.rs` `warden_marks`) is the worked
+example.
+- Mark the zones first: armour where it would take hits, machinery and engine
+  where things work, walkways where crews would step. Zones cover the whole
+  model in a few boxes.
+- Then the fittings, where a real machine would have them: a hatch where a crew
+  gets in, louvres and grilles over engines, access covers on the sides of
+  engine bays, bolt rows along deck edges, applique on the faces that take hits,
+  weld seams down the middle of big plates.
+- Paint marks belong where they mean something: hazard stripes on tow points,
+  hinges and moving parts; a warning sign by an exhaust, a hot or a dangerous
+  part; the hull number on a flank both sides can read; lettering under it or
+  on access covers. Never as decoration on a plain face.
+- Keep the big faces calm. A tank-sized unit carries about 15–25 fittings and a
+  few paint marks; a structure more; a scout fewer.
+- A mark's box must cross the face it is meant for. A box that only meets a
+  track or a barrel (rubber, metal) draws nothing. Look at each mark in a close
+  shot (`scripts/shot.sh unit KEY --look X,Y,Z --zoom 5`).
+- Mirror what is mirrored (`b.mirror_y`): a mark recorded inside it lands on both
+  sides.
 
 ## Effect palettes (*planned*)
 
@@ -205,7 +290,10 @@ set shows for each.
 
 **Finish**
 - [ ] Painted only through slots; no `GLOW_*` mesh pieces, no colour in code.
-- [ ] Face-fitted surface detail (plate courses, seams, rivets), and dirt by tier.
+- [ ] Its zones marked, and its fittings and paint marks placed where a real
+      machine would carry them ("Texture detail and marks").
+- [ ] No fitting modelled that a mark can draw (bolts, vents, grilles,
+      hatch outlines).
 - [ ] Looks right in its own skin and in at least one other.
 
 **Motion**
@@ -271,10 +359,9 @@ drift again:
 
 ## Order of work
 
-1. This spec.
-2. The skin layer and the first example, the T1 tank, together. It is built on
-   slots from day one, then shown in ARC's and Regency's skins. A tank that
-   reads right in all three proves the layer.
+1. This spec. (Done.)
+2. The skin layer and the first example, the T1 tank, together. (Done for ARC:
+   skins, finish, marks, the Warden marked.) Next its Regency counterpart.
 3. The gallery map, layer toggles and comparison sheets.
 4. The rest of the reference set, each with its effects as templates.
 5. Moving ARC and the Regency over, one family at a time. Colours go into skin
