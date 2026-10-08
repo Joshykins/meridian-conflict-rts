@@ -318,9 +318,6 @@ impl Renderer {
                 self.slot_count,
                 self.fog_enabled as u32 | (input.build_grid as u32) << 1,
             ],
-            plating: self.palette[0],
-            accent: self.palette[1],
-            glow: self.palette[2],
             team_colors: self.team_colors,
             build_cursor: self.build_cursor,
             scene: [
@@ -340,7 +337,7 @@ impl Renderer {
             tree_blasts,
             shadow_cascades: cascades.each_ref().map(|c| c.view_proj.to_cols_array_2d()),
             shadow_info: cascades.each_ref().map(|c| c.info),
-            shield: self.palette[3],
+            shield: self.shield_color,
             nukes,
             nuke_view,
             strategic,

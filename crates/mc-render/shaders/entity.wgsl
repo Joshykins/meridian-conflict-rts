@@ -232,6 +232,8 @@ struct VsOut {
     // A settled wreck's section (wreck.wgsl): the stretch of the hull it keeps along model
     // x (metres), 1 when it draws the hull's inside, 1 when it is posed at all.
     @location(17) @interpolate(flat) wreck: vec4<f32>,
+    // Its skin (`ModelInfo::skin`): what its surface slots look like.
+    @location(18) @interpolate(flat) skin: u32,
 }
 
 struct Weld {
@@ -2494,6 +2496,7 @@ fn vs_main(in: VsIn) -> VsOut {
         | select(0u, CLASS_NANITE, (e.status[1] & UNIT_NANITE) != 0u);
     out.face = in.face;
     out.unit_id = e.unit_id;
+    out.skin = model.skin;
     // A spacecraft's drives burn with its speed over the ground; its lift jets with its
     // climb or descent. The glow on each knows its drive's or jet's mouth.
     out.drive = vec4<f32>(-1.0, 0.0, 0.0, 0.0);
@@ -2677,6 +2680,7 @@ fn vs_prop(in: VsIn) -> VsOut {
     out.model_class = ((model.icon >> 8u) & 0xFFu) | ((in.surface & 0xFFFFu) << 16u);
     out.face = in.face;
     out.unit_id = e.unit_id;
+    out.skin = model.skin;
     out.drive = vec4<f32>(-1.0, 0.0, 0.0, 0.0);
     out.drive_at = vec4<f32>(0.0);
     out.dust = select(0.62, model.surface.y / max(model.height, 0.1), model.surface.y > 0.0);
@@ -2977,32 +2981,32 @@ fn fs_shadow(in: VsOut) {
     }
 }
 
-fn material_of(id: u32, owner: u32) -> Pbr {
+fn material_of(id: u32, owner: u32, skin: u32) -> Pbr {
     var m: Pbr;
     m.emissive = vec3<f32>(0.0);
     m.metallic = 0.0;
     m.roughness = 0.6;
     m.albedo = vec3<f32>(0.5);
+    // The slots a model paints: what they look like is its skin's (data/skins).
     switch id {
-        case 0u: { m.albedo = globals.plating.rgb; m.metallic = 0.3; m.roughness = 0.6; }
-        case 1u: { m.albedo = globals.accent.rgb; m.metallic = 0.7; m.roughness = 0.42; }
-        case 2u: { m.albedo = globals.glow.rgb * 0.2; m.emissive = globals.glow.rgb * 5.0; m.roughness = 0.3; }
+        case 0u: { m = skin_slot(skin, SKIN_PLATE); }
+        case 1u: { m = skin_slot(skin, SKIN_TRIM); }
+        case 2u: { m = skin_slot(skin, SKIN_EMITTER); }
         case 3u: { m.albedo = globals.team_colors[owner & OWNER_MASK].rgb * TEAM_PAINT; m.metallic = 0.3; m.roughness = 0.4; m.emissive = globals.team_colors[owner & OWNER_MASK].rgb * TEAM_GLOW; }
-        case 4u: { m.albedo = vec3<f32>(0.32, 0.33, 0.36); m.metallic = 0.95; m.roughness = 0.32; }
-        case 5u: { m.albedo = vec3<f32>(0.02, 0.05, 0.09); m.metallic = 0.9; m.roughness = 0.08; m.emissive = globals.glow.rgb * 0.15; }
-        case 6u: { m.albedo = vec3<f32>(0.03, 0.03, 0.035); m.roughness = 0.9; }
-        case 7u: { m.albedo = vec3<f32>(0.3, 0.12, 0.02); m.emissive = vec3<f32>(1.0, 0.42, 0.08) * 4.0; m.roughness = 0.3; }
+        case 4u: { m = skin_slot(skin, SKIN_METAL); }
+        case 5u: { m = skin_slot(skin, SKIN_GLASS); }
+        case 6u: { m = skin_slot(skin, SKIN_RUBBER); }
+        case 7u: { m = skin_slot(skin, SKIN_GUN_GLOW); }
         case 8u: { m.albedo = vec3<f32>(0.16, 0.11, 0.07); m.roughness = 0.95; }
         case 9u: { m.albedo = vec3<f32>(0.07, 0.16, 0.05); m.roughness = 0.85; }
         case 10u: { m.albedo = vec3<f32>(0.3, 0.29, 0.27); m.roughness = 0.9; }
         case 11u: { m.albedo = vec3<f32>(0.42, 0.42, 0.41); m.roughness = 0.85; }
         case 12u: { m.albedo = vec3<f32>(0.05, 0.07, 0.1); m.metallic = 0.8; m.roughness = 0.15; m.emissive = vec3<f32>(0.9, 0.75, 0.45) * 0.35; }
-        case 13u: { m.albedo = vec3<f32>(0.3, 0.17, 0.02); m.emissive = AMBER * 4.0; m.roughness = 0.3; }
-        case 14u: { m.albedo = globals.plating.rgb * vec3<f32>(0.3, 0.33, 0.39); m.metallic = 0.45; m.roughness = 0.42; }
-        case 15u: { m.albedo = vec3<f32>(0.28, 0.03, 0.03); m.emissive = vec3<f32>(1.0, 0.08, 0.06) * 5.0; m.roughness = 0.28; }
-        // Regency construction: a violet with red in it (their counterpart to ARC's amber).
-        case 16u: { m.albedo = vec3<f32>(0.18, 0.05, 0.3); m.emissive = vec3<f32>(0.66, 0.12, 1.0) * 5.0; m.roughness = 0.25; }
-        case 17u: { m.albedo = vec3<f32>(0.3, 0.02, 0.02); m.emissive = regency_lamp_light(); m.roughness = 0.25; }
+        case 13u: { m = skin_slot(skin, SKIN_BUILD_GLOW); }
+        case 14u: { m = skin_slot(skin, SKIN_PLATE_DARK); }
+        case 15u: { m = skin_slot(skin, SKIN_BEACON); }
+        case 16u: { m = skin_slot(skin, SKIN_NANITE); }
+        case 17u: { m = skin_slot(skin, SKIN_LASER); }
         // Precursor alloy, its dark joints, and its cold blue-white light.
         // Precursor alloy: aged metal, not paint. Weathered on props below.
         case 18u: { m.albedo = vec3<f32>(0.44, 0.45, 0.46); m.metallic = 0.55; m.roughness = 0.5; }
@@ -3017,7 +3021,7 @@ fn material_of(id: u32, owner: u32) -> Pbr {
         // Shield projectors, in the faction's shield colour. Saturated before it is
         // pushed, or a pale gold blows out to white in the tonemap.
         // Helmet visor: gold-orange mirror glass, lit faintly from within.
-        case 26u: { m.albedo = vec3<f32>(0.46, 0.2, 0.02); m.metallic = 1.0; m.roughness = 0.12; }
+        case 26u: { m = skin_slot(skin, SKIN_VISOR); }
         case 24u: { m.albedo = globals.shield.rgb * 0.25; m.emissive = pow(globals.shield.rgb, vec3<f32>(2.2)) * 2.6; m.roughness = 0.3; }
         default: {}
     }
@@ -3134,7 +3138,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 
     let owner = flags & 0xFFu;
     let time = globals.camera.w;
-    var m = material_of(in.material, owner);
+    var m = material_of(in.material, owner, in.skin);
     if in.material == MAT_FOLIAGE {
         let leaf = foliage_sample(in);
         if foliage_missing(in, leaf) { discard; }
@@ -3292,6 +3296,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             ri.grads[k] = reg_face_grad(df1[k], df2[k], dl1, dl2);
         }
         ri.optic = (in.model_class >> 16u) & 0xFFu;
+        ri.skin = in.skin;
         ri.nanite = ((in.model_class >> 16u) & 0xFFu) == NANITE_PATTERN_SLOT;
         ri.time = time;
         ri.unit = in.state.w;
@@ -3650,7 +3655,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             let chase = fract(around * REACTOR_PULSES - time * REACTOR_PULSE_RATE + seed);
             let pulse = pow(chase, 5.0);
             let spark = step(0.985, fract(around * 23.0 + floor(time * 9.0 + seed) * 0.37));
-            m.emissive = mix(globals.glow.rgb * 0.5, vec3<f32>(0.95, 0.97, 1.0) * 1.6, pulse)
+            m.emissive = mix(skins[in.skin].highlight.rgb * 0.5, vec3<f32>(0.95, 0.97, 1.0) * 1.6, pulse)
                 * (0.9 + 9.0 * pulse + 3.0 * spark) * live;
         }
     }
@@ -3829,7 +3834,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             // machinery (regency.wgsl). The film's hue follows the plate's own shape, not
             // its scan relief: each bump would flip it between colours.
             let face_seed = f32((in.model_class >> 24u) & 0xFFu) / 255.0;
-            m = regency_paint(m, in.material == MAT_METAL, in.material == MAT_PLATING, regency,
+            m = regency_paint(m, in.skin, in.material == MAT_METAL, in.material == MAT_PLATING, regency,
                 dot(normalize(in.normal), v), face_seed);
         }
         let unit_at = vec3<f32>(in.state.w * 131.0, in.state.w * 71.0, in.state.w * 17.0);
@@ -4079,7 +4084,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         let pulse = 0.6 + 0.4 * sin(time * 5.0);
         let rim = pow(1.0 - max(dot(n, v), 0.0), 2.0);
         // `health` carries validity for ghosts: 1 placeable, 0 blocked.
-        let tint = mix(vec3<f32>(1.0, 0.15, 0.1), globals.glow.rgb, step(0.5, in.state.y));
+        let tint = mix(vec3<f32>(1.0, 0.15, 0.1), skins[in.skin].highlight.rgb, step(0.5, in.state.y));
         color = tint * (0.5 + rim * 2.5) * pulse;
         let weave = fract((in.clip.x + in.clip.y) * 0.25);
         if weave < 0.5 {

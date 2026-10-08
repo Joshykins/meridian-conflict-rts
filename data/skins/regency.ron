@@ -1,0 +1,43 @@
+// The Regency's skin (docs/STANDARD.md, STYLE.md "The Regency look"): black plate under
+// a red iridescent film over dark graphite machinery. Its plate is finished by
+// regency.wgsl from `film`, which keeps only the slots' light and shade; the slots'
+// own colours below are the shared ones every model was drawn with before skins
+// (only the first faction's palette reached the shader), kept so the Regency looks
+// exactly as it did. Choosing the Regency's own slot colours (its emitters red, its
+// glass without ARC's blue) is a look change of its own.
+(
+    highlight: (0.55, 0.85, 1.0),
+    slots: (
+        plate: (color: Rgb((0.16, 0.185, 0.225)), metal: 0.3, rough: 0.6),
+        plate_dark: (color: Plate((0.3, 0.33, 0.39)), metal: 0.45, rough: 0.42),
+        trim: (color: Rgb((0.072, 0.082, 0.1)), metal: 0.7, rough: 0.42),
+        emitter: (color: Highlight(0.2), rough: 0.3, glow: Highlight(5.0)),
+        metal: (color: Rgb((0.32, 0.33, 0.36)), metal: 0.95, rough: 0.32),
+        glass: (color: Rgb((0.02, 0.05, 0.09)), metal: 0.9, rough: 0.08, glow: Highlight(0.15)),
+        rubber: (color: Rgb((0.03, 0.03, 0.035)), rough: 0.9),
+        gun_glow: (color: Rgb((0.3, 0.12, 0.02)), rough: 0.3, glow: Light((1.0, 0.42, 0.08), 4.0)),
+        build_glow: (color: Rgb((0.3, 0.17, 0.02)), rough: 0.3, glow: Light((1.0, 0.6, 0.1), 4.0)),
+        beacon: (color: Rgb((0.28, 0.03, 0.03)), rough: 0.28, glow: Light((1.0, 0.08, 0.06), 5.0)),
+        // Nanite light: a violet with red in it (their counterpart to ARC's amber).
+        nanite: (color: Rgb((0.18, 0.05, 0.3)), rough: 0.25, glow: Light((0.66, 0.12, 1.0), 5.0)),
+        // Their lamp red: missile defence and the lamps let into their plate.
+        laser: (color: Rgb((0.3, 0.02, 0.02)), rough: 0.25, glow: Light((1.0, 0.07, 0.05), 5.5)),
+        visor: (color: Rgb((0.46, 0.2, 0.02)), metal: 1.0, rough: 0.12),
+    ),
+    film: (
+        // The plate: dark charcoal steel seen square on; as a face turns away the film's
+        // sheen rises, its hue cycling crimson, deep red, copper and back.
+        black: (0.1, 0.092, 0.084),
+        red: (0.36, 0.018, 0.022),
+        deep: (0.2, 0.008, 0.016),
+        copper: (0.34, 0.075, 0.02),
+        // The second plate: a paler steel under a thinner film.
+        pale: (0.15, 0.14, 0.13),
+        // Worn through the film to bright steel.
+        steel_lit: (0.36, 0.34, 0.315),
+        // The machinery: dark graphite, darker in its grooves, polished where worked.
+        works: (0.12, 0.112, 0.1),
+        works_deep: (0.02, 0.019, 0.017),
+        works_polish: (0.24, 0.225, 0.205),
+    ),
+)

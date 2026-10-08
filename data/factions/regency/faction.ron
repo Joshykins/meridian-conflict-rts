@@ -8,8 +8,9 @@
     // the stand-in's until they have some. Structures are always their own (mc-data checks).
     stand_in: Some("Aster"),
     commander: "regency_commander",
-    plating_color: (0.03, 0.026, 0.026),
-    accent_color: (0.012, 0.01, 0.01),
+    // Its models' look: data/skins/regency.ron.
+    skin: "regency",
+    // Its crest's colour on the set-up screens; its models' light is its skin's.
     highlight_color: (1.0, 0.05, 0.07),
     // Adjacency conduits: one bowed arc under lapped dark plates with lit seams, running
     // between low faceted field nodes; energy in the violet their nanites build in.

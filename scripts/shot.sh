@@ -30,6 +30,7 @@
 #   scripts/shot.sh unit aster_t1_tank
 #   scripts/shot.sh unit aster_t1_tank --views front34 --look 1,0,2.5 --zoom 3
 #   scripts/shot.sh unit aster_t1_tank --scenario march --ticks 40 --frames 60 --turn 90
+#   scripts/shot.sh unit aster_t1_tank --skin arc_verdant   (in another skin, data/skins)
 #   scripts/shot.sh run --range --unit aster_commander --scenario work --ticks 120 --follow 5
 #   scripts/shot.sh variants aster_t1_tank base tank_light~slim tank_light~twin
 #   scripts/shot.sh variants aster_t1_tank=base,tank_light~slim aster_t1_scout=base,scout~b

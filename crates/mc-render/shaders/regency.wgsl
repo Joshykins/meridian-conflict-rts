@@ -13,26 +13,23 @@
 // Relief comes out as a slope in model space (`RegencyLook::slope`), which
 // entity.wgsl carries into the world with `reg_to_world`.
 
-// The foundation strips' plate (foundations.wgsl): a dark warm graphite.
+// A model's plate and machinery take their colours from its skin's `film`
+// (data/skins/regency.ron, `SKIN_FILM_*`): charcoal steel under a film whose sheen
+// cycles crimson, deep red, copper as a face turns away, a paler second plate,
+// graphite machinery darker in its grooves and polished where worked.
+//
+// The foundation strips (foundations.wgsl) read no skin yet; until they do, these are
+// theirs, the same as the Regency skin's: their dark warm graphite, their lit lips'
+// bright steel, and their graphite inlay.
 const REG_GUNMETAL: vec3<f32> = vec3<f32>(0.1, 0.092, 0.082);
-// Where the plate is worn through its film to bright steel (and the foundation
-// strips' lit lips).
 const REG_STEEL_LIT: vec3<f32> = vec3<f32>(0.36, 0.34, 0.315);
-// The plate: dark charcoal steel under a thin film. Seen square on it is charcoal; as a
-// face turns away the film's sheen rises, and its hue cycles crimson, deep red,
-// copper and back with the angle, each facet started at its own point in the cycle.
-const REG_FILM_BLACK: vec3<f32> = vec3<f32>(0.1, 0.092, 0.084);
-const REG_FILM_RED: vec3<f32> = vec3<f32>(0.36, 0.018, 0.022);
-const REG_FILM_DEEP: vec3<f32> = vec3<f32>(0.2, 0.008, 0.016);
-const REG_FILM_COPPER: vec3<f32> = vec3<f32>(0.34, 0.075, 0.02);
-// The second plate (`PLATING` under `pattern::EMBER`): a paler steel under a thinner
-// film, for a two-tone hull whose bands of it stand against the charcoal.
-const REG_FILM_PALE: vec3<f32> = vec3<f32>(0.15, 0.14, 0.13);
-// The machinery under the plates: a dark graphite a shade off the plate, darker in
-// its grooves, and the lighter steel it polishes to where it is worked.
 const REG_WORKS: vec3<f32> = vec3<f32>(0.12, 0.112, 0.1);
 const REG_WORKS_DEEP: vec3<f32> = vec3<f32>(0.02, 0.019, 0.017);
-const REG_WORKS_POLISH: vec3<f32> = vec3<f32>(0.24, 0.225, 0.205);
+
+// A film colour of a skin (`SKIN_FILM_*`).
+fn reg_film_color(skin: u32, which: u32) -> vec3<f32> {
+    return skins[skin].film[which].rgb;
+}
 
 struct RegencyIn {
     // Model space, metres, and the face's normal there (unit).
@@ -55,6 +52,8 @@ struct RegencyIn {
     // A nanite face (`nanite::PATTERN_SLOT`): a lit slot down its middle.
     nanite: bool,
     optic: u32,
+    // Its skin (`ModelInfo::skin`): the film's colours and the lamps' red.
+    skin: u32,
     // Seconds, and the unit's own random, zero to one.
     time: f32,
     unit: f32,
@@ -73,10 +72,10 @@ struct RegencyLook {
     glow: vec3<f32>,
 }
 
-// The red lamp colour used by both the existing GLOW_LASER material and
-// surface-inlaid optics, so their hue and brightness cannot drift apart.
-fn regency_lamp_light() -> vec3<f32> {
-    return vec3<f32>(1.0, 0.07, 0.05) * 5.5;
+// The lamps let into the plate burn as the skin's `laser` slot does (the
+// GLOW_LASER material), so their hue and brightness cannot drift apart.
+fn regency_lamp_light(skin: u32) -> vec3<f32> {
+    return skins[skin].slots[2u * SKIN_LASER + 1u].rgb;
 }
 
 fn regency_none() -> RegencyLook {
@@ -397,12 +396,12 @@ fn regency_plate(i: RegencyIn) -> RegencyLook {
             let d = max(slot.x - half, slot.z * 2.1 - slot.y);
             let lit = 1.0 - smoothstep(-fw, fw, d);
             out.tone *= 1.0 - 0.9 * (1.0-smoothstep(-fw, fw, d-half));
-            out.glow = regency_lamp_light() * lit;
+            out.glow = regency_lamp_light(i.skin) * lit;
         }
     } else if i.optic == EMBER_PLATE_RIM {
         let inset = max(i.scale * 0.028, o.small * 0.18);
         let lit = surf_band(o.e - inset, i.scale * 0.013, fw);
-        out.glow = regency_lamp_light() * lit;
+        out.glow = regency_lamp_light(i.skin) * lit;
     }
     if i.nanite {
         out = reg_nanite(i, out, fw);
@@ -482,24 +481,29 @@ fn regency_look(i: RegencyIn, works: bool) -> RegencyLook {
 }
 
 // The film's colour at `cos_v` (the face's normal against the view).
-fn reg_film(cos_v: f32, seed: f32, pale: bool) -> vec3<f32> {
+fn reg_film(skin: u32, cos_v: f32, seed: f32, pale: bool) -> vec3<f32> {
     let off = 1.0 - saturate(cos_v);
     let rise = smoothstep(0.3, 0.9, off) * select(1.0, 0.7, pale);
     // Ping-pong crimson -> deep red -> copper -> deep red -> crimson.
     let h = abs(fract(off * 1.6 + seed * 0.8) * 2.0 - 1.0) * 2.0;
-    let hue = mix(mix(REG_FILM_RED, REG_FILM_DEEP, smoothstep(0.0, 1.0, h)), REG_FILM_COPPER, smoothstep(1.0, 2.0, h));
-    return mix(select(REG_FILM_BLACK, REG_FILM_PALE, pale), hue, rise);
+    let red = reg_film_color(skin, SKIN_FILM_RED);
+    let deep = reg_film_color(skin, SKIN_FILM_DEEP);
+    let copper = reg_film_color(skin, SKIN_FILM_COPPER);
+    let hue = mix(mix(red, deep, smoothstep(0.0, 1.0, h)), copper, smoothstep(1.0, 2.0, h));
+    let plate = select(reg_film_color(skin, SKIN_FILM_BLACK), reg_film_color(skin, SKIN_FILM_PALE), pale);
+    return mix(plate, hue, rise);
 }
 
 // Regency colours over the shared palette's (`lum` keeps the model's own light and
 // shade): plate (`PLATING_DARK`, and the paler `PLATING`), the darker trim (`ACCENT`) and
 // the dark graphite machinery (`METAL`).
-fn regency_paint(m_in: Pbr, works: bool, pale: bool, look: RegencyLook, cos_v: f32, seed: f32) -> Pbr {
+fn regency_paint(m_in: Pbr, skin: u32, works: bool, pale: bool, look: RegencyLook, cos_v: f32, seed: f32) -> Pbr {
     var m = m_in;
     let lum = dot(m.albedo, vec3<f32>(0.3, 0.59, 0.11));
     if works {
-        let base = mix(REG_WORKS_DEEP, REG_WORKS, saturate(look.tone)) * clamp(0.75 + lum, 0.75, 1.3);
-        m.albedo = mix(base, REG_WORKS_POLISH, saturate(look.lift));
+        let base = mix(reg_film_color(skin, SKIN_FILM_WORKS_DEEP), reg_film_color(skin, SKIN_FILM_WORKS), saturate(look.tone))
+            * clamp(0.75 + lum, 0.75, 1.3);
+        m.albedo = mix(base, reg_film_color(skin, SKIN_FILM_WORKS_POLISH), saturate(look.lift));
         m.metallic = 0.6;
         m.roughness = clamp(0.4 + look.rough - 0.18 * look.lift, 0.22, 0.6);
     } else {
@@ -508,7 +512,7 @@ fn regency_paint(m_in: Pbr, works: bool, pale: bool, look: RegencyLook, cos_v: f
         // sheen varying, smudged here, worn through to bright steel at its edges, dull
         // with grime in its seams.
         let tone = look.tone * clamp(0.8 + lum, 0.8, 1.2);
-        m.albedo = mix(reg_film(cos_v, seed, pale) * tone, REG_STEEL_LIT, saturate(look.lift) * 0.5);
+        m.albedo = mix(reg_film(skin, cos_v, seed, pale) * tone, reg_film_color(skin, SKIN_FILM_STEEL_LIT), saturate(look.lift) * 0.5);
         m.metallic = 0.55;
         m.roughness = clamp(0.42 + look.rough - 0.1 * saturate(look.lift), 0.24, 0.8);
     }

@@ -1,0 +1,22 @@
+// A variant of ARC's skin (docs/STANDARD.md, Skins): white plate over dark green
+// frames with green lights, the same models and slots. Worn by no faction; shown with
+// `scripts/shot.sh unit KEY --skin arc_verdant`, the proof that a look changes by
+// data alone.
+(
+    highlight: (0.35, 1.0, 0.45),
+    slots: (
+        plate: (color: Rgb((0.62, 0.63, 0.6)), metal: 0.25, rough: 0.5),
+        plate_dark: (color: Plate((0.12, 0.2, 0.13)), metal: 0.4, rough: 0.45),
+        trim: (color: Rgb((0.02, 0.06, 0.03)), metal: 0.6, rough: 0.45),
+        emitter: (color: Highlight(0.2), rough: 0.3, glow: Highlight(5.0)),
+        metal: (color: Rgb((0.3, 0.31, 0.3)), metal: 0.95, rough: 0.3),
+        glass: (color: Rgb((0.02, 0.07, 0.04)), metal: 0.9, rough: 0.08, glow: Highlight(0.15)),
+        rubber: (color: Rgb((0.03, 0.03, 0.03)), rough: 0.9),
+        gun_glow: (color: Rgb((0.3, 0.12, 0.02)), rough: 0.3, glow: Light((1.0, 0.42, 0.08), 4.0)),
+        build_glow: (color: Rgb((0.3, 0.17, 0.02)), rough: 0.3, glow: Light((1.0, 0.6, 0.1), 4.0)),
+        beacon: (color: Rgb((0.28, 0.03, 0.03)), rough: 0.28, glow: Light((1.0, 0.08, 0.06), 5.0)),
+        nanite: (color: Rgb((0.18, 0.05, 0.3)), rough: 0.25, glow: Light((0.66, 0.12, 1.0), 5.0)),
+        laser: (color: Rgb((0.3, 0.02, 0.02)), rough: 0.25, glow: Light((1.0, 0.07, 0.05), 5.5)),
+        visor: (color: Rgb((0.46, 0.2, 0.02)), metal: 1.0, rough: 0.12),
+    ),
+)

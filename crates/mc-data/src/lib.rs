@@ -11,6 +11,7 @@ pub mod elevator;
 mod raw;
 pub mod refit;
 pub mod regions;
+pub mod skins;
 pub mod sounds;
 pub mod strategic;
 pub mod survival;
@@ -143,10 +144,8 @@ pub struct Faction {
     pub commander: BlueprintId,
     /// The faction whose roster it fields while it has none of its own.
     pub stand_in: Option<FactionId>,
-    /// Linear RGB, presentation only.
-    pub plating_color: [f32; 3],
-    pub accent_color: [f32; 3],
-    pub highlight_color: [f32; 3],
+    /// Its models' look (`Blueprints::skins`). Presentation only.
+    pub skin: skins::SkinId,
     /// Its adjacency conduits: their energy colour (also the interface's marks for them),
     /// their path and their look (`Blueprints::power_line`).
     pub power_line: PowerLine,
@@ -1030,6 +1029,8 @@ pub struct Blueprints {
     pub units: Vec<UnitBlueprint>,
     /// Every unit with refit slots: its slots, modules and loadouts.
     pub refits: Vec<RefitSet>,
+    /// Every skin (`data/skins`), in key order. Presentation only.
+    pub skins: Vec<skins::Skin>,
     by_key: BTreeMap<String, BlueprintId>,
 }
 
@@ -1186,7 +1187,7 @@ impl Blueprints {
             }
             sources.push((faction, units, texts));
         }
-        Self::compile(sources)
+        Self::compile(sources, skins::load(data_dir)?)
     }
 
     /// Finds `data/` next to the executable or in a parent of the working directory.
@@ -1210,6 +1211,7 @@ impl Blueprints {
             Vec<raw::Unit>,
             BTreeMap<String, raw::RawUnitLore>,
         )>,
+        skins: Vec<skins::Skin>,
     ) -> Result<Blueprints, DataError> {
         sources.sort_by(|a, b| a.0.key.cmp(&b.0.key));
         let mut all: Vec<(u8, raw::Unit)> = Vec::new();
@@ -1295,6 +1297,11 @@ impl Blueprints {
                         })?,
                 ),
             };
+            let skin = skins
+                .iter()
+                .position(|s| s.key == f.skin)
+                .map(|j| skins::SkinId(j as u8))
+                .ok_or_else(|| DataError::Invalid(format!("{}: no skin {}", f.key, f.skin)))?;
             factions.push(Faction {
                 id: FactionId(i as u8),
                 key: f.key.clone(),
@@ -1303,9 +1310,7 @@ impl Blueprints {
                 description: f.description.clone(),
                 commander: lookup(&f.commander, &f.key)?,
                 stand_in,
-                plating_color: f.plating_color,
-                accent_color: f.accent_color,
-                highlight_color: f.highlight_color,
+                skin,
                 power_line: f.power_line,
                 shield_color: f.shield_color,
                 construction: f.construction,
@@ -1395,6 +1400,7 @@ impl Blueprints {
             factions,
             units,
             refits,
+            skins,
             by_key,
         })
     }
@@ -1964,6 +1970,7 @@ mod tests {
             std::fs::create_dir_all(target.parent().unwrap()).unwrap();
             std::fs::copy(&entry, &target).unwrap();
         }
+        copy_skins(&dir);
         dir
     }
 
@@ -2267,7 +2274,16 @@ mod tests {
         if let Some(lore) = lore {
             std::fs::write(to.join("lore.ron"), lore).unwrap();
         }
+        copy_skins(&root);
         root
+    }
+
+    /// Copies the shipped skins into a scratch `data/` at `root`: every faction names one.
+    fn copy_skins(root: &Path) {
+        std::fs::create_dir_all(root.join("skins")).unwrap();
+        for file in sorted_entries(&data_dir().join("skins")).unwrap() {
+            std::fs::copy(&file, root.join("skins").join(file.file_name().unwrap())).unwrap();
+        }
     }
 
     #[test]

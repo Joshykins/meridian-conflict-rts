@@ -48,6 +48,8 @@ pub(crate) struct Spec {
     /// (`--gutted`).
     pub(crate) fire: Option<u32>,
     pub(crate) gutted: bool,
+    /// Every model drawn in this skin (`data/skins/<key>.ron`), not its faction's.
+    pub(crate) skin: Option<String>,
 }
 
 /// Where the eye is: `bearing` degrees round from the unit's nose (positive
@@ -131,6 +133,7 @@ pub(crate) fn flag(
             spec.fire = Some(value(arg)?.parse().map_err(|_| "--fire takes seconds")?);
         }
         "--gutted" => spec.gutted = true,
+        "--skin" => spec.skin = Some(value(arg)?),
         _ => return Ok(false),
     }
     Ok(true)
@@ -149,6 +152,7 @@ impl Default for Spec {
             turn: 0.0,
             fire: None,
             gutted: false,
+            skin: None,
         }
     }
 }
@@ -218,6 +222,27 @@ impl Studio {
     ) -> Result<String, String> {
         use std::fmt::Write as _;
         let started = std::time::Instant::now();
+        // Each shot its own skin: a warm renderer goes back to the factions' after one.
+        let skin = match &spec.skin {
+            None => None,
+            Some(key) => Some(
+                self.blueprints
+                    .skins
+                    .iter()
+                    .position(|s| &s.key == key)
+                    .map(|i| mc_data::skins::SkinId(i as u8))
+                    .ok_or_else(|| {
+                        let keys: Vec<&str> = self
+                            .blueprints
+                            .skins
+                            .iter()
+                            .map(|s| s.key.as_str())
+                            .collect();
+                        format!("--skin: no skin {key:?} (data/skins: {})", keys.join(", "))
+                    })?,
+            ),
+        };
+        self.renderer.wear_skin(skin);
         // A prop is staged on the range's default subject's pad, in its place.
         let prop = prop_kind(&opts.subject);
         let hurt = opts.hurt;

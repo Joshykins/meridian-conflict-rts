@@ -35,10 +35,6 @@ struct Globals {
     lod: vec4<f32>,
     // dynamic entity count, static entity count, draw slot count, flags (1 = fog on)
     counts: vec4<u32>,
-    // Faction palette: plating, accent, glow.
-    plating: vec4<f32>,
-    accent: vec4<f32>,
-    glow: vec4<f32>,
     team_colors: array<vec4<f32>, OWNER_COLORS>,
     // Build grid: pointer xy, radius it shows within, taken lot count.
     build_cursor: vec4<f32>,
@@ -275,6 +271,22 @@ struct ModelInfo {
     // roll up over the planted leg, y the nose's dip as a foot comes down (radians), z how
     // far the hull settles onto its knees with it (metres); w 0. Zero rides level.
     leg_sway: vec4<f32>,
+    // Its skin: the index into `skins` (bindings.wgsl).
+    skin: u32,
+    _skin_pad0: u32,
+    _skin_pad1: u32,
+    _skin_pad2: u32,
+}
+
+// What each surface slot of a model looks like (`mc_data::skins`, renderer/skins.rs).
+//!rust crate::renderer::skins::GpuSkin
+struct Skin {
+    // Per slot (`gpu_consts::skin`): albedo and metallic, then emissive and roughness.
+    slots: array<vec4<f32>, SKIN_SLOT_WORDS>,
+    // The Regency finish's colours (`SKIN_FILM_*`), rgb.
+    film: array<vec4<f32>, SKIN_FILM_COLORS>,
+    // The skin's light: its emitters' hue, rgb.
+    highlight: vec4<f32>,
 }
 
 // Mirrors mc_sim::mirror::HousePose (192 bytes): per weapon yaw off the hull last tick and

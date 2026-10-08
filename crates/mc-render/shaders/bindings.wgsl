@@ -869,6 +869,20 @@ struct CraterList {
 // A city structure's look, one word per map prop (renderer/city_fx.rs,
 // gpu_consts::city_look): 0 for every prop that is whole or no building.
 @group(0) @binding(33) var<storage, read> city_look: array<u32>;
+// What each skin's surface slots look like (renderer/skins.rs), by `ModelInfo::skin`.
+@group(0) @binding(34) var<storage, read> skins: array<Skin>;
+
+// A skin slot's look (`SKIN_*`): albedo, metallic, emissive and roughness.
+fn skin_slot(skin: u32, slot: u32) -> Pbr {
+    let a = skins[skin].slots[2u * slot];
+    let e = skins[skin].slots[2u * slot + 1u];
+    var m: Pbr;
+    m.albedo = a.rgb;
+    m.metallic = a.w;
+    m.emissive = e.rgb;
+    m.roughness = e.w;
+    return m;
+}
 
 // The slot (plus one) of the melt field's tile at `tile`, 0 if it has none. The
 // renderer's `first_entry` hashes the same way.

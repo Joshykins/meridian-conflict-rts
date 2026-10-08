@@ -10,7 +10,8 @@ and brought up to it.
 says how any faction's look is put together. Where the two disagree, STYLE.md
 wins on taste and this file wins on structure.
 
-Status (2026-10-08): this is a plan. Nothing below marked *planned* exists in
+Status (2026-10-08): skins carry every model's surface slots and the Regency
+film (`data/skins`, below). The rest is a plan: nothing marked *planned* exists in
 the tree yet.
 
 ## Why: the 2026-10-08 audit
@@ -111,32 +112,26 @@ A model paints **slots**, which say what a surface is, never what colour it is:
 (The final list comes from the materials in `mc-models/src/lib.rs` and
 `gpu_consts.rs`. A slot replaces a material id, not the other way round.)
 
-## Skins (*planned*)
+## Skins
 
-A skin is one data file that fills every slot:
+A skin is one data file, `data/skins/<key>.ron` (`mc_data::skins`), that says
+what every slot a model paints looks like: its colour, metal, roughness and
+light. A colour is given outright (`Rgb`), as a light (`Light(hue, k)`), from the
+skin's own `highlight` (`Highlight(k)`) or as the plate tinted (`Plate(tint)`), so
+a slot that follows another follows it when a skin changes it. The Regency's skin
+also carries its `film`, the colours regency.wgsl finishes Regency plate in.
 
-```ron
-// data/skins/arc_standard.ron (proposed format)
-(
-    id: "arc_standard",         // stable: saved in replays and on the wire
-    faction: "Aster",
-    slots: {
-        plate:   (scan: "metal/brushed_009", color: (0.62, 0.64, 0.66),
-                  roughness: 0.45, metal: 0.3, wear: 0.4, pattern: "plate_courses"),
-        trim:    (scan: "metal/brushed_037", color: (0.08, 0.09, 0.1), ...),
-        emitter: (color: (0.25, 0.65, 1.0), brightness_by_tier: [0.0, 1.0, 1.6, 2.4, 3.2]),
-        ...
-    },
-    effects: "arc_standard",    // the effect palette, below
-    sounds: "aster",            // the sound set
-)
-```
-
-- A faction has a default skin. A unit may override single slots. A variant
-  (desert ARC, a Regency house colour, a reward) is another skin file.
-- On the GPU, skins are rows in one buffer, and each `ModelInfo` carries a skin
-  index. Changing a skin changes an index: no mesh rebuild, no shader change.
+- A faction names its skin in `faction.ron` (`skin: "arc"`). A variant (desert
+  ARC, a Regency house colour, a reward) is another skin file: `arc_verdant` is
+  ARC in white and green.
+- On the GPU, skins are rows in one buffer (scene set 34, renderer/skins.rs), and
+  each `ModelInfo` carries a skin index. `scripts/shot.sh unit KEY --skin KEY`
+  dresses every model in another skin with no rebuild.
 - Skins are presentation only and never reach `State` (determinism unaffected).
+- Not yet in a skin (*planned*): the finish (ARC paint over scanned steel or the
+  Regency film is still chosen by each face's pattern), the lights drawn by
+  surface patterns (windows, strips, lamps), the foundations' graphite, and
+  per-unit slot overrides.
 
 **Distribution.** Skins may be a paid extra, a developer or tournament reward,
 or made by modders. So from the start:

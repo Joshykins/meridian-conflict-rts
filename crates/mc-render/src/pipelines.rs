@@ -529,6 +529,8 @@ pub(crate) const SCENE_SET: &[Binding] = &[
     (32, vk::DescriptorType::STORAGE_BUFFER),
     // How hurt each city structure is (renderer/city_fx.rs).
     (33, vk::DescriptorType::STORAGE_BUFFER),
+    // What each skin's slots look like (renderer/skins.rs).
+    (34, vk::DescriptorType::STORAGE_BUFFER),
 ];
 
 /// The pass set (group 1 of the scene layout): a pass's own two storage buffers.

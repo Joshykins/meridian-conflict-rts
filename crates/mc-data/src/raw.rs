@@ -152,8 +152,13 @@ pub(crate) struct Faction {
     #[serde(default)]
     pub stand_in: Option<String>,
     pub commander: String,
-    pub plating_color: [f32; 3],
-    pub accent_color: [f32; 3],
+    /// Its skin (`data/skins/<skin>.ron`): what its models' surfaces look like.
+    pub skin: String,
+    /// Its crest's colour, linear RGB.
+    #[expect(
+        dead_code,
+        reason = "the set-up screens read it in their own parse (mc-game ui/faction.rs)"
+    )]
     pub highlight_color: [f32; 3],
     /// Its adjacency conduits: the lines between buildings that save each other upkeep.
     pub power_line: PowerLine,

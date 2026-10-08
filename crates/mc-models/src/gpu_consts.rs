@@ -1434,6 +1434,57 @@ shared! {
         pub const JUNCTIONS: u32 = 4;
     }
 
+    /// A skin (`mc_data::Skin`, data/skins, docs/STANDARD.md): what each of a model's
+    /// surface slots looks like, one `GpuSkin` per skin in scene set binding 34, picked
+    /// by `ModelInfo::skin`. Each slot is two vec4s in `Skin::slots`: albedo and metallic,
+    /// then emissive and roughness. Never renumber a slot.
+    pub mod skin as "SKIN_" {
+        /// `material::PLATING`: main armour.
+        pub const PLATE: u32 = 0;
+        /// `material::ACCENT`: frames, joints, recesses.
+        pub const TRIM: u32 = 1;
+        /// `material::GLOW`: the faction's own lights.
+        pub const EMITTER: u32 = 2;
+        /// `material::METAL`: barrels, pistons, working metal.
+        pub const METAL: u32 = 3;
+        /// `material::GLASS`: sensors, canopies.
+        pub const GLASS: u32 = 4;
+        /// `material::TREAD`: tracks, tyres, feet.
+        pub const RUBBER: u32 = 5;
+        /// `material::GLOW_ORANGE`: conventional weapons' light.
+        pub const GUN_GLOW: u32 = 6;
+        /// `material::GLOW_AMBER`: construction's light.
+        pub const BUILD_GLOW: u32 = 7;
+        /// `material::PLATING_DARK`: armour painted dark.
+        pub const PLATE_DARK: u32 = 8;
+        /// `material::GLOW_RED`: beacons (the shader blinks them).
+        pub const BEACON: u32 = 9;
+        /// `material::GLOW_VIOLET`: nanite light.
+        pub const NANITE: u32 = 10;
+        /// `material::GLOW_LASER`: missile-defence red, and the Regency's inlaid lamps.
+        pub const LASER: u32 = 11;
+        /// `material::VISOR`: helmet visor glass.
+        pub const VISOR: u32 = 12;
+        /// Slots in a skin.
+        pub const SLOTS: u32 = 13;
+        /// vec4s in `Skin::slots`: two per slot.
+        pub const SLOT_WORDS: u32 = 26;
+        /// The Regency finish's colours (`Skin::film`, regency.wgsl), one rgb each.
+        pub const FILM_BLACK: u32 = 0;
+        pub const FILM_RED: u32 = 1;
+        pub const FILM_DEEP: u32 = 2;
+        pub const FILM_COPPER: u32 = 3;
+        pub const FILM_PALE: u32 = 4;
+        pub const FILM_STEEL_LIT: u32 = 5;
+        pub const FILM_WORKS: u32 = 6;
+        pub const FILM_WORKS_DEEP: u32 = 7;
+        pub const FILM_WORKS_POLISH: u32 = 8;
+        /// Colours in `Skin::film`.
+        pub const FILM_COLORS: u32 = 9;
+        /// Skins a scene holds at most.
+        pub const MAX: u32 = 16;
+    }
+
     /// Bits of `UnitInstance::owner_flags` (`owner | flags << 8`) the shaders read that the
     /// older hand-written `FLAG_*` list in common.wgsl does not hold.
     pub mod unit_flag as "UNIT_FLAG_" {

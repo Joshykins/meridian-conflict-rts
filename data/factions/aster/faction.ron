@@ -4,8 +4,9 @@
     abbreviation: "ARC",
     description: "The standing military of the Asterian Reach. Angular light-metal plating over dark gunmetal frames, with near-white blue emitters that grow denser on more advanced hardware.",
     commander: "aster_commander",
-    plating_color: (0.16, 0.185, 0.225),
-    accent_color: (0.072, 0.082, 0.1),
+    // Its models' look: data/skins/arc.ron.
+    skin: "arc",
+    // Its crest's colour on the set-up screens; its models' light is its skin's.
     highlight_color: (0.55, 0.85, 1.0),
     // Adjacency conduits: engineered square runs of armoured cable, clamped down, a
     // junction box at each turn; energy in the blue of the reactors' electrical glow.

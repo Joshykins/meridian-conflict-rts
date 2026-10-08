@@ -163,6 +163,8 @@ straight into a match instead.
   --turn DEG             with --frames: the camera turns this many degrees about the unit
   --fire SECONDS         with --unit-shot of a city structure: it has been burning this long
   --gutted               with --unit-shot of a city structure: burnt out
+  --skin KEY             with --unit-shot: every model drawn in skin KEY (data/skins/KEY.ron),
+                         not its faction's own
   --shot-server DIR      stay up with a warm renderer and answer --unit-shot requests dropped in
                          DIR as NAME.req files (one argument per line; --reload re-reads data/,
                          --shaders recompiles the WGSL, --map NAME shoots on that map, a sea for

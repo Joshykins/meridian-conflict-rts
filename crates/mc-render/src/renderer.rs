@@ -98,6 +98,7 @@ mod regency_guns_fx;
 mod regency_mine_fx;
 mod shafts;
 mod shield_upload;
+pub(crate) mod skins;
 mod stake_fx;
 mod star_core_fx;
 mod structure_pads;
@@ -316,9 +317,6 @@ pub(crate) struct Globals {
     pub(crate) height: [f32; 4],
     pub(crate) lod: [f32; 4],
     pub(crate) counts: [u32; 4],
-    pub(crate) plating: [f32; 4],
-    pub(crate) accent: [f32; 4],
-    pub(crate) glow: [f32; 4],
     pub(crate) team_colors: [[f32; 4]; crate::gpu_consts::owner::COLORS as usize],
     pub(crate) build_cursor: [f32; 4],
     pub(crate) build_blocked: [[f32; 4]; BUILD_BLOCKED_MAX],
@@ -445,9 +443,14 @@ pub(crate) struct ModelInfo {
     pub(crate) charge_gear: [f32; 4],
     /// How a walker's hull rides its stride (`Legs::sway`): roll, nod and settle; w 0.
     pub(crate) leg_sway: [f32; 4],
+    /// Its skin (`Blueprints::skins`, renderer/skins.rs): its faction's, for a unit.
+    pub(crate) skin: u32,
+    pub(crate) _skin_pad0: u32,
+    pub(crate) _skin_pad1: u32,
+    pub(crate) _skin_pad2: u32,
 }
 
-const _: () = assert!(std::mem::size_of::<ModelInfo>() == 1056);
+const _: () = assert!(std::mem::size_of::<ModelInfo>() == 1072);
 
 // A prop's far level is the draw slot after its own levels.
 const _: () = assert!(models::LOD_COUNT as u32 == lod::FAR);
@@ -978,7 +981,10 @@ pub struct Renderer {
     node_scratch: Vec<TerrainNode>,
     upload_scratch: Vec<TerrainUpload>,
     map_info: mc_map::MapInfo,
-    palette: [[f32; 4]; 4],
+    /// The first faction's shield colour (`Globals::shield`).
+    shield_color: [f32; 4],
+    /// What each skin's slots look like (renderer/skins.rs, scene set 34).
+    skins: skins::Skins,
     team_colors: [[f32; 4]; crate::gpu_consts::owner::COLORS as usize],
     slot_count: u32,
     static_count: u32,
@@ -1424,7 +1430,19 @@ impl Renderer {
                 .get(infos.len())
                 .and_then(|(tex, h)| models::hull_plan_box(tex, *h))
                 .unwrap_or([0.0, 0.0, model.bounds_radius, model.bounds_radius]);
+            // A unit wears its faction's skin; a prop or cliff the first faction's.
+            let skin = bps
+                .units
+                .get(infos.len())
+                .map_or(bps.factions.first(), |bp| {
+                    bps.factions.get(bp.faction.0 as usize)
+                })
+                .map_or(0, |f| u32::from(f.skin.0));
             infos.push(ModelInfo {
+                skin,
+                _skin_pad0: 0,
+                _skin_pad1: 0,
+                _skin_pad2: 0,
                 slot: first_slot[at],
                 icon: *icon,
                 bounds_radius: model.bounds_radius,
@@ -2242,6 +2260,13 @@ impl Renderer {
             vk::DescriptorType::STORAGE_BUFFER,
             &[craters.buffer()],
         );
+        let skins = skins::Skins::new(&gpu, bps)?;
+        write_buffers(
+            scene_set,
+            34,
+            vk::DescriptorType::STORAGE_BUFFER,
+            &[skins.buffer()],
+        );
         let ground_melt = ground_melt::GroundMelt::new(&gpu)?;
         write_buffers(
             scene_set,
@@ -2511,12 +2536,8 @@ impl Renderer {
             node_scratch: Vec::new(),
             upload_scratch: Vec::new(),
             map_info: info,
-            palette: [
-                rgba(faction.plating_color),
-                rgba(faction.accent_color),
-                rgba(faction.highlight_color),
-                rgba(faction.shield_color),
-            ],
+            shield_color: rgba(faction.shield_color),
+            skins,
             team_colors,
             slot_count,
             static_count,
@@ -5570,6 +5591,7 @@ impl Drop for Renderer {
         self.shafts.destroy(&self.gpu);
         self.craters.destroy(&self.gpu);
         self.ground_melt.destroy(&self.gpu);
+        self.skins.destroy(&self.gpu);
         self.city_fx.destroy(&self.gpu);
         self.heat_haze.destroy(&self.gpu);
         self.lens_flares.destroy(&self.gpu);
