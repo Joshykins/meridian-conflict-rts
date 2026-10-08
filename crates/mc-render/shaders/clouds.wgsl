@@ -227,6 +227,8 @@ struct CloudSample {
     grey: f32,
     // Metres of its own column above the point, for how much sky it hides.
     above: f32,
+    // 1 in a closed deck or a flat sheet, 0 in a heap.
+    flat: f32,
 }
 
 // The cloud at `p`, given the weather there (`weather_at(p.xy)`). `detail` 0
@@ -395,12 +397,15 @@ fn cloud_at(at: vec3<f32>, w: vec4<f32>, detail: f32) -> CloudSample {
         dens = clamp((dens - wisp * erode) / (1.0 - wisp * erode), 0.0, 1.0);
     }
     // A heap is firm inside, so it ends at an edge instead of a wide thin
-    // fringe; a shred stays soft and see-through.
-    dens = mix(dens, dens * (2.0 - dens), firm);
+    // fringe; a shred stays soft and see-through. Squared (twice as steep at
+    // the edge) the fringe still read as fuzz round every heap.
+    let thin = 1.0 - dens;
+    dens = mix(dens, 1.0 - thin * thin * thin * thin, firm);
     dens *= 1.0 - 0.55 * streak;
     out.sigma = dens * CLOUD_SIGMA * (0.65 + 0.8 * storm) * mix(0.12, 1.0, firm);
     out.firm = firm;
     out.above = (1.0 - h) * reach;
+    out.flat = max(deck_closed, sheet);
     if detail > 0.0 {
         // Older, wetter cloud is greyer: patches of it, more in heavy weather.
         let age = grad_noise2(air - vec2<f32>(1409.0, 2203.0), 1400.0);
@@ -864,7 +869,15 @@ fn march(in: FullOut) -> vec4<f32> {
             // blended in over a band so no line shows where they change.
             var tau = 0.0;
             if light_lod < 1.0 {
-                var reach = 0.0;
+                // First a short tap with the fine erosion, about one of its
+                // lumps toward the sun, so each lump shades the crease behind
+                // it. Lit from the coarse taps alone the cauliflower changed
+                // the outline but never its own light: smooth cotton gradients.
+                // Not on a deck's or a sheet's flat top, which it turned into
+                // one even fleece from edge to edge.
+                let short = DETAIL_PERIOD * detail * 0.06;
+                tau = cloud_at(p + sun * short, w, detail).sigma * short * 2.0 * (1.0 - 0.8 * c.flat);
+                var reach = short * 2.0;
                 for (var k = 0; k < 4; k++) {
                     let seg = 70.0 * exp2(f32(k));
                     let q = p + sun * (reach + seg * 0.5);
@@ -1175,28 +1188,6 @@ fn sample_sharp(tex: texture_2d<f32>, uv: vec2<f32>) -> vec4<f32> {
     return sum / weight;
 }
 
-// Cubic B-spline filter as four bilinear taps (all weights positive, no ringing).
-fn sample_smooth(tex: texture_2d<f32>, uv: vec2<f32>) -> vec4<f32> {
-    let size = vec2<f32>(textureDimensions(tex));
-    let at = uv * size - 0.5;
-    let centre = floor(at);
-    let f = at - centre;
-    let f2 = f * f;
-    let f3 = f2 * f;
-    let w0 = (1.0 - 3.0 * f + 3.0 * f2 - f3) / 6.0;
-    let w1 = (4.0 - 6.0 * f2 + 3.0 * f3) / 6.0;
-    let w2 = (1.0 + 3.0 * f + 3.0 * f2 - 3.0 * f3) / 6.0;
-    let w3 = f3 / 6.0;
-    let g0 = w0 + w1;
-    let g1 = w2 + w3;
-    let p0 = (centre - 0.5 + w1 / g0) / size;
-    let p1 = (centre + 1.5 + w3 / g1) / size;
-    return (textureSampleLevel(tex, clamp_sampler, vec2<f32>(p0.x, p0.y), 0.0) * g0.x
-        + textureSampleLevel(tex, clamp_sampler, vec2<f32>(p1.x, p0.y), 0.0) * g1.x) * g0.y
-        + (textureSampleLevel(tex, clamp_sampler, vec2<f32>(p0.x, p1.y), 0.0) * g0.x
-        + textureSampleLevel(tex, clamp_sampler, vec2<f32>(p1.x, p1.y), 0.0) * g1.x) * g1.y;
-}
-
 @fragment
 fn fs_resolve(in: FullOut) -> @location(0) vec4<f32> {
     let px = vec2<i32>(in.clip.xy);
@@ -1340,8 +1331,8 @@ fn cloud_cover(uv: vec2<f32>, through: f32) -> f32 {
 // The accumulated clouds at a full-size pixel whose scene depth is `depth`. The
 // march texels are several pixels wide, and one straddling a treetop and the
 // sky marched to the sky (the farthest of its corners): its cloud and rain,
-// spread by the smooth filter, greyed the leaves beside it and blurred every
-// crown against the sky. Each texel of the cubic B-spline counts only as far
+// spread by the cubic filter, greyed the leaves beside it and blurred every
+// crown against the sky. Each texel of a cubic B-spline counts only as far
 // as it marched to this pixel's own depth; where none did, the nearest wins
 // (none at all for a pixel nearer than all of them).
 fn upsample(uv: vec2<f32>, depth: f32) -> vec4<f32> {
@@ -1385,9 +1376,19 @@ fn upsample(uv: vec2<f32>, depth: f32) -> vec4<f32> {
             nearest_at = px;
         }
     }
-    // All of a piece (nearly every pixel): the four-tap filter.
+    // All of a piece (nearly every pixel): Catmull-Rom, kept inside the four
+    // texels round the pixel so its lobes cannot ring. A B-spline here blurred
+    // as it scaled up, a texel and a half on top of the march's own coarse
+    // size, and every cloud's edge went soft as cotton wool.
     if worst > 0.9 {
-        return sample_smooth(cloud_now, uv);
+        var lo = textureLoad(cloud_now, clamp(vec2<i32>(centre), vec2<i32>(0), last), 0);
+        var hi = lo;
+        for (var i = 1; i < 4; i++) {
+            let c = textureLoad(cloud_now, clamp(vec2<i32>(centre) + vec2<i32>(i & 1, i >> 1u), vec2<i32>(0), last), 0);
+            lo = min(lo, c);
+            hi = max(hi, c);
+        }
+        return clamp(sample_sharp(cloud_now, uv), lo, hi);
     }
     var sum = vec4<f32>(0.0);
     var weight = 0.0;
@@ -1415,7 +1416,7 @@ fn fs_composite(in: FullOut) -> @location(0) vec4<f32> {
         discard;
     }
     // The accumulated clouds, whose texels are several pixels wide, read through a
-    // cubic B-spline: smooth across texels, so a ragged edge is not a row of
+    // cubic (`upsample`): smooth across texels, so a ragged edge is not a row of
     // squares (a small tent showed each texel as one at low camera angles).
     let texel = 1.0 / vec2<f32>(textureDimensions(cloud_now));
     let scene = textureLoad(scene_depth, vec2<i32>(in.clip.xy), 0);
