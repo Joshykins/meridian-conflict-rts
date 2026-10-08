@@ -3906,6 +3906,18 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
                 dot(normalize(in.normal), v), face_seed);
         }
         m.albedo *= fit_shade;
+        // Team colour the model's author painted here (`SMARK_TEAM`), under the dirt.
+        if here.kind == SMARK_TEAM && !wreck && (in.material == MAT_PLATING || in.material == MAT_PLATING_DARK
+            || in.material == MAT_ACCENT || in.material == MAT_METAL) {
+            let plane = mark_plane(here, normalize(face_n + vec3<f32>(0.0, 0.0, 1e-9)), screen_right);
+            let team = team_paint(plane.q, plane.half, local_px);
+            let team_rgb = globals.team_colors[owner & OWNER_MASK].rgb;
+            m.albedo = mix(m.albedo, team_rgb * TEAM_PAINT, team.x);
+            m.albedo = mix(m.albedo, vec3<f32>(0.02, 0.02, 0.022), team.y * 0.85);
+            m.emissive = mix(m.emissive, team_rgb * TEAM_GLOW, team.x);
+            m.metallic = mix(m.metallic, 0.3, team.x);
+            m.roughness = mix(m.roughness, 0.4, team.x);
+        }
         let unit_at = vec3<f32>(in.state.w * 131.0, in.state.w * 71.0, in.state.w * 17.0);
         let rise = in.state.z / max(line, 0.02);
         let dirt = surf_dirt(in.local + unit_at, rise, n.z, kick, grit, seam, local_px);

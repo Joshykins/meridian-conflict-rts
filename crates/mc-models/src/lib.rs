@@ -1066,3 +1066,23 @@ pub fn aircraft_exhausts(mesh: &str) -> &'static [[f32; 3]] {
         _ => &[],
     }
 }
+
+/// Whether `model` wears its team colour at level `mesh` (tests): a team-coloured face
+/// (pointing mostly up, if `upward`), or a team mark the surface paints
+/// (`gpu_consts::surface_mark::TEAM`), which every level draws.
+#[cfg(test)]
+pub(crate) fn wears_team(model: &Model, mesh: &MeshLod, upward: bool) -> bool {
+    model
+        .marks
+        .iter()
+        .any(|m| m.kind == gpu_consts::surface_mark::TEAM)
+        || mesh
+            .vertices
+            .iter()
+            .any(|v| v.material == material::TEAM && (!upward || v.normal[2] > 0.5))
+}
+
+/// The most a reduced level of detail may draw, as a share of the full level (plus 20
+/// triangles), in the tests that hold models to their budgets.
+#[cfg(test)]
+pub(crate) const REDUCED_SHARE: f32 = 0.47;

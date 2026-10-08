@@ -1546,6 +1546,9 @@ shared! {
         /// `laser` slot colour (the Regency's lamp red).
         pub const LAMP: u32 = 21;
         // retired: 22 (GLYPH, engraved strokes: read as random scribbles)
+        /// The owner's colour painted over the box, edged by a dark pin line: team colour
+        /// drawn by the surface, not a plate of mesh.
+        pub const TEAM: u32 = 23;
         /// Marks a model may carry at most.
         pub const MAX: u32 = 48;
     }

@@ -503,9 +503,7 @@ fn check_shots(
             }
         }
         assert!(
-            mesh.vertices
-                .iter()
-                .any(|v| v.material == material::TEAM && v.normal[2] > 0.5),
+            crate::wears_team(&model, mesh, true),
             "{name}: no upward team colour"
         );
         assert!(

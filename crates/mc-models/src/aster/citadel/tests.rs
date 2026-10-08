@@ -81,10 +81,7 @@ fn citadel_fits_its_lot_and_is_unlit_hardware() {
             top >= SIZE.1 * 0.8 && top <= SIZE.1 * 1.1,
             "lod{l}: top {top}"
         );
-        assert!(
-            lod.vertices.iter().any(|v| v.material == material::TEAM),
-            "lod{l}: team colour"
-        );
+        assert!(crate::wears_team(&model, lod, false), "lod{l}: team colour");
         let lit = lod
             .vertices
             .iter()

@@ -220,6 +220,11 @@ on whichever face it crosses and filling the box (greebles.wgsl `fitting_h`,
 | `STENCIL` | a number (paint) | the number |
 | `WARNING` | a warning triangle (paint) | |
 | `LABEL` | lines of stencilled lettering (paint) | which words |
+| `TEAM` | the owner's colour, edged by a pin line (paint, under dirt) | |
+| `LAMP` | a slot lit in the skin's lamp colour (Regency) | |
+| `LAP` | a plate lapped over the next: shadow under, bright edge (Regency) | |
+| `GROOVE` | a machined channel with polished lips (Regency) | channel width |
+| `OUTLINE` | an inset panel line, no bolts (Regency) | |
 
 Fittings carry relief and darken their hollows; paint goes on after dirt, as
 fresh paint. Later marks lie over earlier ones. A model carries at most 48
@@ -234,6 +239,8 @@ example.
   gets in, louvres and grilles over engines, access covers on the sides of
   engine bays, bolt rows along deck edges, applique on the faces that take hits,
   weld seams down the middle of big plates.
+- Team colour is a `TEAM` mark on a level face that reads from above (a roof, a
+  deck, a wing), never a plate of mesh. ARC's `parts::team_panel` lays one.
 - Paint marks belong where they mean something: hazard stripes on tow points,
   hinges and moving parts; a warning sign by an exhaust, a hot or a dangerous
   part; the hull number on a flank both sides can read; lettering under it or
@@ -293,7 +300,7 @@ set shows for each.
 - [ ] Its zones marked, and its fittings and paint marks placed where a real
       machine would carry them ("Texture detail and marks").
 - [ ] No fitting modelled that a mark can draw (bolts, vents, grilles,
-      hatch outlines).
+      hatch outlines), no lit piece of mesh, and team colour painted (`TEAM`).
 - [ ] Looks right in its own skin and in at least one other.
 
 **Motion**

@@ -872,11 +872,20 @@ pub(super) fn tracked_chassis(b: &mut MeshBuilder, c: &Chassis) -> Roof {
         } else {
             track(b, c.rear - 0.1, c.front - 0.05, inner, outer, track_height);
         }
-        // Front fender in team colour, easy to read from above. A dark coarse
-        // hull (the engineer) skips it to stay inside the far-LOD budget.
+        // Front fender, painted in team colour so it reads from above (a mark: the
+        // surface paints it). A dark coarse hull (the engineer) skips it to stay inside
+        // the far-LOD budget.
         if !(b.coarse() && c.dark) {
             let fender = v2(length * 0.2, (outer - inner) * 0.96);
-            b.paint(TEAM);
+            let at = v3(c.front - 0.34 * length, (inner + outer) * 0.5, track_height);
+            let half = (fender * 0.5).extend(0.2);
+            b.mark(
+                at - half,
+                at + half,
+                crate::gpu_consts::surface_mark::TEAM,
+                0.0,
+            );
+            b.paint(PLATING);
             if b.fine() {
                 b.plate(
                     v3(c.front - 0.34 * length, (inner + outer) * 0.5, track_height),
@@ -1067,15 +1076,16 @@ pub(super) fn glow_strip(b: &mut MeshBuilder, base_center: Vec3, size: Vec2, glo
     b.plate(base_center, size, 0.05, 0.02);
 }
 
-/// Team-colour panel lying on a horizontal surface: a raised plate at full
-/// detail, a single quad below that.
+/// Team colour on the surface at `base_center` (a level face there), `size` across:
+/// painted by the surface (`surface_mark::TEAM`), not a plate of mesh.
 pub(super) fn team_panel(b: &mut MeshBuilder, base_center: Vec3, size: Vec2) {
-    b.paint(TEAM);
-    if b.fine() {
-        b.plate(base_center, size, 0.07, 0.03);
-    } else {
-        b.decal(base_center + Vec3::Z * 0.07, size);
-    }
+    let half = (size * 0.5).extend(0.15);
+    b.mark(
+        base_center - half,
+        base_center + half,
+        crate::gpu_consts::surface_mark::TEAM,
+        0.0,
+    );
 }
 
 /// The ground stakes a siege unit plants, one on each corner (`gpu_consts::stake`, the

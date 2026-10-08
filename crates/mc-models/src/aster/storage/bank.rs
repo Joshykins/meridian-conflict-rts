@@ -296,7 +296,7 @@ mod tests {
                 println!("{key} T{tech}: {full}/{mid}/{coarse}");
                 assert!(full <= 2600 && coarse < 60, "{key} T{tech}");
                 assert!(
-                    mid as f32 <= full as f32 * 0.45 + 20.0,
+                    mid as f32 <= full as f32 * crate::REDUCED_SHARE + 20.0,
                     "{key} T{tech} reduced"
                 );
                 assert!(mid > last, "{key} T{tech} adds machinery");

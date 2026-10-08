@@ -2,7 +2,7 @@
 //! the unit file's muzzles agree, and each hatch and round sits on its own cell.
 
 use super::triangles;
-use crate::{build_model_scaled, material, part, CellBlock, Model};
+use crate::{build_model_scaled, part, CellBlock, Model};
 
 /// Every unit with a hatched weapon, built as the game draws it, with that weapon.
 fn launchers() -> Vec<(String, Model, mc_data::Weapon)> {
@@ -150,7 +150,7 @@ fn skyguard_is_a_fixed_site_on_a_wide_pad() {
             "LOD{level}: nothing yaws"
         );
         assert!(
-            lod.vertices.iter().any(|v| v.material == material::TEAM),
+            crate::wears_team(&model, lod, false),
             "LOD{level}: no team colour"
         );
         assert!(

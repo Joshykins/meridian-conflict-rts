@@ -272,6 +272,15 @@ fn fitting_h(kind: u32, q: vec2<f32>, half: vec2<f32>, pitch: f32, fw: f32) -> v
     return vec2<f32>(mix(1.0, h, keep * seen), mix(1.0, shade, keep * mix(0.5, 1.0, seen)));
 }
 
+// How much of the owner's colour lies at `q` (`SMARK_TEAM`): x the paint, y the dark
+// pin line just inside its edge.
+fn team_paint(q: vec2<f32>, half: vec2<f32>, fw: f32) -> vec2<f32> {
+    let inside = surf_edge(q, half);
+    let fill = surf_step(inside, 0.0, fw);
+    let pin = surf_band(inside - 0.03, 0.009, fw);
+    return vec2<f32>(fill * (1.0 - pin), pin);
+}
+
 // A lamp slot's light at `q` (`SMARK_LAMP`), 0 to 1: a bright core down the slot.
 fn lamp_light(q: vec2<f32>, half: vec2<f32>, fw: f32) -> f32 {
     let turned = half.y > half.x;

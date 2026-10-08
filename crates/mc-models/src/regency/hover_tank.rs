@@ -201,7 +201,7 @@ fn glacis(b: &mut MeshBuilder, z: f32, half: f32) {
 
 /// A turret: a bronze ring at the turret's pivot, a faceted housing lofted from `half` its
 /// plan (x, y >= 0, nose to tail) between `z` heights, drawn in to `top` at its roof, the
-/// owner's colour on its roof, a sensor blade swept back and up off it. Its optics are
+/// owner's colour painted on its roof, a sensor blade swept back and up off it. Its optics are
 /// lamp slots in its surface (`marks`).
 fn turret(b: &mut MeshBuilder, half: &[[f32; 2]], z: (f32, f32), top: f32) {
     let plan: Vec<[f32; 2]> = half
@@ -228,13 +228,13 @@ fn turret(b: &mut MeshBuilder, half: &[[f32; 2]], z: (f32, f32), top: f32) {
         )
     });
     let tail = half.last().map_or(-2.0, |p| p[0]) * top - 0.2;
-    b.paint(TEAM);
-    b.face(&[
-        v3(-0.2, -0.45, z.1 + 0.005),
-        v3(-0.2, 0.45, z.1 + 0.005),
-        v3(tail * 0.6, 0.35, z.1 + 0.005),
-        v3(tail * 0.6, -0.35, z.1 + 0.005),
-    ]);
+    // The owner's colour on its roof, painted by the surface.
+    b.mark(
+        v3(tail * 0.6, -0.42, z.1 - 0.15),
+        v3(-0.2, 0.42, z.1 + 0.15),
+        crate::gpu_consts::surface_mark::TEAM,
+        0.0,
+    );
     dark_plate(b);
     blade(
         b,

@@ -1050,10 +1050,7 @@ mod tests {
                     .any(|v| v.part == part::TURRET && v.rig & rig::LIMB_MASK == rig::ARM_GUN),
                 "lod{l}: gun arm"
             );
-            assert!(
-                lod.vertices.iter().any(|v| v.material == material::TEAM),
-                "lod{l}: team colour"
-            );
+            assert!(crate::wears_team(&model, lod, false), "lod{l}: team colour");
             let lit = lod
                 .vertices
                 .iter()

@@ -1179,7 +1179,7 @@ mod tests {
                 "{key}: {full}/{mid}/{coarse}"
             );
             assert!(
-                mid as f32 <= full as f32 * 0.45 + 20.0,
+                mid as f32 <= full as f32 * crate::REDUCED_SHARE + 20.0,
                 "{key}: reduced {mid} of {full}"
             );
             for (l, lod) in model.lods.iter().enumerate() {
