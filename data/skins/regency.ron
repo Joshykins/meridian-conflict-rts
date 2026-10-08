@@ -1,19 +1,17 @@
 // The Regency's skin (docs/STANDARD.md, STYLE.md "The Regency look"): black plate under
 // a red iridescent film over dark graphite machinery. Its plate is finished by
-// regency.wgsl from `film`, which keeps only the slots' light and shade; the slots'
-// own colours below are the shared ones every model was drawn with before skins
-// (only the first faction's palette reached the shader), kept so the Regency looks
-// exactly as it did. Choosing the Regency's own slot colours (its emitters red, its
-// glass without ARC's blue) is a look change of its own.
+// regency.wgsl from `film`, which keeps only the plate slots' light and shade, so their
+// colours are the shared ones. The rest are its own: red emitters and glass, warm
+// graphite trim and working metal. Its fittings (marks) cut deep.
 (
-    highlight: (0.55, 0.85, 1.0),
+    highlight: (1.0, 0.05, 0.07),
     slots: (
         plate: (color: Rgb((0.16, 0.185, 0.225)), metal: 0.3, rough: 0.6),
         plate_dark: (color: Plate((0.3, 0.33, 0.39)), metal: 0.45, rough: 0.42),
-        trim: (color: Rgb((0.072, 0.082, 0.1)), metal: 0.7, rough: 0.42),
+        trim: (color: Rgb((0.05, 0.045, 0.04)), metal: 0.6, rough: 0.45),
         emitter: (color: Highlight(0.2), rough: 0.3, glow: Highlight(5.0)),
-        metal: (color: Rgb((0.32, 0.33, 0.36)), metal: 0.95, rough: 0.32),
-        glass: (color: Rgb((0.02, 0.05, 0.09)), metal: 0.9, rough: 0.08, glow: Highlight(0.15)),
+        metal: (color: Rgb((0.2, 0.19, 0.175)), metal: 0.9, rough: 0.35),
+        glass: (color: Rgb((0.06, 0.015, 0.015)), metal: 0.9, rough: 0.08, glow: Highlight(0.15)),
         rubber: (color: Rgb((0.03, 0.03, 0.035)), rough: 0.9),
         gun_glow: (color: Rgb((0.3, 0.12, 0.02)), rough: 0.3, glow: Light((1.0, 0.42, 0.08), 4.0)),
         build_glow: (color: Rgb((0.3, 0.17, 0.02)), rough: 0.3, glow: Light((1.0, 0.6, 0.1), 4.0)),
@@ -25,7 +23,8 @@
         visor: (color: Rgb((0.46, 0.2, 0.02)), metal: 1.0, rough: 0.12),
     ),
     // Plated faces: steel under the film, not ARC's paint.
-    finish: (kind: Regency),
+    // Plated faces: steel under the film, not ARC's paint; its fittings cut deep.
+    finish: (kind: Regency, seams: 2.5),
     film: (
         // The plate: dark charcoal steel seen square on; as a face turns away the film's
         // sheen rises, its hue cycling crimson, deep red, copper and back.

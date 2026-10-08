@@ -1535,6 +1535,17 @@ shared! {
         pub const WARNING: u32 = 16;
         /// Paint: lines of small stencilled lettering (`arg` picks the words' lengths).
         pub const LABEL: u32 = 17;
+        /// A lapped plate edge along the box's long side: the plate over it stands
+        /// proud, a shadow line under its edge, the edge itself worn bright.
+        pub const LAP: u32 = 18;
+        /// A recessed channel along the box's long side, grime in it.
+        pub const GROOVE: u32 = 19;
+        /// A panel line inset round the box: no bolts, no frame.
+        pub const OUTLINE: u32 = 20;
+        /// A lamp slot let into the plate along the box's long side, lit in the skin's
+        /// `laser` slot colour (the Regency's lamp red).
+        pub const LAMP: u32 = 21;
+        // retired: 22 (GLYPH, engraved strokes: read as random scribbles)
         /// Marks a model may carry at most.
         pub const MAX: u32 = 48;
     }

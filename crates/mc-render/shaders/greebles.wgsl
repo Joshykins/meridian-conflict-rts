@@ -230,6 +230,32 @@ fn fitting_h(kind: u32, q: vec2<f32>, half: vec2<f32>, pitch: f32, fw: f32) -> v
             h = max(h, 1.6 + 0.3 * bolt * step(0.01, bolt));
             shade *= 1.0 - 0.45 * step(0.01, bolt) * (1.0 - bolt) + 0.35 * bolt * bolt;
         }
+        case SMARK_LAP: {
+            // The plate on the +side laps over the one on the -side: a deep shadow under
+            // its edge, the edge itself worn bright.
+            let over = smoothstep(-0.008, 0.008, p.y);
+            h = 1.0 + 0.5 * over;
+            shade = 1.0 - 0.85 * surf_band(p.y + 0.025, 0.022, fw) + 0.6 * surf_band(p.y - 0.008, 0.008, fw);
+        }
+        case SMARK_GROOVE: {
+            // A machined channel: dark down its middle, its lips polished bright.
+            let w = select(0.045, pitch * 0.5, pitch > 0.0);
+            let channel = 1.0 - smoothstep(w * 0.7, w, abs(p.y));
+            h = 1.0 - 0.9 * channel;
+            shade = 1.0 - 0.8 * channel * smoothstep(w, w * 0.3, abs(p.y)) + 0.5 * surf_band(abs(p.y) - w, w * 0.15, fw);
+        }
+        case SMARK_OUTLINE: {
+            let line = surf_band(inside - 0.04, 0.012, fw);
+            h = 1.0 - 0.7 * line;
+            shade = 1.0 - 0.8 * line + 0.35 * surf_band(inside - 0.06, 0.006, fw);
+        }
+        case SMARK_LAMP: {
+            // The slot the lamp sits in (its light is `lamp_light`).
+            let slot = surf_step(0.035 - abs(p.y), 0.0, fw) * surf_step(hf.x - 0.03 - abs(p.x), 0.0, fw);
+            let rim = surf_band(abs(p.y) - 0.045, 0.01, fw) * surf_step(hf.x - abs(p.x), 0.0, fw);
+            h = 1.0 - 0.6 * slot - 0.3 * rim;
+            shade = 1.0 - 0.5 * rim;
+        }
         case SMARK_SEAM: {
             // A weld bead down the middle, rippled where each pass was laid.
             let across = abs(p.y);
@@ -244,6 +270,14 @@ fn fitting_h(kind: u32, q: vec2<f32>, half: vec2<f32>, pitch: f32, fw: f32) -> v
     let keep = surf_step(inside, 0.0, fw);
     let seen = 1.0 - smoothstep(0.012, 0.035, fw);
     return vec2<f32>(mix(1.0, h, keep * seen), mix(1.0, shade, keep * mix(0.5, 1.0, seen)));
+}
+
+// A lamp slot's light at `q` (`SMARK_LAMP`), 0 to 1: a bright core down the slot.
+fn lamp_light(q: vec2<f32>, half: vec2<f32>, fw: f32) -> f32 {
+    let turned = half.y > half.x;
+    let p = select(q, q.yx, turned);
+    let hf = select(half, half.yx, turned);
+    return surf_step(0.022 - abs(p.y), 0.0, fw) * surf_step(hf.x - 0.05 - abs(p.x), 0.0, fw);
 }
 
 // A placed mark's paint (`SMARK_HAZARD`, `SMARK_STENCIL`, `SMARK_WARNING`, `SMARK_LABEL`)

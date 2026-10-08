@@ -23,7 +23,7 @@ use super::chassis::{coarse_lift, hull, lift_bell, Hull};
 use super::commander::form::blade;
 use super::guns::repeater;
 use super::kit::{dark_plate, metal, v3};
-use super::machine::{armour, red_slot, Course, Frame};
+use super::machine::{armour, Course, Frame};
 
 /// Where the turret turns, the gun's trunnion and its mouth (the unit file's `pivot` and
 /// `muzzle`).
@@ -69,6 +69,7 @@ fn rig(b: &mut MeshBuilder) {
 /// The low hull with swept sponsons, its bells and its turret.
 pub(super) fn hover_tank(b: &mut MeshBuilder, _tech: u8) {
     rig(b);
+    marks(b);
     if b.coarse() {
         coarse(b);
         return;
@@ -108,6 +109,57 @@ pub(super) fn hover_tank(b: &mut MeshBuilder, _tech: u8) {
     });
 }
 
+/// The Sledge's surface (docs/STANDARD.md, marks) in the Regency's own detail: plates
+/// lapped over each other, machined channels running with the hull, panel lines inset
+/// round the broad faces, and red lamp slots let into the plate for its optics and
+/// running lights. No bolts, vents or grilles, and nothing lit in the mesh.
+fn marks(b: &mut MeshBuilder) {
+    use crate::gpu_consts::surface_mark as mark;
+    // The glacis laps over the nose.
+    b.mark(v3(2.85, -1.1, 1.1), v3(3.1, 1.1, 1.95), mark::LAP, 0.0);
+    // A channel down the deck, the tail's plate outlined.
+    b.mark(
+        v3(-3.3, -0.05, 1.55),
+        v3(1.6, 0.05, 1.85),
+        mark::GROOVE,
+        0.0,
+    );
+    b.mark(
+        v3(-3.6, -1.1, 0.85),
+        v3(-3.3, 1.1, 1.65),
+        mark::OUTLINE,
+        0.0,
+    );
+    // The turret's roof panel and its brow lapped over its front.
+    b.mark(
+        v3(-1.7, -0.65, 2.65),
+        v3(0.3, 0.65, 2.95),
+        mark::OUTLINE,
+        0.0,
+    );
+    b.mark(v3(0.55, -0.6, 1.95), v3(0.8, 0.6, 2.75), mark::LAP, 0.0);
+    b.mirror_y(|b| {
+        // Optics under the glacis's brow and either side of the gun.
+        b.mark(v3(3.8, 0.3, 1.02), v3(4.1, 0.75, 1.18), mark::LAMP, 0.0);
+        b.mark(v3(3.4, 0.7, 1.05), v3(3.7, 1.05, 1.19), mark::LAMP, 0.0);
+        b.mark(v3(0.6, 0.35, 2.48), v3(0.95, 0.8, 2.62), mark::LAMP, 0.0);
+        // Deck panels either side of the channel, a running light along each.
+        b.mark(
+            v3(-3.0, 0.45, 1.55),
+            v3(-1.4, 1.7, 1.85),
+            mark::OUTLINE,
+            0.0,
+        );
+        b.mark(v3(-1.1, 0.45, 1.55), v3(1.2, 1.5, 1.85), mark::OUTLINE, 0.0);
+        b.mark(v3(-2.8, 1.75, 1.5), v3(-1.6, 1.95, 1.75), mark::LAMP, 0.0);
+        // A channel along each sponson's flank, under its course of plates.
+        b.mark(v3(-3.2, 1.8, 0.95), v3(2.4, 2.8, 1.1), mark::GROOVE, 0.0);
+        // The turret's flank: a channel below its shoulder, a running light above it.
+        b.mark(v3(-2.1, 0.85, 2.26), v3(0.9, 1.35, 2.38), mark::GROOVE, 0.0);
+        b.mark(v3(-1.0, 0.85, 2.45), v3(0.4, 1.35, 2.55), mark::LAMP, 0.0);
+    });
+}
+
 /// A course of `count` plates laid in `f`, each `len` long and `half` either side, the last
 /// running `tail` further into a spike.
 fn course(b: &mut MeshBuilder, f: &Frame, count: usize, step: f32, len: f32, half: f32, tail: f32) {
@@ -128,8 +180,8 @@ fn course(b: &mut MeshBuilder, f: &Frame, count: usize, step: f32, len: f32, hal
     .lay(b, f);
 }
 
-/// The glacis on the low hull's nose: a thick plate from the nose up toward the turret,
-/// red optics under its brow.
+/// The glacis on the low hull's nose: a thick plate from the nose up toward the turret.
+/// Its optics are lamp slots in its surface (`marks`).
 fn glacis(b: &mut MeshBuilder, z: f32, half: f32) {
     dark_plate(b);
     armour(
@@ -145,32 +197,12 @@ fn glacis(b: &mut MeshBuilder, z: f32, half: f32) {
         ],
         0.16,
     );
-    b.mirror_y(|b| {
-        red_slot(
-            b,
-            v3(3.95, 0.5, 1.1),
-            v3(0.7, 0.7, 0.0),
-            Vec3::X,
-            0.35,
-            0.08,
-        );
-        if b.fine() {
-            red_slot(
-                b,
-                v3(3.55, 0.85, 1.12),
-                v3(0.5, 0.86, 0.0),
-                Vec3::X,
-                0.22,
-                0.06,
-            );
-        }
-    });
 }
 
 /// A turret: a bronze ring at the turret's pivot, a faceted housing lofted from `half` its
 /// plan (x, y >= 0, nose to tail) between `z` heights, drawn in to `top` at its roof, the
-/// owner's colour on its roof, a sensor blade swept back and up off it, red optics either
-/// side of the gun.
+/// owner's colour on its roof, a sensor blade swept back and up off it. Its optics are
+/// lamp slots in its surface (`marks`).
 fn turret(b: &mut MeshBuilder, half: &[[f32; 2]], z: (f32, f32), top: f32) {
     let plan: Vec<[f32; 2]> = half
         .iter()
@@ -214,17 +246,6 @@ fn turret(b: &mut MeshBuilder, half: &[[f32; 2]], z: (f32, f32), top: f32) {
         0.9,
         0.12,
     );
-    let front = half[0][0] * top;
-    b.mirror_y(|b| {
-        red_slot(
-            b,
-            v3(front - 0.12, 0.55, z.1 - 0.25),
-            v3(0.7, 0.7, 0.2),
-            Vec3::Y,
-            0.18,
-            0.08,
-        );
-    });
 }
 
 /// The gun on its trunnion, pitching (`rig::ARM_GUN`): a bronze trunnion across the

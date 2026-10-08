@@ -46,15 +46,9 @@ pub(super) fn repeater(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, r: f32) 
     b.paint(GLOW_LASER);
     b.cylinder_between(at(0.9), muzzle + Vec3::X * 0.02, r * 0.26, r * 0.3, sides);
     if b.fine() {
-        // Heat louvres raked back over the housing's back, a red slit under them.
-        red_slot(
-            b,
-            at(0.3) + Vec3::Z * (r * 1.0),
-            Vec3::Z,
-            Vec3::X,
-            len * 0.3,
-            r * 0.06,
-        );
+        // Heat louvres raked back over the housing's back, in its own plate: drawn after
+        // the lens, they took its lamp red and burned as one lit block.
+        dark_plate(b);
         for t in [0.18f32, 0.3, 0.42] {
             blade(
                 b,

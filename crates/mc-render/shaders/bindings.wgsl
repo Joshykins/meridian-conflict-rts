@@ -888,7 +888,7 @@ struct MarksHere {
 
 // Whether a mark kind is a fitting (relief, `fitting_h`) or paint (`mark_paint`).
 fn smark_fitting(kind: u32) -> bool {
-    return kind >= SMARK_GRILLE && kind <= SMARK_SEAM;
+    return (kind >= SMARK_GRILLE && kind <= SMARK_SEAM) || (kind >= SMARK_LAP && kind <= SMARK_LAMP);
 }
 
 fn smark_paint(kind: u32) -> bool {

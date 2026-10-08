@@ -3307,6 +3307,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             // Hollows darken with their depth (laid on after a finish that repaints the
             // plate, below); dirt packs into them.
             fit_shade = f0.y * mix(0.6, 1.0, saturate(f0.x));
+            // A lamp slot burns in the skin's lamp colour.
+            if here.kind == SMARK_LAMP {
+                lights += skins[in.skin].slots[2u * SKIN_LASER + 1u].rgb * lamp_light(plane.q, plane.half, local_px) * 0.6;
+            }
             seam = max(seam, saturate(1.5 * (1.0 - f0.y)));
         }
         soot = sf.soot;
