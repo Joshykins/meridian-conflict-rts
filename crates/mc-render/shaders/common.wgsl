@@ -287,6 +287,13 @@ struct Skin {
     film: array<vec4<f32>, SKIN_FILM_COLORS>,
     // The skin's light: its emitters' hue, rgb.
     highlight: vec4<f32>,
+    // How its plated faces are finished (`SKIN_FINISH_*`), and the lights in its dark
+    // plating (`SKIN_LIGHTS_*`); zw 0.
+    finish: vec4<u32>,
+    // Its plates' size and its edges' wear, each times the standard; zw 0.
+    plates: vec4<f32>,
+    // The dark plating's lights' colour, rgb.
+    lights: vec4<f32>,
 }
 
 // Mirrors mc_sim::mirror::HousePose (192 bytes): per weapon yaw off the hull last tick and

@@ -24,6 +24,8 @@
         laser: (color: Rgb((0.3, 0.02, 0.02)), rough: 0.25, glow: Light((1.0, 0.07, 0.05), 5.5)),
         visor: (color: Rgb((0.46, 0.2, 0.02)), metal: 1.0, rough: 0.12),
     ),
+    // Plated faces: steel under the film, not ARC's paint.
+    finish: (kind: Regency),
     film: (
         // The plate: dark charcoal steel seen square on; as a face turns away the film's
         // sheen rises, its hue cycling crimson, deep red, copper and back.

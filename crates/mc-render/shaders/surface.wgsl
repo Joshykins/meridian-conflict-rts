@@ -55,6 +55,9 @@ struct SurfaceIn {
     // Dark plating: it carries lights, not plate courses.
     dark: bool,
     pattern: u32,
+    // The lights let into dark plating (`SKIN_LIGHTS_*`) and their colour: the skin's.
+    lights: u32,
+    lights_rgb: vec3<f32>,
     // Per face and per unit, zero to one.
     seed: f32,
     unit: f32,
@@ -200,9 +203,10 @@ fn surf_rivets(p: vec2<f32>, half: vec2<f32>, inset: f32, pitch: f32, radius: f3
 
 // The lights in dark plating: level lines, broken into dashes, fitted to the face.
 struct SurfaceDash {
-    // Distance from the line's axis, and how far inside the dash's ends.
+    // Distance from the line's axis, and how far inside the dash's ends; where along it.
     d: f32,
     along: f32,
+    x: f32,
     id: f32,
     on: f32,
 }
@@ -224,6 +228,7 @@ fn surf_dashes(i: SurfaceIn, st: vec2<f32>, cell: SurfaceCell) -> SurfaceDash {
     let room = half.x > i.scale * 0.2 && half.y > i.scale * 0.1;
     dash.on = select(0.0, step(0.42, hash11(cell.id * 17.0 + 0.11)), room);
     dash.d = p.y;
+    dash.x = p.x;
     dash.along = half.x * mix(0.3, 0.62, hash11(cell.id * 37.0)) - abs(p.x);
     return dash;
 }
@@ -1481,18 +1486,27 @@ fn surface_at(i: SurfaceIn) -> Surface {
                         out.rough = (hash11(cell.id * 53.0) - 0.5) * 0.3;
                         out.bare = max(out.bare, 0.3 * surf_band(d_cell - gap * 1.6, gap * 0.9, fw));
                     }
-                    // Only the Precursors' veins are lit: Aster's black carries no orange lines.
-                    let veined = select(0.0, 1.0, i.pattern == PAT_VEINED);
-                    let lit = surf_band(dash.d, w, fw) * surf_step(dash.along, 0.0, fw) * dash.on * outlined * veined;
+                    // The Precursors' veins are lit; other black carries the lights its skin
+                    // gives it (ARC's none), a line or a row of dots.
+                    let vein = i.pattern == PAT_VEINED;
+                    let veined = select(select(0.0, 1.0, i.lights != SKIN_LIGHTS_OFF), 1.0, vein);
+                    var line = surf_band(dash.d, w, fw);
+                    if i.lights == SKIN_LIGHTS_DOTS && !vein {
+                        let pitch = w * 7.0;
+                        let q = (fract(dash.x / pitch) - 0.5) * pitch;
+                        line = 1.0 - surf_step(length(vec2<f32>(q, dash.d)), w * 1.6, fw);
+                    }
+                    let lit = line * surf_step(dash.along, 0.0, fw) * dash.on * outlined * veined;
                     // A slow shimmer along the line; a hurt unit's lights falter and go out.
                     let shimmer = 0.78 + 0.22 * sin(i.time * 1.3 + st.x / i.scale * 1.9 + dash.id * 40.0);
                     let failing = hash11(dash.id * 71.0 + i.unit * 13.0);
                     var alive = 1.0 - smoothstep(failing * 0.9, failing * 0.9 + 0.12, hurt * 1.05);
                     let sputter = step(0.35, hash11(floor(i.time * 9.0 + dash.id * 90.0) * 0.173 + dash.id));
                     alive = max(alive, (1.0 - smoothstep(failing * 0.9 + 0.12, failing * 0.9 + 0.3, hurt)) * sputter);
-                    let tone = select(SURF_ORANGE, SURF_PRECURSOR, i.pattern == PAT_VEINED);
+                    let tone = select(i.lights_rgb, SURF_PRECURSOR, vein);
                     out.emissive = tone * lit * shimmer * alive * lamp * i.lit;
-                    out.paint = vec4<f32>(SURF_SAFETY, lit * (1.0 - i.lit));
+                    // Unlit on a tech 1 line unit: paint in the lights' colour.
+                    out.paint = vec4<f32>(select(saturate(i.lights_rgb), SURF_SAFETY, vein), lit * (1.0 - i.lit));
                     out.cavity = 1.0 - 0.5 * surf_band(dash.d, w * 1.9, fw) * surf_step(dash.along, -w, fw) * dash.on * outlined * veined;
                     // Scuffed edges read lighter on black, which is what draws its forms.
                     out.bare = max(out.bare, 0.55 * (1.0 - smoothstep(0.0, bevel * 0.9, d_face)) * outlined);

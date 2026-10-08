@@ -1483,6 +1483,15 @@ shared! {
         pub const FILM_COLORS: u32 = 9;
         /// Skins a scene holds at most.
         pub const MAX: u32 = 16;
+        /// How plated faces are finished (`Skin::finish.x`): ARC's paint over scanned
+        /// steel (metal.wgsl), or the Regency's film over iron (regency.wgsl).
+        pub const FINISH_ARC: u32 = 0;
+        pub const FINISH_REGENCY: u32 = 1;
+        /// The lights let into dark plating (`Skin::finish.y`, surface.wgsl): none,
+        /// short level lines, or rows of dots.
+        pub const LIGHTS_OFF: u32 = 0;
+        pub const LIGHTS_DASHES: u32 = 1;
+        pub const LIGHTS_DOTS: u32 = 2;
     }
 
     /// Bits of `UnitInstance::owner_flags` (`owner | flags << 8`) the shaders read that the

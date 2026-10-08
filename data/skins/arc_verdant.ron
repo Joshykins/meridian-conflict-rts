@@ -4,6 +4,8 @@
 // data alone.
 (
     highlight: (0.35, 1.0, 0.45),
+    // A row of green lit ports in each dark plate that has room for one.
+    finish: (lights: Dots((0.35, 1.0, 0.45))),
     slots: (
         plate: (color: Rgb((0.62, 0.63, 0.6)), metal: 0.25, rough: 0.5),
         plate_dark: (color: Plate((0.12, 0.2, 0.13)), metal: 0.4, rough: 0.45),

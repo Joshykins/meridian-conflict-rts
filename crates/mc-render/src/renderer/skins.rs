@@ -7,7 +7,7 @@ use crate::gpu::{Buffer, Gpu, GpuError};
 use crate::gpu_consts::skin as gs;
 use ash::vk;
 use bytemuck::{Pod, Zeroable};
-use mc_data::skins::{Skin, SkinId};
+use mc_data::skins::{Finish, Lights, Skin, SkinId};
 use mc_data::Blueprints;
 
 /// One skin as the shaders read it (common.wgsl `Skin`).
@@ -20,6 +20,13 @@ pub(crate) struct GpuSkin {
     pub(crate) film: [[f32; 4]; gs::FILM_COLORS as usize],
     /// The skin's light: its emitters' hue, rgb.
     pub(crate) highlight: [f32; 4],
+    /// How its plated faces are finished (`gpu_consts::skin::FINISH_*`), and the
+    /// lights in its dark plating (`LIGHTS_*`); zw 0.
+    pub(crate) finish: [u32; 4],
+    /// Its plates' size and its edges' wear, each times the standard; zw 0.
+    pub(crate) plates: [f32; 4],
+    /// The dark plating's lights' colour, rgb.
+    pub(crate) lights: [f32; 4],
 }
 
 impl GpuSkin {
@@ -49,6 +56,19 @@ impl GpuSkin {
         }
         let [r, gr, b] = skin.highlight;
         g.highlight = [r, gr, b, 0.0];
+        let f = &skin.finish;
+        let (style, [lr, lg, lb]) = match f.lights {
+            Lights::Off => (gs::LIGHTS_OFF, [0.0; 3]),
+            Lights::Dashes(c) => (gs::LIGHTS_DASHES, c),
+            Lights::Dots(c) => (gs::LIGHTS_DOTS, c),
+        };
+        let kind = match f.kind {
+            Finish::Arc => gs::FINISH_ARC,
+            Finish::Regency => gs::FINISH_REGENCY,
+        };
+        g.finish = [kind, style, 0, 0];
+        g.plates = [f.plate, f.wear, 0.0, 0.0];
+        g.lights = [lr, lg, lb, 0.0];
         g
     }
 }

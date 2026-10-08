@@ -90,6 +90,52 @@ pub struct Film {
     pub works_polish: [f32; 3],
 }
 
+/// How plated faces are finished: the grain, wear and sheen under the slots' colours.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+pub enum Finish {
+    /// Paint over scanned brushed steel, scratched through at the edges (metal.wgsl).
+    #[default]
+    Arc,
+    /// Steel under an iridescent film over graphite machinery (regency.wgsl, `film`).
+    Regency,
+}
+
+/// The lights let into dark plating, one to a plate where it has room, in this colour
+/// (linear, burning brighter by tier; paint on a tech 1 line unit, where nothing is lit).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Deserialize)]
+pub enum Lights {
+    /// None.
+    #[default]
+    Off,
+    /// A short level line.
+    Dashes([f32; 3]),
+    /// A row of dots, like lit ports.
+    Dots([f32; 3]),
+}
+
+/// The finish over a skin's plated slots.
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct Plates {
+    pub kind: Finish,
+    /// Plate size, times the standard (the courses a face is cut into).
+    pub plate: f32,
+    /// How much paint the edges lose, times the standard.
+    pub wear: f32,
+    pub lights: Lights,
+}
+
+impl Default for Plates {
+    fn default() -> Plates {
+        Plates {
+            kind: Finish::Arc,
+            plate: 1.0,
+            wear: 1.0,
+            lights: Lights::Off,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Skin {
@@ -99,7 +145,10 @@ pub struct Skin {
     /// The skin's light: its emitters' hue (ghosts and charge bands take it too).
     pub highlight: [f32; 3],
     pub slots: Slots,
-    /// The Regency finish's colours, where the skin has that finish.
+    /// How its plated faces are finished.
+    #[serde(default)]
+    pub finish: Plates,
+    /// The Regency finish's colours: needed by a skin with that finish.
     #[serde(default)]
     pub film: Option<Film>,
 }
@@ -180,6 +229,18 @@ impl Skin {
             }
             unit(what, s.metal)?;
             unit(what, s.rough)?;
+        }
+        if self.finish.kind == Finish::Regency && self.film.is_none() {
+            return Err("finish Regency needs its film's colours (`film`)".into());
+        }
+        let p = &self.finish;
+        for (what, v) in [("finish plate", p.plate), ("finish wear", p.wear)] {
+            if !(v.is_finite() && (0.25..=4.0).contains(&v)) {
+                return Err(format!("{what} {v}: 0.25 to 4"));
+            }
+        }
+        if let Lights::Dashes(c) | Lights::Dots(c) = p.lights {
+            colour("finish lights", c)?;
         }
         if let Some(f) = &self.film {
             for c in [
@@ -266,6 +327,13 @@ mod tests {
         assert!(skin.check().is_err());
         let mut skin = bps.skins[0].clone();
         skin.slots.plate.color = Paint::Plate([1.0; 3]);
+        assert!(skin.check().is_err());
+        let mut skin = bps.skins[0].clone();
+        skin.finish.kind = Finish::Regency;
+        skin.film = None;
+        assert!(skin.check().is_err(), "a Regency finish with no film");
+        let mut skin = bps.skins[0].clone();
+        skin.finish.plate = 0.0;
         assert!(skin.check().is_err());
     }
 }

@@ -128,10 +128,15 @@ also carries its `film`, the colours regency.wgsl finishes Regency plate in.
   each `ModelInfo` carries a skin index. `scripts/shot.sh unit KEY --skin KEY`
   dresses every model in another skin with no rebuild.
 - Skins are presentation only and never reach `State` (determinism unaffected).
-- Not yet in a skin (*planned*): the finish (ARC paint over scanned steel or the
-  Regency film is still chosen by each face's pattern), the lights drawn by
-  surface patterns (windows, strips, lamps), the foundations' graphite, and
-  per-unit slot overrides.
+- A skin's `finish` says how plated faces are finished: `kind` (`Arc`, paint
+  over scanned steel scratched at the edges, or `Regency`, steel under the film),
+  `plate` (plate size), `wear` (paint lost at the edges) and `lights`, the lights
+  let into dark plating: `Off`, `Dashes(colour)` or `Dots(colour)`. A plain
+  plated face takes its skin's finish whatever model it is on, so an ARC tank in
+  the Regency skin wears the film. A face with a specific pattern (an airframe,
+  a warship hull, a deck) keeps it.
+- Not yet in a skin (*planned*): the lights drawn by specific patterns (windows,
+  strips, decks, lamps), the foundations' graphite, and per-unit slot overrides.
 
 **Distribution.** Skins may be a paid extra, a developer or tournament reward,
 or made by modders. So from the start:

@@ -2486,7 +2486,7 @@ fn vs_main(in: VsIn) -> VsOut {
     // rubber is no belt (a hover skirt or a walker's soles).
     // Naval (icon bit 23) rides in bit 11.
     out.model_class = ((model.icon >> 8u) & 0xFFu) | ((model.icon >> 8u) & 0x100u) | select(0x200u, 0u, belt) | ((model.icon >> 12u) & 0x800u)
-        | ((in.surface & 0xFFFFu) << 16u)
+        | ((finished_pattern(model.skin, in.material, in.surface & 0xFFu) | (in.surface & 0xFF00u)) << 16u)
         | select(0u, 0x1000u, (model.icon & 0x1000000u) != 0u)
         // Bit 13: a capital ship (icon bit 26).
         | select(0u, 0x2000u, (model.icon & 0x4000000u) != 0u)
@@ -2981,6 +2981,21 @@ fn fs_shadow(in: VsOut) {
     }
 }
 
+// A face's pattern under its skin's finish (`Skin::finish`): a plain plated face is
+// finished as the skin it wears says, so a Regency skin lays its film on any model's
+// plate and an ARC skin paints a Regency model's. Every other pattern is the model's.
+fn finished_pattern(skin: u32, material: u32, pattern: u32) -> u32 {
+    let plated = material == MAT_PLATING || material == MAT_PLATING_DARK || material == MAT_ACCENT
+        || material == MAT_METAL;
+    if !plated {
+        return pattern;
+    }
+    if skins[skin].finish.x == SKIN_FINISH_REGENCY {
+        return select(pattern, PAT_EMBER, pattern == PAT_GENERIC);
+    }
+    return select(pattern, PAT_GENERIC, regency_pattern(pattern));
+}
+
 fn material_of(id: u32, owner: u32, skin: u32) -> Pbr {
     var m: Pbr;
     m.emissive = vec3<f32>(0.0);
@@ -3192,7 +3207,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         si.seed = f32((in.model_class >> 24u) & 0xFFu) / 255.0;
         si.unit = in.state.w;
         si.unit_id = in.unit_id;
-        si.scale = clamp(0.55 * pow(in.weld.z, 0.6), 0.7, 6.0);
+        // Plates as big as the model and its skin say.
+        si.scale = clamp(0.55 * pow(in.weld.z, 0.6), 0.7, 6.0) * skins[in.skin].plates.x;
+        si.lights = skins[in.skin].finish.y;
+        si.lights_rgb = skins[in.skin].lights.rgb;
         si.time = time;
         si.working = select(0.0, 1.0, (flags & FLAG_BUILDING) != 0u && in.refit.z <= 0.0
             && (flags & (FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) == 0u);
@@ -3220,7 +3238,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         let bs = bitangent * inverseSqrt(max(dot(bitangent, bitangent), 1e-12));
         si.up = abs(face_n.z) / max(length(face_n), 1e-12);
         si.rise = vec2<f32>(abs(ts.z), abs(bs.z));
-        let sf = surface_at(si);
+        var sf = surface_at(si);
+        // Paint off the edges as the skin wears it.
+        let wear = skins[in.skin].plates.y;
+        sf.bare = select(sf.bare, saturate(sf.bare * wear), wear != 1.0);
         n = normalize(n - ts * sf.slope.x - bs * sf.slope.y);
 
         m.albedo = mix(m.albedo, sf.paint.rgb, sf.paint.a);
@@ -3286,7 +3307,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         ri.px = local_px;
         ri.dl1 = dl1;
         ri.dl2 = dl2;
-        ri.scale = clamp(0.55 * pow(in.weld.z, 0.6), 0.7, 6.0);
+        ri.scale = clamp(0.55 * pow(in.weld.z, 0.6), 0.7, 6.0) * skins[in.skin].plates.x;
         ri.face = in.face;
         ri.seed = f32((in.model_class >> 24u) & 0xFFu) / 255.0;
         // How each of the face's coordinates grows in model space.
