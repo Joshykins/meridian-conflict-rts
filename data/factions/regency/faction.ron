@@ -48,6 +48,7 @@
             Commander: "regency_select_commander",
             Engineer: "regency_select_engineer",
             Bot: "regency_select_bot",
+            SiegeWalker: "regency_select_bot",
             Scout: "regency_select_scout",
             Factory: "regency_select_factory",
             Extractor: "regency_select_extractor",

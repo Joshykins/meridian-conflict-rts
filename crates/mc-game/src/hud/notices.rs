@@ -29,8 +29,8 @@ pub enum Glyph {
     Trefoil,
     /// A ring with a cross: an interception.
     Intercept,
-    /// A tier-5 titan's figure (`hud/titan.rs`).
-    Titan,
+    /// A tier-5 titan's figure, its own strategic icon's (`hud/titan.rs`).
+    Titan(mc_data::IconKind),
     /// A lightning bolt in a turning ring: a titan's great bore.
     Storm,
     /// A space elevator's figure (`hud/elevator.rs`).
@@ -344,7 +344,7 @@ fn glyph(ui: &mut Ui, c: Vec2, g: Glyph, tone: u32, t: f32, k: f32) {
             }
             ui.disc(c, 2.4, rgb(tone, k));
         }
-        Glyph::Titan => super::icons::titan(ui, c, 9.0, rgb(tone, k)),
+        Glyph::Titan(kind) => super::icons::figure(ui, kind, c, 9.0, rgb(tone, k)),
         Glyph::Elevator => super::icons::elevator(ui, c, 9.0, rgb(tone, k)),
         Glyph::Storm => super::titan::bolt(ui, c, 7.0, rgb(tone, 0.95 * k), t * 0.9),
         Glyph::Intercept => {

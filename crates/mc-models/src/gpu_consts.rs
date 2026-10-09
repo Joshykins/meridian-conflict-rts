@@ -165,10 +165,18 @@ shared! {
     /// Strategic icons (icons.wgsl), and the click reach that matches them (mc-game pick.rs).
     pub mod icon as "ICON_" {
         /// A tier-5 titan's icon, drawn wider than anything else's: output pixels across.
-        /// The space elevator, the other tier 5, is drawn as big and framed the same.
+        /// Every tier 5 (the titans, the space elevator) is drawn as big and framed the same.
         pub const TITAN_PX: f32 = 34.0;
+        /// The titan's shape number (`IconKind::Titan`; `icon_shape`'s case).
+        pub const TITAN: u32 = 28;
         /// The space elevator's shape number (`IconKind::Elevator`; `icon_shape`'s case).
         pub const ELEVATOR: u32 = 37;
+        /// The winged titan's shape number (`IconKind::WingedTitan`; `icon_shape`'s case).
+        pub const WINGED_TITAN: u32 = 38;
+        /// The siege walker's shape number (`IconKind::SiegeWalker`; `icon_shape`'s case).
+        pub const SIEGE_WALKER: u32 = 39;
+        /// The assault walker's shape number (`IconKind::AssaultWalker`; `icon_shape`'s case).
+        pub const ASSAULT_WALKER: u32 = 40;
         /// `ModelInfo::icon` bit: the model is a mobile unit.
         pub const MOBILE: u32 = 0x10000;
         /// `ModelInfo::icon` bit: the unit flies.

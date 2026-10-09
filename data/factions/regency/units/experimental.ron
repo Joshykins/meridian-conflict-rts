@@ -239,7 +239,7 @@
                 sounds: (fire: "regency_gravitic_throw", impact: "regency_sunspear_hit", ground: "regency_sunspear_hit"),
             ),
         ],
-        mesh: "regency_colossus", icon: Bot,
+        mesh: "regency_colossus", icon: SiegeWalker,
         sounds: (death: "blast_large", moving: "regency_crawl", step: "regency_footfall"),
     ),
     // The Seraph, the Regency's tier 5: a winged mecha that hangs over the ground on its
@@ -330,7 +330,7 @@
                 sounds: (fire: "regency_gravitic_throw", impact: "regency_sunspear_hit", ground: "regency_sunspear_hit"),
             ),
         ],
-        mesh: "regency_seraph", icon: Titan,
+        mesh: "regency_seraph", icon: WingedTitan,
         sounds: (
             death: "blast_colossal", moving: "aster_hover",
             dash_charge: "regency_warp_spool", dash_leave: "regency_warp_jump", dash_land: "regency_seraph_landing",

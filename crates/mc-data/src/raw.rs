@@ -130,6 +130,16 @@ pub enum IconKind {
     Damper = 36,
     /// A space elevator: a cable coming down into three clamp jaws.
     Elevator = 37,
+    /// A tier-5 winged titan from the front, hovering: three blade feathers fanned off
+    /// each shoulder vane, guns hung at its sides, legs trailing to points. Framed like
+    /// the [`IconKind::Titan`].
+    WingedTitan = 38,
+    /// A four-legged siege walker in profile: legs arched over a slung hull, the beam
+    /// head low at the front, a rocket pack on its back.
+    SiegeWalker = 39,
+    /// A reverse-kneed assault walker in profile: a hunched hull with a launcher hump,
+    /// a low pointed head and the gun arm out in front.
+    AssaultWalker = 40,
 }
 
 /// One unit's entry in a faction's `lore.ron`: its own text, and its weapons' by weapon name.

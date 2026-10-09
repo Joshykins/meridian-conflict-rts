@@ -50,6 +50,10 @@
             SensorShip: "select_intel",
             // A titan: its own answer (titan_alerts.ron), the size of the thing in it.
             Titan: "select_titan",
+            WingedTitan: "select_titan",
+            // The tier-4 walkers: the assault walker the titan's, the siege walker a bot's.
+            AssaultWalker: "select_titan",
+            SiegeWalker: "select_bot",
             // A space elevator: its cable drawn tight (elevator_alerts.ron).
             Elevator: "select_elevator",
             // Salvage answers like the engineers it works beside.

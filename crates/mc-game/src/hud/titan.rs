@@ -28,6 +28,7 @@ struct Card {
     kind: NewsKind,
     unit: u32,
     name: String,
+    icon: mc_data::IconKind,
     at: Vec2,
     age: f32,
 }
@@ -68,6 +69,7 @@ pub fn alerts(hud: &mut Hud, ui: &mut Ui, s: &Scene, dt: f32) {
                 kind: n.kind,
                 unit: n.unit,
                 name: n.name.clone(),
+                icon: n.icon,
                 at: n.at,
                 age: 0.0,
             });
@@ -152,7 +154,7 @@ pub fn alerts(hud: &mut Hud, ui: &mut Ui, s: &Scene, dt: f32) {
             title,
             sub,
             tone,
-            glyph: Glyph::Titan,
+            glyph: Glyph::Titan(first.icon),
             loud,
             figure: Some("T5".to_owned()),
             // Kept calm: the urgency of a card follows its soonest mark.

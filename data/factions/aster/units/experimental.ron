@@ -135,7 +135,7 @@
                 sounds: (fire: "breacher_gatling_fire", each_round: true, spin: "breacher_gatling_spin", whir: "breacher_gatling_whir", spindown: "breacher_gatling_spindown", impact: "shell_heavy", ground: "shell_heavy"),
             ),
         ],
-        mesh: "breacher", icon: Titan,
+        mesh: "breacher", icon: AssaultWalker,
         sounds: (death: "blast_colossal", moving: "breacher_walk", step: "breacher_step"),
     ),
     (

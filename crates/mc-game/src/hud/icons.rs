@@ -466,6 +466,9 @@ pub fn strategic(ui: &mut Ui, kind: IconKind, tech: u8, c: Vec2, r: f32, color: 
         }
         IconKind::Titan => titan(ui, c, r, color),
         IconKind::Elevator => elevator(ui, c, r, color),
+        IconKind::WingedTitan => winged_titan(ui, c, r, color),
+        IconKind::SiegeWalker => siege_walker(ui, c, r, color),
+        IconKind::AssaultWalker => assault_walker(ui, c, r, color),
         IconKind::Salvage | IconKind::SalvageCarrier | IconKind::SalvageDrone => {
             salvage(ui, kind, c, r, color, cut)
         }
@@ -585,15 +588,7 @@ pub fn titan(ui: &mut Ui, c: Vec2, r: f32, color: Color) {
     limb(ui, (0.1, -0.02), (0.24, -0.3), 0.1);
     limb(ui, (0.24, -0.3), (0.29, -0.66), 0.085);
     bx(ui, 0.31, -0.72, 0.14, 0.055);
-    // The tier-5 frame, where there is room for it.
-    if r >= 9.0 {
-        let frame = Rect::new(c.x - r * 1.05, c.y - r * 1.02, r * 2.1, r * 2.36);
-        ui.brackets(
-            frame,
-            r * 0.32,
-            [color[0], color[1], color[2], color[3] * 0.8],
-        );
-    }
+    tier5_frame(ui, c, r, color);
 }
 
 /// A space elevator from the front, as `icons.wgsl` draws it (`sd_elevator`): its cable
@@ -623,6 +618,19 @@ pub fn elevator(ui: &mut Ui, c: Vec2, r: f32, color: Color) {
     }
     let middle = [(-0.17, -0.76), (0.17, -0.76), (0.08, -0.3), (-0.08, -0.3)];
     fill_outline(ui, &middle.map(|(x, y)| at(x, y)), color);
+    tier5_frame(ui, c, r, color);
+}
+
+/// A titan's figure, framed, for a card: the winged titan's or the walking one's.
+pub fn figure(ui: &mut Ui, kind: IconKind, c: Vec2, r: f32, color: Color) {
+    match kind {
+        IconKind::WingedTitan => winged_titan(ui, c, r, color),
+        _ => titan(ui, c, r, color),
+    }
+}
+
+/// A tier 5's corner brackets round its figure, where there is room for them.
+fn tier5_frame(ui: &mut Ui, c: Vec2, r: f32, color: Color) {
     if r >= 9.0 {
         let frame = Rect::new(c.x - r * 1.05, c.y - r * 1.02, r * 2.1, r * 2.36);
         ui.brackets(
@@ -630,6 +638,129 @@ pub fn elevator(ui: &mut Ui, c: Vec2, r: f32, color: Color) {
             r * 0.32,
             [color[0], color[1], color[2], color[3] * 0.8],
         );
+    }
+}
+
+/// Draws a figure given in the renderer's icon square (y up) into a box of half-size `r`
+/// round `c`, with the same parts `icons.wgsl` builds its shapes from.
+struct Pen<'a, 'u> {
+    ui: &'a mut Ui<'u>,
+    c: Vec2,
+    k: f32,
+    color: Color,
+}
+
+impl<'a, 'u> Pen<'a, 'u> {
+    fn new(ui: &'a mut Ui<'u>, c: Vec2, r: f32, color: Color) -> Self {
+        Self {
+            ui,
+            c,
+            k: r * 0.9,
+            color,
+        }
+    }
+
+    fn at(&self, (x, y): (f32, f32)) -> Vec2 {
+        self.c + Vec2::new(x, -y) * self.k
+    }
+
+    /// `sd_box`: centre and half-size.
+    fn rect(&mut self, (x, y): (f32, f32), (hw, hh): (f32, f32)) {
+        let (a, b) = (self.at((x - hw, y + hh)), self.at((x + hw, y - hh)));
+        self.ui
+            .fill(Rect::new(a.x, a.y, b.x - a.x, b.y - a.y), self.color);
+    }
+
+    /// `sd_taper` (`sd_segment` when the radii match): a limb from `a` to `b`.
+    fn limb(&mut self, a: (f32, f32), b: (f32, f32), ra: f32, rb: f32) {
+        let (pa, pb) = (self.at(a), self.at(b));
+        let n = (pb - pa).normalize_or_zero().perp();
+        let (ra, rb) = (ra * self.k, rb * self.k);
+        fill_outline(
+            self.ui,
+            &[pa + n * ra, pb + n * rb, pb - n * rb, pa - n * ra],
+            self.color,
+        );
+        self.ui.disc(pa, ra, self.color);
+        self.ui.disc(pb, rb, self.color);
+    }
+
+    /// `sd_poly4`.
+    fn quad(&mut self, points: [(f32, f32); 4]) {
+        let points = points.map(|p| self.at(p));
+        fill_outline(self.ui, &points, self.color);
+    }
+}
+
+/// A tier-5 winged titan from the front, as `icons.wgsl` draws it (`sd_winged_titan`):
+/// hovering, three blade feathers fanned off each shoulder vane, guns hung at its sides,
+/// legs trailing to points. Framed as a tier 5 where there is room.
+pub fn winged_titan(ui: &mut Ui, c: Vec2, r: f32, color: Color) {
+    let mut pen = Pen::new(ui, c, r, color);
+    pen.rect((0.0, 0.52), (0.08, 0.09));
+    for s in [-1.0, 1.0] {
+        pen.quad([(0.0, 0.42), (s * 0.22, 0.42), (s * 0.13, 0.0), (0.0, 0.0)]);
+        pen.quad([
+            (0.0, 0.02),
+            (s * 0.14, 0.02),
+            (s * 0.08, -0.16),
+            (0.0, -0.16),
+        ]);
+        pen.limb((s * 0.18, 0.34), (s * 0.4, 0.5), 0.08, 0.08);
+        for (a, tip) in [
+            ((0.34, 0.5), (0.56, 0.98)),
+            ((0.4, 0.48), (0.88, 0.78)),
+            ((0.4, 0.42), (0.94, 0.4)),
+        ] {
+            pen.limb((s * a.0, a.1), (s * tip.0, tip.1), 0.085, 0.03);
+        }
+        pen.limb((s * 0.26, 0.34), (s * 0.3, 0.04), 0.06, 0.06);
+        pen.rect((s * 0.31, -0.14), (0.06, 0.17));
+    }
+    pen.limb((-0.08, -0.14), (-0.15, -0.88), 0.08, 0.025);
+    pen.limb((0.08, -0.14), (0.16, -0.66), 0.08, 0.025);
+    tier5_frame(ui, c, r, color);
+}
+
+/// A four-legged siege walker in profile, as `icons.wgsl` draws it (`sd_siege_walker`):
+/// legs arched over a slung hull, the beam head low at the front, a rocket pack on its back.
+pub fn siege_walker(ui: &mut Ui, c: Vec2, r: f32, color: Color) {
+    let mut pen = Pen::new(ui, c, r, color);
+    pen.rect((-0.04, 0.16), (0.44, 0.17));
+    pen.quad([(0.34, 0.24), (0.66, 0.16), (0.64, -0.06), (0.34, -0.02)]);
+    pen.rect((0.82, 0.06), (0.16, 0.05));
+    pen.rect((-0.2, 0.38), (0.18, 0.08));
+    for s in [-1.0, 1.0] {
+        pen.limb((s * 0.3, 0.22), (s * 0.56, 0.56), 0.08, 0.08);
+        pen.limb((s * 0.56, 0.56), (s * 0.82, -0.72), 0.07, 0.05);
+        pen.limb((s * 0.12, 0.08), (s * 0.3, -0.3), 0.07, 0.07);
+        pen.limb((s * 0.3, -0.3), (s * 0.34, -0.72), 0.06, 0.05);
+    }
+}
+
+/// A reverse-kneed assault walker in profile, as `icons.wgsl` draws it
+/// (`sd_assault_walker`): a hunched hull with a launcher hump, a low pointed head and the
+/// gun arm out in front.
+pub fn assault_walker(ui: &mut Ui, c: Vec2, r: f32, color: Color) {
+    let mut pen = Pen::new(ui, c, r, color);
+    pen.quad([(-0.46, 0.34), (0.24, 0.4), (0.36, 0.06), (-0.4, 0.04)]);
+    pen.quad([(0.2, 0.34), (0.6, 0.26), (0.58, 0.16), (0.24, 0.12)]);
+    pen.quad([(-0.4, 0.3), (-0.08, 0.36), (0.02, 0.6), (-0.32, 0.58)]);
+    pen.rect((0.36, 0.0), (0.26, 0.12));
+    pen.rect((0.76, 0.05), (0.16, 0.035));
+    pen.rect((0.76, -0.06), (0.16, 0.035));
+    for (o, lift) in [(-0.16, 0.0), (0.06, 0.12)] {
+        let knee = (o + 0.3, -0.36 + lift);
+        let ankle = (o - 0.02, -0.66 + lift);
+        pen.limb((o, 0.02), knee, 0.1, 0.1);
+        pen.limb(knee, ankle, 0.08, 0.08);
+        let (x, y) = ankle;
+        pen.quad([
+            (x - 0.1, y + 0.02),
+            (x + 0.08, y + 0.02),
+            (x + 0.22, y - 0.14),
+            (x - 0.1, y - 0.14),
+        ]);
     }
 }
 

@@ -59,7 +59,11 @@ fn vs_icon(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     if shape == 13u {
         size_px = 8.0;
     }
-    if shape == ICON_TITAN || shape == ICON_ELEVATOR {
+    if shape == ICON_SIEGE_WALKER || shape == ICON_ASSAULT_WALKER {
+        // A tier-4 walker: its legs need the pixels a structure gets.
+        size_px = 20.0;
+    }
+    if is_tier5(shape) {
         // A tier 5 (a titan, a space elevator): bigger than anything else, framed (`fs_icon`).
         size_px = ICON_TITAN_PX;
     }
@@ -382,12 +386,24 @@ fn icon_shape(shape: u32, p: vec2<f32>) -> f32 {
         // platform on it, into the clamp jaws of two tower flanks and the one between them
         // (`hud/icons.rs` draws the same; `fs_icon` frames it as a tier 5).
         case 37u: { return sd_elevator(p); }
+        // A winged titan from the front, hovering: blade feathers fanned off each shoulder
+        // vane, guns hung at its sides, legs trailing to points (`hud/icons.rs` draws the
+        // same; `fs_icon` frames it).
+        case 38u: { return sd_winged_titan(p); }
+        // A four-legged siege walker in profile: legs arched over a slung hull, the beam
+        // head low at the front, the rocket pack on its back (`hud/icons.rs` draws the same).
+        case 39u: { return sd_siege_walker(p); }
+        // A reverse-kneed assault walker in profile: hunched hull, launcher hump, low
+        // pointed head, the gun arm out in front (`hud/icons.rs` draws the same).
+        case 40u: { return sd_assault_walker(p); }
         default: { return sd_box(p, vec2<f32>(0.6)); }
     }
 }
 
-// `IconKind::Titan`.
-const ICON_TITAN: u32 = 28u;
+// The tier 5s' shapes: drawn big and framed.
+fn is_tier5(shape: u32) -> bool {
+    return shape == ICON_TITAN || shape == ICON_WINGED_TITAN || shape == ICON_ELEVATOR;
+}
 // `IconKind::SalvageDrone`: drawn small, one of a carrier's swarm.
 const ICON_SALVAGE_DRONE: u32 = 33u;
 
@@ -447,6 +463,68 @@ fn sd_elevator(p: vec2<f32>) -> f32 {
     return min(min(min(cable, platform), min(base, tower)), min(jaw, middle));
 }
 
+// A segment from `a` (radius `ra`) to `b` (radius `rb`): a tapering limb or blade.
+fn sd_taper(p: vec2<f32>, a: vec2<f32>, b: vec2<f32>, ra: f32, rb: f32) -> f32 {
+    let pa = p - a;
+    let ba = b - a;
+    let h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+    return length(pa - ba * h) - mix(ra, rb, h);
+}
+
+fn sd_winged_titan(p: vec2<f32>) -> f32 {
+    let q = vec2<f32>(abs(p.x), p.y);
+    var d = sd_box(p - vec2<f32>(0.0, 0.52), vec2<f32>(0.08, 0.09));
+    d = min(d, sd_poly4(q, vec2<f32>(0.0, 0.42), vec2<f32>(0.22, 0.42), vec2<f32>(0.13, 0.0), vec2<f32>(0.0, 0.0)));
+    d = min(d, sd_poly4(q, vec2<f32>(0.0, 0.02), vec2<f32>(0.14, 0.02), vec2<f32>(0.08, -0.16), vec2<f32>(0.0, -0.16)));
+    // The wings: a vane up out of each shoulder, three feathers fanned off it.
+    d = min(d, sd_segment(q, vec2<f32>(0.18, 0.34), vec2<f32>(0.4, 0.5)) - 0.08);
+    d = min(d, sd_taper(q, vec2<f32>(0.34, 0.5), vec2<f32>(0.56, 0.98), 0.085, 0.03));
+    d = min(d, sd_taper(q, vec2<f32>(0.4, 0.48), vec2<f32>(0.88, 0.78), 0.085, 0.03));
+    d = min(d, sd_taper(q, vec2<f32>(0.4, 0.42), vec2<f32>(0.94, 0.4), 0.085, 0.03));
+    // Arms down, the guns hung at its sides.
+    d = min(d, sd_segment(q, vec2<f32>(0.26, 0.34), vec2<f32>(0.3, 0.04)) - 0.06);
+    d = min(d, sd_box(q - vec2<f32>(0.31, -0.14), vec2<f32>(0.06, 0.17)));
+    // Legs trailing to points, one lower than the other: it hovers.
+    d = min(d, sd_taper(p, vec2<f32>(-0.08, -0.14), vec2<f32>(-0.15, -0.88), 0.08, 0.025));
+    d = min(d, sd_taper(p, vec2<f32>(0.08, -0.14), vec2<f32>(0.16, -0.66), 0.08, 0.025));
+    return d;
+}
+
+fn sd_siege_walker(p: vec2<f32>) -> f32 {
+    var d = sd_box(p - vec2<f32>(-0.04, 0.16), vec2<f32>(0.4, 0.13)) - 0.04;
+    d = min(d, sd_poly4(p, vec2<f32>(0.34, 0.24), vec2<f32>(0.66, 0.16), vec2<f32>(0.64, -0.06), vec2<f32>(0.34, -0.02)));
+    d = min(d, sd_box(p - vec2<f32>(0.82, 0.06), vec2<f32>(0.16, 0.05)));
+    d = min(d, sd_box(p - vec2<f32>(-0.2, 0.38), vec2<f32>(0.18, 0.08)));
+    // Fore and aft the same: the far legs arched high over the hull, the near ones under it.
+    let q = vec2<f32>(abs(p.x), p.y);
+    d = min(d, sd_segment(q, vec2<f32>(0.3, 0.22), vec2<f32>(0.56, 0.56)) - 0.08);
+    d = min(d, sd_taper(q, vec2<f32>(0.56, 0.56), vec2<f32>(0.82, -0.72), 0.07, 0.05));
+    d = min(d, sd_segment(q, vec2<f32>(0.12, 0.08), vec2<f32>(0.3, -0.3)) - 0.07);
+    d = min(d, sd_taper(q, vec2<f32>(0.3, -0.3), vec2<f32>(0.34, -0.72), 0.06, 0.05));
+    return d;
+}
+
+fn sd_assault_walker(p: vec2<f32>) -> f32 {
+    var d = sd_poly4(p, vec2<f32>(-0.46, 0.34), vec2<f32>(0.24, 0.4), vec2<f32>(0.36, 0.06), vec2<f32>(-0.4, 0.04));
+    d = min(d, sd_poly4(p, vec2<f32>(0.2, 0.34), vec2<f32>(0.6, 0.26), vec2<f32>(0.58, 0.16), vec2<f32>(0.24, 0.12)));
+    d = min(d, sd_poly4(p, vec2<f32>(-0.4, 0.3), vec2<f32>(-0.08, 0.36), vec2<f32>(0.02, 0.6), vec2<f32>(-0.32, 0.58)));
+    // The gun arm and its twin barrels.
+    d = min(d, sd_box(p - vec2<f32>(0.36, 0.0), vec2<f32>(0.26, 0.12)));
+    d = min(d, sd_box(p - vec2<f32>(0.76, 0.05), vec2<f32>(0.16, 0.035)));
+    d = min(d, sd_box(p - vec2<f32>(0.76, -0.06), vec2<f32>(0.16, 0.035)));
+    // Reverse-kneed legs mid-stride, the near one lifting.
+    for (var i = 0; i < 2; i++) {
+        let o = select(-0.16, 0.06, i == 1);
+        let lift = select(0.0, 0.12, i == 1);
+        let knee = vec2<f32>(o + 0.3, -0.36 + lift);
+        let ankle = vec2<f32>(o - 0.02, -0.66 + lift);
+        d = min(d, sd_segment(p, vec2<f32>(o, 0.02), knee) - 0.1);
+        d = min(d, sd_segment(p, knee, ankle) - 0.08);
+        d = min(d, sd_poly4(p, ankle + vec2<f32>(-0.1, 0.02), ankle + vec2<f32>(0.08, 0.02), ankle + vec2<f32>(0.22, -0.14), ankle + vec2<f32>(-0.1, -0.14)));
+    }
+    return d;
+}
+
 // A titan's frame: four corner brackets round the whole quad (in `uv`).
 fn sd_titan_frame(uv: vec2<f32>) -> f32 {
     let q = abs(uv);
@@ -469,7 +547,7 @@ fn fs_icon(in: IconOut) -> @location(0) vec4<f32> {
     }
     // A tier 5's corner brackets: drawn paler than the figure, outlined like it.
     var frame = 0.0;
-    if shape == ICON_TITAN || shape == ICON_ELEVATOR {
+    if is_tier5(shape) {
         let f = sd_titan_frame(in.uv);
         d = min(d, f);
         let aaf = fwidth(f) * 1.2;

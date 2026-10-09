@@ -44,6 +44,9 @@ fn every_kind() -> Vec<IconKind> {
         SensorShip,
         Damper,
         Elevator,
+        WingedTitan,
+        SiegeWalker,
+        AssaultWalker,
     ];
     for kind in &all {
         match kind {
@@ -51,7 +54,7 @@ fn every_kind() -> Vec<IconKind> {
             | Extractor | Power | Storage | Defense | Intel | Wall | Shield | Fighter | Bomber
             | Ship | Submarine | Gunship | Transport | Silo | AntiNuke | Warship | Titan
             | Salvage | SalvageCarrier | SalvageDrone | TorpedoBomber | SensorShip | Damper
-            | Elevator => {}
+            | Elevator | WingedTitan | SiegeWalker | AssaultWalker => {}
         }
     }
     all
@@ -101,12 +104,14 @@ fn every_icon_kind_has_a_shape() {
     );
 }
 
-/// The space elevator's number is the one the shader sizes and frames as a tier 5
-/// (`gpu_consts::icon::ELEVATOR`, generated into `icons.wgsl` as `ICON_ELEVATOR`).
+/// The numbers the shader sizes and frames by name (`gpu_consts::icon`, generated into
+/// `icons.wgsl` as `ICON_*`) are their icon kinds'.
 #[test]
-fn the_elevator_shape_is_its_icon_kind() {
-    assert_eq!(
-        IconKind::Elevator as u32,
-        mc_models::gpu_consts::icon::ELEVATOR
-    );
+fn the_named_shapes_are_their_icon_kinds() {
+    use mc_models::gpu_consts::icon;
+    assert_eq!(IconKind::Titan as u32, icon::TITAN);
+    assert_eq!(IconKind::Elevator as u32, icon::ELEVATOR);
+    assert_eq!(IconKind::WingedTitan as u32, icon::WINGED_TITAN);
+    assert_eq!(IconKind::SiegeWalker as u32, icon::SIEGE_WALKER);
+    assert_eq!(IconKind::AssaultWalker as u32, icon::ASSAULT_WALKER);
 }

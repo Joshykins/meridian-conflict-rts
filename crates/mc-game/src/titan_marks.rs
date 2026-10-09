@@ -225,6 +225,8 @@ pub struct News {
     pub owner: u8,
     /// The titan's name ("Behemoth").
     pub name: String,
+    /// Its strategic icon: the figure on its card.
+    pub icon: mc_data::IconKind,
     pub at: Vec2,
 }
 
@@ -301,13 +303,15 @@ impl Charge {
         if !warned(self.owner, at, self.radius) {
             return;
         }
+        let bp = blueprints.unit(self.blueprint);
         t.serial += 1;
         t.news.push(News {
             serial: t.serial,
             kind: NewsKind::StrikeWarning,
             unit: self.unit,
             owner: self.owner,
-            name: blueprints.unit(self.blueprint).name.clone(),
+            name: bp.name.clone(),
+            icon: bp.visual.icon,
             at,
         });
     }
@@ -328,14 +332,15 @@ pub struct Titans {
 }
 
 impl Titans {
-    fn tell(&mut self, kind: NewsKind, u: &UnitInstance, name: &str, owner: u8) {
+    fn tell(&mut self, kind: NewsKind, u: &UnitInstance, bp: &UnitBlueprint, owner: u8) {
         self.serial += 1;
         self.news.push(News {
             serial: self.serial,
             kind,
             unit: u.unit_id,
             owner,
-            name: name.to_owned(),
+            name: bp.name.clone(),
+            icon: bp.visual.icon,
             at: Vec2::new(u.pos[0], u.pos[1]),
         });
         if self.news.len() > 16 {
@@ -538,8 +543,7 @@ pub fn observe(view: &mut View, blueprints: &Blueprints) {
         }
     }
     for (kind, u, owner) in news {
-        let name = bp_of(blueprints, u).name.clone();
-        t.tell(kind, u, &name, owner);
+        t.tell(kind, u, bp_of(blueprints, u), owner);
     }
 }
 
@@ -644,9 +648,8 @@ pub fn seed(view: &mut View, world: &mc_sim::World, blueprints: &Blueprints) {
             .iter()
             .find(|u| u.owner_flags & KIND_WRECK == 0 && is_titan(bp_of(blueprints, u)));
         if let Some(u) = first {
-            let name = bp_of(blueprints, u).name.clone();
             let owner = owner_of(u);
-            view.titans.tell(kind, u, &name, owner);
+            view.titans.tell(kind, u, bp_of(blueprints, u), owner);
         }
     }
 }
