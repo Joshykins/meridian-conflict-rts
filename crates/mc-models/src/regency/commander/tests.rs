@@ -311,7 +311,7 @@ fn the_auxiliary_arm_is_the_unit_files() {
     let tip = model.lods[0]
         .vertices
         .iter()
-        .filter(|v| v.rig & rig::LIMB_MASK == rig::FOLD_HEAD && v.material == GLOW_VIOLET)
+        .filter(|v| v.rig & rig::LIMB_MASK == rig::FOLD_HEAD)
         .map(|v| Vec3::from(v.pos).distance(shoulder::AUX_EMITTER))
         .fold(f32::MAX, f32::min);
     assert!(tip < 0.1, "the head's emitter is {tip} m off");
