@@ -98,7 +98,7 @@ fn it_is_a_shielded_tech_4_that_walks_the_ground() {
         "it paths round slopes, water and buildings like any walker; no giant's stomp"
     );
     assert_eq!(bp.weapons.len(), 4);
-    assert!(bp.weapons[LANCE as usize].beam && bp.weapons[LANCE as usize].star_beam);
+    assert!(bp.weapons[LANCE as usize].beam);
     assert!(
         bp.weapons[1].mount && bp.weapons[2].mount,
         "the guns turn on their own"

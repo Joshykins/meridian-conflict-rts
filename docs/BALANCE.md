@@ -37,7 +37,7 @@ Off the lines, measured the same way:
   aircraft. Raised on a lot by Artificer IIIs or the Exarch's Engineering Suite III.
 - Colossus (Regency T4 four-legged siege walker, 4200 mass, the Strider's and the
   Breacher's peer; made a T4 in full 2026-10-08 at the user's word): 75000 health plus an
-  18000 hull field. Its Heavy Pinch-fusion Lance charges 3 s and then burns 5 s (50 ticks
+  18000 hull field. Its Heavy Pinched Lance, a tight red stream, charges 3 s and then burns 5 s (50 ticks
   of 1200 with 40 m of splash, every 40 s): about 12000 dps through the burn, 1500 averaged
   over the reload, dragging from mark to mark while it burns. Two Rapid Pinch-fusion Guns
   on its shoulders (450 a shot every 0.8 s, 1100 m, taking turns) and eight unguided Ruin

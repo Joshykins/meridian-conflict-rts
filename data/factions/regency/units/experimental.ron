@@ -180,17 +180,18 @@
         motion: (layer: Land, size: 5, speed: 25, accel: 10, turn: 30, aim_arc: 80),
         weapons: [
             (
-                name: "Heavy Pinch-fusion Lance",
+                name: "Heavy Pinched Lance",
                 // Charged for three seconds with the head opening, then fifty ticks of beam
                 // over five seconds, each a hit on everything within a compound's breadth of
                 // the mark; the head stays open until the burn ends. It slews slowly while it
-                // burns (`sweep`), dragging a trench of glass from mark to mark.
+                // burns (`sweep`), dragging a trench of glass from mark to mark. A tight red
+                // Pinched stream, not the Scourge's star: no halo, no spill.
                 damage: 1200, splash: 40, range_min: 180, range: 1200, reload: 40.0,
                 salvo: 50, salvo_delay: 0.1,
-                hitscan: true, beam: true, star_beam: true, trajectory: Direct,
+                hitscan: true, beam: true, trajectory: Direct,
                 turret_turn: 14, sweep: 10, muzzle: (30.4800, 0.0000, 31.4400), pivot: (12.0000, 0.0000, 31.4400),
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
-                plasma_grade: Some(PinchFusion), flash: 1.0, impact: 1.5, tracer: 2.0,
+                plasma_grade: Some(Pinched), flash: 1.0, impact: 1.5, tracer: 1.5,
                 sounds: (
                     charge: "regency_lance_charge", charge_time: 3.0,
                     hold: "regency_lance_hold", spindown: "regency_lance_vent",
