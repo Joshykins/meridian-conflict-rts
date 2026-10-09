@@ -1093,6 +1093,11 @@ shared! {
         pub const B: f32 = 1.0;
         /// How fast the nanites run along a slot, metres a second.
         pub const FLOW_SPEED: f32 = 1.6;
+        /// While the unit builds (`FLAG_BUILDING`): how fast they run instead, and how many
+        /// times brighter the slots burn, pulsing at `WORK_BEAT` radians a second.
+        pub const WORK_FLOW_SPEED: f32 = 6.0;
+        pub const WORK_GLOW: f32 = 6.0;
+        pub const WORK_BEAT: f32 = 7.0;
     }
 
     /// Materials (the sim's mass) as a light: the HUD's Materials red-orange

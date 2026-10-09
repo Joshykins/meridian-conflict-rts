@@ -3369,6 +3369,8 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         ri.nanite = ((in.model_class >> 16u) & 0xFFu) == NANITE_PATTERN_SLOT;
         ri.time = time;
         ri.unit = in.state.w;
+        ri.working = select(0.0, 1.0, (flags & FLAG_BUILDING) != 0u && in.refit.z <= 0.0
+            && (flags & (FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) == 0u);
         regency = regency_look(ri, works);
         lights += regency.glow;
         n = normalize(n - reg_to_world(regency.slope, dl1, dl2, dpdx(in.world), dpdy(in.world)));

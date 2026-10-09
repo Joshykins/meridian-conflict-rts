@@ -57,6 +57,8 @@ struct RegencyIn {
     // Seconds, and the unit's own random, zero to one.
     time: f32,
     unit: f32,
+    // One while the unit builds (`FLAG_BUILDING`): its nanite slots run fast and burn bright.
+    working: f32,
 }
 
 struct RegencyLook {
@@ -144,7 +146,8 @@ fn reg_nanite_slot(i: RegencyIn) -> vec3<f32> {
 }
 
 // The slot cut in a nanite face: dark glazing, framed by a groove and a lit lip, the
-// nanites streaming along it in violet, thickening and thinning, a slow beat over them.
+// nanites streaming along it in violet, thickening and thinning, a slow beat over them;
+// while the unit builds they race along it, burning several times brighter on a quick beat.
 fn reg_nanite(i: RegencyIn, out_in: RegencyLook, fw: f32) -> RegencyLook {
     var out = out_in;
     let slot = reg_nanite_slot(i);
@@ -162,12 +165,15 @@ fn reg_nanite(i: RegencyIn, out_in: RegencyLook, fw: f32) -> RegencyLook {
     out.rough -= 0.25 * inside;
     // The nanites: knots running along the slot through a finer churn, in model space so
     // neighbouring faces' slots run as one stream.
-    let flow = i.local + vec3<f32>(i.unit * 41.0, i.unit * 13.0, -i.time * NANITE_FLOW_SPEED);
+    let speed = mix(NANITE_FLOW_SPEED, NANITE_WORK_FLOW_SPEED, i.working);
+    let flow = i.local + vec3<f32>(i.unit * 41.0, i.unit * 13.0, -i.time * speed);
     let knot = smoothstep(0.35, 0.8, surf_noise3(flow * vec3<f32>(1.3, 1.3, 0.7)));
     let churn = 0.5 + surf_fbm3(flow * 2.0, i.scale * 0.08, fw);
     let seen = surf_resolved(half, fw);
     let stream = mix(0.55, 0.25 + 1.3 * knot * churn, seen);
-    let beat = 0.8 + 0.2 * sin(i.time * 1.7 + i.unit * 31.0);
+    let idle_beat = 0.8 + 0.2 * sin(i.time * 1.7 + i.unit * 31.0);
+    let work_beat = NANITE_WORK_GLOW * (0.75 + 0.25 * sin(i.time * NANITE_WORK_BEAT + i.unit * 31.0));
+    let beat = mix(idle_beat, work_beat, i.working);
     // Brightest down the slot's middle.
     let core = 1.0 - smoothstep(0.0, half, slot.x) * 0.6;
     let violet = vec3<f32>(NANITE_R, NANITE_G, NANITE_B);

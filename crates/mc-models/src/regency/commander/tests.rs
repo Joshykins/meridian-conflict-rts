@@ -307,12 +307,16 @@ fn the_auxiliary_arm_is_the_unit_files() {
     let model = build_model_fitted("regency_commander", 10.4, HEIGHT, 1, &["aux_eng"]).unwrap();
     let fold = model.fold.expect("the arm folds");
     assert!(Vec3::new(fold[0], fold[1], fold[2]).distance(shoulder::AUX_HINGE) < 1e-3);
-    // The head's tip is the emitter.
-    let tip = model.lods[0]
+    // The beam leaves the middle of the bore's mouth, the frontmost machinery on the head.
+    let bore: Vec<Vec3> = model.lods[0]
         .vertices
         .iter()
-        .filter(|v| v.rig & rig::LIMB_MASK == rig::FOLD_HEAD)
-        .map(|v| Vec3::from(v.pos).distance(shoulder::AUX_EMITTER))
-        .fold(f32::MAX, f32::min);
-    assert!(tip < 0.1, "the head's emitter is {tip} m off");
+        .filter(|v| v.rig & rig::LIMB_MASK == rig::FOLD_HEAD && v.material == METAL)
+        .map(|v| Vec3::from(v.pos))
+        .collect();
+    let front = bore.iter().map(|p| p.x).fold(f32::MIN, f32::max);
+    let face: Vec<Vec3> = bore.into_iter().filter(|p| p.x > front - 0.05).collect();
+    let middle = face.iter().copied().sum::<Vec3>() / face.len() as f32;
+    let off = middle.distance(shoulder::AUX_EMITTER);
+    assert!(off < 0.05, "the emitter is {off} m off the bore");
 }

@@ -5,7 +5,8 @@
 //! nanite crystal sits between two slotted cage slabs, three vanes standing off them;
 //! then the breech block the trunnions run through; a six-sided barrel jacketed in slotted
 //! plates out to a raised band; and at the muzzle a flared collar, three fins round it and
-//! the crystal point the beam leaves from (`AUX_EMITTER`, its `emitters`).
+//! the bore sunk into its face, the beam leaving the middle of its mouth (`AUX_EMITTER`,
+//! its `emitters`).
 //!
 //! The violet is the plates' own (`kit::nanite_plate`: the slot regency.wgsl lets into a
 //! face), never a lit piece, so every slotted face is broad and long enough on a model
@@ -56,7 +57,7 @@ const SLAB: [[f32; 2]; 8] = [
     [0.9, -1.0],
     [1.0, -0.35],
 ];
-/// A square stood on its corner: the crystals' four long faces.
+/// A square stood on its corner: the crystal's four long faces.
 const DIAMOND: [[f32; 2]; 4] = [[1.0, 0.0], [0.0, 1.0], [-1.0, 0.0], [0.0, -1.0]];
 
 pub(super) fn aux_eng(b: &mut MeshBuilder) {
@@ -216,11 +217,12 @@ fn projector(b: &mut MeshBuilder) {
             ring(on_line(band + 0.35), up, 0.5, 0.5),
             ring(on_line(len - 0.6), up, 0.46, 0.46),
             ring(on_line(len - 0.3), up, 0.6, 0.6),
-            ring(on_line(len - 0.05), up, 0.52, 0.52),
         ],
         &HEX,
     );
+    muzzle(b, len);
     // The fins round the muzzle, swept forward, each rooted on the collar.
+    machined(b);
     for k in 0..3 {
         let a = std::f32::consts::TAU * (k as f32 / 3.0);
         let r = up * a.cos() + across * a.sin();
@@ -234,17 +236,6 @@ fn projector(b: &mut MeshBuilder) {
             &KEEL,
         );
     }
-    // The crystal point standing out of the muzzle.
-    nanite_plate(b);
-    sleeve(
-        b,
-        &[
-            ring(on_line(len - 0.45), up, 0.34, 0.34),
-            ring(on_line(len - 0.15), up, 0.4, 0.4),
-            ring(AUX_EMITTER, up, 0.02, 0.02),
-        ],
-        &DIAMOND,
-    );
     if b.fine() {
         // Heat spines along the breech's top, and a feed line down each side of the
         // jacket below its slots.
@@ -274,6 +265,31 @@ fn projector(b: &mut MeshBuilder) {
             );
         }
     }
+}
+
+/// The beam line's hexagon `t` metres ahead of the trunnions, `r` across, as `sleeve`
+/// lays `HEX` out.
+fn hex_ring(t: f32, r: f32) -> Vec<Vec3> {
+    let (_, up, across) = line();
+    HEX.iter()
+        .map(|&[s, u]| on_line(t) + (across * s + up * u) * r)
+        .collect()
+}
+
+/// The muzzle collar's open front, an armoured lip with a red gasket round the bore, and
+/// the bore: a cavity sunk into the collar, the beam leaving the middle of its mouth.
+fn muzzle(b: &mut MeshBuilder, len: f32) {
+    let outer = hex_ring(len, 0.52);
+    let mouth = hex_ring(len, 0.32);
+    machined(b);
+    b.with_facets(|b| b.loft(&[hex_ring(len - 0.3, 0.6), outer.clone()], false, false));
+    b.paint(PLATING_DARK).pattern(pattern::EMBER_RIM);
+    for k in 0..HEX.len() {
+        let n = (k + 1) % HEX.len();
+        b.face(&[outer[k], mouth[k], mouth[n], outer[n]]);
+    }
+    metal(b);
+    b.with_facets(|b| b.loft(&[mouth, hex_ring(len - 0.28, 0.22)], false, true));
 }
 
 /// The crystal behind the breech, between two broad slotted cage plates either side of
