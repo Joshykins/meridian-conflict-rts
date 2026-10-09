@@ -160,40 +160,37 @@
         mesh: "regency_strider", icon: Bot,
         sounds: (death: "blast_large", moving: "regency_crawl", step: "regency_footfall"),
     ),
-    // T4 siege quadruped: a low armored hull over four widely planted limbs. The
-    // recessed aperture charges for three seconds, then holds a cutting stream for
-    // five. Two independent chin guns and eight cased Ruin Rockets cover its flanks.
-    // Model and every weapon mount use the same 3.6x authored scale.
+    // T4 siege quadruped: a low armored hull over four widely planted limbs, a Strider's
+    // and a Breacher's peer. The recessed aperture charges for three seconds, then holds a
+    // cutting stream for five. Two heavy guns and eight cased Ruin Rockets cover its flanks.
+    // Model and every weapon mount use the same 1.2x authored scale.
     (
-        // Stable blueprint key retained for saved rosters and replays.
-        key: "regency_t5_colossus",
+        key: "regency_t4_colossus",
         name: "Colossus",
-        role: "Cataclysm Siege Walker",
+        role: "Siege Walker",
         tech: 4,
         categories: ["Land", "DirectFire", "Experimental"],
-        health: 90000,
-        cost: (mass: 6500, energy: 65000, time: 36000),
-        radius: 144.0, height: 133.2,
-        footprint: (24, 24),
-        vision: 1400, radar: 2000,
-        shield: (kind: Hull, health: 25000, regen: 180),
-        economy: (energy_upkeep: 750),
-        motion: (layer: Land, size: 4, speed: 25, accel: 8, turn: 16, aim_arc: 80, stride: true),
-        // One footfall each half stride, planted ahead of the middle on alternate sides.
-        stomp: (pace: 42, reach: 36, gauge: 39.6, radius: 28.8, damage: 2400),
+        health: 75000,
+        cost: (mass: 4200, energy: 42000, time: 24000),
+        radius: 48.0, height: 44.4,
+        footprint: (8, 8),
+        vision: 1250,
+        shield: (kind: Hull, health: 18000, regen: 120),
+        economy: (energy_upkeep: 400),
+        motion: (layer: Land, size: 5, speed: 25, accel: 10, turn: 30, aim_arc: 80),
         weapons: [
             (
                 name: "Heavy Pinch-fusion Lance",
                 // Charged for three seconds with the head opening, then fifty ticks of beam
-                // over five seconds, each a hit on everything within a fortified position's breadth of the
-                // mark. It slews slowly while it burns (`sweep`), dragging a trench of glass
-                // from mark to mark.
-                damage: 1200, splash: 80, range_min: 180, range: 1200, reload: 40.0,
+                // over five seconds, each a hit on everything within a compound's breadth of
+                // the mark; the head stays open until the burn ends. It slews slowly while it
+                // burns (`sweep`), dragging a trench of glass from mark to mark.
+                damage: 1200, splash: 40, range_min: 180, range: 1200, reload: 40.0,
                 salvo: 50, salvo_delay: 0.1,
                 hitscan: true, beam: true, star_beam: true, trajectory: Direct,
-                turret_turn: 14, sweep: 10, muzzle: (115.2000, 0.0000, 94.3200), pivot: (36.0000, 0.0000, 94.3200),
+                turret_turn: 14, sweep: 10, muzzle: (30.4800, 0.0000, 31.4400), pivot: (12.0000, 0.0000, 31.4400),
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
-                plasma_grade: Some(PinchFusion), flash: 2.0, impact: 5.0, tracer: 12.0,
+                plasma_grade: Some(PinchFusion), flash: 1.0, impact: 1.5, tracer: 2.0,
                 sounds: (
                     charge: "regency_lance_charge", charge_time: 3.0,
                     hold: "regency_lance_hold", spindown: "regency_lance_vent",
@@ -201,13 +198,13 @@
             ),
             (
                 name: "Rapid Pinch-fusion Gun",
-                // The left gun under the head, on a turret of its own.
+                // The left gun, on a turret of its own.
                 damage: 450, splash: 12, range: 1100, reload: 0.8, speed: 1500, trajectory: Ballistic,
                 loft: 0.3, flat_fire: true, mount: true, turret_turn: 70, arc: 200,
-                muzzle: (74.8800, 30.9600, 80.2800), pivot: (58.3200, 30.9600, 80.2800),
+                muzzle: (25.2000, 12.9600, 37.2000), pivot: (10.8000, 12.9600, 37.2000),
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
                 plasma_grade: Some(PinchFusion),
-                flash: 0.9, impact: 1.6, tracer: 0.9,
+                flash: 1.2, impact: 1.6, tracer: 1.4,
                 sounds: (fire: "regency_sunspear_fire", impact: "regency_sunspear_hit", ground: "regency_sunspear_hit"),
             ),
             (
@@ -215,34 +212,33 @@
                 // The right gun: half a reload behind the left (`twins.rs`).
                 damage: 450, splash: 12, range: 1100, reload: 0.8, speed: 1500, trajectory: Ballistic,
                 loft: 0.3, flat_fire: true, mount: true, turret_turn: 70, arc: 200,
-                muzzle: (74.8800, -30.9600, 80.2800), pivot: (58.3200, -30.9600, 80.2800),
+                muzzle: (25.2000, -12.9600, 37.2000), pivot: (10.8000, -12.9600, 37.2000),
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
                 plasma_grade: Some(PinchFusion),
-                flash: 0.9, impact: 1.6, tracer: 0.9,
+                flash: 1.2, impact: 1.6, tracer: 1.4,
                 sounds: (fire: "regency_sunspear_fire", impact: "regency_sunspear_hit", ground: "regency_sunspear_hit"),
             ),
             (
                 name: "Ruin Rocket Battery",
-                // Eight cased rockets out of the back, lofted high and not guided: they leave
-                // in a ripple, scatter wide (`spread`) and fall where they will over the
-                // field, with red exhaust, black smoke and a compact red containment burst.
-                damage: 900, splash: 35, range_min: 300, range: 1800, reload: 24.0,
-                salvo: 8, salvo_delay: 0.2, speed: 380, trajectory: Ballistic, rake: 65, loft: 9,
+                // Eight cased rockets out of the back, lofted and not guided: they leave in a
+                // quick ripple, scatter wide (`spread`) and fall where they will, with red
+                // exhaust and a compact red containment burst.
+                damage: 900, splash: 30, range_min: 300, range: 1400, reload: 24.0,
+                salvo: 8, salvo_delay: 0.2, speed: 800, trajectory: Ballistic, rake: 65, loft: 3,
                 mount: true, turret_turn: 60, arc: 360, spread: 6,
-                muzzle: (-19.8000, 0.0000, 124.9200), pivot: (-23.4000, 0.0000, 115.2000),
+                muzzle: (-6.9000, 0.0000, 40.8300), pivot: (-7.8000, 0.0000, 38.4000),
                 muzzles: [
-                    (-15.4114, 10.8000, 123.2946), (-15.4114, -10.8000, 123.2946), (-15.4114, 3.6000, 123.2946), (-15.4114, -3.6000, 123.2946),
-                    (-24.1886, 10.8000, 126.5455), (-24.1886, -10.8000, 126.5455), (-24.1886, 3.6000, 126.5455), (-24.1886, -3.6000, 126.5455),
+                    (-5.8028, 2.7000, 40.4236), (-5.8028, -2.7000, 40.4236), (-5.8028, 0.9000, 40.4236), (-5.8028, -0.9000, 40.4236),
+                    (-7.9972, 2.7000, 41.2364), (-7.9972, -2.7000, 41.2364), (-7.9972, 0.9000, 41.2364), (-7.9972, -0.9000, 41.2364),
                 ],
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
-                missile: true, intercept: 100, caliber: 3.5, trail: true, wake: 1.6, tracer: 2,
-                flash: 1.4, impact: 1.4, shockwave: 1.6,
+                missile: true, intercept: 100, caliber: 1.0, trail: true, wake: 0.8, tracer: 1,
+                flash: 0.9, impact: 1.0,
                 plasma_grade: Some(Gravitic),
-
                 sounds: (fire: "regency_gravitic_throw", impact: "regency_sunspear_hit", ground: "regency_sunspear_hit"),
             ),
         ],
-        mesh: "regency_colossus", icon: Titan,
-        sounds: (death: "titan_death", moving: "regency_crawl", step: "regency_footfall", step_far: "titan_step_far"),
+        mesh: "regency_colossus", icon: Bot,
+        sounds: (death: "blast_large", moving: "regency_crawl", step: "regency_footfall"),
     ),
 ]

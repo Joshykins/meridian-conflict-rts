@@ -8,7 +8,7 @@
 //! The battery is drawn in its own frame: the origin on the pivot, +x down the cells, the
 //! middle of their face at `(FACE, 0, 0)`, y across, z up the face.
 
-use glam::Affine3A;
+use glam::{Affine3A, Vec3};
 
 use super::detail::armor as dark_plate;
 use crate::builder::MeshBuilder;
@@ -47,10 +47,20 @@ pub(super) fn axis() -> (f32, f32) {
 pub(super) fn mouths() -> [glam::Vec3; 8] {
     let (theta, face) = axis();
     let turn = glam::Mat3::from_rotation_y(-theta);
-    CELLS.map(|[y, z]| ROCKET_PIVOT + turn * v3(face, y, z))
+    CELLS.map(|[y, z]| ROCKET_PIVOT + SIZE * (turn * v3(face, y, z)))
 }
 
+/// The pack is drawn this many times its authored size about its hinge.
+pub(super) const SIZE: f32 = 0.75;
+
 pub(super) fn pack(b: &mut MeshBuilder) {
+    let frame = Affine3A::from_translation(ROCKET_PIVOT)
+        * Affine3A::from_scale(Vec3::splat(SIZE))
+        * Affine3A::from_translation(-ROCKET_PIVOT);
+    b.with(frame, drawn);
+}
+
+fn drawn(b: &mut MeshBuilder) {
     // The coaming: a low plated ring round the turntable, flush with the deck.
     dark_plate(b);
     let segs = if b.fine() { 28 } else { 12 };

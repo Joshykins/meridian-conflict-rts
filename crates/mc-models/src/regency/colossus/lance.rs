@@ -12,16 +12,22 @@ use super::LANCE_PIVOT;
 use crate::builder::MeshBuilder;
 use crate::gpu_consts::charge_gear::{EXTEND, SPREAD};
 use crate::{pattern, rig};
-use glam::Vec3;
+use glam::{Affine3A, Vec3};
 
 #[cfg(test)]
 pub(super) const MOUTH: f32 = 22.0;
 pub(super) const GEAR: f32 = 3.5;
 
+/// The lance is drawn this many times its authored size about its trunnion, small enough
+/// to read as a T4's head, not a titan's.
+pub(super) const SIZE: f32 = 0.7;
+
 pub(super) fn lance(b: &mut MeshBuilder) {
-    b.set_charge_gear(LANCE_PIVOT, GEAR);
+    b.set_charge_gear(LANCE_PIVOT, GEAR * SIZE);
     b.with_limb(rig::ARM_GUN, |b| {
-        b.at(LANCE_PIVOT, |b| {
+        let frame =
+            Affine3A::from_translation(LANCE_PIVOT) * Affine3A::from_scale(Vec3::splat(SIZE));
+        b.with(frame, |b| {
             dark_plate(b);
             sleeve(
                 b,

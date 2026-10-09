@@ -1,8 +1,8 @@
-//! The two Rapid Pinch-fusion Guns slung under the Colossus's chin, weapons 1 and 2, the left
-//! (+y) and the right. Each stands on its bracket's pylon in a gun house of its own
-//! (`MeshBuilder::with_house`): a plated cradle that turns, and in it a compact barrel that
-//! pitches and kicks back, its mouth ringed by two short pinch coils lit in the prism. Each
-//! picks its own mark.
+//! The two Rapid Pinch-fusion Guns on the Colossus's front shoulders, weapons 1 and 2, the
+//! left (+y) and the right. Each stands in a gun house of its own
+//! (`MeshBuilder::with_house`): a turret drum that turns, and on it a long heavy barrel that
+//! pitches and kicks back, ringed by three pinch coils lit in the prism. They stand on the
+//! deck so they read from above. Each picks its own mark.
 //!
 //! Drawn in its own frame: the origin on the trunnion, +x down the barrel, the middle of
 //! the mouth at `(LEN, 0, 0)`.
@@ -19,9 +19,11 @@ use super::GUN_PIVOT;
 use crate::{material::GLOW_LASER, pattern};
 
 /// From the trunnion to the middle of the barrel's mouth.
-pub(super) const LEN: f32 = 4.6;
+pub(super) const LEN: f32 = 12.0;
+/// The barrel's radius at its root.
+const BORE: f32 = 0.8;
 /// How far the barrel kicks back when it fires.
-const KICK: f32 = 0.8;
+const KICK: f32 = 1.0;
 
 /// Both guns: weapon 1 on the left, weapon 2 its mirror on the right.
 pub(super) fn guns(b: &mut MeshBuilder) {
@@ -39,56 +41,86 @@ pub(super) fn guns(b: &mut MeshBuilder) {
     }
 }
 
-/// The gun in its own frame: the cradle, and the barrel in it.
+/// The gun in its own frame: a turret drum sunk into the shoulder plate, a faceted
+/// mantlet on it, and one long barrel out of a shroud, pinch coils lit in the prism down it
+/// and a squared muzzle brake.
 fn gun(b: &mut MeshBuilder) {
     let fine = b.fine();
-    // The cradle: a round plated turntable drum let up into the pod above it, a seam band
-    // round it, a red slot either flank.
     dark_plate(b);
     b.pattern(pattern::EMBER_SLOT);
     let sides = b.sides(14);
-    b.prism(v3(0.0, 0.0, -1.3), sides, 2.0, 1.9, 2.9);
+    b.prism(v3(0.0, 0.0, -2.6), sides, 3.4, 3.1, 2.2);
     if fine {
         seam(b);
-        b.prism(v3(0.0, 0.0, 0.1), sides, 2.06, 2.06, 0.3);
+        b.prism(v3(0.0, 0.0, -0.5), sides, 3.2, 3.2, 0.3);
     }
     b.with_recoil(|b| {
-        // The breech between the cheeks, a drum over the trunnion.
-        collar(b, Vec3::ZERO, Vec3::Y, 0.85, 2.4);
+        // The mantlet: a faceted block over the trunnion.
         dark_plate(b);
         b.with_facets(|b| {
             b.beam(
-                v3(-1.4, 0.0, 0.0),
-                v3(1.6, 0.0, 0.0),
-                Vec2::new(1.5, 1.6),
-                Vec2::new(1.3, 1.4),
+                v3(-2.6, 0.0, 0.0),
+                v3(2.2, 0.0, 0.0),
+                Vec2::new(3.2, 2.4),
+                Vec2::new(2.7, 2.0),
             );
         });
-        // The shroud over the barrel's root, an octagon, and the barrel out of it.
+        collar(b, Vec3::ZERO, Vec3::Y, 1.1, 3.6);
         sleeve(
             b,
             &[
-                ring(v3(1.4, 0.0, 0.0), Vec3::Z, 0.85, 0.85),
-                ring(v3(3.8, 0.0, 0.0), Vec3::Z, 0.8, 0.8),
+                ring(v3(2.0, 0.0, 0.0), Vec3::Z, BORE * 1.9, BORE * 1.9),
+                ring(v3(LEN * 0.42, 0.0, 0.0), Vec3::Z, BORE * 1.7, BORE * 1.7),
             ],
             &OCT,
         );
         metal(b);
-        let sides = b.sides(10);
-        b.cylinder_between(v3(2.4, 0.0, 0.0), v3(LEN - 0.2, 0.0, 0.0), 0.5, 0.42, sides);
-        // Two short pinch coils round the muzzle end, lit in the prism.
-        for (x, stage) in [(2.9f32, 3u32), (3.8, 5)] {
+        let bs = b.sides(10);
+        b.cylinder_between(
+            v3(LEN * 0.4, 0.0, 0.0),
+            v3(LEN - 0.6, 0.0, 0.0),
+            BORE,
+            BORE * 0.85,
+            bs,
+        );
+        for (i, stage) in [(0.55f32, 2u32), (0.68, 4), (0.81, 6)] {
+            let x = LEN * i;
             dark_plate(b);
-            hoop_on(b, v3(x, 0.0, 0.0), Vec3::X, 0.62, 0.35, 0.7, sides);
+            hoop_on(
+                b,
+                v3(x, 0.0, 0.0),
+                Vec3::X,
+                BORE * 1.35,
+                BORE * 0.6,
+                0.8,
+                bs,
+            );
             b.paint(GLOW_LASER).pattern(pattern::COIL + stage);
             b.face(&[
-                v3(x + 0.71, -0.25, 0.45),
-                v3(x + 0.71, 0.25, 0.45),
-                v3(x + 0.71, 0.25, 0.58),
-                v3(x + 0.71, -0.25, 0.58),
+                v3(x + 0.81, -0.3, BORE * 0.9),
+                v3(x + 0.81, 0.3, BORE * 0.9),
+                v3(x + 0.81, 0.3, BORE * 1.15),
+                v3(x + 0.81, -0.3, BORE * 1.15),
             ]);
         }
+        // The muzzle brake: a squared block with a port either side.
         dark_plate(b);
-        hoop_on(b, v3(LEN - 0.1, 0.0, 0.0), Vec3::X, 0.46, 0.22, 0.5, sides);
+        b.with_facets(|b| {
+            b.chamfered_box(
+                v3(LEN - 0.5, 0.0, 0.0),
+                v3(1.4, BORE * 2.6, BORE * 2.4),
+                0.15,
+            );
+        });
+        if fine {
+            seam(b);
+            for side in [-1.0f32, 1.0] {
+                b.chamfered_box(
+                    v3(LEN - 0.5, side * BORE * 1.31, 0.0),
+                    v3(0.7, 0.05, BORE * 1.2),
+                    0.02,
+                );
+            }
+        }
     });
 }

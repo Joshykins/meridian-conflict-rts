@@ -3,7 +3,7 @@
 use super::super::commander::form::{ring, sleeve, OCT};
 use super::super::kit::{metal, seam, v3};
 use super::detail::armor as dark_plate;
-use super::{DECK, LANCE_PIVOT, RACE};
+use super::{lance, DECK, LANCE_PIVOT, RACE};
 use crate::builder::{MeshBuilder, Section};
 use crate::{material::*, part, pattern, rig};
 use glam::{Vec2, Vec3};
@@ -57,17 +57,6 @@ fn shoulder(b: &mut MeshBuilder) {
     panel(b, -25.0, -10.0, 12.0, 6.0, 26.8, 3.0, true);
     panel(b, -9.3, 4.5, 12.0, 7.0, 27.3, 3.4, false);
     panel(b, 5.2, 16.5, 10.0, 5.4, 26.0, 2.8, true);
-    // The cheek cradles physically meet the independent chin-gun housings.
-    dark_plate(b);
-    sleeve(
-        b,
-        &[
-            ring(v3(7.0, 8.6, 24.0), Vec3::Z, 3.5, 3.5),
-            ring(v3(15.0, 8.6, 24.0), Vec3::Z, 3.0, 3.0),
-            ring(v3(18.0, 8.6, 23.0), Vec3::Z, 2.2, 2.0),
-        ],
-        &OCT,
-    );
     if b.fine() {
         seam(b);
         b.chamfered_box(v3(-4.0, 17.6, 25.0), v3(19.0, 1.3, 3.2), 0.35);
@@ -149,9 +138,9 @@ pub(super) fn coarse(b: &mut MeshBuilder) {
         b.with_limb(rig::ARM_GUN, |b| {
             b.beam(
                 LANCE_PIVOT,
-                LANCE_PIVOT + v3(21.0, 0.0, 0.0),
-                Vec2::splat(8.0),
-                Vec2::splat(3.0),
+                LANCE_PIVOT + v3(21.0 * lance::SIZE, 0.0, 0.0),
+                Vec2::splat(8.0 * lance::SIZE),
+                Vec2::splat(3.0 * lance::SIZE),
             )
         });
     });

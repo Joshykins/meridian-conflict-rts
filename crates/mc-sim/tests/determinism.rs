@@ -217,7 +217,7 @@ fn setup(w: &mut World) {
                 add("aster_t5_space_elevator", 1, 250, 1600);
                 // The Regency siege walker: a lance that charges and burns a salvo of ticks, twin
                 // mounts turning on their own, unguided lofted rockets and a hull field.
-                add("regency_t5_colossus", 1, 1500, 900);
+                add("regency_t4_colossus", 1, 1500, 900);
                 // Its hull field runs on power: a plant for it, or the Courier's warp has none left.
                 add("aster_t3_power", 1, 600, 150);
             }

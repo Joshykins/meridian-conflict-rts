@@ -4,7 +4,7 @@
 //! the established faction finish. The jawed siege aperture pitches independently,
 //! with two chin guns and an eight-cell dorsal rocket pack on separate mounts.
 //!
-//! Authored at 40 m radius by 37 m high and built 3.6 times larger. The blueprint's
+//! Authored at 40 m radius by 37 m high and built 1.2 times larger. The blueprint's
 //! dimensions and weapon origins are checked against this model's rig.
 
 mod body;
@@ -28,7 +28,7 @@ pub(super) const RADIUS: f32 = 40.0;
 pub(super) const HEIGHT: f32 = 37.0;
 /// How much bigger the unit file builds it.
 #[cfg(test)]
-const SCALE: f32 = 3.6;
+const SCALE: f32 = 1.2;
 
 /// Where the carapace turns on the crown: the top of the race, the carapace's belly.
 const RACE: f32 = 19.2;
@@ -39,15 +39,19 @@ const DECK: f32 = 27.0;
 /// and `muzzle`. The charge forms [`lance::MOUTH`] ahead of the trunnion, past the jaws' tips.
 const LANCE_PIVOT: Vec3 = Vec3::new(10.0, 0.0, 26.2);
 #[cfg(test)]
-const LANCE_MUZZLE: Vec3 = Vec3::new(LANCE_PIVOT.x + lance::MOUTH, 0.0, LANCE_PIVOT.z);
-/// How far round the charge the jaws stand: none of them closer than 0.4 of it.
+const LANCE_MUZZLE: Vec3 = Vec3::new(
+    LANCE_PIVOT.x + lance::MOUTH * lance::SIZE,
+    0.0,
+    LANCE_PIVOT.z,
+);
+/// How far round the charge the jaws stand, at the head's size: none of them closer than
+/// 0.4 of it.
 #[cfg(test)]
-// The compact charge core is under one authored metre across at full charge.
-const HOLD: f32 = 2.5;
+const HOLD: f32 = 2.5 * lance::SIZE;
 
-/// The left chin gun's trunnion and the middle of its barrel's mouth: the unit file's
+/// The left shoulder gun's trunnion and the middle of its barrel's mouth: the unit file's
 /// weapon 1 `pivot` and `muzzle`. The right gun (weapon 2) is their mirror.
-const GUN_PIVOT: Vec3 = Vec3::new(16.2, 8.6, 22.3);
+const GUN_PIVOT: Vec3 = Vec3::new(9.0, 10.8, 31.0);
 #[cfg(test)]
 const GUN_MUZZLE: Vec3 = Vec3::new(GUN_PIVOT.x + guns::LEN, GUN_PIVOT.y, GUN_PIVOT.z);
 

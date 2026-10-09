@@ -133,7 +133,7 @@ pub(super) const MODELS: &[ModelDef] = &[
         strider::strider,
     ),
     // The tech 4 siege walker: a carapace on four long legs, a jawed Heavy Pinch-fusion
-    // Lance for a head, two chin guns and a rocket battery on its back (`colossus`).
+    // Lance for a head, two shoulder guns and a rocket battery on its back (`colossus`).
     ModelDef::new(
         "regency_colossus",
         colossus::RADIUS,

@@ -34,7 +34,7 @@ fn fits_the_librarys_checks() {
 fn the_unit_files_weapons_are_the_models() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
     let blueprints = mc_data::Blueprints::load(&dir).unwrap();
-    let bp = blueprints.unit(blueprints.id_of("regency_t5_colossus").unwrap());
+    let bp = blueprints.unit(blueprints.id_of("regency_t4_colossus").unwrap());
     assert_eq!(bp.visual.mesh, "regency_colossus");
     assert!((bp.radius.to_f32() - RADIUS * SCALE).abs() < 1e-3);
     assert!((bp.height.to_f32() - HEIGHT * SCALE).abs() < 1e-3);
@@ -57,7 +57,11 @@ fn the_unit_files_weapons_are_the_models() {
         near(v(w.pivot.unwrap()), GUN_PIVOT * mirror, "gun pivot");
         assert!(w.mount, "{}: a house of its own", w.name);
     }
-    near(v(rockets.muzzle), ROCKET_MUZZLE, "rocket face");
+    near(
+        v(rockets.muzzle),
+        ROCKET_PIVOT + rockets::SIZE * (ROCKET_MUZZLE - ROCKET_PIVOT),
+        "rocket face",
+    );
     near(v(rockets.pivot.unwrap()), ROCKET_PIVOT, "rocket hinge");
     assert!(rockets.mount && rockets.missile);
     assert_eq!(rockets.muzzles.len(), rockets::CELLS.len());
@@ -89,7 +93,11 @@ fn the_rig_is_the_unit_files() {
         ]
     );
     let gear = model.charge_gear.expect("charge gear");
-    assert_eq!(gear[3], lance::GEAR, "gear travels at the model's size");
+    assert_eq!(
+        gear[3],
+        lance::GEAR * lance::SIZE,
+        "gear travels at the head's size"
+    );
     for lod in &model.lods {
         assert!(lod.vertices.iter().all(|v| v.material != GLOW_VIOLET));
     }
@@ -278,7 +286,7 @@ fn the_jaws_part_round_the_bore() {
 fn the_cells_are_clear() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
     let blueprints = mc_data::Blueprints::load(&dir).unwrap();
-    let bp = blueprints.unit(blueprints.id_of("regency_t5_colossus").unwrap());
+    let bp = blueprints.unit(blueprints.id_of("regency_t4_colossus").unwrap());
     let rake = bp.weapons[3].rake.to_radians_f32();
     assert!(
         (rake.to_degrees() - 65.0).abs() < 0.5,

@@ -12,7 +12,7 @@ use mc_sim::{Command, MatchConfig, PlayerCommand, PlayerSetup, SimEvent, World};
 use std::path::Path;
 use std::sync::Arc;
 
-const COLOSSUS: &str = "regency_t5_colossus";
+const COLOSSUS: &str = "regency_t4_colossus";
 const LANCE: u8 = 0;
 const ROCKETS: u8 = 3;
 
@@ -85,17 +85,17 @@ fn fired_on(world: &mut World, weapon: u8, ticks: u32) -> Vec<u32> {
 }
 
 #[test]
-fn it_is_a_shielded_striding_tech_4() {
+fn it_is_a_shielded_tech_4_that_walks_the_ground() {
     let w = world();
     let bp = w.blueprints.unit(w.blueprints.id_of(COLOSSUS).unwrap());
     assert_eq!(bp.tech, 4);
-    assert_eq!(bp.radius, Fx::from_int(144));
-    assert_eq!(bp.health, Fx::from_int(90000));
+    assert_eq!(bp.radius, Fx::from_int(48));
+    assert_eq!(bp.health, Fx::from_int(75000));
     assert!(bp.shield.is_some_and(|s| s.is_hull()), "a hull field");
     let motion = bp.motion.unwrap();
     assert!(
-        motion.stride,
-        "it steps over the ground and what stands on it"
+        !motion.stride && bp.stomp.is_none(),
+        "it paths round slopes, water and buildings like any walker; no giant's stomp"
     );
     assert_eq!(bp.weapons.len(), 4);
     assert!(bp.weapons[LANCE as usize].beam && bp.weapons[LANCE as usize].star_beam);
@@ -196,12 +196,12 @@ fn the_rockets_scatter() {
             &w,
             1,
             "aster_t3_assault_bot",
-            (2000, 512),
+            (1700, 512),
             flag::PASSIVE | flag::INVULNERABLE,
         ),
     ])
     .unwrap();
-    let rocket_splash = Fx::from_int(35);
+    let rocket_splash = Fx::from_int(30);
     let mut landed = Vec::new();
     let mut fired = Vec::new();
     let colossus = w.blueprints.id_of(COLOSSUS).unwrap();

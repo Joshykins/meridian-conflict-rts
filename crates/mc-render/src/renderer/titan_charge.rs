@@ -21,6 +21,9 @@ use mc_sim::mirror::{SimEvent, UnitInstance};
 pub(super) const CHARGE_RECORD: f32 = -1000.0;
 /// Long ago: a unit that has never charged or fired.
 const NEVER: f32 = -1.0e4;
+/// A shot this soon (seconds) after the last one carries on the same burn: a held beam
+/// (the Colossus's lance) fires every tick, and its gear stays open until the last.
+const HOLD_GAP: f32 = 0.5;
 
 #[derive(Clone, Copy)]
 struct Charge {
@@ -152,13 +155,15 @@ impl TitanCharge {
             };
         }
         for (blueprint, weapon, at) in self.shots.drain(..) {
-            // The nearest unit charging that weapon fired it.
+            // The nearest unit charging that weapon, or still burning it, fired it.
             let mut best: Option<(u32, f32)> = None;
             for u in units.iter().filter(|u| coil(u)) {
                 let Some(c) = self.units.get(&u.unit_id) else {
                     continue;
                 };
-                if c.blueprint != blueprint || c.weapon != weapon || c.start <= c.shot {
+                let burning = c.start <= c.shot && time - c.shot < HOLD_GAP;
+                if c.blueprint != blueprint || c.weapon != weapon || !(c.start > c.shot || burning)
+                {
                     continue;
                 }
                 let d = (u.pos[0] - at[0]).hypot(u.pos[1] - at[1]);
@@ -212,5 +217,13 @@ mod tests {
         tc.shots.push((1, 1, [120.0, 40.0]));
         let m = tc.patch(&[u], 8.1)[0].mount;
         assert_eq!(m[2], 8.1);
+        // A held beam's next tick carries the burn on: the last shot moves with it.
+        tc.shots.push((1, 1, [120.0, 40.0]));
+        let m = tc.patch(&[u], 8.2)[0].mount;
+        assert_eq!(m[2], 8.2);
+        // A shot long after is no part of it, and wants a new charge.
+        tc.shots.push((1, 1, [120.0, 40.0]));
+        let m = tc.patch(&[u], 12.0)[0].mount;
+        assert_eq!(m[2], 8.2);
     }
 }

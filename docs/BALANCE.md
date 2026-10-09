@@ -35,17 +35,17 @@ Off the lines, measured the same way:
   and caught inside the gatlings' 750 m it loses, either way badly hurt
   (mc-sim `tests/strider.rs`). Shorter reach than the Fulgur's AEB-2 and nothing against
   aircraft. Raised on a lot by Artificer IIIs or the Exarch's Engineering Suite III.
-- Colossus (Regency T5 four-legged siege walker, 90000 mass, the Behemoth's peer at three
-  quarters its price): 900000 health plus a 150000 hull field (the Behemoth: 1.3 M plus
-  200000). Its Heavy Pinch-fusion Lance charges 3 s and then burns 5 s (50 ticks of 600
-  with 140 m of splash, every 40 s): about 6000 dps on everything
-  within a base's breadth of the mark, and it drags from mark to mark while it burns. Two
-  Rapid Pinch-fusion Guns (900 a shot, 1400 m, taking turns) and eight unguided Ruin
-  Rockets (2400, 55 m splash, 2800 m, scattering 6 degrees, every 24 s) are its escort
-  of the base. It reaches 1500 m with the lance and 2800 with the rockets (the Behemoth's
-  guns reach 2600 and its bore 3800), has nothing for the air, and is raised on a lot by
-  Artificer IIIs or the Exarch's Engineering Suite III. Unplayed (2026-10-06): the numbers
-  are a first pass (mc-sim `tests/colossus.rs`).
+- Colossus (Regency T4 four-legged siege walker, 4200 mass, the Strider's and the
+  Breacher's peer; made a T4 in full 2026-10-08 at the user's word): 75000 health plus an
+  18000 hull field. Its Heavy Pinch-fusion Lance charges 3 s and then burns 5 s (50 ticks
+  of 1200 with 40 m of splash, every 40 s): about 12000 dps through the burn, 1500 averaged
+  over the reload, dragging from mark to mark while it burns. Two Rapid Pinch-fusion Guns
+  on its shoulders (450 a shot every 0.8 s, 1100 m, taking turns) and eight unguided Ruin
+  Rockets (900, 30 m splash, 1400 m, scattering 6 degrees, every 24 s) cover its flanks. It
+  walks the ground like any other walker (no stride over slopes, water or buildings, no
+  stomp), has nothing for the air, and is raised on a lot by Artificer IIIs or the Exarch's
+  Engineering Suite III. Unplayed: the numbers are a first pass (mc-sim
+  `tests/colossus.rs`).
 - Breacher (T4 assault walker, 3800 mass): 72000 health plus a 16000 hull field, about 2000
   dps from its two gatling-breach cannons at full spin (300 a shot, 0.3 s) and 430 from the
   thermobaric launchers (32 rockets of 240 every 18 s), so about 3.9 per unit of mass, a little
