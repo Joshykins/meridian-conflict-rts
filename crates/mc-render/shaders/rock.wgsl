@@ -88,23 +88,49 @@ fn cliff_rock(p: vec3<f32>, n: vec3<f32>, px: f32, dz: f32, dpx: vec3<f32>, dpy:
 // blocks `CliffBlocks` marks) move each vertex of a steep wall out of it or back
 // into it by `crag_relief`: the wall's surface becomes granite split along joints.
 
-// Three random numbers in 0..1 for a lattice point.
+// Three random numbers in 0..1 for a lattice point: an integer hash, so
+// neighbouring points are unrelated however far out on the map they lie (a
+// `sin` hash of a large argument repeats itself in lines on the GPU).
 fn crag_hash3(i: vec3<f32>) -> vec3<f32> {
-    var q = vec3<f32>(dot(i, vec3<f32>(127.1, 311.7, 74.7)), dot(i, vec3<f32>(269.5, 183.3, 246.1)),
-        dot(i, vec3<f32>(113.5, 271.9, 124.6)));
-    return fract(sin(q) * 43758.5453);
+    var q = bitcast<vec3<u32>>(vec3<i32>(i)) * vec3<u32>(1664525u) + vec3<u32>(1013904223u);
+    q.x += q.y * q.z;
+    q.y += q.z * q.x;
+    q.z += q.x * q.y;
+    q ^= q >> vec3<u32>(16u);
+    q.x += q.y * q.z;
+    q.y += q.z * q.x;
+    q.z += q.x * q.y;
+    return vec3<f32>(q >> vec3<u32>(8u)) * (1.0 / 16777216.0);
 }
 
-// Smooth value noise in 3D, 0..1, one lattice cell a unit.
+// Smooth gradient noise in 3D, 0..1 about 0.5, one lattice cell a unit. Gradient,
+// not value, noise: value noise's contours turn square corners, which the
+// crag's lighting and its snow drew as boxes.
 fn crag_noise3(p: vec3<f32>) -> f32 {
     let i = floor(p);
     let f = p - i;
-    let u = f * f * (3.0 - 2.0 * f);
-    let a = mix(mix(crag_hash3(i).x, crag_hash3(i + vec3<f32>(1.0, 0.0, 0.0)).x, u.x),
-        mix(crag_hash3(i + vec3<f32>(0.0, 1.0, 0.0)).x, crag_hash3(i + vec3<f32>(1.0, 1.0, 0.0)).x, u.x), u.y);
-    let b = mix(mix(crag_hash3(i + vec3<f32>(0.0, 0.0, 1.0)).x, crag_hash3(i + vec3<f32>(1.0, 0.0, 1.0)).x, u.x),
-        mix(crag_hash3(i + vec3<f32>(0.0, 1.0, 1.0)).x, crag_hash3(i + vec3<f32>(1.0, 1.0, 1.0)).x, u.x), u.y);
-    return mix(a, b, u.z);
+    let u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+    let x00 = mix(crag_grad(i, f, vec3<f32>(0.0, 0.0, 0.0)), crag_grad(i, f, vec3<f32>(1.0, 0.0, 0.0)), u.x);
+    let x10 = mix(crag_grad(i, f, vec3<f32>(0.0, 1.0, 0.0)), crag_grad(i, f, vec3<f32>(1.0, 1.0, 0.0)), u.x);
+    let x01 = mix(crag_grad(i, f, vec3<f32>(0.0, 0.0, 1.0)), crag_grad(i, f, vec3<f32>(1.0, 0.0, 1.0)), u.x);
+    let x11 = mix(crag_grad(i, f, vec3<f32>(0.0, 1.0, 1.0)), crag_grad(i, f, vec3<f32>(1.0, 1.0, 1.0)), u.x);
+    return clamp(0.5 + mix(mix(x00, x10, u.y), mix(x01, x11, u.y), u.z) * 0.75, 0.0, 1.0);
+}
+
+// The ramp of the lattice point `i + o` at `f` within cell `i` (`crag_noise3`).
+fn crag_grad(i: vec3<f32>, f: vec3<f32>, o: vec3<f32>) -> f32 {
+    return dot(crag_hash3(i + o) * 2.0 - 1.0, f - o);
+}
+
+// How much a joint cell `d` (-1, 0 or 1 along each axis) away from the point's
+// own counts, `f` being where in its own cell the point lies: all of the cell and
+// of the nearer neighbour, the farther one fading out, so no site drops out of
+// `crag_depth` with a jump as the point crosses into the next cell. Only the cell
+// and the neighbour on the point's side count at all.
+fn crag_cell_weight(d: vec3<f32>, f: vec3<f32>) -> f32 {
+    let w = select(select(vec3<f32>(1.0), smoothstep(vec3<f32>(0.5), vec3<f32>(1.0), f), d > vec3<f32>(0.0)),
+        1.0 - smoothstep(vec3<f32>(0.0), vec3<f32>(0.5), f), d < vec3<f32>(0.0));
+    return w.x * w.y * w.z;
 }
 
 // How far granite stands out of a wall at `p`, metres, before weighting. Joint
@@ -114,24 +140,23 @@ fn crag_noise3(p: vec3<f32>) -> f32 {
 // step. Over them, ribs and gullies running down the face, and a rough skin.
 fn crag_depth(p: vec3<f32>) -> f32 {
     let scale = vec3<f32>(1.0 / 10.0, 1.0 / 10.0, 1.0 / 16.0);
-    // The eight cells round the point: the corner it is nearest.
-    let cell = floor(p * scale - 0.5);
-    // Smooth minimum (exponential) over their planes, each rising away from its
-    // own site so it only rules near it.
+    let cell = floor(p * scale);
+    let f = p * scale - cell;
+    // The neighbour on the point's side along each axis (`crag_cell_weight`).
+    let side = select(vec3<f32>(1.0), vec3<f32>(-1.0), f < vec3<f32>(0.5));
+    // Smooth minimum (exponential) over the planes of those eight cells, each
+    // rising away from its own site so it only rules near it.
     var sum = 0.0;
     let k = 1.2;
-    for (var z = 0; z <= 1; z++) {
-        for (var y = 0; y <= 1; y++) {
-            for (var x = 0; x <= 1; x++) {
-                let c = cell + vec3<f32>(f32(x), f32(y), f32(z));
-                let h = crag_hash3(c);
-                let site = (c + 0.15 + 0.7 * h) / scale;
-                let tilt = (crag_hash3(c + 17.0) - 0.5) * vec3<f32>(0.6, 0.6, 0.45);
-                let off = p - site;
-                let v = dot(off, tilt) + (h.z - 0.5) * 2.5 + 0.035 * dot(off * scale * 10.0, off * scale * 10.0);
-                sum += exp(-v / k);
-            }
-        }
+    for (var n = 0u; n < 8u; n++) {
+        let d = side * vec3<f32>(f32(n & 1u), f32((n >> 1u) & 1u), f32(n >> 2u));
+        let c = cell + d;
+        let h = crag_hash3(c);
+        let site = (c + 0.15 + 0.7 * h) / scale;
+        let tilt = (crag_hash3(c + 17.0) - 0.5) * vec3<f32>(0.6, 0.6, 0.45);
+        let off = p - site;
+        let v = dot(off, tilt) + (h.z - 0.5) * 2.5 + 0.035 * dot(off * scale * 10.0, off * scale * 10.0);
+        sum += crag_cell_weight(d, f) * exp(-v / k);
     }
     let facets = 2.5 + k * log(max(sum, 1e-6));
     let ribs = crag_noise3(p / vec3<f32>(7.0, 7.0, 34.0)) - 0.5;
@@ -139,10 +164,13 @@ fn crag_depth(p: vec3<f32>) -> f32 {
     return clamp(facets, -3.0, 3.0) + ribs * 2.5 + skin * 0.6;
 }
 
-// A ridged field, 0-1: sharp crests where the noise crosses its middle, broad
-// troughs between.
+// A ridged field, 0-1: crests where the noise crosses its middle, broad troughs
+// between. The crest is rounded over a few percent of the noise, a metre or so:
+// a crease a pixel wide flips the light across it and draws a hairline down the
+// face.
 fn crag_ridged(p: vec3<f32>) -> f32 {
-    let v = 1.0 - abs(crag_noise3(p) * 2.0 - 1.0);
+    let d = crag_noise3(p) * 2.0 - 1.0;
+    let v = 1.0 - (sqrt(d * d + 0.0064) - 0.08);
     return v * v;
 }
 
