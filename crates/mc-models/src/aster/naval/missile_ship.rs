@@ -24,7 +24,7 @@ const CELL_X: [f32; 4] = [2.0, 0.0, -2.0, -4.0];
 const CELL_Y: f32 = 1.5;
 const CELL_Z: f32 = 6.0;
 /// The cells' forward cant, and their height from root to lid.
-const CANT: f32 = 15.0 * std::f32::consts::PI / 180.0;
+pub(crate) const CANT: f32 = 15.0 * std::f32::consts::PI / 180.0;
 const CELL_H: f32 = 2.05;
 /// The dark plinth the rack stands on, and its top.
 const RACK_X: f32 = -1.0;

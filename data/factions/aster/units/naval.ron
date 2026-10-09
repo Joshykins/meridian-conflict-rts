@@ -378,15 +378,16 @@
         motion: (layer: Naval, size: 3, speed: 34, accel: 12, turn: 30),
         // Eight cells on the deck canted forward, each holding a rack of unguided rockets.
         // The cells are fixed, so the hull turns its bow onto the mark; a salvo ripples
-        // thirty-two rockets out on a high lob (`rake`), falling over the mark and round
-        // it: many small warheads, none of them guided, cheap to shoot down one by one and
-        // hard to stop all of.
+        // thirty-two rockets out on a high lob along the cells (`fixed_rack`, `rake`: 75
+        // degrees, the model's cells canted 15 off the vertical), falling over the mark and
+        // round it: many small warheads, none of them guided, cheap to shoot down one by
+        // one and hard to stop all of.
         weapons: [(
             name: "Dumbfire Rockets",
             damage: 150, splash: 12, range_min: 250, range: 1800, reload: 20, salvo: 32, salvo_delay: 0.15, speed: 300, trajectory: Ballistic, loft: 3,
             turret_turn: 0, arc: 360, muzzle: (2.0, -1.5, 6.0), spread: 3,
             muzzles: [(2.0, -1.5, 6.0), (2.0, 1.5, 6.0), (0.0, -1.5, 6.0), (0.0, 1.5, 6.0), (-2.0, -1.5, 6.0), (-2.0, 1.5, 6.0), (-4.0, -1.5, 6.0), (-4.0, 1.5, 6.0)],
-            targets: ["Land", "Naval", "Structure"], color: Orange, missile: true, rake: 55, intercept: 20,
+            targets: ["Land", "Naval", "Structure"], color: Orange, missile: true, rake: 75, fixed_rack: true, intercept: 20,
             trail: true, flash: 1.0, impact: 1.4, shockwave: 0.3,
             sounds: (fire: "missile_launch", impact: "shell_heavy", ground: "shell_heavy"),
         )],

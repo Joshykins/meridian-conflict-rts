@@ -11,6 +11,7 @@ use super::{
 
 mod breacher;
 mod cells;
+mod pod_racks;
 
 /// The blueprints in `data/factions/aster/units/*.ron` that matter to a model.
 struct Blueprint {

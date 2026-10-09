@@ -26,7 +26,7 @@ pub(crate) use mechs::RAIL as COMMANDER_RAIL;
 mod mine;
 mod missile_defense;
 mod mobile_shield;
-mod naval;
+pub(super) mod naval;
 mod onager;
 pub(crate) use naval::{MEGALODON_RAIL, NARWHAL_RAIL};
 mod parts;

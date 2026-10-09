@@ -24,7 +24,7 @@ mod aa_cruiser;
 mod battleship;
 mod carrier;
 mod destroyer;
-mod missile_ship;
+pub(crate) mod missile_ship;
 mod seabed_defense;
 mod shield_boat;
 mod submarine_hunter;

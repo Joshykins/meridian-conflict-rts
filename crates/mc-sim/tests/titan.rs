@@ -615,17 +615,19 @@ fn the_rockets_fly_an_arc() {
             }
         }
     }
-    // The pods stand some 480 m up (20 m ground); a flat shot at 2 km never climbs over them.
+    // The pods stand some 480 m up (20 m ground), raked 17 degrees: a rocket laid at 2 km
+    // climbs well over them (a flat shot never would).
     assert!(
-        top > Fx::from_int(700),
+        top > Fx::from_int(560),
         "rockets topped out at {} m",
         top.to_f32()
     );
 }
 
 /// With its mark off to the side, the pods wait for the torso to come round before they
-/// ripple: every rocket leaves along the bearing and comes down out by the mark, none at
-/// the Behemoth's feet. The salvo goes round every tube in both pods.
+/// ripple: every rocket leaves along the bearing, out of a cell mouth and along the pods'
+/// rake (the pods are fixed on the shoulders and never pitch), and comes down out by the
+/// mark, none at the Behemoth's feet. The salvo goes round every tube in both pods.
 #[test]
 fn the_pods_wait_for_the_torso_and_use_every_tube() {
     let mut w = world();
@@ -647,6 +649,8 @@ fn the_pods_wait_for_the_torso_and_use_every_tube() {
     let mut tubes = std::collections::BTreeSet::new();
     let mut fired = 0;
     let mut nearest = Fx::from_int(1_000_000);
+    let mut by_mark = Fx::from_int(1_000_000);
+    let rack = w.blueprints.unit(bp).weapons[pods].clone();
     for _ in 0..seconds(30) {
         w.tick(&[]).unwrap();
         for e in &w.events {
@@ -668,6 +672,18 @@ fn the_pods_wait_for_the_torso_and_use_every_tube() {
                         torso.0
                     );
                     let at = pos.xy() - w.state.units.pos[row(&w, titan)];
+                    let climb = vel.z.to_f32().atan2(vel.xy().length().to_f32());
+                    assert!(
+                        (climb - rack.rake.to_radians_f32()).abs() < 0.05,
+                        "a rocket left at {climb} rad, not along the pods"
+                    );
+                    let z = pos.z - w.state.units.z[row(&w, titan)];
+                    assert!(
+                        rack.muzzles.iter().any(|m| (m.z - z).abs() < Fx::ONE
+                            && (m.xy().length() - at.length()).abs() < Fx::ONE),
+                        "a rocket left from {:?}, not a pod cell",
+                        pos.to_f32()
+                    );
                     tubes.insert([at.x.round_int(), at.y.round_int(), pos.z.round_int()]);
                 }
             }
@@ -679,6 +695,7 @@ fn the_pods_wait_for_the_torso_and_use_every_tube() {
                 && p.pos[i].z < Fx::from_int(120)
             {
                 nearest = nearest.min(p.pos[i].xy().distance(home));
+                by_mark = by_mark.min(p.pos[i].xy().distance(FxVec2::from_ints(1000, 5500)));
             }
         }
     }
@@ -692,6 +709,11 @@ fn the_pods_wait_for_the_torso_and_use_every_tube() {
         nearest > Fx::from_int(1500),
         "a rocket came down {} m from the Behemoth",
         nearest.to_f32()
+    );
+    assert!(
+        by_mark < Fx::from_int(200),
+        "no rocket came down within {} m of the mark",
+        by_mark.to_f32()
     );
 }
 
