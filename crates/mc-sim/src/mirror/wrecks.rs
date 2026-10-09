@@ -263,12 +263,16 @@ impl World {
     /// Hulls still coming down out of the sky: tumbling as they fall (`AircraftCrash`),
     /// and once in the sea turning to hang nose down, coming level over their last few
     /// metres to the bottom. Like wrecks, they show under the fog anywhere the viewer's
-    /// team has explored, so a kill made out of sight is still seen coming down.
+    /// team has explored or has radar over, so a kill made out of sight is still seen
+    /// coming down.
     pub(super) fn push_crashes(&self, viewer: Option<u8>, units: &mut Vec<UnitInstance>) {
         let s = &self.state;
         for crash in &s.aircraft_crashes {
             if let (Some(v), true) = (viewer, s.fog_enabled) {
-                if !self.fog.is_explored(crash.pos.xy(), self.team_mask(v)) {
+                let mask = self.team_mask(v);
+                if !self.fog.is_explored(crash.pos.xy(), mask)
+                    && !self.fog.is_detected(crash.pos.xy(), mask)
+                {
                     continue;
                 }
             }
@@ -341,12 +345,13 @@ impl World {
     }
 
     /// Ships' hulls going down through the water, listing and trimmed as the sim sinks them.
-    /// Shown anywhere explored, like the wreck they settle into.
+    /// Shown anywhere explored or on radar, like the wreck they settle into.
     pub(super) fn push_sinking(&self, viewer: Option<u8>, units: &mut Vec<UnitInstance>) {
         let s = &self.state;
         for hull in &s.sinking {
             if let (Some(v), true) = (viewer, s.fog_enabled) {
-                if !self.fog.is_explored(hull.pos, self.team_mask(v)) {
+                let mask = self.team_mask(v);
+                if !self.fog.is_explored(hull.pos, mask) && !self.fog.is_detected(hull.pos, mask) {
                     continue;
                 }
             }

@@ -64,17 +64,17 @@ pub fn is_reclaim(kind: u32) -> bool {
 
 impl World {
     /// Whether `player` knows of wreck `w`: a settled wreck is salvage to plan around, so
-    /// it counts anywhere the player's team has explored, not only in sight, and the
-    /// map's own wreckage from the start. What the player is shown (`push_wrecks`, the
-    /// Ctrl survey) and every wreck a reclaimer picks for itself (area and guard work,
-    /// idle salvage, reclaim heads, drone carriers) follow this one rule.
+    /// it counts anywhere the player's team has explored or has radar over, not only in
+    /// sight, and the map's own wreckage from the start. What the player is shown
+    /// (`push_wrecks`, the Ctrl survey) and every wreck a reclaimer picks for itself (area
+    /// and guard work, idle salvage, reclaim heads, drone carriers) follow this one rule.
     pub(crate) fn wreck_known(&self, w: usize, player: u8) -> bool {
         let s = &self.state;
+        let (at, mask) = (s.wrecks.pos[w], self.team_mask(player));
         !s.fog_enabled
             || s.wrecks.from_map[w]
-            || self
-                .fog
-                .is_explored(s.wrecks.pos[w], self.team_mask(player))
+            || self.fog.is_explored(at, mask)
+            || self.fog.is_detected(at, mask)
     }
 
     /// This tick's reclaim beams. Left out when the viewer can see neither end.

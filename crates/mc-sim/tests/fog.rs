@@ -281,3 +281,44 @@ fn what_a_side_has_seen_survives_a_snapshot() {
         assert_eq!(back.tick(&[]).unwrap(), w.tick(&[]).unwrap());
     }
 }
+
+/// Radar finds salvage: a wreck on ground the viewer never explored but has radar over is
+/// on the map for it, like the radar contact it was.
+#[test]
+fn wrecks_show_under_radar() {
+    let mut w = world();
+    w.state.players[0].free_build = true;
+    // Watchtower sight is 500 m and its radar 3000 m: the tank at 800 m is radar only.
+    w.tick(&[
+        spawn(0, "aster_t1_radar", 512, &w),
+        spawn(1, "aster_t1_tank", 1312, &w),
+    ])
+    .unwrap();
+    let tank = w
+        .state
+        .units
+        .slots
+        .iter()
+        .find(|&r| w.state.units.owner[r] == 1)
+        .map(|r| w.state.units.id(r))
+        .unwrap();
+    w.tick(&[PlayerCommand {
+        player: 1,
+        command: Command::SelfDestruct {
+            units: vec![tank],
+            timed: false,
+        },
+    }])
+    .unwrap();
+    for _ in 0..5 {
+        w.tick(&[]).unwrap();
+    }
+    assert_eq!(w.state.wrecks.slots.live(), 1, "the tank leaves a wreck");
+    let at = FxVec2::from_ints(1312, 512);
+    let mask = w.team_mask(0);
+    assert!(!w.fog.is_explored(at, mask) && w.fog.is_detected(at, mask));
+
+    let mut frame = RenderFrame::default();
+    w.write_render_frame(Some(0), &mut frame);
+    assert_eq!(wrecks(&frame).len(), 1, "the wreck under radar is shown");
+}
