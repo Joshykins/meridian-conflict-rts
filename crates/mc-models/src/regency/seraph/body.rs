@@ -5,13 +5,14 @@
 use glam::{Affine3A, Vec3};
 
 use crate::builder::{MeshBuilder, Section};
+use crate::gpu_consts::flight;
 use crate::material::*;
 use crate::pattern;
 
 use super::super::commander::form::{ball, blade, ring, sleeve, ARCH, KEEL, OCT};
 use super::super::kit::{dark_plate, metal, seam, v3};
 use super::super::machine::{armour, swept, Frame};
-use super::{ANKLE, HIP, KNEE, NECK, SHOULDER, TOE, WAIST};
+use super::{Pose, NECK, SHOULDER, WAIST};
 
 /// A bone from `a` to `c` in the leg's plane: its direction, and the normal out of its
 /// front (forward).
@@ -21,18 +22,23 @@ fn bone(a: Vec3, c: Vec3) -> (Vec3, Vec3) {
     (u, if n.x < 0.0 { -n } else { n })
 }
 
-/// The left leg (the right is its mirror), fixed in its hanging pose.
-pub(super) fn leg(b: &mut MeshBuilder) {
-    thigh(b);
-    shin(b);
-    foot(b);
+/// A leg on the left side (the right is built as a left one and mirrored), fixed in its
+/// hanging pose.
+/// The thigh swings about the hip as it trails, the shin and foot about the knee
+/// (`gpu_consts::flight`).
+pub(super) fn leg(b: &mut MeshBuilder, p: Pose) {
+    b.with_flight(flight::THIGH, |b| thigh(b, p.hip, p.knee));
+    b.with_flight(flight::SHIN, |b| {
+        shin(b, p.knee, p.ankle);
+        foot(b, p.ankle, p.toe);
+    });
 }
 
-fn thigh(b: &mut MeshBuilder) {
-    let (u, n) = bone(HIP, KNEE);
-    let at = |t: f32, fwd: f32| HIP.lerp(KNEE, t) + n * fwd;
+fn thigh(b: &mut MeshBuilder, hip: Vec3, knee: Vec3) {
+    let (u, n) = bone(hip, knee);
+    let at = |t: f32, fwd: f32| hip.lerp(knee, t) + n * fwd;
     metal(b);
-    ball(b, HIP, 0.95);
+    ball(b, hip, 0.95);
     dark_plate(b);
     sleeve(
         b,
@@ -59,13 +65,13 @@ fn thigh(b: &mut MeshBuilder) {
     blade(b, at(0.82, 1.15), -u + n * 0.06, n, 3.0, 0.78, 0.0, 0.28);
 }
 
-fn shin(b: &mut MeshBuilder) {
-    let (u, n) = bone(KNEE, ANKLE);
-    let at = |t: f32, fwd: f32| KNEE.lerp(ANKLE, t) + n * fwd;
+fn shin(b: &mut MeshBuilder, knee: Vec3, ankle: Vec3) {
+    let (u, n) = bone(knee, ankle);
+    let at = |t: f32, fwd: f32| knee.lerp(ankle, t) + n * fwd;
     metal(b);
     b.cylinder_between(
-        KNEE - Vec3::Y * 0.7,
-        KNEE + Vec3::Y * 0.7,
+        knee - Vec3::Y * 0.7,
+        knee + Vec3::Y * 0.7,
         0.55,
         0.55,
         b.sides(10),
@@ -132,13 +138,13 @@ fn shin(b: &mut MeshBuilder) {
     );
 }
 
-/// The foot, hanging toe down: a long pointed sabot from the ankle to `TOE`, armoured
+/// The foot, hanging toe down: a long pointed sabot from the ankle to its toe, armoured
 /// over the instep, a spur behind the heel.
-fn foot(b: &mut MeshBuilder) {
-    let (u, n) = bone(ANKLE, TOE);
-    let at = |t: f32, fwd: f32| ANKLE.lerp(TOE, t) + n * fwd;
+fn foot(b: &mut MeshBuilder, ankle: Vec3, toe: Vec3) {
+    let (u, n) = bone(ankle, toe);
+    let at = |t: f32, fwd: f32| ankle.lerp(toe, t) + n * fwd;
     metal(b);
-    ball(b, ANKLE, 0.7);
+    ball(b, ankle, 0.7);
     dark_plate(b);
     sleeve(
         b,

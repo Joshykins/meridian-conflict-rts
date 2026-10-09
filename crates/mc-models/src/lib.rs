@@ -664,6 +664,31 @@ pub struct Model {
     pub discharge: Option<Discharge>,
     /// A VTOL's tilting engine pods (`part::VTOL_FRONT`, `VTOL_REAR`).
     pub vtol: Option<Vtol>,
+    /// A winged flier's wings and trailing legs (`MeshBuilder::set_flight`).
+    pub flight: Option<Flight>,
+}
+
+/// A winged flier's rig, posed by flight.wgsl from how the unit moves: its wings' feathers
+/// fan, sweep and breathe about the hub, its legs trail and swing about the hips and knees.
+/// Model space, the left (+y) side; the right is the mirror. Which vertices ride it is in
+/// their rig bits (`gpu_consts::flight`).
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Flight {
+    /// The left wing's hub, where its feathers' roots meet.
+    pub hub: [f32; 3],
+    /// The left hip.
+    pub hip: [f32; 3],
+    /// The left leg's knee, and the right's (given on the left: the right leg is built as
+    /// a left one and mirrored), so the two legs may hang differently.
+    pub knees: [[f32; 3]; 2],
+}
+
+impl Flight {
+    /// For `ModelInfo::flight`: hub, hip, left knee, right knee; each w 1.
+    pub fn gpu(&self) -> [[f32; 4]; 4] {
+        let w = |p: [f32; 3]| [p[0], p[1], p[2], 1.0];
+        [w(self.hub), w(self.hip), w(self.knees[0]), w(self.knees[1])]
+    }
 }
 
 /// A VTOL's tilting engine pods, one or two a side (`MeshBuilder::set_vtol`). Each is

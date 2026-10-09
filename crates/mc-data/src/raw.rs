@@ -1021,6 +1021,11 @@ pub struct RawWeapon {
     /// aft for a `rear` weapon.
     #[serde(default)]
     pub facing: f64,
+    /// Degrees the gun rests at, up from level, while it has nothing to shoot (a
+    /// shoulder gun rests with its torso). Negative: lowered, as a gun carried at a
+    /// walker's side. Zero (the default): level, or up at the sky for an AA gun.
+    #[serde(default)]
+    pub rest_pitch: f64,
     /// Multiplies the muzzle flash. 1 is the size the damage implies.
     #[serde(default = "one_f64")]
     pub flash: f64,
@@ -1882,6 +1887,7 @@ impl Unit {
                 burn_ticks: ticks(w.burn).min(600) as u16,
                 burn_dps: fx(w.burn_dps.max(0.0)),
                 rear: w.rear,
+                rest_pitch: Angle(steps(w.rest_pitch.clamp(-90.0, 90.0)).round() as i64 as u16),
                 facing: if w.facing != 0.0 {
                     Angle(steps(w.facing).round() as i64 as u16)
                 } else if w.rear {

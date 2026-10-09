@@ -1135,6 +1135,7 @@ fn fallback_model(key: &str, radius: f32, height: f32) -> Model {
         lifts: Vec::new(),
         discharge: None,
         vtol: None,
+        flight: None,
     }
 }
 

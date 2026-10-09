@@ -142,24 +142,13 @@ pub(super) const MODELS: &[ModelDef] = &[
         colossus::colossus,
     ),
     // The tech 5 strike titan: a winged knight hanging on its lift, a repeater down each
-    // forearm, two launch decks on its back (`seraph`). Design variants of its wings.
+    // forearm, two launch decks on its back, a wing of seven feathers off each shoulder
+    // blade (`seraph`).
     ModelDef::new(
         "regency_seraph",
         seraph::RADIUS,
         seraph::HEIGHT,
         seraph::seraph,
-    ),
-    ModelDef::new(
-        "regency_seraph~seraph",
-        seraph::RADIUS,
-        seraph::HEIGHT,
-        seraph::seraph_seraph,
-    ),
-    ModelDef::new(
-        "regency_seraph~halo",
-        seraph::RADIUS,
-        seraph::HEIGHT,
-        seraph::seraph_halo,
     ),
     // Factories: the land press works (`brood`), the air launch frame (`hatchery`), the
     // shell crouched on its legs behind the berth (`tidebrood`). All three upgrade in place

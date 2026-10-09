@@ -7,15 +7,17 @@
 //! horned helm with a red visor, high pauldrons swept back. A Rapid Pinch-fusion Repeater
 //! runs the length of each forearm (`arms`), its bore split between two lit rails. On the
 //! back between the wing roots stand two launch decks, eight cells each, open to the sky,
-//! from which the cased seekers climb and fall round it (`deck`). The wings (`wings`) are
-//! a binder from each shoulder blade carrying the feathers: long dark blades rimmed in red
-//! (`pattern::EMBER_RIM`), the light in the plate, never a lit piece.
+//! from which the cased seekers climb and fall round it (`deck`). The wings (`wings`) fan
+//! out of a housing on each shoulder blade: seven dark feathers rimmed in red
+//! (`pattern::EMBER_RIM`), each cut differently, the light in the plate, never a lit
+//! piece. Its legs hang staggered, one drawn up; with nothing to shoot its forearms hang
+//! at its sides, the repeaters pointed down (the unit file's `rest_pitch`).
 //!
 //! Finish (docs/STYLE.md "The Regency look"): dark plates, graphite machinery, red light.
 //! No violet: it does not build.
 //!
 //! Rig: `part::HULL` everything below the waist ring (`WAIST`), the legs fixed in their
-//! hanging pose; `part::TURRET` the torso, head, arms, wings and decks, turning about the
+//! hanging pose (`LEFT`, `RIGHT`); `part::TURRET` the torso, head, arms, wings and decks, turning about the
 //! waist to face what it shoots. The forearms pitch about the elbows (`rig::ARM_GUN`, `ELBOW`
 //! and its mirror). The helm idles about `NECK`. The hull is a hovercraft's (`set_hover`):
 //! the shader bobs it.
@@ -31,11 +33,12 @@ mod deck;
 mod tests;
 mod wings;
 
-use glam::{Vec2, Vec3};
+use glam::{Affine3A, Vec2, Vec3};
 
 use crate::builder::MeshBuilder;
+use crate::gpu_consts::flight;
 use crate::material::*;
-use crate::{part, rig};
+use crate::{part, rig, Flight};
 
 use super::kit::{dark_plate, v3};
 
@@ -46,12 +49,30 @@ pub(super) const HEIGHT: f32 = 31.0;
 #[cfg(test)]
 const SCALE: f32 = 4.0;
 
-/// The left leg's joints in its hanging pose: hip, knee a little forward, ankle, and the
-/// pointed toe's tip, the lowest point of the model.
-const HIP: Vec3 = Vec3::new(0.0, 1.5, 12.8);
-const KNEE: Vec3 = Vec3::new(0.75, 1.75, 8.5);
-const ANKLE: Vec3 = Vec3::new(-0.15, 1.9, 4.5);
-const TOE: Vec3 = Vec3::new(1.0, 1.95, 1.6);
+/// A leg's joints in its hanging pose, given on the left: hip, knee, ankle and the
+/// pointed toe's tip.
+#[derive(Clone, Copy)]
+struct Pose {
+    hip: Vec3,
+    knee: Vec3,
+    ankle: Vec3,
+    toe: Vec3,
+}
+
+/// The legs hang staggered: the left nearly straight, its toe the lowest point of the
+/// model; the right drawn up, its knee forward and its shin swept back under it.
+const LEFT: Pose = Pose {
+    hip: Vec3::new(0.0, 1.5, 12.8),
+    knee: Vec3::new(0.55, 1.75, 8.45),
+    ankle: Vec3::new(-0.2, 1.9, 4.45),
+    toe: Vec3::new(0.85, 1.95, 1.6),
+};
+const RIGHT: Pose = Pose {
+    hip: Vec3::new(0.0, 1.5, 12.8),
+    knee: Vec3::new(1.85, 1.7, 8.9),
+    ankle: Vec3::new(-0.45, 1.85, 5.55),
+    toe: Vec3::new(-0.6, 1.9, 2.55),
+};
 /// The ring the torso turns on.
 const WAIST: f32 = 14.6;
 /// The left shoulder's ball, and the left elbow the forearm pitches about.
@@ -63,58 +84,56 @@ const MUZZLE: Vec3 = Vec3::new(7.4, 4.75, 15.25);
 /// Where the helm turns while it idles.
 const NECK: Vec3 = Vec3::new(0.25, 0.0, 20.5);
 
-/// The wings, one per design variant (`regency_seraph~name`).
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum Wings {
-    /// A: a binder rising from each shoulder blade, five long feathers fanned off its
-    /// elbow and a fan of short inner blades under it: the reference's planform.
-    Freedom,
-    /// B: three wings a side, upper, middle and lower, each a course of swept plates
-    /// laid like feathers.
-    Seraph,
-    /// C: a sunburst of seven long blades a side, raying from a hub on the back.
-    Halo,
+/// Mirrors what `f` builds across the centreline.
+fn mirrored(b: &mut MeshBuilder, f: impl FnOnce(&mut MeshBuilder)) {
+    b.with(Affine3A::from_scale(Vec3::new(1.0, -1.0, 1.0)), f);
 }
 
 pub(super) fn seraph(b: &mut MeshBuilder, _tech: u8) {
-    build(b, Wings::Freedom);
-}
-
-pub(super) fn seraph_seraph(b: &mut MeshBuilder, _tech: u8) {
-    build(b, Wings::Seraph);
-}
-
-pub(super) fn seraph_halo(b: &mut MeshBuilder, _tech: u8) {
-    build(b, Wings::Halo);
-}
-
-fn build(b: &mut MeshBuilder, wings: Wings) {
     b.set_hover();
+    b.set_flight(Flight {
+        hub: wings::HUB.to_array(),
+        hip: LEFT.hip.to_array(),
+        knees: [LEFT.knee.to_array(), RIGHT.knee.to_array()],
+    });
     b.set_turret_pivot(v3(0.0, 0.0, WAIST));
     b.set_arm_pivot(ELBOW);
     b.set_recoil(ELBOW, MUZZLE.with_y(0.0), 0.25);
     if b.coarse() {
-        coarse(b, wings);
+        coarse(b);
         return;
     }
-    b.mirror_y(body::leg);
+    body::leg(b, LEFT);
+    mirrored(b, |b| body::leg(b, RIGHT));
     body::pelvis(b);
     b.with_part(part::TURRET, |b| {
         body::torso(b);
         body::head(b);
         b.mirror_y(arms::arm);
         deck::decks(b);
-        b.mirror_y(|b| wings::wing(b, wings));
+        b.mirror_y(wings::wing);
     });
 }
 
 /// From far off: the legs two bars, the torso a wedge with the team colour on top, the
 /// forearms bars that still pitch, each wing a few broad blades.
-fn coarse(b: &mut MeshBuilder, wings: Wings) {
+fn coarse(b: &mut MeshBuilder) {
     dark_plate(b);
-    b.mirror_y(|b| {
-        b.face(&[HIP + v3(0.6, 0.6, 0.0), TOE, HIP + v3(-0.6, -0.6, 0.0)]);
-        b.face(&[HIP + v3(-0.6, -0.6, 0.0), TOE, HIP + v3(0.6, 0.6, 0.0)]);
+    let flat = |b: &mut MeshBuilder, p: Pose| {
+        b.face(&[
+            p.hip + v3(0.6, 0.6, 0.0),
+            p.toe,
+            p.hip + v3(-0.6, -0.6, 0.0),
+        ]);
+        b.face(&[
+            p.hip + v3(-0.6, -0.6, 0.0),
+            p.toe,
+            p.hip + v3(0.6, 0.6, 0.0),
+        ]);
+    };
+    b.with_flight(flight::THIGH, |b| {
+        flat(b, LEFT);
+        mirrored(b, |b| flat(b, RIGHT));
     });
     b.frustum_open(
         v3(0.0, 0.0, 12.2),
@@ -151,6 +170,6 @@ fn coarse(b: &mut MeshBuilder, wings: Wings) {
                 )
             });
         });
-        b.mirror_y(|b| wings::coarse(b, wings));
+        b.mirror_y(wings::coarse);
     });
 }

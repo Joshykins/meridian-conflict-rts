@@ -98,6 +98,8 @@ pub struct Weapon {
     /// Which way the weapon rests and its arc is centred, off the nose (180 for `rear`).
     /// A limited arc off the nose also limits what it takes as a target (`RawWeapon::facing`).
     pub facing: Angle,
+    /// The pitch it rests at while it has nothing to shoot (`RawWeapon::rest_pitch`).
+    pub rest_pitch: Angle,
     /// Multiplies the muzzle flash. 1 is the size the damage implies.
     pub flash: f32,
     /// Multiplies the impact flash. 1 is the size the damage implies.

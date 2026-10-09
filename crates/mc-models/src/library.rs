@@ -236,6 +236,7 @@ fn build_fitted_made(
     let mut lifts = Vec::new();
     let mut discharge = None;
     let mut vtol = None;
+    let mut flight = None;
     let lods: [MeshLod; LOD_COUNT] = std::array::from_fn(|lod| {
         let mut builder = MeshBuilder::new(lod, root);
         builder.set_modules(modules);
@@ -269,6 +270,7 @@ fn build_fitted_made(
             lifts = builder.lifts();
             discharge = builder.discharge();
             vtol = builder.vtol();
+            flight = builder.flight();
         }
         builder.finish()
     });
@@ -334,6 +336,7 @@ fn build_fitted_made(
         lifts,
         discharge,
         vtol,
+        flight,
     })
 }
 

@@ -1305,7 +1305,13 @@ impl World {
                         .unit(units.blueprint[row])
                         .motion
                         .is_none_or(|m| m.layer != mc_data::MoveLayer::Air);
-                let rest = if sky_gun { IDLE_SKY_PITCH } else { Angle::ZERO };
+                let rest = if weapon.rest_pitch != Angle::ZERO {
+                    weapon.rest_pitch
+                } else if sky_gun {
+                    IDLE_SKY_PITCH
+                } else {
+                    Angle::ZERO
+                };
                 let rate = hull_pitch_rate(bp.unit(units.blueprint[row]), w, weapon);
                 units.arm_pitch[row][slot] = units.arm_pitch[row][slot].turn_toward(rest, rate);
             }

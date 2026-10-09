@@ -1322,6 +1322,23 @@ shared! {
         pub const NANITE: u32 = 0x8000;
     }
 
+    /// A winged flier's rig (`Model::flight`, flight.wgsl): what a vertex of its wings or
+    /// trailing legs is, in rig bits `SHIFT..` (`MeshBuilder::with_flight`). They borrow
+    /// the `UPGRADE_AT` bits, which mean something only on refit pieces, never on these.
+    pub mod flight as "FLIGHT_" {
+        pub const SHIFT: u32 = 16;
+        pub const MASK: u32 = 0x7F;
+        /// A feather, `FEATHER + i` for the `i`th from the top of its wing.
+        pub const FEATHER: u32 = 1;
+        pub const FEATHERS: u32 = 7;
+        /// The short vanes at the fan's root: they follow its middle.
+        pub const VANE: u32 = 8;
+        /// A trailing leg's thigh (swinging about the hip) and its shin and foot (about
+        /// the knee, carried by the thigh).
+        pub const THIGH: u32 = 9;
+        pub const SHIN: u32 = 10;
+    }
+
     /// A salvage drone docked on an aircraft (`mc_sim::mirror::UNIT_RIDING`, a test holds
     /// them equal): drawn in the frame its carrier is drawn in (entity.wgsl `riding_frame`).
     pub mod dock as "DOCK_" {

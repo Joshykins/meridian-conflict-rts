@@ -1,20 +1,47 @@
-//! The wings: from a hinge on each shoulder blade, a plated binder carrying long feathers
-//! of dark armour, each rimmed in red (`pattern::EMBER_RIM`), a narrower plate laid down
-//! its middle. The design variants lay the feathers differently (`Wings`).
+//! The wings: a plated housing on each shoulder blade, and fanned out of it seven
+//! feathers of dark armour, each rimmed in red (`pattern::EMBER_RIM`). They change as the
+//! fan turns down: the crown, the highest, is a broad compound blade with a spar along
+//! its leading edge, a vent at its root and a forked tip; under it a notched blade, a
+//! hooked one, a straight sword, a sickle, a guarded dagger and last a bare spike
+//! pointing at the ground. Each lies a little behind the one above, so they overlap like
+//! the feathers of a folded fan. Short graphite vanes fill the fan's root.
 
 use glam::Vec3;
 
 use crate::builder::MeshBuilder;
+use crate::gpu_consts::flight;
 use crate::material::*;
 use crate::pattern;
 
-use super::super::commander::form::{ball, ring, sleeve, KEEL, OCT};
+use super::super::commander::form::{ring, sleeve, ARCH};
 use super::super::kit::{dark_plate, metal, v3};
 use super::super::machine::{armour, swept, Frame};
-use super::Wings;
 
-/// The left wing's hinge on the shoulder blade, outside the launch deck.
-const ROOT: Vec3 = Vec3::new(-2.9, 2.75, 19.6);
+/// The middle of the left fan's root, at the housing's outer face.
+pub(super) const HUB: Vec3 = Vec3::new(-3.3, 3.55, 19.9);
+
+/// A feather's cut, from the crown down.
+#[derive(Clone, Copy)]
+enum Cut {
+    Crown,
+    Notched,
+    Hooked,
+    Sword,
+    Sickle,
+    Dagger,
+    Spike,
+}
+
+/// The left fan from the top: each feather's angle above level, its length and cut.
+const FAN: [(f32, f32, Cut); 7] = [
+    (46.0, 14.0, Cut::Crown),
+    (26.0, 13.0, Cut::Notched),
+    (8.0, 12.3, Cut::Hooked),
+    (-10.0, 11.2, Cut::Sword),
+    (-28.0, 9.8, Cut::Sickle),
+    (-46.0, 8.4, Cut::Dagger),
+    (-63.0, 6.8, Cut::Spike),
+];
 
 /// A direction in the wing's plane: `deg` above level, out to the left, swept back by
 /// `sweep` of a unit.
@@ -23,170 +50,224 @@ fn ray(deg: f32, sweep: f32) -> Vec3 {
     v3(-sweep, a.cos(), a.sin()).normalize()
 }
 
-/// One feather from `root` along `dir`, `len` long and `half` either side, its broad face
-/// turned back and a little up: the rimmed plate, and down its middle a narrower plate
-/// standing off it (full detail only).
-fn feather(b: &mut MeshBuilder, root: Vec3, dir: Vec3, len: f32, half: f32) {
-    let face = -Vec3::X + Vec3::Z * 0.15;
-    let f = Frame::new(root, dir, face);
+/// A feather's outline (`s` along it from the root, `t` across, positive toward its
+/// trailing edge, the side nearer the ground), `len` long.
+fn outline(cut: Cut, len: f32) -> Vec<[f32; 2]> {
+    let pts: &[[f32; 2]] = match cut {
+        // Broad, stepped in a third of the way out on both edges, its tip swept up.
+        Cut::Crown => &[
+            [0.0, -0.25],
+            [0.2, -1.05],
+            [0.5, -1.1],
+            [0.56, -0.78],
+            [0.86, -0.66],
+            [1.0, -0.2],
+            [0.93, 0.22],
+            [0.7, 0.56],
+            [0.63, 0.92],
+            [0.3, 1.15],
+            [0.08, 1.0],
+            [0.0, 0.6],
+        ],
+        // A step cut out of its leading edge near the tip.
+        Cut::Notched => &[
+            [0.0, -0.5],
+            [0.6, -0.66],
+            [0.65, -0.36],
+            [0.94, -0.32],
+            [1.0, 0.0],
+            [0.82, 0.36],
+            [0.2, 0.62],
+            [0.0, 0.5],
+        ],
+        // Its point turned down toward the trailing edge, a hook behind it.
+        Cut::Hooked => &[
+            [0.0, -0.46],
+            [0.76, -0.56],
+            [1.0, -0.06],
+            [0.96, 0.4],
+            [0.86, 0.2],
+            [0.22, 0.52],
+            [0.0, 0.46],
+        ],
+        // Straight and even to a centred point.
+        Cut::Sword => &[
+            [0.0, -0.46],
+            [0.8, -0.46],
+            [1.0, 0.0],
+            [0.8, 0.46],
+            [0.0, 0.46],
+        ],
+        // Bowed down along its length.
+        Cut::Sickle => &[
+            [0.0, -0.4],
+            [0.5, -0.46],
+            [0.84, -0.16],
+            [1.0, 0.36],
+            [0.8, 0.18],
+            [0.45, 0.36],
+            [0.0, 0.4],
+        ],
+        // A guard near the root, then a long narrow blade.
+        Cut::Dagger => &[
+            [0.0, -0.3],
+            [0.22, -0.3],
+            [0.25, -0.46],
+            [0.32, -0.28],
+            [1.0, 0.0],
+            [0.32, 0.28],
+            [0.25, 0.46],
+            [0.22, 0.3],
+            [0.0, 0.3],
+        ],
+        Cut::Spike => &[[0.0, -0.26], [1.0, 0.0], [0.0, 0.26]],
+    };
+    // Broad blades, as the crown, narrowing down the fan to the spike.
+    let wide = match cut {
+        Cut::Crown => 1.55,
+        Cut::Notched | Cut::Hooked => 1.4,
+        Cut::Sword | Cut::Sickle => 1.3,
+        Cut::Dagger => 1.25,
+        Cut::Spike => 1.2,
+    };
+    pts.iter().map(|&[s, t]| [s * len, t * wide]).collect()
+}
+
+/// One feather from `root` along `dir`: its rimmed plate turned to face back and a little
+/// up, and down its middle a narrower plate standing off each face (full detail only).
+fn feather(b: &mut MeshBuilder, root: Vec3, dir: Vec3, len: f32, cut: Cut) {
+    let f = Frame::new(root, dir, -Vec3::X + Vec3::Z * 0.15);
     b.paint(PLATING_DARK).pattern(pattern::EMBER_RIM);
-    armour(b, &f, &swept(len, half, 0.0, 0.78), 0.2);
-    if b.fine() && len > 3.0 {
-        dark_plate(b);
-        let g = Frame::new(f.at(len * 0.08, 0.0, 0.2), dir, f.n);
-        armour(b, &g, &swept(len * 0.66, half * 0.42, 0.0, 0.7), 0.1);
-        armour(
-            b,
-            &Frame::new(f.at(len * 0.08, 0.0, 0.0), dir, -f.n),
-            &swept(len * 0.66, half * 0.42, 0.0, 0.7),
-            0.1,
-        );
+    armour(b, &f, &outline(cut, len), 0.2);
+    if matches!(cut, Cut::Crown) {
+        crown(b, &f, len);
+    }
+    if !b.fine() || matches!(cut, Cut::Spike) {
+        return;
+    }
+    dark_plate(b);
+    let half = match cut {
+        Cut::Crown => 0.62,
+        Cut::Notched | Cut::Hooked => 0.34,
+        _ => 0.24,
+    };
+    for n in [f.n, -f.n] {
+        let lift = if n == f.n { 0.2 } else { 0.0 };
+        let g = Frame::new(f.at(len * 0.06, 0.0, lift), f.u, n);
+        armour(b, &g, &swept(len * 0.6, half, 0.0, 0.72), 0.08);
     }
 }
 
-/// A short inner blade in graphite: the machinery the feathers spread from.
-fn vane(b: &mut MeshBuilder, root: Vec3, dir: Vec3, len: f32, half: f32) {
-    metal(b);
+/// The crown's own gear: a spar laid along its leading edge from the root, a vent let
+/// into its root, and a second, short blade forked up off its tip.
+fn crown(b: &mut MeshBuilder, f: &Frame, len: f32) {
+    dark_plate(b);
+    let spar = Frame::new(f.at(len * 0.2, -1.52, 0.18), f.u, f.n);
+    armour(b, &spar, &swept(len * 0.64, 0.26, -0.6, 0.85), 0.24);
+    b.paint(PLATING_DARK).pattern(pattern::EMBER_SLOT);
     armour(
         b,
-        &Frame::new(root, dir, -Vec3::X),
-        &swept(len, half, 0.0, 0.6),
+        &Frame::new(f.at(len * 0.12, 0.2, 0.2), f.u, f.n),
+        &[
+            [0.0, -0.32],
+            [len * 0.22, -0.32],
+            [len * 0.2, 0.32],
+            [0.0, 0.32],
+        ],
+        0.1,
+    );
+    // The fork: off the leading edge three quarters out, raked up past the tip.
+    let up = (f.u - f.v * 0.32).normalize();
+    b.paint(PLATING_DARK).pattern(pattern::EMBER_RIM);
+    armour(
+        b,
+        &Frame::new(f.at(len * 0.66, -1.08, -0.02), up, f.n),
+        &swept(len * 0.42, 0.36, -0.4, 0.6),
         0.16,
     );
 }
 
-/// A plated binder from `a` to `c`, keeled along its back.
-fn binder(b: &mut MeshBuilder, a: Vec3, c: Vec3, w: f32) {
-    let out = -Vec3::X + Vec3::Z * 0.3;
+/// A short graphite vane: the machinery the feathers spread from.
+fn vane(b: &mut MeshBuilder, root: Vec3, dir: Vec3, len: f32) {
+    metal(b);
+    armour(
+        b,
+        &Frame::new(root, dir, -Vec3::X),
+        &swept(len, 0.32, 0.0, 0.6),
+        0.14,
+    );
+}
+
+/// The housing on the shoulder blade: an arched plate sleeve from the back out to the
+/// fan's root, a graphite drum under it where the fan turns.
+fn housing(b: &mut MeshBuilder) {
     dark_plate(b);
     sleeve(
         b,
         &[
-            ring(a, out, w * 0.9, w),
-            ring(a.lerp(c, 0.4), out, w, w * 1.05),
-            ring(c, out, w * 0.55, w * 0.6),
+            ring(v3(-1.9, 1.7, 19.0), -Vec3::X + Vec3::Z * 0.4, 0.95, 0.8),
+            ring(v3(-2.7, 2.7, 19.6), -Vec3::X + Vec3::Z * 0.4, 1.15, 0.95),
+            ring(
+                HUB + v3(-0.1, 0.1, 0.0),
+                -Vec3::X + Vec3::Z * 0.4,
+                0.9,
+                0.75,
+            ),
         ],
-        &KEEL,
+        &ARCH,
     );
-}
-
-/// The hinge on the shoulder blade every wing turns out of.
-fn hinge(b: &mut MeshBuilder) {
     metal(b);
-    ball(b, ROOT, 0.55);
-    b.cylinder_between(ROOT - v3(0.0, 0.85, 0.0), ROOT, 0.5, 0.6, b.sides(8));
+    b.cylinder_between(
+        HUB + v3(0.45, 0.0, 0.0),
+        HUB - v3(0.6, 0.0, 0.0),
+        0.72,
+        0.72,
+        b.sides(10),
+    );
 }
 
 /// The left wing (the right is its mirror).
-pub(super) fn wing(b: &mut MeshBuilder, wings: Wings) {
-    hinge(b);
-    match wings {
-        Wings::Freedom => freedom(b),
-        Wings::Seraph => seraph(b),
-        Wings::Halo => halo(b),
+pub(super) fn wing(b: &mut MeshBuilder) {
+    housing(b);
+    for (i, &(deg, len, cut)) in FAN.iter().enumerate() {
+        let dir = ray(deg, 0.14 + 0.02 * i as f32);
+        // Each lies behind the one above it, its root out on the drum's rim.
+        let root = HUB + dir * 0.55 - Vec3::X * (0.12 + 0.34 * i as f32);
+        b.with_flight(flight::FEATHER + i as u32, |b| {
+            feather(b, root, dir, len, cut)
+        });
     }
-}
-
-/// A: the binder rises out to an elbow, the great upper feather runs on from it, five
-/// more fan down off the elbow, and short graphite vanes fill the fan's root.
-fn freedom(b: &mut MeshBuilder) {
-    let elbow = v3(-3.9, 5.9, 23.6);
-    binder(b, ROOT, elbow, 0.62);
-    metal(b);
-    ball(b, elbow, 0.38);
-    for (deg, len, half) in [
-        (40.0f32, 12.2, 0.72),
-        (20.0, 12.6, 0.66),
-        (2.0, 12.2, 0.62),
-        (-16.0, 11.2, 0.6),
-        (-33.0, 9.8, 0.56),
-        (-50.0, 8.2, 0.52),
-    ] {
-        feather(b, elbow, ray(deg, 0.16), len, half);
-    }
-    for (deg, len) in [
-        (55.0f32, 4.6),
-        (28.0, 5.6),
-        (5.0, 6.0),
-        (-20.0, 5.6),
-        (-42.0, 4.8),
-    ] {
-        vane(b, ROOT + v3(-0.4, 0.4, 0.2), ray(deg, 0.1), len, 0.34);
-    }
-}
-
-/// B: three wings a side, upper, middle and lower, each a binder with feathers stepped
-/// along it, longer toward its tip, laid like a bird's primaries.
-fn seraph(b: &mut MeshBuilder) {
-    // (binder's tip, feathers' direction at the root and at the tip, how many, lengths)
-    let arms: [(Vec3, f32, f32, usize, f32, f32); 3] = [
-        (v3(-4.2, 8.2, 26.6), 80.0, 40.0, 5, 5.0, 9.5),
-        (v3(-4.4, 9.6, 20.4), 10.0, -8.0, 5, 4.2, 8.6),
-        (v3(-3.8, 6.4, 15.6), -50.0, -70.0, 4, 3.6, 6.4),
-    ];
-    for (tip, d0, d1, count, l0, l1) in arms {
-        binder(b, ROOT, tip, 0.48);
-        for i in 0..count {
-            let t = (i as f32 + 1.0) / count as f32;
-            let root = ROOT.lerp(tip, 0.15 + 0.85 * t);
-            let len = l0 + (l1 - l0) * t;
-            feather(b, root, ray(d0 + (d1 - d0) * t, 0.2), len, 0.48);
+    b.with_flight(flight::VANE, |b| {
+        for (deg, len) in VANES {
+            vane(b, HUB + v3(0.3, 0.0, 0.0), ray(deg, 0.08), len);
         }
-    }
+    });
 }
 
-/// C: seven long blades raying from a hub on the shoulder blade like a sunburst, longest
-/// toward the top, each stepped out from the hub on a graphite spoke.
-fn halo(b: &mut MeshBuilder) {
-    let hub = ROOT + v3(-0.5, 0.4, 0.6);
-    metal(b);
-    sleeve(
-        b,
-        &[
-            ring(hub - v3(0.0, 0.3, 0.0), -Vec3::X, 1.0, 1.0),
-            ring(hub + v3(-0.5, 0.0, 0.0), -Vec3::X, 0.6, 0.6),
-        ],
-        &OCT,
-    );
-    for (deg, len) in [
-        (96.0f32, 12.6),
-        (74.0, 14.2),
-        (52.0, 14.6),
-        (31.0, 14.2),
-        (11.0, 13.0),
-        (-9.0, 11.4),
-        (-29.0, 9.4),
-    ] {
-        let d = ray(deg, 0.12);
-        let start = hub + d * 1.4;
-        metal(b);
-        b.cylinder_between(hub, start, 0.22, 0.16, b.sides(6));
-        feather(b, start, d, len, 0.5);
-    }
-}
+/// The vanes at the fan's root: each one's angle above level and its length.
+const VANES: [(f32, f32); 5] = [
+    (36.0, 4.8),
+    (16.0, 5.6),
+    (-2.0, 5.8),
+    (-20.0, 5.2),
+    (-38.0, 4.4),
+];
 
-/// From far off: each wing two broad blades, seen from both sides.
-pub(super) fn coarse(b: &mut MeshBuilder, wings: Wings) {
+/// From far off: the wing two broad blades, seen from both sides, moving as its middle
+/// feathers do.
+pub(super) fn coarse(b: &mut MeshBuilder) {
     dark_plate(b);
-    let (top, out, low) = match wings {
-        Wings::Freedom => (
-            v3(-5.5, 13.0, 31.0),
-            v3(-6.0, 18.0, 23.0),
-            v3(-5.2, 10.5, 14.0),
-        ),
-        Wings::Seraph => (
-            v3(-5.5, 11.0, 31.0),
-            v3(-6.0, 17.5, 20.0),
-            v3(-5.0, 8.5, 9.6),
-        ),
-        Wings::Halo => (
-            v3(-5.0, 4.5, 33.0),
-            v3(-5.5, 17.0, 23.0),
-            v3(-5.0, 11.0, 14.0),
-        ),
-    };
+    b.with_flight(flight::VANE, coarse_blades);
+}
+
+fn coarse_blades(b: &mut MeshBuilder) {
+    let (top, out, low) = (
+        v3(-5.5, 12.8, 30.0),
+        v3(-6.2, 18.0, 21.5),
+        v3(-5.2, 7.0, 13.0),
+    );
     for (a, c) in [(top, out), (out, low)] {
-        b.face(&[ROOT, a, c]);
-        b.face(&[ROOT, c, a]);
+        b.face(&[HUB, a, c]);
+        b.face(&[HUB, c, a]);
     }
 }

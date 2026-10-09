@@ -1733,7 +1733,7 @@ impl Blueprints {
                         | (w.flak as u64) << 8
                         | (w.airburst as u64) << 9,
                 );
-                h.write_u64(w.cant.0 as u64);
+                h.write_u64(w.cant.0 as u64 | (w.rest_pitch.0 as u64) << 16);
                 h.write_i64(w.skim.0);
                 h.write_i64(w.apogee.0);
                 h.write_i64(w.intercept_hp.0);

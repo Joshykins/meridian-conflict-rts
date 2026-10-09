@@ -283,10 +283,11 @@
         weapons: [
             (
                 name: "Rapid Fusion Repeater",
-                // The left forearm's: a pinch-fusion bolt every half second, each its own
-                // turret on the forearm.
+                // The left forearm's: a pinch-fusion bolt every half second. The torso turns
+                // to the mark and both forearms come up to it about the elbows; with nothing
+                // to shoot they hang at its sides, the guns pointed down (`rest_pitch`).
                 damage: 1500, splash: 18, range: 1000, reload: 0.5, speed: 1600, trajectory: Ballistic,
-                loft: 0.3, flat_fire: true, mount: true, turret_turn: 120, arc: 240,
+                loft: 0.3, flat_fire: true, turret_turn: 120, rest_pitch: -80,
                 muzzle: (29.6, 19.0, 61.0), pivot: (-0.8, 17.4, 61.6),
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
                 plasma_grade: Some(PinchFusion),
@@ -297,7 +298,7 @@
                 name: "Rapid Fusion Repeater",
                 // The right forearm's: half a reload behind the left (`twins.rs`).
                 damage: 1500, splash: 18, range: 1000, reload: 0.5, speed: 1600, trajectory: Ballistic,
-                loft: 0.3, flat_fire: true, mount: true, turret_turn: 120, arc: 240,
+                loft: 0.3, flat_fire: true, turret_turn: 120, rest_pitch: -80,
                 muzzle: (29.6, -19.0, 61.0), pivot: (-0.8, -17.4, 61.6),
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
                 plasma_grade: Some(PinchFusion),

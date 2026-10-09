@@ -134,6 +134,7 @@ pub struct MeshBuilder {
     lifts: Vec<super::Lift>,
     discharge: Option<super::Discharge>,
     vtol: Option<super::Vtol>,
+    flight: Option<super::Flight>,
     dust_line: Option<f32>,
     /// The pattern byte leaf cards carry: which leaf atlas the shader samples
     /// ([`Self::leaf_atlas`]).
@@ -201,6 +202,7 @@ impl MeshBuilder {
             lifts: Vec::new(),
             discharge: None,
             vtol: None,
+            flight: None,
             dust_line: None,
             leaf_atlas: pattern::NONE,
             modules: Vec::new(),
@@ -622,6 +624,30 @@ impl MeshBuilder {
 
     pub fn vtol(&self) -> Option<super::Vtol> {
         self.vtol
+    }
+
+    /// Declares the model's flight rig (`Model::flight`), in the current frame.
+    pub fn set_flight(&mut self, flight: super::Flight) {
+        let at = |p: [f32; 3]| self.transform.transform_point3(Vec3::from(p)).to_array();
+        self.flight = Some(super::Flight {
+            hub: at(flight.hub),
+            hip: at(flight.hip),
+            knees: flight.knees.map(at),
+        });
+    }
+
+    pub fn flight(&self) -> Option<super::Flight> {
+        self.flight
+    }
+
+    /// Runs `f` as a piece of the flight rig (`gpu_consts::flight`: a feather, a vane, a
+    /// thigh or a shin).
+    pub fn with_flight(&mut self, piece: u32, f: impl FnOnce(&mut Self)) {
+        use crate::gpu_consts::flight::{MASK, SHIFT};
+        let previous = self.rig;
+        self.rig = (previous & !(MASK << SHIFT)) | (piece & MASK) << SHIFT;
+        f(self);
+        self.rig = previous;
     }
 
     /// Where the model's personal shield is thrown from, if the model says (`set_shield_emitter`).
