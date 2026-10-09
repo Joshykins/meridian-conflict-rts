@@ -23,7 +23,7 @@
 //!   forearm is rebuilt as the pinched-plasmeric, then the pinch-fusion cannon
 //!   (`cannons`). The back carries Nanite Repair, a stack of slotted plates the field
 //!   fans out into wings, or the Material Formation Engine (`back`); the left shoulder
-//!   the auxiliary engineering tendril (`shoulder`).
+//!   the auxiliary engineering lens on its mast (`shoulder`).
 
 mod arms;
 mod back;

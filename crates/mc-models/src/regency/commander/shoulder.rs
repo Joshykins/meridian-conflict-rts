@@ -1,13 +1,14 @@
-//! The Auxiliary Engineering Suite (`aux_eng`): a nanite tendril over the left shoulder.
-//! From a plated saddle on the upper back behind the pauldron (`AUX_HINGE`) it runs as one
-//! unbroken curve (`SPINE`) up, over the shoulder and down at the work: a run of separate
-//! keeled vertebrae, each held clear of the next with nothing between them, tapering into
-//! the head (from `AUX_WRIST`, the unit file's `hinge`), where three keeled petals cup the
-//! nanite crystal the beam leaves from (`AUX_EMITTER`, its `emitters`). The light is the
-//! plates' own (`kit::nanite_plate`), not a lit piece.
+//! The Auxiliary Engineering Suite (`aux_eng`): a floating nanite lens over the left
+//! shoulder. From a plated saddle on the upper back behind the pauldron (`AUX_HINGE`) a
+//! keeled mast rises along one unbroken curve (`SPINE`), leaning over the shoulder; at its
+//! end (`AUX_WRIST`, the unit file's `hinge`) it forks, the two tines carrying the curve on
+//! either side, and between them a nanite crystal hangs free on the same line, its tip the
+//! emitter the beam leaves from (`AUX_EMITTER`, its `emitters`). A broken ring of shards
+//! floats round the crystal. The light is the plates' own (`kit::nanite_plate`), not a lit
+//! piece.
 //!
-//! Stowed (`MeshBuilder::with_fold`, entity.wgsl's folding gear), the tendril rocks back
-//! to stand raised over the shoulder and the head curls down under its crest.
+//! Stowed (`MeshBuilder::with_fold`, entity.wgsl's folding gear), the mast rocks back to
+//! stand upright behind the pauldron like a staff, the lens held up on top.
 
 use glam::{Vec2, Vec3};
 
@@ -17,30 +18,28 @@ use super::super::kit::{dark_plate, metal, nanite_plate, v3};
 use super::form::{ring, sleeve, Ring, KEEL, OCT};
 
 pub(super) const AUX_HINGE: Vec3 = Vec3::new(-2.6, 2.9, 21.4);
-pub(super) const AUX_EMITTER: Vec3 = Vec3::new(3.5, 3.5, 24.0);
-/// The tendril's line: a cubic from the knuckle up and over the shoulder, ending at the
+pub(super) const AUX_EMITTER: Vec3 = Vec3::new(2.0, 3.2, 25.0);
+/// The suite's line: a cubic from the knuckle up and over the shoulder, ending at the
 /// emitter pointing down and forward at the work.
 const SPINE: [Vec3; 4] = [
     AUX_HINGE,
-    Vec3::new(-2.9, 3.2, 26.2),
-    Vec3::new(1.2, 3.45, 27.8),
+    Vec3::new(-2.8, 3.1, 25.2),
+    Vec3::new(-0.6, 3.2, 26.8),
     AUX_EMITTER,
 ];
-/// Where on `SPINE` the vertebrae end and the head begins: `AUX_WRIST`.
-const HEAD_AT: f32 = 0.76;
-pub(super) const AUX_WRIST: Vec3 = Vec3::new(1.6187, 3.4315, 25.8333);
-const VERTEBRAE: usize = 7;
-/// The air between two vertebrae, as a share of each one's run.
-const GAP: f32 = 0.12;
-/// Stowed, the tendril rocks back to stand raised over the shoulder, and the head curls
-/// down and forward under its crest, the curve still unbroken.
-const AUX_STOWED: f32 = 0.8;
-const AUX_HEAD_STOWED: f32 = -1.2;
+/// Where on `SPINE` the mast ends and the fork begins: `AUX_WRIST`.
+const HEAD_AT: f32 = 0.62;
+pub(super) const AUX_WRIST: Vec3 = Vec3::new(-0.681, 3.1567, 25.645);
+/// Where the crystal starts, clear of the mast's end.
+const CRYSTAL_AT: f32 = 0.7;
+/// Stowed, the mast stands upright behind the pauldron, the lens held up on top.
+const AUX_STOWED: f32 = 0.9;
+const AUX_HEAD_STOWED: f32 = 0.6;
 
 pub(super) fn aux_eng(b: &mut MeshBuilder) {
     b.module("aux_eng", 0.0, saddle);
     b.module("aux_eng", 0.3, |b| {
-        b.with_fold(AUX_HINGE, AUX_STOWED, vertebrae);
+        b.with_fold(AUX_HINGE, AUX_STOWED, mast);
         b.with_fold_head(AUX_WRIST, AUX_HEAD_STOWED, head);
     });
 }
@@ -69,17 +68,7 @@ fn outward(t: f32) -> Vec3 {
     Vec3::new(-d.z, 0.0, d.x)
 }
 
-/// How thick the tendril is at `t`, tapering from the knuckle into the head.
-fn girth(t: f32) -> f32 {
-    1.0 - 0.5 * t
-}
-
-/// A section across `SPINE` at `t`, `w` across and `h` outward at full girth.
-fn section(t: f32, w: f32, h: f32) -> Ring {
-    ring(spine(t), outward(t), w * girth(t), h * girth(t))
-}
-
-/// The saddle on the upper back and the knuckle the tendril turns on.
+/// The saddle on the upper back and the knuckle the mast turns on.
 fn saddle(b: &mut MeshBuilder) {
     dark_plate(b);
     let base = v3(-2.4, 2.6, 20.3);
@@ -104,101 +93,93 @@ fn saddle(b: &mut MeshBuilder) {
     );
 }
 
-/// The vertebrae: keeled plates swollen just ahead of their middle, each lofted along the
-/// curve with a little air before the next, a short spur raked back off each one's ridge.
-fn vertebrae(b: &mut MeshBuilder) {
-    let step = HEAD_AT / VERTEBRAE as f32;
-    for i in 0..VERTEBRAE {
-        let t0 = i as f32 * step + step * GAP * 0.5;
-        let t1 = (i + 1) as f32 * step - step * GAP * 0.5;
-        let at = |f: f32| t0 + (t1 - t0) * f;
-        nanite_plate(b);
-        sleeve(
-            b,
-            &[
-                section(at(0.0), 0.34, 0.4),
-                section(at(0.35), 0.5, 0.64),
-                section(at(0.7), 0.44, 0.52),
-                section(at(1.0), 0.3, 0.34),
-            ],
-            &KEEL,
-        );
-        if b.fine() {
-            let t = at(0.4);
-            let g = girth(t);
-            let root = spine(t) + outward(t) * 0.55 * g;
-            let tip = root + (outward(t) * 0.5 + along(t) * 0.45) * g;
-            dark_plate(b);
-            sleeve(
-                b,
-                &[
-                    ring(root, along(t), 0.1 * g, 0.12 * g),
-                    ring(tip, along(t), 0.02, 0.02),
-                ],
-                &KEEL,
-            );
-        }
-    }
+/// The mast: one keeled plate lofted along the curve, ridge to the outside, tapering from
+/// the knuckle to the fork.
+fn mast(b: &mut MeshBuilder) {
+    let rings: Vec<Ring> = (0..=6)
+        .map(|i| {
+            let f = i as f32 / 6.0;
+            let t = HEAD_AT * f;
+            ring(spine(t), outward(t), 0.44 - 0.14 * f, 0.66 - 0.24 * f)
+        })
+        .collect();
+    nanite_plate(b);
+    sleeve(b, &rings, &KEEL);
 }
 
-/// The head: the end of the curve as a housing that carries on from the vertebrae, three
-/// petals cupped forward round the crystal at its tip.
+/// The head: the fork's two tines carrying the curve on either side, the crystal free
+/// between them on the line itself, and the broken ring of shards round it.
 fn head(b: &mut MeshBuilder) {
-    let start = HEAD_AT + HEAD_AT / VERTEBRAE as f32 * GAP * 0.5;
-    let t = |f: f32| start + (1.0 - start) * f;
+    let t = |f: f32| HEAD_AT + (1.0 - HEAD_AT) * f;
+    // The fork's root: a short block across the mast's end, out to both tines.
     dark_plate(b);
-    sleeve(
-        b,
-        &[
-            section(t(0.0), 0.32, 0.34),
-            section(t(0.2), 0.42, 0.44),
-            section(t(0.45), 0.36, 0.38),
-        ],
-        &OCT,
-    );
-    let o = spine(t(0.4));
-    let d = along(t(0.7));
-    let up = outward(t(0.7));
-    for k in 0..3 {
-        let a = std::f32::consts::TAU * (k as f32 / 3.0);
-        let r = up * a.cos() + Vec3::Y * a.sin();
+    let root = ring(spine(HEAD_AT), outward(HEAD_AT), 0.3, 0.42);
+    let root_end = ring(spine(t(0.08)), outward(t(0.08)), 0.5, 0.36);
+    sleeve(b, &[root, root_end], &OCT);
+    for side in [1.0f32, -1.0] {
+        let y = Vec3::Y * side;
+        let tine = |f: f32, spread: f32, w: f32, h: f32| ring(spine(t(f)) + y * spread, y, w, h);
         sleeve(
             b,
             &[
-                ring(o + r * 0.24, r, 0.2, 0.13),
-                ring(o + r * 0.5 + d * 0.55, r, 0.18, 0.13),
-                ring(o + r * 0.34 + d * 1.25, r, 0.02, 0.02),
+                tine(0.0, 0.3, 0.28, 0.22),
+                tine(0.3, 0.95, 0.26, 0.22),
+                tine(0.7, 0.9, 0.18, 0.15),
+                tine(1.05, 0.5, 0.02, 0.02),
             ],
             &KEEL,
         );
     }
+    // The crystal, its tip the emitter, its waist the widest point of the head.
+    let a = spine(CRYSTAL_AT);
+    let up = outward(0.85);
+    let d = (AUX_EMITTER - a).normalize();
+    let waist = a.lerp(AUX_EMITTER, 0.45);
     nanite_plate(b);
-    let from = spine(t(0.42));
     sleeve(
         b,
         &[
-            ring(from, up, 0.02, 0.02),
-            ring(from.lerp(AUX_EMITTER, 0.4), up, 0.3, 0.3),
+            ring(a, up, 0.02, 0.02),
+            ring(waist, up, 0.72, 0.72),
             ring(AUX_EMITTER, up, 0.02, 0.02),
         ],
         &OCT,
     );
+    dark_plate(b);
+    for k in 0..3 {
+        let a = std::f32::consts::TAU * (k as f32 / 3.0) + 0.5;
+        let r = up * a.cos() + Vec3::Y * a.sin();
+        let tangent = d.cross(r).normalize();
+        let mid = waist + r * 1.35;
+        sleeve(
+            b,
+            &[
+                ring(mid - tangent * 0.8 - d * 0.15, r, 0.04, 0.04),
+                ring(mid, r, 0.34, 0.26),
+                ring(mid + tangent * 0.8 + d * 0.15, r, 0.04, 0.04),
+            ],
+            &KEEL,
+        );
+    }
 }
 
-/// From far off: the tendril as three bars along its curve and the head as a fourth,
-/// still folding.
+/// From far off: the mast as two bars along its curve and the crystal as a third, still
+/// folding.
 pub(super) fn coarse(b: &mut MeshBuilder) {
     b.module("aux_eng", 0.3, |b| {
         dark_plate(b);
         b.with_fold(AUX_HINGE, AUX_STOWED, |b| {
-            for i in 0..3 {
-                let (t0, t1) = (HEAD_AT * i as f32 / 3.0, HEAD_AT * (i + 1) as f32 / 3.0);
-                let w = 0.8 * girth(t0);
-                b.beam(spine(t0), spine(t1), Vec2::splat(w), Vec2::splat(w * 0.8));
-            }
+            let mid = HEAD_AT * 0.5;
+            b.beam(spine(0.0), spine(mid), Vec2::splat(0.8), Vec2::splat(0.65));
+            b.beam(spine(mid), AUX_WRIST, Vec2::splat(0.65), Vec2::splat(0.5));
         });
         b.with_fold_head(AUX_WRIST, AUX_HEAD_STOWED, |b| {
-            b.beam(AUX_WRIST, AUX_EMITTER, Vec2::splat(0.6), Vec2::splat(0.3))
+            b.beam(
+                spine(CRYSTAL_AT),
+                AUX_EMITTER,
+                Vec2::splat(1.0),
+                Vec2::splat(0.3),
+            )
         });
     });
 }

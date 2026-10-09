@@ -132,13 +132,13 @@
                 modules: [
                     (
                         key: "aux_eng", icon: Engineer, name: "Auxiliary Engineering Suite",
-                        summary: "A nanite tendril uncurls over the left shoulder and builds with a second beam.",
+                        summary: "A floating nanite lens leans out over the left shoulder and builds with a second beam.",
                         cost: (mass: 800, energy: 9600, time: 900),
                         build_power: 60,
-                        // Stands raised over the pauldron, head curled; it rocks forward over
-                        // the shoulder and the head uncurls at its wrist (`hinge`) to point
-                        // down at the work (`shoulder.rs`).
-                        emitters: [(3.5, 3.5, 24.0)], unfold: 1.4, hinge: (1.6187, 3.4315, 25.8333),
+                        // Stands upright behind the pauldron, the lens on top; the mast leans
+                        // forward over the shoulder and the fork turns at its end (`hinge`) to
+                        // point the crystal down at the work (`shoulder.rs`).
+                        emitters: [(2.0, 3.2, 25.0)], unfold: 1.4, hinge: (-0.681, 3.1567, 25.645),
                     ),
                 ],
             ),
