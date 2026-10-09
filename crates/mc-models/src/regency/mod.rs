@@ -44,6 +44,7 @@ mod reclaimer;
 mod scorpion;
 mod scout;
 mod seeker_hover;
+mod seraph;
 mod sonar;
 pub(crate) mod space;
 mod strategic;
@@ -139,6 +140,26 @@ pub(super) const MODELS: &[ModelDef] = &[
         colossus::RADIUS,
         colossus::HEIGHT,
         colossus::colossus,
+    ),
+    // The tech 5 strike titan: a winged knight hanging on its lift, a repeater down each
+    // forearm, two launch decks on its back (`seraph`). Design variants of its wings.
+    ModelDef::new(
+        "regency_seraph",
+        seraph::RADIUS,
+        seraph::HEIGHT,
+        seraph::seraph,
+    ),
+    ModelDef::new(
+        "regency_seraph~seraph",
+        seraph::RADIUS,
+        seraph::HEIGHT,
+        seraph::seraph_seraph,
+    ),
+    ModelDef::new(
+        "regency_seraph~halo",
+        seraph::RADIUS,
+        seraph::HEIGHT,
+        seraph::seraph_halo,
     ),
     // Factories: the land press works (`brood`), the air launch frame (`hatchery`), the
     // shell crouched on its legs behind the berth (`tidebrood`). All three upgrade in place
@@ -322,6 +343,8 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         // Four long legs, a plated carapace, the lance's jaws and coils, two chin guns and
         // a pack of eight rocket tubes.
         "regency_colossus" => 11000,
+        // A knight's body, two repeaters, sixteen cells and two wings of plated feathers.
+        "regency_seraph" => 14000,
         "regency_wake_tank" => 5000,
         // Three armoured belts, layered crown, segmented lance and six rocket cells.
         "regency_executioner" => 7000,
@@ -385,7 +408,9 @@ pub(super) fn reduced_share(key: &str) -> Option<f32> {
         // Faceted plates and skirts that keep their sides when reduced.
         "regency_skyspear" | "regency_fusion_howitzer" => Some(0.52),
         // Plated hulls, heads and legs: faceted solids that keep their sides when reduced.
-        "regency_strider" | "regency_wake_tank" | "regency_colossus" => Some(0.5),
+        "regency_strider" | "regency_wake_tank" | "regency_colossus" | "regency_seraph" => {
+            Some(0.5)
+        }
         // Bunkers, pylons and casemates of faceted plate that keep their sides reduced.
         "regency_nuke_silo" | "regency_nuke_defense" => Some(0.58),
         // Octagonal stages and prongs that keep their sides when reduced.
