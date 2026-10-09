@@ -10,7 +10,7 @@
 //!   (`pattern::MASS_FLOW`) down each diagonal face from the head to the vault lid.
 //! - The head is the Breaker's (`reclaimer::house`, `reclaimer::head`) at [`K`] times its
 //!   size: a graphite yaw collar, armoured cheeks, a keeled cowl and the nozzle with the
-//!   violet lens at its tip, where the stream leaves.
+//!   Materials lens at its tip, where the stream leaves.
 //! - Tech 2 raises a plated pylon on each flank, braced to the mast, with a head of its own
 //!   at [`FLANK_K`] and a chute from it into the vault: three wrecks come apart at once.
 //!   Tech 3 leans a plated buttress against every corner of the vault and floats a toothed
@@ -435,7 +435,7 @@ mod tests {
         }
     }
 
-    /// Every head the blueprint has is a house at its pivot with the violet lens's tip at
+    /// Every head the blueprint has is a house at its pivot with the lens's tip at
     /// its emitter, and the model has no house the blueprint lacks.
     #[test]
     fn the_unit_files_heads_are_the_models() {
@@ -466,7 +466,7 @@ mod tests {
                 let near = mesh
                     .vertices
                     .iter()
-                    .filter(|v| v.material == GLOW_VIOLET && v.rig & rig::RECOIL != 0)
+                    .filter(|v| v.material == GLOW_MATERIALS && v.rig & rig::RECOIL != 0)
                     .map(|v| Vec3::from(v.pos).distance(emitter))
                     .fold(f32::MAX, f32::min);
                 // The lens narrows to a ring 0.05 of the Breaker's metres across at its tip.

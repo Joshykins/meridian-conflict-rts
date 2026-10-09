@@ -468,7 +468,8 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     forms, holds a beat pulling debris in, then flashes, and leaves a glassed
     crater that burns red for a while; no mushroom.
 - **Nanites** build and take apart (the Regency reclaim). They are never a
-  weapon.
+  weapon. Taking apart, they are in Materials red-orange like every reclaim
+  (the stream, its knots and motes, the lit lens it leaves), never violet.
 - **Shields:** bubble shields under the same rules as ARC's (they draw energy
   and drop in any stall): the Ward (tech 2, upgrading to Ward II). The Exarch
   carries none; its back takes nanite repair instead. A Regency field is a **prism veil**

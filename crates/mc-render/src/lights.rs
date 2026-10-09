@@ -547,20 +547,27 @@ impl Lights {
             if b.kind == mc_sim::reclaim::BEAM_NANITE
                 || b.kind == mc_sim::reclaim::BEAM_NANITE_RECLAIM
             {
-                // A nanite stream: a violet line, and a hot knot where it pours into the site
-                // (or, taking something apart, where it grips it).
+                // A nanite stream: a violet line, and a hot knot where it pours into the site.
+                // Taking something apart it is Materials, as every reclaim is, the knot
+                // where it grips.
+                let reclaim = b.kind == mc_sim::reclaim::BEAM_NANITE_RECLAIM;
+                let (line, knot) = if reclaim {
+                    (MATERIALS, MATERIALS)
+                } else {
+                    (Vec3::new(0.9, 0.1, 0.5), Vec3::new(0.8, 0.14, 1.0))
+                };
                 let to = Vec3::from(b.to) + Vec3::Z * b.height * 0.55;
                 self.glows.push(Glow {
                     from: Vec3::from(b.from),
                     to,
-                    color: Vec3::new(0.9, 0.1, 0.5) * 6.0,
+                    color: line * 6.0,
                     range: 8.0,
                     line: true,
                 });
                 self.glows.push(Glow {
                     from: to,
                     to,
-                    color: Vec3::new(0.8, 0.14, 1.0) * 15.0,
+                    color: knot * 15.0,
                     range: 12.0,
                     line: false,
                 });

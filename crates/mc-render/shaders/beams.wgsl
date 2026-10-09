@@ -725,7 +725,8 @@ fn replicator_fragment(in: BeamOut, n: f32) -> vec4<f32> {
 // finish its flight when the work stops.
 // `BEAM_NANITE_RECLAIM`: the Regency's reclaim (docs/STYLE.md "The Regency suite": nanites
 // build and take apart). The same stream from the emitter to where it grips its target,
-// red there and violet into the emitter, but its motes drift home along the strands: the
+// but in Materials, as every reclaim is: red-orange where it grips, deep red into the
+// emitter, hot near white in its knots; and its motes drift home along the strands: the
 // matter riding back. When it stops the grip lets go first and the strands drain home into
 // the emitter.
 // `BEAM_NANITE_SITE`: round a site while it is fed, or round a refit. A swarm of black
@@ -740,6 +741,22 @@ fn replicator_fragment(in: BeamOut, n: f32) -> vec4<f32> {
 const NANITE_VIOLET: vec3<f32> = vec3<f32>(0.66, 0.12, 1.0);
 const NANITE_RED: vec3<f32> = vec3<f32>(1.0, 0.06, 0.08);
 const NANITE_HOT: vec3<f32> = vec3<f32>(1.0, 0.62, 0.72);
+
+// A stream's three colours: `cool` where it leaves the emitter and at a glow's rim, `body`
+// for the rest of its way, `hot` in its knots and motes. Building, the violet of Regency
+// construction cooling to red; taking apart (`BEAM_NANITE_RECLAIM`), Materials.
+struct NaniteTint {
+    cool: vec3<f32>,
+    body: vec3<f32>,
+    hot: vec3<f32>,
+}
+
+fn nanite_tint(kind: f32) -> NaniteTint {
+    if kind > f32(BEAM_NANITE_RECLAIM) - 0.5 {
+        return NaniteTint(RED, MATERIALS, WHITE);
+    }
+    return NaniteTint(NANITE_VIOLET, NANITE_RED, NANITE_HOT);
+}
 
 const SHAPE_STRAND: f32 = 9.0;
 const SHAPE_NANITE_GLOW: f32 = 10.0;
@@ -1108,6 +1125,7 @@ fn particle_thread(m: f32, u: f32, y: f32, px: f32, amp: f32, seed: f32, flow: f
 fn nanite_fragment(in: BeamOut, n: f32) -> vec4<f32> {
     let time = globals.camera.w;
     let shape = in.state.x;
+    let tint = nanite_tint(in.kind);
     if shape > 14.5 {
         return swarm_fragment(in);
     }
@@ -1168,19 +1186,19 @@ fn nanite_fragment(in: BeamOut, n: f32) -> vec4<f32> {
             let drain = in.extra.w;
             let gather = mix(1.0, pow(s, 3.0) * 1.6, drain);
             // Kept deep: a bright violet line blooms out to near white.
-            let tint = mix(NANITE_VIOLET, NANITE_RED, 0.15 + 0.5 * drain * s);
-            let color = tint * bright * 0.9 * gather + NANITE_HOT * (hot * 0.5 + bright * drain * pow(s, 6.0) * 0.6);
+            let ring = mix(NANITE_VIOLET, NANITE_RED, 0.15 + 0.5 * drain * s);
+            let color = ring * bright * 0.9 * gather + NANITE_HOT * (hot * 0.5 + bright * drain * pow(s, 6.0) * 0.6);
             return vec4<f32>(color * in.level, clamp(bright * 0.2 * gather, 0.0, 0.35) * in.level);
         }
         // The head glows as it creeps on (the lead's as it snaps across).
         let tip = exp(-pow((head - m) / 0.5, 2.0)) * (0.5 + 0.5 * n);
         if lead {
-            let color = NANITE_VIOLET * bright * 1.6 + NANITE_HOT * (tip * 2.0 + hot * 1.5);
+            let color = tint.cool * bright * 1.6 + tint.hot * (tip * 2.0 + hot * 1.5);
             return vec4<f32>(color * ends * in.level, 0.0);
         }
-        // Violet as it leaves, red for the rest of the way.
-        let tint = mix(NANITE_VIOLET, NANITE_RED, smoothstep(0.04, 0.4, s));
-        let color = tint * bright * 2.6 + NANITE_HOT * (hot * 2.4 + tip * 1.2 * bright);
+        // Violet as it leaves, red for the rest of the way (reclaim: deep red, then Materials).
+        let along = mix(tint.cool, tint.body, smoothstep(0.04, 0.4, s));
+        let color = along * bright * 2.6 + tint.hot * (hot * 2.4 + tip * 1.2 * bright);
         let cover = clamp(bright * 0.3, 0.0, 0.45);
         return vec4<f32>(color * ends * in.level, cover * ends * in.level);
     }
@@ -1191,12 +1209,12 @@ fn nanite_fragment(in: BeamOut, n: f32) -> vec4<f32> {
     let fall = pow(1.0 - d, 2.0);
     if shape < 10.5 {
         // A glow: violet at its rim, red in it, near white in its heart where it feeds.
-        let rim = mix(NANITE_VIOLET, NANITE_RED, fall * 0.7);
-        let hot = mix(rim, NANITE_HOT, fall * fall * in.state.y);
+        let rim = mix(tint.cool, tint.body, fall * 0.7);
+        let hot = mix(rim, tint.hot, fall * fall * in.state.y);
         return vec4<f32>(hot * fall * 2.6 * in.level, clamp(fall * 0.4 * in.level, 0.0, 0.5));
     }
     // A mote: red, a few hot.
-    let color = mix(NANITE_RED, NANITE_HOT, step(0.8, in.state.z) * fall);
+    let color = mix(tint.body, tint.hot, step(0.8, in.state.z) * fall);
     return vec4<f32>(color * fall * 3.0 * in.level, 0.0);
 }
 

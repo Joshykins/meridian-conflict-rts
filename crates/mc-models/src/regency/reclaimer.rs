@@ -10,16 +10,17 @@
 //!
 //! The head: a bronze yaw collar on a plated pedestal, armoured cheeks either side of the
 //! trunnion, and the pitching head on it: a keeled cowl with a swept plate down its back,
-//! a bronze nozzle out of a seam-dark collar and a violet nanite lens at its tip, where
+//! a bronze nozzle out of a seam-dark collar and a nanite lens at its tip, where
 //! the stream leaves (`EMITTER`). Nanites build and take apart (docs/STYLE.md "The Regency
 //! suite"), so its stream is the Regency's nanite strands (beams.wgsl
-//! `BEAM_NANITE_RECLAIM`), not ARC's salvage beam, and the lens runs hot while it works.
+//! `BEAM_NANITE_RECLAIM`), not ARC's salvage beam, in the Materials red-orange of every
+//! reclaim; the lens (`GLOW_MATERIALS`) runs hot in it while it works.
 //!
 //! Lift: bronze collars under the wings and the body, a lift bell in each with red
 //! plasma crackling under it (`engineer::lift_drum`, renderer `lift_fx.rs`).
 //!
 //! Finish (docs/STYLE.md "The Regency look"): dark plates, seams dark, dark bronze on the
-//! machinery, violet only on the lens that works, red optics.
+//! machinery, Materials only on the lens that works, red optics.
 //!
 //! Rig: a hovercraft (`MeshBuilder::set_hover`). The head is a gun house of its own bound to
 //! head 0 (`with_house`): it turns about its pivot and what is inside `with_recoil` pitches
@@ -305,7 +306,7 @@ pub(super) fn house(b: &mut MeshBuilder, p: Vec3) {
 
 /// The pitching head from its trunnion `p` to the lens's tip `tip`, built facing +x: a
 /// bronze trunnion drum, a keeled cowl, a swept plate down its back, red optics either
-/// side, a seam-dark collar, the bronze nozzle and the violet lens.
+/// side, a seam-dark collar, the bronze nozzle and the lens.
 pub(super) fn head(b: &mut MeshBuilder, p: Vec3, tip: Vec3) {
     metal(b);
     let sides = b.sides(10);
@@ -342,7 +343,7 @@ pub(super) fn head(b: &mut MeshBuilder, p: Vec3, tip: Vec3) {
     let lens = tip - Vec3::X * 0.34;
     metal(b);
     b.cylinder_between(collar + Vec3::X * 0.16, lens, 0.17, 0.13, sides);
-    b.paint(GLOW_VIOLET);
+    b.paint(GLOW_MATERIALS);
     b.cylinder_between(lens, tip, 0.2, 0.05, sides);
 }
 
@@ -376,21 +377,21 @@ mod tests {
         assert_eq!(model.houses.len(), 1);
         assert_eq!(Vec3::from(model.houses[0].pivot), PIVOT);
         for lod in &model.lods[..2] {
-            // The lens's tip is the emitter, on the house, pitching; nothing else is violet.
-            let violet: Vec<Vec3> = lod
+            // The lens's tip is the emitter, on the house, pitching; nothing else is lit.
+            let lens: Vec<Vec3> = lod
                 .vertices
                 .iter()
-                .filter(|v| v.material == GLOW_VIOLET)
-                .inspect(|v| assert!(v.rig & rig::RECOIL != 0, "violet off the head"))
+                .filter(|v| v.material == GLOW_MATERIALS)
+                .inspect(|v| assert!(v.rig & rig::RECOIL != 0, "lens off the head"))
                 .map(|v| Vec3::from(v.pos))
                 .collect();
-            let near = violet
+            let near = lens
                 .iter()
                 .map(|p| p.distance(EMITTER))
                 .fold(f32::MAX, f32::min);
             assert!(near < 0.06, "lens {near} m from the emitter");
-            let front = violet.iter().map(|p| p.x).fold(f32::MIN, f32::max);
-            assert!((front - EMITTER.x).abs() < 0.02, "violet ends at {front}");
+            let front = lens.iter().map(|p| p.x).fold(f32::MIN, f32::max);
+            assert!((front - EMITTER.x).abs() < 0.02, "lens ends at {front}");
         }
     }
 
