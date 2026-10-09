@@ -20,48 +20,20 @@ use super::super::kit::{dark_plate, metal, seam, v3};
 use super::super::machine::{armour, collar, swept, Course, Frame};
 use super::{body, head, plan, team_mark};
 
-pub(crate) const MODELS: &[ModelDef] = &[
-    ModelDef::new("regency_assault_aircraft", RADIUS, HEIGHT, scythe_roots),
-    ModelDef::new(
-        "regency_assault_aircraft~cheeks",
-        RADIUS,
-        HEIGHT,
-        scythe_cheeks,
-    ),
-    ModelDef::new(
-        "regency_assault_aircraft~blades",
-        RADIUS,
-        HEIGHT,
-        scythe_blades,
-    ),
-];
+pub(crate) const MODELS: &[ModelDef] = &[ModelDef::new(
+    "regency_assault_aircraft",
+    RADIUS,
+    HEIGHT,
+    scythe,
+)];
 
 pub(crate) const RADIUS: f32 = 14.0;
 pub(crate) const HEIGHT: f32 = 6.0;
 
-/// Where the two projectors hang (the port one; the starboard mirrors it): the mouth (the
-/// unit file's muzzle) and how long the projector is back from it.
-#[derive(Clone, Copy)]
-struct Mount {
-    mouth: Vec3,
-    length: f32,
-}
-
-/// Under the wing roots, below the engines, reaching out ahead of the leading edge.
-const ROOTS: Mount = Mount {
-    mouth: Vec3::new(5.0, 3.0, 0.9),
-    length: 3.6,
-};
-/// Close under the nose's cheeks, either side of the chin.
-const CHEEKS: Mount = Mount {
-    mouth: Vec3::new(7.4, 1.6, 0.65),
-    length: 3.2,
-};
-/// Out under the blades.
-const BLADES: Mount = Mount {
-    mouth: Vec3::new(1.6, 6.4, 1.0),
-    length: 3.4,
-};
+/// The port projector's mouth, out under the blade (the unit file's muzzle; the starboard
+/// one mirrors it), and how long the projector is back from it.
+const MOUTH: Vec3 = Vec3::new(1.6, 6.4, 1.0);
+const LENGTH: f32 = 3.4;
 
 /// How far the projectors are laid down off level, toward the ground their beams land on.
 const DROOP: f32 = 0.2;
@@ -108,18 +80,18 @@ fn projector(b: &mut MeshBuilder, mouth: Vec3, length: f32) {
 }
 
 /// Both projectors, port and starboard: the guns (`part::TURRET`), though they never turn.
-fn projectors(b: &mut MeshBuilder, mount: Mount) {
+fn projectors(b: &mut MeshBuilder) {
     b.with_part(part::TURRET, |b| {
-        b.mirror_y(|b| projector(b, mount.mouth, mount.length));
+        b.mirror_y(|b| projector(b, MOUTH, LENGTH));
     });
 }
 
 /// Far off: a plan's flat solid, the team colour on top, and the projectors.
-fn coarse(b: &mut MeshBuilder, outline: &[[f32; 2]], top: f32, mount: Mount) {
+fn coarse(b: &mut MeshBuilder, outline: &[[f32; 2]], top: f32) {
     dark_plate(b);
     b.extrude_z(outline, 1.0, top);
     team_mark(b, -1.0, top, 2.4);
-    projectors(b, mount);
+    projectors(b);
 }
 
 /// The port engine along the wing root: a plated nacelle from an intake over the wing's
@@ -199,19 +171,7 @@ const SCYTHE_WING: [[f32; 2]; 9] = [
     [-6.6, 1.8],
 ];
 
-fn scythe_roots(b: &mut MeshBuilder, _tech: u8) {
-    scythe(b, ROOTS);
-}
-
-fn scythe_cheeks(b: &mut MeshBuilder, _tech: u8) {
-    scythe(b, CHEEKS);
-}
-
-fn scythe_blades(b: &mut MeshBuilder, _tech: u8) {
-    scythe(b, BLADES);
-}
-
-fn scythe(b: &mut MeshBuilder, mount: Mount) {
+fn scythe(b: &mut MeshBuilder, _tech: u8) {
     if b.coarse() {
         let outline = plan(&[
             [8.6, 0.0],
@@ -221,7 +181,7 @@ fn scythe(b: &mut MeshBuilder, mount: Mount) {
             [-6.4, 4.0],
             [-9.6, 0.0],
         ]);
-        coarse(b, &outline, 4.9, mount);
+        coarse(b, &outline, 4.9);
         return;
     }
     body(b, &SCYTHE_HULL, 1.0, 3.8, 0.82);
@@ -259,7 +219,7 @@ fn scythe(b: &mut MeshBuilder, mount: Mount) {
         );
         engine(b);
     });
-    projectors(b, mount);
+    projectors(b);
 }
 
 #[cfg(test)]
@@ -268,9 +228,9 @@ mod tests {
 
     #[test]
     fn every_design_fits_the_librarys_checks() {
-        for (key, mount) in MODELS.iter().map(|d| d.key).zip([ROOTS, CHEEKS, BLADES]) {
-            let starboard = mount.mouth * v3(1.0, -1.0, 1.0);
-            let muzzles = [mount.mouth.to_array(), starboard.to_array()];
+        for key in MODELS.iter().map(|d| d.key) {
+            let starboard = MOUTH * v3(1.0, -1.0, 1.0);
+            let muzzles = [MOUTH.to_array(), starboard.to_array()];
             super::super::super::check(key, RADIUS, HEIGHT, None, &muzzles);
             let model = crate::build_model(key).unwrap();
             assert!(model.lifts.is_empty(), "{key}: a jet, not on lift bells");

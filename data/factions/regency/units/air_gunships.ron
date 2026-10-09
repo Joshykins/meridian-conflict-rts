@@ -71,7 +71,7 @@
         wreck_fraction: 0,
     ),
     // The assault craft: the Thunderhead's place. It strafes: a heavy jet, it flies runs at
-    // its mark, and two Plasmeric beams fixed under its wing roots, laid down ahead
+    // its mark, and two Plasmeric beams fixed out under its blades, laid down ahead
     // of it, come on short of the mark and rake two lines through it and out past it
     // (`strafe`, mc-sim `strafe.rs`). The ground they sear is left burning with red
     // plasma that burns whatever stands in it.
@@ -95,7 +95,7 @@
                 name: "Twin Plasmeric Beams",
                 damage: 110, splash: 7, range: 420, reload: 0.1, hitscan: true, beam: true,
                 salvo: 2, trajectory: Direct, spin_up: 0.2,
-                arc: 20, muzzle: (5.0, 3.0, 0.9), muzzles: [(5.0, 3.0, 0.9), (5.0, -3.0, 0.9)],
+                arc: 20, muzzle: (1.6, 6.4, 1.0), muzzles: [(1.6, 6.4, 1.0), (1.6, -6.4, 1.0)],
                 strafe: (ahead: 200, length: 180, gap: 16),
                 burn: 5, burn_dps: 45,
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,

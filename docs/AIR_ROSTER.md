@@ -462,7 +462,7 @@ crackling under them. The Reaper is a jet (since 2026-10-09; it was a lift-bell 
 - **Reaper** (`regency_t3_assault_aircraft`, tech 3): a scythe-winged jet, an engine on
   each wing root, that strafes (since 2026-10-09; it used to hang over its mark on lift
   bells). It flies runs like the Thunderhead (`hover: false`) but does not dive. Its Twin Plasmeric Beams are a `strafe`
-  (mc-sim `strafe.rs`): two held beams fixed under the wing roots, landing 200 m ahead of
+  (mc-sim `strafe.rs`): two held beams fixed out under the blades, landing 200 m ahead of
   the nose, toed out to land 16 m apart. They come on when where they land is 90 m short of the mark, rake
   two lines through it as the craft flies in and go out 90 m past it, swinging up to 10
   degrees off the nose to stay on a mark off the run's line. Each strike `burn`s: the
