@@ -21,9 +21,6 @@ const CLOSE_STEP: u8 = 16;
 const BREAK_STEP: u8 = 42;
 /// The bubble only stops shots once it is mostly there.
 pub(crate) const SHIELD_BLOCKING_OPEN: u8 = 200;
-/// A broken dome refills this many times faster than a live one regenerates,
-/// so a generator is not out of the fight for long after it blips.
-const BREAK_REGEN_MUL: i32 = 2;
 /// Stored energy below this counts as empty. A stall pays each spender its share
 /// rounded down, so a starved grid is left holding a few raw units, never zero.
 const DRY: Fx = Fx::ONE;
@@ -144,7 +141,7 @@ impl World {
             let grow = &mut self.state.units.shield_grow[row];
             *grow = grow.saturating_sub(1);
             if self.state.units.shield_recharge[row] > 0 {
-                self.recover_shield(row, spec.health, spec.regen);
+                self.recover_shield(row, spec.health, spec.recharge);
             }
             let want = self.shield_wants_up(row);
             let open = self.state.units.shield_open[row];
@@ -165,16 +162,16 @@ impl World {
         }
     }
 
-    /// Fill after a break at `BREAK_REGEN_MUL` times the live rate. The dome
+    /// Fill after a break at the shield's `recharge` rate. The dome
     /// stays down until it is full; a stall pauses the fill.
     /// `shield_recharge` stays set until then.
-    fn recover_shield(&mut self, row: usize, max: Fx, regen: Fx) {
+    fn recover_shield(&mut self, row: usize, max: Fx, recharge: Fx) {
         if self.shield_off(row) {
             return;
         }
         let hp = self.state.units.shield_hp[row];
         if hp < max {
-            self.state.units.shield_hp[row] = (hp + regen * BREAK_REGEN_MUL / DT).min(max);
+            self.state.units.shield_hp[row] = (hp + recharge / DT).min(max);
         }
         if self.state.units.shield_hp[row] >= max {
             self.state.units.shield_recharge[row] = 0;

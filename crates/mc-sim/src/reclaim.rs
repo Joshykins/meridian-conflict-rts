@@ -12,6 +12,7 @@ use crate::orders::CHASE_REPATH_DISTANCE;
 use crate::reclaim_heads::HeadWork;
 use crate::spatial::kind;
 use crate::tables::*;
+use crate::veterancy::veterancy_regen;
 use crate::{SimError, World};
 use mc_core::{Fx, FxVec2, FxVec3, TICKS_PER_SECOND};
 
@@ -277,6 +278,15 @@ impl World {
             self.state.units.id(row),
         );
         let enemies = self.are_enemies(by, of);
+        // A beam holds the unit's regen back, which weapons do not: what regen will put in
+        // this tick comes out first, uncredited, so strong regen never outpaces the beam.
+        // Once a tick: the first beam on it this tick finds it not yet hurt.
+        if !self.state.units.has_flag(t, flag::HURT) {
+            let level = self.state.units.veterancy[t];
+            let regen = veterancy_regen(self.bp(t).regen, full, level) / DT;
+            let health = &mut self.state.units.health[t];
+            *health -= regen.min(*health - Fx::EPSILON).max(Fx::ZERO);
+        }
         let taken = (full * (power / DT) / time)
             .max(Fx::EPSILON)
             .min(self.state.units.health[t]);

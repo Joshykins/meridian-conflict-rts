@@ -102,18 +102,21 @@
                 modules: [
                     (
                         key: "nano_repair", icon: Engineer, name: "Nanite Repair",
-                        summary: "Nanite feeds down the spine mend the Exarch's own hull, far faster than it heals bare.",
+                        summary: "Nanite feeds down the spine thicken and mend the Exarch's own hull, far faster than it heals bare.",
                         cost: (mass: 900, energy: 10800, time: 1100),
-                        regen: 60,
+                        // Less hull than ARC's Personal Shield, more regen than it.
+                        health: 4000, regen: 100,
                     ),
                     (
                         key: "nano_field", icon: Engineer, name: "Nanite Repair Field", after: "nano_repair",
-                        summary: "The nanites go out in a cloud: every unit and structure of its side near the Exarch slowly mends, and the Exarch still mends itself.",
-                        cost: (mass: 2200, energy: 26400, time: 2600),
-                        // It takes Nanite Repair's place, so it carries its regen too.
-                        regen: 60,
-                        // A hundredth of each friend's full health a second, within 120 m.
-                        repair_field: (radius: 120, rate: 0.01),
+                        summary: "The nanites go out in a cloud: every unit and structure of its side near the Exarch mends, and the Exarch's own hull grows far heavier.",
+                        cost: (mass: 3000, energy: 36000, time: 3500),
+                        // It takes Nanite Repair's place, so these are the totals, not more on top.
+                        // With Suite III's hull, about two thirds of a tech 4.
+                        health: 28000, regen: 220,
+                        // 40 health a second to every friend within 180 m, whatever its size:
+                        // much for a tech 1 unit, little for a big one.
+                        repair_field: (radius: 180, heal: 40),
                     ),
                     (
                         key: "mfe", icon: Power, name: "Material Formation Engine",
