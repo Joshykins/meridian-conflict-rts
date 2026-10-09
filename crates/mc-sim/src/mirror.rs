@@ -514,6 +514,37 @@ pub enum SimEvent {
         unit: UnitId,
         ticks: u16,
     },
+    /// A unit with a dash began to wind up at `from`; in `ticks` it comes down at `to`
+    /// (`dash.rs`).
+    DashCharging {
+        unit: UnitId,
+        from: FxVec3,
+        to: mc_core::FxVec2,
+        ticks: u16,
+        blueprint: BlueprintId,
+        owner: u8,
+    },
+    /// Its windup was called off (a stun, or an order that holds it): it stays.
+    DashCancelled {
+        unit: UnitId,
+    },
+    /// It left `from` and is at `to` in the same tick: a teleport, nothing between.
+    DashLanded {
+        unit: UnitId,
+        from: FxVec3,
+        to: FxVec3,
+        blueprint: BlueprintId,
+        owner: u8,
+    },
+    /// Its landing went off as a shockwave at `pos`, striking enemies out to `radius`.
+    /// Right after its `DashLanded`.
+    DashShockwave {
+        unit: UnitId,
+        pos: FxVec3,
+        radius: mc_core::Fx,
+        blueprint: BlueprintId,
+        owner: u8,
+    },
 }
 
 #[repr(C)]

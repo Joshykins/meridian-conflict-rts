@@ -7,6 +7,7 @@
 //! tables, and [`Blueprints::content_hash`] lets peers verify that before a
 //! match starts.
 
+pub mod dash;
 pub mod elevator;
 mod raw;
 pub mod refit;
@@ -814,6 +815,8 @@ pub struct UnitBlueprint {
     /// ship's are, rather than shoulder guns riding the torso.
     pub hull_mounts: bool,
     pub stomp: Option<Stomp>,
+    /// Dashes into the middle of the enemies it sees and lands as a shockwave.
+    pub dash: Option<dash::Dash>,
     pub motion: Option<Motion>,
     pub economy: Economy,
     /// A core mine: makes materials out of the ground around it.
@@ -1527,6 +1530,10 @@ impl Blueprints {
                 Some(e) => e.hash(&mut h),
                 None => h.write_u64(u64::MAX),
             }
+            match &u.dash {
+                Some(d) => d.hash(&mut h),
+                None => h.write_u64(u64::MAX),
+            }
             h.write_u64(u.water_build as u64);
             h.write_u64(u.seabed as u64);
             h.write_i64(u.drone_radius.0);
@@ -1735,7 +1742,8 @@ impl Blueprints {
                         | (w.boost_ticks as u64) << 16
                         | (w.hatch_ticks as u64) << 32
                         | (w.split as u64) << 48
-                        | (w.split_ordered as u64) << 49,
+                        | (w.split_ordered as u64) << 49
+                        | (w.on_dash as u64) << 50,
                 );
                 h.write_u64(w.orbs as u64 | (w.orb_ticks as u64) << 8);
                 h.write_i64(w.proximity.0);

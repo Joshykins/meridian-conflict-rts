@@ -1,4 +1,4 @@
-// The Regency experimentals (tech 4): too big for any factory. Their tech 3 engineers and an
+// The Regency experimentals (tech 4 and 5): too big for any factory. Their tech 3 engineers and an
 // Exarch with Engineering Suite III raise them on a lot of their own, as they would a
 // structure (`footprint` on a mobile unit), and the finished machine walks off it.
 [
@@ -241,5 +241,95 @@
         ],
         mesh: "regency_colossus", icon: Bot,
         sounds: (death: "blast_large", moving: "regency_crawl", step: "regency_footfall"),
+    ),
+    // The Seraph, the Regency's tier 5: a winged mecha that hangs over the ground on its
+    // lifts (it hovers over land and water alike), an assassin among titans. It is fast
+    // for anything its size, and it does not walk into a fight: once it sees enemies on the
+    // ground some way off it winds up and is simply there, in the middle of them, and its
+    // landing goes off as a shockwave that throws their army flat (`dash`, mc-sim
+    // `dash.rs`). A Rapid Fusion Repeater rides each forearm, the two taking turns; from
+    // between its wings a battery of sixteen Gravitic Seekers goes up whenever there is
+    // anything in reach, and all at once every time it lands from a dash (`on_dash`),
+    // arcing over and down on what stands all round it. No anti-air.
+    //
+    // Balance: a first pass. Half a Behemoth's price for a third of its health, the field
+    // included; about 7500 dps at 1000 m against the Behemoth's siege reach, and a dash
+    // that puts it under a siege gun's `range_min`. Raised on a lot by Artificer IIIs or the
+    // Exarch's Engineering Suite III, like the tier 4s.
+    //
+    // Model: `regency_seraph` (`models::regency::seraph`), authored at a quarter size and
+    // built 4 times authored size: every mount follows it.
+    (
+        key: "regency_t5_seraph",
+        name: "Seraph",
+        role: "Strike Titan",
+        tech: 5,
+        categories: ["Land", "DirectFire", "Experimental"],
+        health: 420000,
+        cost: (mass: 60000, energy: 600000, time: 200000),
+        radius: 60.0, height: 124.0,
+        footprint: (10, 10),
+        vision: 2000,
+        shield: (kind: Hull, health: 60000, regen: 300),
+        economy: (energy_upkeep: 2000),
+        motion: (layer: Hover, size: 5, speed: 70, accel: 60, turn: 120),
+        // Once it sees an enemy on the ground or the water between 400 m and 1800 m, with
+        // nothing at its feet, it winds up for 0.4 s and comes down in the middle of
+        // everything within 250 m of it: 15000 at the heart of a 220 m shockwave, a
+        // quarter of that at its edge, and a 1.5 s stun on all but experimentals. Then 15 s
+        // to recharge. It dashes idle, chasing, on an attack-move or patrol, or at an attack
+        // order's mark; never on a move order, at hold fire or at hold position.
+        dash: (range: 1800, min: 400, gather: 250, cooldown: 15, windup: 0.4, blast: 220, damage: 15000, edge: 0.25, stun: 1.5),
+        weapons: [
+            (
+                name: "Rapid Fusion Repeater",
+                // The left forearm's: a pinch-fusion bolt every half second, each its own
+                // turret on the forearm.
+                damage: 1500, splash: 18, range: 1000, reload: 0.5, speed: 1600, trajectory: Ballistic,
+                loft: 0.3, flat_fire: true, mount: true, turret_turn: 120, arc: 240,
+                muzzle: (29.6, 19.0, 61.0), pivot: (-0.8, 17.4, 61.6),
+                targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
+                plasma_grade: Some(PinchFusion),
+                flash: 1.3, impact: 1.8, tracer: 1.5,
+                sounds: (fire: "regency_sunspear_fire", impact: "regency_sunspear_hit", ground: "regency_sunspear_hit"),
+            ),
+            (
+                name: "Rapid Fusion Repeater",
+                // The right forearm's: half a reload behind the left (`twins.rs`).
+                damage: 1500, splash: 18, range: 1000, reload: 0.5, speed: 1600, trajectory: Ballistic,
+                loft: 0.3, flat_fire: true, mount: true, turret_turn: 120, arc: 240,
+                muzzle: (29.6, -19.0, 61.0), pivot: (-0.8, -17.4, 61.6),
+                targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
+                plasma_grade: Some(PinchFusion),
+                flash: 1.3, impact: 1.8, tracer: 1.5,
+                sounds: (fire: "regency_sunspear_fire", impact: "regency_sunspear_hit", ground: "regency_sunspear_hit"),
+            ),
+            (
+                name: "Gravitic Seeker Battery",
+                // Sixteen cells in four rows between the wings, fired inside pair first. The
+                // seekers leave straight up, climb to `apogee`, turn over and fall on the
+                // targets round it, spread over them even under an attack order
+                // (`split_ordered`), each a small supernova (`fusion_strike`). It fires
+                // whenever anything is in reach, and the whole battery goes up the moment it
+                // lands from a dash, whatever its reload (`on_dash`). Ground only.
+                damage: 1100, splash: 26, range_min: 60, range: 1300, reload: 12.0, speed: 300,
+                trajectory: Direct, turret_turn: 0, arc: 360, mount: true,
+                muzzle: (-6.2, 4.6, 85.2), pivot: (-10.1, 0, 85.2),
+                muzzles: [
+                    (-6.2, 4.6, 85.2), (-6.2, -4.6, 85.2), (-6.2, 7.4, 85.2), (-6.2, -7.4, 85.2),
+                    (-8.8, 4.6, 85.2), (-8.8, -4.6, 85.2), (-8.8, 7.4, 85.2), (-8.8, -7.4, 85.2),
+                    (-11.4, 4.6, 85.2), (-11.4, -4.6, 85.2), (-11.4, 7.4, 85.2), (-11.4, -7.4, 85.2),
+                    (-14.0, 4.6, 85.2), (-14.0, -4.6, 85.2), (-14.0, 7.4, 85.2), (-14.0, -7.4, 85.2),
+                ],
+                targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
+                missile: true, guided: true, vertical_launch: true, apogee: 260,
+                salvo: 16, salvo_delay: 0.1, split: true, split_ordered: true, on_dash: true,
+                intercept: 80, caliber: 1.2, flash: 1.2, impact: 1.4, shockwave: 1.0,
+                plasma_grade: Some(Gravitic), fusion_strike: true,
+                sounds: (fire: "regency_gravitic_throw", impact: "regency_sunspear_hit", ground: "regency_sunspear_hit"),
+            ),
+        ],
+        mesh: "regency_seraph", icon: Titan,
+        sounds: (death: "blast_colossal", moving: "aster_hover"),
     ),
 ]

@@ -1,9 +1,11 @@
 //! The state tables. Together with the tick counter and the RNG these are the
 //! whole game state: struct-of-arrays columns, one row per entity.
 
+use crate::dash::DashState;
 use crate::focus::Focus;
 pub use crate::slots::Handle;
 use crate::slots::{put, Slots};
+pub use crate::warp::{WarpPhase, WarpState};
 use crate::{SimError, Table};
 use mc_core::{Angle, Fx, FxVec2, FxVec3, StateHasher};
 use mc_data::{BlueprintId, MAX_WEAPONS, ROTARY_SLOTS};
@@ -254,42 +256,8 @@ pub struct Units {
     /// Stunned by an EMP (a dampened warp): ticks left, then the whole stun's length.
     /// A stunned unit does nothing: no orders, no fire, no way on (`warp.rs`).
     pub stun: Vec<[u16; 2]>,
-}
-
-/// Where a capital ship is in a jump (`warp.rs`).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum WarpPhase {
-    #[default]
-    Idle,
-    /// Spooling the drive where it is, and bringing its nose onto the mark.
-    Spool,
-    /// Out of the world: not drawn, seen, hit or ordered. It is already where it will
-    /// come out (`pos` is `to`).
-    Transit,
-    /// Back in the world, the drive winding down.
-    Emerge,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct WarpState {
-    pub phase: WarpPhase,
-    /// Ticks spent in this phase, and how many it lasts. Spooling, `length` is the
-    /// charge's time at full power (`Warp::charge_ticks` for the jump's distance).
-    pub ticks: u16,
-    pub length: u16,
-    /// Where the jump starts and where it comes out.
-    pub from: FxVec2,
-    pub to: FxVec2,
-    /// The dampener dragging this jump down; `NONE` for a clean one.
-    pub damper: UnitId,
-    /// Ticks until the drive can spool again.
-    pub recharge: u16,
-    /// Spooling: energy charged into the drive so far, toward `need`.
-    pub charge: Fx,
-    /// The whole charge this jump takes, priced by its distance when it began to spool
-    /// (`Warp::charge`): fixed then, so the economy and the mirror read it, not a
-    /// distance that moves.
-    pub need: Fx,
+    /// A unit with a dash: its windup and recharge (`dash.rs`).
+    pub dash: Vec<DashState>,
 }
 
 pub struct UnitSpawn {
@@ -380,6 +348,7 @@ impl Units {
             ground_aim: Vec::new(),
             warp: Vec::new(),
             stun: Vec::new(),
+            dash: Vec::new(),
         }
     }
 
@@ -466,6 +435,7 @@ impl Units {
         );
         put(&mut self.warp, row, WarpState::default());
         put(&mut self.stun, row, [0; 2]);
+        put(&mut self.dash, row, DashState::default());
         Ok(row)
     }
 
@@ -601,6 +571,7 @@ impl Units {
                     | (self.stun[row][0] as u64) << 32
                     | (self.stun[row][1] as u64) << 48,
             );
+            self.dash[row].hash(h);
             for w in 0..MAX_WEAPONS {
                 h.write_u64(
                     self.weapon_cooldown[row][w] as u64

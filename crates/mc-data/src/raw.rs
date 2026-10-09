@@ -414,6 +414,9 @@ pub(crate) struct Unit {
     /// A giant walker's crushing footfalls (`RawStomp`).
     #[serde(default)]
     pub stomp: Option<RawStomp>,
+    /// Dashes into the middle of the enemies it sees ([`crate::dash::Dash`]).
+    #[serde(default)]
+    pub dash: Option<crate::dash::RawDash>,
     #[serde(default)]
     pub motion: Option<RawMotion>,
     #[serde(default)]
@@ -997,6 +1000,10 @@ pub struct RawWeapon {
     /// ordered salvo stays whole on its mark.
     #[serde(default)]
     pub split_ordered: bool,
+    /// Fires a whole salvo the moment its unit lands from a dash (`crate::dash`), however
+    /// far through its reload it was; the reload then starts again from the volley.
+    #[serde(default)]
+    pub on_dash: bool,
     #[serde(default)]
     pub proximity: f64,
     /// Seconds the ground burns where a round lands; zero: it does not.
@@ -1865,6 +1872,7 @@ impl Unit {
                 hatch_ticks: ticks(w.hatch).min(600) as u16,
                 split: w.split,
                 split_ordered: w.split_ordered,
+                on_dash: w.on_dash,
                 proximity: fx(w.proximity),
                 burn_ticks: ticks(w.burn).min(600) as u16,
                 burn_dps: fx(w.burn_dps.max(0.0)),
@@ -2104,6 +2112,25 @@ impl Unit {
                 radius: fx(s.radius),
                 damage: fx(s.damage),
             }),
+            dash: match &self.dash {
+                Some(_)
+                    if self
+                        .motion
+                        .as_ref()
+                        .is_none_or(|m| m.layer == MoveLayer::Air) =>
+                {
+                    return Err(DataError::Invalid(format!(
+                        "{key}: a dash is for a unit that moves on the ground or the water"
+                    )));
+                }
+                Some(d) => Some(d.compile(key, fx, TICKS_PER_SECOND)?),
+                None if weapons.iter().any(|w: &Weapon| w.on_dash) => {
+                    return Err(DataError::Invalid(format!(
+                        "{key}: an on_dash weapon needs a dash"
+                    )));
+                }
+                None => None,
+            },
             motion,
             economy: Economy {
                 mass_income: fx(e.mass_income),

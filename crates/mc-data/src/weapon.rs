@@ -88,6 +88,8 @@ pub struct Weapon {
     pub split: bool,
     /// A `split` salvo spreads under an attack order too (`RawWeapon::split_ordered`).
     pub split_ordered: bool,
+    /// Fires a whole salvo as its unit lands from a dash (`RawWeapon::on_dash`).
+    pub on_dash: bool,
     pub proximity: Fx,
     pub burn_ticks: u16,
     /// Damage a second its burning ground does to each enemy standing in it.

@@ -37,6 +37,7 @@ pub mod combat;
 pub mod command;
 mod contacts;
 mod curve;
+pub mod dash;
 mod debug;
 mod destruct;
 mod dogfight;

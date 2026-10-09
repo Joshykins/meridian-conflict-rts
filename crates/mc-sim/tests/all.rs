@@ -85,6 +85,7 @@ mod repair;
 mod repair_field;
 mod sealed_pocket;
 mod self_destruct;
+mod seraph;
 mod shield;
 mod site_map;
 mod skyguard;

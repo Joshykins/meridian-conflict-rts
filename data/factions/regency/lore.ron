@@ -71,6 +71,13 @@
             "Ruin Rocket Battery": "Eight rockets thrown out of its back in one quick ripple. Unguided and wild, they fall across the field and burst as pinch-fusion strikes.",
         },
     ),
+    "regency_t5_seraph": (
+        lore: "A winged machine that hangs over the field on its lifts. It does not march to a fight: it gathers itself, is gone, and comes down in the middle of the enemy, and its landing throws everything round it flat.",
+        weapons: {
+            "Rapid Fusion Repeater": "A pinch-fusion gun along each forearm, firing a bolt every half second; the two take turns.",
+            "Gravitic Seeker Battery": "Sixteen seekers thrown up from between its wings whenever anything is near, and all at once as it lands; they arc over and fall on everything round it.",
+        },
+    ),
     "regency_t1_engineer": (
         lore: "A construction craft that rides a gravity lift over land and sea alike and builds with the nanite emitter on its arm.",
         weapons: {},

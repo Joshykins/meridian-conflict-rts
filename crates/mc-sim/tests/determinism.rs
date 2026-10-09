@@ -234,6 +234,11 @@ fn setup(w: &mut World) {
                 // An Exarch with its Nanite Repair Field by the north's AA, which start
                 // half dead, mending them (`repair_field.rs`).
                 add("regency_commander+nano_field", 1, 800, 540);
+                // The Regency Seraph: it dashes into the middle of the south's army and lands
+                // as a shockwave, its seekers going up as it lands (`dash.rs`).
+                add("regency_t5_seraph", 1, 600, 1300);
+                // Its upkeep has a plant of its own, or the dampener goes dark.
+                add("aster_t3_power", 1, 1000, 150);
             }
         }
     }
@@ -495,6 +500,7 @@ fn reference() -> Vec<u64> {
     let mut stunned_at_snapshot = false;
     let (mut on_blocks, mut alight, mut down) = (0, 0, 0);
     let mut platforms = 0;
+    let mut dashes = 0;
     let hashes = (1..TICKS)
         .map(|t| {
             let commands = script(&mut w, t);
@@ -548,6 +554,7 @@ fn reference() -> Vec<u64> {
                     mc_sim::SimEvent::ElevatorDocked { units, .. } if *units > 0 => {
                         platforms += 1
                     }
+                    mc_sim::SimEvent::DashLanded { .. } => dashes += 1,
                     _ => {}
                 }
             }
@@ -560,6 +567,8 @@ fn reference() -> Vec<u64> {
         })
         .collect();
     eprintln!("determinism: city {on_blocks} shots on blocks, {alight} alight, {down} down");
+    // The Seraph dashed into the south's army.
+    assert!(dashes > 0, "the Seraph never dashed");
     // The elevator's first platform brought its queue down after the snapshot.
     assert!(platforms > 0, "no elevator platform docked with units");
     // City blocks took shots, caught fire and came down.

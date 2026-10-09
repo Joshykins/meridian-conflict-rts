@@ -35,9 +35,46 @@
 
 use crate::mirror::SimEvent;
 use crate::orders::order;
-use crate::tables::{flag, Order, OrderKind, UnitId, WarpPhase, WarpState};
+use crate::tables::{flag, Order, OrderKind, UnitId};
 use crate::{Handle, SimError, World};
 use mc_core::{Angle, Fx, FxVec2};
+use serde::{Deserialize, Serialize};
+
+/// Where a capital ship is in a jump (`warp.rs`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum WarpPhase {
+    #[default]
+    Idle,
+    /// Spooling the drive where it is, and bringing its nose onto the mark.
+    Spool,
+    /// Out of the world: not drawn, seen, hit or ordered. It is already where it will
+    /// come out (`pos` is `to`).
+    Transit,
+    /// Back in the world, the drive winding down.
+    Emerge,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WarpState {
+    pub phase: WarpPhase,
+    /// Ticks spent in this phase, and how many it lasts. Spooling, `length` is the
+    /// charge's time at full power (`Warp::charge_ticks` for the jump's distance).
+    pub ticks: u16,
+    pub length: u16,
+    /// Where the jump starts and where it comes out.
+    pub from: FxVec2,
+    pub to: FxVec2,
+    /// The dampener dragging this jump down; `NONE` for a clean one.
+    pub damper: UnitId,
+    /// Ticks until the drive can spool again.
+    pub recharge: u16,
+    /// Spooling: energy charged into the drive so far, toward `need`.
+    pub charge: Fx,
+    /// The whole charge this jump takes, priced by its distance when it began to spool
+    /// (`Warp::charge`): fixed then, so the economy and the mirror read it, not a
+    /// distance that moves.
+    pub need: Fx,
+}
 
 /// A jump never lasts less than this, however short: 1.5 s in warp.
 const MIN_TRANSIT: u16 = 15;
@@ -173,11 +210,12 @@ impl World {
         self.state.units.stun[row][0] > 0
     }
 
-    /// Held out of movement: stunned, or spooling or coming out of a jump (the jump
-    /// holds it still and turns it). A ship in transit is out of the world altogether.
+    /// Held out of movement: stunned, winding up a dash (`dash.rs`), or spooling or coming
+    /// out of a jump (the jump holds it still and turns it). A ship in transit is out of the world altogether.
     #[inline]
     pub(crate) fn warp_held(&self, row: usize) -> bool {
         self.stunned(row)
+            || self.dash_held(row)
             || matches!(
                 self.state.units.warp[row].phase,
                 WarpPhase::Spool | WarpPhase::Emerge

@@ -724,6 +724,10 @@ impl World {
             self.run_warps()?;
         }
         {
+            let _t = mc_core::perf_span!("fn.run_dashes");
+            self.run_dashes()?;
+        }
+        {
             let _t = mc_core::perf_span!("fn.run_transports");
             self.run_transports();
         }
