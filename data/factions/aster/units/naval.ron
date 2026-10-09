@@ -659,7 +659,7 @@
         tech: 4,
         categories: ["Naval", "DirectFire", "Artillery", "Experimental"],
         health: 48000,
-        cost: (mass: 14000, energy: 150000, time: 48000),
+        cost: (mass: 18000, energy: 193000, time: 62000),
         radius: 74.25, height: 9.45, footprint: (14, 5), hull: (74.25, 13.5),
         vision: 800, sonar: 2600, water_build: true,
         dive: (depth: 6, time: 6),

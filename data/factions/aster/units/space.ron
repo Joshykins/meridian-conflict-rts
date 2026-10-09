@@ -79,7 +79,7 @@
         tech: 4,
         categories: ["Air", "Space", "Experimental"],
         health: 55000,
-        cost: (mass: 8750, energy: 105000, time: 35000),
+        cost: (mass: 18000, energy: 216000, time: 72000),
         radius: 150, height: 70, footprint: (27, 13), hull: (162, 78), vision: 1900, radar: 2400,
         motion: (layer: Air, size: 0, speed: 60, accel: 6, turn: 8, altitude: 560, hover: true),
         // A heavy drive, dear by the kilometre and slow to spool and to recharge.
@@ -172,7 +172,7 @@
         tech: 4,
         categories: ["Air", "Space", "Experimental"],
         health: 160000,
-        cost: (mass: 16000, energy: 220000, time: 70000),
+        cost: (mass: 45000, energy: 619000, time: 197000),
         radius: 285, height: 110, footprint: (48, 18), hull: (290, 110), vision: 2400, radar: 3600,
         // Shots meet the long hull along its length, stern drives to bow, not a disc of its radius.
         body: (fore: 285, aft: -255, beam: 76),
@@ -304,7 +304,7 @@
         tech: 4,
         categories: ["Land", "Defense", "AntiAir", "Experimental"],
         health: 100000,
-        cost: (mass: 11200, energy: 150000, time: 48000),
+        cost: (mass: 31500, energy: 422000, time: 135000),
         radius: 46, height: 86, footprint: (8, 8),
         vision: 600,
         weapons: [

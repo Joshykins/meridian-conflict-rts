@@ -96,7 +96,7 @@
         tech: 4,
         categories: ["Land", "DirectFire", "Experimental"],
         health: 72000,
-        cost: (mass: 3400, energy: 34000, time: 20000),
+        cost: (mass: 26000, energy: 260000, time: 153000),
         radius: 36.0, height: 96.0,
         footprint: (6, 6),
         vision: 1200,
