@@ -13,8 +13,8 @@ use crate::material::GLOW_LASER;
 use crate::part;
 
 use super::super::super::kit::{dark_plate, metal, seam, v3};
-use super::body::Body;
-use super::pale_plate;
+use super::super::body::Body;
+use super::super::dress::pale_plate;
 
 /// The cells' spacing and each lid's half-width.
 const PITCH: f32 = 7.0;

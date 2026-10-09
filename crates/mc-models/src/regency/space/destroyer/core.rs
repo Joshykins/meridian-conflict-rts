@@ -11,7 +11,7 @@ use crate::material::{GLOW_LASER, GLOW_PRISM};
 
 use super::super::super::kit::{dark_plate, metal, seam, slab, v3};
 use super::super::super::machine::hoop;
-use super::body::Body;
+use super::super::body::Body;
 
 /// The drum's radius, its apertures' rims', and how far a lens stands out of its face.
 const DRUM: f32 = 34.0;

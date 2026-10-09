@@ -36,8 +36,17 @@ ground by one metre, matching the mesh and animation rig.
 
 Vassal can engage ships, aircraft and surface targets. Suzerain's two heavy guns
 engage ships, aircraft and naval hulls; its six splash batteries also bombard land
-units and structures. Each casemate uses its own weapon slot and pivot, so barrels
+units and structures. Each gun uses its own weapon slot and pivot, so barrels
 pitch and traverse with the weapon they represent.
+
+Suzerain is a narrow faceted gun hull about 210 m long, dressed as the Ark is:
+swept armour shards in courses, twin ridges down the spine aft of a horned bridge,
+canted fins and teeth over the stern, a keel blade under the bow
+(`crates/mc-models/src/regency/space/suzerain/`). Its weapons are built into the
+hull: the chine swells into a blister at each battery, the ball seated in a pocket
+pressed into it under a hooded plate, so each battery bears across its own side
+(`facing` ±90, `arc` 220). The heavy guns turn in armoured wells let into the
+deck, the after one on a raised step so it fires over the forward one.
 
 Scourge is the tech 4 capital ship, about 750 m long: one faceted arrowhead of hard
 chines with two great blades swept back past the stern, plated in two tones (charcoal,

@@ -1,4 +1,5 @@
 use super::destroyer::{battery_mounts, lance_muzzle, seeker_muzzles};
+use super::suzerain::gun_mounts;
 use crate::{build_model, build_model_scaled, material};
 use glam::Vec3;
 
@@ -118,6 +119,24 @@ fn plasma_gun_houses_are_bound_to_their_weapons_and_end_at_their_muzzles() {
                 .fold(f32::MAX, f32::min);
             assert!(near < 1.2, "{key} gun {slot}: no emitter at muzzle, {near}");
         }
+    }
+}
+
+#[test]
+fn the_suzerains_guns_turn_in_its_wells_and_pockets() {
+    let bp = blueprints();
+    let unit = bp.unit(bp.id_of("regency_t3_space_cruiser").unwrap());
+    let at = |p: mc_core::FxVec3| Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
+    let show = |p: Vec3| format!("({}, {}, {})", p.x, p.y, p.z);
+    let mounts = gun_mounts();
+    assert_eq!(unit.weapons.len(), mounts.len());
+    for (k, (weapon, (pivot, muzzle))) in unit.weapons.iter().zip(mounts).enumerate() {
+        assert!(
+            weapon.pivot.map(at) == Some(pivot) && at(weapon.muzzle) == muzzle,
+            "gun {k}: pivot {} muzzle {}",
+            show(pivot),
+            show(muzzle)
+        );
     }
 }
 

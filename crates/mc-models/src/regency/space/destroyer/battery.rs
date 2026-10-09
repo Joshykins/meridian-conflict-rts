@@ -12,7 +12,7 @@ use crate::material::GLOW_LASER;
 
 use super::super::super::kit::{dark_plate, metal, seam, v3};
 use super::super::super::machine::hoop_on;
-use super::pale_plate;
+use super::super::dress::pale_plate;
 
 /// The house's size against the authored one.
 pub(super) const SIZE: f32 = 1.35;

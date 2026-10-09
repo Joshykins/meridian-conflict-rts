@@ -276,7 +276,9 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_coffer" | "regency_space_frigate" => 6000,
         // The Bastion's counterpart, at the Bastion's size and detail.
         "regency_ark" => 14000,
-        "regency_space_cruiser" => 9000,
+        // The Resolute's peer, plated in the Ark's courses with blistered battery
+        // pockets and gun wells.
+        "regency_space_cruiser" => 11000,
         // The tech 4 hero hull, the Dominion's peer: plate courses laid over the whole
         // of it, the blades, the core's drum with an aperture each end, six ball
         // mounts in pockets pressed into the chines (each pocket's stations add a

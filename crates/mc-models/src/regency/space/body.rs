@@ -11,7 +11,7 @@ use glam::{Vec2, Vec3};
 
 use crate::builder::MeshBuilder;
 
-use super::super::super::kit::{seam, v3};
+use super::super::kit::{seam, v3};
 
 /// The corners round the port half, keel to spine.
 pub(super) const KEEL_EDGE: f32 = 1.0;
@@ -206,8 +206,13 @@ impl Body {
 
     /// The hull itself, in the seam colour: what shows between the plates.
     pub(super) fn hull(&self, b: &mut MeshBuilder) {
-        let rings: Vec<Vec<Vec3>> = self.stations.iter().map(|s| self.ring(s.x)).collect();
         seam(b);
+        self.shell(b);
+    }
+
+    /// The hull itself in whatever paint is current.
+    pub(super) fn shell(&self, b: &mut MeshBuilder) {
+        let rings: Vec<Vec<Vec3>> = self.stations.iter().map(|s| self.ring(s.x)).collect();
         b.with_facets(|b| b.loft(&rings, true, true));
     }
 
