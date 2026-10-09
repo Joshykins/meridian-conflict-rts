@@ -1471,8 +1471,14 @@ impl World {
                 aim.extend(aim_z),
             )
         });
+        // A torso gun that sways lays its own yaw and pitch within its sway of the torso,
+        // and lays its bore, which hangs beside the torso's axis, through the mark.
+        let swaying = on_body && w != 0 && weapon.sway.0 > 0;
         let bearing = match deck {
             Some((yaw, _)) => units.heading[row] + yaw,
+            None if swaying => {
+                crate::bore_lay::yaw(weapon, (aim - yaw_origin).angle(), yaw_origin.distance(aim))
+            }
             None => (aim - yaw_origin).angle(),
         };
 
@@ -1480,10 +1486,11 @@ impl World {
         // Howitzers elevate to the lob, not the line of sight, and wait until the tube is there.
         let mut pitched_on = true;
         let slot = pitch_slot(weapon, w);
-        // A torso gun that sways lays its own yaw and pitch within its sway of the torso.
-        let swaying = on_body && w != 0 && weapon.sway.0 > 0;
-        // A vertical launcher's cells stand as they are: it never pitches.
-        let laid = weapon.pivot.filter(|_| !weapon.vertical_launch);
+        // A vertical launcher's cells stand as they are, and a rack built at its rake
+        // (`fixed_rack`): they never pitch.
+        let laid = weapon
+            .pivot
+            .filter(|_| !weapon.vertical_launch && !weapon.fixed_rack);
         if let (true, Some(pivot)) = (drives || swaying, laid) {
             let want = if weapon.missile {
                 missile_rack_pitch(weapon)
@@ -1518,7 +1525,16 @@ impl World {
                 let forward = lean(FxVec2::from_angle(facing).extend(Fx::ZERO));
                 let up = lean(FxVec3::new(Fx::ZERO, Fx::ZERO, Fx::ONE));
                 let delta = (aim - pos).extend(aim_z - units.z[row]) - lean(local_pivot);
-                crate::world::pitch_to(delta.dot(forward), delta.dot(up))
+                if swaying {
+                    // Already measured from the pivot along the laid bore.
+                    crate::bore_lay::pitch(weapon, pivot, delta.dot(forward), delta.dot(up))
+                } else {
+                    crate::world::pitch_to(delta.dot(forward), delta.dot(up))
+                }
+            } else if swaying {
+                let rise = aim_z - (units.z[row] + pivot.z);
+                let run = crate::bore_lay::run(weapon, pivot, yaw_origin.distance(aim));
+                crate::bore_lay::pitch(weapon, pivot, run, rise)
             } else {
                 let rise = aim_z - (units.z[row] + pivot.z);
                 if (direct_air && aircraft.is_none())
@@ -2000,7 +2016,7 @@ impl World {
             .and_then(|first| first.pivot);
         let pivot = weapon
             .pivot
-            .filter(|p| w == 0 || weapon.mount || Some(*p) == arm);
+            .filter(|p| !weapon.fixed_rack && (w == 0 || weapon.mount || Some(*p) == arm));
 
         let mut wakes = Vec::new();
         for i in 0..volley {

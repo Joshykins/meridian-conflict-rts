@@ -40,6 +40,14 @@ fn breacher_unit_file_matches_the_model() {
             );
         }
     }
+    // The launchers are fixed in the hump: the rockets leave the cells along them.
+    assert!(pods_w.fixed_rack, "the pods do not pitch in the model");
+    assert!(
+        (pods_w.rake.to_radians_f32() - POD.1).abs() < 0.005,
+        "the rockets' rake {} is not the pods' {}",
+        pods_w.rake.to_radians_f32(),
+        POD.1
+    );
     for (w, side) in [(1, -1.0), (2, 1.0)] {
         let want = muzzle() * Vec3::new(1.0, side, 1.0);
         assert!(

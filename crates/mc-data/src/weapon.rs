@@ -155,6 +155,8 @@ pub struct Weapon {
     pub sway: Angle,
     /// A rocket rack's launch angle above level; zero: the rack's rake (`RawWeapon::rake`).
     pub rake: Angle,
+    /// The rack is built at its `rake` and never pitches (`RawWeapon::fixed_rack`).
+    pub fixed_rack: bool,
     /// Its own turret on the unit's turret: aims about `pivot` by itself and fires while the unit works.
     pub mount: bool,
     /// Reaches what is on the ground or the water along the line of sight, so an

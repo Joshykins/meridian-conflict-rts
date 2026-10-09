@@ -1120,6 +1120,12 @@ pub struct RawWeapon {
     /// leaves at. Zero (the default): the rack's own rake, from `pivot` to `muzzle`.
     #[serde(default)]
     pub rake: f64,
+    /// A rocket rack built on the torso at its `rake` (a walker's back pods): it turns
+    /// with the torso but never pitches, so its rockets leave from `muzzles` as they
+    /// stand, along the rake. Without it a rack pitches about `pivot` from its rest
+    /// (`pivot` to `muzzle`) up to the rake.
+    #[serde(default)]
+    pub fixed_rack: bool,
     /// A turret of its own on the unit's turret (a shoulder gun): it turns and pitches
     /// about `pivot` on its own, and keeps firing while the unit builds, unless it is
     /// under water.
@@ -1630,6 +1636,12 @@ impl Unit {
                     "{ctx}: loft is only for ballistic weapons"
                 )));
             }
+            if w.fixed_rack && !(w.missile && w.trajectory == Trajectory::Ballistic && w.rake > 0.0)
+            {
+                return Err(DataError::Invalid(format!(
+                    "{ctx}: fixed_rack is only for a ballistic rocket rack with a rake"
+                )));
+            }
             if w.rounds > 1 && (w.trajectory != Trajectory::Direct || w.missile) {
                 return Err(DataError::Invalid(format!(
                     "{ctx}: rounds is only for direct-fire guns"
@@ -1862,6 +1874,7 @@ impl Unit {
                 depression: Angle(steps(w.depression.clamp(0.0, 89.0)).round() as i64 as u16),
                 sway: Angle(steps(w.sway.clamp(0.0, 60.0)).round() as i64 as u16),
                 rake: Angle(steps(w.rake.clamp(0.0, 80.0)).round() as i64 as u16),
+                fixed_rack: w.fixed_rack,
                 mount: w.mount,
                 slant: w.slant,
                 spin_ticks: ticks(w.spin_up).clamp(0, 600) as u16,

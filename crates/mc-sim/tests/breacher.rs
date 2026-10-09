@@ -173,3 +173,102 @@ fn the_rockets_set_the_ground_ahead_alight() {
         "every fire is ahead of the walker"
     );
 }
+
+/// Every new shot of the Breacher's weapon `weapon` this tick: where it left and its
+/// velocity, in floats.
+fn new_shots(w: &World, weapon: usize, seen: &mut Vec<u32>) -> Vec<([f32; 3], [f32; 3])> {
+    let p = &w.state.projectiles;
+    let bp = w.blueprints.id_of(BREACHER).unwrap();
+    let mut out = Vec::new();
+    for i in 0..p.len() {
+        if p.blueprint[i] != bp || p.weapon[i] as usize != weapon || seen.contains(&p.serial[i]) {
+            continue;
+        }
+        seen.push(p.serial[i]);
+        out.push((p.origin[i].to_f32(), p.vel[i].to_f32()));
+    }
+    out
+}
+
+/// Each arm's barrels point where its shells go: the bore hangs beside and below the
+/// shoulder it turns and pitches about, and is laid through the mark, so a shell (fired
+/// from the muzzle at the mark) leaves along the barrels, within the gun's spread.
+#[test]
+fn the_arms_shoot_down_their_barrels() {
+    let mut w = world();
+    let breacher = add(&mut w, BREACHER, 0, 1000, 3000, 0);
+    add(&mut w, "aster_t3_land_factory", 1, 1260, 3040, 0);
+    let arms = arms(&w);
+    let mut seen = Vec::new();
+    let mut checked = 0;
+    for _ in 0..seconds(8) {
+        w.tick(&[]).unwrap();
+        let r = row(&w, breacher);
+        for (slot, &arm) in arms.iter().enumerate() {
+            for (_, vel) in new_shots(&w, arm, &mut seen) {
+                let units = &w.state.units;
+                let yaw = (units.heading[r] + units.weapon_yaw[r][arm]).to_radians_f32();
+                let pitch = Angle::ZERO.delta_to(units.arm_pitch[r][2 + arm]) as f32
+                    * (std::f32::consts::TAU / 65536.0);
+                let barrel = [
+                    pitch.cos() * yaw.cos(),
+                    pitch.cos() * yaw.sin(),
+                    pitch.sin(),
+                ];
+                let speed = (vel[0] * vel[0] + vel[1] * vel[1] + vel[2] * vel[2]).sqrt();
+                let dot = (barrel[0] * vel[0] + barrel[1] * vel[1] + barrel[2] * vel[2]) / speed;
+                let off = dot.clamp(-1.0, 1.0).acos().to_degrees();
+                assert!(
+                    off < 2.5,
+                    "arm {slot}'s shell left {off:.1} degrees off its barrels"
+                );
+                checked += 1;
+            }
+        }
+    }
+    assert!(checked >= 10, "only {checked} shells checked");
+}
+
+/// The rockets leave the launchers' cells as they stand in the hump, which never pitch,
+/// and along them (`fixed_rack`, `rake`). The mark is out of the arms' reach, so the pods
+/// lead the torso: a leading rack that pitched about the shoulder threw its rockets from
+/// well ahead of the hump.
+#[test]
+fn the_rockets_leave_the_cells_along_them() {
+    let mut w = world();
+    let breacher = add(&mut w, BREACHER, 0, 1000, 3000, 0);
+    add(&mut w, "aster_t3_land_factory", 1, 1950, 3000, 0);
+    let bp = w
+        .blueprints
+        .unit(w.blueprints.id_of(BREACHER).unwrap())
+        .clone();
+    let pods = &bp.weapons[0];
+    let rake = pods.rake.to_radians_f32();
+    let mut seen = Vec::new();
+    let mut checked = 0;
+    for _ in 0..seconds(12) {
+        w.tick(&[]).unwrap();
+        let r = row(&w, breacher);
+        let units = &w.state.units;
+        let torso = (units.heading[r] + units.weapon_yaw[r][0]).to_radians_f32();
+        let at = units.pos[r].extend(units.z[r]).to_f32();
+        for (origin, vel) in new_shots(&w, 0, &mut seen) {
+            let near = pods.muzzles.iter().any(|m| {
+                let m = m.to_f32();
+                let x = at[0] + m[0] * torso.cos() - m[1] * torso.sin();
+                let y = at[1] + m[0] * torso.sin() + m[1] * torso.cos();
+                let z = at[2] + m[2];
+                ((origin[0] - x).powi(2) + (origin[1] - y).powi(2) + (origin[2] - z).powi(2)).sqrt()
+                    < 0.5
+            });
+            assert!(near, "a rocket left from {origin:?}, not a cell");
+            let climb = vel[2].atan2((vel[0] * vel[0] + vel[1] * vel[1]).sqrt());
+            assert!(
+                (climb - rake).abs() < 0.05,
+                "a rocket left at {climb:.2} rad, the cells are raked {rake:.2}"
+            );
+            checked += 1;
+        }
+    }
+    assert!(checked >= 16, "only {checked} rockets checked");
+}

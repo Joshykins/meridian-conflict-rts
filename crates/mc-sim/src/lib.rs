@@ -30,6 +30,7 @@ mod assist_follow;
 mod assist_work;
 pub mod batch;
 mod body;
+mod bore_lay;
 pub mod city;
 mod cluster;
 pub mod combat;

@@ -94,9 +94,11 @@
                 // ground ahead. Each rocket bursts as a fuel-air charge and leaves the ground
                 // burning where it fell. Listed first: the launchers ride the torso, so the
                 // torso's aim is theirs, and the arms after them each swing off it on their
-                // own (`sway`).
+                // own (`sway`). The launchers are fixed in the hump (`fixed_rack`): the
+                // rockets leave the cells as they stand, along the cells (`rake`, the model's
+                // `breacher::POD` rake of 0.95 rad).
                 name: "Thermobaric Rocket Pods",
-                damage: 240, splash: 36, range_min: 190, range: 1125, reload: 18.0, salvo: 32, salvo_delay: 0.05, speed: 300, trajectory: Ballistic, rake: 20, loft: 2,
+                damage: 240, splash: 36, range_min: 190, range: 1125, reload: 18.0, salvo: 32, salvo_delay: 0.05, speed: 300, trajectory: Ballistic, rake: 54.43, fixed_rack: true, loft: 2,
                 turret_turn: 40, pivot: (0, 0, 50), muzzle: (-8.75, 6.5, 62.5),
                 // The model's `pods::mouths`, the left launcher's then the right's in turn.
                 muzzles: [(-6.3125, 3.5, 60.75), (-6.3125, -3.5, 60.75), (-6.3125, 5.5, 60.75), (-6.3125, -5.5, 60.75), (-6.3125, 7.5, 60.75), (-6.3125, -7.5, 60.75), (-6.3125, 9.5, 60.75), (-6.3125, -9.5, 60.75),
