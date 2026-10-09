@@ -585,6 +585,21 @@ impl RawCone {
     }
 }
 
+/// A strafing beam: held beams fixed in an aircraft's hull, one from each of its
+/// `muzzles` (port and starboard), laid down along the nose so each lands `ahead` metres
+/// in front of the hull, `gap` metres apart, toed out from the muzzles. On a run the beams come on as where they
+/// land reaches `length` / 2 short of the mark, rake the ground through it as the
+/// aircraft flies on, and go out `length` / 2 past it: two lines seared over the ground,
+/// striking what stands on them. A beam swings a little off the nose (`arc`) to stay on a
+/// mark off the run's line. Only on an aircraft that makes runs (not `hover`).
+#[derive(Deserialize, Clone, Copy)]
+#[serde(deny_unknown_fields)]
+pub struct RawStrafe {
+    pub ahead: f64,
+    pub length: f64,
+    pub gap: f64,
+}
+
 /// An Argon Electric Bore: the shot is an argon tracer, and when it lands the charge is
 /// dumped down the ionised channel it left. `width`: how far either side of that channel
 /// the discharge sears (zero: only the bolt, the blast is the weapon's splash). `damage`:
@@ -1237,6 +1252,9 @@ pub struct RawWeapon {
     /// A cone weapon: every shot strikes all it may shoot in a fan ahead (`RawCone`).
     #[serde(default)]
     pub cone: Option<RawCone>,
+    /// A strafing beam (`RawStrafe`).
+    #[serde(default)]
+    pub strafe: Option<RawStrafe>,
     /// A giant gun's spent sabot, thrown clear with every shot (`RawSabot`).
     #[serde(default)]
     pub sabot: Option<RawSabot>,
@@ -1769,6 +1787,23 @@ impl Unit {
                     "{ctx}: a cone is a hitscan direct shot with no splash, beam or bore"
                 )));
             }
+            if w.strafe.is_some_and(|s| {
+                s.ahead <= 0.0 || s.length <= 0.0 || s.gap < 0.0 || s.ahead >= w.range
+            }) || (w.strafe.is_some()
+                && (!w.beam
+                    || !w.hitscan
+                    || w.turret_turn != 0.0
+                    || w.muzzles.is_empty()
+                    || self
+                        .motion
+                        .as_ref()
+                        .is_none_or(|m| m.layer != MoveLayer::Air || m.hover)))
+            {
+                return Err(DataError::Invalid(format!(
+                    "{ctx}: a strafe is a held hitscan beam fixed in an aircraft that makes \
+                     runs, from its muzzles, landing inside its range"
+                )));
+            }
             if w.bore.is_some()
                 && (w.trajectory != Trajectory::Direct || w.missile || w.beam || w.torpedo)
             {
@@ -1913,6 +1948,11 @@ impl Unit {
                         ticks: ticks(s.seconds).clamp(1, 1200) as u16,
                         damage: fx(s.damage.max(0.0)),
                     }),
+                }),
+                strafe: w.strafe.map(|s| crate::Strafe {
+                    ahead: fx(s.ahead),
+                    half: fx(s.length / 2.0),
+                    gap: fx(s.gap),
                 }),
                 cone: w.cone.map(|c| crate::Cone {
                     half: Angle(steps(c.angle.clamp(1.0, 180.0)).round() as i64 as u16),

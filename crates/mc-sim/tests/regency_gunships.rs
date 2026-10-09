@@ -1,7 +1,7 @@
 //! The Regency's hovering combat craft (`data/factions/regency/units/air_gunships.ron`): the
 //! Quiver lets its Wicks go at what it fights and each bursts on the mark (`strike_drones.rs`),
-//! and the Reaper hangs over its mark holding a beam on it (`Motion::hangs`,
-//! `Weapon::beam`).
+//! and the Reaper strafes its mark with two beams, leaving the ground burning
+//! (`Weapon::strafe`).
 
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
@@ -212,55 +212,75 @@ fn a_quiver_with_empty_bays_waits_for_its_wicks() {
 }
 
 #[test]
-fn the_reaper_hangs_still_over_its_mark_and_holds_its_beam_on_it() {
+fn the_reaper_strafes_its_mark_with_two_burning_lines() {
     let mut w = world();
     rich(&mut w, 0);
     let reaper = spawn(&mut w, "regency_t3_assault_aircraft", 0, 400, 600);
-    let tank = target(&mut w, "aster_t4_assault_tank", 1100, 600);
-    let tank_bp = w.blueprints.unit(w.state.units.blueprint[row(&w, tank)]);
-    let (full, reach, at) = (
-        tank_bp.health,
-        tank_bp.radius,
-        w.state.units.pos[row(&w, tank)],
-    );
+    let tank = target(&mut w, "aster_t4_assault_tank", 1300, 600);
+    let full = w
+        .blueprints
+        .unit(w.state.units.blueprint[row(&w, tank)])
+        .health;
     attack(&mut w, reaper, tank);
-    for _ in 0..200 {
+    // The first run's strikes, until the beams go out.
+    let mut first = Vec::new();
+    let mut closest = Fx::from_int(10_000);
+    let mut plasma_fires = false;
+    for _ in 0..600 {
         w.tick(&[]).unwrap();
-    }
-    // Hung near the mark, inside its reach, and still.
-    let r = row(&w, reaper);
-    let off = w.state.units.pos[r].distance(at);
-    assert!(
-        off > Fx::from_int(50) && off < Fx::from_int(260),
-        "hangs {off} m from its mark"
-    );
-    let mut across = (Fx::from_int(10_000), Fx::from_int(-10_000));
-    let side = (at - w.state.units.pos[r]).normalize().perp();
-    let still = w.state.units.pos[r];
-    for _ in 0..60 {
-        w.tick(&[]).unwrap();
-        for e in &w.events {
-            if let SimEvent::Impact { pos, .. } = e {
-                let d = (pos.xy() - at).dot(side);
-                across = (across.0.min(d), across.1.max(d));
-            }
+        let struck: Vec<_> = w
+            .events
+            .iter()
+            .filter_map(|e| match e {
+                SimEvent::Impact { pos, .. } => Some(pos.xy()),
+                _ => None,
+            })
+            .collect();
+        if struck.is_empty() && !first.is_empty() {
+            break;
         }
+        first.extend(struck);
+        if let Some(t) = w.state.units.row(tank) {
+            let r = row(&w, reaper);
+            closest = closest.min(w.state.units.pos[r].distance(w.state.units.pos[t]));
+        }
+        plasma_fires |= w.state.fires.plasma.iter().any(|&p| p);
     }
-    let r = row(&w, reaper);
     assert!(
-        w.state.units.pos[r].distance(still) < Fx::from_int(8),
-        "it held still while it fired"
+        first.len() >= 10,
+        "{} strikes on the first run",
+        first.len()
     );
-    // On the hull, not swinging either side of it.
+    // The run is flown west to east along y = 600: the strikes lie along it, a line
+    // through the mark, not a point on it.
+    let (lo, hi) = first.iter().fold((i32::MAX, i32::MIN), |(lo, hi), p| {
+        (lo.min(p.x.floor_int()), hi.max(p.x.floor_int()))
+    });
+    assert!(hi - lo > 100, "the strikes spread over {lo}..{hi}");
     assert!(
-        across.1 - across.0 < reach * 2,
-        "the beam strayed across {:?}",
-        across
+        lo < 1300 && hi > 1300,
+        "the line ran through the mark: {lo}..{hi}"
+    );
+    // Two lines, one either side of the run's, 16 m apart.
+    let port = first.iter().filter(|p| p.y > Fx::from_int(605)).count();
+    let starboard = first.iter().filter(|p| p.y < Fx::from_int(595)).count();
+    assert!(
+        port > 3 && starboard > 3,
+        "port {port}, starboard {starboard}"
+    );
+    assert!(
+        plasma_fires,
+        "the seared ground was left burning with plasma"
+    );
+    // It flew on in, not hanging off at its reach.
+    assert!(
+        closest < Fx::from_int(150),
+        "came no nearer than {closest} m"
     );
     let left = w
         .state
         .units
         .row(tank)
         .map_or(Fx::ZERO, |t| w.state.units.health[t]);
-    assert!(left < full, "the beam hurt the tank");
+    assert!(left < full, "the beams hurt the tank");
 }

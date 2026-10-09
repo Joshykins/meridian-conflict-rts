@@ -88,6 +88,7 @@ mod stand_off;
 mod standing;
 pub mod state_hash;
 pub mod store_lights;
+mod strafe;
 mod stranded;
 mod strike_drones;
 pub mod survival;

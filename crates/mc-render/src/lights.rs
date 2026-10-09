@@ -515,7 +515,8 @@ impl Lights {
                 });
             }
         }
-        for f in &frame.fires {
+        // Plasma left burning throws its own red light (`plasma_left_burning`).
+        for f in frame.fires.iter().filter(|f| f.plasma == 0) {
             self.push_ground_fire(f);
         }
         self.glows.clear();

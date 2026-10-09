@@ -3837,6 +3837,10 @@ impl Renderer {
     /// The flame is a draped wave in the reserved effect slots. Smoke stays in
     /// the puff tail so a later blast cannot erase a column that is still rising.
     fn ground_fires(&mut self, fires: &[FireInstance], time: f32) {
+        // Plasma left burning is drawn as the beam lays it (`plasma_left_burning`), not as
+        // fire.
+        let fires: Vec<_> = fires.iter().filter(|f| f.plasma == 0).copied().collect();
+        let fires = &fires[..];
         let shown = fires.len().min(MAX_GROUND_FIRES);
         let first = fires.len() - shown;
         let mut waves = vec![Effect::zeroed(); MAX_GROUND_FIRES];

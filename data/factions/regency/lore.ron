@@ -427,9 +427,9 @@
         weapons: {},
     ),
     "regency_t3_assault_aircraft": (
-        lore: "A heavy craft that comes in over a battle and stops there, hanging on six lift bells while its beam burns what lies below it and drags a line of glass from one mark to the next.",
+        lore: "A heavy craft on six lift bells that runs in low over its mark and rakes it end to end, leaving two lines of ground burning red behind it.",
         weapons: {
-            "Pinch-fusion Beam": "Plasma pinched until it fuses and held as a beam, white at its heart with bursts of fusion strobing along it; it holds on its mark and melts the ground it crosses between marks.",
+            "Twin Plasmeric Beams": "Two streams of bound plasma fixed under the wing roots, laid down ahead of the craft: they come on short of the mark, sear two lines through it and out past it, and leave the ground they cross burning with plasma.",
         },
     ),
     "regency_t2_interceptor": (

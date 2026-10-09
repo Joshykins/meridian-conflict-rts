@@ -536,12 +536,14 @@ impl World {
                 let radius =
                     (Fx::from_int(4) + weapon.splash * Fx::ratio(11, 20)).min(Fx::from_int(32));
                 let xy = hit.point.xy();
-                // A stream gun lands ten rounds a second in one place: a round that falls
-                // within half a patch of one the same gun lit rekindles it rather than
-                // lighting another, so a strafe leaves a burning line, not a stack of
-                // patches ten deep (and the fires table stays small).
+                // A stream gun lands ten rounds a second in one place, a held beam a
+                // strike a tick: one that falls within half a patch of one the same gun
+                // lit rekindles it rather than lighting another, so a strafe leaves a
+                // burning line, not a stack of patches ten deep (and the fires table
+                // stays small).
+                let stream = weapon.rounds > 1 || weapon.beam;
                 let fires = &mut self.state.fires;
-                let rekindle = (weapon.rounds > 1)
+                let rekindle = stream
                     .then(|| {
                         (0..fires.len()).find(|&i| {
                             fires.source[i] == source
@@ -555,7 +557,7 @@ impl World {
                     fires.span[i] = weapon.burn_ticks;
                 } else {
                     // A round that struck a hull still sets the ground under it alight.
-                    let z = if weapon.rounds > 1 {
+                    let z = if stream {
                         self.terrain.height_at(xy).max(self.terrain.water_level())
                     } else {
                         hit.point.z
@@ -569,6 +571,7 @@ impl World {
                         owner,
                         source,
                         weapon.target_mask,
+                        weapon.plasma_grade.is_some(),
                     );
                 }
             }

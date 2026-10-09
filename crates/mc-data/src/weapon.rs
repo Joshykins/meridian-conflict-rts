@@ -2,7 +2,9 @@
 
 use mc_core::{Angle, Fx, FxVec3};
 
-use crate::{Bore, Cluster, Cone, PlasmaGrade, Sabot, Trajectory, WeaponColor, WeaponSounds};
+use crate::{
+    Bore, Cluster, Cone, PlasmaGrade, Sabot, Strafe, Trajectory, WeaponColor, WeaponSounds,
+};
 
 /// The widest circle, metres, a `Bombard` order may spread a gun's shots over unless
 /// its data gives it more (`RawWeapon::bombard`).
@@ -231,6 +233,9 @@ pub struct Weapon {
     /// A cone weapon (`RawWeapon::cone`): each shot strikes everything it may shoot in the
     /// fan ahead of the gun at once (`combat::wake`), and nothing flies.
     pub cone: Option<Cone>,
+    /// A strafing beam (`RawWeapon::strafe`): fixed in the hull, it rakes a line over the
+    /// ground through its mark as the aircraft flies its run (`strafe.rs`).
+    pub strafe: Option<Strafe>,
     /// Names from the sound library; what is `None` falls back to the library's defaults.
     pub sounds: WeaponSounds,
     /// Ticks before a salvo at which the weapon is heard charging. Zero: it does not charge.

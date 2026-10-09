@@ -460,11 +460,14 @@ plasma crackling under them.
   each), as the commander's salvage drones are (`air_support.rs`). Wicks are aircraft: flak and
   fighters shoot them down on the way in, and they die with their carrier.
 - **Reaper** (`regency_t3_assault_aircraft`, tech 3): a scythe-winged craft on six bells
-  that does not strafe. It `hangs`: it flies in to two fifths of its reach from its mark
-  and holds still there, moving again only when the mark drifts out of that band
-  (`orders.rs` `air_hang`). Its Pinch-fusion Beam (a `beam`, like the Harrow's) holds
-  on the mark; fired down the barrel (`sweep`), it stays lit while it slews to the next
-  mark and glasses the ground it crosses on the way.
+  that strafes (since 2026-10-09; it used to hang over its mark). It flies runs like the
+  Thunderhead (`hover: false`) but does not dive. Its Twin Plasmeric Beams are a `strafe`
+  (mc-sim `strafe.rs`): two held beams fixed under the wing roots, landing 200 m ahead of
+  the nose, toed out to land 16 m apart. They come on when where they land is 90 m short of the mark, rake
+  two lines through it as the craft flies in and go out 90 m past it, swinging up to 10
+  degrees off the nose to stay on a mark off the run's line. Each strike `burn`s: the
+  ground is left burning with red plasma (`Fires::plasma`, drawn as a plasma wake, not
+  flame) at 45 a second for 5 s.
 
 Check: `cargo test -p mc-sim --test sim -- regency_gunships::`; both are in the
 determinism match.

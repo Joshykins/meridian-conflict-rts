@@ -35,6 +35,9 @@ const CHARGE: u32 = 8;
 const CUT: f32 = 0.12;
 /// Metres apart the pools a beam glasses the ground with are laid.
 const GLASS_STEP: f32 = 2.4;
+/// Furthest a beam's strike may have moved since it last glassed the ground for the
+/// stretch between to be seared too: past it the beam jumped to a new mark.
+const RAKE_GAP: f32 = 40.0;
 /// How many times wider than the star beam its halo is.
 const HALO: f32 = 4.5;
 /// Radius, in beam widths, of the plasma spreading over the ground where a star beam strikes.
@@ -177,12 +180,24 @@ impl Renderer {
         let start = muzzle - travel;
         let reach = travel.length() + 6.0;
         let fx = &mut self.plasma_fx;
-        let same = fx.held.iter_mut().find(|h| {
-            h.owner == owner
-                && h.blueprint == blueprint
-                && h.weapon == weapon
-                && h.from[1].distance(start) < reach
-        });
+        // The same gun's beam last tick, the one that left from nearest where this one
+        // starts and not already fed this tick: a gun with twin beams (a strafe) fires
+        // both each tick, one from each muzzle.
+        let same = fx
+            .held
+            .iter_mut()
+            .filter(|h| {
+                h.owner == owner
+                    && h.blueprint == blueprint
+                    && h.weapon == weapon
+                    && h.last < time
+                    && h.from[1].distance(start) < reach
+            })
+            .min_by(|a, b| {
+                a.from[1]
+                    .distance(start)
+                    .total_cmp(&b.from[1].distance(start))
+            });
         match same {
             Some(h) => {
                 h.from = [start, muzzle];
@@ -241,21 +256,39 @@ impl Renderer {
         let width = h.width;
         let fusion = h.fusion;
         let star = h.star;
-        // It glasses the ground where it lands, a pool at a time as the strike walks.
-        let glass = !on_unit
-            && h.glassed
-                .is_none_or(|g| g.distance(at.truncate()) > GLASS_STEP);
+        // It glasses the ground where it lands, a pool at a time as the strike walks. A
+        // beam raking fast over the ground (a strafe) lays the stretch it crossed since
+        // its last pool too, so it leaves an unbroken line.
+        let last = h.glassed;
+        let glass = !on_unit && last.is_none_or(|g| g.distance(at.truncate()) > GLASS_STEP);
         if glass {
             h.glassed = Some(at.truncate());
         }
+        let from = last.filter(|g| g.distance(at.truncate()) < RAKE_GAP);
+        let w = &self.blueprints.unit(blueprint).weapons[weapon as usize];
+        let burn = w.burn_ticks as f32 / mc_core::TICKS_PER_SECOND as f32;
+        if glass && burn > 0.0 && w.plasma_grade.is_some() {
+            self.plasma_left_burning(from, at, width, burn, time);
+        }
         if glass {
             // A star's beam runs the ground white-hot; any other glows it red at first,
-            // and melts it as it drags on over ground it has already heated.
+            // and melts it as it drags on over ground it has already heated. One that
+            // leaves it burning only sears it: the burning plasma is its mark.
             let peak = if star {
                 1.0
+            } else if burn > 0.0 {
+                (0.12 + 0.08 * width).min(0.5)
             } else {
                 (0.25 + 0.12 * width).min(0.9)
             };
+            if let Some(g) = from {
+                let steps = (g.distance(at.truncate()) / GLASS_STEP).floor() as usize;
+                for k in 1..steps {
+                    let p = g.lerp(at.truncate(), k as f32 / steps as f32);
+                    self.ground_melt
+                        .melt(p, width * 2.8, peak, time, GLASS_COOL);
+                }
+            }
             self.ground_melt
                 .melt(at.truncate(), width * 2.8, peak, time, GLASS_COOL);
             // The excavation lance digs as it glasses; the star only melts.

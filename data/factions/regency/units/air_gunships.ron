@@ -69,10 +69,11 @@
         sounds: (death: "blast_small", moving: "aster_hover"),
         wreck_fraction: 0,
     ),
-    // The assault craft: the Thunderhead's place. It does not strafe: it comes in over its
-    // mark, hangs there on six lift bells (`hangs`) and holds a Pinch-fusion Beam on it,
-    // walking the beam back and forth across it (`walk`) so it glasses a swath of ground
-    // and everything standing in it.
+    // The assault craft: the Thunderhead's place. It strafes: it flies runs at its mark on
+    // six lift bells, and two Plasmeric beams fixed under its wing roots, laid down ahead
+    // of it, come on short of the mark and rake two lines through it and out past it
+    // (`strafe`, mc-sim `strafe.rs`). The ground they sear is left burning with red
+    // plasma that burns whatever stands in it.
     (
         key: "regency_t3_assault_aircraft",
         name: "Reaper",
@@ -83,17 +84,21 @@
         cost: (mass: 1350, energy: 52000, time: 8400),
         radius: 14, height: 6,
         vision: 1000,
-        motion: (layer: Air, size: 0, speed: 110, accel: 40, turn: 70, altitude: 90, hover: true, hangs: true),
+        motion: (layer: Air, size: 0, speed: 130, accel: 45, turn: 80, altitude: 90, hover: false),
         weapons: [
             (
-                // Fires every tick it bears (`beam`), 550 a second, the stream a few metres
-                // wide where it lands. It runs up its pinch for 0.6 s before it lights.
-                name: "Pinch-fusion Beam",
-                damage: 55, splash: 6, range: 420, reload: 0.1, hitscan: true, beam: true,
-                trajectory: Direct, spin_up: 0.6,
-                turret_turn: 60, pivot: (4.2, 0, 0.6), muzzle: (6.4, 0, 0.2), sweep: 8,
+                // Both beams strike every tick they rake, 110 each where they land, the
+                // lines 16 m apart. They land 200 m ahead of the nose, swing 10 degrees off
+                // it, and rake 180 m of ground a run, about a second and a half; what they
+                // sear burns 5 s at 45 a second (`burn`).
+                name: "Twin Plasmeric Beams",
+                damage: 110, splash: 7, range: 420, reload: 0.1, hitscan: true, beam: true,
+                salvo: 2, trajectory: Direct, spin_up: 0.2,
+                arc: 20, muzzle: (5.0, 3.0, 0.9), muzzles: [(5.0, 3.0, 0.9), (5.0, -3.0, 0.9)],
+                strafe: (ahead: 200, length: 180, gap: 16),
+                burn: 5, burn_dps: 45,
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
-                flash: 1.3, impact: 1.4, plasma_grade: Some(PinchFusion),
+                flash: 1.3, impact: 1.4, plasma_grade: Some(Plasmeric),
                 sounds: (hold: "regency_pinched_beam"),
             ),
         ],

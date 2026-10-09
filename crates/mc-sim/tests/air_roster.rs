@@ -484,6 +484,7 @@ fn a_full_fire_table_puts_out_the_patch_nearest_to_burning_out() {
             0,
             mc_sim::Handle::NONE,
             0,
+            false,
         );
     }
     let pos = w.state.units.pos[t].extend(w.state.units.z[t] + Fx::from_int(2));

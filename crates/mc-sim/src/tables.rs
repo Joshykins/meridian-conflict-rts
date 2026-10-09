@@ -1351,6 +1351,9 @@ pub struct Fires {
     pub owner: Vec<u8>,
     pub source: Vec<UnitId>,
     pub target_mask: Vec<u32>,
+    /// Plasma left burning by a Regency gun (`Weapon::plasma_grade`), not fire: the
+    /// renderer draws it as a red plasma wake on the ground. It burns the same.
+    pub plasma: Vec<bool>,
 }
 
 impl Fires {
@@ -1380,6 +1383,7 @@ impl Fires {
         owner: u8,
         source: UnitId,
         target_mask: u32,
+        plasma: bool,
     ) {
         if self.len() < MAX_FIRES {
             self.pos.push(pos);
@@ -1391,6 +1395,7 @@ impl Fires {
             self.owner.push(owner);
             self.source.push(source);
             self.target_mask.push(target_mask);
+            self.plasma.push(plasma);
             return;
         }
         let i = (0..self.len())
@@ -1405,6 +1410,7 @@ impl Fires {
         self.owner[i] = owner;
         self.source[i] = source;
         self.target_mask[i] = target_mask;
+        self.plasma[i] = plasma;
     }
 
     pub fn swap_remove(&mut self, i: usize) {
@@ -1417,6 +1423,7 @@ impl Fires {
         self.owner.swap_remove(i);
         self.source.swap_remove(i);
         self.target_mask.swap_remove(i);
+        self.plasma.swap_remove(i);
     }
 
     pub fn hash(&self, h: &mut StateHasher) {
@@ -1428,7 +1435,11 @@ impl Fires {
             h.write_i64(self.radius[i].0);
             h.write_u64(self.ticks[i] as u64 | (self.span[i] as u64) << 16);
             h.write_i64(self.dps[i].0);
-            h.write_u64(self.owner[i] as u64 | (self.target_mask[i] as u64) << 8);
+            h.write_u64(
+                self.owner[i] as u64
+                    | (self.target_mask[i] as u64) << 8
+                    | (self.plasma[i] as u64) << 40,
+            );
             h.write_u32(self.source[i].0);
         }
     }

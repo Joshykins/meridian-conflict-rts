@@ -1,10 +1,10 @@
 //! The Reaper, the Regency's tech 3 beam assault craft (`regency_t3_assault_aircraft`): a
-//! heavy craft on six lift bells that comes in over its mark and hangs there, sweeping a
-//! Pinch-fusion Beam across the ground from a projector under its nose.
+//! heavy craft on six lift bells that flies runs at its mark and rakes it with two
+//! Plasmeric beams from projectors fixed under it, one either side (the unit file's
+//! `strafe`).
 //!
-//! The projector (`projector`) turns in a ball under the nose (`part::TURRET`) and pitches
-//! in it (`rig::ARM_GUN`) about `PIVOT`; its red lens is the muzzle (the unit file's
-//! `pivot` and `muzzle`).
+//! Each projector (`projector`) is a plated housing with an emitter barrel, laid down a
+//! little toward the ground ahead; its mouth is a muzzle of the unit file's `muzzles`.
 //!
 //! The shape is a scythe: a long plated hull under a high keel, and a crescent wing either
 //! side swept back like a scythe's blade into a down-turned tip, three bells under each.
@@ -13,68 +13,107 @@ use glam::{Vec2, Vec3};
 
 use crate::builder::{MeshBuilder, Section};
 use crate::library::ModelDef;
-use crate::material::*;
-use crate::{part, rig};
+use crate::part;
 
 use super::super::kit::{dark_plate, metal, seam, v3};
 use super::super::lift::bell;
 use super::super::machine::{armour, collar, shaft, swept, Course, Frame};
 use super::{body, head, plan, team_mark};
 
-pub(crate) const MODELS: &[ModelDef] = &[ModelDef::new(
-    "regency_assault_aircraft",
-    RADIUS,
-    HEIGHT,
-    scythe,
-)];
+pub(crate) const MODELS: &[ModelDef] = &[
+    ModelDef::new("regency_assault_aircraft", RADIUS, HEIGHT, scythe_roots),
+    ModelDef::new(
+        "regency_assault_aircraft~cheeks",
+        RADIUS,
+        HEIGHT,
+        scythe_cheeks,
+    ),
+    ModelDef::new(
+        "regency_assault_aircraft~blades",
+        RADIUS,
+        HEIGHT,
+        scythe_blades,
+    ),
+];
 
 pub(crate) const RADIUS: f32 = 14.0;
 pub(crate) const HEIGHT: f32 = 6.0;
 
-/// The projector's trunnion and its lens (the unit file's weapon `pivot` and `muzzle`).
-pub(crate) const PIVOT: Vec3 = Vec3::new(4.2, 0.0, 0.6);
-pub(crate) const MUZZLE: Vec3 = Vec3::new(6.4, 0.0, 0.2);
+/// Where the two projectors hang (the port one; the starboard mirrors it): the mouth (the
+/// unit file's muzzle) and how long the projector is back from it.
+#[derive(Clone, Copy)]
+struct Mount {
+    mouth: Vec3,
+    length: f32,
+}
 
-/// The beam projector in its ball under the nose: a plated housing, a bronze emitter tube
-/// ringed with collars, and the red lens at its mouth.
-fn projector(b: &mut MeshBuilder) {
-    b.set_turret_pivot(PIVOT);
-    b.set_arm_pivot(PIVOT);
-    let dir = (MUZZLE - PIVOT).normalize();
+/// Under the wing roots, reaching out ahead of the leading edge.
+const ROOTS: Mount = Mount {
+    mouth: Vec3::new(5.0, 3.0, 0.9),
+    length: 3.6,
+};
+/// Close under the nose's cheeks, either side of the chin.
+const CHEEKS: Mount = Mount {
+    mouth: Vec3::new(7.4, 1.6, 0.65),
+    length: 3.2,
+};
+/// Out under the blades, between the first and second bells.
+const BLADES: Mount = Mount {
+    mouth: Vec3::new(1.6, 6.4, 1.0),
+    length: 3.4,
+};
+
+/// How far the projectors are laid down off level, toward the ground their beams land on.
+const DROOP: f32 = 0.2;
+
+/// One beam projector, fixed: a plated housing hung on a web from the hull above, a bronze
+/// emitter barrel ringed with collars, and a heavy ring round its mouth at `mouth`.
+fn projector(b: &mut MeshBuilder, mouth: Vec3, length: f32) {
+    let dir = v3(DROOP.cos(), 0.0, -DROOP.sin());
+    let back = mouth - dir * length;
+    dark_plate(b);
+    if b.coarse() {
+        // Far off: a wedge from the housing's back to the mouth.
+        let (top, port, star) = (
+            back + Vec3::Z * 0.35,
+            back + v3(0.0, 0.4, -0.3),
+            back + v3(0.0, -0.4, -0.3),
+        );
+        b.face(&[mouth, top, port]);
+        b.face(&[mouth, star, top]);
+        b.face(&[mouth, port, star]);
+        b.face(&[top, star, port]);
+        return;
+    }
+    let housing = back + dir * length * 0.62;
+    b.beam(back, housing, Vec2::new(0.8, 0.7), Vec2::new(0.62, 0.56));
+    // The web it hangs from, up into the hull or wing over it.
+    let web = back + dir * length * 0.3;
+    b.beam(
+        web + Vec3::Z * 0.2,
+        v3(web.x, web.y, 1.5),
+        Vec2::new(0.16, length * 0.4),
+        Vec2::new(0.16, length * 0.5),
+    );
+    metal(b);
+    let sides = b.sides(8);
+    b.cylinder_between(housing - dir * 0.1, mouth - dir * 0.12, 0.17, 0.15, sides);
+    for k in [0.72f32, 0.84] {
+        collar(b, back + dir * length * k, dir, 0.24, 0.08);
+    }
+    collar(b, mouth - dir * 0.1, dir, 0.26, 0.12);
+}
+
+/// Both projectors, port and starboard: the guns (`part::TURRET`), though they never turn.
+fn projectors(b: &mut MeshBuilder, mount: Mount) {
     b.with_part(part::TURRET, |b| {
-        dark_plate(b);
-        if b.coarse() {
-            // Far off: one tapered block from the ball to the lens.
-            b.with_limb(rig::ARM_GUN, |b| {
-                b.beam(PIVOT, MUZZLE, Vec2::new(0.9, 0.8), Vec2::new(0.3, 0.3));
-            });
-            return;
-        }
-        let sides = b.sides(10);
-        b.spheroid(PIVOT, v3(0.62, 0.58, 0.5), sides, 5);
-        b.with_limb(rig::ARM_GUN, |b| {
-            dark_plate(b);
-            b.beam(
-                PIVOT + dir * 0.2,
-                PIVOT + dir * 1.4,
-                Vec2::new(0.62, 0.56),
-                Vec2::new(0.42, 0.4),
-            );
-            metal(b);
-            let sides = b.sides(8);
-            b.cylinder_between(PIVOT + dir * 1.3, MUZZLE - dir * 0.18, 0.15, 0.13, sides);
-            for k in [1.55f32, 1.8] {
-                collar(b, PIVOT + dir * k, dir, 0.22, 0.08);
-            }
-            b.paint(GLOW_LASER);
-            b.cylinder_between(MUZZLE - dir * 0.2, MUZZLE, 0.21, 0.15, sides);
-        });
+        b.mirror_y(|b| projector(b, mount.mouth, mount.length));
     });
 }
 
 /// Far off: a plan's flat solid, the team colour on top, one dark face for the bells, and
-/// the projector.
-fn coarse(b: &mut MeshBuilder, outline: &[[f32; 2]], top: f32) {
+/// the projectors.
+fn coarse(b: &mut MeshBuilder, outline: &[[f32; 2]], top: f32, mount: Mount) {
     dark_plate(b);
     b.extrude_z(outline, 1.0, top);
     team_mark(b, -1.0, top, 2.4);
@@ -82,7 +121,7 @@ fn coarse(b: &mut MeshBuilder, outline: &[[f32; 2]], top: f32) {
         seam(b);
         b.face(&[v3(4.0, 0.0, 0.3), v3(-5.0, -4.0, 0.3), v3(-5.0, 4.0, 0.3)]);
     });
-    projector(b);
+    projectors(b, mount);
 }
 
 /// A plated keel along the back from `fore` to `aft`, `top` high, lapped in a course of
@@ -131,7 +170,19 @@ const SCYTHE_WING: [[f32; 2]; 9] = [
     [-6.6, 1.8],
 ];
 
-fn scythe(b: &mut MeshBuilder, _tech: u8) {
+fn scythe_roots(b: &mut MeshBuilder, _tech: u8) {
+    scythe(b, ROOTS);
+}
+
+fn scythe_cheeks(b: &mut MeshBuilder, _tech: u8) {
+    scythe(b, CHEEKS);
+}
+
+fn scythe_blades(b: &mut MeshBuilder, _tech: u8) {
+    scythe(b, BLADES);
+}
+
+fn scythe(b: &mut MeshBuilder, mount: Mount) {
     if b.coarse() {
         let outline = plan(&[
             [8.6, 0.0],
@@ -141,7 +192,7 @@ fn scythe(b: &mut MeshBuilder, _tech: u8) {
             [-6.4, 4.0],
             [-9.6, 0.0],
         ]);
-        coarse(b, &outline, 4.9);
+        coarse(b, &outline, 4.9, mount);
         return;
     }
     body(b, &SCYTHE_HULL, 1.0, 3.8, 0.82);
@@ -187,7 +238,7 @@ fn scythe(b: &mut MeshBuilder, _tech: u8) {
         bell(b, v3(-3.3, 7.9, 0.0), 0.95, 1.4);
         bell(b, v3(-6.9, 10.6, 0.0), 0.85, 1.4);
     });
-    projector(b);
+    projectors(b, mount);
 }
 
 #[cfg(test)]
@@ -196,11 +247,12 @@ mod tests {
 
     #[test]
     fn every_design_fits_the_librarys_checks() {
-        for key in MODELS.iter().map(|d| d.key) {
-            super::super::super::check(key, RADIUS, HEIGHT, None, &[MUZZLE.to_array()]);
+        for (key, mount) in MODELS.iter().map(|d| d.key).zip([ROOTS, CHEEKS, BLADES]) {
+            let starboard = mount.mouth * v3(1.0, -1.0, 1.0);
+            let muzzles = [mount.mouth.to_array(), starboard.to_array()];
+            super::super::super::check(key, RADIUS, HEIGHT, None, &muzzles);
             let model = crate::build_model(key).unwrap();
             assert_eq!(model.lifts.len(), 6, "{key}: six lift bells");
-            assert_eq!(Vec3::from(model.turret_pivot), PIVOT, "{key}: turret pivot");
         }
     }
 }

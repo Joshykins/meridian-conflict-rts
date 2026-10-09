@@ -59,6 +59,7 @@ use mc_sim::mirror::{
 };
 use std::mem::size_of;
 
+mod burning;
 mod fusion;
 mod plasmeric;
 mod strike;

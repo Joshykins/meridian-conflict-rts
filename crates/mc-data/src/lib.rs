@@ -236,6 +236,16 @@ pub struct Cone {
     pub speed: Fx,
 }
 
+/// A strafing beam's stroke (`RawStrafe`): it lands `ahead` of the hull along the nose,
+/// and rakes the ground while its mark is within `half` of where it lands. The beams land
+/// `gap` apart, side by side.
+#[derive(Clone, Copy, Debug)]
+pub struct Strafe {
+    pub ahead: Fx,
+    pub half: Fx,
+    pub gap: Fx,
+}
+
 /// A gun's spent casing (`RawSabot`).
 #[derive(Clone, Copy, Debug)]
 pub struct Sabot {

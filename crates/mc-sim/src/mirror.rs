@@ -1343,6 +1343,8 @@ pub struct FireInstance {
     pub radius: f32,
     pub elapsed: f32,
     pub duration: f32,
+    /// 1: plasma left burning (`Fires::plasma`), not fire; 0: fire.
+    pub plasma: u32,
 }
 
 /// A builder at work this tick, for the game's building sounds.
@@ -2669,6 +2671,7 @@ impl World {
                 radius: s.fires.radius[i].to_f32(),
                 elapsed: (span - left).max(0.0),
                 duration: span,
+                plasma: s.fires.plasma[i] as u32,
             });
         }
 

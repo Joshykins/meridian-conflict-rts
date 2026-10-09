@@ -1579,7 +1579,20 @@ impl World {
             }
         }
 
-        let aligned = if bomb {
+        // A strafing beam lays its stroke ahead of the hull, not on the mark (`strafe.rs`).
+        let stroke = weapon.strafe.and_then(|strafe| {
+            crate::strafe::stroke(
+                pos,
+                units.heading[row],
+                strafe,
+                weapon.half_arc,
+                t.pos,
+                t.radius,
+            )
+        });
+        let aligned = if weapon.strafe.is_some() {
+            stroke.is_some()
+        } else if bomb {
             let nose = FxVec2::from_angle(units.heading[row]);
             let to = aim - pos;
             let half_salvo = Fx::ratio(
@@ -1978,7 +1991,9 @@ impl World {
         // what is in the cone as the torso comes round. A held beam off its mark lays onto
         // the surface under the barrel, so as it slews from one mark to the next it drags a
         // line across the ground; units in its path intercept it.
-        let (aim, aim_z) = if weapon.sweep > 0 && !weapon.missile {
+        let (aim, aim_z) = if let Some(at) = stroke {
+            (at, Fx::ZERO)
+        } else if weapon.sweep > 0 && !weapon.missile {
             // Down the barrel from where the gun turns (`turret_at`: the Harrow's tail root).
             let root = pos
                 + bp.unit(units.blueprint[row])
@@ -2013,6 +2028,7 @@ impl World {
             (aim, aim_z)
         };
         let unit_z = units.z[row];
+        let heading = units.heading[row];
         let travel = (units.pos[row] - units.prev_pos[row]).extend(unit_z - units.prev_z[row]);
         let arm_pitch = units.arm_pitch[row][slot];
         let torso = units.heading[row] + units.weapon_yaw[row][0];
@@ -2035,7 +2051,16 @@ impl World {
         let mut wakes = Vec::new();
         for i in 0..volley {
             let tube = first_tube + i as usize;
-            let (aim, aim_z) = if weapon.corkscrew > Fx::ZERO {
+            let (aim, aim_z) = if stroke.is_some() {
+                // Each beam lands on the ground in its own line, beside the others.
+                let local = weapon.muzzles[tube % weapon.muzzles.len()];
+                let gap = weapon.strafe.map_or(Fx::ZERO, |s| s.gap);
+                let at = crate::strafe::beam_at(aim, heading, local, gap);
+                (
+                    at,
+                    self.terrain.height_at(at).max(self.terrain.water_level()),
+                )
+            } else if weapon.corkscrew > Fx::ZERO {
                 let phase = Angle::from_degrees(
                     (tube % 6) as i32 * 60 + if w.is_multiple_of(2) { 30 } else { 0 },
                 );
