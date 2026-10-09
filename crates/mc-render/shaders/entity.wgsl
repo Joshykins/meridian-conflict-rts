@@ -4178,8 +4178,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     if (flags & KIND_GHOST) != 0u {
         let pulse = 0.6 + 0.4 * sin(time * 5.0);
         let rim = pow(1.0 - max(dot(n, v), 0.0), 2.0);
-        // `health` carries validity for ghosts: 1 placeable, 0 blocked.
-        let tint = mix(vec3<f32>(1.0, 0.15, 0.1), skins[in.skin].highlight.rgb, step(0.5, in.state.y));
+        // `health` carries validity for ghosts: 1 placeable, 0 blocked. The same
+        // cyan and red for every faction, never the skin's highlight: the
+        // Regency's is red, which read as blocked everywhere.
+        let tint = mix(vec3<f32>(1.0, 0.15, 0.1), vec3<f32>(0.55, 0.85, 1.0), step(0.5, in.state.y));
         color = tint * (0.5 + rim * 2.5) * pulse;
         let weave = fract((in.clip.x + in.clip.y) * 0.25);
         if weave < 0.5 {
