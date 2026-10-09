@@ -667,6 +667,51 @@ fn single(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect, stri
     }
 }
 
+/// Height of each further line of a weapon card's chips.
+const CHIP_LINE: f32 = 18.0;
+
+/// A weapon card's chips: what it is, what it hits, its splash and whether its rounds can
+/// be shot down.
+fn weapon_chips(w: &Weapon, tone: u32) -> Vec<(String, u32)> {
+    let (_, figures) = weapon_rows(w);
+    let kind = figures
+        .iter()
+        .find(|f| f.0 == "Type")
+        .map(|f| f.1.clone())
+        .unwrap_or_default();
+    let mut chips = vec![(kind, tone)];
+    for (bit, label, c) in [
+        (cat::LAND, "Land", super::style::LAND),
+        (cat::AIR, "Air", super::style::AIR),
+        (cat::NAVAL, "Naval", super::style::NAVY),
+    ] {
+        if w.target_mask & bit != 0 {
+            chips.push((label.to_owned(), c));
+        }
+    }
+    if w.splash.to_f32() > 0.0 {
+        chips.push((format!("Splash {:.0} m", w.splash.to_f32()), palette::DIM));
+    }
+    if w.interceptable() {
+        chips.push(("Interceptable".to_owned(), palette::WARN));
+    }
+    chips
+}
+
+/// The height a weapon card's chips take past their first line, `cw` wide.
+pub(super) fn weapon_chips_extra(ui: &mut Ui, w: &Weapon, cw: f32) -> f32 {
+    let mut cx = 0.0;
+    let mut extra = 0.0;
+    for (label, _) in weapon_chips(w, 0) {
+        let cw_ = ui.text_width(type_scale::MICRO, &label) + 10.0;
+        if cx > 0.0 && cx + cw_ > cw {
+            (cx, extra) = (0.0, extra + CHIP_LINE);
+        }
+        cx += cw_ + 4.0;
+    }
+    extra
+}
+
 /// One weapon: its kind's colour, its name and lore, what it hits, and bars for the numbers.
 /// `count` identical mounts share the card, under `name`. `lit` is how far it is in focus
 /// (its rings lit on the ground), `back` how far another card is; `arcs` are where its
@@ -706,7 +751,6 @@ fn weapon_card(
             lit,
         );
     }
-    let (_, figures) = weapon_rows(w);
     let times = format!("\u{d7}{count}");
     let room = cw
         - 2.0 * glyph
@@ -734,29 +778,14 @@ fn weapon_card(
             &times,
         );
     }
-    // Kind and targets as chips.
-    let mut cx = x;
-    let kind = figures
-        .iter()
-        .find(|f| f.0 == "Type")
-        .map(|f| f.1.clone())
-        .unwrap_or_default();
-    let mut chips = vec![(kind, tone)];
-    for (bit, label, c) in [
-        (cat::LAND, "Land", super::style::LAND),
-        (cat::AIR, "Air", super::style::AIR),
-        (cat::NAVAL, "Naval", super::style::NAVY),
-    ] {
-        if w.target_mask & bit != 0 {
-            chips.push((label.to_owned(), c));
-        }
-    }
-    if w.splash.to_f32() > 0.0 {
-        chips.push((format!("Splash {:.0} m", w.splash.to_f32()), palette::DIM));
-    }
-    for (label, c) in chips {
+    // Kind, targets and the rest as chips, in as many lines as the card needs.
+    let (mut cx, mut cy) = (x, r.y + 24.0);
+    for (label, c) in weapon_chips(w, tone) {
         let cw_ = ui.text_width(type_scale::MICRO, &label) + 10.0;
-        let chip = Rect::new(cx, r.y + 24.0, cw_, 14.0);
+        if cx > x && cx + cw_ > x + cw {
+            (cx, cy) = (x, cy + CHIP_LINE);
+        }
+        let chip = Rect::new(cx, cy, cw_, 14.0);
         ui.fill(chip, rgb(c, 0.18));
         ui.text(
             chip.x + 5.0,
@@ -767,7 +796,7 @@ fn weapon_card(
         );
         cx += cw_ + 4.0;
     }
-    let mut y = r.y + 50.0;
+    let mut y = cy + 26.0;
     for line in wrap_text(ui, type_scale::MICRO, &w.lore, cw) {
         ui.text(x, y, type_scale::MICRO, rgb(palette::DIM, 1.0), &line);
         y += 15.0;

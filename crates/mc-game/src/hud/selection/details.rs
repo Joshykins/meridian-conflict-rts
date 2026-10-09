@@ -11,7 +11,7 @@ pub(super) fn details_card(ui: &mut Ui, hud: &mut Hud, bp: &UnitBlueprint, ancho
     let card_w = (cw - 12.0) * 0.5;
     let weapon_h = |ui: &mut Ui, wp: &Weapon| {
         let lines = wrap_text(ui, type_scale::MICRO, &wp.lore, card_w - 20.0).len();
-        44.0 + lines as f32 * 15.0 + 4.0 * 22.0 + 10.0
+        44.0 + weapon_chips_extra(ui, wp, card_w - 22.0) + lines as f32 * 15.0 + 4.0 * 22.0 + 10.0
     };
     let sets = weapon_sets(bp);
     let mut rows_h = 0.0;

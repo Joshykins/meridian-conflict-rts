@@ -307,6 +307,12 @@ impl Weapon {
             Fx::ZERO
         }
     }
+
+    /// Whether its rounds can be shot down in flight: missile defence lases anything with a
+    /// casing (`casing_hp`), and torpedo interceptors run down torpedoes.
+    pub fn interceptable(&self) -> bool {
+        self.casing_hp() > Fx::ZERO || (self.torpedo && !self.intercepts)
+    }
 }
 
 #[cfg(test)]

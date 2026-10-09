@@ -1,7 +1,8 @@
 //! The Carillon, the Regency's orb battery: it makes plasma orbs a batch at a time while
 //! idle and holds up to four batches, spends one orb a shot when something comes into
 //! reach, and sends each as a fleck that homes on its mark, takes another when the mark
-//! dies and flies home to the store when there is none.
+//! dies and flies home to the store when there is none. Missile defence can shoot the
+//! flecks down.
 
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
@@ -10,7 +11,7 @@ use mc_map::Heightfield;
 use mc_sim::mirror::RenderFrame;
 use mc_sim::tables::Controller;
 use mc_sim::world::MapData;
-use mc_sim::{MatchConfig, PlayerSetup, UnitId, World};
+use mc_sim::{MatchConfig, PlayerSetup, SimEvent, UnitId, World};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -188,4 +189,27 @@ fn flecks_climb_over_a_ridge_in_their_way() {
         w.state.units.health[r] < w.blueprints.unit(w.state.units.blueprint[r]).health
     });
     assert!(hurt, "the flecks got over the ridge");
+}
+
+#[test]
+fn missile_defence_shoots_flecks_down() {
+    let mut w = world();
+    full_spire(&mut w);
+    spawn(&mut w, "aster_t1_tank", 1, (AT.0 + 900, AT.1));
+    spawn(
+        &mut w,
+        "aster_t2_missile_defense",
+        1,
+        (AT.0 + 960, AT.1 + 40),
+    );
+    let mut lased = 0;
+    for _ in 0..60 {
+        w.tick(&[]).unwrap();
+        lased += w
+            .events
+            .iter()
+            .filter(|e| matches!(e, SimEvent::MissileLased { killed: true, .. }))
+            .count();
+    }
+    assert!(lased > 0, "the lasers burned flecks out of the air");
 }

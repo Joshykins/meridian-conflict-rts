@@ -268,6 +268,9 @@ pub fn draw(ui: &mut Ui, groups: &[Group], x: f32, y: f32, cw: f32) -> f32 {
                 chips.push((label, c));
             }
         }
+        if w.interceptable() {
+            chips.push(("Interceptable", palette::WARN));
+        }
         let chips_w: f32 = chips
             .iter()
             .map(|(l, _)| ui.text_width(type_scale::MICRO, l) + 14.0)
