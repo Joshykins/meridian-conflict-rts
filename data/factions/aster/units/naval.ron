@@ -467,7 +467,7 @@
         vision: 1440,
         // Engaged and stopped, it lays its beam to the mark, a little forward of square, so
         // every battery bears.
-        motion: (layer: Naval, size: 5, speed: 26, accel: 7, turn: 18, broadside: 75),
+        motion: (layer: Naval, size: 5, speed: 32, accel: 7, turn: 18, broadside: 75),
         // Three triple turrets, each a house of its own: two forward, one astern, each
         // carrying three Arc Cannons (the Trebuchet's Arc Howitzer made a naval gun, laid
         // flatter): a long charge, then great rounds of blue plasma on a shallow arc that
@@ -573,7 +573,7 @@
         anti_missile: 350,
         anti_missile_mounts: [(-20.0, -13.3, 16.75), (36.0, 15.4, 9.1), (36.0, -15.4, 9.1), (-54.0, 16.1, 9.1)],
         economy: (energy_upkeep: 120),
-        motion: (layer: Naval, size: 5, speed: 28, accel: 7, turn: 18),
+        motion: (layer: Naval, size: 5, speed: 33, accel: 7, turn: 18),
         // The fleet's long arm against air: a Skyguard's reach afloat (a little short of the
         // fixed site's), no gun of any kind. Twelve hatched cells in two blocks on the
         // island's plinth, fore block first; a salvo spreads over the aircraft in range.
@@ -665,7 +665,7 @@
         dive: (depth: 6, time: 6),
         shield: (kind: Hull, health: 24000, regen: 160),
         economy: (energy_upkeep: 400),
-        motion: (layer: Naval, size: 5, speed: 26, accel: 7, turn: 16),
+        motion: (layer: Naval, size: 5, speed: 32, accel: 7, turn: 16),
         strategic: (
             kind: Nuke,
             // A warhead assembled aboard, as the silo's, and held four at most.
@@ -742,7 +742,7 @@
         cost: (mass: 3800, energy: 34200, time: 22800),
         radius: 84, height: 34,
         vision: 1200,
-        motion: (layer: Naval, size: 5, speed: 30, accel: 7, turn: 20),
+        motion: (layer: Naval, size: 5, speed: 34, accel: 7, turn: 20),
         weapons: [
             (
                 name: "Zenith Rail Cannon",

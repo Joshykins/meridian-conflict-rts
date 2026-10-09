@@ -1,10 +1,9 @@
 //! The Claymore, the Regency's tech 2 heavy destroyer (`regency_t2_destroyer`): the
-//! Marlin's place, but it dives. A warship drawn to go under: low, long and streamlined,
+//! Marlin's place. A warship drawn low, long and streamlined,
 //! its superstructure swept back into a fin, its guns sitting low in houses of their own,
 //! dark plate lapped over bronze workings (docs/STYLE.md "The Regency look", "The navy").
 //!
-//! The origin is the waterline; the keel is drawn below it and the sea closes over the
-//! whole hull when it dives. The weapon points are the unit file's:
+//! The origin is the waterline; the keel is drawn below it. The weapon points are the unit file's:
 //!
 //! - House 0, the Pinched-plasmeric Cannon forward ([`GUN`]): a fork whose projectors
 //!   reach past the bore and hold the charge between them ([`CHARGE`], the `muzzle`).

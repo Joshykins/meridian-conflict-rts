@@ -1,5 +1,5 @@
-//! The Dirk, the Regency's tech 1 attack boat: a low semi-submersible that lies dived in
-//! ambush and comes up to fight. Dark plates lapped over a faceted hull, swept back into
+//! The Dirk, the Regency's tech 1 attack boat: a low, fast dart that rides
+//! the surface. Dark plates lapped over a faceted hull, swept back into
 //! points where they trail; bronze workings in the gaps between them; a pair of red
 //! optics at the bow; plasma jets at the stern; a small gun house over the foredeck with
 //! a twin plasmeric repeater, its bores red.
@@ -7,7 +7,7 @@
 //! Finish (docs/STYLE.md "The Regency look", "The navy"): dark plate (`dark_plate`),
 //! dark seams (`seam`), dark bronze machinery (`metal`), red only in optics, bores and
 //! jets. The hull's origin is its waterline; the keel is drawn below it, and the deck
-//! sits low so the sea closes over it when it dives.
+//! sits low.
 //!
 //! Rig: the repeater turns on a gun house of its own (`MeshBuilder::with_house`, weapon 0)
 //! about `PIVOT`, the barrels recoiling inside it. The numbers match

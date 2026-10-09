@@ -1,6 +1,6 @@
-//! The Regency's navy (docs/NAVY.md "The Regency's navy"): the attack boat lies dived in
-//! ambush and comes up to fire, the heavy destroyer fights dived with torpedoes only, and
-//! the cruiser's heavy seeker takes structures and nothing else.
+//! The Regency's navy (docs/NAVY.md "The Regency's navy"): only the submarines dive, the
+//! surface hulls stay up and fight, and the cruiser's heavy seeker takes structures and
+//! nothing else.
 
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
@@ -93,75 +93,38 @@ fn full(w: &World, id: UnitId) -> Fx {
 }
 
 #[test]
-fn the_attack_boat_lies_dived_until_it_has_a_mark() {
-    let mut w = sea();
-    let dirk = spawn(&mut w, "regency_t1_attack_boat", 0, 1000, 1000);
-    run(&mut w, 60);
-    assert!(
-        under(&w, dirk),
-        "with nothing to fight it goes down and stays"
-    );
-    assert!(w.state.units.dive_goal[row(&w, dirk)], "ordered down");
+fn only_the_submarines_dive() {
+    let w = sea();
+    let subs = ["regency_t1_submarine", "regency_t3_submarine"];
+    for bp in &w.blueprints.units {
+        let naval = bp
+            .motion
+            .is_some_and(|m| m.layer == mc_data::MoveLayer::Naval);
+        if !naval || !bp.key.starts_with("regency_") {
+            continue;
+        }
+        assert_eq!(
+            bp.dive.is_some(),
+            subs.contains(&bp.key.as_str()),
+            "{}: only the submarines dive",
+            bp.key
+        );
+    }
 }
 
 #[test]
-fn the_attack_boat_surfaces_to_fire_and_dives_again() {
+fn the_attack_boat_stays_up_and_fires() {
     let mut w = sea();
     let dirk = spawn(&mut w, "regency_t1_attack_boat", 0, 1000, 1000);
-    run(&mut w, 40);
-    assert!(under(&w, dirk));
-    // An enemy boat sails into reach of the repeater.
+    run(&mut w, 60);
+    assert!(!under(&w, dirk), "it rides the surface");
     let skiff = spawn(&mut w, "aster_t1_attack_boat", 1, 1250, 1000);
-    let mut surfaced = false;
-    for _ in 0..80 {
-        run(&mut w, 1);
-        if w.state.units.row(skiff).is_none() {
-            break;
-        }
-        surfaced |= !under(&w, dirk);
-        if under(&w, dirk) {
-            assert_eq!(
-                health(&w, skiff),
-                full(&w, skiff),
-                "nothing hits it while the boat is under"
-            );
-        }
-        if health(&w, skiff) < full(&w, skiff) {
-            break;
-        }
-    }
-    assert!(surfaced, "it came up for the mark");
+    run(&mut w, 80);
     assert!(
         w.state.units.row(skiff).is_none() || health(&w, skiff) < full(&w, skiff),
-        "and fired on it"
+        "it fired on the boat in reach"
     );
-    // The mark is gone: it goes back down.
-    if let Some(r) = w.state.units.row(skiff) {
-        w.state.units.health[r] = Fx::ZERO;
-    }
-    run(&mut w, 60);
-    assert!(under(&w, dirk), "with the mark gone it dives again");
-}
-
-#[test]
-fn the_heavy_destroyer_fights_dived_with_torpedoes_only() {
-    let mut w = sea();
-    let claymore = spawn(&mut w, "regency_t2_destroyer", 0, 1000, 1000);
-    run(&mut w, 120);
-    assert!(under(&w, claymore), "it dives by default");
-    // An enemy boat in reach of the torpedoes: dived, only they can strike it.
-    let target = spawn(&mut w, "aster_t1_attack_boat", 1, 1500, 1000);
-    run(&mut w, 200);
-    let hit = w
-        .state
-        .units
-        .row(target)
-        .is_none_or(|r| w.state.units.health[r] < w.bp(r).health);
-    assert!(hit, "its torpedoes reach a hull from under the water");
-    assert!(
-        under(&w, claymore),
-        "it stays dived: it was ordered down, not in ambush"
-    );
+    assert!(!under(&w, dirk), "and never went down");
 }
 
 #[test]
@@ -190,23 +153,6 @@ fn the_cruisers_heavy_seeker_takes_structures_only() {
 }
 
 #[test]
-fn the_battleship_needs_deep_water_to_go_under() {
-    // Twenty metres is too shallow for its keel and its height: it settles as low as the
-    // bed lets it, still a target for guns.
-    let mut w = sea_of(20);
-    let shallow = spawn(&mut w, "regency_t3_battleship", 0, 1000, 1000);
-    run(&mut w, 200);
-    assert!(
-        !under_of(&w, shallow, 20),
-        "in 20 m of water its upperworks stay out"
-    );
-    let mut w = sea_of(40);
-    let deep = spawn(&mut w, "regency_t3_battleship", 0, 1000, 1000);
-    run(&mut w, 200);
-    assert!(under_of(&w, deep, 40), "in 40 m it goes all the way under");
-}
-
-#[test]
 fn the_assault_submarine_is_the_fastest_regency_hull() {
     let w = sea();
     let speed = |key: &str| {
@@ -230,16 +176,17 @@ fn the_assault_submarine_is_the_fastest_regency_hull() {
 }
 
 #[test]
-fn surfaced_guns_hold_while_the_battleship_is_under() {
+fn surfaced_guns_hold_while_the_rapier_is_under() {
     let mut w = sea_of(40);
-    let flamberge = spawn(&mut w, "regency_t3_battleship", 0, 1000, 1000);
+    let rapier = spawn(&mut w, "regency_t3_submarine", 0, 1000, 1000);
     run(&mut w, 200);
-    assert!(under_of(&w, flamberge, 40));
+    assert!(under_of(&w, rapier, 40));
     // A boat on the surface, in reach of everything aboard: only the torpedoes may take it.
-    let target = spawn(&mut w, "aster_t1_frigate", 1, 1600, 1000);
+    spawn(&mut w, "aster_t1_frigate", 1, 1500, 1000);
     run(&mut w, 1);
-    let r = row(&w, flamberge);
+    let r = row(&w, rapier);
     let bp = w.bp(r);
+    assert!(bp.weapons.iter().any(|w| w.surfaced));
     for (weapon, mark) in bp.weapons.iter().zip(w.state.units.weapon_target[r]) {
         if weapon.surfaced {
             assert_eq!(
@@ -250,5 +197,21 @@ fn surfaced_guns_hold_while_the_battleship_is_under() {
             );
         }
     }
-    let _ = target;
+}
+
+#[test]
+fn no_warship_is_slower_than_32() {
+    // Both navies: the big hulls used to crawl at 24-30 m/s (2026-10-08).
+    let w = sea();
+    for bp in &w.blueprints.units {
+        let Some(m) = bp.motion.filter(|m| m.layer == mc_data::MoveLayer::Naval) else {
+            continue;
+        };
+        assert!(
+            m.speed >= Fx::from_int(32),
+            "{} sails at {:?}",
+            bp.key,
+            m.speed
+        );
+    }
 }

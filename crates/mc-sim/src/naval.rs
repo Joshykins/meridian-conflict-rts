@@ -169,21 +169,9 @@ impl World {
     }
 
     /// Whether `weapon` on `row` is out of the fight while the hull is under: a gun that
-    /// works only surfaced, on a hull dived that does not lie in ambush (`Dive::ambush`:
-    /// that one marks its target dived and comes up to fire).
+    /// works only surfaced, on a hull dived.
     pub(crate) fn held_dived(&self, row: usize, weapon: &Weapon) -> bool {
-        weapon.surfaced && !self.bp(row).dive.is_some_and(|d| d.ambush) && self.submerged(row)
-    }
-
-    /// Whether an ambushing boat (`Dive::ambush`) has a mark for a gun that works only
-    /// surfaced, so it comes up, or stays up, to fire.
-    fn springs(&self, row: usize) -> bool {
-        let units = &self.state.units;
-        self.bp(row)
-            .weapons
-            .iter()
-            .zip(units.weapon_target[row])
-            .any(|(w, t)| w.surfaced && t != Handle::NONE)
+        weapon.surfaced && self.submerged(row)
     }
 
     /// Whether hulls `a` and `b` pass one over the other instead of bumping: both ride
@@ -245,9 +233,7 @@ impl World {
                 continue;
             };
             let step = 255u16.div_ceil(dive.ticks.max(1)).min(255) as u8;
-            // Lying in ambush, it surfaces while it has a mark and goes down without one.
-            let down = units.dive_goal[row] && !(dive.ambush && self.springs(row));
-            let units = &mut self.state.units;
+            let down = units.dive_goal[row];
             units.dive[row] = if down {
                 units.dive[row].saturating_add(step)
             } else {

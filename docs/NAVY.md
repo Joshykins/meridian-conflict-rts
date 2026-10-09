@@ -127,43 +127,36 @@ sea after a battle pays for the battle.
 
 ## The Regency's navy
 
-`data/factions/regency/units/naval.ron`, models `models::regency::naval`. Where ARC's
-fleet is a set of surface specialists, the Regency's goes under: nearly every hull
-dives, so a Regency fleet picks when the fight starts. What it pays: a gun that needs the
-surface (`surfaced`) does nothing dived, and only torpedoes work from under the water.
+`data/factions/regency/units/naval.ron`, models `models::regency::naval`. Only the
+submarines dive (the Stiletto and the Rapier); every other hull rides the surface. A gun
+that needs the surface (`surfaced`) does nothing dived, and only torpedoes work from
+under the water.
 Their guns fire plasma; their torpedoes and seekers are Gravitic (`plasma_grade:
 Gravitic`), a plasma charge steered in gravity containment.
 
-- The **Dirk** (attack boat) lies in ambush (`dive.ambush`): ordered down, it still
-  marks targets for its surfaced-only gun as if it were up, comes up while that gun has
-  a mark, and goes down again when it has none. It carries nothing that works under the
-  water and no sonar, so it finds its marks by eye.
-- The **Falchion** (frigate) is the one tech 1 hull that stays up: radar and flak for a
-  squadron that is otherwise dived.
-- The **Claymore** (heavy destroyer) dives with a hull shield that holds under the water
-  too. Dived it fights with gravitic torpedoes and meets torpedoes with interceptors; its
-  pinched-plasmeric cannon and its AA repeater need it surfaced, and it comes up only on order
-  (it does not lie in ambush).
+- The **Dirk** (attack boat) is fast and light: a twin plasmeric repeater, no sonar.
+- The **Falchion** (frigate) carries radar and flak for a tech 1 squadron.
+- The **Claymore** (heavy destroyer) has a hull shield, gravitic torpedoes and
+  interceptors, a pinched-plasmeric cannon and an AA repeater.
 - The **Pavise** (cruiser) holds the sky (a seeker battery, two gravity-lens mounts that crush
   missiles over the ships round it) and has one long arm the Manta lacks: a heavy
   gravitic seeker, one at a time, at structures and nothing else.
 
 | Unit | Tier | Role | Notes |
 |---|---|---|---|
-| Dirk | 1 | Attack boat | Dives; surfaces to fire its twin plasmeric repeater; no sonar. |
+| Dirk | 1 | Attack boat | Twin plasmeric repeater; no sonar. |
 | Stiletto | 1 | Attack submarine | Gravitic torpedoes, sonar. |
-| Falchion | 1 | Frigate | Heavy plasmeric repeater, plasmeric AA repeater, radar. Stays up. |
-| Claymore | 2 | Heavy destroyer | Dives; hull shield; gravitic torpedoes and interceptors dived; pinched-plasmeric cannon and light AA repeater surfaced; radar, sonar. |
+| Falchion | 1 | Frigate | Heavy plasmeric repeater, plasmeric AA repeater, radar. |
+| Claymore | 2 | Heavy destroyer | Hull shield; gravitic torpedoes and interceptors; pinched-plasmeric cannon and light AA repeater; radar, sonar. |
 | Pavise | 2 | Cruiser | Gravitic seeker battery (AA, 1,800 m), two gravity-lens missile defence mounts (600 m), a light repeater, radar; a heavy gravitic seeker at structures to 2,600 m. |
-| Flamberge | 3 | Battleship | Dives (needs about 30 m of water to go under); three twin Pinch-fusion Cannon houses, four twin heavy repeaters on the beams, light flak, gravity-lens missile defence, all surfaced only; bow gravitic torpedoes dived or up. No sonar, no torpedo defence. |
+| Flamberge | 3 | Battleship | Three twin Pinch-fusion Cannon houses, four twin heavy repeaters on the beams, light flak, gravity-lens missile defence, bow gravitic torpedoes. No sonar, no torpedo defence. |
 | Mantlet | 3 | Air-defence carrier | Twelve heavy gravitic seeker cells (2,700 m), flak on both beams, gravity-lens missile defence, interceptor tubes, radar 3,800 m. No gun. |
 | Rapier | 3 | Assault submarine | The fastest hull under the sea; six-tube gravitic torpedo launcher and interceptors dived; surfaced, two twin repeaters, flak and a gravitic seeker pod. |
 
 The Slipway builds the tech 1 hulls and is refitted in place to the Slipway II and the
 Slipway III for the tech 2 and tech 3 ones. Like ARC's Wharf it is a one-sided quay: the
-berth is open water, so a capital ship longer than the yard still fits. Every Regency
-hull that dives and carries guns brings them up only on order (the Dirk excepted, which
-lies in ambush).
+berth is open water, so a capital ship longer than the yard still fits. The Rapier,
+the one submarine with guns, brings them up only on order.
 
 Its structures at sea, both moored and refitted in place where they float:
 
@@ -171,7 +164,7 @@ Its structures at sea, both moored and refitted in place where they float:
   each tier (1,400 / 2,800 / 5,600 m) but, like the Orrery on land, its optics see
   further.
 - The **Harpoon** (torpedo launcher) has two tiers, not three: past them the Regency
-  meets submarines with its own (the Rapier, and the Claymore that dives), not with a
+  meets submarines with its own (the Rapier, and the Claymore's torpedoes), not with a
   seabed battery. A launcher house turns at the waterline with two gravitic tubes under
   it (620 m, past the Stiletto's 560). The Harpoon II, its last tier, hangs a second house
   under the first (900 m, past the Claymore's 700) and fits three fixed interceptor tubes

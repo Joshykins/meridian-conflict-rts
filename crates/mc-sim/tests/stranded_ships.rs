@@ -133,14 +133,17 @@ fn stranded_ship_takes_the_nearest_water(key: &str, shallow: bool) {
         pos.x > spawn.x && (pos.y - spawn.y).abs() < Fx::from_int(24),
         "it went straight east to the sea: {pos:?}"
     );
-    // Afloat, it coasts to a stop and stays afloat, clear of the land.
+    // Afloat, it coasts to a stop within its stopping distance (speed² / 2·accel, and a
+    // margin) and stays afloat, clear of the land.
+    let motion = w.blueprints.unit(bp).motion.unwrap();
+    let stop = motion.speed * motion.speed / (motion.accel * 2) + Fx::from_int(20);
     for _ in 0..100 {
         w.tick(&[]).unwrap();
     }
     let after = w.state.units.pos[w.state.units.row(ship).unwrap()];
     assert!(
-        afloat(&w, key, after) && after.x >= pos.x && after.distance(pos) < Fx::from_int(60),
-        "{pos:?} -> {after:?}"
+        afloat(&w, key, after) && after.x >= pos.x && after.distance(pos) < stop,
+        "{pos:?} -> {after:?}, stopping in {stop:?}"
     );
 }
 

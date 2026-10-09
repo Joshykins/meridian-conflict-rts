@@ -543,8 +543,7 @@ impl World {
 
     pub(crate) fn is_valid_target(&self, shooter: usize, target: usize, weapon: &Weapon) -> bool {
         // Interceptor tubes never take a unit (`naval_arms.rs`); a deck gun that only
-        // works surfaced holds nothing while its hull is under, unless the boat lies in
-        // ambush (it comes up for the mark).
+        // works surfaced holds nothing while its hull is under.
         if weapon.intercepts || self.held_dived(shooter, weapon) {
             return false;
         }

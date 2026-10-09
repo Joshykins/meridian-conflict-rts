@@ -554,16 +554,12 @@ pub(crate) struct RawBody {
 }
 
 /// How a submarine dives: `depth` metres of water over its deck when dived, and
-/// `time` seconds to go down or come up. `ambush`: a boat whose guns all need the surface
-/// marks its target dived, comes up to fire and goes down again when it has nothing to
-/// fire at (`Dive::ambush`).
+/// `time` seconds to go down or come up.
 #[derive(Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawDive {
     pub depth: f64,
     pub time: f64,
-    #[serde(default)]
-    pub ambush: bool,
 }
 
 /// A cone weapon (the Regency Wake Tank's wake): each shot rolls out from the muzzle as one
@@ -2024,7 +2020,6 @@ impl Unit {
                     Some(Dive {
                         depth: fx(d.depth),
                         ticks: ticks(d.time).clamp(1, 600) as u16,
-                        ambush: d.ambush,
                     })
                 }
                 None => None,

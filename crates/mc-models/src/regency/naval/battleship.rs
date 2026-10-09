@@ -1,10 +1,9 @@
 //! The Flamberge, the Regency's tech 3 battleship (`regency_t3_battleship`): the
-//! Leviathan's place, but it dives. A capital ship drawn to go under: low and long, its
+//! Leviathan's place. A capital ship drawn low and long, its
 //! superstructure swept back, dark plate lapped over bronze workings (docs/STYLE.md "The
 //! Regency look", "The navy").
 //!
-//! The origin is the waterline; the keel is drawn below it and the sea closes over the
-//! whole hull when it dives. The hull is a whaleback arrowhead under one long swept fin
+//! The origin is the waterline; the keel is drawn below it. The hull is a whaleback arrowhead under one long swept fin
 //! ([`body`]); the main houses carry the Sunspear's rails made twin ([`guns`]). It draws
 //! the unit file's weapon points:
 //!

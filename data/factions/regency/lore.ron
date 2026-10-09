@@ -172,13 +172,13 @@
         weapons: {},
     ),
     "regency_t3_battleship": (
-        lore: "A battleship that can go under: three houses of pinch-fusion guns that come up out of the sea to fire, and go down again.",
+        lore: "A long, low battleship: three houses of pinch-fusion guns that melt what they land on, and a broadside of heavy repeaters.",
         weapons: {
             "Fore Pinch-fusion Cannon": "Twin guns that squeeze their plasma until it fuses and launch it white-hot; it melts what it lands on.",
             "Second Pinch-fusion Cannon": "The second pair of pinch-fusion guns, raised over the first.",
             "Aft Pinch-fusion Cannon": "The aft pair, covering the stern.",
-            "Gravitic Torpedo Tubes": "Four bow tubes of heavy gravitic torpedoes, fired dived or up.",
-            "Plasmeric AA Repeater": "A light AA repeater that works only with the hull up.",
+            "Gravitic Torpedo Tubes": "Four bow tubes of heavy gravitic torpedoes.",
+            "Plasmeric AA Repeater": "A light AA repeater.",
             "Port Fore Secondary": "A twin heavy repeater on the beam.",
             "Port Aft Secondary": "A twin heavy repeater on the beam.",
             "Starboard Fore Secondary": "A twin heavy repeater on the beam.",
@@ -226,9 +226,9 @@
         weapons: {},
     ),
     "regency_t1_attack_boat": (
-        lore: "A blade of a boat that lies just under the surface where no gun can find it, and comes up only to fire.",
+        lore: "A blade of a boat, fast and low on the water, that cuts in to fire and is gone again.",
         weapons: {
-            "Twin Plasmeric Repeater": "Two light plasmeric guns in a low turret that fire bolts of plasma held tight by gravity; they work only with the hull up.",
+            "Twin Plasmeric Repeater": "Two light plasmeric guns in a low turret that fire bolts of plasma held tight by gravity.",
         },
     ),
     "regency_t1_submarine": (
@@ -245,11 +245,11 @@
         },
     ),
     "regency_t2_destroyer": (
-        lore: "A heavy destroyer that dives: it fights from under the sea with torpedoes behind its shield, and comes up to bring its cannon to bear.",
+        lore: "A heavy destroyer that fights behind its shield, torpedoes for hulls and a pinched cannon for the rest.",
         weapons: {
-            "Pinched-plasmeric Cannon": "Plasma gathered and squeezed by gravity in front of the bore, then pinched out as one dense jet; it works only with the hull up.",
-            "Gravitic Torpedo Tubes": "Four bow tubes of gravitic torpedoes, fired dived or surfaced.",
-            "Plasmeric AA Repeater": "A light AA repeater aft that works only with the hull up.",
+            "Pinched-plasmeric Cannon": "Plasma gathered and squeezed by gravity in front of the bore, then pinched out as one dense jet.",
+            "Gravitic Torpedo Tubes": "Four bow tubes of gravitic torpedoes.",
+            "Plasmeric AA Repeater": "A light AA repeater aft.",
             "Interceptor Tubes": "Short gravitic torpedoes that run at torpedoes coming in and burst them under the water.",
         },
     ),

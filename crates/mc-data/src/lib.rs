@@ -286,10 +286,6 @@ pub struct Dive {
     pub depth: Fx,
     /// Ticks to dive or to surface.
     pub ticks: u16,
-    /// Ordered down, it still comes up while a gun that works only surfaced has a mark,
-    /// and goes back down when none has (`naval.rs` `run_dive`): it hides dived and
-    /// surfaces to fight. Its marks are picked dived, as if it were up.
-    pub ambush: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -1559,7 +1555,6 @@ impl Blueprints {
                 Some(d) => {
                     h.write_i64(d.depth.0);
                     h.write_u64(d.ticks as u64);
-                    h.write_u64(d.ambush as u64);
                 }
                 None => h.write_u64(u64::MAX),
             }

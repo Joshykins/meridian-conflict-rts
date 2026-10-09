@@ -1,10 +1,9 @@
 // The Regency's navy (docs/NAVY.md "The Regency's navy"). Hulls ride the water as ARC's
 // do (`layer: Naval`): the origin is the waterline, `height` stands above it.
 //
-// Where ARC's navy is a fleet of specialists on the surface, the Regency's goes under:
-// nearly every hull dives, and its guns come up with it. What dives cannot be shot at
-// by guns, only found by sonar and hit by torpedoes, so a Regency fleet picks when the
-// fight starts. What it pays: a gun that needs the surface does nothing dived.
+// Only the submarines dive (the Stiletto and the Rapier); every other hull rides the
+// surface. What dives cannot be shot at by guns, only found by sonar and hit by
+// torpedoes. What it pays: a gun that needs the surface does nothing dived.
 //
 // Every weapon names its grade (`plasma_grade`): their guns fire plasma; their
 // torpedoes and seekers are Gravitic, a plasma charge steered in gravity containment.
@@ -12,10 +11,8 @@
 // pivot below is the model's own number.
 [
     // ---- Tech 1 -------------------------------------------------------------------------
-    // The attack boat: fast, light, and it dives. It carries nothing that works under the
-    // water and hears nothing there (no sonar): it lies dived out of sight of guns, comes
-    // up when its repeater has a mark in reach, and goes down again when it has none
-    // (`dive.ambush`). Dearer than a Skiff, a little lighter, a little more bite.
+    // The attack boat: fast and light, a twin repeater on a dart of a hull. Dearer than a
+    // Skiff, a little lighter, a little more bite.
     (
         key: "regency_t1_attack_boat",
         name: "Dirk",
@@ -26,12 +23,11 @@
         cost: (mass: 70, energy: 390, time: 350),
         radius: 6.5, height: 3.2,
         vision: 360,
-        dive: (depth: 1.5, time: 1.5, ambush: true),
         motion: (layer: Naval, size: 0, speed: 58, accel: 36, turn: 120),
         weapons: [(
             name: "Twin Plasmeric Repeater",
             damage: 15, splash: 1, range: 320, reload: 0.45, speed: 480, trajectory: Direct,
-            turret_turn: 220, mount: true, surfaced: true,
+            turret_turn: 220, mount: true,
             pivot: (2.0, 0, 2.2), muzzle: (4.4, 0, 2.45),
             muzzles: [(4.4, -0.3, 2.45), (4.4, 0.3, 2.45)],
             targets: ["Land", "Naval"], color: Orange, red: 1.0,
@@ -67,7 +63,7 @@
         mesh: "regency_submarine", icon: Submarine,
         sounds: (death: "blast", moving: "sub_motor"),
     ),
-    // The frigate: the one tech 1 hull that stays up. A heavy repeater forward, a plasmeric
+    // The frigate: a heavy repeater forward, a plasmeric
     // AA repeater aft that reaches past it, and radar: the eyes and the umbrella of a tech 1
     // fleet, as a Pike.
     (
@@ -111,10 +107,9 @@
         sounds: (death: "blast_large", moving: "ship_engine"),
     ),
     // ---- Tech 2 -------------------------------------------------------------------------
-    // The heavy destroyer: the Marlin's place, a little stronger, and it dives. Dived it
-    // fights with its gravitic torpedoes and meets torpedoes with interceptors; its hull
-    // shield holds under the water too. The pinched-plasmeric cannon and the AA repeater need it
-    // up (`surfaced`): the player brings it up to fight on the surface.
+    // The heavy destroyer: the Marlin's place, a little stronger. A pinched-plasmeric
+    // cannon, gravitic torpedoes and an AA repeater, interceptor tubes to meet torpedoes,
+    // sonar, and a hull shield.
     (
         key: "regency_t2_destroyer",
         name: "Claymore",
@@ -125,7 +120,6 @@
         cost: (mass: 1050, energy: 7350, time: 6300),
         radius: 27, height: 11,
         vision: 800, radar: 1400, sonar: 900,
-        dive: (depth: 3, time: 4),
         shield: (kind: Hull, health: 5000, regen: 50),
         economy: (energy_upkeep: 80),
         motion: (layer: Naval, size: 3, speed: 40, accel: 14, turn: 34),
@@ -137,7 +131,7 @@
                 name: "Pinched-plasmeric Cannon",
                 damage: 440, splash: 2, range: 1300, reload: 2.2, rounds: 8, round_span: 0.25,
                 speed: 900, trajectory: Direct,
-                turret_turn: 50, arc: 300, mount: true, surfaced: true,
+                turret_turn: 50, arc: 300, mount: true,
                 pivot: (14.0, 0, 4.6), muzzle: (22.0, 0, 4.6),
                 targets: ["Land", "Naval"], color: Orange, red: 1.0,
                 plasma_grade: Some(Pinched),
@@ -147,7 +141,7 @@
                     impact: "regency_halberd_hit", ground: "regency_halberd_hit",
                 ),
             ),
-            // Four bow tubes: gravitic torpedoes, dived or up.
+            // Four bow tubes: gravitic torpedoes.
             (
                 name: "Gravitic Torpedo Tubes",
                 damage: 340, splash: 3, range: 700, reload: 6, speed: 52, trajectory: Direct,
@@ -157,19 +151,19 @@
                 plasma_grade: Some(Gravitic),
                 sounds: (fire: "torpedo_launch", impact: "torpedo_hit", ground: "torpedo_hit"),
             ),
-            // A light AA repeater aft, up only: two tubes, a bolt out of each in turn.
+            // A light AA repeater aft: two tubes, a bolt out of each in turn.
             (
                 name: "Plasmeric AA Repeater",
                 damage: 29, splash: 1, range: 650, reload: 0.9, speed: 650, trajectory: Direct,
                 salvo: 2, salvo_delay: 0.1,
-                turret_turn: 220, mount: true, surfaced: true, pivot: (-13.0, 0, 5.0), muzzle: (-10.9, 0, 5.0),
+                turret_turn: 220, mount: true, pivot: (-13.0, 0, 5.0), muzzle: (-10.9, 0, 5.0),
                 muzzles: [(-10.9, -0.42, 5.0), (-10.9, 0.42, 5.0)],
                 targets: ["Air"], color: Orange, red: 1.0,
                 plasma_grade: Some(Plasmeric),
                 flash: 1.0, impact: 1.0, tracer: 0.7,
                 sounds: (fire: "regency_canopy_fire", impact: "regency_repeater_hit", ground: "regency_repeater_hit"),
             ),
-            // Interceptor tubes astern, dived or up: short gravitic torpedoes that meet
+            // Interceptor tubes astern: short gravitic torpedoes that meet
             // torpedoes coming in and burst them under the water.
             (
                 name: "Interceptor Tubes",
@@ -249,10 +243,9 @@
         sounds: (death: "blast_large", moving: "ship_engine"),
     ),
     // ---- Tech 3 -------------------------------------------------------------------------
-    // The battleship: the Leviathan's place, and it dives. Three twin Pinch-fusion Cannon
-    // houses, four twin heavy repeaters on the beams, a light AA repeater, gravity lenses, and bow
-    // torpedoes. Its guns all need the surface; dived it fights with torpedoes alone and
-    // comes up on order. A hull its size needs deep water to go under: about 30 m.
+    // The battleship: the Leviathan's place. Three twin Pinch-fusion Cannon houses, four
+    // twin heavy repeaters on the beams, a light AA repeater, gravity lenses, and bow
+    // torpedoes.
     // No sonar and no torpedo defence: its gaps are the point, as the Leviathan's are.
     (
         key: "regency_t3_battleship",
@@ -264,16 +257,15 @@
         cost: (mass: 4600, energy: 41400, time: 27600),
         radius: 64, height: 16,
         vision: 1400,
-        dive: (depth: 3, time: 8),
         anti_missile: 300,
         anti_missile_mounts: [(-1.0, 5.0, 13.0), (-1.0, -5.0, 13.0), (-20.0, 5.0, 10.5), (-20.0, -5.0, 10.5)],
-        motion: (layer: Naval, size: 5, speed: 24, accel: 6, turn: 18, broadside: 75),
+        motion: (layer: Naval, size: 5, speed: 32, accel: 6, turn: 18, broadside: 75),
         weapons: [
             (
                 name: "Fore Pinch-fusion Cannon",
                 damage: 2400, splash: 10, range_min: 150, range: 2400, reload: 12, salvo: 2, salvo_delay: 0,
                 speed: 1100, trajectory: Ballistic, loft: 0.6, flat_fire: true,
-                turret_turn: 22, arc: 300, mount: true, surfaced: true,
+                turret_turn: 22, arc: 300, mount: true,
                 pivot: (38.0, 0, 8.0), muzzle: (53.0, 0, 8.4), muzzles: [(53.0, -1.6, 8.4), (53.0, 1.6, 8.4)],
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
                 plasma_grade: Some(PinchFusion),
@@ -287,7 +279,7 @@
                 name: "Second Pinch-fusion Cannon",
                 damage: 2400, splash: 10, range_min: 150, range: 2400, reload: 12, salvo: 2, salvo_delay: 0,
                 speed: 1100, trajectory: Ballistic, loft: 0.6, flat_fire: true,
-                turret_turn: 22, arc: 300, mount: true, surfaced: true,
+                turret_turn: 22, arc: 300, mount: true,
                 pivot: (20.0, 0, 11.0), muzzle: (35.0, 0, 11.4), muzzles: [(35.0, -1.6, 11.4), (35.0, 1.6, 11.4)],
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
                 plasma_grade: Some(PinchFusion),
@@ -301,7 +293,7 @@
                 name: "Aft Pinch-fusion Cannon",
                 damage: 2400, splash: 10, range_min: 150, range: 2400, reload: 12, salvo: 2, salvo_delay: 0,
                 speed: 1100, trajectory: Ballistic, loft: 0.6, flat_fire: true,
-                turret_turn: 22, arc: 300, rear: true, mount: true, surfaced: true,
+                turret_turn: 22, arc: 300, rear: true, mount: true,
                 pivot: (-36.0, 0, 8.0), muzzle: (-21.0, 0, 8.4), muzzles: [(-21.0, -1.6, 8.4), (-21.0, 1.6, 8.4)],
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
                 plasma_grade: Some(PinchFusion),
@@ -315,7 +307,7 @@
                 name: "Plasmeric AA Repeater",
                 damage: 34, splash: 1, range: 720, reload: 0.7, speed: 650, trajectory: Direct,
                 salvo: 2, salvo_delay: 0.1,
-                turret_turn: 220, mount: true, surfaced: true, pivot: (-6.0, 0, 15.0), muzzle: (-3.2, 0, 15.0),
+                turret_turn: 220, mount: true, pivot: (-6.0, 0, 15.0), muzzle: (-3.2, 0, 15.0),
                 muzzles: [(-3.2, -0.55, 15.0), (-3.2, 0.55, 15.0)],
                 targets: ["Air"], color: Orange, red: 1.0,
                 plasma_grade: Some(Plasmeric),
@@ -325,7 +317,7 @@
             (
                 name: "Port Fore Secondary",
                 damage: 70, splash: 4, range: 800, reload: 1.2, speed: 480, trajectory: Direct,
-                turret_turn: 60, arc: 180, facing: 90, mount: true, surfaced: true,
+                turret_turn: 60, arc: 180, facing: 90, mount: true,
                 pivot: (6.0, 9.0, 7.0), muzzle: (11.0, 9.0, 7.2),
                 muzzles: [(11.0, 8.5, 7.2), (11.0, 9.5, 7.2)],
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
@@ -336,7 +328,7 @@
             (
                 name: "Port Aft Secondary",
                 damage: 70, splash: 4, range: 800, reload: 1.2, speed: 480, trajectory: Direct,
-                turret_turn: 60, arc: 180, facing: 90, mount: true, surfaced: true,
+                turret_turn: 60, arc: 180, facing: 90, mount: true,
                 pivot: (-18.0, 9.0, 7.0), muzzle: (-13.0, 9.0, 7.2),
                 muzzles: [(-13.0, 8.5, 7.2), (-13.0, 9.5, 7.2)],
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
@@ -347,7 +339,7 @@
             (
                 name: "Starboard Fore Secondary",
                 damage: 70, splash: 4, range: 800, reload: 1.2, speed: 480, trajectory: Direct,
-                turret_turn: 60, arc: 180, facing: -90, mount: true, surfaced: true,
+                turret_turn: 60, arc: 180, facing: -90, mount: true,
                 pivot: (6.0, -9.0, 7.0), muzzle: (11.0, -9.0, 7.2),
                 muzzles: [(11.0, -9.5, 7.2), (11.0, -8.5, 7.2)],
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
@@ -358,7 +350,7 @@
             (
                 name: "Starboard Aft Secondary",
                 damage: 70, splash: 4, range: 800, reload: 1.2, speed: 480, trajectory: Direct,
-                turret_turn: 60, arc: 180, facing: -90, mount: true, surfaced: true,
+                turret_turn: 60, arc: 180, facing: -90, mount: true,
                 pivot: (-18.0, -9.0, 7.0), muzzle: (-13.0, -9.0, 7.2),
                 muzzles: [(-13.0, -9.5, 7.2), (-13.0, -8.5, 7.2)],
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
@@ -366,7 +358,7 @@
                 flash: 1.2, impact: 1.4, tracer: 1.4,
                 sounds: (fire: "regency_repeater", impact: "regency_repeater_hit", ground: "regency_repeater_hit"),
             ),
-            // Four bow tubes: gravitic torpedoes, dived or up.
+            // Four bow tubes: gravitic torpedoes.
             (
                 name: "Gravitic Torpedo Tubes",
                 damage: 1200, splash: 4, range: 1000, reload: 9, speed: 56, trajectory: Direct,
@@ -396,7 +388,7 @@
         anti_missile: 350,
         anti_missile_mounts: [(38.0, 10.5, 10.6), (38.0, -10.5, 10.6), (-53.0, 14.0, 10.4), (-53.0, -14.0, 10.4)],
         economy: (energy_upkeep: 120),
-        motion: (layer: Naval, size: 5, speed: 28, accel: 7, turn: 18),
+        motion: (layer: Naval, size: 5, speed: 33, accel: 7, turn: 18),
         weapons: [
             (
                 name: "Heavy Gravitic Seeker Battery",
@@ -577,7 +569,7 @@
     ),
     // The torpedo launcher: a caisson round a well, a launcher house turning in it at the waterline,
     // its gravitic tubes just under the surface. Two tiers only: past them the Regency
-    // meets submarines with its own (the Rapier, and the destroyer that dives), not with a
+    // meets submarines with its own (the Rapier, and the destroyer's torpedoes), not with a
     // seabed battery. So the tech 2 refit, the last, adds interceptor tubes as well as a
     // second launcher: it is the Regency's one fixed defence against torpedoes coming in.
     // At each tier it reaches past the hull of its tier that it meets: the Stiletto's 560,
