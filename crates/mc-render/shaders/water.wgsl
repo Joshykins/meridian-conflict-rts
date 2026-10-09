@@ -683,8 +683,8 @@ fn sea_stir(xy: vec2<f32>, time: f32, pixel: f32) -> SeaStir {
             // The line its run leaves on the water, by its look (`mc_data::TorpedoLook`):
             // 0 air: a bright seam of bubbles over a wider pale band, breaking into
             //   specks as it ages;
-            // 1 a plasma drive: a narrow glassy line of steam, few bubbles, and a red
-            //   glow under the water behind the head;
+            // 1 a plasma drive: a narrow glassy line of steam, few bubbles, and a soft
+            //   red glow under the water over the head alone;
             // 2 an interceptor: a thin fizzing line snaking behind it, soon gone;
             // 3 heavy: twin seams from its two screws over a broad band that lies long;
             // 4 a pump-jet: its air let go in gulps, a dotted line.
@@ -764,11 +764,15 @@ fn sea_stir(xy: vec2<f32>, time: f32, pixel: f32) -> SeaStir {
                 let white = select(1.0, 0.45, plasma) * select(1.0, 1.15, sprint);
                 churn = max(churn, seam * fade * white);
                 torpedo_air = max(torpedo_air, exp(-d * d / (band * band)) * fade * select(1.0, 0.6, look == 4u));
-                if plasma {
-                    // The drive's glow under the water, hot behind the head and dying fast.
-                    let hot = exp(-d * d / (band * band * 0.6)) * exp(-max(age, 0.0) / 1.2) * fade;
-                    out.ember = max(out.ember, hot);
-                }
+            }
+            if plasma {
+                // The drive's glow under the water: a soft round patch over the head
+                // alone, never laid along the line (a red line read as a laser).
+                let head = sea_fx.wakes[i].trail[0];
+                let off = xy - head.xy;
+                let r = 2.4;
+                let hot = exp(-dot(off, off) / (r * r)) * smoothstep(1.0, 6.0, head.z) * strength * 0.55;
+                out.ember = max(out.ember, hot);
             }
             continue;
         }
