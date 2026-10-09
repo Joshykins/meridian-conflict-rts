@@ -5,12 +5,26 @@ live in `docs/STYLE.md` "The navy"; the tier arithmetic in `docs/BALANCE.md`.
 
 ## The navy runs one tier ahead of the land
 
-A warship is priced and powered like a land unit of the tier above it: a tier 1 warship
-like tier 2 land, tier 2 like tier 3 land, and tier 3 ships beyond anything on land. Ranges
-are about twice the land unit of the same tier; health and firepower four to five times.
-What ships pay for it is that they cannot hide, cannot leave the water, and shore batteries
-(the Trebuchet, the Skyguard) and aircraft reach them. Energy per mass for warships is
-6 / 7 / 9 by tier.
+A warship is priced like a land unit of the tier above it: a tier 1 warship like tier 2
+land, tier 2 like tier 3 land, and tier 3 ships beyond anything on land. Energy per mass
+for warships is 6 / 7 / 9 by tier.
+
+## Ships buy range and hull, not firepower
+
+A warship wins by outranging and outlasting, never by out-damaging land for its mass
+(the user's call, 2026-10-09, after a comparison with Forged Alliance, whose warships carry
+a quarter to a tenth of the land's DPS per mass):
+
+- Health per mass about that of the same-tier land line, or a little over (10-14 a mass).
+- Range two to six times the land unit of the same tier.
+- DPS per mass well under the land's (tanks 0.36-0.57): about 0.15-0.25 for a tier 2 or
+  3 surface gun line, about 0.2-0.35 for a submarine's torpedoes. Anti-air is measured
+  against aircraft (`docs/BALANCE.md` "Air and anti-air"), not here.
+- The tier 1 boats (Skiff, Dirk) are tanks at sea, not long-range ships, and keep tank
+  numbers.
+
+What ships pay besides is that they cannot hide, cannot leave the water, and shore
+batteries (the Trebuchet, the Skyguard) and aircraft reach them.
 
 ## Every unit hurts something other than ships
 

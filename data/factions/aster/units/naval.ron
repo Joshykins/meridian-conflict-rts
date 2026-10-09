@@ -79,7 +79,7 @@
         // Four bow tubes, fired in pairs. They are the only thing that reaches a dived hull.
         weapons: [(
             name: "Torpedo Tubes",
-            damage: 170, splash: 3, range: 550, reload: 5, speed: 48, trajectory: Direct,
+            damage: 120, splash: 3, range: 550, reload: 5, speed: 48, trajectory: Direct,
             salvo: 2, salvo_delay: 0.6,
             muzzle: (9.6, 0, -1.0), muzzles: [(9.6, -0.7, -0.8), (9.6, 0.7, -0.8), (9.6, -0.7, -1.6), (9.6, 0.7, -1.6)],
             targets: ["Naval"], color: Orange, torpedo: true, impact: 2.2, shockwave: 0.6,
@@ -156,7 +156,7 @@
         // reaches a little past a Barracuda's 550.
         weapons: [(
             name: "Torpedo Launcher",
-            damage: 170, splash: 3, range: 600, reload: 3.5, speed: 50, trajectory: Direct,
+            damage: 120, splash: 3, range: 600, reload: 3.5, speed: 50, trajectory: Direct,
             salvo: 2, salvo_delay: 0.6,
             turret_turn: 120, mount: true, pivot: (0, 0, -3.0), muzzle: (3.2, 0, -3.0),
             muzzles: [(3.2, -0.45, -3.0), (3.2, 0.45, -3.0)],
@@ -181,7 +181,7 @@
         weapons: [
             (
                 name: "Torpedo Launcher",
-                damage: 400, splash: 3, range: 800, reload: 4, speed: 54, trajectory: Direct,
+                damage: 200, splash: 3, range: 800, reload: 4, speed: 54, trajectory: Direct,
                 salvo: 2, salvo_delay: 0.5,
                 turret_turn: 120, mount: true, pivot: (0, 0, -3.0), muzzle: (3.2, 0, -3.0),
                 muzzles: [(3.2, -0.45, -3.0), (3.2, 0.45, -3.0)],
@@ -190,7 +190,7 @@
             ),
             (
                 name: "Torpedo Launcher",
-                damage: 400, splash: 3, range: 800, reload: 4, speed: 54, trajectory: Direct,
+                damage: 200, splash: 3, range: 800, reload: 4, speed: 54, trajectory: Direct,
                 salvo: 2, salvo_delay: 0.5,
                 turret_turn: 120, mount: true, pivot: (0, 0, -5.5), muzzle: (3.2, 0, -5.5),
                 muzzles: [(3.2, -0.45, -5.5), (3.2, 0.45, -5.5)],
@@ -220,7 +220,7 @@
         weapons: [
             (
                 name: "Heavy Torpedo Launcher",
-                damage: 1500, splash: 4, range: 1000, reload: 5, speed: 58, trajectory: Direct,
+                damage: 550, splash: 4, range: 1000, reload: 5, speed: 58, trajectory: Direct,
                 salvo: 4, salvo_delay: 0.4, turret_turn: 0, arc: 360,
                 muzzle: (6, 0, 7), muzzles: [(6, -3, 7), (6, 3, 7), (-6, -3, 7), (-6, 3, 7)],
                 targets: ["Naval"], color: Orange, torpedo: true, torpedo_look: Heavy, impact: 3.0, shockwave: 1.0,
@@ -228,7 +228,7 @@
             ),
             (
                 name: "Heavy Torpedo Launcher",
-                damage: 1500, splash: 4, range: 1000, reload: 5, speed: 58, trajectory: Direct,
+                damage: 550, splash: 4, range: 1000, reload: 5, speed: 58, trajectory: Direct,
                 salvo: 4, salvo_delay: 0.4, turret_turn: 0, arc: 360,
                 muzzle: (0, 6, 7), muzzles: [(-3, 6, 7), (3, 6, 7), (-3, -6, 7), (3, -6, 7)],
                 targets: ["Naval"], color: Orange, torpedo: true, torpedo_look: Heavy, impact: 3.0, shockwave: 1.0,
@@ -284,7 +284,7 @@
             // reaches far past the other T2 hulls, with heavy, slow hits.
             (
                 name: "Bolt Rifle",
-                damage: 380, splash: 5, range: 1500, reload: 1.8, speed: 450, trajectory: Ballistic, loft: 1,
+                damage: 380, splash: 5, range: 1500, reload: 2.4, speed: 450, trajectory: Ballistic, loft: 1,
                 turret_turn: 50, arc: 300, mount: true, pivot: (14.4, 0, 6.24), muzzle: (23.28, 0, 6.24), spread: 1,
                 targets: ["Land", "Naval"], color: Blue, flash: 0.6, impact: 1.8, shockwave: 0.6,
                 tracer: 0.35, plasma: 0.8, trail: true, wake: 0.35, bolts: 6, discharge: 16, arc_charge: 7.44,
@@ -294,7 +294,7 @@
             // Four bow tubes under the waterline.
             (
                 name: "Torpedo Tubes",
-                damage: 300, splash: 3, range: 650, reload: 6, speed: 50, trajectory: Direct,
+                damage: 220, splash: 3, range: 650, reload: 6, speed: 50, trajectory: Direct,
                 salvo: 2, salvo_delay: 0.6,
                 muzzle: (19.2, 0, -1.44), muzzles: [(19.2, -0.96, -1.44), (19.2, 0.96, -1.44), (19.2, -0.96, -2.4), (19.2, 0.96, -2.4)],
                 targets: ["Naval"], color: Orange, torpedo: true, impact: 2.2, shockwave: 0.6,
@@ -384,7 +384,7 @@
         // one and hard to stop all of.
         weapons: [(
             name: "Dumbfire Rockets",
-            damage: 150, splash: 12, range_min: 250, range: 1800, reload: 20, salvo: 32, salvo_delay: 0.15, speed: 300, trajectory: Ballistic, loft: 3,
+            damage: 110, splash: 12, range_min: 250, range: 1800, reload: 20, salvo: 32, salvo_delay: 0.15, speed: 300, trajectory: Ballistic, loft: 3,
             turret_turn: 0, arc: 360, muzzle: (2.0, -1.5, 6.0), spread: 3,
             muzzles: [(2.0, -1.5, 6.0), (2.0, 1.5, 6.0), (0.0, -1.5, 6.0), (0.0, 1.5, 6.0), (-2.0, -1.5, 6.0), (-2.0, 1.5, 6.0), (-4.0, -1.5, 6.0), (-4.0, 1.5, 6.0)],
             targets: ["Land", "Naval", "Structure"], color: Orange, missile: true, rake: 75, fixed_rack: true, intercept: 20,
@@ -410,7 +410,7 @@
             // Six bow tubes in two banks.
             (
                 name: "Torpedo Tubes",
-                damage: 480, splash: 3, range: 700, reload: 5, speed: 52, trajectory: Direct,
+                damage: 300, splash: 3, range: 700, reload: 6, speed: 52, trajectory: Direct,
                 salvo: 3, salvo_delay: 0.5,
                 muzzle: (13.4, 0, -1.0), muzzles: [(13.4, -0.9, -1.0), (13.4, 0.9, -1.0), (13.4, -0.9, -1.9), (13.4, 0.9, -1.9), (13.4, -0.9, -2.8), (13.4, 0.9, -2.8)],
                 targets: ["Naval"], color: Orange, torpedo: true, impact: 2.4, shockwave: 0.7,
@@ -479,7 +479,7 @@
         weapons: [
             (
                 name: "Fore Battery",
-                damage: 2000, splash: 32, range_min: 150, range: 2520, reload: 12, salvo: 3, salvo_delay: 0, speed: 300, trajectory: Ballistic, loft: 2,
+                damage: 1500, splash: 32, range_min: 150, range: 2520, reload: 18, salvo: 3, salvo_delay: 0, speed: 300, trajectory: Ballistic, loft: 2,
                 turret_turn: 24, arc: 300, mount: true, pivot: (44.0, 0, 11.0), muzzle: (66.0, 0, 11.4),
                 muzzles: [(66.0, -3.4, 11.4), (66.0, 0, 11.4), (66.0, 3.4, 11.4)], spread: 3.5,
                 targets: ["Land", "Naval", "Structure"], color: Blue, flash: 2.2, impact: 2.0, shockwave: 1.6,
@@ -489,7 +489,7 @@
             ),
             (
                 name: "Second Battery",
-                damage: 2000, splash: 32, range_min: 150, range: 2520, reload: 12, salvo: 3, salvo_delay: 0, speed: 300, trajectory: Ballistic, loft: 2,
+                damage: 1500, splash: 32, range_min: 150, range: 2520, reload: 18, salvo: 3, salvo_delay: 0, speed: 300, trajectory: Ballistic, loft: 2,
                 turret_turn: 24, arc: 300, mount: true, pivot: (24.0, 0, 14.6), muzzle: (46.0, 0, 15.0),
                 muzzles: [(46.0, -3.4, 15.0), (46.0, 0, 15.0), (46.0, 3.4, 15.0)], spread: 3.5,
                 targets: ["Land", "Naval", "Structure"], color: Blue, flash: 2.2, impact: 2.0, shockwave: 1.6,
@@ -501,7 +501,7 @@
             // rests turned round to the stern.
             (
                 name: "Aft Battery",
-                damage: 2000, splash: 32, range_min: 150, range: 2520, reload: 12, salvo: 3, salvo_delay: 0, speed: 300, trajectory: Ballistic, loft: 2,
+                damage: 1500, splash: 32, range_min: 150, range: 2520, reload: 18, salvo: 3, salvo_delay: 0, speed: 300, trajectory: Ballistic, loft: 2,
                 turret_turn: 24, arc: 300, rear: true, mount: true, pivot: (-40.0, 0, 8.8), muzzle: (18.0, 0, 9.2),
                 muzzles: [(18.0, -3.4, 9.2), (18.0, 0, 9.2), (18.0, 3.4, 9.2)], spread: 3.5,
                 targets: ["Land", "Naval", "Structure"], color: Blue, flash: 2.2, impact: 2.0, shockwave: 1.6,
@@ -522,7 +522,7 @@
             // Conventional guns: orange shells. Authored facing the nose, as every house.
             (
                 name: "Port Fore Secondary",
-                damage: 140, splash: 6, range: 780, reload: 3, salvo: 2, salvo_delay: 0, speed: 420, trajectory: Ballistic, loft: 1,
+                damage: 90, splash: 6, range: 780, reload: 4, salvo: 2, salvo_delay: 0, speed: 420, trajectory: Ballistic, loft: 1,
                 turret_turn: 60, arc: 180, facing: 90, mount: true, pivot: (8.0, 10.5, 9.0), muzzle: (15.0, 10.5, 9.3),
                 muzzles: [(15.0, 9.9, 9.3), (15.0, 11.1, 9.3)], spread: 4,
                 targets: ["Land", "Naval", "Structure"], color: Orange, flash: 1.1, tracer: 0.5, flat_fire: true,
@@ -530,7 +530,7 @@
             ),
             (
                 name: "Port Aft Secondary",
-                damage: 140, splash: 6, range: 780, reload: 3, salvo: 2, salvo_delay: 0, speed: 420, trajectory: Ballistic, loft: 1,
+                damage: 90, splash: 6, range: 780, reload: 4, salvo: 2, salvo_delay: 0, speed: 420, trajectory: Ballistic, loft: 1,
                 turret_turn: 60, arc: 180, facing: 90, mount: true, pivot: (-20.0, 10.5, 9.0), muzzle: (-13.0, 10.5, 9.3),
                 muzzles: [(-13.0, 9.9, 9.3), (-13.0, 11.1, 9.3)], spread: 4,
                 targets: ["Land", "Naval", "Structure"], color: Orange, flash: 1.1, tracer: 0.5, flat_fire: true,
@@ -538,7 +538,7 @@
             ),
             (
                 name: "Starboard Fore Secondary",
-                damage: 140, splash: 6, range: 780, reload: 3, salvo: 2, salvo_delay: 0, speed: 420, trajectory: Ballistic, loft: 1,
+                damage: 90, splash: 6, range: 780, reload: 4, salvo: 2, salvo_delay: 0, speed: 420, trajectory: Ballistic, loft: 1,
                 turret_turn: 60, arc: 180, facing: -90, mount: true, pivot: (8.0, -10.5, 9.0), muzzle: (15.0, -10.5, 9.3),
                 muzzles: [(15.0, -11.1, 9.3), (15.0, -9.9, 9.3)], spread: 4,
                 targets: ["Land", "Naval", "Structure"], color: Orange, flash: 1.1, tracer: 0.5, flat_fire: true,
@@ -546,7 +546,7 @@
             ),
             (
                 name: "Starboard Aft Secondary",
-                damage: 140, splash: 6, range: 780, reload: 3, salvo: 2, salvo_delay: 0, speed: 420, trajectory: Ballistic, loft: 1,
+                damage: 90, splash: 6, range: 780, reload: 4, salvo: 2, salvo_delay: 0, speed: 420, trajectory: Ballistic, loft: 1,
                 turret_turn: 60, arc: 180, facing: -90, mount: true, pivot: (-20.0, -10.5, 9.0), muzzle: (-13.0, -10.5, 9.3),
                 muzzles: [(-13.0, -11.1, 9.3), (-13.0, -9.9, 9.3)], spread: 4,
                 targets: ["Land", "Naval", "Structure"], color: Orange, flash: 1.1, tracer: 0.5, flat_fire: true,
@@ -623,7 +623,7 @@
             // Eight bow tubes.
             (
                 name: "Heavy Torpedo Tubes",
-                damage: 1800, splash: 4, range: 900, reload: 6, speed: 55, trajectory: Direct,
+                damage: 1000, splash: 4, range: 900, reload: 8, speed: 55, trajectory: Direct,
                 salvo: 4, salvo_delay: 0.4,
                 muzzle: (28.0, 0, -1.5), muzzles: [(28.0, -1.0, -1.5), (28.0, 1.0, -1.5), (28.0, -2.2, -1.5), (28.0, 2.2, -1.5), (28.0, -1.0, -2.6), (28.0, 1.0, -2.6), (28.0, -2.2, -2.6), (28.0, 2.2, -2.6)],
                 targets: ["Naval"], color: Orange, torpedo: true, torpedo_look: Heavy, impact: 3.0, shockwave: 1.0,
@@ -637,7 +637,7 @@
             // up its last run (`discharge`).
             (
                 name: "Cruise Missiles",
-                damage: 2400, splash: 30, range_min: 400, range: 2800, reload: 24, salvo: 4, salvo_delay: 1.5, speed: 140, trajectory: Direct,
+                damage: 2400, splash: 30, range_min: 400, range: 2800, reload: 32, salvo: 4, salvo_delay: 1.5, speed: 140, trajectory: Direct,
                 turret_turn: 0, arc: 360, muzzle: (-2.0, -2.0, 1.2),
                 muzzles: [(-2.0, -2.0, 1.2), (-2.0, 2.0, 1.2), (-6.0, -2.0, 1.2), (-6.0, 2.0, 1.2)],
                 targets: ["Land", "Naval", "Structure"], color: Blue, missile: true, guided: true, vertical_launch: true, skim: 25,

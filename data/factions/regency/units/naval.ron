@@ -53,7 +53,7 @@
         motion: (layer: Naval, size: 1, speed: 42, accel: 20, turn: 60),
         weapons: [(
             name: "Gravitic Torpedo Tubes",
-            damage: 185, splash: 3, range: 560, reload: 5, speed: 54, trajectory: Direct,
+            damage: 130, splash: 3, range: 560, reload: 5, speed: 54, trajectory: Direct,
             salvo: 2, salvo_delay: 0.6,
             muzzle: (10.0, 0, -0.9), muzzles: [(10.0, -0.7, -0.9), (10.0, 0.7, -0.9)],
             targets: ["Naval"], color: Orange, torpedo: true, impact: 2.2, shockwave: 0.6,
@@ -129,7 +129,7 @@
             // It cannot bear astern.
             (
                 name: "Pinched-plasmeric Cannon",
-                damage: 440, splash: 2, range: 1300, reload: 2.2, rounds: 8, round_span: 0.25,
+                damage: 440, splash: 2, range: 1300, reload: 2.8, rounds: 8, round_span: 0.25,
                 speed: 900, trajectory: Direct,
                 turret_turn: 50, arc: 300, mount: true,
                 pivot: (14.0, 0, 4.6), muzzle: (22.0, 0, 4.6),
@@ -144,7 +144,7 @@
             // Four bow tubes: gravitic torpedoes.
             (
                 name: "Gravitic Torpedo Tubes",
-                damage: 340, splash: 3, range: 700, reload: 6, speed: 52, trajectory: Direct,
+                damage: 240, splash: 3, range: 700, reload: 6, speed: 52, trajectory: Direct,
                 salvo: 2, salvo_delay: 0.6,
                 muzzle: (25.3, 0, -1.55), muzzles: [(25.3, -0.7, -1.55), (25.3, 0.7, -1.55), (25.3, -0.7, -2.35), (25.3, 0.7, -2.35)],
                 targets: ["Naval"], color: Orange, torpedo: true, impact: 2.4, shockwave: 0.7,
@@ -263,7 +263,7 @@
         weapons: [
             (
                 name: "Fore Pinch-fusion Cannon",
-                damage: 2400, splash: 10, range_min: 150, range: 2400, reload: 12, salvo: 2, salvo_delay: 0,
+                damage: 2000, splash: 10, range_min: 150, range: 2400, reload: 18, salvo: 2, salvo_delay: 0,
                 speed: 1100, trajectory: Ballistic, loft: 0.6, flat_fire: true,
                 turret_turn: 22, arc: 300, mount: true,
                 pivot: (38.0, 0, 8.0), muzzle: (53.0, 0, 8.4), muzzles: [(53.0, -1.6, 8.4), (53.0, 1.6, 8.4)],
@@ -277,7 +277,7 @@
             ),
             (
                 name: "Second Pinch-fusion Cannon",
-                damage: 2400, splash: 10, range_min: 150, range: 2400, reload: 12, salvo: 2, salvo_delay: 0,
+                damage: 2000, splash: 10, range_min: 150, range: 2400, reload: 18, salvo: 2, salvo_delay: 0,
                 speed: 1100, trajectory: Ballistic, loft: 0.6, flat_fire: true,
                 turret_turn: 22, arc: 300, mount: true,
                 pivot: (20.0, 0, 11.0), muzzle: (35.0, 0, 11.4), muzzles: [(35.0, -1.6, 11.4), (35.0, 1.6, 11.4)],
@@ -291,7 +291,7 @@
             ),
             (
                 name: "Aft Pinch-fusion Cannon",
-                damage: 2400, splash: 10, range_min: 150, range: 2400, reload: 12, salvo: 2, salvo_delay: 0,
+                damage: 2000, splash: 10, range_min: 150, range: 2400, reload: 18, salvo: 2, salvo_delay: 0,
                 speed: 1100, trajectory: Ballistic, loft: 0.6, flat_fire: true,
                 turret_turn: 22, arc: 300, rear: true, mount: true,
                 pivot: (-36.0, 0, 8.0), muzzle: (-21.0, 0, 8.4), muzzles: [(-21.0, -1.6, 8.4), (-21.0, 1.6, 8.4)],
@@ -316,7 +316,7 @@
             ),
             (
                 name: "Port Fore Secondary",
-                damage: 70, splash: 4, range: 800, reload: 1.2, speed: 480, trajectory: Direct,
+                damage: 50, splash: 4, range: 800, reload: 1.5, speed: 480, trajectory: Direct,
                 turret_turn: 60, arc: 180, facing: 90, mount: true,
                 pivot: (6.0, 9.0, 7.0), muzzle: (11.0, 9.0, 7.2),
                 muzzles: [(11.0, 8.5, 7.2), (11.0, 9.5, 7.2)],
@@ -327,7 +327,7 @@
             ),
             (
                 name: "Port Aft Secondary",
-                damage: 70, splash: 4, range: 800, reload: 1.2, speed: 480, trajectory: Direct,
+                damage: 50, splash: 4, range: 800, reload: 1.5, speed: 480, trajectory: Direct,
                 turret_turn: 60, arc: 180, facing: 90, mount: true,
                 pivot: (-18.0, 9.0, 7.0), muzzle: (-13.0, 9.0, 7.2),
                 muzzles: [(-13.0, 8.5, 7.2), (-13.0, 9.5, 7.2)],
@@ -338,7 +338,7 @@
             ),
             (
                 name: "Starboard Fore Secondary",
-                damage: 70, splash: 4, range: 800, reload: 1.2, speed: 480, trajectory: Direct,
+                damage: 50, splash: 4, range: 800, reload: 1.5, speed: 480, trajectory: Direct,
                 turret_turn: 60, arc: 180, facing: -90, mount: true,
                 pivot: (6.0, -9.0, 7.0), muzzle: (11.0, -9.0, 7.2),
                 muzzles: [(11.0, -9.5, 7.2), (11.0, -8.5, 7.2)],
@@ -349,7 +349,7 @@
             ),
             (
                 name: "Starboard Aft Secondary",
-                damage: 70, splash: 4, range: 800, reload: 1.2, speed: 480, trajectory: Direct,
+                damage: 50, splash: 4, range: 800, reload: 1.5, speed: 480, trajectory: Direct,
                 turret_turn: 60, arc: 180, facing: -90, mount: true,
                 pivot: (-18.0, -9.0, 7.0), muzzle: (-13.0, -9.0, 7.2),
                 muzzles: [(-13.0, -9.5, 7.2), (-13.0, -8.5, 7.2)],
@@ -361,7 +361,7 @@
             // Four bow tubes: gravitic torpedoes.
             (
                 name: "Gravitic Torpedo Tubes",
-                damage: 1200, splash: 4, range: 1000, reload: 9, speed: 56, trajectory: Direct,
+                damage: 800, splash: 4, range: 1000, reload: 10, speed: 56, trajectory: Direct,
                 salvo: 2, salvo_delay: 0.5,
                 muzzle: (62.0, 0, -2.3), muzzles: [(62.0, -1.2, -1.7), (62.0, 1.2, -1.7), (62.0, -1.2, -2.9), (62.0, 1.2, -2.9)],
                 targets: ["Naval"], color: Orange, torpedo: true, impact: 3.0, shockwave: 1.0,
@@ -459,7 +459,7 @@
         weapons: [
             (
                 name: "Gravitic Torpedo Launcher",
-                damage: 1100, splash: 4, range: 950, reload: 6, speed: 66, trajectory: Direct,
+                damage: 1100, splash: 4, range: 950, reload: 8, speed: 66, trajectory: Direct,
                 salvo: 3, salvo_delay: 0.4,
                 muzzle: (25.0, 0, -1.5), muzzles: [(25.0, -1.0, -1.0), (25.0, 1.0, -1.0), (25.0, -1.0, -2.0), (25.0, 1.0, -2.0), (25.0, -2.0, -1.5), (25.0, 2.0, -1.5)],
                 targets: ["Naval"], color: Orange, torpedo: true, impact: 2.8, shockwave: 0.9,
@@ -587,7 +587,7 @@
         upgrades_to: "regency_t2_torpedo_defense",
         weapons: [(
             name: "Gravitic Torpedo Launcher",
-            damage: 200, splash: 3, range: 620, reload: 4, speed: 52, trajectory: Direct,
+            damage: 160, splash: 3, range: 620, reload: 4, speed: 52, trajectory: Direct,
             salvo: 2, salvo_delay: 0.6,
             turret_turn: 120, mount: true, pivot: (0, 0, -1.0), muzzle: (4.0, 0, -1.0),
             muzzles: [(4.0, -0.5, -1.0), (4.0, 0.5, -1.0)],
@@ -611,7 +611,7 @@
         weapons: [
             (
                 name: "Gravitic Torpedo Launcher",
-                damage: 400, splash: 3, range: 900, reload: 4, speed: 56, trajectory: Direct,
+                damage: 230, splash: 3, range: 900, reload: 4, speed: 56, trajectory: Direct,
                 salvo: 2, salvo_delay: 0.5,
                 turret_turn: 120, mount: true, pivot: (0, 0, -1.0), muzzle: (4.0, 0, -1.0),
                 muzzles: [(4.0, -0.5, -1.0), (4.0, 0.5, -1.0)],
@@ -621,7 +621,7 @@
             ),
             (
                 name: "Gravitic Torpedo Launcher",
-                damage: 400, splash: 3, range: 900, reload: 4, speed: 56, trajectory: Direct,
+                damage: 230, splash: 3, range: 900, reload: 4, speed: 56, trajectory: Direct,
                 salvo: 2, salvo_delay: 0.5,
                 turret_turn: 120, mount: true, pivot: (0, 0, -4.0), muzzle: (4.0, 0, -4.0),
                 muzzles: [(4.0, -0.5, -4.0), (4.0, 0.5, -4.0)],

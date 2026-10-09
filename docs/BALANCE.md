@@ -125,13 +125,40 @@ a pass; anti-air punishes them over seconds, not in one shot.
 Measure in the sim with `zz_aa_probe` (what each AA lands on each aircraft) and
 `zz_petrel_probe` (Petrel passes on engineers, reactors, mines and tanks).
 
+## The navy
+
+2026-10-09, against FAF (spooky-db; 1 ogrid ≈ 16 m of range): our warships used to carry
+land-grade DPS per mass and four to six times the land's range, while FAF's carry a
+quarter to a tenth of the land's DPS per mass. Prices and health stayed; firepower came
+down to the rule in `docs/NAVY.md` "Ships buy range and hull, not firepower".
+
+| hull | mass | DPS against hulls and land, before -> after | per mass after | FAF peer per mass |
+|---|---|---|---|---|
+| Barracuda / Stiletto | 150 / 160 | 68 / 74 -> 48 / 52 torpedo | 0.32 | 0.10 |
+| Marlin | 920 | 211 + 100 torp -> 158 + 73 | 0.17 + 0.08 | ~0.13 + 0.04 |
+| Claymore | 1,050 | 200 + 113 torp -> 157 + 80 | 0.15 + 0.08 | |
+| Swordfish | 880 | 240 -> 176 | 0.20 | |
+| Moray | 600 | 288 torp -> 150 | 0.25 | 0.09 |
+| Leviathan | 4,200 | 1,500 + 373 -> 750 + 180 | 0.22 | ~0.06 |
+| Flamberge | 4,600 | 1,200 + 233 + 267 torp -> 667 + 133 + 160 | 0.21 | |
+| Kraken | 2,600 | 1,200 torp + 400 missiles -> 500 + 300 | 0.19 + 0.12 | 0.02 |
+| Rapier | 2,000 | 550 torp -> 412 | 0.21 | 0.10 |
+
+The big guns kept their weight a shot and fire less often (the Leviathan 1,500 a shell
+every 18 s, was 2,000 every 12 s), so a broadside is still an event. The torpedo launchers
+came down with the submarines they meet and keep about twice their DPS per mass
+(`torpedo_launchers.rs`). Left as they were: the Skiff and Dirk (tanks at sea), the Pike and
+Falchion (already under the land), the anti-air hulls (Manta, Pavise, Atoll, Mantlet:
+measured against aircraft), the Narwhal (shoots only spaceships) and the Megalodon (an
+experimental, 0.13 a mass already).
+
 ## Energy per mass
 
 | kind | T1 | T2 | T3 |
 |---|---|---|---|
 | land units, engineers | 5 | 6 | 8 |
 | aircraft (the energy-hungry branch) | 15 | 35 | 38 |
-| warships (docs/NAVY.md: one tier ahead of the land) | 6 | 7 | 9 |
+| warships (docs/NAVY.md: priced one tier ahead of the land) | 6 | 7 | 9 |
 | defences | 8 | 9 | 10 |
 | economy structures (mines, reactors) | 6 | 6 | 6 |
 | commander refits | 12 (engineering suites 10) | | |
