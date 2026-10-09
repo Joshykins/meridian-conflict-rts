@@ -991,8 +991,16 @@ fn vs_shield(@builtin(vertex_index) vid: u32) -> ShieldOut {
     return out;
 }
 
+// fs_shield behind the clouds where it is past them (bindings.wgsl `past_clouds_at`, at the
+// glass's own depth).
 @fragment
 fn fs_shield(in: ShieldOut) -> ShieldFrag {
+    var px = fs_shield_lit(in);
+    px.color *= past_clouds_at(vec4<f32>(in.clip.xy, px.depth, 1.0));
+    return px;
+}
+
+fn fs_shield_lit(in: ShieldOut) -> ShieldFrag {
     let eye = globals.camera.xyz;
     let time = globals.camera.w;
     let dir = normalize(in.world - eye);

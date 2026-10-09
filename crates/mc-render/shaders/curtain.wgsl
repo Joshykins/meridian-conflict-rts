@@ -60,8 +60,14 @@ fn vs_curtain(@builtin(vertex_index) v: u32) -> CurtainOut {
     return out;
 }
 
+// fs_curtain behind the clouds where it is past them (bindings.wgsl `past_clouds_at`): it
+// stands up into the cloud.
 @fragment
 fn fs_curtain(in: CurtainOut) -> @location(0) vec4<f32> {
+    return fs_curtain_lit(in) * past_clouds_at(in.clip);
+}
+
+fn fs_curtain_lit(in: CurtainOut) -> vec4<f32> {
     let time = globals.camera.w;
     let ground = max(terrain_height(in.world.xy), globals.map.z);
     // Metres above the ground or the sea.

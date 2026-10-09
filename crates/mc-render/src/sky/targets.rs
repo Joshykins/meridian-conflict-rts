@@ -4,13 +4,15 @@ use super::*;
 
 impl Sky {
     /// Size-dependent targets: the march, its two histories, and the depth it stops at.
+    /// The march and the histories also go into the scene set (bindings 36-38), for the
+    /// effects drawn past the clouds (bindings.wgsl `past_clouds`).
     pub fn resize(
         &mut self,
         gpu: &Gpu,
-        width: u32,
-        height: u32,
+        (width, height): (u32, u32),
         depth: vk::ImageView,
         cloud_divisor: u32,
+        scene_set: vk::DescriptorSet,
     ) -> Result<(), GpuError> {
         // SAFETY: `resize` runs only from the renderer's `create_size_dependent`, after the
         // device went idle, so no command buffer in flight uses these framebuffers; they are
@@ -93,6 +95,16 @@ impl Sky {
             write_image(gpu, *set, 2, sampled, self.targets[0].view, read);
             write_image(gpu, *set, 3, sampled, self.targets[1 + (1 - k)].view, read);
             write_image(gpu, *set, 4, sampled, self.targets[1 + k].view, read);
+        }
+        for (binding, target) in [(36, 0), (37, 1), (38, 2)] {
+            write_image(
+                gpu,
+                scene_set,
+                binding,
+                sampled,
+                self.targets[target].view,
+                read,
+            );
         }
         self.march_size = (w, h);
         self.history_valid = false;

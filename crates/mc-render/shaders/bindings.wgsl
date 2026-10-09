@@ -665,6 +665,85 @@ fn weather_at(at: vec2<f32>) -> vec4<f32> {
 // to a plane under the layer, per texel of the map. 1 everywhere with the
 // clouds off.
 @group(0) @binding(27) var cloud_shade: texture_2d<f32>;
+
+// The clouds the composite lays over the picture (sky.rs `Sky::resize`), for the
+// see-through effects drawn after it (`past_clouds`): the march this frame, its .z how
+// far along the ray the cloud it saw lies (0 none), and the two histories it is folded
+// into, this frame's by the frame number's parity (`Sky::history`). Read only while
+// atmos.ground_color.w says the clouds are drawn.
+@group(0) @binding(36) var clouds_marched: texture_2d<u32>;
+@group(0) @binding(37) var clouds_history_even: texture_2d<f32>;
+@group(0) @binding(38) var clouds_history_odd: texture_2d<f32>;
+
+// The eye's ray through screen uv `uv`.
+fn screen_ray(uv: vec2<f32>) -> vec3<f32> {
+    let ndc = vec2<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
+    let h = globals.inv_view_proj * vec4<f32>(ndc, 0.01, 1.0);
+    return normalize(h.xyz / h.w - globals.camera.xyz);
+}
+
+// With something selected, the middle of the screen sees through the clouds below the camera: they
+// stay, as a faint hologram of themselves (their outline and contour lines
+// in the interface's cyan), so the battle under them shows.
+fn cloud_holo(uv: vec2<f32>, ray: vec3<f32>) -> f32 {
+    let aspect = globals.viewport.x / globals.viewport.y;
+    let off_centre = length((uv - 0.5) * vec2<f32>(aspect, 1.0));
+    let down = smoothstep(0.1, 0.4, -ray.z) * smoothstep(atmos.frame.w + atmos.layer.x - 400.0, atmos.frame.w + atmos.layer.x + 200.0, globals.camera.z);
+    // Only while the player has something selected: otherwise the sky is left alone.
+    return (1.0 - smoothstep(0.18, 0.5, off_centre)) * down * atmos.frame.z;
+}
+
+// At the zooms the battle is fought at, the clouds are a veil over it;
+// pulled back to the strategic view they are solid. Only over it: cloud
+// overhead, looked up at from low down, is the sky, and veiled it all but
+// vanished (an overcast deck let the sun through).
+fn cloud_battle_veil(ray: vec3<f32>) -> f32 {
+    let over_battle = 1.0 - smoothstep(-0.12, 0.08, ray.z);
+    return mix(1.0, mix(0.55, 1.0, smoothstep(3000.0, 10000.0, atmos.view.z)), over_battle);
+}
+
+// How much the composite lets the clouds cover the picture at `uv`, from the
+// clouds' transmittance there: veiled over the battle, thinned by the hologram.
+fn cloud_cover(uv: vec2<f32>, through: f32) -> f32 {
+    let ray = screen_ray(uv);
+    return (1.0 - through) * cloud_battle_veil(ray) * mix(1.0, 0.14, cloud_holo(uv, ray));
+}
+
+// How much of a see-through effect `t` metres along the ray through scene pixel `px`
+// shows past the clouds: all of it in front of the deck, what the composite let
+// through behind it, eased across the deck's depth. The effects are drawn after the
+// clouds' composite, so smoke rising in front of a cloud is not laid under it (as
+// nuke.wgsl `find_clouds` does for a blast).
+fn past_clouds(px: vec2<f32>, t: f32) -> f32 {
+    if atmos.ground_color.w < 0.5 {
+        return 1.0;
+    }
+    let uv = px / globals.scene.xy;
+    let dims = vec2<i32>(textureDimensions(clouds_marched));
+    let at = clamp(vec2<i32>(uv * vec2<f32>(dims)), vec2<i32>(0), dims - 1);
+    let deck = bitcast<f32>(textureLoad(clouds_marched, at, 0).z);
+    if !(deck > 0.0 && deck < 1.0e8) {
+        return 1.0;
+    }
+    var through: f32;
+    if (u32(atmos.frame.x) & 1u) == 0u {
+        through = textureSampleLevel(clouds_history_even, clamp_sampler, uv, 0.0).a;
+    } else {
+        through = textureSampleLevel(clouds_history_odd, clamp_sampler, uv, 0.0).a;
+    }
+    let cover = cloud_cover(uv, clamp(through, 0.0, 1.0));
+    // The deck is some hundreds of metres thick; along a slanting ray, more.
+    let thick = min(180.0 / max(abs(screen_ray(uv).z), 0.12), 1500.0);
+    return 1.0 - cover * smoothstep(deck - thick, deck + thick, t);
+}
+
+// `past_clouds` for a fragment at `clip` (its @builtin(position); its depth says how far).
+fn past_clouds_at(clip: vec4<f32>) -> f32 {
+    let uv = clip.xy / globals.scene.xy;
+    let ndc = vec2<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
+    let h = globals.inv_view_proj * vec4<f32>(ndc, max(clip.z, 0.0000001), 1.0);
+    return past_clouds(clip.xy, distance(h.xyz / h.w, globals.camera.xyz));
+}
 // Ambient occlusion from the depth pre-pass, half the scene's size (renderer/gtao.rs).
 @group(0) @binding(30) var ao_map: texture_2d<f32>;
 

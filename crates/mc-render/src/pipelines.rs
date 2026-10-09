@@ -533,6 +533,10 @@ pub(crate) const SCENE_SET: &[Binding] = &[
     (34, vk::DescriptorType::STORAGE_BUFFER),
     // What each model's surface carries where (renderer/surface_marks.rs).
     (35, vk::DescriptorType::STORAGE_BUFFER),
+    // The clouds' march and its two histories, for the effects drawn past them (sky.rs).
+    (36, vk::DescriptorType::SAMPLED_IMAGE),
+    (37, vk::DescriptorType::SAMPLED_IMAGE),
+    (38, vk::DescriptorType::SAMPLED_IMAGE),
 ];
 
 /// The pass set (group 1 of the scene layout): a pass's own two storage buffers.

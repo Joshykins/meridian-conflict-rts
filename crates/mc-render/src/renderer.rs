@@ -2859,10 +2859,10 @@ impl Renderer {
         // follow the output: supersampling does not multiply the clouds' cost.
         self.sky.resize(
             &self.gpu,
-            self.width,
-            self.height,
+            (self.width, self.height),
             self.depth.view,
             self.quality.cloud_divisor,
+            self.scene_set,
         )?;
         let clouds = self
             .sky

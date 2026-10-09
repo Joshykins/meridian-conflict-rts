@@ -1324,32 +1324,6 @@ fn to_screen(p: vec3<f32>) -> vec3<f32> {
     return vec3<f32>((c.x / w * 0.5 + 0.5) * globals.viewport.x, (0.5 - c.y / w * 0.5) * globals.viewport.y, c.z / w);
 }
 
-// With something selected, the middle of the screen sees through the clouds below the camera: they
-// stay, as a faint hologram of themselves (their outline and contour lines
-// in the interface's cyan), so the battle under them shows.
-fn cloud_holo(uv: vec2<f32>) -> f32 {
-    let aspect = globals.viewport.x / globals.viewport.y;
-    let off_centre = length((uv - 0.5) * vec2<f32>(aspect, 1.0));
-    let down = smoothstep(0.1, 0.4, -view_ray(uv).z) * smoothstep(atmos.frame.w + atmos.layer.x - 400.0, atmos.frame.w + atmos.layer.x + 200.0, globals.camera.z);
-    // Only while the player has something selected: otherwise the sky is left alone.
-    return (1.0 - smoothstep(0.18, 0.5, off_centre)) * down * atmos.frame.z;
-}
-
-// At the zooms the battle is fought at, the clouds are a veil over it;
-// pulled back to the strategic view they are solid. Only over it: cloud
-// overhead, looked up at from low down, is the sky, and veiled it all but
-// vanished (an overcast deck let the sun through).
-fn cloud_veil(uv: vec2<f32>) -> f32 {
-    let over_battle = 1.0 - smoothstep(-0.12, 0.08, view_ray(uv).z);
-    return mix(1.0, mix(0.55, 1.0, smoothstep(3000.0, 10000.0, atmos.view.z)), over_battle);
-}
-
-// How much the composite lets the clouds cover the picture at `uv`, from the
-// clouds' transmittance there: veiled over the battle, thinned by the hologram.
-fn cloud_cover(uv: vec2<f32>, through: f32) -> f32 {
-    return (1.0 - through) * cloud_veil(uv) * mix(1.0, 0.14, cloud_holo(uv));
-}
-
 // The accumulated clouds at a full-size pixel whose scene depth is `depth`. The
 // march texels are several pixels wide, and one straddling a treetop and the
 // sky marched to the sky (the farthest of its corners): its cloud and rain,
@@ -1448,7 +1422,8 @@ fn fs_composite(in: FullOut) -> @location(0) vec4<f32> {
     var light = cloud.rgb;
     var cover = 1.0 - cloud.a;
 
-    let holo = cloud_holo(in.uv);
+    let ray = screen_ray(in.uv);
+    let holo = cloud_holo(in.uv, ray);
     let e = texel * 3.0;
     let ax = textureSampleLevel(cloud_now, clamp_sampler, in.uv + vec2<f32>(e.x, 0.0), 0.0).a
         - textureSampleLevel(cloud_now, clamp_sampler, in.uv - vec2<f32>(e.x, 0.0), 0.0).a;
@@ -1460,7 +1435,7 @@ fn fs_composite(in: FullOut) -> @location(0) vec4<f32> {
     // Soft, a few pixels wide: a hairline would crawl as the cloud drifts.
     let px = max(fwidth(level), 1e-4);
     let contour = (1.0 - smoothstep(px * 0.5, px * 3.0, band)) * smoothstep(0.05, 0.2, cover);
-    let veil = cloud_veil(in.uv);
+    let veil = cloud_battle_veil(ray);
     cover *= veil;
     light *= veil;
     if holo > 0.0 {

@@ -1264,8 +1264,13 @@ fn vs_plume(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instanc
     return out;
 }
 
+// fs_plume behind the clouds where it is past them (bindings.wgsl `past_clouds_at`).
 @fragment
 fn fs_plume(in: PlumeOut) -> @location(0) vec4<f32> {
+    return fs_plume_lit(in) * past_clouds_at(in.clip);
+}
+
+fn fs_plume_lit(in: PlumeOut) -> vec4<f32> {
     let f = plume_frame(in.slot);
     let eye = globals.camera.xyz;
     let time = globals.camera.w;

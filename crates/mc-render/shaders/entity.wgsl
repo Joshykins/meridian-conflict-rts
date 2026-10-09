@@ -4339,8 +4339,14 @@ fn fs_hull_depth(in: VsOut) {
 // How much of a personal field shows when nothing is hitting it.
 const HULL_IDLE: f32 = 0.45;
 
+// fs_hull behind the clouds where it is past them (bindings.wgsl `past_clouds_at`): a
+// flying hull's field goes into the cloud with it.
 @fragment
 fn fs_hull(in: VsOut) -> @location(0) vec4<f32> {
+    return fs_hull_lit(in) * past_clouds_at(in.clip);
+}
+
+fn fs_hull_lit(in: VsOut) -> vec4<f32> {
     let s = shields[in.material];
     let open = mix(s.prev_open, s.open, globals.sun.w);
     // Unfolds from the emitter over the plates, same language as a rising dome.

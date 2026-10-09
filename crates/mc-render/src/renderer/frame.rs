@@ -1011,41 +1011,10 @@ impl Renderer {
             device.cmd_draw(cmd, 6, 1, 0, 0);
             self.timers.end(&device, cmd);
 
-            // Shockwaves after the sea: drawn before it, the surface painted over
-            // every front that crossed open water.
-            self.timers.draws(&device, cmd, "scene.shockwaves");
-            device.cmd_bind_pipeline(
-                cmd,
-                vk::PipelineBindPoint::GRAPHICS,
-                self.pipelines.shockwave,
-            );
-            bind_pass_set(self.shockwaves_set);
-            device.cmd_draw(
-                cmd,
-                SHOCKWAVE_LAT * SHOCKWAVE_LON * 6,
-                MAX_SHOCKWAVES as u32,
-                0,
-                0,
-            );
-            self.timers.end(&device, cmd);
-
             // Cone weapons' wakes, shells of light added onto the scene (wake_shell.wgsl).
             self.timers.draws(&device, cmd, "scene.wake_shells");
             self.wake_shells.draw(&device, cmd, self.layouts.scene);
             self.timers.end(&device, cmd);
-
-            // The climate walls' curtain (curtain.wgsl): a quad a segment of wall.
-            let segments = self.look.walls().segments().len() as u32;
-            if segments > 0 {
-                self.timers.draws(&device, cmd, "scene.curtain");
-                device.cmd_bind_pipeline(
-                    cmd,
-                    vk::PipelineBindPoint::GRAPHICS,
-                    self.pipelines.curtain,
-                );
-                device.cmd_draw(cmd, segments * 6, 1, 0, 0);
-                self.timers.end(&device, cmd);
-            }
 
             self.timers.draws(&device, cmd, "scene.rings");
             self.adjacency_links
@@ -1077,6 +1046,81 @@ impl Renderer {
                 ringed_count * ring_cells,
             );
             self.timers.end(&device, cmd);
+            // Ore veins glow through the ground, and through trees and units,
+            // while the mine survey is up.
+            self.timers.draws(&device, cmd, "scene.veins");
+            if self.vein_count > 0 && self.ore.highlight > 0.01 {
+                // Set 0 (scene) is bound already; the veins read nothing else.
+                device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipelines.vein);
+                device.cmd_bind_vertex_buffers(cmd, 0, &[self.vein_vb.buffer], &[0]);
+                device.cmd_push_constants(
+                    cmd,
+                    self.layouts.scene,
+                    vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+                    0,
+                    bytemuck::bytes_of(&[self.ore.highlight, self.ore.vein_time]),
+                );
+                device.cmd_draw(cmd, self.vein_count, 1, 0, 0);
+            }
+            self.timers.end(&device, cmd);
+            // Light shafts: the haze's sunlight taken back where the air is shadowed
+            // (shafts.wgsl), before the clouds cover the far view.
+            if self.shafts.enabled {
+                self.timers.draws(&device, cmd, "scene.shafts");
+                self.shafts.draw_composite(&self.gpu, cmd, self.scene_set);
+                self.timers.end(&device, cmd);
+            }
+            // The clouds over the world, before the see-through effects: those in the air
+            // (smoke and trails, shockwaves, shields, beams, shots, the curtain) are drawn
+            // after them and hide themselves behind the deck where they are past it
+            // (bindings.wgsl `past_clouds`). Drawn before, a missile's trail climbing in
+            // front of a cloud bank was laid under it. The ground's overlays (rings, veins)
+            // and the sea's wakes stay under the clouds.
+            self.timers.draws(&device, cmd, "clouds.composite");
+            self.sky.draw_composite(&self.gpu, cmd, self.scene_set);
+            self.timers.end(&device, cmd);
+            // The composite bound set 0 under its own layout and left push constants undefined.
+            device.cmd_bind_descriptor_sets(
+                cmd,
+                vk::PipelineBindPoint::GRAPHICS,
+                self.layouts.scene,
+                0,
+                &[self.scene_set],
+                &[],
+            );
+            push(0, self.shield_count);
+
+            // Shockwaves after the sea: drawn before it, the surface painted over
+            // every front that crossed open water.
+            self.timers.draws(&device, cmd, "scene.shockwaves");
+            device.cmd_bind_pipeline(
+                cmd,
+                vk::PipelineBindPoint::GRAPHICS,
+                self.pipelines.shockwave,
+            );
+            bind_pass_set(self.shockwaves_set);
+            device.cmd_draw(
+                cmd,
+                SHOCKWAVE_LAT * SHOCKWAVE_LON * 6,
+                MAX_SHOCKWAVES as u32,
+                0,
+                0,
+            );
+            self.timers.end(&device, cmd);
+
+            // The climate walls' curtain (curtain.wgsl): a quad a segment of wall.
+            let segments = self.look.walls().segments().len() as u32;
+            if segments > 0 {
+                self.timers.draws(&device, cmd, "scene.curtain");
+                device.cmd_bind_pipeline(
+                    cmd,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.pipelines.curtain,
+                );
+                device.cmd_draw(cmd, segments * 6, 1, 0, 0);
+                self.timers.end(&device, cmd);
+            }
+
             self.timers.draws(&device, cmd, "scene.shields");
             if dome_count > 0 {
                 device.cmd_bind_pipeline(
@@ -1150,36 +1194,9 @@ impl Renderer {
             }
 
             self.timers.end(&device, cmd);
-            // Ore veins glow through the ground, and through trees and units,
-            // while the mine survey is up.
-            self.timers.draws(&device, cmd, "scene.veins");
-            if self.vein_count > 0 && self.ore.highlight > 0.01 {
-                // Set 0 (scene) is bound already; the veins read nothing else.
-                device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipelines.vein);
-                device.cmd_bind_vertex_buffers(cmd, 0, &[self.vein_vb.buffer], &[0]);
-                device.cmd_push_constants(
-                    cmd,
-                    self.layouts.scene,
-                    vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
-                    0,
-                    bytemuck::bytes_of(&[self.ore.highlight, self.ore.vein_time]),
-                );
-                device.cmd_draw(cmd, self.vein_count, 1, 0, 0);
-            }
-            self.timers.end(&device, cmd);
-            // Light shafts: the haze's sunlight taken back where the air is shadowed
-            // (shafts.wgsl), before the clouds cover the far view.
-            if self.shafts.enabled {
-                self.timers.draws(&device, cmd, "scene.shafts");
-                self.shafts.draw_composite(&self.gpu, cmd, self.scene_set);
-                self.timers.end(&device, cmd);
-            }
-            // The clouds over everything in the world, then the rain close up: from under the
-            // deck the drops are nearer than any cloud (fs_rain lets the clouds cover them
-            // only seen from over the deck). Icons and bars stay on top.
-            self.timers.draws(&device, cmd, "clouds.composite");
-            self.sky.draw_composite(&self.gpu, cmd, self.scene_set);
-            self.timers.end(&device, cmd);
+            // Then the rain close up: from under the deck the drops are nearer than any cloud
+            // (fs_rain lets the clouds cover them only seen from over the deck). Icons and
+            // bars stay on top.
             self.timers.draws(&device, cmd, "scene.rain");
             self.sky.draw_rain(&self.gpu, cmd, self.scene_set);
             self.timers.end(&device, cmd);

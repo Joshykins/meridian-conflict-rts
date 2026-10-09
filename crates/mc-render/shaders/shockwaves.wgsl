@@ -185,10 +185,13 @@ fn fs_shockwave_lit(in: WaveOut) -> WavePixel {
     return out;
 }
 
-// fs_shockwave, seen through the water from under it (bindings.wgsl `under_sea_seen`).
+// fs_shockwave, seen through the water from under it (bindings.wgsl `under_sea_seen`) and
+// behind the clouds where it is past them (`past_clouds_at`, at the front's own depth).
+// Alpha-blended: only its alpha fades.
 @fragment
 fn fs_shockwave(in: WaveOut) -> WavePixel {
     var px = fs_shockwave_lit(in);
     px.color = under_sea_seen(px.color, in.clip);
+    px.color.a *= past_clouds_at(vec4<f32>(in.clip.xy, px.depth, 1.0));
     return px;
 }

@@ -1351,16 +1351,28 @@ fn cased_seeker_color(s: vec3<f32>) -> array<vec3<f32>, 2> {
     return array<vec3<f32>, 2>(base, SEEKER_RED * line * 4.0 * pulse);
 }
 
-// fs_shot, seen through the water from under it (bindings.wgsl `under_sea_seen`).
-@fragment
-fn fs_shot(in: SpriteOut) -> @location(0) vec4<f32> {
-    return under_sea_seen(fs_shot_lit(in), in.clip);
+// How much of a shot or effect shows past the clouds (bindings.wgsl `past_clouds_at`):
+// the draw under them hides behind the deck, the markers over them do not.
+fn sprite_past_clouds(clip: vec4<f32>) -> f32 {
+    if push.layer == SPRITE_LAYER_OVER_CLOUD {
+        return 1.0;
+    }
+    return past_clouds_at(clip);
 }
 
-// fs_sprite, seen through the water from under it (bindings.wgsl `under_sea_seen`).
+// fs_shot, seen through the water from under it (bindings.wgsl `under_sea_seen`) and
+// behind the clouds where it is past them. Alpha-blended: only its alpha fades.
+@fragment
+fn fs_shot(in: SpriteOut) -> @location(0) vec4<f32> {
+    let c = under_sea_seen(fs_shot_lit(in), in.clip);
+    return vec4<f32>(c.rgb, c.a * sprite_past_clouds(in.clip));
+}
+
+// fs_sprite, seen through the water from under it (bindings.wgsl `under_sea_seen`) and
+// behind the clouds where it is past them.
 @fragment
 fn fs_sprite(in: SpriteOut) -> @location(0) vec4<f32> {
-    return under_sea_seen(fs_sprite_lit(in), in.clip);
+    return under_sea_seen(fs_sprite_lit(in), in.clip) * sprite_past_clouds(in.clip);
 }
 
 // fs_missile, seen through the water from under it (bindings.wgsl `under_sea_seen`).

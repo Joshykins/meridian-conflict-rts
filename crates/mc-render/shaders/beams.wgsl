@@ -1234,8 +1234,9 @@ fn swarm_fragment(in: BeamOut) -> vec4<f32> {
     return vec4<f32>(color, cover);
 }
 
-// fs_beam, seen through the water from under it (bindings.wgsl `under_sea_seen`).
+// fs_beam, seen through the water from under it (bindings.wgsl `under_sea_seen`) and
+// behind the clouds where it is past them (`past_clouds_at`).
 @fragment
 fn fs_beam(in: BeamOut) -> @location(0) vec4<f32> {
-    return under_sea_seen(fs_beam_lit(in), in.clip);
+    return under_sea_seen(fs_beam_lit(in), in.clip) * past_clouds_at(in.clip);
 }
