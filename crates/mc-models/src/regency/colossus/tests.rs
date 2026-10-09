@@ -50,7 +50,7 @@ fn the_unit_files_weapons_are_the_models() {
     };
     near(v(lance.muzzle), LANCE_MUZZLE, "lance muzzle");
     near(v(lance.pivot.unwrap()), LANCE_PIVOT, "lance pivot");
-    assert!(lance.beam && lance.star_beam && !lance.mount);
+    assert!(lance.beam && !lance.star_beam && !lance.mount);
     for (w, side) in [(left, 1.0f32), (right, -1.0)] {
         let mirror = Vec3::new(1.0, side, 1.0);
         near(v(w.muzzle), GUN_MUZZLE * mirror, "gun muzzle");
