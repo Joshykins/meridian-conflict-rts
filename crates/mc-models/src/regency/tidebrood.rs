@@ -1,102 +1,213 @@
-//! The Slipway, the Regency naval factory, on its 8 x 8 lot (96 m square): a one-sided
-//! quay, like ARC's Wharf.
+//! The Slipway, the Regency naval factory, on its 8 x 8 lot (96 m square): a scaled shell
+//! crouched behind the berth on clawed legs that plunge through the water to the seabed,
+//! its arms reaching out over the berth to hang the fabricator heads over the hull.
 //!
-//! It stands on the water (its origin is the surface, and nothing reaches under it). The
-//! berth is open water at the lot origin, where the hull floats while it is printed;
-//! everything the Slipway has stands behind its berth face (-y), so nothing is on the
-//! far side or at either end, and a capital ship longer or wider than the lot still
-//! fits. Ships leave toward +x, past the quay's swept bow.
+//! Its origin is the water's surface. The berth is open water at the lot origin, where
+//! the hull floats while it is printed; everything the Slipway has stands behind it (-y,
+//! nothing past y = -2.5), so a capital ship longer or wider than the lot still fits.
 //!
-//! - The quay is an armoured pontoon: a bronze apron along the berth face (mooring
-//!   blocks, bronze frames down the face, a lit seam, a violet edge at the bow end where
-//!   ships leave), then plates lapped back like feathers into spikes over the rest.
-//!   Red optics either side of the bow's point.
-//! - Over the berth the fabricator heads hang from arms reaching out off the quay
-//!   (their mounts are `mc_core::print_heads`, where the nanite streams pour from):
-//!   each head under a plated crab at an arm's tip. The violet runs hot while it builds.
-//! - A toothed bronze turntable turns on the quay (`part::SPINNER`).
-//! - The owner's colour runs along the quay's ridge.
+//! - The shell is a hard-chined body lofted across the lot (the Ark's language), laid in
+//!   backswept scales lapped out from the middle both ways, a glazed course on each side
+//!   where the nanites show, an armour ridge down its crest with the owner's colour on
+//!   it, and spines along the crest.
+//! - Eight clawed legs, four a side, reach out off its flanks and down through the water;
+//!   the shader lets each foot down onto the seabed however deep it is (`part::PILE`), so
+//!   nothing is levelled under it.
+//! - The heads (their mounts are `mc_core::print_heads`) hang under scaled arms off the
+//!   shell's front. The violet runs hot while it builds.
 //!
-//! Each tier is more elaborate, not more lit: tech 2 (Slipway II) puts up a second,
-//! taller pair of arms at the quay's ends, tech 3 (Slipway III) a high boom over the
-//! middle of the berth with three heads under it, for the capital ships.
-//!
-//! The quay is a plated ridge; the arms are cantilevers off plated pylons, braced off the
-//! apron, counterweighted over the back; tech 2 adds a machine bank along the back, tech
-//! 3 the boom along the berth on two pylons.
+//! Each tier adds reach, not light: tech 2 (Slipway II) a second, taller pair of arms at
+//! the shell's ends and taller spines, tech 3 (Slipway III) an arch sprung off the shell's
+//! ends over the front of the berth, three heads under it for the capital ships.
 
-use glam::{Vec2, Vec3};
+use glam::{Affine3A, Vec2, Vec3};
 
 use crate::builder::MeshBuilder;
 use crate::material::*;
 use crate::part;
 
-use super::kit::{cable, dark_plate, metal, seam, v3};
+use super::kit::{dark_plate, nanite_plate, seam, v3};
 use super::machine::*;
 
 const MESH: &str = "regency_tidebrood";
 
-/// The quay: its berth face, ridge and back (y); its apron's inner edge.
-const FACE: f32 = -17.0;
-const APRON: f32 = -24.0;
-const RIDGE_Y: f32 = -33.0;
-const BACK: f32 = -44.0;
-/// Its bow's point (+x, where ships leave) and its stern.
-const BOW: f32 = 46.0;
-const STERN: f32 = -42.0;
-/// Heights: the apron and the quay's sides, the ridge, the plates' thickness.
-const SIDE_Z: f32 = 4.0;
-const RIDGE_Z: f32 = 9.0;
-const THICK: f32 = 0.85;
-/// Tech 3's boom along the berth: its line (y), height, and ends (x).
-const BOOM_Y: f32 = -3.5;
-const BOOM_Z: f32 = 30.6;
-const BOOM_END: f32 = 27.0;
-
-/// The quay's deck height at `y`: flat over the apron, peaked at the ridge.
-fn deck(y: f32) -> f32 {
-    let t = if y > RIDGE_Y {
-        (APRON - y.min(APRON)) / (APRON - RIDGE_Y)
-    } else {
-        (y - BACK) / (RIDGE_Y - BACK)
-    };
-    SIDE_Z + (RIDGE_Z - SIDE_Z) * t.clamp(0.0, 1.0)
-}
-
-/// Where the quay's bow has swept back to at `y`: the point is on the ridge.
-fn bow_x(y: f32) -> f32 {
-    BOW - (y - RIDGE_Y).abs() * 0.6
-}
-
-/// The heads tier `tier` fits: mount, scale, aim.
 fn heads(tier: u8) -> impl Iterator<Item = (Vec3, f32, Vec3)> {
     tier_heads(MESH, tier)
 }
 
-// ---- Pieces ----------------------------------------------------------------------------
+// ---- The kit: lofted bodies along a path, laid in scales -------------------------------
 
-/// A plated crab riding a rail along `along` at `at` (the middle of its underside): bronze
-/// wheels at full detail, a red optic looking out its `look` end.
-fn crab(b: &mut MeshBuilder, at: Vec3, along: Vec3, look: Vec3) {
-    let along = along.normalize();
-    let across = Vec3::Z.cross(along);
-    let half = along.abs() * 2.6 + across.abs() * 2.4;
+/// A station of a lofted body: its centre, half its width across the path, half its depth.
+#[derive(Clone, Copy)]
+struct St {
+    c: Vec3,
+    w: f32,
+    h: f32,
+}
+
+const fn st(x: f32, y: f32, z: f32, w: f32, h: f32) -> St {
+    St {
+        c: Vec3::new(x, y, z),
+        w,
+        h,
+    }
+}
+
+/// The path's direction at station `i`.
+fn dir(path: &[St], i: usize) -> Vec3 {
+    let a = path[i.saturating_sub(1)].c;
+    let c = path[(i + 1).min(path.len() - 1)].c;
+    (c - a).normalize()
+}
+
+/// The section's side (across the path, level) and up.
+fn axes(d: Vec3) -> (Vec3, Vec3) {
+    let s = d.cross(Vec3::Z).try_normalize().unwrap_or(Vec3::Y);
+    (s, s.cross(d).normalize())
+}
+
+/// The body's section at `s` with direction `d`: a keel, two knuckles, two upper chines
+/// and the crest: hard chines, like the Ark's hull.
+fn section(s: &St, d: Vec3) -> [Vec3; 6] {
+    let (side, up) = axes(d);
+    let p = |a: f32, b: f32| s.c + side * (a * s.w) + up * (b * s.h);
+    [
+        p(0.0, -1.0),
+        p(-1.0, -0.3),
+        p(-0.72, 0.5),
+        p(0.0, 1.0),
+        p(0.72, 0.5),
+        p(1.0, -0.3),
+    ]
+}
+
+/// The path's length to each station.
+fn lengths(path: &[St]) -> Vec<f32> {
+    let mut acc = vec![0.0];
+    for w in path.windows(2) {
+        acc.push(acc[acc.len() - 1] + w[0].c.distance(w[1].c));
+    }
+    acc
+}
+
+/// The station `s` metres along the path, and the path's direction there.
+fn along(path: &[St], acc: &[f32], s: f32) -> (St, Vec3) {
+    let s = s.clamp(0.0, acc[acc.len() - 1]);
+    let i = acc
+        .windows(2)
+        .position(|w| s <= w[1])
+        .unwrap_or(acc.len() - 2);
+    let k = (s - acc[i]) / (acc[i + 1] - acc[i]).max(1e-4);
+    let (a, c) = (path[i], path[i + 1]);
+    (
+        St {
+            c: a.c.lerp(c.c, k),
+            w: a.w + (c.w - a.w) * k,
+            h: a.h + (c.h - a.h) * k,
+        },
+        (c.c - a.c).normalize(),
+    )
+}
+
+/// The body lofted along `path`, capped at both ends, in dark plate.
+fn body(b: &mut MeshBuilder, path: &[St]) {
+    let rings: Vec<Vec<Vec3>> = (0..path.len())
+        .map(|i| section(&path[i], dir(path, i)).to_vec())
+        .collect();
     dark_plate(b);
-    b.block(at - half, at + half + Vec3::Z * 1.6);
-    if b.fine() {
-        for k in [-1.6f32, 1.6] {
-            collar(b, at + along * k + Vec3::Z * 0.1, across, 0.8, 5.0);
+    b.with_facets(|b| b.loft(&rings, true, true));
+}
+
+/// Scales on `faces` of the body (face `j` runs from section point `j` to `j + 1`),
+/// laid from `s0` to `s1` metres along the path, one every `step`, lapped toward `s1`
+/// (`s1 < s0` laps them back toward the path's start) so their spikes point that way.
+/// Below full detail every other one is left off. `glazed` faces show their nanites.
+fn scales(
+    b: &mut MeshBuilder,
+    path: &[St],
+    faces: &[usize],
+    s0: f32,
+    s1: f32,
+    step: f32,
+    glazed: &[usize],
+) {
+    let acc = lengths(path);
+    let sign = (s1 - s0).signum();
+    let count = ((s1 - s0).abs() / step).floor() as usize;
+    for k in 0..count {
+        if !b.fine() && k % 2 == 1 {
+            continue;
+        }
+        let s = s0 + sign * step * (k as f32 + 0.5);
+        let (station, d) = along(path, &acc, s);
+        let ring = section(&station, d);
+        for &j in faces {
+            let (p, q) = (ring[j], ring[(j + 1) % 6]);
+            let across = q - p;
+            let mut n = d.cross(across).normalize();
+            let mid = (p + q) * 0.5;
+            if n.dot(mid - station.c) < 0.0 {
+                n = -n;
+            }
+            let u = d * sign;
+            let f = Frame::new(mid - u * (step * 0.55), u, n);
+            if glazed.contains(&j) {
+                nanite_plate(b);
+            } else {
+                dark_plate(b);
+            }
+            let last = k + 1 == count;
+            let len = step * 1.45 + if last { 3.0 } else { 0.0 };
+            armour(b, &f, &swept(len, across.length() * 0.48, 0.0, 0.3), 0.7);
         }
     }
-    let look = look.normalize();
-    red_slot(
-        b,
-        at + look * (half.dot(look.abs()) + 0.05) + Vec3::Z * 0.8,
-        look,
-        Vec3::Z.cross(look),
-        2.6,
-        0.25,
-    );
+}
+
+/// An armour ridge along the body's crest from `s0` to `s1`, the owner's colour on it.
+fn ridge(b: &mut MeshBuilder, path: &[St], s0: f32, s1: f32) {
+    let acc = lengths(path);
+    let top = |s: f32| {
+        let (station, d) = along(path, &acc, s);
+        section(&station, d)[3] + Vec3::Z * 0.4
+    };
+    let n = 6;
+    for k in 0..n {
+        let (a, c) = (
+            top(s0 + (s1 - s0) * k as f32 / n as f32),
+            top(s0 + (s1 - s0) * (k + 1) as f32 / n as f32),
+        );
+        dark_plate(b);
+        b.beam(a, c, Vec2::new(1.6, 1.0), Vec2::new(1.6, 1.0));
+        if (1..n - 1).contains(&k) {
+            team(b, a + Vec3::Z * 0.52, c + Vec3::Z * 0.52, 0.5);
+        }
+    }
+}
+
+/// Spines along the crest from `s0` to `s1`: tall plates swept back toward `s1`, `rise`
+/// high at the middle of the run, shorter toward its ends.
+fn spines(b: &mut MeshBuilder, path: &[St], s0: f32, s1: f32, count: usize, rise: f32) {
+    let acc = lengths(path);
+    for k in 0..count {
+        let t = (k as f32 + 0.5) / count as f32;
+        let (station, d) = along(path, &acc, s0 + (s1 - s0) * t);
+        let foot = section(&station, d)[3];
+        let u = (d * (s1 - s0).signum() * 0.9 + Vec3::Z).normalize();
+        let (side, _) = axes(d);
+        let f = Frame::new(foot - u * 1.0, u, side);
+        let len = rise * (1.0 - (t - 0.5).abs() * 1.1);
+        dark_plate(b);
+        armour(b, &f, &swept(len, 1.4, -0.6, 0.35), 0.6);
+        let back = Frame::new(foot - u * 1.0, u, -side);
+        armour(b, &back, &swept(len, 1.4, 0.6, 0.35), 0.6);
+    }
+}
+
+/// The owner's colour: a strip from `a` to `c`, `w` either side, facing up.
+fn team(b: &mut MeshBuilder, a: Vec3, c: Vec3, w: f32) {
+    let across = Vec3::Z.cross(c - a).normalize() * w;
+    b.paint(TEAM);
+    b.face(&[a - across, c - across, c + across, a + across]);
 }
 
 /// A head hung on a plated drop from `from_z` (the underside of what carries it).
@@ -108,539 +219,228 @@ fn hang(b: &mut MeshBuilder, mount: Vec3, s: f32, aim: Vec3, from_z: f32) {
         Vec2::new(1.4, 1.2),
         Vec2::new(1.0, 0.9),
     );
+    if b.fine() {
+        collar(b, v3(mount.x, mount.y, from_z - 0.4), Vec3::X, 0.8, 2.2);
+    }
     fabricator(b, mount, aim, s);
 }
 
-/// The berth face's apron (`x0` to `x1` along it): mooring blocks, bronze frames down the
-/// face, a lit seam, and a violet edge at its bow end where ships leave.
-fn apron(b: &mut MeshBuilder, x0: f32, x1: f32) {
-    let face = FACE - 0.3;
-    let mut x = x0 + 6.0;
-    while x < x1 - 3.0 {
-        shaft(b, v3(x, face, 0.4), v3(x, face, SIDE_Z + 0.4), 0.55);
-        x += 12.0;
-    }
-    let mut x = x0 + 12.0;
-    while x < x1 - 6.0 {
-        dark_plate(b);
-        b.block(
-            v3(x - 1.4, face - 2.2, SIDE_Z - 0.2),
-            v3(x + 1.4, face + 0.6, SIDE_Z + 1.2),
-        );
-        x += 24.0;
-    }
-    red_slot(
-        b,
-        v3((x0 + x1) * 0.5, face + 0.1, 2.0),
-        Vec3::Y,
-        Vec3::X,
-        x1 - x0 - 10.0,
-        0.2,
-    );
-    b.paint(GLOW_VIOLET);
-    b.beam(
-        v3(x1 - 0.4, FACE + 0.2, 0.6),
-        v3(x1 - 0.4, FACE + 0.2, SIDE_Z + 3.0),
-        Vec2::new(0.35, 0.5),
-        Vec2::new(0.35, 0.5),
-    );
+/// A scaled arm along `path` (root to tip), the head at `mount` hung under it where the
+/// arm passes over it.
+fn arm(b: &mut MeshBuilder, path: &[St], mount: Vec3, s: f32, aim: Vec3) {
+    body(b, path);
+    let acc = lengths(path);
+    let len = acc[acc.len() - 1];
+    scales(b, path, &[2, 3, 4], len - 1.0, 0.0, len / 4.0, &[]);
+    let under = (0..=40)
+        .map(|k| along(path, &acc, len * k as f32 / 40.0).0)
+        .min_by(|a, c| {
+            a.c.truncate()
+                .distance(mount.truncate())
+                .total_cmp(&c.c.truncate().distance(mount.truncate()))
+        })
+        .map_or(mount.z + 1.3, |st| st.c.z - st.h * 0.8);
+    hang(b, mount, s, aim, under);
 }
 
-/// The toothed turntable turning at `at` (the spinner's pivot), on a plated drum.
-fn turntable(b: &mut MeshBuilder, at: Vec3, r: f32) {
-    let fine = b.fine();
-    seam(b);
-    b.prism(
-        v3(at.x, at.y, at.z - 1.6),
-        b.sides(12),
-        r + 1.4,
-        r + 0.8,
-        1.0,
-    );
-    b.with_part(part::SPINNER, |b| {
-        metal(b);
-        let sides = b.sides(16);
-        b.prism(at - Vec3::Z * 0.6, sides, r, r, 1.0);
-        if fine {
-            teeth(b, at - Vec3::Z * 0.1, r - 0.2, 18, v3(0.7, 0.8, 0.9));
-        }
-        dark_plate(b);
-        b.beam(
-            at + v3(-r + 0.8, 0.0, 0.5),
-            at + v3(r - 0.8, 0.0, 0.5),
-            Vec2::new(1.6, 1.0),
-            Vec2::new(1.6, 1.0),
-        );
-    });
-}
-
-/// Rows of plates lapped back along the quay (toward -x) from `from` to `to`, across the
-/// band `y0` to `y1` of the deck, `count` plates the last running `tail` past.
-fn plate_row(b: &mut MeshBuilder, y0: f32, y1: f32, from: f32, to: f32, count: usize, tail: f32) {
-    let (z0, z1) = (deck(y0) + 0.3, deck(y1) - 0.2);
-    let y = (y0 + y1) * 0.5;
-    let across = v3(0.0, y1 - y0, z1 - z0);
-    let normal = v3(0.0, -across.z, across.y);
-    let normal = if normal.z < 0.0 { -normal } else { normal };
-    let len = (from - to) * 0.45;
-    let f = Frame::new(v3(from, y, (z0 + z1) * 0.5), -Vec3::X, normal);
+/// Far off: a body as a three-sided loft through `rings` of its stations, spread along it.
+fn coarse_body(b: &mut MeshBuilder, path: &[St], rings: usize) {
+    let last = path.len() - 1;
+    let rings: Vec<Vec<Vec3>> = (0..rings)
+        .map(|k| k * last / (rings - 1))
+        .map(|i| {
+            let ring = section(&path[i], dir(path, i));
+            vec![ring[1], ring[3], ring[5]]
+        })
+        .collect();
     dark_plate(b);
-    let plates = Course {
-        count,
-        step: (from - to - len) / (count - 1) as f32,
-        len,
-        half: across.length() * 0.5,
-        tip: if y1 > y0 { 1.0 } else { -1.0 },
-        thick: THICK,
-        tail,
+    b.loft(&rings, true, true);
+}
+
+/// Far off: the crest's spines as one fin over the body at `at`, `top` high.
+fn coarse_fin(b: &mut MeshBuilder, at: Vec3, top: f32) {
+    dark_plate(b);
+    let fin = [
+        at + v3(-6.0, 0.0, 0.0),
+        at + v3(6.0, 0.0, 0.0),
+        at.with_z(top),
+    ];
+    b.face(&fin);
+    b.face(&[fin[2], fin[1], fin[0]]);
+}
+
+/// The mirror image across x = 0, for the far side of a symmetrical yard.
+fn mirrored(b: &mut MeshBuilder, f: impl Fn(&mut MeshBuilder)) {
+    f(b);
+    b.with(Affine3A::from_scale(v3(-1.0, 1.0, 1.0)), f);
+}
+
+/// The scales, ridge and spines of a body running across the lot (-x to +x): lapped out
+/// from the middle both ways, so the yard is one piece, not a hull with a bow.
+fn dress(b: &mut MeshBuilder, path: &[St], spine_rise: f32, spine_count: usize) {
+    let len = lengths(path)[path.len() - 1];
+    let mid = len * 0.5;
+    let step = 4.4;
+    for (s1, glaze) in [(len, [4usize]), (0.0, [2usize])] {
+        scales(b, path, &[1, 2, 4, 5], mid, s1, step, &glaze);
     }
-    .lay(b, &f);
-    if b.fine() {
-        metal(b);
-        for &(g, long) in &plates {
-            let top = g.at(long * 0.3, 0.0, 0.0);
-            b.cylinder_between(top, top - g.n * 1.0, 0.45, 0.45, 4);
+    ridge(b, path, mid - len * 0.3, mid + len * 0.3);
+    if spine_count > 0 {
+        spines(b, path, mid + 3.0, len - 6.0, spine_count, spine_rise);
+        spines(b, path, mid - 3.0, 6.0, spine_count, spine_rise);
+    }
+}
+
+fn mirror_st(path: &[St]) -> Vec<St> {
+    path.iter()
+        .map(|p| St {
+            c: p.c * v3(-1.0, 1.0, 1.0),
+            ..*p
+        })
+        .collect()
+}
+
+/// The arm on either side for each of `tier`'s heads: `path` is the +x arm.
+fn arms(b: &mut MeshBuilder, tier: u8, path: &[St]) {
+    for (mount, s, aim) in heads(tier) {
+        if mount.x > 0.0 {
+            arm(b, path, mount, s, aim);
+        } else {
+            arm(b, &mirror_st(path), mount, s, aim);
         }
     }
 }
 
-/// The quay's swept bow (red optics either side of its point).
-fn bow_optics(b: &mut MeshBuilder) {
-    let tip = v3(bow_x(RIDGE_Y), RIDGE_Y, SIDE_Z - 1.4);
-    for side in [-1.0f32, 1.0] {
-        let along = v3(-0.6, side, 0.0).normalize();
-        let out = v3(1.0, side * 0.6, 0.0).normalize();
-        red_slot(b, tip + along * 3.0 + out * 0.05, out, along, 3.0, 0.3);
+/// Tech 3's arch over the front of the berth, sprung off the shell's ends.
+const ARCH: [St; 9] = [
+    st(-42.0, -18.0, 14.0, 2.4, 2.2),
+    st(-37.0, -10.0, 23.0, 2.0, 1.9),
+    st(-29.0, -5.0, 29.4, 1.8, 1.6),
+    st(-15.0, -4.4, 31.2, 1.7, 1.5),
+    st(0.0, -4.3, 31.6, 1.7, 1.5),
+    st(15.0, -4.4, 31.2, 1.7, 1.5),
+    st(29.0, -5.0, 29.4, 1.8, 1.6),
+    st(37.0, -10.0, 23.0, 2.0, 1.9),
+    st(42.0, -18.0, 14.0, 2.4, 2.2),
+];
+
+/// Tech 3: the arch, its heads hung under it.
+fn arch(b: &mut MeshBuilder) {
+    body(b, &ARCH);
+    let len = lengths(&ARCH)[ARCH.len() - 1];
+    scales(b, &ARCH, &[2, 3, 4], len * 0.5, len, 3.6, &[]);
+    scales(b, &ARCH, &[2, 3, 4], len * 0.5, 0.0, 3.6, &[]);
+    for (mount, s, aim) in heads(3) {
+        hang(b, mount, s, aim, 29.6);
     }
 }
 
-/// The owner's colour: a strip `x0` to `x1` along `y`, facing up at `z`.
-fn team(b: &mut MeshBuilder, x0: f32, x1: f32, y: f32, w: f32, z: f32) {
-    b.paint(TEAM);
-    b.face(&[
-        v3(x0, y - w, z),
-        v3(x1, y - w, z),
-        v3(x1, y + w, z),
-        v3(x0, y + w, z),
-    ]);
+/// The shell: low and broad behind the berth, crouched on its legs.
+const SHELL: [St; 9] = [
+    st(-41.0, -32.0, 6.0, 1.0, 1.0),
+    st(-37.5, -32.0, 7.0, 7.0, 4.2),
+    st(-30.0, -33.0, 8.0, 10.6, 5.6),
+    st(-15.0, -34.0, 8.6, 12.0, 6.2),
+    st(0.0, -34.0, 8.8, 12.4, 6.4),
+    st(15.0, -34.0, 8.6, 12.0, 6.2),
+    st(30.0, -33.0, 8.0, 10.6, 5.6),
+    st(37.5, -32.0, 7.0, 7.0, 4.2),
+    st(41.0, -32.0, 6.0, 1.0, 1.0),
+];
+
+/// A clawed leg (+x side): off the shell's flank, out and down through the water to the
+/// seabed, its last station on the surface so the shader lets it down to the bottom.
+fn leg(from: Vec3, out: Vec2) -> [St; 4] {
+    // Its reach is how long `out` is.
+    let (o, r) = (out.normalize(), out.length() / 12.0);
+    let p = |k: f32, z: f32| (from.truncate() + o * (k * r)).extend(z);
+    let at = |c: Vec3, w: f32, h: f32| St { c, w, h };
+    [
+        at(p(0.0, from.z), 2.4, 2.2),
+        at(p(5.0, from.z + 3.0), 2.0, 1.9),
+        at(p(10.0, 2.6), 1.6, 1.6),
+        at(p(12.0, 1.0), 1.0, 1.0),
+    ]
 }
-
-/// Lapped plates along the top of an arm or boom from `tip` back toward `root`, the last
-/// running `tail` past into a spike.
-fn arm_plates(b: &mut MeshBuilder, tip: Vec3, root: Vec3, half: f32, count: usize, tail: f32) {
-    let span = (root - tip).length();
-    let len = span * 0.42;
-    let f = Frame::new(tip, root - tip, Vec3::Z);
-    dark_plate(b);
-    Course {
-        count,
-        step: (span - len) / (count - 1) as f32,
-        len,
-        half,
-        tip: 0.0,
-        thick: THICK * 0.8,
-        tail,
-    }
-    .lay(b, &f);
-}
-
-// ---- The quay, cantilevers off plated pylons -------------------------------------------
-
-/// The turntable, on the caisson at the quay's stern.
-const TURNTABLE: Vec3 = Vec3::new(-34.0, -33.0, 8.6);
-/// Its caisson: from the stern to `CAISSON` along the quay.
-const CAISSON: f32 = -27.0;
 
 pub(super) fn tidebrood(b: &mut MeshBuilder, tech: u8) {
-    b.set_spinner_pivot(TURNTABLE);
+    let legs = [
+        (v3(10.0, -24.0, 5.0), Vec2::new(1.8, 12.0)),
+        (v3(30.0, -26.0, 5.0), Vec2::new(7.2, 9.6)),
+        (v3(35.0, -37.0, 5.0), Vec2::new(5.6, -4.2)),
+        (v3(15.0, -41.0, 5.0), Vec2::new(1.6, -4.8)),
+    ];
     if b.coarse() {
-        coarse(b, tech);
+        coarse_body(b, &SHELL, 3);
+        coarse_fin(b, v3(0.0, -34.0, 14.0), if tech >= 2 { 26.0 } else { 21.0 });
+        team(b, v3(-8.0, -34.0, 15.3), v3(8.0, -34.0, 15.3), 1.8);
+        b.with_part(part::PILE, |b| {
+            dark_plate(b);
+            mirrored(b, |b| {
+                for (from, out) in legs.into_iter().take(2) {
+                    let foot = (from.truncate() + out).extend(0.0);
+                    let s = Vec3::Z.cross(foot - from).normalize() * 1.2;
+                    let quad = [from - s, foot - s, foot + s, from + s];
+                    b.face(&quad);
+                    let mut back = quad;
+                    back.reverse();
+                    b.face(&back);
+                }
+            });
+        });
+        if tech >= 3 {
+            coarse_body(b, &ARCH, 3);
+        }
         return;
     }
-    quay(b);
-    apron(b, STERN, bow_x(FACE));
-    bow_optics(b);
-    caisson(b);
-    for (mount, s, aim) in heads(1) {
-        cantilever(b, mount, s, aim, 3.0, 6.0);
-    }
-    tier(b, tech, 2, 0.2, |b| {
-        for (mount, s, aim) in heads(2) {
-            cantilever(b, mount, s, aim, 3.2, 6.8);
+    body(b, &SHELL);
+    dress(b, &SHELL, 9.0, 3);
+    mirrored(b, |b| {
+        for (from, out) in legs {
+            let path = leg(from, out);
+            // The leg's foot: the shader lets what is at the surface down to the seabed.
+            b.with_part(part::PILE, |b| {
+                body(b, &path);
+                seam(b);
+                let foot = path[3].c;
+                b.beam(
+                    foot,
+                    foot.with_z(0.0),
+                    Vec2::new(1.8, 1.8),
+                    Vec2::new(2.6, 2.6),
+                );
+            });
+            let len = lengths(&path)[path.len() - 1];
+            b.with_part(part::PILE, |b| {
+                scales(b, &path, &[2, 3, 4], len - 3.0, 0.0, len / 4.0, &[]);
+            });
+            if b.fine() {
+                collar(b, from, out.extend(0.0), 2.2, 1.8);
+            }
         }
-        bank(b);
     });
-    tier(b, tech, 3, 0.25, boom);
-}
-
-/// Far off: the quay, its caisson, the arms of the highest tier as a tower and a top,
-/// the owner's colour along the ridge.
-fn coarse(b: &mut MeshBuilder, tech: u8) {
-    dark_plate(b);
-    let ring = |z: f32, inset: f32| -> Vec<Vec3> {
-        vec![
-            v3(bow_x(RIDGE_Y) - inset, RIDGE_Y, z),
-            v3(bow_x(FACE) - inset, FACE - inset * 0.3, z),
-            v3(STERN + inset * 0.3, FACE - inset * 0.3, z),
-            v3(STERN + inset * 0.3, BACK + inset * 0.3, z),
-            v3(bow_x(BACK) - inset, BACK + inset * 0.3, z),
-        ]
-    };
-    b.loft(&[ring(0.0, 0.0), ring(RIDGE_Z + 0.6, 6.0)], false, true);
-    team(b, -20.0, 30.0, RIDGE_Y, 1.4, RIDGE_Z + 0.65);
-    dark_plate(b);
-    let tiers: &[u8] = match tech {
-        1 => &[1],
-        2 => &[1, 2],
-        _ => &[2],
-    };
-    for &t in tiers {
-        for (mount, _, _) in heads(t) {
-            coarse_arm(b, mount.x, mount.y - 2.0, mount.z + 3.0 + 1.2);
-        }
-    }
-    if tech >= 3 {
-        for x in [-BOOM_END + 2.0, BOOM_END - 2.0] {
-            b.prism(v3(x, RIDGE_Y + 1.0, RIDGE_Z), 3, 3.0, 2.2, BOOM_Z - RIDGE_Z);
-        }
-        b.face(&[
-            v3(-BOOM_END, BOOM_Y - 2.0, BOOM_Z + 1.3),
-            v3(BOOM_END, BOOM_Y - 2.0, BOOM_Z + 1.3),
-            v3(BOOM_END, BOOM_Y + 2.0, BOOM_Z + 1.3),
-            v3(-BOOM_END, BOOM_Y + 2.0, BOOM_Z + 1.3),
-        ]);
-    }
-}
-
-/// A coarse arm: a three-sided tower on the ridge and a top reaching out to `tip`.
-fn coarse_arm(b: &mut MeshBuilder, x: f32, tip: f32, top: f32) {
-    b.prism(v3(x, RIDGE_Y, RIDGE_Z), 3, 3.4, 2.4, top - RIDGE_Z);
-    b.face(&[
-        v3(x - 1.8, RIDGE_Y - 6.0, top),
-        v3(x + 1.8, RIDGE_Y - 6.0, top),
-        v3(x + 1.8, tip, top),
-        v3(x - 1.8, tip, top),
-    ]);
-}
-
-/// The quay: a pontoon swept to a point at the bow, square at the stern, its bronze deck
-/// peaked at the ridge, plates lapped back over it.
-fn quay(b: &mut MeshBuilder) {
-    let hull = |z: f32| -> Vec<Vec3> {
-        vec![
-            v3(bow_x(RIDGE_Y), RIDGE_Y, z),
-            v3(bow_x(FACE), FACE, z),
-            v3(STERN, FACE, z),
-            v3(STERN, BACK, z),
-            v3(bow_x(BACK), BACK, z),
-        ]
-    };
-    seam(b);
-    b.loft(&[hull(0.0), hull(SIDE_Z - 0.6)], false, true);
-    let section = [
-        (FACE - 0.4, SIDE_Z - 0.6),
-        (APRON, SIDE_Z - 0.4),
-        (RIDGE_Y, RIDGE_Z - 0.9),
-        (BACK + 0.6, SIDE_Z - 0.6),
+    let arm_1 = [
+        st(12.0, -26.0, 12.0, 2.6, 2.2),
+        st(13.0, -20.0, 15.6, 2.2, 1.8),
+        st(14.0, -14.0, 17.6, 1.8, 1.4),
+        st(14.0, -9.5, 18.0, 1.5, 1.2),
+        st(14.0, -5.0, 17.6, 0.3, 0.3),
     ];
-    let deck_ring = |x: Option<f32>| -> Vec<Vec3> {
-        section
-            .iter()
-            .map(|&(y, z)| v3(x.unwrap_or(bow_x(y) - 3.0), y, z))
-            .collect()
-    };
-    metal(b);
-    b.loft(&[deck_ring(Some(STERN + 0.4)), deck_ring(None)], true, true);
-    // Plates: one row up the inner slope from the apron, two down the back.
-    for (y0, y1, count) in [
-        (RIDGE_Y + 0.4, APRON - 0.4, 5),
-        (RIDGE_Y - 0.4, RIDGE_Y - 5.2, 5),
-        (RIDGE_Y - 5.8, BACK - 0.8, 5),
-    ] {
-        plate_row(
-            b,
-            y0,
-            y1,
-            bow_x((y0 + y1) * 0.5) - 3.0,
-            CAISSON + 2.0,
-            count,
-            3.0,
-        );
-    }
-    team(b, -20.0, 30.0, RIDGE_Y, 0.6, RIDGE_Z + 1.5);
-}
-
-/// The caisson at the stern, the turntable on its roof, plates lapped back over its
-/// sides into spikes past the stern.
-fn caisson(b: &mut MeshBuilder) {
-    seam(b);
-    b.frustum_open(
-        v3((STERN + CAISSON) * 0.5, (APRON + BACK) * 0.5, 0.0),
-        Vec2::new(CAISSON - STERN, APRON - BACK),
-        Vec2::new(CAISSON - STERN - 2.0, APRON - BACK - 3.0),
-        TURNTABLE.z - 1.6,
-        Vec2::ZERO,
-    );
-    for (y, tip) in [(APRON - 2.0, 1.0f32), (BACK + 2.0, -1.0)] {
-        let f = Frame::new(
-            v3(CAISSON + 1.0, y, TURNTABLE.z - 1.8),
-            -Vec3::X,
-            v3(0.0, -tip * 0.35, 1.0),
-        );
-        dark_plate(b);
-        Course {
-            count: 2,
-            step: 6.0,
-            len: 8.0,
-            half: 3.4,
-            tip: -tip,
-            thick: THICK,
-            tail: 3.0,
-        }
-        .lay(b, &f);
-    }
-    turntable(b, TURNTABLE, 5.0);
-}
-
-/// A cantilever over the berth for the head at `mount`: a plated pylon on the ridge
-/// leaning toward the berth, an arm out over the water `lift` above the head with the
-/// crab and head at its tip, counterweighted `back` behind the pylon, braced off the
-/// apron by a plated strut.
-fn cantilever(b: &mut MeshBuilder, mount: Vec3, s: f32, aim: Vec3, lift: f32, back: f32) {
-    let x = mount.x;
-    let arm_z = mount.z + lift;
-    let tip = mount.y + 2.4;
-    let root = RIDGE_Y - back;
-    // Bearing block on the ridge, a bronze collar the pylon stands in.
-    dark_plate(b);
-    b.block(
-        v3(x - 4.2, RIDGE_Y - 3.4, deck(RIDGE_Y) - 1.2),
-        v3(x + 4.2, RIDGE_Y + 3.4, RIDGE_Z + 0.8),
-    );
-    collar(b, v3(x, RIDGE_Y + 0.6, RIDGE_Z + 1.2), Vec3::Z, 2.9, 0.8);
-    // The pylon: faceted, leaning toward the berth.
-    dark_plate(b);
-    b.with_facets(|b| {
-        b.frustum(
-            v3(x, RIDGE_Y + 0.6, RIDGE_Z + 0.8),
-            Vec2::new(4.6, 5.2),
-            Vec2::new(3.2, 3.4),
-            arm_z - 1.2 - (RIDGE_Z + 0.8),
-            Vec2::new(0.0, 2.0),
-        )
+    arms(b, 1, &arm_1);
+    tier(b, tech, 2, 0.2, |b| {
+        let arm_2 = [
+            st(30.0, -26.0, 12.0, 2.6, 2.2),
+            st(31.5, -18.0, 18.4, 2.2, 1.8),
+            st(32.0, -13.0, 21.4, 1.8, 1.4),
+            st(32.0, -9.0, 22.0, 1.5, 1.2),
+            st(32.0, -5.0, 21.6, 0.3, 0.3),
+        ];
+        arms(b, 2, &arm_2);
+        let len = lengths(&SHELL)[SHELL.len() - 1];
+        spines(b, &SHELL, len * 0.5 + 2.0, len * 0.5 + 24.0, 3, 14.0);
+        spines(b, &SHELL, len * 0.5 - 2.0, len * 0.5 - 24.0, 3, 14.0);
     });
-    let top = v3(x, RIDGE_Y + 2.6, arm_z);
-    red_slot(
-        b,
-        v3(x, RIDGE_Y + 3.6, arm_z - 3.0),
-        v3(0.0, 1.0, 0.2),
-        Vec3::X,
-        2.4,
-        0.3,
-    );
-    // The arm, out to the tip; the counterweight under its root.
-    dark_plate(b);
-    b.beam(
-        v3(x, root, arm_z),
-        v3(x, tip, arm_z),
-        Vec2::new(3.6, 2.4),
-        Vec2::new(3.0, 2.0),
-    );
-    arm_plates(
-        b,
-        v3(x, tip + 0.6, arm_z + 1.0),
-        v3(x, root, arm_z + 1.0),
-        1.9,
-        3,
-        3.0,
-    );
-    dark_plate(b);
-    b.block(
-        v3(x - 2.0, root - 0.4, arm_z - 4.6),
-        v3(x + 2.0, root + 4.0, arm_z - 1.0),
-    );
-    // Braced off the apron.
-    strut(
-        b,
-        v3(x, FACE - 2.4, SIDE_Z + 0.4),
-        v3(x, tip - 6.0, arm_z - 1.1),
-        0.6,
-    );
-    if b.fine() {
-        // The crab's drive line under the arm, and its feed cable down the pylon.
-        shaft(
-            b,
-            v3(x, top.y, arm_z - 1.5),
-            v3(x, tip + 0.8, arm_z - 1.5),
-            0.32,
-        );
-        metal(b);
-        cable(
-            b,
-            &[
-                v3(x + 1.9, RIDGE_Y - 1.6, RIDGE_Z + 1.0),
-                v3(x + 1.9, RIDGE_Y + 0.6, arm_z - 1.4),
-                v3(x + 1.9, mount.y + 4.0, arm_z - 1.4),
-            ],
-            0.28,
-        );
-    }
-    crab(b, v3(x, mount.y, arm_z + 1.2), Vec3::Y, Vec3::Y);
-    hang(b, mount, s, aim, arm_z - 1.0);
-}
-
-/// Tech 2: a machine bank along the quay's back: a low plated housing, plates lapped back
-/// along its outer edge into a spike, feed lines up the quay's back.
-fn bank(b: &mut MeshBuilder) {
-    let (y0, y1, x0, x1, top) = (BACK - 2.8, BACK + 0.5, -24.0, 22.0, 4.8);
-    seam(b);
-    b.frustum_open(
-        v3((x0 + x1) * 0.5, (y0 + y1) * 0.5, 0.0),
-        Vec2::new(x1 - x0, y1 - y0),
-        Vec2::new(x1 - x0 - 2.0, y1 - y0 - 1.0),
-        top,
-        Vec2::ZERO,
-    );
-    let f = Frame::new(
-        v3(x1 + 1.0, y0 + 2.0, top + 0.3),
-        -Vec3::X,
-        v3(0.0, -0.35, 1.0),
-    );
-    dark_plate(b);
-    Course {
-        count: 4,
-        step: 10.5,
-        len: 13.0,
-        half: 1.6,
-        tip: 1.0,
-        thick: THICK,
-        tail: 3.0,
-    }
-    .lay(b, &f);
-    red_slot(
-        b,
-        v3(x1 - 0.9, (y0 + y1) * 0.5, top * 0.5),
-        Vec3::X,
-        Vec3::Y,
-        2.4,
-        0.3,
-    );
-    if b.fine() {
-        metal(b);
-        for x in [-14.0, 0.0, 12.0] {
-            cable(
-                b,
-                &[
-                    v3(x, y0 + 1.2, top),
-                    v3(x, BACK + 1.0, top + 0.6),
-                    v3(x, BACK + 3.0, deck(BACK + 3.0) + 0.4),
-                ],
-                0.3,
-            );
-        }
-    }
-}
-
-/// Tech 3: the boom along the berth on two tall pylons, its arms reaching out from them,
-/// three crabs riding it with the tech 3 heads under them.
-fn boom(b: &mut MeshBuilder) {
-    for x in [-BOOM_END + 2.0, BOOM_END - 2.0] {
-        // Pylon: a bearing block, a tall faceted tower, plates lapped down its back.
-        dark_plate(b);
-        b.block(
-            v3(x - 4.6, RIDGE_Y - 3.8, deck(RIDGE_Y) - 1.2),
-            v3(x + 4.6, RIDGE_Y + 3.8, RIDGE_Z + 1.0),
-        );
-        collar(b, v3(x, RIDGE_Y, RIDGE_Z + 1.4), Vec3::Z, 3.2, 0.8);
-        dark_plate(b);
-        b.with_facets(|b| {
-            b.frustum(
-                v3(x, RIDGE_Y, RIDGE_Z + 1.0),
-                Vec2::new(5.4, 6.0),
-                Vec2::new(3.6, 4.0),
-                BOOM_Z - 1.0 - (RIDGE_Z + 1.0),
-                Vec2::new(0.0, 1.0),
-            )
-        });
-        let f = Frame::new(
-            v3(x, RIDGE_Y - 2.6, BOOM_Z - 2.0),
-            v3(0.0, -0.25, -1.0),
-            -Vec3::Y,
-        );
-        dark_plate(b);
-        Course {
-            count: 3,
-            step: 6.0,
-            len: 8.0,
-            half: 2.6,
-            tip: 0.0,
-            thick: THICK,
-            tail: 3.0,
-        }
-        .lay(b, &f);
-        red_slot(
-            b,
-            v3(x, RIDGE_Y + 3.1, BOOM_Z - 4.0),
-            Vec3::Y,
-            Vec3::X,
-            2.6,
-            0.3,
-        );
-        // The arm out to the boom, a plated strut under it off the pylon.
-        dark_plate(b);
-        b.beam(
-            v3(x, RIDGE_Y - 4.0, BOOM_Z),
-            v3(x, BOOM_Y - 1.6, BOOM_Z),
-            Vec2::new(3.8, 2.6),
-            Vec2::new(3.4, 2.4),
-        );
-        strut(
-            b,
-            v3(x, RIDGE_Y + 3.0, BOOM_Z - 9.0),
-            v3(x, BOOM_Y - 4.0, BOOM_Z - 1.3),
-            0.6,
-        );
-        arm_plates(
-            b,
-            v3(x, BOOM_Y - 1.0, BOOM_Z + 1.4),
-            v3(x, RIDGE_Y - 4.0, BOOM_Z + 1.4),
-            2.0,
-            3,
-            3.0,
-        );
-    }
-    dark_plate(b);
-    b.beam(
-        v3(-BOOM_END, BOOM_Y, BOOM_Z),
-        v3(BOOM_END, BOOM_Y, BOOM_Z),
-        Vec2::new(3.4, 2.4),
-        Vec2::new(3.4, 2.4),
-    );
-    // Plates lapped back along the boom (toward -x), the last a spike past its end.
-    let f = Frame::new(v3(BOOM_END, BOOM_Y, BOOM_Z + 1.2), -Vec3::X, Vec3::Z);
-    dark_plate(b);
-    Course {
-        count: 4,
-        step: 13.0,
-        len: 16.0,
-        half: 1.6,
-        tip: 0.0,
-        thick: THICK * 0.8,
-        tail: 3.0,
-    }
-    .lay(b, &f);
-    if b.fine() {
-        shaft(
-            b,
-            v3(-BOOM_END + 1.0, BOOM_Y + 1.5, BOOM_Z - 1.4),
-            v3(BOOM_END - 1.0, BOOM_Y + 1.5, BOOM_Z - 1.4),
-            0.32,
-        );
-    }
-    for (mount, s, aim) in heads(3) {
-        crab(b, v3(mount.x, BOOM_Y, BOOM_Z + 1.2), Vec3::X, Vec3::Y);
-        hang(b, mount, s, aim, BOOM_Z - 1.0);
-    }
+    tier(b, tech, 3, 0.25, arch);
 }
 
 #[cfg(test)]

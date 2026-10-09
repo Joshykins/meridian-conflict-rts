@@ -141,8 +141,9 @@ pub(super) const MODELS: &[ModelDef] = &[
         colossus::colossus,
     ),
     // Factories: the land press works (`brood`), the air launch frame (`hatchery`), the
-    // one-sided quay (`tidebrood`). All three upgrade in place to tech 3, the land one's
-    // lifted ring, the air one's crown and the quay's high boom standing taller.
+    // shell crouched on its legs behind the berth (`tidebrood`). All three upgrade in place
+    // to tech 3, the land one's lifted ring, the air one's crown and the shell's arch
+    // standing taller.
     ModelDef::tiered(
         "regency_brood",
         [(46.0, 22.0), (46.0, 22.0), (46.0, 35.0)],
@@ -267,7 +268,8 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_scorpion" => 14000,
         // The land and air factories' tech 3, with their tech 2 kit and more.
         "regency_brood" | "regency_hatchery" => 15000,
-        "regency_tidebrood" => 9000,
+        // The Slipway's scaled shell, legs, arms and tech 3 arch.
+        "regency_tidebrood" => 12000,
         // The tech 1 hulls; the tech 2 warships have a capital ship's detail, lighter.
         "regency_attack_boat" => 2400,
         // The tech 1 air force: jets by the dozen, a transport the size of a frigate.

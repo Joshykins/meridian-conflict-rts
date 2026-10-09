@@ -154,8 +154,10 @@ Gravitic`), a plasma charge steered in gravity containment.
 | Rapier | 3 | Assault submarine | The fastest hull under the sea; six-tube gravitic torpedo launcher and interceptors dived; surfaced, two twin repeaters, flak and a gravitic seeker pod. |
 
 The Slipway builds the tech 1 hulls and is refitted in place to the Slipway II and the
-Slipway III for the tech 2 and tech 3 ones. Like ARC's Wharf it is a one-sided quay: the
-berth is open water, so a capital ship longer than the yard still fits. The Rapier,
+Slipway III for the tech 2 and tech 3 ones. It is a scaled shell crouched behind the
+berth on clawed legs that reach down to the seabed, its arms out over the water; like ARC's
+Wharf it stands on one side only, so a capital ship longer than the yard still fits. No
+structure built in the water levels the seabed or the shore under it. The Rapier,
 the one submarine with guns, brings them up only on order.
 
 Its structures at sea, both moored and refitted in place where they float:

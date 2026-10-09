@@ -128,10 +128,10 @@ const REGENCY_AIR: FactoryHeads = FactoryHeads {
     ],
 };
 
-/// The Regency naval factory (`models::regency::tidebrood`): a one-sided quay, all its heads
-/// on the quay side (-y), the berth open water. Tech 1 hangs two from arms reaching out
-/// over the berth, tech 2 two more from taller arms at the quay's ends, and tech 3 three
-/// from a high boom over the middle of the berth, above the capital ships.
+/// The Regency naval factory (`models::regency::tidebrood`): a scaled shell crouched behind
+/// the berth, all its heads on that side (-y), the berth open water. Tech 1 hangs two from
+/// arms reaching out over the berth, tech 2 two more from taller arms at the shell's ends,
+/// and tech 3 three from an arch over the front of the berth, above the capital ships.
 const REGENCY_NAVAL: FactoryHeads = FactoryHeads {
     aim: [0.0, 0.0, 2.5],
     heads: &[
