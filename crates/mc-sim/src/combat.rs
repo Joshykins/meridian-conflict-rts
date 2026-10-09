@@ -1769,6 +1769,15 @@ impl World {
             };
             if on_body {
                 units.weapon_yaw[row][0] = torso;
+                // An arm that laid earlier this tick is carried with the torso as it
+                // turns: never past its sway of where the torso now points.
+                let weapons = &bp.unit(units.blueprint[row]).weapons;
+                for (i, other) in weapons.iter().enumerate().skip(1) {
+                    if i != w && other.sway.0 > 0 && on_torso(weapons, i) {
+                        units.weapon_yaw[row][i] =
+                            within_sway(torso, units.weapon_yaw[row][i], other.sway);
+                    }
+                }
             }
             units.weapon_yaw[row][w] = yaw;
             if weapon.sweep > 0 && !weapon.missile {
