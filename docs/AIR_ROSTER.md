@@ -443,10 +443,10 @@ ARC stand-ins (`aster_jet`, `aster_hover`).
 
 ## The Regency's gunships: Quiver and Reaper (2026-10-02)
 
-The Regency's hovering combat craft (`data/factions/regency/units/air_gunships.ron`,
-models `crates/mc-models/src/regency/gunships/`) take the Kestrel's and Thunderhead's
-places at the Skyforge. Neither has rotors or jets: each floats on gravity lift bells, red
-plasma crackling under them.
+The Regency's gunships (`data/factions/regency/units/air_gunships.ron`, models
+`crates/mc-models/src/regency/gunships/`) take the Kestrel's and Thunderhead's places at
+the Skyforge. The Quiver has no rotors or jets: it floats on gravity lift bells, red plasma
+crackling under them. The Reaper is a jet (since 2026-10-09; it was a lift-bell craft).
 
 - **Quiver** (`regency_t2_drone_carrier`, tech 2): a manta-shaped hull with six bays down
   its back, a **Wick** (`regency_wick`) in each. Its one weapon `launches` the Wicks: on a
@@ -459,9 +459,9 @@ plasma crackling under them.
   it. Spent Wicks are built again in their bays, one at a time (2 mass, 20 energy, 1.5 s
   each), as the commander's salvage drones are (`air_support.rs`). Wicks are aircraft: flak and
   fighters shoot them down on the way in, and they die with their carrier.
-- **Reaper** (`regency_t3_assault_aircraft`, tech 3): a scythe-winged craft on six bells
-  that strafes (since 2026-10-09; it used to hang over its mark). It flies runs like the
-  Thunderhead (`hover: false`) but does not dive. Its Twin Plasmeric Beams are a `strafe`
+- **Reaper** (`regency_t3_assault_aircraft`, tech 3): a scythe-winged jet, an engine on
+  each wing root, that strafes (since 2026-10-09; it used to hang over its mark on lift
+  bells). It flies runs like the Thunderhead (`hover: false`) but does not dive. Its Twin Plasmeric Beams are a `strafe`
   (mc-sim `strafe.rs`): two held beams fixed under the wing roots, landing 200 m ahead of
   the nose, toed out to land 16 m apart. They come on when where they land is 90 m short of the mark, rake
   two lines through it as the craft flies in and go out 90 m past it, swinging up to 10

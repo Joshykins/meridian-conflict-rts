@@ -1,6 +1,7 @@
-// The Regency's two hovering combat craft (docs/STYLE.md "The Regency suite"): no rotors and
-// no jets, each held up on gravity lift bells with red plasma crackling under their mouths
-// (`models::regency::lift`). They take the ARC gunships' places at the Skyforge.
+// The Regency's gunships (docs/STYLE.md "The Regency suite"), in the ARC gunships' places at
+// the Skyforge. The Quiver and its Wicks hover with no rotors and no jets, held up on
+// gravity lift bells with red plasma crackling under their mouths (`models::regency::lift`);
+// the Reaper is a jet that flies runs.
 //
 // Models: `models::regency::air::{quiver, wick, reaper}`, authored at the sizes here, so
 // every muzzle, socket and pivot below is the model's own number.
@@ -69,8 +70,8 @@
         sounds: (death: "blast_small", moving: "aster_hover"),
         wreck_fraction: 0,
     ),
-    // The assault craft: the Thunderhead's place. It strafes: it flies runs at its mark on
-    // six lift bells, and two Plasmeric beams fixed under its wing roots, laid down ahead
+    // The assault craft: the Thunderhead's place. It strafes: a heavy jet, it flies runs at
+    // its mark, and two Plasmeric beams fixed under its wing roots, laid down ahead
     // of it, come on short of the mark and rake two lines through it and out past it
     // (`strafe`, mc-sim `strafe.rs`). The ground they sear is left burning with red
     // plasma that burns whatever stands in it.
@@ -103,7 +104,7 @@
             ),
         ],
         mesh: "regency_assault_aircraft", icon: Gunship,
-        sounds: (death: "blast", moving: "aster_hover"),
+        sounds: (death: "blast", moving: "aster_heavy_jet"),
         shield: (kind: Hull, health: 3000, regen: 45), economy: (energy_upkeep: 70),
     ),
 ]

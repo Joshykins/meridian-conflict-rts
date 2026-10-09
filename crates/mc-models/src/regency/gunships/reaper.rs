@@ -1,13 +1,13 @@
 //! The Reaper, the Regency's tech 3 beam assault craft (`regency_t3_assault_aircraft`): a
-//! heavy craft on six lift bells that flies runs at its mark and rakes it with two
-//! Plasmeric beams from projectors fixed under it, one either side (the unit file's
-//! `strafe`).
+//! heavy jet that flies runs at its mark and rakes it with two Plasmeric beams from
+//! projectors fixed under it, one either side (the unit file's `strafe`).
 //!
 //! Each projector (`projector`) is a plated housing with an emitter barrel, laid down a
 //! little toward the ground ahead; its mouth is a muzzle of the unit file's `muzzles`.
 //!
 //! The shape is a scythe: a long plated hull under a high keel, and a crescent wing either
-//! side swept back like a scythe's blade into a down-turned tip, three bells under each.
+//! side swept back like a scythe's blade into a down-turned tip. An engine rides each wing
+//! root, its nozzle under the keel's tail (`engine`).
 
 use glam::{Vec2, Vec3};
 
@@ -15,9 +15,9 @@ use crate::builder::{MeshBuilder, Section};
 use crate::library::ModelDef;
 use crate::part;
 
+use super::super::air::exhaust;
 use super::super::kit::{dark_plate, metal, seam, v3};
-use super::super::lift::bell;
-use super::super::machine::{armour, collar, shaft, swept, Course, Frame};
+use super::super::machine::{armour, collar, swept, Course, Frame};
 use super::{body, head, plan, team_mark};
 
 pub(crate) const MODELS: &[ModelDef] = &[
@@ -47,7 +47,7 @@ struct Mount {
     length: f32,
 }
 
-/// Under the wing roots, reaching out ahead of the leading edge.
+/// Under the wing roots, below the engines, reaching out ahead of the leading edge.
 const ROOTS: Mount = Mount {
     mouth: Vec3::new(5.0, 3.0, 0.9),
     length: 3.6,
@@ -57,7 +57,7 @@ const CHEEKS: Mount = Mount {
     mouth: Vec3::new(7.4, 1.6, 0.65),
     length: 3.2,
 };
-/// Out under the blades, between the first and second bells.
+/// Out under the blades.
 const BLADES: Mount = Mount {
     mouth: Vec3::new(1.6, 6.4, 1.0),
     length: 3.4,
@@ -98,6 +98,9 @@ fn projector(b: &mut MeshBuilder, mouth: Vec3, length: f32) {
     metal(b);
     let sides = b.sides(8);
     b.cylinder_between(housing - dir * 0.1, mouth - dir * 0.12, 0.17, 0.15, sides);
+    if !b.fine() {
+        return;
+    }
     for k in [0.72f32, 0.84] {
         collar(b, back + dir * length * k, dir, 0.24, 0.08);
     }
@@ -111,17 +114,43 @@ fn projectors(b: &mut MeshBuilder, mount: Mount) {
     });
 }
 
-/// Far off: a plan's flat solid, the team colour on top, one dark face for the bells, and
-/// the projectors.
+/// Far off: a plan's flat solid, the team colour on top, and the projectors.
 fn coarse(b: &mut MeshBuilder, outline: &[[f32; 2]], top: f32, mount: Mount) {
     dark_plate(b);
     b.extrude_z(outline, 1.0, top);
     team_mark(b, -1.0, top, 2.4);
-    b.with_part(part::LOCOMOTION, |b| {
-        seam(b);
-        b.face(&[v3(4.0, 0.0, 0.3), v3(-5.0, -4.0, 0.3), v3(-5.0, 4.0, 0.3)]);
-    });
     projectors(b, mount);
+}
+
+/// The port engine along the wing root: a plated nacelle from an intake over the wing's
+/// leading edge back to a bronze nozzle with red heat in its mouth (`air::exhaust`, which
+/// marks it as an exhaust for the trails).
+fn engine(b: &mut MeshBuilder) {
+    const Y: f32 = 2.5;
+    const Z: f32 = 2.45;
+    let (front, back) = (v3(1.6, Y, Z), v3(-7.6, Y, Z));
+    dark_plate(b);
+    b.with_facets(|b| {
+        b.beam(front, back, Vec2::new(1.3, 1.1), Vec2::new(1.5, 1.2));
+    });
+    exhaust(b, v3(-8.5, Y, Z), 0.62, 1.1);
+    if !b.fine() {
+        return;
+    }
+    // Close up: the intake's dark mouth, and a lapped plate down the nacelle's back.
+    seam(b);
+    b.beam(
+        front + Vec3::X * 0.06,
+        front - Vec3::X * 0.12,
+        Vec2::new(1.0, 0.8),
+        Vec2::new(1.0, 0.8),
+    );
+    armour(
+        b,
+        &Frame::new(v3(-0.4, Y, Z + 0.6), v3(-1.0, 0.0, 0.0), Vec3::Z),
+        &swept(3.6, 0.55, 0.0, 0.45),
+        0.14,
+    );
 }
 
 /// A plated keel along the back from `fore` to `aft`, `top` high, lapped in a course of
@@ -228,15 +257,7 @@ fn scythe(b: &mut MeshBuilder, mount: Mount) {
             &swept(1.5, 0.6, 0.3, 0.5),
             0.16,
         );
-        // The lift's machinery along the wing root, in bronze.
-        if b.fine() {
-            metal(b);
-            shaft(b, v3(1.0, 2.2, 1.5), v3(-5.6, 2.3, 1.5), 0.16);
-            collar(b, v3(-2.0, 2.25, 1.5), Vec3::X, 0.26, 0.2);
-        }
-        bell(b, v3(0.2, 4.6, 0.0), 1.0, 1.4);
-        bell(b, v3(-3.3, 7.9, 0.0), 0.95, 1.4);
-        bell(b, v3(-6.9, 10.6, 0.0), 0.85, 1.4);
+        engine(b);
     });
     projectors(b, mount);
 }
@@ -252,7 +273,8 @@ mod tests {
             let muzzles = [mount.mouth.to_array(), starboard.to_array()];
             super::super::super::check(key, RADIUS, HEIGHT, None, &muzzles);
             let model = crate::build_model(key).unwrap();
-            assert_eq!(model.lifts.len(), 6, "{key}: six lift bells");
+            assert!(model.lifts.is_empty(), "{key}: a jet, not on lift bells");
+            assert_eq!(model.exhausts.len(), 2, "{key}: two engines");
         }
     }
 }

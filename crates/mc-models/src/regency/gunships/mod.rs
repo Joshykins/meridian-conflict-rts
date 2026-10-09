@@ -1,16 +1,18 @@
-//! The Regency's hovering combat craft (`data/factions/regency/units/air_gunships.ron`,
-//! docs/STYLE.md "The Regency look"): no rotors, no jets, each held up on gravity lift bells
-//! (`regency::lift`) with red plasma crackling under their mouths.
+//! The Regency's gunships (`data/factions/regency/units/air_gunships.ron`, docs/STYLE.md
+//! "The Regency look"). The Quiver and the Wick hover with no rotors and no jets, held up on
+//! gravity lift bells (`regency::lift`) with red plasma crackling under their mouths; the
+//! Reaper is a jet.
 //!
 //! - The Quiver (`quiver`), the tech 2 drone carrier: a hull with six bays down its back,
 //!   a Wick in each.
 //! - The Wick (`wick`): the Quiver's drone, a pinched-plasmeric charge on one small bell.
-//! - The Reaper (`reaper`), the tech 3 beam assault craft: a heavy craft on six bells, a
-//!   Pinch-fusion Beam projector under its nose.
+//! - The Reaper (`reaper`), the tech 3 beam assault craft: a heavy jet with two Plasmeric
+//!   beam projectors fixed under it.
 //!
 //! Each file has its own catalogue entries (`MODELS`). Finish: dark plate lapped over dark
 //! bronze, red optics and charges; no violet (none of them builds). An aircraft's origin is
-//! the bottom of its lift bells; the shader heaves the hull in flight (`hover_sway`).
+//! the bottom of its lift bells (the Reaper's, its belly); the shader heaves a hovering hull in
+//! flight (`hover_sway`).
 
 pub(crate) mod quiver;
 pub(crate) mod reaper;

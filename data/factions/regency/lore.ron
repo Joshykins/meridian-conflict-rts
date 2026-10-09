@@ -427,7 +427,7 @@
         weapons: {},
     ),
     "regency_t3_assault_aircraft": (
-        lore: "A heavy craft on six lift bells that runs in low over its mark and rakes it end to end, leaving two lines of ground burning red behind it.",
+        lore: "A heavy jet that runs in over its mark and rakes it end to end, leaving two lines of ground burning red behind it.",
         weapons: {
             "Twin Plasmeric Beams": "Two streams of bound plasma fixed under the wing roots, laid down ahead of the craft: they come on short of the mark, sear two lines through it and out past it, and leave the ground they cross burning with plasma.",
         },
