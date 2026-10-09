@@ -132,13 +132,13 @@
                 modules: [
                     (
                         key: "aux_eng", icon: Engineer, name: "Auxiliary Engineering Suite",
-                        summary: "A floating nanite lens leans out over the left shoulder and builds with a second beam.",
+                        summary: "A nanite projector rises on the left shoulder and builds with a second beam.",
                         cost: (mass: 800, energy: 9600, time: 900),
                         build_power: 60,
-                        // Stands upright behind the pauldron, the lens on top; the mast leans
-                        // forward over the shoulder and the fork turns at its end (`hinge`) to
-                        // point the crystal down at the work (`shoulder.rs`).
-                        emitters: [(2.0, 3.2, 25.0)], unfold: 1.4, hinge: (-0.681, 3.1567, 25.645),
+                        // A projector in a yoke on the pauldron: stowed it tips its muzzle up;
+                        // out, it pitches on its trunnions (`hinge`) to point at the work, the
+                        // beam leaving the crystal at its muzzle (`shoulder.rs`).
+                        emitters: [(3.4, 3.2, 23.55)], unfold: 1.4, hinge: (-0.6, 3.2, 23.889),
                     ),
                 ],
             ),
