@@ -922,7 +922,7 @@ fn shade_ground(world: vec3<f32>, crag: vec4<f32>, pixel: vec2<f32>, dpx: vec3<f
     // Classify beaches and submerged ground from the same heightfield as
     // the ocean, not interpolated coarse-triangle height. Otherwise LOD
     // changes move the sand band independently of the true coastline.
-    let z = terrain_height(xy);
+    let ground_z = terrain_height(xy);
     let water = globals.map.z;
     let eye = globals.camera.xyz;
     let dist = distance(world, eye);
@@ -934,7 +934,28 @@ fn shade_ground(world: vec3<f32>, crag: vec4<f32>, pixel: vec2<f32>, dpx: vec3<f
     let step = clamp(dist * 0.004, 4.0, 48.0);
     let base_n = terrain_normal(xy, step);
     let slope = 1.0 - base_n.z;
+
+    // On a crag the drawn surface is the rock (`crag_relief`): its facets are lit as
+    // they lie, worked out per pixel (`crag_shade`), and it is all rock. The rock
+    // stands tens of metres off the heightfield, so the ground there is classified
+    // at the height it is drawn at, which is where the sea meets it: a sea cliff's
+    // crag otherwise took the sand, silt and caustics of the shallows its
+    // heightfield foot stands in.
+    let crag_w = crag.x;
+    let z = mix(ground_z, world.z, smoothstep(0.004, 0.1, crag_w));
     let alt = z - water;
+    var facet = base_n;
+    var crag_depth_here = 0.0;
+    if crag_w > 0.004 {
+        var c: Crag;
+        c.weight = crag_w;
+        c.fine = crag.y;
+        c.mass_lift = crag.z;
+        c.facet_lift = crag.w;
+        let shade = crag_shade(xy, base_n, px, c);
+        facet = shade.normal;
+        crag_depth_here = shade.depth;
+    }
 
     // ---- Where things grow (habitat.wgsl) -----------------------------------
     let hab = habitat(xy, z, base_n, px);
@@ -1034,21 +1055,6 @@ fn shade_ground(world: vec3<f32>, crag: vec4<f32>, pixel: vec2<f32>, dpx: vec3<f
     // Cliffs are shaded from a wider normal: the 8 m heightfield steps down a
     // cliff in facets, and the fine normal fluted them into organ pipes.
     var cliff_n = base_n;
-    // On a crag the drawn surface is the rock (`crag_relief`): its facets are lit as
-    // they lie, worked out per pixel (`crag_shade`), and it is all rock.
-    let crag_w = crag.x;
-    var facet = base_n;
-    var crag_depth_here = 0.0;
-    if crag_w > 0.004 {
-        var c: Crag;
-        c.weight = crag_w;
-        c.fine = crag.y;
-        c.mass_lift = crag.z;
-        c.facet_lift = crag.w;
-        let shade = crag_shade(xy, base_n, px, c);
-        facet = shade.normal;
-        crag_depth_here = shade.depth;
-    }
     if rock_face > 0.004 || crag_w > 0.004 {
         cliff_n = normalize(mix(base_n, terrain_normal(xy, max(step * 3.0, 20.0)), 0.8));
         // Mostly the facet as it lies, a little of the wall's own lean: a sliver
@@ -1398,7 +1404,7 @@ fn shade_ground(world: vec3<f32>, crag: vec4<f32>, pixel: vec2<f32>, dpx: vec3<f
     let rise = globals.sun.z / max(length(globals.sun.xy), 0.1);
     for (var i = 0; i < 4; i++) {
         let reach = 24.0 * exp2(f32(i));
-        let obstruction = terrain_height(xy + toward_sun * reach) - z - rise * reach;
+        let obstruction = terrain_height(xy + toward_sun * reach) - ground_z - rise * reach;
         horizon = min(horizon, smoothstep(-3.0, 5.0, -obstruction));
     }
     let shadow = sun_shadow(world, base_n) * horizon;
@@ -1415,7 +1421,7 @@ fn shade_ground(world: vec3<f32>, crag: vec4<f32>, pixel: vec2<f32>, dpx: vec3<f
         var rise = 0.0;
         for (var k = 0; k < 2; k++) {
             let r = reach * select(1.0, 3.6, k == 1);
-            let above = terrain_height(xy + dir * r) - (z + dot(lean, dir * r));
+            let above = terrain_height(xy + dir * r) - (ground_z + dot(lean, dir * r));
             rise = max(rise, above / r);
         }
         open_sky += 1.0 - rise * inverseSqrt(1.0 + rise * rise);
