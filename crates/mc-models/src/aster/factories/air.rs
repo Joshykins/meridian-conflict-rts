@@ -8,6 +8,8 @@ const AIR_HANGAR_Y: f32 = 27.0;
 const AIR_GANTRY_X: f32 = -19.0;
 const AIR_GANTRY_Z: f32 = 18.0;
 const AIR_TOWER: Vec3 = Vec3::new(33.0, -37.0, 0.0);
+const EAVES: f32 = 8.5;
+const RIDGE: f32 = 13.0;
 
 /// Air hangar: a clear lift deck with nothing over it, a white hangar either side
 /// with its shutters on the deck, a portal gantry over the deck's back edge carrying
@@ -16,8 +18,6 @@ const AIR_TOWER: Vec3 = Vec3::new(33.0, -37.0, 0.0);
 pub(in crate::aster) fn factory_air(b: &mut MeshBuilder, tech: u8) {
     const HANGAR_X0: f32 = -44.0;
     const HANGAR_X1: f32 = 18.0;
-    const EAVES: f32 = 8.5;
-    const RIDGE: f32 = 13.0;
     let y0 = AIR_HANGAR_Y;
 
     if b.coarse() {
@@ -120,12 +120,13 @@ pub(in crate::aster) fn factory_air(b: &mut MeshBuilder, tech: u8) {
                 v2(0.8, 0.6),
             );
         }
-        // Roof: a team band down the long slope, vents beside it.
-        on_slope_y(b, [y0 + 16.0, EAVES + 1.2], [y0 + 1.0, RIDGE], 0.5, |b| {
-            b.paint(PLATING).pattern(pattern::TEAM_BAND);
-            b.plate(v3(-13.0, -2.5, 0.0), v2(56.0, 3.2), 0.14, 0.05);
-            team_panel(b, v3(12.0, 3.4, 0.0), v2(6.0, 3.0));
-        });
+        // Roof: a catwalk down the long slope, close up only.
+        if b.fine() {
+            on_slope_y(b, [y0 + 16.0, EAVES + 1.2], [y0 + 1.0, RIDGE], 0.5, |b| {
+                b.paint(PLATING);
+                b.plate(v3(-13.0, -2.5, 0.0), v2(56.0, 3.2), 0.14, 0.05);
+            });
+        }
         // Deck face: black pilasters between three shutter bays, conduit over them.
         b.paint(ACCENT);
         for x in [-40.0, -22.0, -4.0, 14.0] {
@@ -141,11 +142,6 @@ pub(in crate::aster) fn factory_air(b: &mut MeshBuilder, tech: u8) {
         }
         conduit(b, v3(-41.0, y0 - 0.9, 9.0), v3(15.0, y0 - 0.1, 10.0));
         if b.fine() {
-            on_slope_y(b, [y0 + 16.0, EAVES + 1.2], [y0 + 1.0, RIDGE], 0.5, |b| {
-                for x in [-31.0, -13.0, 5.0] {
-                    vent(b, v3(x, 3.2, 0.0), v2(3.6, 2.0), 3, ACCENT);
-                }
-            });
             // Outer wall: a band of black at the eaves, lights let into it.
             b.paint(ACCENT);
             b.block(
@@ -193,9 +189,8 @@ pub(in crate::aster) fn factory_air(b: &mut MeshBuilder, tech: u8) {
 
     // Control tower beside the lane.
     factory_tower(b, AIR_TOWER, 0.0, 24.0);
-    beacon(b, AIR_TOWER + v3(2.2, -2.6, 24.14));
     if b.fine() {
-        antenna(b, AIR_TOWER + v3(-2.5, 3.0, 24.0), 3.6, 0.06);
+        antenna_unlit(b, AIR_TOWER + v3(-2.5, 3.0, 24.0), 3.6, 0.06);
         b.paint(ACCENT).pattern(pattern::CONDUIT);
         b.block(
             AIR_TOWER + v3(4.3, -2.0, 2.0),
@@ -237,7 +232,7 @@ pub(in crate::aster) fn factory_air(b: &mut MeshBuilder, tech: u8) {
     // Suite III: cantilever gantries on the hangar roofs with fabricators of their
     // own, and the tower's mast raised.
     kit(b, tech, 3, 0.3, |b| {
-        // Roof lanterns along each hangar's ridge, lit along the deck side.
+        // Roof lanterns along each hangar's ridge, louvred along the deck side.
         b.mirror_y(|b| {
             for (x0, x1) in [(-40.0, -12.0), (-3.0, 14.0)] {
                 let cx = (x0 + x1) * 0.5;
@@ -245,10 +240,8 @@ pub(in crate::aster) fn factory_air(b: &mut MeshBuilder, tech: u8) {
                 b.cuboid_open(v3(cx, y0 + 5.0, 13.3), v3(x1 - x0, 4.0, 3.8));
                 b.paint(ACCENT);
                 b.cuboid(v3(cx, y0 + 5.0, 15.0), v3(x1 - x0 + 0.3, 4.3, 0.5));
-                b.paint(PLATING).pattern(pattern::TEAM_BAND);
+                b.paint(PLATING);
                 b.plate(v3(cx, y0 + 5.0, 15.25), v2(x1 - x0 - 1.0, 3.4), 0.12, 0.04);
-                b.paint(GLOW);
-                b.cuboid(v3(cx, y0 + 2.96, 13.9), v3(x1 - x0 - 2.0, 0.1, 0.6));
             }
         });
         b.mirror_y(|b| {
@@ -283,18 +276,98 @@ pub(in crate::aster) fn factory_air(b: &mut MeshBuilder, tech: u8) {
         b.prism(AIR_TOWER + v3(-0.4, 0.0, 34.5), 6, 0.4, 0.15, 4.0);
     });
 
-    if tech >= 2 {
-        b.paint(GLOW);
-        b.mirror_y(|b| b.cuboid(v3(-13.0, y0 + 18.3, EAVES - 1.0), v3(40.0, 0.2, 0.3)));
-        if b.fine() {
-            antenna(b, AIR_TOWER + v3(-3.0, -3.2, 24.0), 2.8, 0.1);
-        }
+    if tech >= 2 && b.fine() {
+        antenna_unlit(b, AIR_TOWER + v3(-3.0, -3.2, 24.0), 2.8, 0.1);
     }
-    if tech >= 3 {
-        b.paint(GLOW);
-        b.prism(AIR_TOWER + v3(-0.4, 0.0, 38.5), 6, 0.35, 0.15, 0.8);
-        if b.fine() {
-            b.mirror_y(|b| glow_strip(b, v3(-8.0, y0 - 5.0, 26.3), v2(1.2, 16.0), GLOW));
-        }
+    marks(b, tech);
+}
+
+/// What the Aerie's surface carries where (docs/STANDARD.md, "Texture detail and marks").
+fn marks(b: &mut MeshBuilder, tech: u8) {
+    use crate::gpu_consts::surface_mark as mark;
+    // Holes and slats at a building's pitch, not a vehicle's.
+    const PITCH: f32 = 0.22;
+    let y0 = AIR_HANGAR_Y;
+    // The blast fence takes the jets: armour, a warning at each end.
+    b.mark(
+        v3(-30.4, -23.0, 1.0),
+        v3(-25.0, 23.0, 7.2),
+        mark::ARMOUR,
+        0.0,
+    );
+    // Each hangar's number on its outer wall, between its doors.
+    for (side, number) in [(1.0, 2.0), (-1.0, 3.0)] {
+        let y = side * (y0 + 18.0);
+        b.mark(
+            v3(-16.0, y - 0.3, 2.0),
+            v3(-10.0, y + 0.3, 6.4),
+            mark::STENCIL,
+            number,
+        );
     }
+    // The control tower: a door toward the lane, lettering over it.
+    b.mark(
+        AIR_TOWER + v3(-1.2, 5.5, 1.6),
+        AIR_TOWER + v3(1.2, 6.1, 4.8),
+        mark::ACCESS,
+        0.0,
+    );
+    b.mark(
+        AIR_TOWER + v3(-1.8, 5.5, 5.2),
+        AIR_TOWER + v3(1.8, 6.1, 6.0),
+        mark::LABEL,
+        1.0,
+    );
+    b.mirror_y(|b| {
+        b.mark(
+            v3(-28.6, 18.6, 2.4),
+            v3(-26.4, 20.6, 5.6),
+            mark::WARNING,
+            0.0,
+        );
+        // The roof: grilles over the bays, the owner's colour.
+        on_slope_y(b, [y0 + 16.0, EAVES + 1.2], [y0 + 1.0, RIDGE], 0.5, |b| {
+            for x in [-31.0, -13.0, 5.0] {
+                b.mark(
+                    v3(x - 1.8, 2.2, -0.1),
+                    v3(x + 1.8, 4.2, 0.2),
+                    mark::GRILLE,
+                    PITCH,
+                );
+            }
+            team_panel(b, v3(12.5, 3.0, 0.0), v2(8.0, 3.6));
+        });
+        // The outer wall: two doors.
+        for x in [-36.0, 8.0] {
+            b.mark(
+                v3(x - 1.3, y0 + 17.7, 1.5),
+                v3(x + 1.3, y0 + 18.3, 4.6),
+                mark::ACCESS,
+                0.0,
+            );
+        }
+        // The gable on the lane: louvres under the roof.
+        b.mark(
+            v3(17.7, y0 + 5.0, 5.4),
+            v3(18.4, y0 + 13.0, 8.2),
+            mark::LOUVRES,
+            PITCH,
+        );
+        if tech >= 3 {
+            // The roof lanterns: louvres down the deck side, the owner's colour along the top.
+            for (x0, x1) in [(-40.0, -12.0), (-3.0, 14.0)] {
+                b.mark(
+                    v3(x0 + 1.0, y0 + 2.7, 12.9),
+                    v3(x1 - 1.0, y0 + 3.3, 14.5),
+                    mark::LOUVRES,
+                    PITCH,
+                );
+                team_panel(
+                    b,
+                    v3((x0 + x1) * 0.5, y0 + 5.0, 15.37),
+                    v2(x1 - x0 - 3.0, 1.2),
+                );
+            }
+        }
+    });
 }

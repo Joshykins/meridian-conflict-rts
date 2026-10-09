@@ -4,12 +4,13 @@ use glam::{Vec2, Vec3};
 
 use super::*;
 
+const WALL_H: f32 = 8.4;
+const WALL_Y: f32 = 26.0;
+const HOUSE_Z: f32 = 13.6;
+
 /// Land foundry: a U of white halls round the pad, a road out +x, fabricators on
 /// the halls' print shelves.
 pub(in crate::aster) fn factory_land(b: &mut MeshBuilder, tech: u8) {
-    const WALL_H: f32 = 8.4;
-    const WALL_Y: f32 = 26.0;
-    const HOUSE_Z: f32 = 13.6;
     const TOWER: f32 = FACTORY_TOWER;
     /// Top of the print shelves the fabricators stand on.
     const SHELF: f32 = WALL_H * 0.68 + 0.8;
@@ -76,7 +77,7 @@ pub(in crate::aster) fn factory_land(b: &mut MeshBuilder, tech: u8) {
     );
     b.paint(ACCENT);
     b.block(v3(-38.4, -21.2, 0.0), v3(-13.9, 21.2, 1.5));
-    b.paint(PLATING).pattern(pattern::TEAM_BAND);
+    b.paint(PLATING);
     b.plate(v3(-26.25, 0.0, HOUSE_Z), v2(11.8, 38.0), 0.2, 0.06);
     // The forge's mouth: a long bank of louvres over the door, the fire showing through.
     on_slope(b, [-14.35, 7.35], [-19.85, HOUSE_Z - 0.05], 0.5, |b| {
@@ -125,7 +126,6 @@ pub(in crate::aster) fn factory_land(b: &mut MeshBuilder, tech: u8) {
             v3(18.0, WALL_Y - 4.05, WALL_H - 0.9),
         );
         if b.fine() {
-            vent(b, v3(14.5, WALL_Y, WALL_H + 0.18), v2(4.6, 2.4), 3, ACCENT);
             // The outer wall: buttress ribs, and between them a band of conduit.
             for x in [-12.0, -4.0, 4.0, 12.0] {
                 b.paint(ACCENT);
@@ -206,8 +206,6 @@ pub(in crate::aster) fn factory_land(b: &mut MeshBuilder, tech: u8) {
         portal_gantry(b, 18.5, WALL_Y, WALL_H, 26.0);
         b.paint(ACCENT);
         b.cuboid(v3(18.5, 0.0, 25.35), v3(4.0, 10.0, 1.3));
-        b.paint(GLOW_AMBER);
-        b.cuboid(v3(18.5, 0.0, 24.66), v3(3.0, 8.0, 0.08));
         // Fabricator drums on the house roof, piped down to the forge.
         for y in [9.5, 16.2] {
             fabricator_tank(b, v3(-26.4, y, HOUSE_Z + 0.2), 2.7, 6.0);
@@ -229,15 +227,6 @@ pub(in crate::aster) fn factory_land(b: &mut MeshBuilder, tech: u8) {
             b.cuboid(v3(-10.0, WALL_Y, WALL_H + 6.63), v3(10.3, 5.9, 0.7));
             b.paint(PLATING);
             b.plate(v3(-10.0, WALL_Y, WALL_H + 7.2), v2(9.2, 5.0), 0.16, 0.05);
-            if b.fine() {
-                vent(
-                    b,
-                    v3(-10.0, WALL_Y, WALL_H + 7.36),
-                    v2(4.0, 2.6),
-                    3,
-                    GLOW_AMBER,
-                );
-            }
         });
         b.paint(PLATING);
         b.prism(v3(-28.0, -16.0, TOWER), 8, 3.2, 2.6, 2.2);
@@ -288,15 +277,6 @@ pub(in crate::aster) fn factory_land(b: &mut MeshBuilder, tech: u8) {
                     }
                     let run = (v3(high.x, y, high.y) - low).normalize();
                     b.cylinder_between(low - run * 0.2, low + run * 0.2, R + 0.12, R + 0.12, sides);
-                    // A sight glass on the riser, the furnace showing in it.
-                    b.paint(GLOW_ORANGE);
-                    b.cylinder_between(
-                        v3(RISER_X, y, 5.6),
-                        v3(RISER_X, y, 6.2),
-                        R + 0.04,
-                        R + 0.04,
-                        sides,
-                    );
                 }
             }
         });
@@ -321,24 +301,135 @@ pub(in crate::aster) fn factory_land(b: &mut MeshBuilder, tech: u8) {
         });
     });
 
-    if tech >= 2 {
-        b.paint(GLOW);
-        for y in [9.5, 16.2] {
-            b.prism(v3(-26.4, y, HOUSE_Z + 6.2), 8, 0.9, 0.6, 0.6);
-        }
-        if b.fine() {
-            antenna(b, v3(-25.6, -20.0, TOWER + 2.2), 3.4, 0.08);
-        }
-    }
-    if tech >= 3 {
-        b.paint(GLOW);
-        b.prism(v3(-28.4, -16.0, TOWER + 16.0), 6, 0.5, 0.2, 1.0);
-        if b.fine() {
-            b.mirror_y(|b| glow_strip(b, v3(7.0, WALL_Y + 0.4, WALL_H + 8.96), v2(3.4, 2.0), GLOW));
-            antenna(b, v3(-31.0, -20.0, TOWER), 4.2, 0.04);
-        }
-    }
     if b.fine() {
-        antenna(b, v3(-31.2, -12.0, TOWER), 4.8, 0.0);
+        if tech >= 2 {
+            antenna_unlit(b, v3(-25.6, -20.0, TOWER + 2.2), 3.4, 0.08);
+        }
+        if tech >= 3 {
+            antenna_unlit(b, v3(-31.0, -20.0, TOWER), 4.2, 0.04);
+        }
+        antenna_unlit(b, v3(-31.2, -12.0, TOWER), 4.8, 0.0);
     }
+    marks(b, tech);
+}
+
+/// What the Forge's surface carries where (docs/STANDARD.md, "Texture detail and marks").
+fn marks(b: &mut MeshBuilder, tech: u8) {
+    use crate::gpu_consts::surface_mark as mark;
+    // Holes and slats at a building's pitch, not a vehicle's.
+    const PITCH: f32 = 0.22;
+    // Zones: the house's back, where the furnace's pipes and conduit run, is machinery;
+    // the flat roofs crews walk are tread plate.
+    b.mark(
+        v3(-38.6, -22.0, 1.5),
+        v3(-32.7, 22.0, 13.6),
+        mark::MACHINERY,
+        0.0,
+    );
+    b.mark(
+        v3(-32.0, -19.0, HOUSE_Z + 0.1),
+        v3(-20.5, 19.0, HOUSE_Z + 0.35),
+        mark::WALKWAY,
+        0.0,
+    );
+    // The house roof's hatch, beside the drums.
+    b.mark(
+        v3(-22.6, 3.6, HOUSE_Z + 0.1),
+        v3(-21.2, 5.0, HOUSE_Z + 0.35),
+        mark::HATCH,
+        0.0,
+    );
+    // The forge door's lintel striped, for what has to pass under it.
+    b.mark(
+        v3(-13.45, -10.6, 7.65),
+        v3(-13.15, 10.6, 8.35),
+        mark::HAZARD,
+        0.0,
+    );
+    // The back wall: a door between the pilasters, lettering over it.
+    b.mark(v3(-38.3, -1.4, 1.6), v3(-37.8, 1.4, 4.8), mark::ACCESS, 0.0);
+    b.mark(v3(-38.3, -2.2, 5.2), v3(-37.8, 2.2, 6.0), mark::LABEL, 2.0);
+    // Each hall's number on its outer wall, between the middle buttresses.
+    for (side, number) in [(1.0, 2.0), (-1.0, 3.0)] {
+        let y = side * (WALL_Y + 4.3);
+        b.mark(
+            v3(-2.6, y - 0.3, 5.0),
+            v3(2.6, y + 0.3, 7.6),
+            mark::STENCIL,
+            number,
+        );
+    }
+    b.mirror_y(|b| {
+        b.mark(
+            v3(-16.0, WALL_Y - 3.6, WALL_H + 0.1),
+            v3(20.0, WALL_Y + 3.6, WALL_H + 0.45),
+            mark::WALKWAY,
+            0.0,
+        );
+        // A grille over the hall's plant, at its road end.
+        b.mark(
+            v3(12.2, WALL_Y - 1.2, WALL_H + 0.1),
+            v3(16.8, WALL_Y + 1.2, WALL_H + 0.45),
+            mark::GRILLE,
+            PITCH,
+        );
+        // The house's front flanks on the courtyard: a door, a warning by the furnace.
+        b.mark(
+            v3(-14.5, 14.0, 1.6),
+            v3(-13.9, 16.4, 4.8),
+            mark::ACCESS,
+            0.0,
+        );
+        b.mark(
+            v3(-14.5, 11.4, 4.4),
+            v3(-13.9, 12.8, 5.8),
+            mark::WARNING,
+            0.0,
+        );
+        // Its gable ends: louvres high up, where the furnace's heat leaves.
+        b.mark(
+            v3(-30.0, 19.4, 8.6),
+            v3(-23.0, 22.6, 11.4),
+            mark::LOUVRES,
+            PITCH,
+        );
+        // The halls' outer walls, over the conduit: louvres and an access cover.
+        b.mark(
+            v3(-10.6, WALL_Y + 4.0, 5.0),
+            v3(-5.4, WALL_Y + 4.6, 7.4),
+            mark::LOUVRES,
+            PITCH,
+        );
+        b.mark(
+            v3(6.2, WALL_Y + 4.0, 4.9),
+            v3(9.8, WALL_Y + 4.6, 7.4),
+            mark::ACCESS,
+            0.0,
+        );
+        // The halls' road ends: the corner guards striped, a door.
+        b.mark(
+            v3(20.6, WALL_Y - 4.4, 1.4),
+            v3(21.4, WALL_Y - 2.6, 3.2),
+            mark::HAZARD,
+            0.0,
+        );
+        b.mark(v3(20.6, 24.6, 1.5), v3(21.4, 27.4, 4.6), mark::ACCESS, 0.0);
+        if tech >= 2 {
+            // The assembly lofts' roofs: the grille over their plant.
+            b.mark(
+                v3(-12.0, WALL_Y - 1.3, WALL_H + 7.2),
+                v3(-8.0, WALL_Y + 1.3, WALL_H + 7.5),
+                mark::GRILLE,
+                PITCH,
+            );
+        }
+        if tech >= 3 {
+            b.mark(
+                v3(5.0, WALL_Y - 1.0, WALL_H + 8.8),
+                v3(9.0, WALL_Y + 1.8, WALL_H + 9.1),
+                mark::VENT,
+                PITCH,
+            );
+        }
+    });
 }

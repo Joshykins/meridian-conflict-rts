@@ -1874,14 +1874,8 @@ fn higher_tech_adds_highlights() {
             .filter(|t| model.lods[0].vertices[t[0] as usize].material == material::GLOW)
             .count()
     };
-    for key in [
-        "factory_land",
-        "factory_air",
-        "factory_naval",
-        "extractor",
-        "power",
-        "radar",
-    ] {
+    // The factories carry no lit pieces (docs/STANDARD.md): their light is the surface's.
+    for key in ["extractor", "power", "radar"] {
         let [t1, t2, t3] = [1, 2, 3].map(|tech| glow(key, tech));
         assert!(
             t1 > 0 && t1 < t2 && t2 < t3,

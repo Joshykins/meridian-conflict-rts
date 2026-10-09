@@ -153,14 +153,6 @@ fn fabricator(b: &mut MeshBuilder, mount: Vec3, aim: Vec3, s: f32, anchor_z: f32
                         s * 0.46,
                         8,
                     );
-                    b.paint(GLOW_AMBER);
-                    b.cylinder_between(
-                        v3(s * 2.05, 0.0, 0.0),
-                        v3(s * 2.13, 0.0, 0.0),
-                        s * 0.34,
-                        s * 0.34,
-                        8,
-                    );
                     b.paint(ACCENT);
                     b.cylinder_between(
                         v3(s * 2.55, 0.0, 0.0),
@@ -197,7 +189,7 @@ fn fabricator(b: &mut MeshBuilder, mount: Vec3, aim: Vec3, s: f32, anchor_z: f32
     });
 }
 
-/// Fabricator drum: a black drum under a white shell, an amber charge ring, a
+/// Fabricator drum: a black drum under a white shell, a black band at its waist, a
 /// white lid with a black cap, feet on a white plinth.
 fn fabricator_tank(b: &mut MeshBuilder, at: Vec3, radius: f32, height: f32) {
     let sides = b.sides(10);
@@ -211,7 +203,7 @@ fn fabricator_tank(b: &mut MeshBuilder, at: Vec3, radius: f32, height: f32) {
         radius,
         sides,
     );
-    b.paint(GLOW_AMBER);
+    b.paint(ACCENT);
     b.cylinder_between(
         at + Vec3::Z * (height * 0.5),
         at + Vec3::Z * (height * 0.56),
@@ -276,7 +268,8 @@ fn apron(b: &mut MeshBuilder, min: Vec2, max: Vec2, well: Vec2, height: f32) {
 
 /// A portal gantry across the lot at `x`: black legs on white footings at `±legs_y`,
 /// standing on `base_z`, and a white box girder on a black soffit at `deck_z`, the
-/// owner's colour along its top and a conduit down its +x face.
+/// owner's colour along its top, a conduit down its +x face and clearance stripes
+/// on its -x face.
 fn portal_gantry(b: &mut MeshBuilder, x: f32, legs_y: f32, base_z: f32, deck_z: f32) {
     b.mirror_y(|b| {
         b.paint(PLATING);
@@ -302,21 +295,23 @@ fn portal_gantry(b: &mut MeshBuilder, x: f32, legs_y: f32, base_z: f32, deck_z: 
     b.cuboid(v3(x, 0.0, deck_z + 0.3), v3(3.2, span + 3.8, 0.6));
     b.paint(PLATING);
     b.chamfered_box(v3(x, 0.0, deck_z + 1.4), v3(3.4, span + 4.8, 1.6), 0.4);
-    b.paint(PLATING).pattern(pattern::TEAM_BAND);
+    b.paint(PLATING);
     b.plate(v3(x, 0.0, deck_z + 2.2), v2(2.6, span - 3.2), 0.12, 0.04);
+    team_panel(b, v3(x, 0.0, deck_z + 2.32), v2(1.1, span - 6.0));
+    if b.fine() {
+        use crate::gpu_consts::surface_mark as mark;
+        b.mark(
+            v3(x - 1.85, -span * 0.3, deck_z + 0.8),
+            v3(x - 1.55, span * 0.3, deck_z + 1.9),
+            mark::HAZARD,
+            0.0,
+        );
+    }
     conduit(
         b,
         v3(x + 1.7, -span * 0.46, deck_z + 0.5),
         v3(x + 1.95, span * 0.46, deck_z + 1.3),
     );
-}
-
-/// Red obstruction lamp on a short stalk.
-fn beacon(b: &mut MeshBuilder, at: Vec3) {
-    b.paint(ACCENT);
-    b.prism(at, 6, 0.16, 0.11, 0.4);
-    b.paint(GLOW_RED);
-    b.cuboid(at + Vec3::Z * 0.58, Vec3::splat(0.38));
 }
 
 /// Shared lift deck at the lot centre: a black well, a white lid on each
@@ -363,7 +358,8 @@ fn factory_pad(b: &mut MeshBuilder, pad_x: f32, pad_y: f32) {
     });
 }
 
-/// Control tower: white shaft on a black plinth, a band of glass, a white roof.
+/// Control tower: white shaft on a black plinth, a band of glass, a white roof with
+/// the owner's colour on it.
 fn factory_tower(b: &mut MeshBuilder, at: Vec3, base_z: f32, tower: f32) {
     let plan = chamfered_rect(v2(5.0, 5.8), 1.4);
     b.at(at, |b| {
@@ -397,8 +393,9 @@ fn factory_tower(b: &mut MeshBuilder, at: Vec3, base_z: f32, tower: f32) {
                 Section::scaled(tower, 0.6, 0.68).shifted(-0.4, 0.0),
             ],
         );
-        b.paint(PLATING).pattern(pattern::TEAM_BAND);
+        b.paint(PLATING);
         b.plate(v3(-0.4, 0.0, tower), v2(3.9, 4.6), 0.14, 0.05);
+        team_panel(b, v3(-0.4, 0.0, tower + 0.14), v2(2.6, 3.2));
     });
 }
 

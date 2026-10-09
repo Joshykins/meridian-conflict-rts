@@ -3246,6 +3246,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         si.tech = f32(max(in.model_class & 0xFFu, 1u));
         si.lit = select(1.0, 0.0, si.tech < 1.5 && (in.model_class & 0x100u) != 0u);
         si.mobile = select(0.0, 1.0, (in.model_class & 0x100u) != 0u);
+        si.structure = si.mobile < 0.5 && (flags & KIND_PROP) == 0u;
         si.health = select(select(in.state.y, 1.0, (flags & (KIND_PROP | FLAG_UNDER_CONSTRUCTION)) != 0u), 0.0, hull_down);
         si.local = in.local;
         si.reach = in.weld.z;

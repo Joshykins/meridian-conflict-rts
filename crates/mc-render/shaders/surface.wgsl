@@ -90,6 +90,9 @@ struct SurfaceIn {
     lit: f32,
     // One on a mobile unit: its work lights sit lower while it is idle than a building's.
     mobile: f32,
+    // A structure (not a unit, not a map prop): its faces take mixed finishes with real-size
+    // seams (`surf_structure_plate`), not a unit's plate courses.
+    structure: bool,
     health: f32,
     // Model space, with the model's reach and height, for damage that spans faces.
     local: vec3<f32>,
@@ -190,6 +193,196 @@ fn surf_courses(i: SurfaceIn, st_in: vec2<f32>, want: vec2<f32>) -> SurfaceCell 
     cell.half = vec2<f32>(cw, rh) * 0.5;
     cell.id = hash21(vec2<f32>(r * 7.31 + i.seed * 91.7, c * 3.17 + i.seed * 17.3));
     return cell;
+}
+
+// Where cut `k` of `n` falls along a run cut into cells `w` long, each inner cut moved up
+// to `jitter` of a cell either way.
+fn surf_cut_at(k: f32, w: f32, n: f32, seed: f32, jitter: f32) -> f32 {
+    if k <= 0.0 {
+        return 0.0;
+    }
+    if k >= n {
+        return n * w;
+    }
+    return (k + jitter * (hash11(k * 7.13 + seed * 31.7) - 0.5)) * w;
+}
+
+// The cell of a run `len` long cut into `n` that `x` lies in: its index and its ends.
+fn surf_cut(x: f32, len: f32, n: f32, seed: f32, jitter: f32) -> vec3<f32> {
+    let w = len / n;
+    var c = clamp(floor(x / w), 0.0, n - 1.0);
+    if x < surf_cut_at(c, w, n, seed, jitter) {
+        c -= 1.0;
+    } else if x >= surf_cut_at(c + 1.0, w, n, seed, jitter) {
+        c += 1.0;
+    }
+    c = clamp(c, 0.0, n - 1.0);
+    return vec3<f32>(c, surf_cut_at(c, w, n, seed, jitter), surf_cut_at(c + 1.0, w, n, seed, jitter));
+}
+
+// A structure's faces are not all one plating: each takes a finish of its own, picked
+// by its seed (so mirrored faces match), walls from one set and roofs from another.
+const STRUCT_SHEET: u32 = 1u;
+const STRUCT_HEAVY: u32 = 2u;
+const STRUCT_MEMBRANE: u32 = 3u;
+
+struct StructPlate {
+    cell: SurfaceCell,
+    kind: u32,
+    // The point on the face, metres from its corner (x across, y up), and the face's size.
+    q: vec2<f32>,
+    len: vec2<f32>,
+}
+
+fn surf_structure_kind(i: SurfaceIn) -> u32 {
+    let roll = hash11(i.seed * 173.0 + 0.41);
+    if i.up > 0.7 {
+        return select(STRUCT_HEAVY, STRUCT_MEMBRANE, roll < 0.55);
+    }
+    return select(STRUCT_HEAVY, STRUCT_SHEET, roll < 0.6);
+}
+
+// A structure's plate at `st_in`: x across the face, y up it (or across the short side
+// of a level face).
+fn surf_structure_plate(i: SurfaceIn, st_in: vec2<f32>) -> StructPlate {
+    var st = st_in;
+    var half = i.half;
+    let swap = select(i.rise.x > i.rise.y, half.y > half.x, i.up > 0.7);
+    if swap && !i.wraps {
+        st = st.yx;
+        half = half.yx;
+    }
+    let q = st + half;
+    let len = 2.0 * half;
+    let kind = surf_structure_kind(i);
+    var rows = 1.0;
+    var cols = 1.0;
+    var jitter = 0.0;
+    switch kind {
+        case STRUCT_SHEET: {
+            // Big flat sheets, riveted along their seams.
+            rows = surf_fit(len.y, 4.5);
+            cols = surf_fit(len.x, i.scale * 1.4);
+            jitter = 0.3;
+        }
+        case STRUCT_MEMBRANE: {
+            rows = surf_fit(len.y, 11.0);
+            cols = surf_fit(len.x, 9.0);
+            jitter = 0.5;
+        }
+        default: {
+            rows = surf_fit(len.y, i.scale * 0.9);
+            jitter = 0.6;
+        }
+    }
+    let r = surf_cut(q.y, len.y, rows, i.seed * 13.0, jitter);
+    if kind == STRUCT_HEAVY {
+        cols = surf_fit(len.x, i.scale * mix(0.8, 2.2, hash11(r.x * 3.7 + i.seed * 5.0)));
+    }
+    let c = surf_cut(q.x, len.x, cols, r.x * 11.0 + i.seed * 7.0, jitter);
+    var plate: StructPlate;
+    plate.cell.p = q - vec2<f32>(c.y + c.z, r.y + r.z) * 0.5;
+    plate.cell.half = vec2<f32>(c.z - c.y, r.z - r.y) * 0.5;
+    plate.cell.id = hash21(vec2<f32>(r.x * 7.31 + i.seed * 91.7, c.x * 3.17 + i.seed * 17.3));
+    plate.kind = kind;
+    plate.q = q;
+    plate.len = len;
+    return plate;
+}
+
+// The structure over a building's plating, drawn across its seams: the frame's columns and
+// girts, a service pipe on brackets; and on single plates an access cover or a bank of
+// louvres. Each face picks its own from its seed. All in the plate's own paint.
+// x the height (1 the plate, higher proud, lower let in), y the shade (1 none), z how
+// much of the point a proud member covers (the plates' seams hidden under it).
+fn surf_struct_features(i: SurfaceIn, plate: StructPlate, gap: f32, fw: f32) -> vec3<f32> {
+    let q = plate.q;
+    let len = plate.len;
+    var h = 1.0;
+    var shade = 1.0;
+    var cover = 0.0;
+    let f = max(fw, 1e-4);
+    let roll = vec4<f32>(
+        hash11(i.seed * 211.0 + 0.13),
+        hash11(i.seed * 307.0 + 0.71),
+        hash11(i.seed * 401.0 + 0.29),
+        hash11(i.seed * 503.0 + 0.57),
+    );
+    if i.up < 0.7 {
+        // Frame: columns at bay spacing (on most walls), a girt across.
+        let bays = surf_fit(len.x, mix(5.5, 9.0, roll.x));
+        let bay = len.x / bays;
+        let k = round(q.x / bay);
+        let dc = abs(q.x - k * bay);
+        let col_w = 0.22;
+        let framed = roll.y < 0.75 && len.y > 3.0;
+        if framed {
+            let col = surf_step(col_w - dc, 0.0, f);
+            h = max(h, 1.0 + 0.45 * col);
+            cover = max(cover, col);
+            shade *= 1.0 - 0.15 * surf_band(dc - col_w, 0.015, f);
+            // Bolts down each column's face.
+            let pitch = 0.45;
+            let by = (fract(q.y / pitch) - 0.5) * pitch;
+            let bolt = 1.0 - smoothstep(0.0, 0.045, length(vec2<f32>(dc - col_w * 0.5, by)));
+            h = max(h, 1.0 + 0.6 * bolt * col);
+        }
+        // A girt band across the face, at a height its seed picks.
+        let girt_y = len.y * mix(0.35, 0.7, roll.z);
+        let dg = abs(q.y - girt_y);
+        if framed && len.y > 5.0 {
+            let girt = surf_step(0.14 - dg, 0.0, f);
+            h = max(h, 1.0 + 0.3 * girt);
+            cover = max(cover, girt);
+            shade *= 1.0 - 0.15 * surf_band(dg - 0.14, 0.012, f);
+        }
+        // A service pipe along the face on brackets.
+        if roll.w < 0.5 && len.x > 8.0 {
+            let pipe_y = len.y * mix(0.55, 0.85, hash11(i.seed * 59.0));
+            let dp = abs(q.y - pipe_y);
+            let r = 0.13;
+            let pipe = sqrt(saturate(1.0 - (dp * dp) / (r * r)));
+            h = max(h, 1.0 + 0.7 * pipe);
+            cover = max(cover, step(0.01, pipe));
+            shade *= 1.0 - 0.15 * surf_band(dp - r, 0.02, f);
+            let bx = abs(fract(q.x / 2.4) - 0.5) * 2.4;
+            let bracket = surf_step(0.07 - bx, 0.0, f) * surf_step(r + 0.06 - dp, 0.0, f);
+            h = max(h, 1.0 + 0.8 * bracket);
+            cover = max(cover, bracket);
+        }
+    } else {
+        // Roof battens across the sheeting.
+        let n = surf_fit(len.y, mix(4.0, 7.0, roll.x));
+        let p = len.y / n;
+        let db = abs((fract(q.y / p) - 0.5) * p);
+        let edge = abs(q.y) < 0.5 || abs(q.y - len.y) < 0.5;
+        let batten = surf_step(0.12 - db, 0.0, f) * select(1.0, 0.0, edge);
+        h = max(h, 1.0 + 0.35 * batten);
+        cover = max(cover, batten);
+        shade *= 1.0 - 0.15 * surf_band(db - 0.12, 0.012, f) * select(1.0, 0.0, edge);
+    }
+    // Single plates: one in a few carries a fitting of its own.
+    let c = plate.cell;
+    let pick = hash11(c.id * 67.0 + 0.19);
+    let roomy = min(c.half.x, c.half.y) > 0.9;
+    if roomy && pick < 0.12 {
+        // A bolted access cover.
+        let cover = c.half * vec2<f32>(0.42, 0.38);
+        let e = surf_edge(c.p, cover);
+        h = min(h, 1.0 - 0.4 * surf_band(e, gap * 1.2, f));
+        h += 0.5 * surf_rivets(c.p, cover, 0.06, 1e3, 0.035);
+        shade *= 1.0 - 0.5 * surf_band(e, gap * 1.2, f);
+    } else if roomy && pick < 0.2 && i.up < 0.7 {
+        // A bank of louvres.
+        let bank = c.half * vec2<f32>(0.55, 0.35);
+        let e = surf_edge(c.p, bank);
+        let pitch = 2.0 * bank.y / surf_fit(2.0 * bank.y, 0.12);
+        let s = fract((c.p.y + bank.y) / pitch);
+        let inside = surf_step(e, 0.0, f);
+        h = min(h, mix(1.0, 0.45 + 0.5 * s, inside));
+        shade *= 1.0 - 0.6 * inside * (1.0 - s) * (1.0 - s);
+    }
+    return vec3<f32>(h, shade, cover);
 }
 
 // A ring of rivets just inside a rectangle, spaced to land on its corners.
@@ -306,9 +499,27 @@ fn surf_draught(i: SurfaceIn, fw: f32) -> vec4<f32> {
 // ---- relief -----------------------------------------------------------------
 
 fn surf_relief_plates(i: SurfaceIn, st: vec2<f32>, bevel: f32, gap: f32) -> f32 {
-    let cell = surf_courses(i, st, vec2<f32>(i.scale * 1.5, i.scale));
+    let building = i.structure;
+    var cell = surf_courses(i, st, vec2<f32>(i.scale * 1.5, i.scale));
+    var plate: StructPlate;
+    if building {
+        plate = surf_structure_plate(i, st);
+        cell = plate.cell;
+    }
     let d = surf_edge(cell.p, cell.half);
-    var h = surf_rise(d, gap, bevel) * (0.78 + 0.22 * cell.id);
+    var h = surf_rise(d, gap, bevel) * select(0.78 + 0.22 * cell.id, 0.9 + 0.1 * cell.id, building);
+    if building && i.zone == 0u {
+        // Flat sheets are riveted along their seams; a membrane lies flat.
+        if plate.kind == STRUCT_SHEET {
+            h += 0.4 * surf_rivets(cell.p, cell.half, gap + bevel * 1.5, 0.3, 0.035);
+        }
+        if plate.kind == STRUCT_MEMBRANE {
+            h = 1.0 - 0.15 * (1.0 - surf_rise(d, gap, bevel));
+        }
+        // Members over the plating hide its seams; fittings let in sink into it.
+        let feat = surf_struct_features(i, plate, gap, 0.0);
+        return mix(h + min(feat.x - 1.0, 0.0), feat.x, feat.z);
+    }
     if i.detail > 0.0 {
         // The skin's texture detail in place of the plates' few fittings.
         return min(h, surf_greeble(i, cell, surf_face_edge(i, st), gap, bevel, 0.0).h);
@@ -819,9 +1030,24 @@ fn surf_plasma_slit(i: SurfaceIn, st: vec2<f32>) -> vec2<f32> {
     return vec2<f32>(open, framed);
 }
 
+// A plate's bevel and seam gap, metres. A structure's seams are a sheet's real seams,
+// a centimetre or two whatever its size; a unit's grow with its plates.
+fn surf_seam_size(i: SurfaceIn) -> vec2<f32> {
+    if i.structure {
+        return vec2<f32>(0.03, 0.01);
+    }
+    return vec2<f32>(i.scale * 0.035, i.scale * 0.012);
+}
+
+// How deep and dark seams are cut, times the standard: the skin's on a unit, never
+// deeper than the standard on a structure.
+fn surf_seam_depth(i: SurfaceIn) -> f32 {
+    return select(i.seams, min(i.seams, 1.0), i.structure);
+}
+
 fn surf_relief(i: SurfaceIn, st: vec2<f32>) -> f32 {
-    let bevel = i.scale * 0.035;
-    let gap = i.scale * 0.012;
+    let bevel = surf_seam_size(i).x;
+    let gap = surf_seam_size(i).y;
     let small = select(min(i.half.x, i.half.y), i.half.y, i.wraps);
     // A face too small to carry an outline is trim: it stays flat.
     let outlined = smoothstep(bevel * 2.5, bevel * 5.0, small);
@@ -1074,8 +1300,8 @@ fn surface_at(i: SurfaceIn) -> Surface {
     out.emissive = vec3<f32>(0.0);
 
     let fw = max(i.px, 1e-4);
-    let bevel = i.scale * 0.035;
-    let gap = i.scale * 0.012;
+    let bevel = surf_seam_size(i).x;
+    let gap = surf_seam_size(i).y;
     let hurt = 1.0 - saturate(i.health);
     // A hull is laid out from the model position, not the face: its twisted facets have no frame.
     let framed = i.pattern != PAT_NONE && (max(abs(i.half.x), i.half.y) > 0.0 || i.pattern == PAT_HULL);
@@ -1091,9 +1317,9 @@ fn surface_at(i: SurfaceIn) -> Surface {
         let h0 = surf_relief(i, st);
         // Only what lies below a plate's face is a hollow: a plate's own face sits from
         // 0.78 to 1 (`surf_relief_plates`), and darkening it all packed grime over it.
-        hollow = mix(1.0, mix(0.4, 1.0, smoothstep(0.2, 0.72, h0)), saturate(i.seams - 1.0));
+        hollow = mix(1.0, mix(0.4, 1.0, smoothstep(0.2, 0.72, h0)), saturate(surf_seam_depth(i) - 1.0));
         // Seams cut as deep as the skin says.
-        let depth = bevel * 0.85 * i.seams;
+        let depth = bevel * 0.85 * surf_seam_depth(i);
         out.slope = vec2<f32>(surf_relief(i, st + vec2<f32>(e, 0.0)) - h0, surf_relief(i, st + vec2<f32>(0.0, e)) - h0) * (depth / e);
         // Nothing to resolve once a bevel is a small part of a pixel.
         out.slope *= 1.0 - smoothstep(bevel * 3.0, bevel * 9.0, fw);
@@ -1548,15 +1774,29 @@ fn surface_at(i: SurfaceIn) -> Surface {
                     // Scuffed edges read lighter on black, which is what draws its forms.
                     out.bare = max(out.bare, 0.55 * (1.0 - smoothstep(0.0, bevel * 0.9, d_face)) * outlined);
                 } else if small > i.scale * 0.3 {
-                    let cell = surf_courses(i, st, vec2<f32>(i.scale * 1.5, i.scale));
+                    let building = i.structure;
+                    var cell = surf_courses(i, st, vec2<f32>(i.scale * 1.5, i.scale));
+                    var plate: StructPlate;
+                    if building {
+                        plate = surf_structure_plate(i, st);
+                        cell = plate.cell;
+                    }
                     let d_cell = surf_edge(cell.p, cell.half);
-                    out.cavity = 1.0 - 0.62 * surf_band(d_cell, gap, fw);
+                    out.cavity = 1.0 - select(0.62, 0.3, building) * surf_band(d_cell, gap, fw);
                     // No two plates quite the same paint or polish: a patchwork of greys.
-                    out.cavity *= 0.84 + 0.3 * cell.id;
+                    out.cavity *= select(0.84 + 0.3 * cell.id, 0.93 + 0.12 * cell.id, building);
                     out.rough = (hash11(cell.id * 53.0) - 0.5) * 0.16;
+                    if building && i.zone == 0u {
+                        if plate.kind == STRUCT_MEMBRANE {
+                            // A roof membrane: no paint shine.
+                            out.rough += 0.2;
+                        }
+                        let feat = surf_struct_features(i, plate, gap, fw);
+                        out.cavity = mix(out.cavity, 0.97, feat.z) * feat.y;
+                    }
                     let style = select(hash11(cell.id * 91.0 + 0.37), 0.0, i.detail > 0.0);
                     let roomy = min(cell.half.x, cell.half.y) > i.scale * 0.3;
-                    if i.detail > 0.0 {
+                    if i.detail > 0.0 && (!building || i.zone != 0u) {
                         let g = surf_greeble(i, cell, d_face, gap, bevel, fw);
                         out.cavity *= g.cavity;
                         out.paint = mix(out.paint, vec4<f32>(g.paint.rgb, 1.0), g.paint.a);

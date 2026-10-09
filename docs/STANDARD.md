@@ -252,6 +252,26 @@ example.
   shot (`scripts/shot.sh unit KEY --look X,Y,Z --zoom 5`).
 - Mirror what is mirrored (`b.mirror_y`): a mark recorded inside it lands on both
   sides.
+- On a building, size fittings to the building: give grilles, louvres and vents a
+  pitch (`arg`, about 0.22 m on the ARC factories), or their holes fall under a pixel.
+- Paint numbers on a light plated wall, not on dark trim or a deck: the ink is dark on
+  light paint and reads poorly elsewhere.
+
+**Structures are not plated like units.** A unit's plate courses and seams grow with
+it; on a 46 m building that reads as brickwork. A structure's plain plated faces
+(surface.wgsl `surf_structure_plate`) instead:
+
+- take a finish each, picked by the face's seed so mirrored faces match: walls large
+  flat sheets riveted along their seams or heavy plates of uneven size, roofs a plain
+  membrane or heavy plates;
+- carry the structure over the plating, drawn across the seams in the plate's own
+  paint: frame columns and a girt, a service pipe on some walls, battens on roofs; and
+  on one plate in a few an access cover or a bank of louvres;
+- keep seams at a sheet's real size, about a centimetre, never cut deeper than the
+  standard whatever the skin's `seams`.
+
+No ribbed or profiled sheet, no bracing drawn as lines, no stains, blotches or fade.
+A zone (machinery, engine, walkway) still sets its own panelling there.
 
 ## Effect palettes (*planned*)
 

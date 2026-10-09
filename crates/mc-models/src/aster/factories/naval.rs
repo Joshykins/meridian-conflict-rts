@@ -167,7 +167,7 @@ pub(in crate::aster) fn factory_naval(b: &mut MeshBuilder, tech: u8) {
         );
     }
     if b.fine() {
-        // Bollards along the coping, lamps at its ends, ladders down the face.
+        // Bollards along the coping, ladders down the face.
         for x in [-40.0, -28.0, -12.0, 4.0, 16.0, 32.0] {
             b.paint(ACCENT);
             b.cylinder_between(
@@ -184,9 +184,6 @@ pub(in crate::aster) fn factory_naval(b: &mut MeshBuilder, tech: u8) {
                 0.7,
                 8,
             );
-        }
-        for x in [-42.5, 42.5] {
-            beacon(b, v3(x, QUAY_FACE - 1.0, DECK + 0.7));
         }
         for x in [-30.0, 22.0] {
             b.paint(METAL);
@@ -229,7 +226,7 @@ pub(in crate::aster) fn factory_naval(b: &mut MeshBuilder, tech: u8) {
         v3(hx0 - 0.25, front - 1.6, DECK + 8.0),
         v3(hx1 + 0.25, front + 0.25, DECK + 8.8),
     );
-    b.paint(PLATING).pattern(pattern::TEAM_BAND);
+    b.paint(PLATING);
     b.plate(
         v3((hx0 + hx1) * 0.5, -42.0, hall_top),
         v2(hx1 - hx0 - 2.0, 3.8),
@@ -249,8 +246,6 @@ pub(in crate::aster) fn factory_naval(b: &mut MeshBuilder, tech: u8) {
         );
     }
     if b.fine() {
-        vent(b, v3(-33.0, -38.3, hall_top), v2(4.0, 2.4), 3, ACCENT);
-        vent(b, v3(-13.0, -38.3, hall_top), v2(4.0, 2.4), 3, ACCENT);
         b.paint(ACCENT).pattern(pattern::FURNACE);
         b.plate(v3(-23.0, -38.3, hall_top), v2(5.0, 2.4), 0.08, 0.04);
         // Pilasters along the back wall.
@@ -360,7 +355,7 @@ pub(in crate::aster) fn factory_naval(b: &mut MeshBuilder, tech: u8) {
                 0.1,
                 4,
             );
-            antenna(b, v3(x + 0.35, CRANE_Y - 1.0, CRANE_Z + 4.5), 2.0, 0.0);
+            antenna_unlit(b, v3(x + 0.35, CRANE_Y - 1.0, CRANE_Z + 4.5), 2.0, 0.0);
         }
         // Tip block, the fabricator hung under it.
         b.paint(ACCENT);
@@ -372,9 +367,8 @@ pub(in crate::aster) fn factory_naval(b: &mut MeshBuilder, tech: u8) {
 
     // Harbour tower at the far end of the quay.
     factory_tower(b, WHARF_TOWER, 0.0, 24.0 - DECK);
-    beacon(b, WHARF_TOWER + v3(2.2, -2.6, 24.14 - DECK));
     if b.fine() {
-        antenna(b, WHARF_TOWER + v3(-2.5, 3.0, 24.0 - DECK), 3.6, 0.06);
+        antenna_unlit(b, WHARF_TOWER + v3(-2.5, 3.0, 24.0 - DECK), 3.6, 0.06);
     }
 
     // Suite II: fabricators on the coping, drums on the deck, the tower's radar mast.
@@ -393,7 +387,6 @@ pub(in crate::aster) fn factory_naval(b: &mut MeshBuilder, tech: u8) {
         b.paint(PLATING);
         b.chamfered_box(v3(0.0, -27.0, gz), v3(84.0, 2.6, 1.6), 0.4);
         conduit(b, v3(-40.0, -25.75, gz - 0.55), v3(40.0, -25.55, gz + 0.35));
-        glow_strip(b, v3(0.0, -27.0, gz + 0.8), v2(70.0, 0.4), GLOW);
         // An upper storey on the works hall.
         b.paint(PLATING);
         b.cuboid_open(v3(-27.0, -42.15, hall_top + 3.0), v3(18.0, 4.7, 6.0));
@@ -404,7 +397,7 @@ pub(in crate::aster) fn factory_naval(b: &mut MeshBuilder, tech: u8) {
             v3(-35.0, -39.8, hall_top + 1.2),
             v3(-19.0, -39.65, hall_top + 4.4),
         );
-        b.paint(PLATING).pattern(pattern::TEAM_BAND);
+        b.paint(PLATING);
         b.plate(v3(-27.0, -42.15, hall_top + 6.0), v2(17.0, 4.0), 0.12, 0.04);
         for (mount, s, aim) in heads("factory_naval", 2) {
             b.paint(ACCENT);
@@ -470,7 +463,7 @@ pub(in crate::aster) fn factory_naval(b: &mut MeshBuilder, tech: u8) {
         b.chamfered_box(v3(x, (-44.0 + -4.5) * 0.5, jib_z), v3(3.0, 39.5, 2.2), 0.5);
         b.paint(ACCENT);
         b.cuboid(v3(x, (-40.0 + -5.0) * 0.5, jib_z - 1.3), v3(2.4, 35.0, 0.4));
-        b.paint(PLATING).pattern(pattern::TEAM_BAND);
+        b.paint(PLATING);
         b.plate(v3(x, -20.0, jib_z + 1.1), v2(2.2, 26.0), 0.1, 0.04);
         // Counterweight under the jib's back end, a mast over the house.
         b.paint(PLATING_DARK);
@@ -498,21 +491,128 @@ pub(in crate::aster) fn factory_naval(b: &mut MeshBuilder, tech: u8) {
         b.prism(WHARF_TOWER + v3(-0.4, 0.0, 34.5 - DECK), 6, 0.4, 0.15, 4.0);
     });
 
-    if tech >= 2 {
-        b.paint(GLOW);
-        b.cuboid(
-            v3((hx0 + hx1) * 0.5, front + 0.35, DECK + 8.4),
-            v3(hx1 - hx0 - 1.0, 0.2, 0.3),
+    if tech >= 2 && b.fine() {
+        antenna_unlit(b, WHARF_TOWER + v3(-3.0, -3.2, 24.0 - DECK), 2.8, 0.1);
+    }
+    marks(b, tech);
+}
+
+/// What the Wharf's surface carries where (docs/STANDARD.md, "Texture detail and marks").
+fn marks(b: &mut MeshBuilder, tech: u8) {
+    use crate::gpu_consts::surface_mark as mark;
+    // Holes and slats at a building's pitch, not a vehicle's.
+    const PITCH: f32 = 0.22;
+    let (hx0, hx1, back, front) = (-40.0, -6.0, -45.0, -34.0);
+    let hall_top = DECK + 11.0;
+    // The quay deck is walked; bolts along its back edge.
+    b.mark(
+        v3(-QUAY_X, QUAY_BACK + 0.5, DECK),
+        v3(QUAY_X, QUAY_FACE - 2.5, DECK + 0.3),
+        mark::WALKWAY,
+        0.0,
+    );
+    b.mark(
+        v3(-QUAY_X + 1.0, QUAY_BACK - 0.3, DECK - 0.8),
+        v3(QUAY_X - 1.0, QUAY_BACK + 0.3, DECK - 0.2),
+        mark::BOLTS,
+        0.0,
+    );
+    // The works hall's roof: grilles over its plant, the owner's colour down the back.
+    for x in [-33.0, -13.0] {
+        b.mark(
+            v3(x - 2.0, -39.5, hall_top - 0.1),
+            v3(x + 2.0, -37.1, hall_top + 0.2),
+            mark::GRILLE,
+            PITCH,
         );
-        if b.fine() {
-            antenna(b, WHARF_TOWER + v3(-3.0, -3.2, 24.0 - DECK), 2.8, 0.1);
-        }
+    }
+    team_panel(
+        b,
+        v3((hx0 + hx1) * 0.5, -42.0, hall_top + 0.14),
+        v2(30.0, 1.5),
+    );
+    // Its front, between the shutters: a door, lettering over it.
+    b.mark(
+        v3(-24.4, front - 0.3, DECK + 1.4),
+        v3(-22.6, front + 0.3, DECK + 4.6),
+        mark::ACCESS,
+        0.0,
+    );
+    b.mark(
+        v3(-25.0, front - 0.3, DECK + 5.0),
+        v3(-22.0, front + 0.3, DECK + 5.8),
+        mark::LABEL,
+        3.0,
+    );
+    // The quay end of the hall: its number, a door; the far end: louvres.
+    b.mark(
+        v3(hx1 - 0.3, -42.0, DECK + 4.0),
+        v3(hx1 + 0.3, -37.0, DECK + 8.0),
+        mark::STENCIL,
+        2.0,
+    );
+    b.mark(
+        v3(hx1 - 0.3, -44.2, DECK + 1.4),
+        v3(hx1 + 0.3, -42.6, DECK + 4.6),
+        mark::ACCESS,
+        0.0,
+    );
+    b.mark(
+        v3(hx0 - 0.3, -42.0, DECK + 6.0),
+        v3(hx0 + 0.3, -37.0, DECK + 9.0),
+        mark::LOUVRES,
+        PITCH,
+    );
+    // The back wall: louvres between the pilasters.
+    for x in [-28.5, -17.5] {
+        b.mark(
+            v3(x - 2.6, back - 0.3, DECK + 4.0),
+            v3(x + 2.6, back + 0.3, DECK + 7.0),
+            mark::LOUVRES,
+            PITCH,
+        );
+    }
+    // The cranes: hazard stripes round the foot, where the tower slews.
+    for x in CRANE_X {
+        b.mark(
+            v3(x - 2.6, CRANE_Y - 2.6, DECK + 0.2),
+            v3(x + 2.6, CRANE_Y + 2.6, DECK + 1.3),
+            mark::HAZARD,
+            0.0,
+        );
+    }
+    // The harbour tower: a door toward the berth, lettering over it.
+    b.mark(
+        WHARF_TOWER + v3(-1.2, 5.5, 1.6),
+        WHARF_TOWER + v3(1.2, 6.1, 4.8),
+        mark::ACCESS,
+        0.0,
+    );
+    b.mark(
+        WHARF_TOWER + v3(-1.8, 5.5, 5.2),
+        WHARF_TOWER + v3(1.8, 6.1, 6.0),
+        mark::LABEL,
+        1.0,
+    );
+    if tech >= 2 {
+        // The gallery is walked; the upper storey's roof carries the owner's colour.
+        b.mark(
+            v3(-41.0, -28.1, DECK + 10.9),
+            v3(41.0, -25.9, DECK + 11.2),
+            mark::WALKWAY,
+            0.0,
+        );
+        team_panel(b, v3(-27.0, -42.15, hall_top + 6.12), v2(14.0, 1.6));
     }
     if tech >= 3 {
-        b.paint(GLOW);
-        b.prism(v3(HAMMER.x, HAMMER.y, HAMMER.z + 7.1), 6, 0.35, 0.15, 0.8);
-        if b.fine() {
-            glow_strip(b, v3(HAMMER.x, -30.0, HAMMER.z + 2.2), v2(1.0, 12.0), GLOW);
-        }
+        // The hammerhead: the owner's colour along its jib, stripes at its foot.
+        let (x, y, jib_z) = (HAMMER.x, HAMMER.y, HAMMER.z + 1.0);
+        team_panel(b, v3(x, -20.0, jib_z + 1.2), v2(0.9, 24.0));
+        b.mark(
+            v3(x - 3.3, y - 3.3, DECK + 0.2),
+            v3(x + 3.3, y + 3.3, DECK + 1.5),
+            mark::HAZARD,
+            0.0,
+        );
     }
 }
