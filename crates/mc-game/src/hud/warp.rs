@@ -149,6 +149,34 @@ pub(super) fn drive_line(s: &Scene, u: &UnitInstance, bp: &UnitBlueprint) -> Opt
     })
 }
 
+/// A dash's line for our own unit (mc-sim `dash.rs`): ready, or recharging with the
+/// seconds left.
+pub(super) fn dash_line(s: &Scene, u: &UnitInstance, bp: &UnitBlueprint) -> Option<Line> {
+    let d = bp.dash?;
+    if (u.owner_flags & 0xFF) as u8 != s.view.local {
+        return None;
+    }
+    let recharge = s.queue_of(u).map_or(0.0, |q| q.dash_recharge);
+    Some(if recharge > 0.0 {
+        let full = d.cooldown_ticks.max(1) as f32 / 10.0;
+        (
+            "Dash recharging".to_owned(),
+            seconds(recharge),
+            Some(1.0 - recharge / full),
+            palette::ACCENT,
+            palette::DIM,
+        )
+    } else {
+        (
+            "Dash ready".to_owned(),
+            format!("{} m", whole(d.range.to_f32())),
+            None,
+            palette::ACCENT,
+            palette::ACCENT,
+        )
+    })
+}
+
 /// A dampener's line: its field up, or down and why. Only for a field the viewer is
 /// shown: an enemy's never is.
 pub(super) fn damper_line(s: &Scene, u: &UnitInstance, bp: &UnitBlueprint) -> Option<Line> {
@@ -174,7 +202,7 @@ pub(super) fn damper_line(s: &Scene, u: &UnitInstance, bp: &UnitBlueprint) -> Op
     Some((label.to_owned(), radius, None, tone, tone))
 }
 
-/// The drive's line (ready, or recharging with the seconds left) or a dampener's, under
+/// The drive's line (ready, or recharging with the seconds left), a dampener's or a dash's, under
 /// the activity line. Returns where the next band starts.
 pub(super) fn band(
     ui: &mut Ui,
@@ -185,8 +213,9 @@ pub(super) fn band(
     y: f32,
     cw: f32,
 ) -> f32 {
-    let Some((label, value, share, bar_tone, tone)) =
-        drive_line(s, u, bp).or_else(|| damper_line(s, u, bp))
+    let Some((label, value, share, bar_tone, tone)) = drive_line(s, u, bp)
+        .or_else(|| damper_line(s, u, bp))
+        .or_else(|| dash_line(s, u, bp))
     else {
         return y;
     };

@@ -235,6 +235,11 @@ impl World {
         });
     }
 
+    /// Seconds before `row` may dash again (`UnitOrders::dash_recharge`, `crate::dash`).
+    pub(super) fn dash_recharge_seconds(&self, row: usize) -> f32 {
+        self.state.units.dash[row].cooldown as f32 / TICKS_PER_SECOND as f32
+    }
+
     /// Seconds before the drive in `row` may spool again (`UnitOrders::warp_recharge`).
     pub(super) fn warp_recharge_seconds(&self, row: usize) -> f32 {
         let w = &self.state.units.warp[row];

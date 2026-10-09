@@ -330,6 +330,9 @@
             ),
         ],
         mesh: "regency_seraph", icon: Titan,
-        sounds: (death: "blast_colossal", moving: "aster_hover"),
+        sounds: (
+            death: "blast_colossal", moving: "aster_hover",
+            dash_charge: "regency_warp_spool", dash_leave: "regency_warp_jump", dash_land: "regency_seraph_landing",
+        ),
     ),
 ]

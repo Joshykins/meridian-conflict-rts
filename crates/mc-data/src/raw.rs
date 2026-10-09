@@ -1347,6 +1347,11 @@ pub struct UnitSounds {
     /// Heard by its owner when the unit is selected. Left out, the library's
     /// `select` default for the unit's `icon` kind plays.
     pub select: Option<String>,
+    /// A dash (`crate::dash`): its windup, the unit leaving where it stood, and its
+    /// landing's shockwave.
+    pub dash_charge: Option<String>,
+    pub dash_leave: Option<String>,
+    pub dash_land: Option<String>,
 }
 
 fn one() -> u8 {

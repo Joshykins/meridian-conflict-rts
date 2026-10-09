@@ -46,6 +46,7 @@ mod capital_fx;
 mod capture;
 mod casing_fx;
 mod damper_fx;
+mod dash_fx;
 mod dive_fx;
 mod drive_swing;
 pub use capture::Shot;
@@ -4690,6 +4691,7 @@ impl Renderer {
             return;
         }
         self.giant_event(event, time);
+        self.dash_event(event, time);
         self.titan_charge
             .note(event, self.tick_seconds, &self.blueprints);
         match event {

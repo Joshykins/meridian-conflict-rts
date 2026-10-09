@@ -8,6 +8,9 @@
 //!   half, the rift at the exit point swelling toward the moment the ship comes out, a
 //!   stunned hull's arcs following its stun, and a live dampener's low field hum.
 //! - The systems-reboot gesture as a stun starts to wear off.
+//! - A dash (mc-sim `dash.rs`), warp's short cousin: the unit's own `dash_charge` as it
+//!   winds up, `dash_leave` where it stood and `dash_land` where it comes down (its
+//!   `UnitSounds`, so each dasher carries its own).
 //!
 //! A ship is heard by its size, never its tier: lower and louder the bigger its hull.
 //! Each sound is looked up per blueprint as `<moving>_<name>` (its `moving` sound's
@@ -105,6 +108,17 @@ fn size(radius: f32) -> (f32, f32) {
     )
 }
 
+/// One of a dasher's own sounds (`UnitSounds::dash_*`), if it names one.
+fn dash_sound(
+    library: &SoundLibrary,
+    blueprints: &Blueprints,
+    blueprint: u32,
+    pick: impl Fn(&mc_data::UnitSounds) -> &Option<String>,
+) -> Option<SoundId> {
+    let bp = blueprints.units.get(blueprint as usize)?;
+    pick(&bp.sounds).as_deref().and_then(|n| library.id_of(n))
+}
+
 impl WarpSounds {
     /// One sim tick: plays the one-shots and returns the loops wanted, as
     /// `Audio::set_loops` takes them. `hear` is the game's (gain, pan) for a place.
@@ -194,6 +208,25 @@ impl WarpSounds {
                     let (b, i) = (blueprint.0 as u32, ids(blueprint.0 as u32));
                     let sound = if *dampened { i.arrive_damped } else { i.arrive };
                     play(sound, Vec3::from(at.to_f32()), radius(b), 1.15);
+                }
+                SimEvent::DashCharging {
+                    from, blueprint, ..
+                } => {
+                    let b = blueprint.0 as u32;
+                    let sound = dash_sound(&library, blueprints, b, |s| &s.dash_charge);
+                    play(sound, Vec3::from(from.to_f32()), radius(b), 0.9);
+                }
+                SimEvent::DashLanded {
+                    from, blueprint, ..
+                } => {
+                    let b = blueprint.0 as u32;
+                    let sound = dash_sound(&library, blueprints, b, |s| &s.dash_leave);
+                    play(sound, Vec3::from(from.to_f32()), radius(b), 1.0);
+                }
+                SimEvent::DashShockwave { pos, blueprint, .. } => {
+                    let b = blueprint.0 as u32;
+                    let sound = dash_sound(&library, blueprints, b, |s| &s.dash_land);
+                    play(sound, Vec3::from(pos.to_f32()), radius(b), 1.2);
                 }
                 _ => {}
             }

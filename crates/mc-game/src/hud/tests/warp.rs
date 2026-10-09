@@ -1,5 +1,5 @@
 //! Warp on the HUD: the order card's Warp button, and what the unit card says of a jump,
-//! a stun, the drive's recharge and a dampener's field.
+//! a stun, the drive's recharge, a dampener's field and a dash's recharge.
 
 use super::*;
 use crate::game::Targeting;
@@ -153,5 +153,28 @@ fn a_dampeners_card_says_whether_its_field_is_up() {
     let s = scene(&rig, &stats);
     let (label, ..) = super::super::warp::damper_line(&s, &u, bp).unwrap();
     assert_eq!(label, "Warp field down  \u{b7}  no power");
+    rig.settle();
+}
+
+#[test]
+fn the_card_tells_a_dashs_recharge() {
+    let stats = FrameStats::default();
+    let mut rig = Rig::new("regency_t5_seraph");
+    let bp = rig
+        .blueprints
+        .unit(rig.blueprints.id_of("regency_t5_seraph").unwrap());
+    let s = scene(&rig, &stats);
+    let u = s.view.frame.units[0];
+    let (label, value, ..) = super::super::warp::dash_line(&s, &u, bp).expect("a dash line");
+    assert_eq!((label.as_str(), value.as_str()), ("Dash ready", "1,800 m"));
+    rig.view.status.queues = vec![UnitOrders {
+        unit_id: u.unit_id,
+        dash_recharge: 7.5,
+        ..Default::default()
+    }];
+    let s = scene(&rig, &stats);
+    let (label, value, share, ..) = super::super::warp::dash_line(&s, &u, bp).unwrap();
+    assert_eq!((label.as_str(), value.as_str()), ("Dash recharging", "8 s"));
+    assert!(share.is_some_and(|p| (p - 0.5).abs() < 1e-4));
     rig.settle();
 }

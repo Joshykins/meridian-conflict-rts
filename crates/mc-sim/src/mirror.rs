@@ -959,6 +959,9 @@ pub struct UnitOrders {
     /// Seconds before its warp drive may spool again (`Warp::cooldown_ticks`); zero when
     /// ready or without a drive.
     pub warp_recharge: f32,
+    /// Seconds before it may dash again (`Dash::cooldown_ticks`); zero when ready, winding
+    /// up, or without a dash.
+    pub dash_recharge: f32,
     /// Seconds before its stun wears off (`crate::warp`); zero when not stunned.
     pub stunned: f32,
     /// A factory with batch on: its muster block and who stands in it.
@@ -2891,6 +2894,7 @@ impl World {
                 }),
                 cargo: self.cargo_view(row),
                 warp_recharge: self.warp_recharge_seconds(row),
+                dash_recharge: self.dash_recharge_seconds(row),
                 stunned: self.stun_seconds(row),
                 batch: self.batch_view(row),
                 elevator: self.elevator_view(row),
