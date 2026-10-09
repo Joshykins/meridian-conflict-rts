@@ -8,7 +8,7 @@ use glam::Vec3;
 
 use super::super::limbs::*;
 use super::super::parts::*;
-use super::{gun, GUN};
+use super::{gun, legs, plate, GUN};
 use crate::builder::{chamfered_rect, MeshBuilder, Section};
 use crate::material::*;
 use crate::{part, pattern};
@@ -28,15 +28,6 @@ fn slab(b: &mut MeshBuilder, q: [Vec3; 4], out: Vec3, t: f32) {
     );
 }
 
-/// A thin seam of light from `a` to `c`, up close only. Leaves the brush on plating.
-fn seam(b: &mut MeshBuilder, a: Vec3, c: Vec3) {
-    if b.fine() {
-        b.paint(GLOW).pattern(pattern::PLAIN);
-        b.beam(a, c, v2(0.14, 0.14), v2(0.14, 0.14));
-    }
-    b.paint(PLATING);
-}
-
 /// The pelvis, and over the waist the torso, its plates, the brow and the hump.
 pub(super) fn body(b: &mut MeshBuilder) {
     b.with_part(part::HULL, |b| {
@@ -47,7 +38,6 @@ pub(super) fn body(b: &mut MeshBuilder) {
 }
 
 fn torso(b: &mut MeshBuilder) {
-    let fine = b.fine();
     b.paint(ACCENT).pattern(pattern::PLAIN);
     b.prism(v3(-1.0, 0.0, 24.0), b.sides(14), 7.2, 6.8, 2.0);
     // The core: narrow over the hips, swelling forward and up into the shoulders.
@@ -62,7 +52,7 @@ fn torso(b: &mut MeshBuilder) {
         ],
     );
     // The brow: a heavy faceted plate jutting forward over the head, its crown ridged.
-    b.paint(PLATING);
+    plate(b);
     b.extrude_y_chamfered(
         &[
             [5.0, 38.0],
@@ -79,10 +69,9 @@ fn torso(b: &mut MeshBuilder) {
         -2.2,
         2.2,
     );
-    seam(b, v3(15.9, -7.4, 37.25), v3(15.9, 7.4, 37.25));
     b.mirror_y(|b| {
         // A pectoral slab either side of the head, raked back under the brow.
-        b.paint(PLATING);
+        plate(b);
         slab(
             b,
             [
@@ -94,7 +83,6 @@ fn torso(b: &mut MeshBuilder) {
             v3(1.0, 0.15, -0.55),
             1.1,
         );
-        seam(b, v3(13.0, 4.5, 37.3), v3(12.2, 12.6, 37.3));
         // A flank plate down the side of the shoulders, lapped over a lower one.
         slab(
             b,
@@ -118,7 +106,6 @@ fn torso(b: &mut MeshBuilder) {
             v3(0.0, 1.0, -0.3),
             0.9,
         );
-        seam(b, v3(-4.6, 13.5, 36.6), v3(7.6, 14.4, 36.2));
         // The hump's side plates, stepped, round the launcher wells.
         slab(
             b,
@@ -131,10 +118,9 @@ fn torso(b: &mut MeshBuilder) {
             Y,
             1.0,
         );
-        seam(b, v3(-14.8, 11.7, 37.4), v3(-5.4, 12.1, 37.4));
     });
     // The belly plate under the chest.
-    b.paint(PLATING);
+    plate(b);
     b.extrude_y_chamfered(
         &[
             [4.0, 26.0],
@@ -160,18 +146,6 @@ fn torso(b: &mut MeshBuilder) {
         2.0,
     );
     team_panel(b, v3(0.5, 0.0, 46.8), v2(3.0, 3.6));
-    if fine {
-        b.paint(PLATING_DARK);
-        for k in 0..4 {
-            let z = 35.0 + 1.8 * k as f32;
-            b.beam(
-                v3(-16.6, -7.0, z),
-                v3(-16.6, 7.0, z),
-                v2(0.5, 0.35),
-                v2(0.5, 0.35),
-            );
-        }
-    }
 }
 
 /// An arm, carried in its gun house: the shoulder drum, a layered pauldron over it, the
@@ -191,7 +165,7 @@ pub(super) fn arm(b: &mut MeshBuilder, side: f32) {
     );
     // The pauldron: a faceted hood over the shoulder, a second plate lapped over its
     // crown, a seam of light between them.
-    b.paint(PLATING);
+    plate(b);
     b.at(s + v3(1.0, side * 1.0, 1.2), |b| {
         b.loft(
             &[
@@ -214,7 +188,14 @@ pub(super) fn arm(b: &mut MeshBuilder, side: f32) {
             Vec3::Z,
             0.9,
         );
-        seam(b, v3(-3.6, side * 5.65, 3.0), v3(4.6, side * 5.65, 3.0));
+        // A bolt row along the pauldron's skirt.
+        let (y0, y1) = ((side * 5.1).min(side * 6.1), (side * 5.1).max(side * 6.1));
+        b.mark(
+            v3(-4.0, y0, -2.4),
+            v3(4.2, y1, -2.0),
+            crate::gpu_consts::surface_mark::BOLTS,
+            0.8,
+        );
     });
     // The upper arm.
     b.paint(ACCENT).pattern(pattern::PLAIN);
@@ -224,7 +205,7 @@ pub(super) fn arm(b: &mut MeshBuilder, side: f32) {
         elbow,
         &[(0.0, 3.0, 2.8, 2.8, 1.0), (1.0, 2.4, 2.2, 2.2, 0.9)],
     );
-    b.paint(PLATING);
+    plate(b);
     armour(
         b,
         s + v3(1.0, side * 4.0, -4.0),
@@ -242,5 +223,5 @@ pub(super) fn arm(b: &mut MeshBuilder, side: f32) {
             0.4,
         );
     }
-    joint(b, elbow, 2.4, 1.8);
+    legs::joint(b, elbow, 2.4, 1.8);
 }

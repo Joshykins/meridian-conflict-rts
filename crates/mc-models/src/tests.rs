@@ -817,6 +817,9 @@ const OVER_BUDGET: &[Over] = &[
     // The point defence turret is small; its full level lost its team plates to the
     // surface (team marks), leaving its gun's mid detail a bigger share.
     ("turret", None, Some(0.52), None),
+    // The Breacher's fittings are surface marks: its full level lost the bolt heads, vent
+    // slats and lit seams, leaving its frame's mid detail a bigger share.
+    ("breacher", None, Some(0.53), None),
 ];
 type Over = (&'static str, Option<usize>, Option<f32>, Option<usize>);
 

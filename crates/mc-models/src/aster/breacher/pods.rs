@@ -8,8 +8,11 @@ use glam::Vec3;
 use super::super::limbs::*;
 use super::super::parts::*;
 use crate::builder::MeshBuilder;
+use crate::gpu_consts::surface_mark as mark;
 use crate::material::*;
 use crate::pattern;
+
+use super::plate;
 
 const X: Vec3 = Vec3::X;
 
@@ -30,7 +33,7 @@ pub(super) fn launcher_at(b: &mut MeshBuilder, face: Vec3, pitch: f32, cheek: bo
 fn launcher(b: &mut MeshBuilder, cheek: bool) {
     let fine = b.fine();
     let (x, y, z) = (0.0f32, 0.0f32, 0.0f32);
-    b.paint(PLATING);
+    plate(b);
     b.loft(
         &[
             x_ring(x - 0.2, y, z, HALF, HALF, 1.2),
@@ -71,7 +74,7 @@ fn launcher(b: &mut MeshBuilder, cheek: bool) {
     }
     if cheek {
         // A cheek plate down the outside, standing off it.
-        b.paint(PLATING);
+        plate(b);
         b.extrude_y(
             &[
                 [x + 0.4, z - HALF + 0.4],
@@ -90,10 +93,11 @@ fn launcher(b: &mut MeshBuilder, cheek: bool) {
         b.paint(ACCENT).pattern(pattern::PLAIN);
         for k in 0..2 {
             let hx = x - 4.0 - 2.6 * k as f32;
-            b.block(
+            let (lo, hi) = (
                 v3(hx - 1.0, y - HALF + 0.6, z + HALF + 0.25),
                 v3(hx + 1.0, y - 0.6, z + HALF + 0.45),
             );
+            b.mark(lo - Vec3::Z * 0.4, hi, mark::ACCESS, 0.0);
         }
         b.paint(PLATING).pattern(pattern::HAZARD);
         b.loft(

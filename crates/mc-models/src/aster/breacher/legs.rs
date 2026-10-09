@@ -6,7 +6,7 @@ use glam::Vec3;
 
 use super::super::limbs::*;
 use super::super::parts::*;
-use super::FOOT;
+use super::{plate, FOOT};
 use crate::builder::MeshBuilder;
 use crate::material::*;
 use crate::{part, pattern, rig};
@@ -31,6 +31,29 @@ pub(super) fn leg(b: &mut MeshBuilder, l: Leg) {
         b.with_limb(rig::TARSUS, |b| tarsus(b, l));
         b.with_limb(rig::FOOT, |b| foot(b, l.ankle));
     });
+}
+
+/// A joint drum across the limb at `at`: a dark drum under a plated cap, a dark boss in
+/// the cap's middle. Not the walkers' shared drum: its ring of bolt heads reads as
+/// squares at a Breacher's size.
+pub(super) fn joint(b: &mut MeshBuilder, at: Vec3, half: f32, r: f32) {
+    let n = b.sides(16);
+    b.paint(ACCENT).pattern(pattern::PLAIN);
+    b.cylinder_between(at - Y * half, at + Y * half, r, r, n);
+    // The outer cap: one plated disc stepped in from the drum, its edge chamfered.
+    b.paint(PLATING).pattern(pattern::PLAIN);
+    b.cylinder_between(at + Y * half, at + Y * (half + 0.45), r * 0.9, r * 0.8, n);
+    // The boss and the inner hub in dark trim: bright metal end-on mirrors the sky and
+    // reads as a hole through the joint.
+    b.paint(ACCENT).pattern(pattern::PLAIN);
+    b.cylinder_between(
+        at + Y * (half + 0.45),
+        at + Y * (half + 0.75),
+        r * 0.34,
+        r * 0.3,
+        n,
+    );
+    b.cylinder_between(at - Y * (half + 0.5), at - Y * half, r * 0.5, r * 0.62, n);
 }
 
 /// From far off: each bone a bar.
@@ -61,7 +84,7 @@ fn thigh(b: &mut MeshBuilder, l: Leg) {
             (1.0, 3.0, 2.8, 2.8, 0.9),
         ],
     );
-    b.paint(PLATING);
+    plate(b);
     armour(
         b,
         hip.lerp(knee, 0.08) + face * 3.2,
@@ -107,7 +130,7 @@ fn shin(b: &mut MeshBuilder, l: Leg) {
             (1.0, 2.4, 2.0, 2.0, 0.7),
         ],
     );
-    b.paint(PLATING);
+    plate(b);
     armour(
         b,
         knee.lerp(hock, 0.1) + face * 2.2,
@@ -126,9 +149,6 @@ fn shin(b: &mut MeshBuilder, l: Leg) {
                 0.35,
             );
         }
-        b.paint(TEAM).pattern(pattern::PLAIN);
-        let at = knee.lerp(hock, 0.5) + face * 3.7;
-        b.beam(at - Y * 2.0, at + Y * 2.0, v2(0.8, 0.2), v2(0.8, 0.2));
     }
     joint(b, hock, 2.8, 2.6);
 }
@@ -138,7 +158,7 @@ fn shin(b: &mut MeshBuilder, l: Leg) {
 fn tarsus(b: &mut MeshBuilder, l: Leg) {
     let (hock, ankle) = (l.hock, l.ankle);
     let (_, _, face) = bone_frame(hock, ankle);
-    b.paint(PLATING);
+    plate(b);
     limb(
         b,
         hock,
@@ -169,7 +189,6 @@ fn tarsus(b: &mut MeshBuilder, l: Leg) {
 /// A great flat foot: a dark sole pad, a light shell over it rising to the ankle, a prow
 /// plate over the front, ankle guards, a heel block. No toes.
 fn foot(b: &mut MeshBuilder, ankle: Vec3) {
-    let fine = b.fine();
     let (rear, front, width) = FOOT;
     let (x0, x1) = (ankle.x + rear, ankle.x + front);
     let half = width * 0.5;
@@ -179,7 +198,7 @@ fn foot(b: &mut MeshBuilder, ankle: Vec3) {
         ankle.y - half,
         ankle.y + half,
     );
-    b.paint(PLATING);
+    plate(b);
     b.extrude_y(
         &[
             [x0, 0.8],
@@ -215,17 +234,4 @@ fn foot(b: &mut MeshBuilder, ankle: Vec3) {
         v3(x0 - 0.4, ankle.y - 2.0, 0.6),
         v3(x0 + 2.2, ankle.y + 2.0, 3.0),
     );
-    if fine {
-        b.paint(METAL);
-        for k in 0..4 {
-            let x = x0 + 1.6 + k as f32 * (x1 - x0 - 3.2) / 3.0;
-            b.cuboid(v3(x, ankle.y + half - 0.1, 1.4), v3(0.5, 0.3, 0.5));
-            b.cuboid(v3(x, ankle.y - half + 0.1, 1.4), v3(0.5, 0.3, 0.5));
-        }
-        b.paint(PLATING).pattern(pattern::HAZARD);
-        b.block(
-            v3(x1 - 0.6, ankle.y - half + 0.8, 1.0),
-            v3(x1 + 0.05, ankle.y + half - 0.8, 1.5),
-        );
-    }
 }

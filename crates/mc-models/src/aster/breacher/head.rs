@@ -8,6 +8,8 @@ use crate::builder::{MeshBuilder, Section};
 use crate::material::*;
 use crate::pattern;
 
+use super::plate;
+
 /// Where the head turns: low, ahead of the chest, under the brow.
 const NECK: Vec3 = Vec3::new(11.0, 0.0, 33.5);
 
@@ -25,7 +27,7 @@ fn collar(b: &mut MeshBuilder) {
 
 /// A low head drawn out to a blunt prow: a dark lower half, a light plated crown with fins
 /// swept back from it, one thin sensor line between them wrapped round the prow. It looks
-/// about while the unit idles (`with_head`).
+/// about while the unit idles (`with_head`). The sensor line is dark glass.
 pub(super) fn head(b: &mut MeshBuilder) {
     collar(b);
     let z = NECK.z;
@@ -49,7 +51,7 @@ pub(super) fn head(b: &mut MeshBuilder) {
                     Section::new(z - 0.2, 1.0),
                 ],
             );
-            b.paint(PLATING);
+            plate(b);
             b.loft_z(
                 &plan,
                 &[
@@ -59,7 +61,7 @@ pub(super) fn head(b: &mut MeshBuilder) {
                 ],
             );
             // The sensor line between them, wrapped round the prow.
-            b.paint(GLOW).pattern(pattern::PLAIN);
+            b.paint(GLASS);
             b.loft_z(
                 &plan,
                 &[
@@ -69,7 +71,7 @@ pub(super) fn head(b: &mut MeshBuilder) {
             );
             if fine {
                 // Fins swept back from the crown.
-                b.paint(PLATING);
+                plate(b);
                 b.mirror_y(|b| {
                     b.extrude_y(
                         &[

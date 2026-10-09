@@ -10,8 +10,11 @@ use glam::{Affine3A, Quat, Vec3};
 use super::super::limbs::*;
 use super::super::parts::*;
 use crate::builder::MeshBuilder;
+use crate::gpu_consts::surface_mark as mark;
 use crate::material::*;
 use crate::pattern;
+
+use super::plate;
 
 const X: Vec3 = Vec3::X;
 const Y: Vec3 = Vec3::Y;
@@ -50,7 +53,7 @@ pub(super) fn gun(b: &mut MeshBuilder, side: f32, origin: Vec3, drum: bool) {
         let fine = b.fine();
         // The body: a faceted housing along the bore, in two plated sections with a dark
         // gap between them and a thin seam of light along its outboard flank.
-        b.paint(PLATING);
+        plate(b);
         b.loft(
             &[
                 x_ring(-11.0, y, z, 3.4, 3.2, 1.2),
@@ -87,15 +90,6 @@ pub(super) fn gun(b: &mut MeshBuilder, side: f32, origin: Vec3, drum: bool) {
             true,
             true,
         );
-        if fine {
-            b.paint(GLOW).pattern(pattern::PLAIN);
-            b.beam(
-                v3(0.0, y + side * 5.32, z + 1.6),
-                v3(8.0, y + side * 5.32, z + 1.6),
-                v2(0.12, 0.25),
-                v2(0.12, 0.25),
-            );
-        }
         breech(b, y, z);
         if drum {
             magazine(b, side, y, z);
@@ -111,13 +105,12 @@ pub(super) fn gun(b: &mut MeshBuilder, side: f32, origin: Vec3, drum: bool) {
         );
         // The ejection port in the outboard flank.
         let port = v3(1.0, y + side * 5.3, z - 0.6);
-        b.paint(PLATING).pattern(pattern::HAZARD);
-        b.block(port + v3(-2.2, -0.35, -1.3), port + v3(2.2, 0.35, 1.3));
         b.paint(TREAD);
         b.block(port + v3(-1.5, -0.5, -0.6), port + v3(1.5, 0.5, 0.6));
         if fine {
-            body_detail(b, side, y, z, drum);
+            body_detail(b, y, z, drum);
         }
+        gun_marks(b, side, port);
         b.with_spin(v3(0.0, y, z), |b| cluster(b, y, z));
     });
 }
@@ -125,7 +118,7 @@ pub(super) fn gun(b: &mut MeshBuilder, side: f32, origin: Vec3, drum: bool) {
 /// The breech hump on the body's roof: a long armoured block over the action, the loading
 /// gate on its flank, vents along its crown.
 fn breech(b: &mut MeshBuilder, y: f32, z: f32) {
-    b.paint(PLATING);
+    plate(b);
     b.frustum(
         v3(-1.5, y, z + 4.2),
         v2(13.0, 5.6),
@@ -135,11 +128,6 @@ fn breech(b: &mut MeshBuilder, y: f32, z: f32) {
     );
     b.paint(ACCENT).pattern(pattern::PLAIN);
     b.block(v3(-6.0, y - 1.4, z + 6.5), v3(2.0, y + 1.4, z + 6.9));
-    b.paint(METAL);
-    for k in 0..5 {
-        let x = -5.4 + 1.6 * k as f32;
-        b.block(v3(x, y - 1.2, z + 6.8), v3(x + 0.6, y + 1.2, z + 7.1));
-    }
 }
 
 /// The ammunition drum behind the body, its axis across the arm, and the feed chute from
@@ -147,7 +135,7 @@ fn breech(b: &mut MeshBuilder, y: f32, z: f32) {
 fn magazine(b: &mut MeshBuilder, side: f32, y: f32, z: f32) {
     let drum = v3(-15.0, y, z + 0.4);
     let n = b.sides(18);
-    b.paint(PLATING);
+    plate(b);
     b.cylinder_between(drum - Y * 3.6, drum + Y * 3.6, 4.8, 4.8, n);
     b.paint(ACCENT).pattern(pattern::PLAIN);
     let fine = b.fine();
@@ -155,7 +143,7 @@ fn magazine(b: &mut MeshBuilder, side: f32, y: f32, z: f32) {
         b.cylinder_between(drum + Y * (s * 3.6), drum + Y * (s * 4.1), 4.0, 3.6, n);
     }
     // The chute: from the drum's underside forward into the body.
-    b.paint(PLATING);
+    plate(b);
     b.beam(
         drum + v3(3.0, 0.0, -3.6),
         v3(-8.0, y, z - 4.4),
@@ -174,7 +162,7 @@ fn magazine(b: &mut MeshBuilder, side: f32, y: f32, z: f32) {
 }
 
 /// Up close: ribs round the drum, rails along the body, a hatch, cable runs.
-fn body_detail(b: &mut MeshBuilder, side: f32, y: f32, z: f32, magazine: bool) {
+fn body_detail(b: &mut MeshBuilder, y: f32, z: f32, magazine: bool) {
     let drum = v3(-15.0, y, z + 0.4);
     b.paint(METAL);
     for k in (0..8).filter(|_| magazine) {
@@ -183,20 +171,6 @@ fn body_detail(b: &mut MeshBuilder, side: f32, y: f32, z: f32, magazine: bool) {
         b.beam(
             drum + off - Y * 3.2,
             drum + off + Y * 3.2,
-            v2(0.6, 0.4),
-            v2(0.6, 0.4),
-        );
-    }
-    b.paint(PLATING).pattern(pattern::PLAIN);
-    for k in 0..8 {
-        let a = (k as f32 + 0.5) * TAU / 8.0;
-        let off = v3(0.0, a.cos() * 5.35, a.sin() * 5.15);
-        if off.z > 3.0 {
-            continue;
-        }
-        b.beam(
-            v3(-8.0, y, z) + off,
-            v3(-5.2, y, z) + off,
             v2(0.6, 0.4),
             v2(0.6, 0.4),
         );
@@ -211,10 +185,22 @@ fn body_detail(b: &mut MeshBuilder, side: f32, y: f32, z: f32, magazine: bool) {
             6,
         );
     }
-    b.paint(TEAM).pattern(pattern::PLAIN);
-    b.block(
-        v3(-8.6, y + side * 5.0 - 0.3, z + 1.0),
-        v3(-3.4, y + side * 5.0 + 0.3, z + 2.2),
+}
+
+/// The gun's marks, in its own frame: a grille over the breech's crown, the owner's
+/// colour on the outboard flank behind the ejection port, hazard stripes round it.
+fn gun_marks(b: &mut MeshBuilder, side: f32, port: Vec3) {
+    // From `lo` to `hi` out from the bore on this gun's outboard side.
+    let ys = |lo: f32, hi: f32| ((side * lo).min(side * hi), (side * lo).max(side * hi));
+    b.mark(v3(-6.5, -1.6, 6.2), v3(2.5, 1.6, 7.0), mark::GRILLE, 0.3);
+    let (y0, y1) = ys(4.3, 5.4);
+    b.mark(v3(-8.4, y0, 0.6), v3(-3.6, y1, 2.4), mark::TEAM, 0.0);
+    let (y0, y1) = ys(4.8, 5.9);
+    b.mark(
+        v3(port.x - 2.2, y0, port.z - 1.3),
+        v3(port.x + 2.2, y1, port.z + 1.3),
+        mark::HAZARD,
+        0.0,
     );
 }
 

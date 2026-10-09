@@ -20,13 +20,15 @@
 //!   (`with_spin`, `Model::spins`); the left gun's about the mirror of that line
 //!   (`entity.wgsl`), so the guns stay mirrored in y.
 //!
-//! Style: layered faceted plates over a dark gunmetal frame, thin blue seams of light
-//! between some of them, grey metal for joints and rams only.
+//! Style: layered faceted plates over a dark gunmetal frame, each plate one whole plate
+//! of scratched steel; fittings, the hull number and the team colour are surface marks
+//! (`marks`), and nothing is lit but the shield projector's ring.
 
 mod body;
 pub(crate) mod gun;
 mod head;
 mod legs;
+mod marks;
 pub(crate) mod pods;
 
 use glam::Vec3;
@@ -35,8 +37,14 @@ use super::limbs::*;
 use super::parts::*;
 use crate::builder::MeshBuilder;
 use crate::material::*;
-use crate::part;
+use crate::{part, pattern};
 use legs::Leg;
+
+/// Paints armour plate: each plate one whole plate (`pattern::PLAIN`), finished by the
+/// skin and carrying the model's marks, not cut into courses.
+fn plate(b: &mut MeshBuilder) {
+    b.paint(PLATING).pattern(pattern::PLAIN);
+}
 
 /// The left leg's joints at rest.
 const LEG: Leg = Leg {
@@ -105,6 +113,7 @@ pub(crate) fn breacher(b: &mut MeshBuilder, _tech: u8) {
         b.mirror_y(|b| pods::launcher_at(b, POD.0, POD.1, true));
         projector(b, v3(-15.0, 0.0, 44.0), SHIELD);
     });
+    marks::marks(b);
 }
 
 /// From far off: the legs as bars, a bar of a body, the launchers' faces and the arms as
