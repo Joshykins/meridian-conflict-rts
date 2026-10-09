@@ -1476,11 +1476,16 @@ impl World {
         let swaying = on_body && w != 0 && weapon.sway.0 > 0;
         let bearing = match deck {
             Some((yaw, _)) => units.heading[row] + yaw,
-            None if swaying => {
-                crate::bore_lay::yaw(weapon, (aim - yaw_origin).angle(), yaw_origin.distance(aim))
-            }
             None => (aim - yaw_origin).angle(),
         };
+        // How far the bore's lay is off the bearing: the torso itself still turns to the
+        // bearing, or a leading arm would hold it off the mark and its pods never fire.
+        let lay_off = if swaying && deck.is_none() {
+            crate::bore_lay::yaw(weapon, bearing, yaw_origin.distance(aim)) - bearing
+        } else {
+            Angle::ZERO
+        };
+        let bearing = bearing + lay_off;
 
         // An arm points up or down at its target as well as round to it.
         // Howitzers elevate to the lob, not the line of sight, and wait until the tube is there.
@@ -1730,7 +1735,7 @@ impl World {
             // Guns sharing a torso (`on_torso`) turn it together: the lead turns it, the
             // others ride where it points, or swing onto their own marks within their sway.
             let torso = if on_body && drives {
-                units.weapon_yaw[row][0].turn_toward(want + base, weapon.turret_turn)
+                units.weapon_yaw[row][0].turn_toward(want + base - lay_off, weapon.turret_turn)
             } else {
                 units.weapon_yaw[row][0]
             };

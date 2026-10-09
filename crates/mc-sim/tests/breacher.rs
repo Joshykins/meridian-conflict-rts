@@ -192,7 +192,8 @@ fn new_shots(w: &World, weapon: usize, seen: &mut Vec<u32>) -> Vec<([f32; 3], [f
 
 /// Each arm's barrels point where its shells go: the bore hangs beside and below the
 /// shoulder it turns and pitches about, and is laid through the mark, so a shell (fired
-/// from the muzzle at the mark) leaves along the barrels, within the gun's spread.
+/// from the muzzle at the mark) leaves along the barrels, within the gun's spread. The
+/// torso the arms lead still faces the mark, so the pods fire too.
 #[test]
 fn the_arms_shoot_down_their_barrels() {
     let mut w = world();
@@ -201,9 +202,11 @@ fn the_arms_shoot_down_their_barrels() {
     let arms = arms(&w);
     let mut seen = Vec::new();
     let mut checked = 0;
+    let mut rockets = 0;
     for _ in 0..seconds(8) {
         w.tick(&[]).unwrap();
         let r = row(&w, breacher);
+        rockets += new_shots(&w, 0, &mut seen).len();
         for (slot, &arm) in arms.iter().enumerate() {
             for (_, vel) in new_shots(&w, arm, &mut seen) {
                 let units = &w.state.units;
@@ -227,6 +230,10 @@ fn the_arms_shoot_down_their_barrels() {
         }
     }
     assert!(checked >= 10, "only {checked} shells checked");
+    assert!(
+        rockets > 0,
+        "the pods never fired with the arms leading the torso"
+    );
 }
 
 /// The rockets leave the launchers' cells as they stand in the hump, which never pitch,
