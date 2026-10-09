@@ -87,6 +87,8 @@ pub(in crate::ai) mod role {
     pub(in crate::ai) const STRIKE: u32 = 1 << 20;
     /// Hits spaceships hard.
     pub(in crate::ai) const ANTI_SPACE: u32 = 1 << 21;
+    /// Brings units and materials down from orbit, free (a space elevator).
+    pub(in crate::ai) const ELEVATOR: u32 = 1 << 22;
 }
 
 /// A shot farther than this many times an ordinary defence's reach is a map gun's.
@@ -293,6 +295,9 @@ fn roles(bp: &UnitBlueprint, p: &Profile) -> u32 {
     }
     if bp.is_site_built_unit() {
         r |= role::PROJECT;
+    }
+    if bp.elevator.is_some() {
+        r |= role::ELEVATOR | role::PROJECT;
     }
     if bp.warp.is_some() {
         r |= role::WARP;

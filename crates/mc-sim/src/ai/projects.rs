@@ -31,6 +31,9 @@ pub(super) enum Project {
     MapGun,
     /// An experimental or a warship, built on a lot and sent with the army.
     Mobile,
+    /// Brings units and materials down from orbit: an investment, wanted once the
+    /// income can carry it (`choose_wants`).
+    Elevator,
 }
 
 pub(super) fn project_kind(bp: &UnitBlueprint) -> Option<Project> {
@@ -38,9 +41,6 @@ pub(super) fn project_kind(bp: &UnitBlueprint) -> Option<Project> {
         || bp.has(cat::REPLICATOR)
         || bp.mine.is_some()
         || bp.transport.is_some()
-        // A space elevator is a factory and a mine at once, not an army or a weapon: the
-        // plans do not choose it (yet).
-        || bp.elevator.is_some()
         || bp.cost_mass <= Fx::ZERO
         // An unarmed ship (the Vigil) is no project: counted as one, each Vigil
         // finished freed the slot for the next, and sides had 30 to 60 of them
@@ -48,6 +48,9 @@ pub(super) fn project_kind(bp: &UnitBlueprint) -> Option<Project> {
         || (bp.is_mobile() && bp.weapons.is_empty())
     {
         return None;
+    }
+    if bp.elevator.is_some() {
+        return Some(Project::Elevator);
     }
     Some(match bp.strategic.as_ref().map(|s| s.kind) {
         Some(StrategicKind::Interceptor) => Project::Interceptor,
@@ -60,6 +63,40 @@ pub(super) fn project_kind(bp: &UnitBlueprint) -> Option<Project> {
 }
 
 impl World {
+    /// A space elevator of `player`'s going up, and the build power it still wants: as
+    /// much as the side's income keeps busy on it. Its first builder alone took most
+    /// of an hour while every other engineer went on claiming far mines.
+    pub(super) fn elevator_short_of_help(
+        &self,
+        player: u8,
+        census: &Census,
+        intel: &Intel,
+    ) -> Option<(usize, Fx)> {
+        let units = &self.state.units;
+        let site = census
+            .sites
+            .iter()
+            .copied()
+            .find(|&s| self.bp(s).elevator.is_some() && !intel.danger.hot(units.pos[s]))?;
+        let bp = self.bp(site);
+        let pl = &self.state.players[player as usize];
+        let fed = |income: Fx, cost: Fx| income * (bp.build_time / cost.max(Fx::ONE));
+        let want = fed(pl.mass_income, bp.cost_mass).min(fed(pl.energy_income, bp.cost_energy));
+        let on: Fx = units
+            .slots
+            .iter()
+            .filter(|&r| units.owner[r] == player && units.is_active(r))
+            .filter(|&r| {
+                self.state.orders.iter(units, r).next().is_some_and(|o| {
+                    (o.kind == OrderKind::Assist && !o.target.is_none() && o.target.index() == site)
+                        || (o.kind == OrderKind::Build && o.blueprint == units.blueprint[site])
+                })
+            })
+            .filter_map(|r| self.bp(r).builder.as_ref().map(|b| b.power))
+            .sum();
+        (on < want).then_some((site, want - on))
+    }
+
     /// Warheads ready in `player`'s silos go at the enemy spot worth most
     /// under a blast: its commander above all, then what stands there.
     pub(super) fn direct_nukes(&self, player: u8, out: &mut Vec<Command>) {

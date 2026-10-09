@@ -1,6 +1,7 @@
 //! What the AI's factories make: engineers while the side is short of them,
 //! salvagers where wrecks lie, a couple of scouts, and otherwise the combat unit
-//! its plans want (`commander/solver.rs`).
+//! its plans want (`commander/solver.rs`). A space elevator's crates are filled
+//! with combat units, as much as their payload holds.
 use super::*;
 
 impl World {
@@ -76,6 +77,44 @@ impl World {
                         && !u.is_salvager()
                 })
                 .collect();
+            if let Some(e) = self.bp(row).elevator {
+                // Free units: fighters only, a whole payload of them each fall, else
+                // the rest comes down as mass (and is lost to a full store).
+                let mut left = e.payload;
+                while let Some(id) = {
+                    let fits: Vec<BlueprintId> = fighters
+                        .iter()
+                        .copied()
+                        .filter(|b| {
+                            let m = self.blueprints.unit(*b).cost_mass;
+                            m > Fx::ZERO && m <= left
+                        })
+                        .collect();
+                    self.solve_production(player, &fits, &composition, counter)
+                } {
+                    left -= self.blueprints.unit(id).cost_mass;
+                    *composition.entry(id).or_insert(0) += 1;
+                    counter = counter.wrapping_add(1);
+                    match out.last_mut() {
+                        Some(Command::Produce {
+                            factories,
+                            blueprint,
+                            count,
+                        }) if *blueprint == id
+                            && *count < u8::MAX
+                            && factories.as_slice() == [self.state.units.id(row)] =>
+                        {
+                            *count += 1
+                        }
+                        _ => out.push(Command::Produce {
+                            factories: vec![self.state.units.id(row)],
+                            blueprint: id,
+                            count: 1,
+                        }),
+                    }
+                }
+                continue;
+            }
             // The best tier missing comes at once, not on every fourth product: the
             // count runs over all factories, and a tech 2 factory that always fell
             // on the wrong turn made one Mason II in five minutes.

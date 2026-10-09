@@ -922,10 +922,11 @@ fn strategic_projects_are_told_apart_by_their_data() {
     assert_eq!(kind("aster_t4_assault_tank"), Some(Mobile));
     assert_eq!(kind("aster_t5_titan"), Some(Mobile));
     assert_eq!(kind("aster_t4_frigate"), Some(Mobile));
-    // A transport, a mine and a plain tank are not projects.
+    // A transport, a mine and a plain tank are not projects; a space elevator is
+    // one of its own.
     assert_eq!(kind("aster_t3_lift_ship"), None);
     assert_eq!(kind("aster_core_mine_t4"), None);
-    assert_eq!(kind("aster_t5_space_elevator"), None);
+    assert_eq!(kind("aster_t5_space_elevator"), Some(Elevator));
     assert_eq!(kind("aster_t1_tank"), None);
 }
 

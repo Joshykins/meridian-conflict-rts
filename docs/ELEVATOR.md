@@ -42,6 +42,12 @@ come down: they land, open, let their units drive out and sink into the ground.
   one, then goes (`hud::elevator::width_for`); the queue strip over the menu always says
   what the crates are doing.
 
+## The AI
+
+A Commander AI raises one once its income would pay for it in 12 minutes, gathers its
+builders on the site, and fills the queue with a whole payload of combat units every
+fall (`docs/AI_COMMANDER.md`, "Space elevator").
+
 ## Where it lives
 
 | Piece | File |

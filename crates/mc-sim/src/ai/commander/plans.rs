@@ -112,6 +112,11 @@ impl Menu<'_> {
     }
 }
 
+/// Minutes of income a space elevator may cost, mass and energy each, to be wanted:
+/// its drops pay its mass back in four minutes (`payload` every `period`), but
+/// until it stands that income goes to nothing else.
+pub(in crate::ai) const ELEVATOR_MINUTES: i32 = 12;
+
 /// Mass of our structures in one zone below which a maybe-nuke is not hedged.
 const HEDGE_WORTH: i32 = 11_000;
 
@@ -840,6 +845,27 @@ impl World {
                 urgent.extend(id);
             }
             want(id);
+        }
+        // A space elevator once the income would pay for one in `ELEVATOR_MINUTES`,
+        // a second at twice that income, and so on: three falls of free units a
+        // minute outweigh any army the same mass would buy.
+        let elevator = |p: &Profile| p.has(role::ELEVATOR);
+        let energy_income = pl.energy_income;
+        let affords = |p: &&Profile| {
+            let bp = self.blueprints.unit(p.id);
+            let span = Fx::from_int(ELEVATOR_MINUTES * 60);
+            let times = |income: Fx, cost: Fx| (income * span / cost.max(Fx::ONE)).floor_int();
+            times(income, bp.cost_mass).min(times(energy_income, bp.cost_energy)) as usize
+        };
+        if let Some(best) = menu
+            .items
+            .iter()
+            .filter(|p| elevator(p))
+            .min_by_key(|p| (p.mass, p.id.0))
+        {
+            if held(&elevator) < affords(best) {
+                want(Some(best.id));
+            }
         }
         let landing = stake(PlanKind::Landing);
         if landing > Stake::Off {

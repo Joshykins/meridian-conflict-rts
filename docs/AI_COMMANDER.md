@@ -82,7 +82,7 @@ health, speed, radius, movement domain (land, hover, amphibious, naval, sub, air
 space); lift room; and **roles** derived from the above: `LINE`, `RAIDER`,
 `ARTILLERY`, `ANTI_AIR`, `ANTI_NAVAL`, `HUNTER`, `TRANSPORT`, `SCOUT`, `STRIKE`,
 `DEFENSE`, `MAP_GUN`, `STRATEGIC`, `PROJECT` (costs many minutes of income),
-`BUILDER`. `profile_tests.rs` fails when an armed unit of any race has no role.
+`ELEVATOR` (a space elevator, from its `elevator:` data), `BUILDER`. `profile_tests.rs` fails when an armed unit of any race has no role.
 
 ### 2. Matchups (`matchup.rs`)
 
@@ -287,6 +287,15 @@ warships, shields, coastal guns where ships hurt it, anti-air where it was bombe
 by the `AirDefense` stake and against outranging aircraft, a sensor ship once
 income allows, and a turret by a mine or plant a ground raid took. The commander
 unit takes only wants at home.
+
+**Space elevator.** Not a plan but an investment: one is wanted once the side's
+mass and energy income would each pay for it in `ELEVATOR_MINUTES` (12), a second
+at twice that income, and so on, and its site starts on the same horizon (other
+wants start on four minutes). While it rises it takes the builders the income can
+keep busy on it, called home from anywhere (`elevator_short_of_help`; expanders
+keep claiming mines). Standing, its queue is filled each fall with a whole payload
+of combat units (`direct_factories`); it is not counted as one of the base's
+factories.
 
 **Urgent wants** answer a threat the side is under now: interceptors once warheads
 are seen, the long-reaching anti-air turret against warships out of its anti-air's

@@ -506,8 +506,13 @@ impl World {
                 continue;
             }
             // Paid for over a few minutes of income: a site starts once the side
-            // could finish it in that time.
-            let seconds = Fx::from_int(240);
+            // could finish it in that time. A space elevator is wanted only once
+            // the income carries it (`ELEVATOR_MINUTES`), and starts then.
+            let seconds = if bp.elevator.is_some() {
+                Fx::from_int(super::plans::ELEVATOR_MINUTES * 60)
+            } else {
+                Fx::from_int(240)
+            };
             if bp.cost_mass > pl.mass + pl.mass_income * seconds
                 || bp.cost_energy > pl.energy + pl.energy_income * seconds
             {

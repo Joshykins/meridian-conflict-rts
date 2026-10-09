@@ -53,6 +53,7 @@ impl World {
         let best = self.best_builder_tech(player);
         let power_wanted =
             self.commander_directives(player).power != super::commander::economy::Power::Enough;
+        let mut elevator = self.elevator_short_of_help(player, census, intel);
         // Builds ordered this think: a second builder choosing the same one joins it.
         let mut ordered: Vec<(BlueprintId, FxVec2, Angle)> = Vec::new();
         for &row in idle.iter().take(skill.builders_per_think) {
@@ -84,6 +85,23 @@ impl World {
                     });
                     continue;
                 }
+            }
+            // A space elevator going up takes the builders the income can keep busy on
+            // it, before any other job, and calls them home from far off: only the one
+            // that started it ever worked on it while the rest claimed far mines.
+            if let Some((site, short)) = elevator.as_mut().filter(|(s, short)| {
+                !expander
+                    && *short > Fx::ZERO
+                    && (!self.bp(row).has(cat::COMMANDER)
+                        || self.within_reach(row, self.state.units.pos[*s]))
+            }) {
+                *short -= self.bp(row).builder.as_ref().map_or(Fx::ZERO, |b| b.power);
+                out.push(Command::Assist {
+                    units: vec![self.state.units.id(row)],
+                    target: self.state.units.id(*site),
+                    queue: false,
+                });
+                continue;
             }
             // A fabricator, when the economy has room for one, before helping with
             // the sites going up: in a materials stall with energy to spare it is
@@ -181,7 +199,7 @@ impl World {
                             factory: bp.has(cat::FACTORY),
                             cover: bp.shield.as_ref().map_or(Fx::ZERO, |s| s.radius),
                         });
-                        if bp.has(cat::FACTORY) {
+                        if base_factory(&bp) {
                             planned.factories += 1;
                             if self.blueprint_trains_engineers(&bp) {
                                 planned.engineer_factories += 1;

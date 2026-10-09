@@ -258,6 +258,12 @@ fn offset_toward(from: FxVec2, to: FxVec2, dist: Fx) -> FxVec2 {
     }
 }
 
+/// A factory the base plans count: one that builds what it makes. A space elevator
+/// is a factory too, but its units come down from orbit, free.
+fn base_factory(bp: &UnitBlueprint) -> bool {
+    bp.has(cat::FACTORY) && bp.elevator.is_none()
+}
+
 /// How far a land radar tower sees. A sonar station out on the water is no
 /// radar cover for the base, nor is a sensor ship that flies off.
 fn land_radar(bp: &UnitBlueprint) -> Option<Fx> {
@@ -420,11 +426,11 @@ impl World {
 
         for &row in &census.sites {
             let bp = self.bp(row);
-            planned.factories += bp.has(cat::FACTORY) as usize;
-            planned.engineer_factories +=
-                (bp.has(cat::FACTORY) && self.blueprint_trains_engineers(bp)) as usize;
-            planned.air_factories += bp.has(cat::FACTORY | cat::AIR) as usize;
-            planned.naval_factories += (bp.has(cat::FACTORY) && adaptive::domain(bp) == 2) as usize;
+            let factory = base_factory(bp);
+            planned.factories += factory as usize;
+            planned.engineer_factories += (factory && self.blueprint_trains_engineers(bp)) as usize;
+            planned.air_factories += (factory && bp.has(cat::AIR)) as usize;
+            planned.naval_factories += (factory && adaptive::domain(bp) == 2) as usize;
             planned.power += bp.has(cat::POWER) as usize;
             planned.anti_air += bp.has(cat::DEFENSE | cat::ANTI_AIR) as usize;
             // A shield going up covers already: without this a second one was
@@ -515,7 +521,14 @@ impl World {
             if bp.has(cat::DEFENSE | cat::ANTI_AIR) {
                 c.anti_air += 1;
             }
-            if bp.has(cat::FACTORY) {
+            if bp.elevator.is_some() {
+                // Not one of the base's factories: nothing is built on it, so the
+                // factory and engineer plans leave it out. Its queue is filled all the
+                // same (`direct_factories`).
+                if idle {
+                    c.factories_idle.push(row);
+                }
+            } else if bp.has(cat::FACTORY) {
                 c.factories.push(row);
                 if self.factory_trains_engineers(row) {
                     c.engineer_factories += 1;
@@ -852,7 +865,7 @@ impl World {
                 let player = self.state.units.owner[builder_row] as usize;
                 let domain = adaptive::domain(bp);
                 // A factory with nothing to train (a yard before its hulls exist) is no use.
-                bp.has(cat::FACTORY)
+                base_factory(bp)
                     && bp.is_structure()
                     && only.is_none_or(|d| d == domain)
                     && bp.builder.as_ref().is_some_and(|f| !f.builds.is_empty())
@@ -1087,5 +1100,7 @@ impl World {
     }
 }
 
+#[cfg(test)]
+mod elevator_tests;
 #[cfg(test)]
 mod tests;
