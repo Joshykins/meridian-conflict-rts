@@ -1188,6 +1188,28 @@ fn sample_sharp(tex: texture_2d<f32>, uv: vec2<f32>) -> vec4<f32> {
     return sum / weight;
 }
 
+// Cubic B-spline as four bilinear taps (all weights positive, no ringing).
+fn sample_smooth(tex: texture_2d<f32>, uv: vec2<f32>) -> vec4<f32> {
+    let size = vec2<f32>(textureDimensions(tex));
+    let at = uv * size - 0.5;
+    let centre = floor(at);
+    let f = at - centre;
+    let f2 = f * f;
+    let f3 = f2 * f;
+    let w0 = (1.0 - 3.0 * f + 3.0 * f2 - f3) / 6.0;
+    let w1 = (4.0 - 6.0 * f2 + 3.0 * f3) / 6.0;
+    let w2 = (1.0 + 3.0 * f + 3.0 * f2 - 3.0 * f3) / 6.0;
+    let w3 = f3 / 6.0;
+    let g0 = w0 + w1;
+    let g1 = w2 + w3;
+    let p0 = (centre - 0.5 + w1 / g0) / size;
+    let p1 = (centre + 1.5 + w3 / g1) / size;
+    return (textureSampleLevel(tex, clamp_sampler, vec2<f32>(p0.x, p0.y), 0.0) * g0.x
+        + textureSampleLevel(tex, clamp_sampler, vec2<f32>(p1.x, p0.y), 0.0) * g1.x) * g0.y
+        + (textureSampleLevel(tex, clamp_sampler, vec2<f32>(p0.x, p1.y), 0.0) * g0.x
+        + textureSampleLevel(tex, clamp_sampler, vec2<f32>(p1.x, p1.y), 0.0) * g1.x) * g1.y;
+}
+
 @fragment
 fn fs_resolve(in: FullOut) -> @location(0) vec4<f32> {
     let px = vec2<i32>(in.clip.xy);
@@ -1376,10 +1398,12 @@ fn upsample(uv: vec2<f32>, depth: f32) -> vec4<f32> {
             nearest_at = px;
         }
     }
-    // All of a piece (nearly every pixel): Catmull-Rom, kept inside the four
-    // texels round the pixel so its lobes cannot ring. A B-spline here blurred
-    // as it scaled up, a texel and a half on top of the march's own coarse
-    // size, and every cloud's edge went soft as cotton wool.
+    // All of a piece (nearly every pixel): a cubic between a B-spline and
+    // Catmull-Rom (near Mitchell-Netravali), kept inside the four texels round
+    // the pixel so its lobes cannot ring. The B-spline alone blurred a texel
+    // and a half on top of the march's own coarse size, every cloud's edge
+    // soft as cotton wool; Catmull-Rom alone drew a lone dark texel in a storm
+    // as a square.
     if worst > 0.9 {
         var lo = textureLoad(cloud_now, clamp(vec2<i32>(centre), vec2<i32>(0), last), 0);
         var hi = lo;
@@ -1388,7 +1412,7 @@ fn upsample(uv: vec2<f32>, depth: f32) -> vec4<f32> {
             lo = min(lo, c);
             hi = max(hi, c);
         }
-        return clamp(sample_sharp(cloud_now, uv), lo, hi);
+        return clamp(mix(sample_smooth(cloud_now, uv), sample_sharp(cloud_now, uv), 0.6), lo, hi);
     }
     var sum = vec4<f32>(0.0);
     var weight = 0.0;
