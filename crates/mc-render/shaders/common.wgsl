@@ -276,10 +276,9 @@ struct ModelInfo {
     // knee, given on the left. Zero for any other model.
     flight: array<vec4<f32>, 4>,
     // A siege carriage's deploy rig (`models::Siege::gpu`, `SIEGE_*`), zero for any other
-    // model: [0] the front left hip (xyz), w how much higher the body stands planted than
-    // packed; [1] its knee planted (xyz), w the pod's splay (radians); [2] the knee packed
-    // (xy), z the gun's pitch packed against its rest, w how far its folding pieces fold
-    // (radians about +y); [3] their hinge (x, z), z 1.
+    // model: [0] the front left arm's hip (xyz), w its pitch below level packed; [1] its
+    // knee planted (xyz), w the pod's splay (radians); [2] x the gun's pitch packed against
+    // its rest, y how far back along the bore its rails lie packed; [3] z 1.
     siege: array<vec4<f32>, 4>,
     // Its skin: the index into `skins` (bindings.wgsl).
     skin: u32,

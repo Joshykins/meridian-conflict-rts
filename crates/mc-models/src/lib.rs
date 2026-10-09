@@ -348,10 +348,10 @@ pub mod rig {
     /// Factory build deck: up while a unit is printing, then lowers to release it.
     pub const LIFT: u32 = 1 << 6;
     /// Siege gear planted when the unit deploys: the Trebuchet's and the Arbalest's
-    /// ground stakes (`STAKE`, `STAKE_SPIKE`), a siege carriage's legs (`SIEGE_MASK`) and
-    /// its gun's folding pieces (`Model::siege`).
+    /// ground stakes (`STAKE`, `STAKE_SPIKE`), a siege carriage's arms and pods
+    /// (`SIEGE_MASK`) and its gun's sliding rails (`Model::siege`).
     pub const DEPLOY: u32 = 1 << 7;
-    /// On `DEPLOY` verts: which piece of a siege carriage's leg (`gpu_consts::siege`).
+    /// On `DEPLOY` verts: which piece of a siege carriage's legs (`gpu_consts::siege`).
     pub const SIEGE_SHIFT: u32 = crate::gpu_consts::siege::SHIFT;
     pub const SIEGE_MASK: u32 = crate::gpu_consts::siege::MASK << SIEGE_SHIFT;
     /// On `DEPLOY` verts: a ground stake's launcher tube, and the spike it fires
@@ -670,48 +670,51 @@ pub struct Model {
     pub vtol: Option<Vtol>,
     /// A winged flier's wings and trailing legs (`MeshBuilder::set_flight`).
     pub flight: Option<Flight>,
-    /// A siege carriage's deploy rig: its legs and its folding gun (`MeshBuilder::set_siege`).
+    /// A siege carriage's deploy rig: its arms, pods and gun (`MeshBuilder::set_siege`).
     pub siege: Option<Siege>,
 }
 
 /// A siege carriage's deploy rig, posed by entity.wgsl from the unit's deploy
-/// (`gpu_consts::siege`): four tread pods on legs, the front left given (+x, +y) and the
-/// others its mirrors, and a gun that lies along the deck packed and folds. Model space,
-/// authored planted. Which vertices ride it is in their rig bits (`rig::DEPLOY`,
-/// `rig::SIEGE_MASK`).
+/// (`gpu_consts::siege`): four tread pods, each on a rigid arm from a hip on the body, the
+/// front left given (+x, +y) and the others its mirrors, and a gun that lies along the deck
+/// packed with its rails slid back. Model space, authored planted. Which vertices ride it
+/// is in their rig bits (`rig::DEPLOY`, `rig::SIEGE_MASK`).
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Siege {
-    /// The front left leg's hip on the body.
+    /// The front left arm's hip on the body, and its knee on the pod, planted.
     pub hip: [f32; 3],
-    /// Its knee on the pod, planted. Each leg is a sleeve from the hip and a blade from
-    /// the knee that slide along each other, so it shortens as the body comes down.
     pub knee: [f32; 3],
-    /// Where the knee stands packed, x and y (the pods stay on the ground).
-    pub packed: [f32; 2],
-    /// How much higher the body stands planted than packed.
-    pub lift: f32,
+    /// How far the arm pitches below level packed (radians): less than planted, so the
+    /// body comes down as the arm lies flatter, the pod staying on the ground.
+    pub packed_pitch: f32,
     /// How far the front left pod is turned out to the left, planted (radians): the X.
     pub splay: f32,
     /// The gun's pitch packed against its rest (radians, negative lowers it).
     pub stow: f32,
-    /// The hinge the gun's folding pieces turn about (x, z at rest; it runs along y), and
-    /// how far they are folded packed (radians about +y).
-    pub fold_hinge: [f32; 2],
-    pub fold: f32,
+    /// How far back along the bore its rails (`rig::DEPLOY` on `ARM_GUN`) lie packed.
+    pub retract: f32,
 }
 
 impl Siege {
-    /// For `ModelInfo::siege`: hip and lift, knee and splay, the packed knee with the
-    /// gun's stow and fold, then the fold hinge with w 1.
+    /// For `ModelInfo::siege`: hip and the packed pitch, knee and splay, the gun's stow and
+    /// retract, then w 1 in the last.
     pub fn gpu(&self) -> [[f32; 4]; 4] {
         let [hx, hy, hz] = self.hip;
         let [kx, ky, kz] = self.knee;
         [
-            [hx, hy, hz, self.lift],
+            [hx, hy, hz, self.packed_pitch],
             [kx, ky, kz, self.splay],
-            [self.packed[0], self.packed[1], self.stow, self.fold],
-            [self.fold_hinge[0], self.fold_hinge[1], 1.0, 0.0],
+            [self.stow, self.retract, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
         ]
+    }
+
+    /// How much higher the body stands planted than packed: the arm's pivot from its
+    /// packed pitch down to its planted one.
+    pub fn lift(&self) -> f32 {
+        let d = glam::Vec3::from(self.knee) - glam::Vec3::from(self.hip);
+        let planted = (-d.z).atan2(d.truncate().length());
+        d.length() * (planted.sin() - self.packed_pitch.sin())
     }
 }
 

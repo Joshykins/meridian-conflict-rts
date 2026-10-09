@@ -340,7 +340,7 @@ const BLUEPRINTS: &[Blueprint] = &[
     unit("regency_engineer", 5.0, 3.889, 2, &[]),
     unit("regency_engineer", 6.0, 4.667, 3, &[]),
     unit("regency_scout", 3.8, 4.0, 1, &[[1.6, 0.0, 2.3]]),
-    unit("regency_skyspear", 22.0, 42.0, 3, &[[12.97, 0.0, 39.333]]),
+    unit("regency_skyspear", 22.0, 42.0, 3, &[[12.97, 0.0, 37.833]]),
     unit(
         "regency_fusion_howitzer",
         11.0,

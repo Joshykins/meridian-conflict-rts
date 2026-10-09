@@ -547,31 +547,29 @@ shared! {
     }
 
     /// A siege carriage's deploy (`Model::siege`, `models::Siege`; entity.wgsl
-    /// `siege_leg`, `siege_gun_fold`): four tread pods on legs, authored planted. Planting,
-    /// the pods splay out into an X, the legs stand and lift the body high over them, then
-    /// the gun rises from lying along the deck and turns to its mark, and last its folded
-    /// pieces swing out into place; packing runs it all the other way. Shares are of the
-    /// deploy (`UnitInstance::deploy`).
+    /// `siege_leg`): four tread pods, each on a rigid arm from a hip on the body, authored
+    /// planted. Planting, each pod first turns in place out into the X, then the arms pivot
+    /// down about their hips and push the body up over the pods; then the gun rises from
+    /// lying along the deck and turns to its mark, and last its rails slide out along the
+    /// bore from where they lay down the turret's flanks. Packing runs it all the other
+    /// way. Shares are of the deploy (`UnitInstance::deploy`).
     pub mod siege as "SIEGE_" {
-        /// Which piece of a leg a `rig::DEPLOY` vertex is, in rig bits `SHIFT..`: the upper
-        /// sleeve (turning about the hip), the lower blade (about the knee) and the pod.
-        /// They borrow the top `UPGRADE_AT` bits, which mean something only on refit
-        /// pieces and on houses, never on a leg. A `DEPLOY` vertex on the gun with none of
-        /// these is one of its folding pieces.
+        /// Which piece a `rig::DEPLOY` vertex on the hull is, in rig bits `SHIFT..`: an arm
+        /// (pivoting about its hip) or a pod. They borrow the top `UPGRADE_AT` bits, which
+        /// mean something only on refit pieces and on houses, never on these. A `DEPLOY`
+        /// vertex on the gun with neither is one of its sliding rails.
         pub const SHIFT: u32 = 22;
         pub const MASK: u32 = 0x3;
-        pub const UPPER: u32 = 1;
-        pub const LOWER: u32 = 2;
-        pub const POD: u32 = 3;
-        /// The pods splay out over the first part of the deploy, the body rises a little
-        /// after they start, the gun rises once the body is up, and its folding pieces
-        /// swing out last.
-        pub const SPREAD_END: f32 = 0.4;
-        pub const LIFT_START: f32 = 0.15;
-        pub const LIFT_END: f32 = 0.55;
-        pub const RAISE_START: f32 = 0.5;
+        pub const ARM: u32 = 1;
+        pub const POD: u32 = 2;
+        /// The pods turn first, the arms pivot as they finish, the gun rises once the body
+        /// is up, and the rails slide out last.
+        pub const TURN_END: f32 = 0.3;
+        pub const PIVOT_START: f32 = 0.25;
+        pub const PIVOT_END: f32 = 0.6;
+        pub const RAISE_START: f32 = 0.55;
         pub const RAISE_END: f32 = 0.8;
-        pub const FOLD_START: f32 = 0.7;
+        pub const SLIDE_START: f32 = 0.75;
     }
 
     /// A VTOL's pods standing up and lying down with the hull's lean (`models::vtol_tilt`,

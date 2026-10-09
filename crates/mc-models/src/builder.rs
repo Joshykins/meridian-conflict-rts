@@ -645,17 +645,12 @@ impl MeshBuilder {
 
     /// Declares the model's siege rig (`Model::siege`), in the current frame.
     pub fn set_siege(&mut self, siege: super::Siege) {
-        let at = |p: [f32; 3]| self.transform.transform_point3(Vec3::from(p));
-        let knee = at(siege.knee);
-        let packed = at([siege.packed[0], siege.packed[1], siege.knee[2]]);
-        let hinge = at([siege.fold_hinge[0], 0.0, siege.fold_hinge[1]]);
-        let lift = self.transform.transform_vector3(Vec3::Z * siege.lift).z;
+        let at = |p: [f32; 3]| self.transform.transform_point3(Vec3::from(p)).to_array();
+        let scale = self.transform.transform_vector3(Vec3::X).length();
         self.siege = Some(super::Siege {
-            hip: at(siege.hip).to_array(),
-            knee: knee.to_array(),
-            packed: [packed.x, packed.y],
-            fold_hinge: [hinge.x, hinge.z],
-            lift,
+            hip: at(siege.hip),
+            knee: at(siege.knee),
+            retract: siege.retract * scale,
             ..siege
         });
     }
@@ -664,8 +659,8 @@ impl MeshBuilder {
         self.siege
     }
 
-    /// Runs `f` as a piece of a siege carriage's leg (`gpu_consts::siege`: `UPPER`,
-    /// `LOWER` or `POD`), or with `0` as one of its gun's folding pieces.
+    /// Runs `f` as a piece of a siege carriage (`gpu_consts::siege`: `ARM` or `POD`), or
+    /// with `0` as one of its gun's sliding rails.
     pub fn with_siege(&mut self, piece: u32, f: impl FnOnce(&mut Self)) {
         let previous = self.rig;
         self.rig = (previous & !rig::SIEGE_MASK) | rig::DEPLOY | (piece << rig::SIEGE_SHIFT);

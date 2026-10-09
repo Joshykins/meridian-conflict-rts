@@ -4,8 +4,9 @@
     // Mobile anti-spaceship gun: a siege carriage that plants to fire, the Sunspear's
     // Pinch-fusion gun on four tread pods, the Regency's answer to warships in the upper air
     // that ARC meets with the Narwhal at sea and the Zenith at home. It cannot fire on the
-    // move: stopped, it plants (`deploy`), its pods splaying out into an X and its legs
-    // lifting the body high, then its gun rises and unfolds; told to move, it packs first.
+    // move: stopped, it plants (`deploy`), each tread pod turning out into an X and its arm
+    // pivoting down to lift the body, then its gun rises and its rails slide out; told to
+    // move, it packs first.
     // Either way takes nine seconds. It plants whenever it stands still, so one parked
     // ahead of a raid is ready for it. It charges for a long beat, then pinches out one
     // fast shot of fusion up at the hull, and shoots at nothing else: escorts keep it alive.
@@ -33,7 +34,7 @@
         weapons: [(
             name: "Pinch-fusion Cannon",
             damage: 13000, splash: 16, range: 2800, reload: 7.0, speed: 1600, trajectory: Direct,
-            turret_turn: 24, muzzle: (12.97, 0, 39.333), pivot: (1, 0, 18.6),
+            turret_turn: 24, muzzle: (12.97, 0, 37.833), pivot: (1, 0, 17.1),
             targets: ["Space"], color: Orange, red: 1.0,
             plasma_grade: Some(PinchFusion),
             flash: 1.2, impact: 3.0, tracer: 3.0,

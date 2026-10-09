@@ -1218,43 +1218,52 @@ fn siege_deploy(e: Entity, t: f32) -> f32 {
     return clamp(mix(e.prev_deploy, e.deploy, t), 0.0, 1.0);
 }
 
-// How far below its authored (planted) height a siege carriage's body is at deploy `out`.
-fn siege_sink(model: ModelInfo, out: f32) -> f32 {
-    return model.siege[0].w * (1.0 - smoothstep(SIEGE_LIFT_START, SIEGE_LIFT_END, out));
+// A siege carriage's front left arm (`models::Siege`): its way out from the hip in plan
+// (xy), its length (z) and its pitch below level planted (w).
+fn siege_arm(model: ModelInfo) -> vec4<f32> {
+    let d = model.siege[1].xyz - model.siege[0].xyz;
+    let plan = length(d.xy);
+    return vec4<f32>(d.xy / max(plan, 1e-4), length(d), atan2(-d.z, plan));
 }
 
-// A siege carriage's leg piece (`models::Siege`), authored planted, at deploy `out`. The
-// leg is the one on the vertex's side and end. Its pod slides from beside the body out to
-// its planted place and turns out into the X; the hip comes down with the body; the sleeve
-// and the blade each turn about their own end to lie along the line from hip to knee, and
-// slide along each other as it shortens.
+// The arms' pitch below level at deploy `out`: packed, then pivoting down to planted.
+fn siege_pitch(model: ModelInfo, out: f32) -> f32 {
+    let arm = siege_arm(model);
+    return mix(model.siege[0].w, arm.w, smoothstep(SIEGE_PIVOT_START, SIEGE_PIVOT_END, out));
+}
+
+// How far below its authored (planted) height a siege carriage's body is at deploy `out`:
+// the arms, their knees on the ground, hold the hips up by their pitch.
+fn siege_sink(model: ModelInfo, out: f32) -> f32 {
+    let arm = siege_arm(model);
+    return arm.z * (sin(arm.w) - sin(siege_pitch(model, out)));
+}
+
+// A siege carriage's arm or pod (`models::Siege`), authored planted, at deploy `out`: the
+// one on the vertex's side and end. Its pod first turns in place out into the X; then the
+// arm pivots down about its hip, its knee riding the pod along the ground, and pushes the
+// body up.
 fn siege_leg(p0: vec3<f32>, n0: vec3<f32>, piece: u32, model: ModelInfo, out: f32) -> array<vec3<f32>, 2> {
     var p = p0;
     var n = n0;
     let side = vec3<f32>(select(-1.0, 1.0, p.x > 0.0), select(-1.0, 1.0, p.y > 0.0), 1.0);
-    let spread = smoothstep(0.0, SIEGE_SPREAD_END, out);
+    let arm = siege_arm(model);
+    let way = vec3<f32>(arm.xy * side.xy, 0.0);
+    let pitch = siege_pitch(model, out);
     let hip0 = model.siege[0].xyz * side;
     let knee0 = model.siege[1].xyz * side;
     let hip = hip0 - vec3<f32>(0.0, 0.0, siege_sink(model, out));
-    let knee = vec3<f32>(mix(model.siege[2].xy, model.siege[1].xy, spread), model.siege[1].z) * side;
+    let knee = hip + way * (arm.z * cos(pitch)) - vec3<f32>(0.0, 0.0, arm.z * sin(pitch));
     if piece == SIEGE_POD {
-        let turn = -(1.0 - spread) * model.siege[1].w * side.x * side.y;
+        let turn = -(1.0 - smoothstep(0.0, SIEGE_TURN_END, out)) * model.siege[1].w * side.x * side.y;
         p = rot_z(p - knee0, turn) + knee;
         n = rot_z(n, turn);
     } else {
-        let was = normalize(knee0 - hip0);
-        let now = normalize(knee - hip);
-        let axis = cross(was, now);
-        let turn = atan2(length(axis), dot(was, now));
-        let pivot0 = select(knee0, hip0, piece == SIEGE_UPPER);
-        let pivot = select(knee, hip, piece == SIEGE_UPPER);
-        if turn > 1e-4 {
-            let k = axis / length(axis);
-            p = rot_about(p - pivot0, k, turn) + pivot;
-            n = rot_about(n, k, turn);
-        } else {
-            p = p - pivot0 + pivot;
-        }
+        // Pitching further down turns the arm about the level line across it.
+        let axis = cross(vec3<f32>(0.0, 0.0, 1.0), way);
+        let turn = pitch - arm.w;
+        p = rot_about(p - hip0, axis, turn) + hip;
+        n = rot_about(n, axis, turn);
     }
     return array<vec3<f32>, 2>(p, n);
 }
@@ -1697,17 +1706,15 @@ fn vs_main(in: VsIn) -> VsOut {
                 if model.crawl[0].w > 1.5 {
                     pitch -= tail_pose(e, model, walk, t, 15u)[5].x;
                 }
-                // A siege gun lies along the deck packed and its folding pieces swing out
-                // once it is up: they fold first, then the gun pitches.
+                // A siege gun lies along the deck packed, its rails slid back along the bore;
+                // they slide out first, then the gun pitches.
                 if model.siege[3].z > 0.5 && limb == LIMB_ARM_GUN {
                     let out = siege_deploy(e, t);
                     if (in.rig & (RIG_DEPLOY | (SIEGE_MASK << SIEGE_SHIFT))) == RIG_DEPLOY {
-                        let hinge = vec3<f32>(model.siege[3].x, 0.0, model.siege[3].y);
-                        let fold = model.siege[2].w * (1.0 - smoothstep(SIEGE_FOLD_START, 1.0, out));
-                        p = rot_xz(p - hinge, fold) + hinge;
-                        n = rot_xz(n, fold);
+                        let back = model.siege[2].y * (1.0 - smoothstep(SIEGE_SLIDE_START, 1.0, out));
+                        p -= normalize(model.recoil.xyz) * back;
                     }
-                    pitch = mix(model.siege[2].z, pitch, smoothstep(SIEGE_RAISE_START, SIEGE_RAISE_END, out));
+                    pitch = mix(model.siege[2].x, pitch, smoothstep(SIEGE_RAISE_START, SIEGE_RAISE_END, out));
                 }
                 // A breech door swings on its hinge first, then rides the gun.
                 if (in.rig & BREECH_RIG) != 0u && model.breech.w != 0.0 {
@@ -2223,7 +2230,8 @@ fn vs_main(in: VsIn) -> VsOut {
             n = posed[1];
         }
     }
-    // A siege carriage: its legs splay and stand, and lift the body (gun and all) over them.
+    // A siege carriage: its pods turn out and its arms pivot down, lifting the body (gun and
+    // all) over them.
     if model.siege[3].z > 0.5
         && (e.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u
     {

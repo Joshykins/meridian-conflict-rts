@@ -2,8 +2,8 @@
 //! Sunspear's kind of gun taken off its keep and put on a body that moves.
 //!
 //! - `regency_skyspear` (`skyspear`): the mobile anti-spaceship gun, a siege carriage on
-//!   four tread pods that splay and lift it to plant, the Sunspear's rails gun unfolding
-//!   and rising to the sky, against warships in the upper air.
+//!   four tread pods that turn out and lift it on their arms to plant, the Sunspear's
+//!   rails gun rising to the sky, against warships in the upper air.
 //! - `regency_fusion_howitzer` (`howitzer`): heavy artillery. A split pinch bore that
 //!   charges for a long beat and lobs one great fusion shot.
 //!

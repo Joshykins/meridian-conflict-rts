@@ -153,10 +153,10 @@ fn ringed(b: &mut MeshBuilder) {
 /// along its outer face, tied across the bore in bronze. At each rail's tip a plated head
 /// sleeved over it carries two gravity lenses on its inner face. The bore recoils; the
 /// rails part through the charge (`SPREAD`, the ties telescoping), and the heads slide
-/// out along them into the charge (`REACH`). With `fold`, the rails and their heads are a
-/// siege gun's folding pieces (`MeshBuilder::with_siege`), and nothing ties them across
+/// out along them into the charge (`REACH`). With `slide`, the rails and their heads are a
+/// siege gun's sliding rails (`MeshBuilder::with_siege`), and nothing ties them across
 /// the bore.
-pub(in crate::regency) fn rails(b: &mut MeshBuilder, len: f32, fold: bool) {
+pub(in crate::regency) fn rails(b: &mut MeshBuilder, len: f32, slide: bool) {
     let fine = b.fine();
     collar(b, Vec3::ZERO, Vec3::Y, 1.6, 10.6);
     dark_plate(b);
@@ -165,9 +165,9 @@ pub(in crate::regency) fn rails(b: &mut MeshBuilder, len: f32, fold: bool) {
         &[[-3.0, 7.0, 4.4, 0.0], [2.5, 7.0, 4.0, 0.0]],
         &CHAMFERED,
     );
-    let ties: &[f32] = if fine && !fold { &[8.0, 15.0] } else { &[] };
+    let ties: &[f32] = if fine && !slide { &[8.0, 15.0] } else { &[] };
     b.mirror_y(|b| {
-        if fold {
+        if slide {
             b.with_siege(0, |b| rail(b, len, ties));
         } else {
             rail(b, len, ties);
