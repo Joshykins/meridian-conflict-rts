@@ -451,6 +451,10 @@ pub(super) fn commander(b: &mut MeshBuilder, _tech: u8) {
                 b.paint(ACCENT);
                 b.mirror_y(|b| b.block(v3(-3.0, 1.0, 12.4), v3(-2.2, 1.4, 16.0)));
             });
+            b.module("shield_2", 0.3, |b| {
+                b.paint(ACCENT);
+                b.block(v3(-3.1, -1.4, 15.8), v3(-2.7, 1.4, 16.2));
+            });
             b.module("aa", 0.3, |b| {
                 b.with_mount(SHOULDER_AA.1, 0.0, |b| {
                     b.paint(ACCENT);
@@ -1262,6 +1266,28 @@ fn commander_back(b: &mut MeshBuilder) {
             b.paint(METAL);
             b.cylinder_between(v3(-2.6, -1.1, 14.0), v3(-2.6, 1.1, 14.0), 0.1, 0.1, 6);
         }
+    });
+    b.module("shield_2", 0.5, |b| {
+        // The heavy field: a wider lens over the generator's, ringed in metal, and a
+        // crossbar tying the fin tips together.
+        b.paint(METAL);
+        b.cylinder_between(
+            v3(-3.3, 0.0, 11.9),
+            v3(-3.5, 0.0, 11.9),
+            0.95,
+            0.9,
+            b.sides(12),
+        );
+        b.paint(GLOW_SHIELD);
+        b.cylinder_between(
+            v3(-3.48, 0.0, 11.9),
+            v3(-3.56, 0.0, 11.9),
+            0.72,
+            0.68,
+            b.sides(12),
+        );
+        b.paint(ACCENT);
+        b.cylinder_between(v3(-2.9, -1.3, 16.2), v3(-2.9, 1.3, 16.2), 0.16, 0.16, 8);
     });
 }
 

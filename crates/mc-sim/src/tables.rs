@@ -93,7 +93,7 @@ pub mod flag {
     pub const WORKING: u16 = 1 << 11;
     /// A reclaim beam took the last of it: it is gone without a blast, a wreck or a scorch mark.
     pub const RECLAIMED: u16 = 1 << 12;
-    /// Lost health this tick (weapons or a reclaim beam). Regen waits.
+    /// Lost health this tick (weapons or a reclaim beam): the commander card flashes.
     pub const HURT: u16 = 1 << 13;
     /// Mending a finished unit's hull this tick (drives the repair beam).
     pub const REPAIRING: u16 = 1 << 14;

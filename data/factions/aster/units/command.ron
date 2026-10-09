@@ -112,7 +112,8 @@
                         summary: "A field wrapped round the commander.",
                         cost: (mass: 1200, energy: 14400, time: 1400),
                         economy: (energy_upkeep: 150),
-                        shield: (kind: Hull, health: 8000, regen: 80),
+                        // Broken, it is down about 20 s while it fills.
+                        shield: (kind: Hull, health: 8000, regen: 100, recharge: 400),
                     ),
                     (
                         key: "drone_port", icon: SalvageCarrier, name: "Salvage Drone Port",
@@ -122,6 +123,15 @@
                         // Home, a drone comes in 3 m over its pad and settles onto it.
                         drone: "aster_reclaim_drone", drone_radius: 1400,
                         drone_sockets: [(-5.3, 2.0, 21.8), (-5.3, -2.0, 21.8)], drone_approach: 3,
+                    ),
+                    (
+                        key: "shield_2", icon: Shield, name: "Heavy Personal Shield", after: "shield",
+                        summary: "A far stronger field round the commander, for the late game.",
+                        cost: (mass: 3000, energy: 36000, time: 3500),
+                        economy: (energy_upkeep: 150),
+                        // With Suite III's hull, about two thirds of a tech 4 in all. Broken, it
+                        // is down about 30 s while it fills.
+                        shield: (kind: Hull, health: 30000, regen: 100, recharge: 1000),
                     ),
                 ],
             ),

@@ -38,10 +38,8 @@ impl World {
 
     pub(crate) fn run_regen(&mut self) {
         for row in self.state.units.slots.iter() {
-            if !self.state.units.is_active(row)
-                || self.state.units.health[row] <= Fx::ZERO
-                || self.state.units.has_flag(row, flag::HURT)
-            {
+            // Regen runs under fire too: being hit does not pause it.
+            if !self.state.units.is_active(row) || self.state.units.health[row] <= Fx::ZERO {
                 continue;
             }
             let bp = self.bp(row);
@@ -294,5 +292,20 @@ mod tests {
         w.run_regen();
         assert!(w.state.units.health[row] > before);
         assert!(w.state.units.health[row] <= w.unit_max_health(row));
+    }
+
+    #[test]
+    fn regen_runs_under_fire() {
+        let mut w = test_world();
+        let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
+        let row = w
+            .spawn_unit(tank, 0, FxVec2::from_ints(500, 512), Angle::ZERO, true)
+            .unwrap();
+        w.state.units.veterancy[row] = VETERANCY_MAX;
+        w.state.units.health[row] = w.unit_max_health(row) / 2;
+        w.state.units.flags[row] |= flag::HURT;
+        let before = w.state.units.health[row];
+        w.run_regen();
+        assert!(w.state.units.health[row] > before);
     }
 }
