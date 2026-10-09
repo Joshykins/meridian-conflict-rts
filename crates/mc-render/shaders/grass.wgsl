@@ -19,6 +19,8 @@ struct GrassOut {
     @location(3) @interpolate(flat) packed: vec3<u32>,
     // How deep in a wind wave the tuft stands (Tuft::sheen).
     @location(4) @interpolate(flat) sheen: f32,
+    // The ground's normal under the tuft.
+    @location(5) @interpolate(flat) ground: vec3<f32>,
 }
 
 // Blade width (metres at the foot), how far the blades splay out of the tuft,
@@ -164,6 +166,7 @@ fn vs_grass(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) ->
     out.blade = vec4<f32>(across, s, grass_shadow(world), r3 + select(0.0, 2.0, stem) + select(0.0, 4.0, flower));
     out.packed = vec3<u32>(t.look, t.tone, t.light);
     out.sheen = t.sheen;
+    out.ground = vec3<f32>(g, gz);
     return out;
 }
 
@@ -213,8 +216,10 @@ fn fs_grass(in: GrassOut) -> @location(0) vec4<f32> {
     let v = normalize(eye - in.world);
     var n = normalize(in.normal);
     n *= select(-1.0, 1.0, dot(n, v) >= 0.0);
-    // A field is lit like a soft volume: the blades' own facing only in part.
-    n = normalize(mix(n, vec3<f32>(0.0, 0.0, 1.0), mix(0.7, 0.35, detail)));
+    // A field is lit like a soft volume lying on the ground: the blades' own
+    // facing only in part, the rest the slope's, so grass on a hillside turned
+    // from the sun is as dim as the ground under it.
+    n = normalize(mix(n, normalize(in.ground), mix(0.7, 0.35, detail)));
     // Deep in the tuft the sky is hidden and the light is low.
     let occlusion = mix(0.28, 1.0, smoothstep(0.0, 0.85, s)) * mix(1.0, 0.8, light.w);
     let sun = globals.sun.xyz;
