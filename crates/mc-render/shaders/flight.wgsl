@@ -1,7 +1,8 @@
 // A winged flier's rig (`models::Flight`, `ModelInfo::flight`): how its wings, trailing
 // legs, head and arms move with what it does, and how its whole body hangs and leans.
 // Everything is read off the unit as it is drawn, nothing written back: its travel
-// this tick and last (`Entity::gait`), its turn, its aim, and its dash (`Entity::deploy`,
+// this tick and last (`Entity::gait`), its turn (`Entity::drive_swing`; both eased by the
+// renderer, flight_ease.rs), its aim, and its dash (`Entity::deploy`,
 // `mirror::dash_pose`: 0 to 1 through the windup, then -1 at the landing easing back to 0).
 //
 // - Idle it breathes: the body heaves and sways slowly on its lift, the wings rise and
@@ -49,7 +50,9 @@ fn flight_state(e: Entity, model: ModelInfo, t: f32, time: f32) -> Flight {
     f.speed = clamp(mix(was, now, t), 0.0, 1.0);
     // A full speed change in about a second reads as a full surge.
     f.surge = clamp((now - was) * 8.0, -1.0, 1.0);
-    f.turn = clamp(lerp_angle(0.0, e.heading - e.prev_heading, 1.0) * 6.0, -1.0, 1.0);
+    // Eased by the renderer (flight_ease.rs), as is the speed in `gait`: the sim's own
+    // turn and surge jump between nothing and full at a tick, and the wings snapped.
+    f.turn = clamp(mix(e.drive_swing.x, e.drive_swing.y, t), -1.0, 1.0);
     let dash = mix(e.prev_deploy, e.deploy, t);
     f.charge = clamp(dash, 0.0, 1.0);
     f.land = clamp(-dash, 0.0, 1.0);

@@ -257,8 +257,8 @@
     // that puts it under a siege gun's `range_min`. Raised on a lot by Artificer IIIs or the
     // Exarch's Engineering Suite III, like the tier 4s.
     //
-    // Model: `regency_seraph` (`models::regency::seraph`), authored at a quarter size and
-    // built 4 times authored size: every mount follows it.
+    // Model: `regency_seraph` (`models::regency::seraph`), authored at a fifth size and
+    // built 5 times authored size: every mount follows it.
     (
         key: "regency_t5_seraph",
         name: "Seraph",
@@ -267,19 +267,19 @@
         categories: ["Land", "DirectFire", "Experimental"],
         health: 420000,
         cost: (mass: 60000, energy: 600000, time: 200000),
-        radius: 60.0, height: 124.0,
-        footprint: (10, 10),
+        radius: 75.0, height: 155.0,
+        footprint: (13, 13),
         vision: 2000,
         shield: (kind: Hull, health: 60000, regen: 300),
         economy: (energy_upkeep: 2000),
         motion: (layer: Hover, size: 5, speed: 70, accel: 60, turn: 120),
         // Once it sees an enemy on the ground or the water between 400 m and 1800 m, with
-        // nothing at its feet, it winds up for 0.4 s and comes down in the middle of
-        // everything within 250 m of it: 15000 at the heart of a 220 m shockwave, a
-        // quarter of that at its edge, and a 1.5 s stun on all but experimentals. Then 15 s
-        // to recharge. It dashes idle, chasing, on an attack-move or patrol, or at an attack
-        // order's mark; never on a move order, at hold fire or at hold position.
-        dash: (range: 1800, min: 400, gather: 250, cooldown: 15, windup: 0.4, blast: 220, damage: 15000, edge: 0.25, stun: 1.5),
+        // nothing at its feet, it charges for 1.5 s, is gone for 0.6 s and comes down in
+        // the middle of everything within 250 m of it, letting go its Seraphic Nova at its
+        // feet. Then 15 s to recharge. It dashes idle, chasing, on an attack-move or patrol,
+        // or at an attack order's mark; never on a move order, at hold fire or at hold
+        // position.
+        dash: (range: 1800, min: 400, gather: 250, cooldown: 15, windup: 1.5, transit: 0.6),
         weapons: [
             (
                 name: "Rapid Fusion Repeater",
@@ -288,7 +288,7 @@
                 // to shoot they hang at its sides, the guns pointed down (`rest_pitch`).
                 damage: 1500, splash: 18, range: 1000, reload: 0.5, speed: 1600, trajectory: Ballistic,
                 loft: 0.3, flat_fire: true, turret_turn: 120, rest_pitch: -80,
-                muzzle: (29.6, 19.0, 61.0), pivot: (-0.8, 17.4, 61.6),
+                muzzle: (37, 23.75, 76.25), pivot: (-1, 21.75, 77),
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
                 plasma_grade: Some(PinchFusion),
                 flash: 1.3, impact: 1.8, tracer: 1.5,
@@ -299,7 +299,7 @@
                 // The right forearm's: half a reload behind the left (`twins.rs`).
                 damage: 1500, splash: 18, range: 1000, reload: 0.5, speed: 1600, trajectory: Ballistic,
                 loft: 0.3, flat_fire: true, turret_turn: 120, rest_pitch: -80,
-                muzzle: (29.6, -19.0, 61.0), pivot: (-0.8, -17.4, 61.6),
+                muzzle: (37, -23.75, 76.25), pivot: (-1, -21.75, 77),
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
                 plasma_grade: Some(PinchFusion),
                 flash: 1.3, impact: 1.8, tracer: 1.5,
@@ -315,12 +315,12 @@
                 // lands from a dash, whatever its reload (`on_dash`). Ground only.
                 damage: 1100, splash: 26, range_min: 60, range: 1300, reload: 12.0, speed: 300,
                 trajectory: Direct, turret_turn: 0, arc: 360, mount: true,
-                muzzle: (-6.2, 4.6, 85.2), pivot: (-10.1, 0, 85.2),
+                muzzle: (-7.75, 5.75, 106.5), pivot: (-12.625, 0, 106.5),
                 muzzles: [
-                    (-6.2, 4.6, 85.2), (-6.2, -4.6, 85.2), (-6.2, 7.4, 85.2), (-6.2, -7.4, 85.2),
-                    (-8.8, 4.6, 85.2), (-8.8, -4.6, 85.2), (-8.8, 7.4, 85.2), (-8.8, -7.4, 85.2),
-                    (-11.4, 4.6, 85.2), (-11.4, -4.6, 85.2), (-11.4, 7.4, 85.2), (-11.4, -7.4, 85.2),
-                    (-14.0, 4.6, 85.2), (-14.0, -4.6, 85.2), (-14.0, 7.4, 85.2), (-14.0, -7.4, 85.2),
+                    (-7.75, 5.75, 106.5), (-7.75, -5.75, 106.5), (-7.75, 9.25, 106.5), (-7.75, -9.25, 106.5),
+                    (-11, 5.75, 106.5), (-11, -5.75, 106.5), (-11, 9.25, 106.5), (-11, -9.25, 106.5),
+                    (-14.25, 5.75, 106.5), (-14.25, -5.75, 106.5), (-14.25, 9.25, 106.5), (-14.25, -9.25, 106.5),
+                    (-17.5, 5.75, 106.5), (-17.5, -5.75, 106.5), (-17.5, 9.25, 106.5), (-17.5, -9.25, 106.5),
                 ],
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
                 missile: true, guided: true, vertical_launch: true, apogee: 260,
@@ -329,11 +329,26 @@
                 plasma_grade: Some(Gravitic), fusion_strike: true,
                 sounds: (fire: "regency_gravitic_throw", impact: "regency_sunspear_hit", ground: "regency_sunspear_hit"),
             ),
+            (
+                name: "Seraphic Nova",
+                // The landing (`dash_only`): a wall of red plasma rolls out all round from its
+                // feet to 320 m in about a second and a quarter, the Wake's wave as a ring
+                // and a mobile nuke: 15000 where it lands, a quarter of that at its edge,
+                // and a 1.5 s stun on all but experimentals. It rolls over hills and walls;
+                // only a shield dome stops it.
+                damage: 15000, range: 320, reload: 15, hitscan: true, trajectory: Direct,
+                cone: (angle: 180, edge: 0.25, speed: 260, stun: 1.5), dash_only: true,
+                turret_turn: 0, arc: 360, mount: true, muzzle: (0, 0, 0),
+                targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
+                plasma_grade: Some(Pinched),
+                flash: 4.0, impact: 2.0, shockwave: 1.5,
+                sounds: (fire: "regency_seraph_wave"),
+            ),
         ],
         mesh: "regency_seraph", icon: WingedTitan,
         sounds: (
             death: "blast_colossal", moving: "aster_hover",
-            dash_charge: "regency_warp_spool", dash_leave: "regency_warp_jump", dash_land: "regency_seraph_landing",
+            dash_charge: "regency_seraph_charge", dash_leave: "regency_seraph_vanish", dash_land: "regency_seraph_landing",
         ),
     ),
 ]

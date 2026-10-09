@@ -47,7 +47,7 @@ pub(super) const RADIUS: f32 = 15.0;
 pub(super) const HEIGHT: f32 = 31.0;
 /// How much bigger the unit file builds it.
 #[cfg(test)]
-const SCALE: f32 = 4.0;
+const SCALE: f32 = 5.0;
 
 /// A leg's joints in its hanging pose, given on the left: hip, knee, ankle and the
 /// pointed toe's tip.

@@ -13,7 +13,8 @@
 //!   a big hull at the edge is caught by its flank. The half-angle may be anything up to
 //!   a half turn, a full circle round the gun. Each unit is struck once a wake.
 //! - **Falloff:** full damage at the muzzle, falling in a straight line with the distance
-//!   from it to `Cone::edge` of it at full range.
+//!   from it to `Cone::edge` of it at full range. A front with a stun (`Cone::stun_ticks`,
+//!   the Seraph's landing wave) stuns all but the experimentals it strikes.
 //! - **Cover:** the wake rolls over the ground, up hills and down, so the ground hides
 //!   nothing from it and the gun needs no line of fire (`World::needs_line`). A shield
 //!   dome between takes the hit for all it covers, once a wake, as a blast's is
@@ -180,6 +181,13 @@ impl World {
                 self.damage_shield(t, damage);
             } else {
                 self.damage_unit(t, damage, wake.owner, wake.source);
+            }
+            // An EMP front (`Cone::stun`) stuns all but the experimentals it reaches.
+            if cone.stun_ticks > 0
+                && self.state.units.slots.is_alive(t)
+                && !self.bp(t).has(mc_data::cat::EXPERIMENTAL)
+            {
+                self.stun(t, cone.stun_ticks);
             }
         }
 

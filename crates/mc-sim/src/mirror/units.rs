@@ -467,9 +467,14 @@ const LAND_TICKS: u16 = 10;
 /// flight.wgsl), last tick and this: its windup's share, 0 to 1; then from the landing,
 /// -1 at the blow easing back to 0 over `LAND_TICKS`. Zero for a unit that never dashed.
 fn dash_pose(dash: &mc_data::dash::Dash, s: &crate::dash::DashState) -> [f32; 2] {
-    if s.phase == crate::dash::DashPhase::Windup {
-        let w = dash.windup_ticks.max(1) as f32;
-        return [s.ticks.saturating_sub(1) as f32 / w, s.ticks as f32 / w];
+    match s.phase {
+        crate::dash::DashPhase::Windup => {
+            let w = dash.windup_ticks.max(1) as f32;
+            return [s.ticks.saturating_sub(1) as f32 / w, s.ticks as f32 / w];
+        }
+        // Gone: not drawn, held at the full charge it left with.
+        crate::dash::DashPhase::Transit => return [1.0; 2],
+        crate::dash::DashPhase::Ready => {}
     }
     // Ticks since it landed: its cooldown started at the landing.
     let since = dash.cooldown_ticks.saturating_sub(s.cooldown);

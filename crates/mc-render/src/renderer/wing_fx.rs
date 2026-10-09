@@ -12,6 +12,7 @@
 //! The puffs are the warp's (`warp_puffs.wgsl`: `WARP_GLOW`, `WARP_STREAK`, `WARP_MOTE`),
 //! clean, coloured red. Presentation only.
 
+use super::flight_ease::FlightEase;
 use super::Renderer;
 use crate::gpu_consts::{flight, puff};
 use crate::models::Flight;
@@ -39,16 +40,33 @@ pub(super) struct WingFx {
     rigs: Vec<Option<(Flight, f32)>>,
     /// Puffs left in this tick's budget.
     left: usize,
+    /// Each flier's turn and speed, eased for its rig (`flight_ease.rs`).
+    eased: FlightEase,
 }
 
 impl WingFx {
     pub(super) fn new(rigs: Vec<Option<(Flight, f32)>>) -> Self {
-        Self { rigs, left: 0 }
+        Self {
+            rigs,
+            left: 0,
+            eased: FlightEase::default(),
+        }
     }
 
     /// A new tick: the budget is full again.
     pub(super) fn new_tick(&mut self) {
         self.left = TICK_BUDGET;
+    }
+
+    /// The units as the GPU should have them, every flier's turn and speed eased
+    /// (`flight_ease.rs`). Called once a tick, as the tick is uploaded.
+    pub(super) fn ease<'a>(
+        &mut self,
+        units: std::borrow::Cow<'a, [UnitInstance]>,
+    ) -> std::borrow::Cow<'a, [UnitInstance]> {
+        let rigs = &self.rigs;
+        self.eased
+            .patch(|b| rigs.get(b as usize).is_some_and(Option::is_some), units)
     }
 
     /// The unit's model has wings.
@@ -104,6 +122,10 @@ impl Renderer {
         let Some(Some((rig, top))) = self.wing_fx.rigs.get(u.blueprint as usize).copied() else {
             return;
         };
+        if u.deploy > 0.0 {
+            // Winding up a dash: the light it gathers (`dash_fx`).
+            self.dash_charge_light(u, u.deploy, time);
+        }
         if self.wing_fx.left < PER_UNIT {
             return;
         }

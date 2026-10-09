@@ -90,6 +90,8 @@ pub struct Weapon {
     pub split_ordered: bool,
     /// Fires a whole salvo as its unit lands from a dash (`RawWeapon::on_dash`).
     pub on_dash: bool,
+    /// Goes off only as its unit lands from a dash (`RawWeapon::dash_only`).
+    pub dash_only: bool,
     pub proximity: Fx,
     pub burn_ticks: u16,
     /// Damage a second its burning ground does to each enemy standing in it.
@@ -105,6 +107,7 @@ pub struct Weapon {
     /// Multiplies the impact flash. 1 is the size the damage implies.
     pub impact: f32,
     /// Multiplies the muzzle and impact shockwave. 0 is none; 1 is the size the damage implies.
+    /// On a cone, how many times its usual height its wall stands (at least 1).
     pub shockwave: f32,
     /// Multiplies the projectile tracer. 1 is the size the damage implies.
     pub tracer: f32,

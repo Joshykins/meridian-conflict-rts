@@ -70,6 +70,8 @@ struct Reach {
     half: f32,
     arc: f32,
     impact: f32,
+    /// How many times its fan's own height the wall stands (`Weapon::shockwave`, at least 1).
+    tall: f32,
 }
 
 impl Renderer {
@@ -143,6 +145,7 @@ impl Renderer {
             half,
             arc: (half * WIDTH).min(PI),
             impact: w.impact.max(0.3),
+            tall: w.shockwave.max(1.0),
         })
     }
 
@@ -196,7 +199,8 @@ impl Renderer {
                 half: reach.half,
                 front,
                 speed: reach.speed,
-                height: wall_height(reach.half_width(reach.range.min(age * reach.speed))),
+                height: wall_height(reach.half_width(reach.range.min(age * reach.speed)))
+                    * reach.tall,
                 fade: (age / 0.05).clamp(0.0, 1.0),
                 spent: age - end,
             });
@@ -320,7 +324,7 @@ impl Renderer {
         for _ in 0..2 {
             let across = self.scatter.signed();
             let (p, _) = self.front_foot(wake, reach, r, across);
-            let up = wall_height(width) * reach.taper(across) * self.scatter.unit();
+            let up = wall_height(width) * reach.tall * reach.taper(across) * self.scatter.unit();
             let drift = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * 1.5;
             let heat = 0.2 + 0.6 * self.scatter.unit();
             let vel = drift + Vec3::Z * (2.0 + 3.0 * self.scatter.unit());
@@ -342,7 +346,7 @@ impl Renderer {
         let mid = mid.extend(self.ground_height(mid).max(water));
         if k.is_multiple_of(2) {
             self.plasma_fx.guns.flare(
-                mid + Vec3::Z * wall_height(width) * 0.5,
+                mid + Vec3::Z * wall_height(width) * reach.tall * 0.5,
                 WHITE.lerp(ICE, 0.5) * 170.0 * reach.impact,
                 (width * 1.4 + 10.0).min(90.0),
                 when,
@@ -370,7 +374,10 @@ impl Renderer {
         for n in 0..pieces {
             let across = 2.0 * (n as f32 + self.scatter.unit()) / pieces as f32 - 1.0;
             let (p, out) = self.front_foot(wake, reach, r, across);
-            let up = wall_height(width) * reach.taper(across) * (0.4 + 0.6 * self.scatter.unit());
+            let up = wall_height(width)
+                * reach.tall
+                * reach.taper(across)
+                * (0.4 + 0.6 * self.scatter.unit());
             let size = 1.2 + 0.06 * width.min(40.0) * (0.6 + 0.6 * self.scatter.unit());
             let pace = reach.speed * (0.3 + 0.3 * self.scatter.unit());
             let vel = (out * pace).extend(1.0 + 3.0 * self.scatter.unit());
@@ -389,7 +396,7 @@ impl Renderer {
             );
         }
         let mid = wake.at.truncate() + wake.ahead * r;
-        let mid = mid.extend(self.ground_height(mid) + wall_height(width) * 0.5);
+        let mid = mid.extend(self.ground_height(mid) + wall_height(width) * reach.tall * 0.5);
         self.plasma_fx.guns.flare(
             mid,
             WHITE.lerp(ICE, 0.4) * 140.0 * reach.impact,

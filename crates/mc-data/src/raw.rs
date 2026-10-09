@@ -594,6 +594,10 @@ pub struct RawCone {
     pub speed: f64,
     #[serde(default = "RawCone::default_edge")]
     pub edge: f64,
+    /// Seconds the front stuns what it strikes (an EMP: no orders, fire or way on), all but
+    /// experimentals; not what a shield dome covers. Zero (the default): no stun.
+    #[serde(default)]
+    pub stun: f64,
 }
 
 impl RawCone {
@@ -1018,6 +1022,10 @@ pub struct RawWeapon {
     /// far through its reload it was; the reload then starts again from the volley.
     #[serde(default)]
     pub on_dash: bool,
+    /// Goes off only as its unit lands from a dash, at its feet (`crate::dash`): it never
+    /// picks a target of its own. A cone (the Seraph's landing wave) rolls out all round.
+    #[serde(default)]
+    pub dash_only: bool,
     #[serde(default)]
     pub proximity: f64,
     /// Seconds the ground burns where a round lands; zero: it does not.
@@ -1047,6 +1055,7 @@ pub struct RawWeapon {
     #[serde(default)]
     pub impact: f64,
     /// Multiplies the muzzle and impact shockwave. 0 (the default) is none; 1 is the size the damage implies.
+    /// On a cone, how many times its usual height its wall stands (at least 1).
     #[serde(default)]
     pub shockwave: f64,
     /// Multiplies the projectile tracer. 1 is the size the damage implies.
@@ -1819,6 +1828,11 @@ impl Unit {
                     "{ctx}: a cone is a hitscan direct shot with no splash, beam or bore"
                 )));
             }
+            if w.dash_only && w.cone.is_none() {
+                return Err(DataError::Invalid(format!(
+                    "{ctx}: a dash_only weapon is a cone, let go at the unit's feet as it lands"
+                )));
+            }
             if w.strafe.is_some_and(|s| {
                 s.ahead <= 0.0 || s.length <= 0.0 || s.gap < 0.0 || s.ahead >= w.range
             }) || (w.strafe.is_some()
@@ -1898,6 +1912,7 @@ impl Unit {
                 split: w.split,
                 split_ordered: w.split_ordered,
                 on_dash: w.on_dash,
+                dash_only: w.dash_only,
                 proximity: fx(w.proximity),
                 burn_ticks: ticks(w.burn).min(600) as u16,
                 burn_dps: fx(w.burn_dps.max(0.0)),
@@ -1992,6 +2007,7 @@ impl Unit {
                     half: Angle(steps(c.angle.clamp(1.0, 180.0)).round() as i64 as u16),
                     edge: fx(c.edge.clamp(0.0, 1.0)),
                     speed: fx(c.speed.clamp(10.0, 2000.0)),
+                    stun_ticks: ticks(c.stun.clamp(0.0, 60.0)) as u16,
                 }),
                 sabot: match &w.sabot {
                     Some(s) => {
@@ -2150,9 +2166,9 @@ impl Unit {
                     )));
                 }
                 Some(d) => Some(d.compile(key, fx, TICKS_PER_SECOND)?),
-                None if weapons.iter().any(|w: &Weapon| w.on_dash) => {
+                None if weapons.iter().any(|w: &Weapon| w.on_dash || w.dash_only) => {
                     return Err(DataError::Invalid(format!(
-                        "{key}: an on_dash weapon needs a dash"
+                        "{key}: an on_dash or dash_only weapon needs a dash"
                     )));
                 }
                 None => None,

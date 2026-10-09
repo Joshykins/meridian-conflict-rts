@@ -238,6 +238,8 @@ pub struct Cone {
     pub half: Angle,
     pub edge: Fx,
     pub speed: Fx,
+    /// Ticks it stuns what it strikes, all but experimentals (`RawCone::stun`).
+    pub stun_ticks: u16,
 }
 
 /// A strafing beam's stroke (`RawStrafe`): it lands `ahead` of the hull along the nose,
@@ -1746,7 +1748,8 @@ impl Blueprints {
                         | (w.hatch_ticks as u64) << 32
                         | (w.split as u64) << 48
                         | (w.split_ordered as u64) << 49
-                        | (w.on_dash as u64) << 50,
+                        | (w.on_dash as u64) << 50
+                        | (w.dash_only as u64) << 51,
                 );
                 h.write_u64(w.orbs as u64 | (w.orb_ticks as u64) << 8);
                 h.write_i64(w.proximity.0);
@@ -1785,6 +1788,7 @@ impl Blueprints {
                     h.write_u64(c.half.0 as u64);
                     h.write_i64(c.edge.0);
                     h.write_i64(c.speed.0);
+                    h.write_u64(c.stun_ticks as u64);
                 }
                 if let Some(c) = w.cluster {
                     h.write_u64(c.count as u64);

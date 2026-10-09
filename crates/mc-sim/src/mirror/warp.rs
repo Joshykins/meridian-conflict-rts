@@ -22,8 +22,8 @@ use mc_data::WarpStyle;
 /// Units' `status[0]`: the jump it is in (spooling, in transit or coming out) is snagged
 /// by a live enemy dampener: torn, slow, and it comes out hurt and stunned.
 pub const UNIT_WARP_DAMPED: u32 = 1 << 12;
-/// Units' `status[0]`: in warp, out of the world. Listed for its own side's interface
-/// (selection, the card), never drawn.
+/// Units' `status[0]`: in warp, or gone in a dash: out of the world. Listed for its own
+/// side's interface (selection, the card), never drawn.
 pub const UNIT_IN_WARP: u32 = 1 << 13;
 /// Units' `status[0]`: its drive's jump is the Regency's (`mc_data::WarpStyle::Nanite`):
 /// the hull comes apart into a swarm instead of stretching into a streak.
@@ -117,7 +117,10 @@ impl World {
         if damped {
             marks |= UNIT_WARP_DAMPED;
         }
-        if w.phase == WarpPhase::Transit && w.ticks > 0 {
+        // Out of the world, listed but not drawn: in a jump, or gone in a dash (`dash.rs`).
+        if (w.phase == WarpPhase::Transit && w.ticks > 0)
+            || units.dash[row].phase == crate::dash::DashPhase::Transit
+        {
             marks |= UNIT_IN_WARP;
         }
         if nanite {

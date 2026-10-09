@@ -216,17 +216,17 @@ impl WarpSounds {
                     let sound = dash_sound(&library, blueprints, b, |s| &s.dash_charge);
                     play(sound, Vec3::from(from.to_f32()), radius(b), 0.9);
                 }
-                SimEvent::DashLanded {
+                SimEvent::DashVanished {
                     from, blueprint, ..
                 } => {
                     let b = blueprint.0 as u32;
                     let sound = dash_sound(&library, blueprints, b, |s| &s.dash_leave);
                     play(sound, Vec3::from(from.to_f32()), radius(b), 1.0);
                 }
-                SimEvent::DashShockwave { pos, blueprint, .. } => {
+                SimEvent::DashLanded { to, blueprint, .. } => {
                     let b = blueprint.0 as u32;
                     let sound = dash_sound(&library, blueprints, b, |s| &s.dash_land);
-                    play(sound, Vec3::from(pos.to_f32()), radius(b), 1.2);
+                    play(sound, Vec3::from(to.to_f32()), radius(b), 1.3);
                 }
                 _ => {}
             }

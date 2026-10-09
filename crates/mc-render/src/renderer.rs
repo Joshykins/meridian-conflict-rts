@@ -61,6 +61,7 @@ mod effect_barriers;
 mod elevator_fx;
 mod fallen_trees;
 mod flak_fx;
+mod flight_ease;
 pub(crate) mod fog_field;
 mod footfalls;
 pub(crate) mod foundations;
@@ -3250,6 +3251,7 @@ impl Renderer {
         }
         let patched = self.titan_charge.patch(units, time);
         let patched = self.capital_fx.swing.patch(&self.blueprints, patched);
+        let patched = self.wing_fx.ease(patched);
         self.dynamic.write(0, bytemuck::cast_slice(&patched));
         self.sim_units = units.len() as u32;
         // One per unit at most (`MAX_HOUSES`): never cut.

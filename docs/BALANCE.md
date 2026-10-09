@@ -79,10 +79,12 @@ Off the lines, measured the same way:
   at 70 m/s. Two Rapid Fusion Repeaters (1500 with 18 m splash every 0.5 s each, 1000 m,
   taking turns: about 6000 dps) and sixteen Gravitic Seekers every 12 s (1100 each, 1300 m,
   about 1500 dps averaged). Its dash (`dash` in the blueprint, mc-sim `dash.rs`): it sees
-  ground or sea enemies 400 to 1800 m off, winds up 0.4 s and comes down in the middle of
-  everything within 250 m of the one it saw, the landing a 220 m shockwave (15000 at the
-  heart to 3750 at the edge, enemies only, 1.5 s stun on all but experimentals), its
-  seekers all going up as it lands; then 15 s to recharge. Not at a move order, hold fire
+  ground or sea enemies 400 to 1800 m off, charges 1.5 s, is gone (unseen, unhittable)
+  0.6 s and comes down in the middle of everything within 250 m of the one it saw. As it
+  lands its Seraphic Nova (a `dash_only` cone weapon, a full-circle wake) rolls out to
+  320 m at 260 m/s (15000 at its feet to 3750 at the edge, enemies only, 1.5 s stun on all
+  but experimentals, over hills and walls, stopped only by shield domes), its seekers all
+  going up as it lands; then 15 s to recharge. Model 25% bigger since 10-09 (radius 75 m). Not at a move order, hold fire
   or hold position. It lands under a siege gun's `range_min` (the Behemoth's Tempest
   900 m, rockets 600 m), so it is the Behemoth's ground answer; nothing against the air.
   Measured (mc-sim `tests/seraph.rs`): it kills four Striders and lives.

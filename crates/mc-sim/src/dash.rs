@@ -1,6 +1,7 @@
 //! The dash (`UnitBlueprint::dash`, the Regency Seraph): a unit that sees enemies on the
-//! ground or the water some way off winds up where it stands, is gone, and comes down in
-//! the middle of them, and its landing goes off as a shockwave.
+//! ground or the water some way off charges where it stands, is gone for a moment, and
+//! comes down in the middle of them, and its landing lets go a wave that rolls out over
+//! everything round it.
 //!
 //! - **When**: its dash is ready (`Dash::cooldown_ticks` after its last landing), it is
 //!   free to pick its fights (idle, chasing on its own, on an attack-move or patrol, or
@@ -15,25 +16,26 @@
 //!   biggest hull), then put clear of any big hull there (one at least half its own
 //!   radius: it never lands inside a giant) and onto the nearest ground its layer can
 //!   stand on (`Nav::nearest_passable`: never a cliff, nor a structure's hull).
-//! - **Windup**: it stops and turns to the mark for `Dash::windup_ticks` (`warp_held`
-//!   keeps it out of movement). A stun, or anything that takes away its freedom (a move
-//!   order, hold fire), calls the dash off at no cost.
-//! - **Landing**: on the windup's last tick it is at the mark: no transit, a teleport
-//!   (`prev_pos` too, so nothing is drawn sliding across the map). The landing strikes every
-//!   enemy unit and structure on the ground within `Dash::blast` (`Dash::falloff`), through
-//!   the shields as any blast is, and stuns all but experimentals for `Dash::stun_ticks`;
-//!   friends are not touched. Its `on_dash` weapons fire a whole salvo at once, however
-//!   far through their reload they were. A chase it began on its own ends there: where it
-//!   lands is its new post.
+//! - **Windup**: it stops and turns to the mark for `Dash::windup_ticks`, charging
+//!   (`warp_held` keeps it out of movement). A stun, or anything that takes away its
+//!   freedom (a move order, hold fire), calls the dash off at no cost.
+//! - **Transit**: its charge spent, it is out of the world (`IN_FACTORY`: not drawn, seen,
+//!   hit or ordered) for `Dash::transit_ticks`, already at the mark (`prev_pos` too, so
+//!   nothing is drawn sliding across the map). Nothing calls it off now.
+//! - **Landing**: back in the world at the mark. Its `dash_only` weapons, cones, go off at
+//!   its feet: each a wake rolling out from where it stands (`wake.rs`), striking the
+//!   enemies its front passes over and stunning them if the cone says so; friends are not
+//!   touched. Its `on_dash` weapons fire a whole salvo at once, however far through their
+//!   reload they were. A chase it began on its own ends there: where it lands is its new
+//!   post.
 
 use mc_core::{Fx, FxVec2};
 use mc_data::{cat, dash::Dash, MoveLayer};
 use serde::{Deserialize, Serialize};
 
-use crate::city::Blow;
 use crate::mirror::SimEvent;
 use crate::spatial::kind;
-use crate::tables::{flag, FireState, OrderKind, UnitId};
+use crate::tables::{flag, FireState, OrderKind};
 use crate::{SimError, World};
 
 /// What a dash may strike and be drawn to: anything on the ground or the water.
@@ -49,12 +51,14 @@ pub enum DashPhase {
     Ready,
     /// Winding up where it stands, bound for `DashState::to`.
     Windup,
+    /// Out of the world, already at `DashState::to`, until it lands.
+    Transit,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DashState {
     pub phase: DashPhase,
-    /// Ticks into the windup.
+    /// Ticks into the windup, or the transit.
     pub ticks: u16,
     /// Ticks until it may dash again.
     pub cooldown: u16,
@@ -109,14 +113,15 @@ impl World {
                     }
                 }
                 DashPhase::Windup => self.step_windup(row, &dash, s)?,
+                DashPhase::Transit => self.step_dash_transit(row, &dash, s)?,
             }
         }
         Ok(())
     }
 
-    /// Winding up a dash: held out of movement (`warp_held`).
+    /// Winding up a dash, or gone in one: held out of movement (`warp_held`).
     pub(crate) fn dash_held(&self, row: usize) -> bool {
-        self.state.units.dash[row].phase == DashPhase::Windup
+        self.state.units.dash[row].phase != DashPhase::Ready
     }
 
     /// Whether `row` may dash, and why.
@@ -288,124 +293,100 @@ impl World {
         let to = self
             .dash_ground(row, s.to)
             .unwrap_or(self.state.units.pos[row]);
-        self.land_dash(row, dash, to, leave)
-    }
-
-    fn land_dash(
-        &mut self,
-        row: usize,
-        dash: &Dash,
-        to: FxVec2,
-        leave: Leave,
-    ) -> Result<(), SimError> {
         if leave == (Leave::Free { chase: true }) {
             // Its own chase ends where it lands, and the walk home behind it with it.
             self.clear_orders(row)?;
         }
+        self.vanish(row, dash, to);
+        Ok(())
+    }
+
+    /// Its charge spent: out of the world at once, already at `to`, until it lands.
+    fn vanish(&mut self, row: usize, dash: &Dash, to: FxVec2) {
         self.stop_moving(row);
         let z = self.stand_z(row, to);
         let units = &mut self.state.units;
         let from = units.pos[row].extend(units.z[row]);
+        units.flags[row] |= flag::IN_FACTORY;
         units.pos[row] = to;
         units.prev_pos[row] = to;
         units.z[row] = z;
         units.prev_z[row] = z;
         units.move_goal[row] = to;
         units.speed[row] = Fx::ZERO;
+        units.dash[row] = DashState {
+            phase: DashPhase::Transit,
+            ticks: 0,
+            cooldown: 0,
+            from: from.xy(),
+            to,
+        };
+        self.events.push(SimEvent::DashVanished {
+            unit: units.id(row),
+            from,
+            to: to.extend(z),
+            ticks: dash.transit_ticks,
+            blueprint: units.blueprint[row],
+            owner: units.owner[row],
+        });
+    }
+
+    fn step_dash_transit(&mut self, row: usize, dash: &Dash, s: DashState) -> Result<(), SimError> {
+        let ticks = s.ticks + 1;
+        self.state.units.dash[row].ticks = ticks;
+        if ticks < dash.transit_ticks {
+            return Ok(());
+        }
+        self.land_dash(row, dash, s)
+    }
+
+    /// Back in the world where it came down: its `dash_only` weapons go off at its feet,
+    /// and its `on_dash` ones fire whatever their reload.
+    fn land_dash(&mut self, row: usize, dash: &Dash, s: DashState) -> Result<(), SimError> {
+        let to = s.to;
+        let units = &mut self.state.units;
+        units.flags[row] &= !flag::IN_FACTORY;
         units.flags[row] |= flag::MOVING;
         units.dash[row] = DashState {
             phase: DashPhase::Ready,
             ticks: 0,
             cooldown: dash.cooldown_ticks,
-            from: from.xy(),
-            to,
+            ..s
         };
         let (unit, owner, blueprint) = (units.id(row), units.owner[row], units.blueprint[row]);
-        let at = to.extend(z);
+        let (z, facing) = (units.z[row], units.heading[row]);
+        let from = s.from.extend(z);
         self.events.push(SimEvent::DashLanded {
             unit,
             from,
-            to: at,
+            to: to.extend(z),
             blueprint,
             owner,
         });
-        self.dash_shockwave(row, dash, to, unit, owner);
-        self.events.push(SimEvent::DashShockwave {
-            unit,
-            pos: at,
-            radius: dash.blast,
-            blueprint,
-            owner,
-        });
-        // The volley that goes up as it lands, whatever its reload.
-        let units = &mut self.state.units;
-        for (w, weapon) in self.blueprints.unit(blueprint).weapons.iter().enumerate() {
+        let feet = to.extend(self.ground_z(row, to) + Fx::ONE);
+        let blueprints = std::sync::Arc::clone(&self.blueprints);
+        for (w, weapon) in blueprints.unit(blueprint).weapons.iter().enumerate() {
+            if weapon.dash_only && weapon.cone.is_some() {
+                // The wave, let go at its feet the way it faces; a full circle rolls out all
+                // round whatever the facing.
+                self.wake(row, w, feet, facing);
+                self.events.push(SimEvent::ShotFired {
+                    pos: feet,
+                    vel: FxVec2::from_angle(facing).extend(Fx::ZERO),
+                    travel: mc_core::FxVec3::ZERO,
+                    color: weapon.color,
+                    owner,
+                    blueprint,
+                    weapon: w as u8,
+                });
+            }
             if weapon.on_dash {
+                // The volley that goes up as it lands, whatever its reload.
+                let units = &mut self.state.units;
                 units.weapon_cooldown[row][w] = 0;
                 units.weapon_salvo_left[row][w] = 0;
             }
         }
         Ok(())
-    }
-
-    /// The landing's blow: every enemy on the ground within reach takes it, less toward
-    /// the edge, and all but experimentals are stunned. Shields between take it instead.
-    fn dash_shockwave(&mut self, row: usize, dash: &Dash, at: FxVec2, by: UnitId, owner: u8) {
-        let mut struck = Vec::new();
-        self.index
-            .query_foes(at, dash.blast, kind::UNIT, self.team_mask(owner), |e| {
-                let t = e.row as usize;
-                if t != row
-                    && self.unit_entry_is_current(e)
-                    && self.are_enemies(owner, self.state.units.owner[t])
-                    && !self.state.units.has_flag(t, flag::IN_FACTORY)
-                    && self.target_layers(t) & GROUND != 0
-                    && self.target_layers(t) & cat::AIR == 0
-                    && !self.submerged(t)
-                {
-                    struck.push(t);
-                }
-                true
-            });
-        struck.sort_unstable();
-        struck.dedup();
-        let origin = at.extend(self.ground_z(row, at) + Fx::ONE);
-        let mut charged = Vec::new();
-        for t in struck {
-            let bp = self.bp(t);
-            let (radius, height, giant) = (bp.radius, bp.height, bp.has(cat::EXPERIMENTAL));
-            let units = &self.state.units;
-            let reach = (units.pos[t].distance(at) - radius).max(Fx::ZERO);
-            if reach > dash.blast {
-                continue;
-            }
-            let damage = dash.falloff(reach);
-            let target = units.pos[t].extend(units.z[t] + height / 2);
-            if let Some(shield) = self.blast_blocker(origin, target, Some(t)) {
-                if !charged.contains(&shield) {
-                    charged.push(shield);
-                    self.damage_shield(shield, damage);
-                }
-                continue;
-            }
-            self.damage_unit(t, damage, owner, by);
-            if dash.stun_ticks > 0 && !giant && self.state.units.slots.is_alive(t) {
-                self.stun(t, dash.stun_ticks);
-            }
-        }
-        self.wear_wrecks(origin, dash.blast, |reach| dash.falloff(reach));
-        self.blast_structures(origin, dash.blast, Blow::BLAST, |reach| dash.falloff(reach));
-        let mut felled = Vec::new();
-        self.prop_index
-            .query(at, dash.blast * Fx::ratio(3, 4), kind::PROP, |e| {
-                felled.push(e.row as usize);
-                true
-            });
-        for prop in felled {
-            if self.map.props[prop].kind.is_tree() {
-                self.state.props_dead[prop / 64] |= 1 << (prop % 64);
-            }
-        }
-        self.add_stain(at, dash.blast * Fx::ratio(3, 4), 140);
     }
 }

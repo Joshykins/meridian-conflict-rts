@@ -1121,8 +1121,9 @@ impl World {
     fn step_weapon(&mut self, row: usize, w: usize) -> Result<(), SimError> {
         let bp = self.blueprints.clone();
         let weapon = &bp.unit(self.state.units.blueprint[row]).weapons[w];
-        // Interceptor tubes are fired and reloaded by `run_torpedo_defence`.
-        if weapon.intercepts {
+        // Interceptor tubes are fired and reloaded by `run_torpedo_defence`, and a
+        // `dash_only` weapon goes off only as its unit lands from a dash (`dash.rs`).
+        if weapon.intercepts || weapon.dash_only {
             return Ok(());
         }
         if let Some((centre, radius)) = self.ground_mark(row).filter(|m| m.1 > Fx::ZERO) {

@@ -1,5 +1,6 @@
 //! The Seraph, the Regency's tier 5: it dashes into the middle of the enemies it sees and
-//! lands as a shockwave (`dash.rs`), its seeker battery going up as it lands.
+//! lands letting go a wave that rolls out all round (`dash.rs`, `wake.rs`), its seeker
+//! battery going up as it lands.
 
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::{Blueprints, MoveLayer};
@@ -109,7 +110,7 @@ fn dashes_into_the_middle_of_a_cluster() {
     let mut w = world(None);
     let seraph = add(&mut w, SERAPH, 0, 500, 2000, false);
     cluster(&mut w, 1700, 2000);
-    let (_, to) = until_landed(&mut w, 30).expect("it dashed");
+    let (_, to) = until_landed(&mut w, 60).expect("it dashed");
     let middle = FxVec2::from_ints(1700, 2000);
     // Clear of the middle bot's hull, on the side it came from.
     let r = &w.state.units;
@@ -121,19 +122,15 @@ fn dashes_into_the_middle_of_a_cluster() {
     assert_eq!(r.pos[row(&w, seraph)], to, "it stands where it landed");
 }
 
-/// It winds up before it goes: the windup's ticks after it was seen charging.
+/// It charges, is gone, and lands: the windup's and the transit's ticks after it was
+/// seen charging. While it is gone it is out of the world, already at the mark.
 #[test]
 fn winds_up_then_lands() {
     let mut w = world(None);
-    add(&mut w, SERAPH, 0, 500, 2000, false);
+    let seraph = add(&mut w, SERAPH, 0, 500, 2000, false);
     cluster(&mut w, 1700, 2000);
-    let windup = w
-        .blueprints
-        .unit_by_key(SERAPH)
-        .unwrap()
-        .dash
-        .unwrap()
-        .windup_ticks as u32;
+    let dash = w.blueprints.unit_by_key(SERAPH).unwrap().dash.unwrap();
+    let windup = dash.windup_ticks as u32 + dash.transit_ticks as u32;
     let mut charged = None;
     for _ in 0..30 {
         w.tick(&[]).unwrap();
@@ -146,8 +143,33 @@ fn winds_up_then_lands() {
         }
     }
     let charged = charged.expect("it wound up");
-    let (landed, _) = until_landed(&mut w, 30).expect("it landed");
-    assert_eq!(landed - charged, windup, "it lands as the windup ends");
+    let mut gone = None;
+    for _ in 0..60 {
+        w.tick(&[]).unwrap();
+        if let Some(to) = w.events.iter().find_map(|e| match e {
+            SimEvent::DashVanished { to, .. } => Some(to.xy()),
+            _ => None,
+        }) {
+            gone = Some((w.tick_count(), to));
+            break;
+        }
+    }
+    let (vanished, mark) = gone.expect("it vanished");
+    assert_eq!(
+        vanished - charged,
+        dash.windup_ticks as u32,
+        "it goes as the charge ends"
+    );
+    let r = row(&w, seraph);
+    assert!(
+        w.state.units.has_flag(r, flag::IN_FACTORY),
+        "out of the world"
+    );
+    assert_eq!(w.state.units.pos[r], mark, "already at the mark");
+    let (landed, to) = until_landed(&mut w, 60).expect("it landed");
+    assert_eq!(landed - charged, windup, "it lands as the transit ends");
+    assert_eq!(to, mark);
+    assert!(!w.state.units.has_flag(row(&w, seraph), flag::IN_FACTORY));
 }
 
 /// Once landed it may not dash again until its recharge is out, and then it does.
@@ -159,7 +181,7 @@ fn the_cooldown_holds_the_next_dash() {
     for (dx, dy) in [(0, 0), (40, 0), (-40, 0)] {
         add(&mut w, SCOUT, 1, 1000 + dx, 2000 + dy, true);
     }
-    let (first, _) = until_landed(&mut w, 30).expect("first dash");
+    let (first, _) = until_landed(&mut w, 60).expect("first dash");
     cluster(&mut w, 1000, 3200);
     let cooldown = w
         .blueprints
@@ -230,23 +252,31 @@ fn an_attack_order_picks_the_cluster() {
         },
     )])
     .unwrap();
-    let (_, to) = until_landed(&mut w, 30).expect("it dashed");
+    let (_, to) = until_landed(&mut w, 60).expect("it dashed");
     assert!(
         to.distance(FxVec2::from_ints(2000, 600)) <= Fx::from_int(90),
         "landed at {to:?}, not by the mark"
     );
 }
 
-/// The landing strikes the enemies round it, stunning all but experimentals; a friend
-/// in the middle of them is not touched.
+/// Ticks for the landing's wave to roll out to its reach.
+fn roll_out(w: &mut World) {
+    for _ in 0..16 {
+        w.tick(&[]).unwrap();
+    }
+}
+
+/// The landing's wave strikes the enemies round it, stunning all but experimentals; a
+/// friend in the middle of them is not touched.
 #[test]
-fn the_shockwave_hurts_enemies_not_friends() {
+fn the_wave_hurts_enemies_not_friends() {
     let mut w = world(None);
     add(&mut w, SERAPH, 0, 500, 2000, false);
     let bots = cluster(&mut w, 1700, 2000);
     let tank = add(&mut w, "aster_t4_assault_tank", 1, 1700, 2150, true);
     let friend = add(&mut w, BOT, 0, 1700, 1880, true);
-    until_landed(&mut w, 30).expect("it dashed");
+    until_landed(&mut w, 60).expect("it dashed");
+    roll_out(&mut w);
     let u = &w.state.units;
     for &b in &bots {
         // Killed outright, or hurt and stunned.
@@ -264,6 +294,27 @@ fn the_shockwave_hurts_enemies_not_friends() {
     let r = row(&w, friend);
     assert_eq!(u.health[r], w.unit_max_health(r), "the friend was struck");
     assert_eq!(u.stun[r][0], 0, "the friend was stunned");
+}
+
+/// The wave rolls out from where it lands: an enemy near its reach is struck (and
+/// stunned) only once the front gets there, not as it lands.
+#[test]
+fn the_wave_rolls_out_from_the_landing() {
+    let mut w = world(None);
+    add(&mut w, SERAPH, 0, 500, 2000, false);
+    cluster(&mut w, 1700, 2000);
+    // Past the cluster's gather, inside the wave's reach of where it lands.
+    let far = add(&mut w, BOT, 1, 1700, 2290, true);
+    until_landed(&mut w, 60).expect("it dashed");
+    let r = row(&w, far);
+    assert_eq!(
+        w.state.units.stun[r][0], 0,
+        "struck before the front got there"
+    );
+    roll_out(&mut w);
+    if let Some(r) = w.state.units.row(far) {
+        assert!(w.state.units.stun[r][0] > 0, "the front never reached it");
+    }
 }
 
 /// Four heavy tanks the landing does not kill, 150 m about `(x, y)`.
@@ -289,7 +340,7 @@ fn the_battery_fires_as_it_lands() {
     let seraph_bp = bp.id;
     let r = row(&w, seraph);
     w.state.units.weapon_cooldown[r][battery] = u16::MAX;
-    until_landed(&mut w, 30).expect("it dashed");
+    until_landed(&mut w, 60).expect("it dashed");
     // The first goes up on the tick it lands.
     let mut launched = 0;
     for k in 0..30 {
@@ -317,7 +368,7 @@ fn lands_on_ground_it_can_stand_on() {
     for (x, y) in [(1560, 2000), (1840, 2000), (1700, 1860), (1700, 2140)] {
         add(&mut w, BOT, 1, x, y, true);
     }
-    let (_, to) = until_landed(&mut w, 30).expect("it dashed");
+    let (_, to) = until_landed(&mut w, 60).expect("it dashed");
     let m = w.bp(row(&w, seraph)).motion.unwrap();
     assert_eq!(m.layer, MoveLayer::Hover);
     assert!(
@@ -349,7 +400,7 @@ fn a_windup_survives_a_snapshot() {
             again.restore(world_terrain(), &bytes).unwrap();
             w = again;
         }
-        until_landed(&mut w, 30).expect("it landed")
+        until_landed(&mut w, 60).expect("it landed")
     };
     assert_eq!(run(false), run(true));
 }

@@ -29,7 +29,9 @@ fn the_unit_files_guns_are_the_models() {
     assert_eq!(bp.visual.mesh, KEY);
     assert!((bp.radius.to_f32() - RADIUS * SCALE).abs() < 1e-3);
     assert!((bp.height.to_f32() - HEIGHT * SCALE).abs() < 1e-3);
-    assert_eq!(bp.weapons.len(), 3);
+    // The repeaters, the seekers, and the landing's wave (`dash_only`, from its feet).
+    assert_eq!(bp.weapons.len(), 4);
+    assert!(bp.weapons[3].dash_only && bp.weapons[3].cone.is_some());
     for (w, side) in bp.weapons[..2].iter().zip([Vec3::ONE, mirror]) {
         assert!(
             v(w.muzzle).distance(MUZZLE * side * SCALE) < 1e-2,

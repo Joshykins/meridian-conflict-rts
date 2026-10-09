@@ -528,20 +528,22 @@ pub enum SimEvent {
     DashCancelled {
         unit: UnitId,
     },
-    /// It left `from` and is at `to` in the same tick: a teleport, nothing between.
+    /// Its charge spent, it left `from` and is gone, out of the world, for `ticks`; then it
+    /// comes down at `to` (`DashLanded`).
+    DashVanished {
+        unit: UnitId,
+        from: FxVec3,
+        to: FxVec3,
+        ticks: u16,
+        blueprint: BlueprintId,
+        owner: u8,
+    },
+    /// It came down at `to`, having left `from`. Its `dash_only` weapons went off at its
+    /// feet the same tick (`ShotFired`).
     DashLanded {
         unit: UnitId,
         from: FxVec3,
         to: FxVec3,
-        blueprint: BlueprintId,
-        owner: u8,
-    },
-    /// Its landing went off as a shockwave at `pos`, striking enemies out to `radius`.
-    /// Right after its `DashLanded`.
-    DashShockwave {
-        unit: UnitId,
-        pos: FxVec3,
-        radius: mc_core::Fx,
         blueprint: BlueprintId,
         owner: u8,
     },
