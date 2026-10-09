@@ -14,7 +14,7 @@
         sounds: (death: "blast_large", moving: "aster_hover"),
     ),
     (
-        key: "regency_t2_space_frigate", name: "Vassal", role: "Space Frigate", title: "Frigate",
+        key: "regency_t2_space_frigate", name: "Vassal", role: "Frigate", title: "Frigate",
         tech: 2, categories: ["Air", "Space", "DirectFire"], health: 3200,
         cost: (mass: 600, energy: 11000, time: 3600),
         radius: 48, height: 16, footprint: (9, 5), hull: (50, 28), vision: 900,
@@ -36,7 +36,7 @@
         sounds: (death: "blast_large", moving: "aster_hover"),
     ),
     (
-        key: "regency_t3_space_cruiser", name: "Suzerain", role: "Space Cruiser", title: "Cruiser",
+        key: "regency_t3_space_cruiser", name: "Suzerain", role: "Monitor", title: "Monitor",
         tech: 3, categories: ["Air", "Space", "DirectFire", "Artillery"], health: 22000,
         cost: (mass: 5600, energy: 96000, time: 30000),
         radius: 96, height: 30, footprint: (18, 7), hull: (110, 40), vision: 1300,

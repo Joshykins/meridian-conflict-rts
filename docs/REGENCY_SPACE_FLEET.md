@@ -9,7 +9,7 @@ dimensions; weapon mounts and cargo apertures use the same metre coordinates.
 | Coffer | 2 | Artificer II/III; Exarch Engineering Suite II/III | Unarmed light transport; eight slots, enough for one commander |
 | Ark | 3 | Artificer III; Exarch Engineering Suite III | Heavy transport; 96 slots, 44 m bay width and 36 m clearance |
 | Vassal | 2 | Artificer II/III; Exarch Engineering Suite II/III | Economical frigate with two independently aiming plasma cannons |
-| Suzerain | 3 | Artificer III; Exarch Engineering Suite III | Cruiser with two anti-ship guns and six area suppression batteries |
+| Suzerain | 3 | Artificer III; Exarch Engineering Suite III | Monitor with two anti-ship guns and six area suppression batteries |
 | Scourge | 4 | Artificer III; Exarch Engineering Suite III | Capital destroyer, the Dominion's peer: a Heavy Pinch-fusion Lance from the energy core through its middle, six Pinch-plasma Batteries, sixteen hatched seeker cells |
 
 All five are site-built aircraft tagged Space (the Scourge also Experimental). Select an appropriate engineer,
