@@ -508,8 +508,8 @@ impl World {
         self.state.players[a as usize].team != self.state.players[b as usize].team
     }
 
-    /// Spawns a unit on the ground at `pos`. Structures also flatten the
-    /// terrain under them and block their footprint for pathing.
+    /// Spawns a unit on the ground at `pos`. Structures also block their footprint for
+    /// pathing, and those on land flatten the terrain under them.
     pub fn spawn_unit(
         &mut self,
         blueprint: BlueprintId,
@@ -521,19 +521,26 @@ impl World {
         let bp = self.blueprints.unit(blueprint).clone();
         // An experimental's site takes its lot like a structure until it is finished.
         if bp.is_structure() || (bp.is_site_built_unit() && !complete) {
-            let lot = path_cells_of(bp.footprint, pos);
-            let record = self.terrain.flatten_rect(lot.0, lot.1, None);
-            if self.state.terrain_edits.len() >= MAX_FLATTENS {
-                return Err(SimError::TableFull(Table::Flattens));
+            // A structure in the water (a naval yard, a seabed installation, a defence
+            // built afloat) stands on its floats and legs, not on a levelled lot: the
+            // seabed and the shore under it stay as they were.
+            let afloat = (bp.water_build || bp.seabed)
+                && self.terrain.height_at(pos) < self.terrain.water_level();
+            if !afloat {
+                let lot = path_cells_of(bp.footprint, pos);
+                let record = self.terrain.flatten_rect(lot.0, lot.1, None);
+                if self.state.terrain_edits.len() >= MAX_FLATTENS {
+                    return Err(SimError::TableFull(Table::Flattens));
+                }
+                self.state.terrain_edits.push(TerrainEdit {
+                    min: (record.min_x, record.min_y),
+                    max: (record.max_x, record.max_y),
+                    sample: record.sample,
+                    faction: bp.faction.0,
+                });
+                self.events.push(SimEvent::TerrainEdited);
             }
-            self.state.terrain_edits.push(TerrainEdit {
-                min: (record.min_x, record.min_y),
-                max: (record.max_x, record.max_y),
-                sample: record.sample,
-                faction: bp.faction.0,
-            });
             self.occupy_lot(&bp, pos, heading);
-            self.events.push(SimEvent::TerrainEdited);
         }
         let ground = self.terrain.height_at(pos);
         let surface = match bp.motion.map(|m| m.layer) {

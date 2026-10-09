@@ -899,3 +899,25 @@ fn a_destroyer_lobs_its_bolt_rifle_over_an_island() {
         "the lobbed gun needs no line of sight"
     );
 }
+
+#[test]
+fn a_structure_in_the_water_leaves_the_seabed_as_it_was() {
+    // A seabed of ridges a few metres high, all under the water.
+    let mut w = sea_with(false, |x| (x % 5) as u16);
+    let before: Vec<u16> = (100..140)
+        .flat_map(|y| (130..170).map(move |x| (x, y)))
+        .map(|(x, y)| w.terrain.sample(x, y))
+        .collect();
+    spawn(&mut w, "aster_t1_naval_factory", 0, 1200, 960, 0);
+    spawn(&mut w, "regency_t1_naval_factory", 0, 1200, 1100, 0);
+    let after: Vec<u16> = (100..140)
+        .flat_map(|y| (130..170).map(move |x| (x, y)))
+        .map(|(x, y)| w.terrain.sample(x, y))
+        .collect();
+    assert_eq!(before, after, "a naval yard levelled the seabed under it");
+    assert!(w.state.terrain_edits.is_empty());
+
+    // On land a structure still levels its lot.
+    spawn(&mut w, "aster_t1_land_factory", 0, 150, 1000, 0);
+    assert_eq!(w.state.terrain_edits.len(), 1);
+}
