@@ -40,6 +40,12 @@ under the player's control; and the commander's death a nuke too.
   9 km 46 s (4.3 km), 20 km 76 s. It is walked by
   distance over 96 samples in wide fixed point; the time left shown is exact
   (`WarheadPath::ticks_left`).
+- **A launcher on a hull** (the Megalodon) lists its tubes' mouths (`strategic.tubes`, x
+  forward, y left, z up, metres): each warhead starts its path with its nose just under the
+  next tube's lid, as the hull lies at the moment it goes, not at the bottom of a silo's
+  tube. Its hatches open on the doors' timing (`deploy`, 4 s), lids swinging up on their
+  outboard hinges (`MeshBuilder::cell_block` hatches). A warhead out of a dived hull paints the boat
+  for 8 s, as a missile's boil does.
 - **An array fires by itself** at an enemy warhead bound for somewhere within its coverage
   (2.4 km), once that warhead is coming down and an interceptor fired now would meet it
   inside the coverage, or it is inside already (never at one still climbing, or still
@@ -91,6 +97,13 @@ under the player's control; and the commander's death a nuke too.
   ground. The stem goes first, the cap thins away within about a minute and a quarter. The
   clouds are thrown back once by the shock and once where the cap climbs through them.
   Shapes over time are mirrored between nuke.wgsl and `nuke_fx::Blast`.
+- **A launch at sea** (`renderer/sea_launch.rs`) is a cold launch: gas throws the missile
+  out of the tube with no fire, boiling the sea over a dived boat (or bursting white out of
+  the mouth of a surfaced one); it breaks the surface in a dome of white water and torn
+  sheets and hangs on the spray; its motor lights only once the nozzle is 16 m clear of the
+  sea (at the boat's missile size), with a flash, fire hammered down onto the water and a
+  ring of steam rolling out over the waves round a column of it. Until then it lays no
+  trail and draws no plume.
 - **The crater** (`renderer/craters.rs`, `terrain.wgsl craters_at`): a glassed pool that
   cools from white-yellow through orange plates and glowing cracks to black-green glass over
   about six minutes (a commander's over about four), a bowl and lip in the shading, and

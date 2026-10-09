@@ -96,6 +96,7 @@ mod reactor_blast;
 mod reactor_fx;
 mod regency_guns_fx;
 mod regency_mine_fx;
+mod sea_launch;
 mod shafts;
 mod shield_upload;
 pub(crate) mod skins;

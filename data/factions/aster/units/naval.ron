@@ -672,6 +672,9 @@
             missile: (mass: 6000, energy: 120000, time: 18000),
             // Drawn as a boat's missile, smaller than the silo's round.
             missile_scale: 0.35,
+            // The twin round silos aft (models/aster/naval/submarine_titan.rs `SILO_*`),
+            // each warhead leaving the next in turn, its nose just under the lid.
+            tubes: [(-51.3, -4.05, 4.8), (-51.3, 4.05, 4.8)],
             power: 60,
             stock: 4,
             speed: 320,

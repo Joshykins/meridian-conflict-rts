@@ -5,8 +5,8 @@
 //! A silo launches only when ordered, at a point anywhere on the map; an array fires by
 //! itself at an enemy warhead coming down within `coverage` of it.
 
-use mc_core::Fx;
 use mc_core::StateHasher;
+use mc_core::{Fx, FxVec3};
 use serde::Deserialize;
 
 use crate::DataError;
@@ -73,6 +73,11 @@ pub struct RawStrategic {
     /// warhead is a smaller missile than a silo's.
     #[serde(default = "one")]
     pub missile_scale: f64,
+    /// A launcher on a hull: its tubes' mouths (x forward, y left, z up from its origin,
+    /// metres), each warhead leaving the next in turn with its nose just under the lid.
+    /// None: the silo's one deep tube under the ground (`nukes::warhead_start`).
+    #[serde(default)]
+    pub tubes: Vec<(f64, f64, f64)>,
 }
 
 fn one() -> f64 {
@@ -137,6 +142,8 @@ pub struct Strategic {
     /// Presentation only, and not hashed: the missile body, its plume and its trail are
     /// drawn this size against the Sunfall's (nuke_fx.rs, nuke.wgsl).
     pub missile_scale: Fx,
+    /// A hull's tube mouths in its own frame (`RawStrategic::tubes`); empty for a silo.
+    pub tubes: Vec<FxVec3>,
 }
 
 impl RawStrategic {
@@ -178,6 +185,9 @@ impl RawStrategic {
         if self.kind == StrategicKind::Interceptor && self.coverage <= 0.0 {
             return bad("an interceptor needs a coverage");
         }
+        if self.kind == StrategicKind::Interceptor && !self.tubes.is_empty() {
+            return bad("an interceptor array fires from its cells, not tubes");
+        }
         Ok(Strategic {
             kind: self.kind,
             round_mass: fx(self.missile.mass),
@@ -190,6 +200,11 @@ impl RawStrategic {
             blast,
             coverage: fx(self.coverage.max(0.0)),
             missile_scale: fx(self.missile_scale),
+            tubes: self
+                .tubes
+                .iter()
+                .map(|t| FxVec3::new(fx(t.0), fx(t.1), fx(t.2)))
+                .collect(),
         })
     }
 }
@@ -216,6 +231,12 @@ impl Strategic {
                 h.write_u64(b.front_ticks as u64);
             }
             None => h.write_u64(u64::MAX),
+        }
+        h.write_u64(self.tubes.len() as u64);
+        for t in &self.tubes {
+            for v in [t.x, t.y, t.z] {
+                h.write_i64(v.0);
+            }
         }
     }
 

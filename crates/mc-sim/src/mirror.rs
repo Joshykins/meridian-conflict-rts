@@ -400,7 +400,8 @@ pub enum SimEvent {
         pos: FxVec3,
         owner: u8,
     },
-    /// A nuclear warhead lit in its silo, bound for `to` (its burst point). Everyone is told.
+    /// A nuclear warhead lit in its silo or a hull's tube at `from` (where its path starts),
+    /// bound for `to` (its burst point). Everyone is told.
     NuclearLaunch {
         from: FxVec3,
         to: FxVec3,

@@ -506,6 +506,21 @@ impl World {
         self.bp(row).strategic.as_ref()
     }
 
+    /// Where the warhead the launcher in `row` sends with `left` rounds still aboard after
+    /// it starts its path: the bottom of a silo's tube, or the mouth of one of a hull's
+    /// tubes (`Strategic::tubes`), the next in turn, as the hull lies now.
+    fn tube_start(&self, row: usize, left: u8) -> FxVec3 {
+        let units = &self.state.units;
+        let base = units.pos[row];
+        match self.launcher_spec(row).map(|s| s.tubes.as_slice()) {
+            Some(tubes) if !tubes.is_empty() => {
+                let t = tubes[left as usize % tubes.len()];
+                (base + t.xy().rotate(units.heading[row])).extend(units.z[row] + t.z)
+            }
+            _ => warhead_start(base.extend(self.terrain.height_at(base))),
+        }
+    }
+
     /// `Command::SetAutoBuild`: `ids`' own launchers build rounds by themselves (`on`), or
     /// only those queued by hand. Turning it off keeps the round in hand as one queued.
     pub(crate) fn set_auto_build(&mut self, player: u8, ids: &[UnitId], on: bool) {
@@ -666,9 +681,14 @@ impl World {
             }
             l.stock -= 1;
             l.idle = 0;
+            let left = l.stock;
             self.state.strategic.serial += 1;
             let serial = self.state.strategic.serial;
-            let start = warhead_start(base.extend(ground));
+            let start = self.tube_start(row, left);
+            // Out of a dived hull, the boil paints the boat, as a missile's does.
+            if start.z < self.terrain.water_level() {
+                self.state.units.revealed[row] = crate::naval_arms::LAUNCH_REVEAL;
+            }
             let to = target(mark);
             self.state.strategic.missiles.push(StrategicMissile {
                 serial,
@@ -686,7 +706,7 @@ impl World {
                 quarry: 0,
             });
             self.events.push(SimEvent::NuclearLaunch {
-                from: base.extend(ground),
+                from: start,
                 to,
                 owner,
                 serial,
@@ -1370,8 +1390,6 @@ impl World {
             let Some(spec) = self.launcher_spec(row) else {
                 continue;
             };
-            let base = self.state.units.pos[row];
-            let start = warhead_start(base.extend(self.terrain.height_at(base)));
             // Ticks until each goes: the doors, or the gap behind the one before.
             let mut wait = match l.launch {
                 Some(_) => {
@@ -1383,6 +1401,7 @@ impl World {
                 None => SILO_DOOR_TICKS as u32,
             };
             for (i, &(at, order)) in l.targets.iter().enumerate() {
+                let start = self.tube_start(row, l.stock.saturating_sub(i as u8 + 1));
                 let ground = self.terrain.height_at(at).max(self.terrain.water_level());
                 let path = WarheadPath::new(start, burst_point(at.extend(ground)), spec.apogee);
                 let flight = path.ticks_left(spec.speed, 0, Fx::ZERO);

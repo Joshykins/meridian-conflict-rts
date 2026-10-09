@@ -203,3 +203,59 @@ fn it_holds_four_warheads_and_launches_one_from_under_the_water() {
     }
     panic!("no warhead left the boat");
 }
+
+/// Each warhead comes up out of one of the two silo hatches aft, as the hull lies, the
+/// next out of the other: not out of the seabed under the boat's middle.
+#[test]
+fn its_warheads_leave_by_the_silo_hatches_in_turn() {
+    let mut w = sea();
+    let boat = spawn(&mut w, MEGALODON, 0, 1500, 1000, 0);
+    for _ in 0..80 {
+        w.tick(&[]).unwrap();
+    }
+    w.state.strategic.launchers.entry(boat).or_default().stock = 4;
+    let row = w.state.units.row(boat).unwrap();
+    let (at, z) = (w.state.units.pos[row], w.state.units.z[row]);
+    let aft = FxVec2::new(Fx::ONE, Fx::ZERO).rotate(w.state.units.heading[row]) * Fx::from_int(-1);
+    for k in 0..2 {
+        order(
+            &mut w,
+            Command::LaunchNuke {
+                units: vec![boat],
+                pos: FxVec2::from_ints(300, 1500 + 100 * k),
+            },
+        );
+    }
+    let mut from = Vec::new();
+    for _ in 0..300 {
+        w.tick(&[]).unwrap();
+        for e in &w.events {
+            if let SimEvent::NuclearLaunch { from: f, .. } = e {
+                from.push(*f);
+            }
+        }
+        if from.len() == 2 {
+            break;
+        }
+    }
+    assert_eq!(from.len(), 2, "two warheads go");
+    for f in &from {
+        let off = f.xy() - at;
+        let back = off.dot(aft);
+        assert!(
+            (Fx::from_int(45)..Fx::from_int(58)).contains(&back),
+            "{back} m aft of the boat's middle"
+        );
+        assert!(
+            (f.z - z).abs() < Fx::from_int(8),
+            "at {} by a hull at {}",
+            f.z,
+            z
+        );
+    }
+    let apart = from[0].xy().distance(from[1].xy());
+    assert!(
+        (Fx::from_int(7)..Fx::from_int(10)).contains(&apart),
+        "the two hatches stand {apart} m apart"
+    );
+}

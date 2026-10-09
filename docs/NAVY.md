@@ -122,7 +122,7 @@ sea after a battle pays for the battle.
 | Kraken | 3 | Strategic submarine | Eight tubes; four sea-skimming cruise missiles per salvo, launched dived. |
 | Breakwater | 1 | Torpedo launcher | A moored float firing attack torpedoes at hulls within 600 m (past a Barracuda); refitted to tier 2 (two launchers, 800 m). |
 | Fathom | 3 | Seabed torpedo launcher | Built on the seabed in deep water; heavy torpedoes at hulls and interceptors at torpedoes from four batteries (1,000 m); only sonar finds it, only torpedoes reach it. |
-| Megalodon | 4 | Experimental submarine | Built by engineers on the water. AEB strike missiles to 6 km (volleys of four over four marks), its own nuclear warheads (assembled aboard, four at most, launched dived), long-range torpedoes, interceptors, two deck rail turrets that work only surfaced, a hull shield that holds dived too. |
+| Megalodon | 4 | Experimental submarine | Built by engineers on the water. AEB strike missiles to 6 km (volleys of four over four marks), its own nuclear warheads (assembled aboard, four at most, cold-launched dived out of the twin silo hatches aft, lit clear of the sea), long-range torpedoes, interceptors, two deck rail turrets that work only surfaced, a hull shield that holds dived too. |
 | Narwhal | 3 | Anti-ship trimaran | A Zenith rail down the keel: the hull turns to aim, the barrel elevates. Shoots only spaceships; nothing else aboard. |
 
 ## The Regency's navy

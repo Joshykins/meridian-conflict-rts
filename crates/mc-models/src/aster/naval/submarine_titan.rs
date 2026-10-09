@@ -6,8 +6,9 @@
 //! of it down the middle ([`build`]). What the unit file places, it places (here in model
 //! space; the file's numbers are these x1.35): six heavy torpedo doors in a raked bow plane
 //! at x = 52 ([`TUBES`]), four big square AEB strike hatches on the hump aft of the sail
-//! with their door tops at the muzzles ([`AEB`]), the nuclear silos' round lids (the boat's
-//! own warheads) that read apart from them, two rail turrets on houses of their own on the
+//! with their door tops at the muzzles ([`AEB`]), the nuclear silos' round hinged lids
+//! that read apart from them, opening for the boat's own warheads ([`silos`], the unit
+//! file's `strategic.tubes`), two rail turrets on houses of their own on the
 //! hump (weapons 3 and 4, [`RAILS`]; the aft one `rear`, authored facing forward), the
 //! interceptor tube doors in the transom ([`INTERCEPTORS`]) and the hull shield's projector
 //! (`set_shield_emitter`). Kraken lineage: black anechoic tiles, a white sail, dark doors.
@@ -18,6 +19,7 @@
 use std::f32::consts::{FRAC_PI_2, TAU};
 
 use super::*;
+use crate::builder::CellGrid;
 
 /// The bow is one raked plane through the tube row: x = BOW_X + BOW_RAKE * (z - TUBE_Z).
 const BOW_X: f32 = 52.0;
@@ -275,34 +277,80 @@ fn aeb_hatches(b: &mut MeshBuilder, deck: f32) {
     }
 }
 
-/// A nuclear silo lid centred on (x, y) with its top at `top`: a raised collar with a
-/// hazard-striped coaming, a dark round lid split across in two leaves with a hinge boss
-/// either side. It reads apart from the square AEB doors at every zoom.
-fn silo_lid(b: &mut MeshBuilder, x: f32, y: f32, base: f32, top: f32, r: f32) {
+/// The twin nuclear silos at (`SILO_X`, ±`SILO_Y`), their collars on the hump from `base`
+/// and their lids' tops at `top`: each a raised collar with a hazard-striped coaming round
+/// a dark tube mouth, shut by a round lid hinged on its outboard edge. The lids are a
+/// block of hatches (`MeshBuilder::cell_block`): they swing up and out as the boat opens
+/// its tubes for a launch (the strategic doors' `deploy`) and the warhead comes up out of
+/// the mouth (`strategic.tubes` in the unit file). They read apart from the square AEB
+/// doors at every zoom.
+fn silos(b: &mut MeshBuilder, base: f32, top: f32) {
+    let r = SILO_R;
     let sides = b.sides(16);
-    b.paint(PLATING).pattern(pattern::PLAIN);
-    b.prism(v3(x, y, base), sides, r * 1.34, r * 1.2, top - 0.22 - base);
-    b.paint(ACCENT).pattern(pattern::HAZARD);
-    b.prism(v3(x, y, top - 0.22), sides, r * 1.16, r * 1.08, 0.08);
-    b.paint(PLATING_DARK).pattern(pattern::PLAIN);
-    b.prism(v3(x, y, top - 0.22), sides, r, r * 0.94, 0.22);
-    if b.fine() {
-        b.paint(ACCENT).pattern(pattern::PLAIN);
-        b.block(
-            v3(x - 0.06, y - r * 0.92, top - 0.01),
-            v3(x + 0.06, y + r * 0.92, top + 0.03),
-        );
-        for s in [-1.0, 1.0] {
-            b.cylinder_between(
-                v3(x - 0.9, y + s * r * 1.12, top - 0.08),
-                v3(x + 0.9, y + s * r * 1.12, top - 0.08),
-                0.22,
-                0.22,
-                6,
-            );
-        }
+    let seat = top - 0.22;
+    let rim = seat + 0.08;
+    let floor = base + 0.15;
+    for s in [-1.0, 1.0] {
+        let (x, y) = (SILO_X, s * SILO_Y);
+        let at = |k: usize, radius: f32, z: f32| {
+            let a = (k as f32 + 0.5) / sides as f32 * TAU;
+            v3(x + radius * a.cos(), y + radius * a.sin(), z)
+        };
+        // A band of the collar between two rings (radius, z), facing out and up; inner
+        // first and below for the mouth's walls, which face in.
+        let band = |b: &mut MeshBuilder, lo: (f32, f32), hi: (f32, f32)| {
+            for k in 0..sides {
+                b.face(&[
+                    at(k, lo.0, lo.1),
+                    at(k + 1, lo.0, lo.1),
+                    at(k + 1, hi.0, hi.1),
+                    at(k, hi.0, hi.1),
+                ]);
+            }
+        };
+        // The collar: a ring round the mouth, its flank, then the hazard-striped coaming.
         b.paint(PLATING).pattern(pattern::PLAIN);
-        b.prism(v3(x, y, top), 8, 0.5, 0.42, 0.06);
+        band(b, (r * 1.34, base), (r * 1.2, seat));
+        band(b, (r * 1.2, seat), (r * 1.16, seat));
+        b.paint(ACCENT).pattern(pattern::HAZARD);
+        band(b, (r * 1.16, seat), (r * 1.08, rim));
+        band(b, (r * 1.08, rim), (r * 0.96, rim));
+        // The mouth: dark walls down to the tube's dark floor.
+        b.paint(PLATING_DARK).pattern(pattern::PLAIN);
+        band(b, (r * 0.96, rim), (r * 0.96, floor));
+        let disc: Vec<Vec3> = (0..sides).map(|k| at(k, r * 0.96, floor)).collect();
+        b.face(&disc);
+    }
+    let grid = CellGrid {
+        centre: v2(SILO_X, 0.0),
+        deck: seat,
+        pitch: SILO_Y * 2.0,
+        half: r,
+        nx: 1,
+        ny: 2,
+        hinge_y: true,
+    };
+    for m in b.cell_block(grid, &[(0, 0), (0, 1)]) {
+        let hinge = m.y + m.y.signum() * r;
+        b.with_part(part::CELL_HATCH, |b| {
+            b.paint(PLATING_DARK).pattern(pattern::PLAIN);
+            b.prism(v3(m.x, m.y, seat), sides, r, r * 0.94, top - seat);
+            if b.fine() {
+                // A boss on the lid, and the knuckles it swings on, outboard.
+                b.paint(PLATING).pattern(pattern::PLAIN);
+                b.prism(v3(m.x, m.y, top), 8, 0.5, 0.42, 0.06);
+                b.paint(ACCENT).pattern(pattern::PLAIN);
+                for dx in [-0.9, 0.9] {
+                    b.cylinder_between(
+                        v3(m.x + dx - 0.35, hinge, seat + 0.1),
+                        v3(m.x + dx + 0.35, hinge, seat + 0.1),
+                        0.2,
+                        0.2,
+                        6,
+                    );
+                }
+            }
+        });
     }
 }
 
@@ -587,6 +635,8 @@ const HUMP_SECTIONS: [(f32, f32); 3] = [(0.4, 1.45), (2.2, 1.12), (DECK, 1.0)];
 /// The nuclear silos at the hump's after end, behind the aft turret, side by side.
 const SILO_X: f32 = -38.0;
 const SILO_Y: f32 = 3.0;
+/// A silo lid's radius, and its tube mouth's.
+const SILO_R: f32 = 2.1;
 /// The sail: a long white knife raked back, grown out of the hump.
 const SAIL_PLAN: [[f32; 2]; 7] = [
     [7.4, 0.0],
@@ -653,9 +703,7 @@ pub(in crate::aster) fn build(b: &mut MeshBuilder, _tech: u8) {
     });
 
     aeb_hatches(b, DECK - 0.02);
-    for s in [-1.0, 1.0] {
-        silo_lid(b, SILO_X, s * SILO_Y, DECK - 0.1, DECK + 0.9, 2.1);
-    }
+    silos(b, DECK - 0.1, DECK + 0.9);
     shield_projector(b, v3(-2.4, 0.0, DECK + 1.2), DECK);
 
     // The hump's flanks: a white strake along each shoulder, and a dark vent bank

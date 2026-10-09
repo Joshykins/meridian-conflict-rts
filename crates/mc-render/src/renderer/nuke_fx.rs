@@ -308,6 +308,8 @@ pub(super) struct NukeFx {
     laid: Vec<(u32, Vec3)>,
     /// Missiles as the last tick showed them.
     missiles: Vec<StrategicInstance>,
+    /// Warheads out of a boat's tubes, not lit until clear of the sea (`sea_launch.rs`).
+    pub(super) sea: super::sea_launch::SeaLaunches,
 }
 
 impl NukeFx {
@@ -369,9 +371,13 @@ impl Renderer {
                 *look as u32,
                 time,
             ),
-            SimEvent::NuclearLaunch { from, look, .. } => {
+            SimEvent::NuclearLaunch {
+                from, look, serial, ..
+            } => {
                 let at = Vec3::from(from.to_f32());
-                if *look as u32 == nuke_look::PLASMA {
+                if self.at_sea(at, 40.0).is_some() {
+                    self.sea_launch(at, *serial, time)
+                } else if *look as u32 == nuke_look::PLASMA {
                     self.nova_launch(at, time)
                 } else {
                     self.silo_launch(at, time)
@@ -636,6 +642,7 @@ impl Renderer {
     pub(super) fn nuke_tick(&mut self, frame: &RenderFrame, time: f32, camera: &Camera) {
         self.settle_blasts(time);
         self.nuke_fx.missiles.clone_from(&frame.strategic);
+        self.sea_launch_tick(&frame.strategic, time);
         // Trails: a ribbon puff every stretch of the path since the last one, all alike
         // from the silo to the end, so the trail reads as one line.
         let missiles = frame.strategic.clone();
@@ -670,7 +677,12 @@ impl Renderer {
             };
             let span = now - last;
             let len = span.length();
-            let count = (len / step).floor() as usize;
+            // Out of a boat's tube, none until the motor lights clear of the sea.
+            let count = if self.nuke_fx.sea.unlit(m.serial) {
+                0
+            } else {
+                (len / step).floor() as usize
+            };
             let dir = span / len.max(0.001);
             let tick = self.tick_seconds.max(0.02);
             // The path is the nose's; the smoke hangs a step behind the nozzle, so the
@@ -713,7 +725,11 @@ impl Renderer {
             // Remembered from the first tick seen, even before a puff is laid: in the slow
             // first seconds of the boost a tick covers less than a step, and forgetting the
             // start each tick left the climb bare until it was fast, at the pitch-over.
-            let laid = last + dir * step * count as f32;
+            let laid = if self.nuke_fx.sea.unlit(m.serial) {
+                now
+            } else {
+                last + dir * step * count as f32
+            };
             match self.nuke_fx.laid.iter_mut().find(|(s, _)| *s == m.serial) {
                 Some(l) => l.1 = laid,
                 None => self.nuke_fx.laid.push((m.serial, laid)),
@@ -957,8 +973,11 @@ impl Renderer {
             let axis = (b - a).normalize_or(Vec3::Z);
             let warhead = m.kind == STRATEGIC_WARHEAD;
             let climbing = axis.z > -0.05;
-            // The motor burns out at the top of a warhead's arc; an interceptor's burns all the way.
-            let plume = if warhead {
+            // The motor burns out at the top of a warhead's arc; an interceptor's burns all the
+            // way. One thrown out of a boat's tube lights only clear of the sea.
+            let plume = if self.nuke_fx.sea.unlit(m.serial) {
+                0.0
+            } else if warhead {
                 if m.boost > 0.5 {
                     105.0
                 } else if climbing {
