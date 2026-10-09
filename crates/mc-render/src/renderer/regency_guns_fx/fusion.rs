@@ -84,7 +84,7 @@ impl Renderer {
         self.fusion_spray(at, centre, face, reach, k, start);
         if ground {
             self.ground_melt
-                .melt(at.truncate(), pool * 0.65, start, 18.0);
+                .melt(at.truncate(), pool * 0.65, 0.7, start, 18.0);
         }
         // Its light on everything round: white, then lavender as the shell spreads.
         self.plasma_fx.guns.light(Glow {

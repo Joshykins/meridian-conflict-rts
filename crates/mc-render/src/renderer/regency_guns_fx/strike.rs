@@ -5,7 +5,7 @@
 use super::{
     ball, grade, Glow, Grade, ARC, BURST, GLOB, GLOW, HOT, MOTE, RED, STREAK, WAKE, WHITE,
 };
-use crate::renderer::{Renderer, PUFF_TREE_SMOKE};
+use crate::renderer::{Renderer, PUFF_CLOD, PUFF_DUST, PUFF_TREE_SMOKE};
 use glam::Vec3;
 use mc_data::BlueprintId;
 
@@ -30,7 +30,7 @@ impl Renderer {
         let ground = height < 1.5 && !on_unit;
         let under = height < 4.0;
         match grade {
-            Grade::Bolt => self.bolt_splash(at, impact, ground, start),
+            Grade::Bolt => self.bolt_splash(at, impact, ground, under && !ground, start),
             Grade::Mortar => self.mortar_burst(at, impact, splash, ground, start),
             Grade::Flak => self.plasma_flak_burst(at, impact, splash, ground, start),
             Grade::Pinched => self.pinched_burst(at, impact, size, under, start),
@@ -39,12 +39,50 @@ impl Renderer {
         true
     }
 
+    /// The dirt a plasma strike on open ground blows out: `n` clods thrown up and out, and
+    /// a short spurt of dust off the seared spot that falls back, brown, not plasma. `s`
+    /// is the strike's size, metres. None off the water.
+    pub(super) fn plasma_dirt(&mut self, at: Vec3, s: f32, n: usize, start: f32) {
+        if self.ground_height(at.truncate()) < self.map_info.water_level.to_f32() {
+            return;
+        }
+        let reach = 0.6 + s * 0.12;
+        for _ in 0..n {
+            let vel = self.scatter.upward(0.4) * (7.0 + self.scatter.unit() * 10.0) * reach;
+            let life = 0.8 + self.scatter.unit() * 0.7;
+            let size = (0.1 + s * 0.02) * (0.6 + 0.8 * self.scatter.unit());
+            self.push_puff(
+                PUFF_CLOD,
+                at + Vec3::Z * 0.2,
+                vel,
+                start,
+                life,
+                (size, 0.08),
+            );
+        }
+        for _ in 0..(1 + n / 4).min(5) {
+            let vel = (self.scatter.upward(0.7) + Vec3::Z * 0.6)
+                * (3.0 + self.scatter.unit() * 4.0)
+                * reach.sqrt();
+            let life = 0.8 + self.scatter.unit() * 0.5;
+            self.push_puff(
+                PUFF_DUST,
+                at + Vec3::Z * 0.3,
+                vel,
+                start + 0.02,
+                life,
+                (0.3 + s * 0.06, 0.9 + s * 0.16),
+            );
+        }
+    }
+
     /// A Plasmeric bolt splashing: it dumps its heat in one go. A white-hot flash, a
     /// ragged red bloom over it, a knot of plasma left clinging and frying where it hit,
     /// droplets of it spattered out (up off the ground, every way off a hull) and sparks
-    /// thrown, the ground seared to a glowing spot. Hard-edged and short, no mist: a stream
+    /// thrown, the ground seared to a glowing spot and dirt blown out of it. A hit `low`
+    /// on a hull standing on the ground kicks a little dirt up round its feet. Hard-edged and short, no mist: a stream
     /// of them lands.
-    fn bolt_splash(&mut self, at: Vec3, impact: f32, ground: bool, start: f32) {
+    fn bolt_splash(&mut self, at: Vec3, impact: f32, ground: bool, low: bool, start: f32) {
         let s = 3.6 * impact;
         self.push_lit(
             GLOW,
@@ -143,8 +181,13 @@ impl Renderer {
             );
         }
         if ground {
+            // A dull red sear: it takes a stream of bolts on one spot to melt it.
             self.ground_melt
-                .melt(at.truncate(), 1.25 * impact, start, 3.0);
+                .melt(at.truncate(), 1.25 * impact, 0.22, start, 3.0);
+            self.plasma_dirt(at, s, 7, start);
+        } else if low {
+            let foot = at.truncate().extend(self.ground_height(at.truncate()));
+            self.plasma_dirt(foot, s * 0.6, 3, start);
         }
         self.plasma_fx.guns.light(Glow {
             pos: at + Vec3::Z,
@@ -220,7 +263,9 @@ impl Renderer {
             );
         }
         if ground {
-            self.ground_melt.melt(at.truncate(), 0.25 * s, start, 2.5);
+            self.ground_melt
+                .melt(at.truncate(), 0.25 * s, 0.2, start, 2.5);
+            self.plasma_dirt(at, s * 0.5, 6, start);
         }
         self.plasma_fx.guns.light(Glow {
             pos: at,
@@ -429,9 +474,10 @@ impl Renderer {
             );
         }
         if ground {
-            // The ground seared: a glassed scorch that glows red and crusts over, embers
-            // rising off it a while.
-            self.ground_melt.melt(at.truncate(), s * 0.5, start, 12.0);
+            // The ground seared: a scorch that glows red, at the melt in its heart, and
+            // crusts over, embers rising off it a while.
+            self.ground_melt
+                .melt(at.truncate(), s * 0.5, 0.6, start, 12.0);
             for _ in 0..20 {
                 let a = self.scatter.unit() * std::f32::consts::TAU;
                 let r = s * 0.45 * self.scatter.unit().sqrt();

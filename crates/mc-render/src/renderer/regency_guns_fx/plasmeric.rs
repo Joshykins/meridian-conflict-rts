@@ -175,7 +175,7 @@ impl Renderer {
 
     /// A Plasmeric Mortar shot coming down at `at`, `splash` metres its blast: a hard red
     /// heart over a white one, a short spout of plasma, globs and spatter thrown out low in
-    /// place of a shock ring, and on the ground a seared pool.
+    /// place of a shock ring, and on the ground a seared pool, clods and dust blown out.
     pub(super) fn mortar_burst(
         &mut self,
         at: Vec3,
@@ -264,7 +264,9 @@ impl Renderer {
             );
         }
         if ground {
-            self.ground_melt.melt(at.truncate(), 0.45 * s, start, 4.0);
+            self.ground_melt
+                .melt(at.truncate(), 0.45 * s, 0.4, start, 4.0);
+            self.plasma_dirt(at, s, 14, start);
         }
         self.plasma_fx.guns.light(Glow {
             pos: at + Vec3::Z,

@@ -249,8 +249,15 @@ impl Renderer {
             h.glassed = Some(at.truncate());
         }
         if glass {
+            // A star's beam runs the ground white-hot; any other glows it red at first,
+            // and melts it as it drags on over ground it has already heated.
+            let peak = if star {
+                1.0
+            } else {
+                (0.25 + 0.12 * width).min(0.9)
+            };
             self.ground_melt
-                .melt(at.truncate(), width * 2.8, time, GLASS_COOL);
+                .melt(at.truncate(), width * 2.8, peak, time, GLASS_COOL);
             // The excavation lance digs as it glasses; the star only melts.
             if fusion && !star {
                 self.impact_craters.dig(at.truncate(), width * 2.2, time);
@@ -465,7 +472,7 @@ impl Renderer {
         }
         if !on_unit {
             self.ground_melt
-                .melt(at.truncate(), splash * 0.55, start, GLASS_COOL);
+                .melt(at.truncate(), splash * 0.55, 0.6, start, GLASS_COOL);
         }
     }
 

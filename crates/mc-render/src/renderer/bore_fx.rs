@@ -287,7 +287,7 @@ impl Renderer {
             self.ground_melt.burn(Burn {
                 pos: to.truncate(),
                 radius: pool,
-                peak: 1.0,
+                peak: 0.85,
                 start,
                 rise: heat_up(drop, 0.0),
                 cool,
@@ -298,7 +298,7 @@ impl Renderer {
         }
         // The channel's molten track over dry ground, and smoke coming off it as it
         // cools. How much it melts goes by how high the channel ran: right over the
-        // ground a wide white-hot gouge that stays molten longest, higher up a narrower
+        // ground a wide gouge, melted yellow-hot, that stays molten longest, higher up a narrower
         // track that starts dull and crusts over sooner, and nothing past `reach`. The
         // reach clears the muzzle, so the ground melts from right in front of the gun.
         // It melts as soon as the channel strikes where the channel runs low on a shot
@@ -327,7 +327,7 @@ impl Renderer {
             self.ground_melt.burn(Burn {
                 pos: at.truncate(),
                 radius,
-                peak: 0.45 + 0.55 * close,
+                peak: 0.35 + 0.5 * close,
                 start,
                 rise,
                 cool: cool * (0.35 + 0.65 * close),
@@ -624,7 +624,8 @@ impl Renderer {
         }
         let start = time + after * self.tick_seconds;
         let cool = SHELL_MELT_COOL * (radius / 20.0).clamp(0.8, 1.5);
-        self.ground_melt.melt(to.truncate(), radius, start, cool);
+        self.ground_melt
+            .melt(to.truncate(), radius, 0.75, start, cool);
     }
 
     /// The charge earthing: forks crawling out over the ground from the hit at `to`,

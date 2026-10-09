@@ -5,6 +5,12 @@
 //! it is glass: the heat drains away over the source's cooling time, the glow dies, and
 //! black glass is left where it ran, scorch round its edge. Glass stays for the match.
 //!
+//! Most hits only sear: one strike glows dull red, below the melt, and it takes a
+//! stream of them, or several guns on one spot, to melt the ground. Stacking slows as
+//! the ground nears white heat (`STACK`), so steady fire from one gun all but never
+//! gets there; only the few sources that burn white-hot by themselves (`Burn::peak` at
+//! 1, a star's beam) do.
+//!
 //! Presentation only. The cells live in 32 m tiles made only where something heated
 //! the ground, found through a hash table; both ride in scene set binding 32 (the
 //! layout is `gpu_consts::melt_field`). terrain.wgsl `melt_shade` draws it as part of
@@ -21,9 +27,11 @@ const TILE: usize = mf::TILE as usize;
 const CELLS: usize = TILE * TILE;
 const TILES: usize = mf::TILES as usize;
 const SLOTS: usize = mf::SLOTS as usize;
-/// Share of the heat already in a cell a new hit adds on top of its own: ground under
-/// steady fire heats up past what one hit gives it.
-const STACK: f32 = 0.2;
+/// Share of the heat already in a cell a new hit adds on top of its own, at cold
+/// ground: ground under steady fire heats up past what one hit gives it. It falls off to
+/// nothing as the cell nears white heat (1), so stacked hits approach it but never reach
+/// it.
+const STACK: f32 = 0.35;
 /// How far past its radius a source reaches, in radii: its heat falls off to nothing
 /// by its radius, its scorch by this (charred near, only seared far out).
 const REACH: f32 = 1.9;
@@ -170,13 +178,13 @@ impl GroundMelt {
         self.burns.push((burn, self.seed >> 8));
     }
 
-    /// A pool of ground melted white-hot at once: `radius` metres at `pos`, its heat
-    /// draining over `cool` seconds from `start`.
-    pub(super) fn melt(&mut self, pos: Vec2, radius: f32, start: f32, cool: f32) {
+    /// A pool of ground heated at once to `peak` (1 white-hot): `radius` metres at `pos`,
+    /// its heat draining over `cool` seconds from `start`.
+    pub(super) fn melt(&mut self, pos: Vec2, radius: f32, peak: f32, start: f32, cool: f32) {
         self.burn(Burn {
             pos,
             radius,
-            peak: 1.0,
+            peak,
             start,
             rise: 0.0,
             cool,
@@ -234,7 +242,7 @@ impl GroundMelt {
     }
 
     /// Raises the cells under `burn` to `share` of its heat, adding `stack` of the heat a
-    /// cell already had.
+    /// cell already had (less the nearer it is to white heat).
     fn heat(&mut self, burn: &Burn, seed: u32, share: f32, stack: f32, time: f32) {
         let r = burn.radius.max(mf::CELL);
         // The edge wanders by `RAGGED`, so the reach does too.
@@ -268,8 +276,9 @@ impl GroundMelt {
                         let tile = &mut self.tiles[s];
                         let c =
                             &mut tile.cells[(cy - base.1) as usize * TILE + (cx - base.0) as usize];
-                        let heat =
-                            (c.heat.max(target) + stack * c.heat.min(target)).min(mf::HEAT_MAX);
+                        let headroom = (1.0 - c.heat).max(0.0);
+                        let heat = (c.heat.max(target) + stack * c.heat.min(target) * headroom)
+                            .min(mf::HEAT_MAX);
                         if heat > c.heat {
                             c.cool = if c.heat > 0.0 {
                                 c.cool.max(burn.cool)
@@ -394,7 +403,7 @@ mod tests {
     }
 
     /// One hit too weak to melt the ground only scorches it; the same hit again and again
-    /// heats it up until it melts, and it is glass once it has cooled.
+    /// heats it up until it melts, but never white-hot, and it is glass once it has cooled.
     #[test]
     fn heat_stacks_until_the_ground_melts_and_glass_stays() {
         let mut m = GroundMelt::empty();
@@ -406,19 +415,29 @@ mod tests {
         assert_eq!(once.glass, 0.0);
         assert!(once.scorch > 0.3);
         let mut t = 0.0;
-        while cell(&m, at).glass < 1.0 && t < 5.0 {
+        while cell(&m, at).heat < mf::MELT + 0.1 && t < 5.0 {
             t += 0.1;
             hit(&mut m, at, 0.3, t);
             m.step(t);
         }
         assert!(t < 5.0, "steady fire never melted the ground");
+        // However long it goes on, one gun's fire does not run the ground white-hot.
+        while t < 30.0 {
+            t += 0.1;
+            hit(&mut m, at, 0.3, t);
+            m.step(t);
+        }
+        let held = cell(&m, at);
+        assert!(held.heat > 0.6 && held.heat < 0.97, "{}", held.heat);
+        let glass = held.glass;
+        assert!(glass > 0.3, "{glass}");
         while t < 60.0 {
             t += 0.2;
             m.step(t);
         }
         let cold = cell(&m, at);
         assert_eq!(cold.heat, 0.0);
-        assert_eq!(cold.glass, 1.0);
+        assert_eq!(cold.glass, glass);
         assert!(m.tiles.iter().all(|t| !t.hot));
         // Well outside the burn nothing happened.
         assert_eq!(cell(&m, at + Vec2::new(12.0, 0.0)).scorch, 0.0);
