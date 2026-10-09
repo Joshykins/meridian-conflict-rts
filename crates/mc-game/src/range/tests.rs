@@ -36,7 +36,8 @@ fn every_unit_can_be_the_subject() {
             Scenario::Warp,
             Scenario::WarpDampened,
             Scenario::Short,
-            Scenario::Elevator
+            Scenario::Elevator,
+            Scenario::Dash
         ],
         "the default subject supports everything a tank can do"
     );
@@ -53,7 +54,8 @@ fn every_unit_can_be_the_subject() {
             Scenario::Warp,
             Scenario::WarpDampened,
             Scenario::Short,
-            Scenario::Elevator
+            Scenario::Elevator,
+            Scenario::Dash
         ],
         "nothing builds a commander, and it draws no energy; it does everything else"
     );
@@ -187,5 +189,22 @@ fn the_elevator_scenario_queues_a_mixed_batch() {
             batch.iter().any(|&(id, _)| b.unit(id).tech >= 4),
             "a tech-4 machine is in it"
         );
+    }
+}
+
+#[test]
+fn a_dash_pack_stands_where_the_seraph_dashes() {
+    let b = blueprints();
+    let pad = FxVec2::from_ints(2000, 2000);
+    let seraph = b.unit(b.id_of("regency_t5_seraph").unwrap());
+    let dash = seraph.dash.as_ref().unwrap();
+    let (commands, _) = stage(Scenario::Dash, &b, pad, seraph.id).unwrap();
+    assert_eq!(commands.len(), 7);
+    for c in commands {
+        let Command::DebugSpawn { pos, .. } = c else {
+            panic!()
+        };
+        let d = pos.distance(pad);
+        assert!(d > dash.min && d < dash.range, "{d:?}");
     }
 }

@@ -115,6 +115,7 @@ mod wake_fx;
 pub(crate) mod wake_shell;
 mod warp_fx;
 mod water_fx;
+mod wing_fx;
 mod work_beams;
 mod wreck_finish;
 mod wreck_fx;
@@ -446,6 +447,9 @@ pub(crate) struct ModelInfo {
     pub(crate) charge_gear: [f32; 4],
     /// How a walker's hull rides its stride (`Legs::sway`): roll, nod and settle; w 0.
     pub(crate) leg_sway: [f32; 4],
+    /// A winged flier's rig (`models::Flight::gpu`), the hub's w its top speed in metres a
+    /// tick. All zero for any other model.
+    pub(crate) flight: [[f32; 4]; 4],
     /// Its skin (`Blueprints::skins`, renderer/skins.rs): its faction's, for a unit.
     pub(crate) skin: u32,
     /// Its surface marks in scene set 35 (renderer/surface_marks.rs): first | count << 24.
@@ -454,7 +458,7 @@ pub(crate) struct ModelInfo {
     pub(crate) _skin_pad2: u32,
 }
 
-const _: () = assert!(std::mem::size_of::<ModelInfo>() == 1072);
+const _: () = assert!(std::mem::size_of::<ModelInfo>() == 1136);
 
 // A prop's far level is the draw slot after its own levels.
 const _: () = assert!(models::LOD_COUNT as u32 == lod::FAR);
@@ -915,6 +919,8 @@ pub struct Renderer {
     lens_flares: lens_flare::LensFlares,
     /// Red plasma under the bells of craft on gravity lift (renderer/lift_fx.rs).
     lift_fx: lift_fx::LiftFx,
+    /// The light off a winged flier's feathers (renderer/wing_fx.rs).
+    wing_fx: wing_fx::WingFx,
     /// Arcs on running reactors, and reactors going up (renderer/reactor_fx.rs).
     reactor_fx: reactor_fx::ReactorFx,
     /// Capital ships' drives, lift jets and lamps (renderer/capital_fx.rs).
@@ -1386,6 +1392,8 @@ impl Renderer {
         let mut exhaust_models: Vec<Vec<models::Exhaust>> = Vec::new();
         // Each model slot's plasma lift bells (`lift_fx`).
         let mut lift_models: Vec<Vec<models::Lift>> = Vec::new();
+        // Each model slot's flight rig (`wing_fx`).
+        let mut flight_models: Vec<Option<models::Flight>> = Vec::new();
         // Each model slot's held charge (`reactor_fx`).
         let mut discharge_models: Vec<Option<models::Discharge>> = Vec::new();
         // Per blueprint: its ground stakes' scale, if it plants any (`stake_fx`).
@@ -1419,6 +1427,7 @@ impl Renderer {
             model_draws.push([first_slot[at], model.lods.len() as u32]);
             exhaust_models.push(model.exhausts.clone());
             lift_models.push(model.lifts.clone());
+            flight_models.push(model.flight);
             discharge_models.push(model.discharge.clone());
             stake_scales.push(models::stakes::stake_scale(model));
             coil_models.push(model.lods[0].vertices.iter().any(|v| {
@@ -1544,6 +1553,15 @@ impl Renderer {
                     .map_or([0.0; 4], |l| [l.sway[0], l.sway[1], l.sway[2], 0.0]),
                 plan_box,
                 vtol: model.vtol.map_or([[0.0; 4]; 2], |v| v.gpu()),
+                // The rig, and in [0].w the top speed in metres a tick: how far its wings
+                // sweep back and its legs trail goes by the share of it it makes.
+                flight: model.flight.map_or([[0.0; 4]; 4], |f| {
+                    let mut rig = f.gpu();
+                    let top = bps.units.get(infos.len()).and_then(|bp| bp.motion);
+                    rig[0][3] =
+                        top.map_or(6.0, |m| m.speed.to_f32()) / mc_core::TICKS_PER_SECOND as f32;
+                    rig
+                }),
                 cells: models::CellBlock::gpu(&model.cells).0,
                 cell_grid: models::CellBlock::gpu(&model.cells).1,
                 spin: model
@@ -2483,6 +2501,14 @@ impl Renderer {
             heat_haze,
             lens_flares,
             lift_fx: lift_fx::LiftFx::new(lift_models),
+            // With each rig its top speed, as its `ModelInfo` carries it.
+            wing_fx: wing_fx::WingFx::new(
+                flight_models
+                    .into_iter()
+                    .zip(&infos)
+                    .map(|(f, info)| f.map(|f| (f, info.flight[0][3])))
+                    .collect(),
+            ),
             reactor_fx: reactor_fx::ReactorFx::new(discharge_models, plant_vents),
             capital_fx: capital_fx::CapitalFx::default(),
             warp_fx: warp_fx::WarpFx::default(),

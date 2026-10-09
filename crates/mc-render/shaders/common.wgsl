@@ -271,6 +271,10 @@ struct ModelInfo {
     // roll up over the planted leg, y the nose's dip as a foot comes down (radians), z how
     // far the hull settles onto its knees with it (metres); w 0. Zero rides level.
     leg_sway: vec4<f32>,
+    // A winged flier's rig (`models::Flight::gpu`, flight.wgsl): [0] the left wing's hub, w
+    // its top speed in metres a tick; [1] the left hip; [2] the left knee; [3] the right
+    // knee, given on the left. Zero for any other model.
+    flight: array<vec4<f32>, 4>,
     // Its skin: the index into `skins` (bindings.wgsl).
     skin: u32,
     // Its surface marks in `surface_marks` (bindings.wgsl): first | count << 24.

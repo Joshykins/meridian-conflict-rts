@@ -1337,6 +1337,24 @@ shared! {
         /// the knee, carried by the thigh).
         pub const THIGH: u32 = 9;
         pub const SHIN: u32 = 10;
+        /// `VsOut::drive_at.w` on the rig's faces: `drive.y` is then how hard their lit rims
+        /// burn against their rest (flight.wgsl `flight_glow`).
+        pub const DRIVE_TAG: f32 = 5.0;
+        /// The pose's main terms, shared by flight.wgsl and the renderer's wing effects
+        /// (`wing_fx.rs`, which lays light at the feathers' tips where the shader draws
+        /// them). Radians per unit of the drive (speed as a share of the top, a dash's
+        /// windup 0 to 1): how far the wings sweep back, rise and close their fans
+        /// (each feather `FAN_STEP` of the closing per place from the middle), and how far
+        /// the body leans forward.
+        pub const SWEEP_SPEED: f32 = 0.6;
+        pub const SWEEP_CHARGE: f32 = -0.35;
+        pub const LIFT_SPEED: f32 = 0.14;
+        pub const LIFT_CHARGE: f32 = 0.32;
+        pub const CLOSE_SPEED: f32 = 0.55;
+        pub const CLOSE_CHARGE: f32 = -0.35;
+        pub const FAN_STEP: f32 = 0.21;
+        pub const LEAN_SPEED: f32 = 0.16;
+        pub const LEAN_CHARGE: f32 = 0.14;
     }
 
     /// A salvage drone docked on an aircraft (`mc_sim::mirror::UNIT_RIDING`, a test holds

@@ -135,6 +135,8 @@ impl World {
                 .clamp(0.002, 1.0)
         });
         let step = s.units.gait_step[row];
+        // A dashing unit's wings: its windup and landing (`dash_pose`).
+        let dash = bp.dash.as_ref().map(|d| dash_pose(d, &s.units.dash[row]));
         let mut flags = s.units.flags[row];
         // In warp it is out of the world, not in a factory: drawn as it leaves, then only listed.
         if !matches!(shown, warp::Shown::Plain) {
@@ -309,6 +311,8 @@ impl World {
             // A material fabricator: how hard it works this tick, in both (`fabricator_work`).
             deploy: if let Some((_, now)) = elevator {
                 now[2]
+            } else if let Some(dash) = dash {
+                dash[1]
             } else if let Some(work) = self.fabricator_work(row) {
                 work
             } else {
@@ -321,6 +325,8 @@ impl World {
             },
             prev_deploy: if let Some((was, _)) = elevator {
                 was[2]
+            } else if let Some(dash) = dash {
+                dash[0]
             } else if let Some(work) = self.fabricator_work(row) {
                 work
             } else {
@@ -452,4 +458,26 @@ impl World {
 /// zero, not nearly a full turn.
 fn signed_pitch(a: mc_core::Angle) -> f32 {
     mc_core::Angle::ZERO.delta_to(a) as f32 * (std::f32::consts::TAU / 65536.0)
+}
+
+/// Ticks the landing's blow takes to spend itself in the wings and legs (`dash_pose`).
+const LAND_TICKS: u16 = 10;
+
+/// What a dashing unit's wings and legs are doing (`mirror::UnitInstance::deploy`, read by
+/// flight.wgsl), last tick and this: its windup's share, 0 to 1; then from the landing,
+/// -1 at the blow easing back to 0 over `LAND_TICKS`. Zero for a unit that never dashed.
+fn dash_pose(dash: &mc_data::dash::Dash, s: &crate::dash::DashState) -> [f32; 2] {
+    if s.phase == crate::dash::DashPhase::Windup {
+        let w = dash.windup_ticks.max(1) as f32;
+        return [s.ticks.saturating_sub(1) as f32 / w, s.ticks as f32 / w];
+    }
+    // Ticks since it landed: its cooldown started at the landing.
+    let since = dash.cooldown_ticks.saturating_sub(s.cooldown);
+    if s.to == mc_core::FxVec2::ZERO || since > LAND_TICKS {
+        return [0.0; 2];
+    }
+    let blow = |t: u16| -(1.0 - t as f32 / LAND_TICKS as f32).clamp(0.0, 1.0);
+    // The landing tick follows the full windup.
+    let was = if since == 0 { 1.0 } else { blow(since - 1) };
+    [was, blow(since)]
 }

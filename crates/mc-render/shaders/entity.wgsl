@@ -10,6 +10,7 @@
 //!use warp_hull
 //!use emp
 //!use wreck
+//!use flight
 // Units, structures, wrecks and props. One multi-draw-indirect call renders
 // every visible model; per-instance data comes from the visible list the cull
 // pass built, so `instance_index` (which includes firstInstance) indexes it.
@@ -1514,6 +1515,21 @@ fn vs_main(in: VsIn) -> VsOut {
         && (e.owner_flags & (KIND_GHOST | FLAG_UNDER_CONSTRUCTION | FLAG_IN_FACTORY)) == 0u {
         stance = stride_sway(stance, model, walk);
     }
+    // A winged flier (flight.wgsl): its wings and trailing legs posed from how it moves,
+    // its head and lowered arms at ease while it idles.
+    let flying = flies(model)
+        && (e.owner_flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION | FLAG_IN_FACTORY)) == 0u;
+    var flight: Flight;
+    if flying {
+        flight = flight_state(e, model, t, time);
+        idle = flight_idle(flight);
+        let piece = (in.rig >> FLIGHT_SHIFT) & FLIGHT_MASK;
+        if piece != 0u && !tier_piece {
+            let posed = flight_pose(p, n, piece, model, flight);
+            p = posed[0];
+            n = posed[1];
+        }
+    }
     // A hull going down (`WRECK_SINKING`, 2) is posed like a falling wreck: whole, pitched and
     // rolled by the sim as it sinks, not crumpled. It settles into an ordinary wreck on the seabed.
     let falling = (e.owner_flags & KIND_WRECK) != 0u && (e.packed == 1u || e.packed == 2u);
@@ -2156,6 +2172,12 @@ fn vs_main(in: VsIn) -> VsOut {
             p.z += crawl_set(e, model, t);
         }
     }
+    // A winged flier hangs on its lift, leaning into its travel (`flight_lean`).
+    if flying {
+        let hung = flight_lean(p, n, model, flight);
+        p = hung[0];
+        n = hung[1];
+    }
     // Hovercraft: the hull rides a cushion, the rubber skirt hangs behind it.
     if (model.icon & 0x20000u) != 0u
         && (e.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u
@@ -2234,7 +2256,9 @@ fn vs_main(in: VsIn) -> VsOut {
     let wreck_lies = wreck.posed && (model.icon & ICON_MOBILE) != 0u;
     origin.z -= wreck_bury(model, wreck, e.health);
     // A walker stands upright: its feet find the ground (`walk_ground`).
-    if ((model.icon & ICON_MOBILE) != 0u && (model.icon & ICON_AIR) == 0u && (model.icon & ICON_NAVAL) == 0u && !walks)
+    // A winged flier hangs upright over whatever is under it.
+    if ((model.icon & ICON_MOBILE) != 0u && (model.icon & ICON_AIR) == 0u && (model.icon & ICON_NAVAL) == 0u && !walks
+        && !flies(model))
         || wreck_lies {
         up = terrain_normal(origin.xy, max(e.radius * select(1.0, 0.5, wreck.count > 1u), 4.0));
         // A wreck comes onto the slope as it settles, from the pose it came down in.
@@ -2536,6 +2560,15 @@ fn vs_main(in: VsIn) -> VsOut {
         let beat = fab_beat(e, time, t);
         out.drive = vec4<f32>(beat.w, beat.z, select(0.0, 1.0, (e.status[0] & UNIT_PAUSED) != 0u), 0.0);
         out.drive_at = vec4<f32>(0.0, 0.0, 0.0, FAB_DRIVE_TAG);
+    }
+    // A flier's wings and legs: how hard their rims burn (`flight_glow`).
+    if flying {
+        let piece = (in.rig >> FLIGHT_SHIFT) & FLIGHT_MASK;
+        if piece != 0u {
+            let i = select(3.0, f32(piece - FLIGHT_FEATHER), piece >= FLIGHT_FEATHER && piece < FLIGHT_VANE);
+            out.drive = vec4<f32>(-1.0, flight_glow(flight, i), 0.0, 0.0);
+            out.drive_at = vec4<f32>(0.0, 0.0, 0.0, FLIGHT_DRIVE_TAG);
+        }
     }
     out.dust = select(0.62, model.surface.y / max(model.height, 0.1), model.surface.y > 0.0);
     let crackles = (e.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST)) == 0u;
@@ -3372,6 +3405,12 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         ri.working = select(0.0, 1.0, (flags & FLAG_BUILDING) != 0u && in.refit.z <= 0.0
             && (flags & (FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) == 0u);
         regency = regency_look(ri, works);
+        // A flier's feathers burn with what it does (`flight_glow`), whiter the harder.
+        if in.drive_at.w == FLIGHT_DRIVE_TAG {
+            let hot = saturate((in.drive.y - 1.5) / 4.0);
+            regency.glow = mix(regency.glow, vec3<f32>(length(regency.glow)) * vec3<f32>(1.0, 0.62, 0.7), hot * 0.6)
+                * in.drive.y;
+        }
         lights += regency.glow;
         n = normalize(n - reg_to_world(regency.slope, dl1, dl2, dpdx(in.world), dpdy(in.world)));
     }

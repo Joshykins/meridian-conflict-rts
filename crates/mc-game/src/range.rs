@@ -108,10 +108,13 @@ pub enum Scenario {
     /// A space elevator has a mixed batch queued (tanks, gunships, tech-4 machines): its
     /// cable comes down, and its first platform brings them down and they roll off.
     Elevator,
+    /// A unit that dashes (`UnitBlueprint::dash`): a pack of red tanks two thirds of its
+    /// reach down the range, and it comes down in the middle of them.
+    Dash,
 }
 
 impl Scenario {
-    pub const ALL: [Scenario; 16] = [
+    pub const ALL: [Scenario; 17] = [
         Scenario::UnderFire,
         Scenario::PointBlank,
         Scenario::Targets,
@@ -128,6 +131,7 @@ impl Scenario {
         Scenario::Pause,
         Scenario::Short,
         Scenario::Elevator,
+        Scenario::Dash,
     ];
 
     pub fn label(self) -> &'static str {
@@ -148,6 +152,7 @@ impl Scenario {
             Scenario::Pause => "Pause",
             Scenario::Short => "Short",
             Scenario::Elevator => "Elevator",
+            Scenario::Dash => "Dash",
         }
     }
 
@@ -169,6 +174,7 @@ impl Scenario {
             "pause" => Scenario::Pause,
             "short" => Scenario::Short,
             "elevator" => Scenario::Elevator,
+            "dash" => Scenario::Dash,
             _ => return None,
         })
     }
@@ -1074,6 +1080,37 @@ fn stage(
         Scenario::Destruct => Ok((Vec::new(), Some((subject, PendingOrder::Destruct)))),
         Scenario::Elevator => elevator_batch(blueprints, bp, pad),
         Scenario::Pause => Ok((Vec::new(), Some((subject, PendingOrder::Pause)))),
+        Scenario::Dash => {
+            let dash = bp.dash.as_ref().ok_or("This Unit Does Not Dash")?;
+            let tank = blueprints
+                .id_of(DEFAULT_SUBJECT)
+                .ok_or("No Tank To Dash At")?;
+            // Past its reach's minimum and well inside its range: a loose pack of seven.
+            let out = (dash.min + dash.range * 2) / 3;
+            let pack = [
+                (0, 0),
+                (-40, -50),
+                (-40, 50),
+                (40, -30),
+                (40, 30),
+                (0, -90),
+                (0, 90),
+            ];
+            Ok((
+                pack.iter()
+                    .map(|&(along, across)| Command::DebugSpawn {
+                        owner: RED,
+                        blueprint: tank,
+                        pos: east(out + Fx::from_int(along), across),
+                        heading: Angle::HALF_TURN,
+                        count: 1,
+                        flags: flag::PASSIVE,
+                        build: 1000,
+                    })
+                    .collect(),
+                None,
+            ))
+        }
         Scenario::Short => {
             let upkeep = bp.economy.energy_upkeep;
             let plant = blueprints

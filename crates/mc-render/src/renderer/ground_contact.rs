@@ -1,6 +1,7 @@
 //! What units do to the ground they cross: the track marks and dust of tracked vehicles,
 //! a walker's footprints (`footfalls.rs`), the downwash a hovercraft keeps under itself,
-//! the red plasma under a craft on gravity lift (`lift_fx.rs`), the arcs on a running
+//! the red plasma under a craft on gravity lift (`lift_fx.rs`), the light off a winged
+//! flier's feathers (`wing_fx.rs`), the arcs on a running
 //! reactor (`reactor_fx.rs`), and the wash of a hovering
 //! aircraft's lift.
 
@@ -31,6 +32,7 @@ impl Renderer {
                 << 8;
         let previous = (self.effect_origin, self.effect_settings);
         self.lift_fx.new_tick();
+        self.wing_fx.new_tick();
         self.reactor_fx.new_tick();
         for u in units {
             self.effect_origin = Some(Vec3::from(u.pos));
@@ -62,6 +64,13 @@ impl Renderer {
                 && self.lift_fx.lifts(u.blueprint)
             {
                 self.plasma_lift(u, time, moving);
+            }
+            if close
+                && u.build >= 1.0
+                && u.owner_flags & hidden_aircraft == 0
+                && self.wing_fx.flies(u.blueprint)
+            {
+                self.wing_light(u, time);
             }
             if close
                 && u.build >= 1.0

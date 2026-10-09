@@ -681,6 +681,9 @@ pub struct Flight {
     /// The left leg's knee, and the right's (given on the left: the right leg is built as
     /// a left one and mirrored), so the two legs may hang differently.
     pub knees: [[f32; 3]; 2],
+    /// The left wing's feather tips at rest, from the top (`gpu_consts::flight::FEATHERS`):
+    /// where the renderer lays their light (`wing_fx.rs`).
+    pub tips: [[f32; 3]; gpu_consts::flight::FEATHERS as usize],
 }
 
 impl Flight {

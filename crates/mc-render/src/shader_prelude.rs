@@ -9,10 +9,11 @@
 //! front of those containing the line `//!use bindings` (`regions` alone for a
 //! shader that binds the atmosphere itself and says `//!use regions`); then `shore`, `habitat`, `streets`, `desert`, `rock`, `surface`,
 //! `metal`, `regency`, `scenery`, `warp_hull` and `warp_puffs` for their own `//!use` lines, in that order,
-//! then `emp` (an EMP stun's look on a model) and `wreck` (how a wreck lies and looks).
+//! then `emp` (an EMP stun's look on a model), `wreck` (how a wreck lies and looks) and
+//! `flight` (a winged flier's rig).
 
 /// Files put in front of shaders, never compiled on their own.
-pub(crate) const PRELUDES: [&str; 21] = [
+pub(crate) const PRELUDES: [&str; 22] = [
     "common",
     "bindings",
     "regions",
@@ -34,6 +35,7 @@ pub(crate) const PRELUDES: [&str; 21] = [
     "emp",
     "wreck",
     "nova",
+    "flight",
 ];
 
 /// The prelude files' text.
@@ -57,6 +59,7 @@ pub(crate) struct Preludes {
     emp: String,
     wreck: String,
     nova: String,
+    flight: String,
 }
 
 impl Preludes {
@@ -90,6 +93,7 @@ impl Preludes {
             emp: read("emp"),
             wreck: read("wreck"),
             nova: read("nova"),
+            flight: read("flight"),
         }
     }
 
@@ -167,6 +171,10 @@ impl Preludes {
         // A Regency warhead's plasma nova (nuke.wgsl; uses its types and billows).
         if uses("nova") {
             prelude = format!("{prelude}\n{}", self.nova);
+        }
+        // A winged flier's wings, legs and lean (entity.wgsl; needs common).
+        if uses("flight") {
+            prelude = format!("{prelude}\n{}", self.flight);
         }
         let lines = prelude.lines().count() + 1;
         (format!("{prelude}\n{body}"), lines)

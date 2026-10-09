@@ -56,8 +56,8 @@ fn outline(cut: Cut, len: f32) -> Vec<[f32; 2]> {
     let pts: &[[f32; 2]] = match cut {
         // Broad, stepped in a third of the way out on both edges, its tip swept up.
         Cut::Crown => &[
-            [0.0, -0.25],
-            [0.2, -1.05],
+            [0.0, -0.6],
+            [0.12, -1.05],
             [0.5, -1.1],
             [0.56, -0.78],
             [0.86, -0.66],
@@ -122,15 +122,7 @@ fn outline(cut: Cut, len: f32) -> Vec<[f32; 2]> {
         ],
         Cut::Spike => &[[0.0, -0.26], [1.0, 0.0], [0.0, 0.26]],
     };
-    // Broad blades, as the crown, narrowing down the fan to the spike.
-    let wide = match cut {
-        Cut::Crown => 1.55,
-        Cut::Notched | Cut::Hooked => 1.4,
-        Cut::Sword | Cut::Sickle => 1.3,
-        Cut::Dagger => 1.25,
-        Cut::Spike => 1.2,
-    };
-    pts.iter().map(|&[s, t]| [s * len, t * wide]).collect()
+    pts.iter().map(|&[s, t]| [s * len, t]).collect()
 }
 
 /// One feather from `root` along `dir`: its rimmed plate turned to face back and a little
@@ -147,9 +139,9 @@ fn feather(b: &mut MeshBuilder, root: Vec3, dir: Vec3, len: f32, cut: Cut) {
     }
     dark_plate(b);
     let half = match cut {
-        Cut::Crown => 0.62,
-        Cut::Notched | Cut::Hooked => 0.34,
-        _ => 0.24,
+        Cut::Crown => 0.42,
+        Cut::Notched | Cut::Hooked => 0.24,
+        _ => 0.18,
     };
     for n in [f.n, -f.n] {
         let lift = if n == f.n { 0.2 } else { 0.0 };
@@ -162,12 +154,12 @@ fn feather(b: &mut MeshBuilder, root: Vec3, dir: Vec3, len: f32, cut: Cut) {
 /// into its root, and a second, short blade forked up off its tip.
 fn crown(b: &mut MeshBuilder, f: &Frame, len: f32) {
     dark_plate(b);
-    let spar = Frame::new(f.at(len * 0.2, -1.52, 0.18), f.u, f.n);
-    armour(b, &spar, &swept(len * 0.64, 0.26, -0.6, 0.85), 0.24);
+    let spar = Frame::new(f.at(0.0, -0.98, 0.18), f.u, f.n);
+    armour(b, &spar, &swept(len * 0.84, 0.2, -0.6, 0.85), 0.24);
     b.paint(PLATING_DARK).pattern(pattern::EMBER_SLOT);
     armour(
         b,
-        &Frame::new(f.at(len * 0.12, 0.2, 0.2), f.u, f.n),
+        &Frame::new(f.at(len * 0.12, 0.1, 0.2), f.u, f.n),
         &[
             [0.0, -0.32],
             [len * 0.22, -0.32],
@@ -181,8 +173,8 @@ fn crown(b: &mut MeshBuilder, f: &Frame, len: f32) {
     b.paint(PLATING_DARK).pattern(pattern::EMBER_RIM);
     armour(
         b,
-        &Frame::new(f.at(len * 0.66, -1.08, -0.02), up, f.n),
-        &swept(len * 0.42, 0.36, -0.4, 0.6),
+        &Frame::new(f.at(len * 0.66, -0.7, -0.02), up, f.n),
+        &swept(len * 0.42, 0.26, -0.4, 0.6),
         0.16,
     );
 }
@@ -227,12 +219,26 @@ fn housing(b: &mut MeshBuilder) {
 }
 
 /// The left wing (the right is its mirror).
+/// Where the `i`th feather from the top leaves the hub, and which way it runs.
+fn feather_line(i: usize, deg: f32) -> (Vec3, Vec3) {
+    let dir = ray(deg, 0.14 + 0.02 * i as f32);
+    // Each lies behind the one above it, its root out on the drum's rim.
+    (HUB + dir * 0.55 - Vec3::X * (0.12 + 0.2 * i as f32), dir)
+}
+
+/// The left wing's feather tips at rest, from the top (`Flight::tips`).
+pub(super) fn tips() -> [[f32; 3]; flight::FEATHERS as usize] {
+    std::array::from_fn(|i| {
+        let (deg, len, _) = FAN[i];
+        let (root, dir) = feather_line(i, deg);
+        (root + dir * len).to_array()
+    })
+}
+
 pub(super) fn wing(b: &mut MeshBuilder) {
     housing(b);
     for (i, &(deg, len, cut)) in FAN.iter().enumerate() {
-        let dir = ray(deg, 0.14 + 0.02 * i as f32);
-        // Each lies behind the one above it, its root out on the drum's rim.
-        let root = HUB + dir * 0.55 - Vec3::X * (0.12 + 0.34 * i as f32);
+        let (root, dir) = feather_line(i, deg);
         b.with_flight(flight::FEATHER + i as u32, |b| {
             feather(b, root, dir, len, cut)
         });

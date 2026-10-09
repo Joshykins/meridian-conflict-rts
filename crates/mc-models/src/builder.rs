@@ -633,6 +633,7 @@ impl MeshBuilder {
             hub: at(flight.hub),
             hip: at(flight.hip),
             knees: flight.knees.map(at),
+            tips: flight.tips.map(at),
         });
     }
 

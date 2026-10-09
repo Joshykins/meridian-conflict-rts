@@ -95,7 +95,12 @@ pub(super) fn seraph(b: &mut MeshBuilder, _tech: u8) {
         hub: wings::HUB.to_array(),
         hip: LEFT.hip.to_array(),
         knees: [LEFT.knee.to_array(), RIGHT.knee.to_array()],
+        tips: wings::tips(),
     });
+    // It hangs on gravity lift: red plasma crackles down to the ground from under its
+    // pointed toes (`lift_fx`).
+    b.add_lift(LEFT.toe, 0.5);
+    b.add_lift(RIGHT.toe * v3(1.0, -1.0, 1.0), 0.5);
     b.set_turret_pivot(v3(0.0, 0.0, WAIST));
     b.set_arm_pivot(ELBOW);
     b.set_recoil(ELBOW, MUZZLE.with_y(0.0), 0.25);
