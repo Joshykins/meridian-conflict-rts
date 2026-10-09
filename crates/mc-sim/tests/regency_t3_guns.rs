@@ -1,5 +1,5 @@
 //! The Regency's tech 3 fusion guns. The Spire (`regency_t3_mobile_aa`) shoots spaceships
-//! and nothing else, its gun raised to the sky. The Kiln (`regency_t3_artillery`) charges,
+//! and nothing else, and only once it has planted. The Kiln (`regency_t3_artillery`) charges,
 //! then lobs one fusion shot high onto a building over a kilometre off.
 
 use mc_core::{Angle, Fx, FxVec2, TICKS_PER_SECOND};
@@ -8,7 +8,7 @@ use mc_jobs::Pool;
 use mc_map::Heightfield;
 use mc_sim::tables::{Controller, FireState, UnitId};
 use mc_sim::world::MapData;
-use mc_sim::{MatchConfig, PlayerSetup, SimEvent, World};
+use mc_sim::{Command, MatchConfig, PlayerCommand, PlayerSetup, SimEvent, World};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -101,6 +101,57 @@ fn the_spire_shoots_down_at_a_warship_and_leaves_the_ground_alone() {
     );
     assert_eq!(health(&w, tank), tank_hp, "it fired on a tank");
     assert_eq!(health(&w, gunship), gunship_hp, "it fired on an aircraft");
+}
+
+/// Standing with nothing to shoot, the Spire plants; it fires only once planted, and told
+/// to move it packs before it rolls.
+#[test]
+fn the_spire_plants_before_it_fires_and_packs_before_it_moves() {
+    let mut w = world();
+    let spire = add(&mut w, SPIRE, 0, 1000, 1000, 0);
+    let row = w.state.units.row(spire).unwrap();
+    let bp = w.blueprints.id_of(SPIRE).unwrap();
+    let plant = w.blueprints.unit(bp).motion.unwrap().deploy_ticks;
+    assert!(
+        plant >= 8 * TICKS_PER_SECOND as u16,
+        "it plants in {plant} ticks"
+    );
+    for _ in 0..(plant / 2) {
+        w.tick(&[]).unwrap();
+    }
+    let half = w.state.units.deploy[row];
+    assert!(half > 0, "it does not plant while it stands idle");
+    // A warship arrives half way through: no shot until the plant is done.
+    add(&mut w, "aster_t4_frigate", 1, 2600, 1000, 180);
+    let mut first = None;
+    for t in 0..(20 * TICKS_PER_SECOND) {
+        w.tick(&[]).unwrap();
+        if first.is_none() && shots(&w, SPIRE) > 0 {
+            first = Some((t, w.state.units.deploy[row]));
+        }
+    }
+    let (_, planted) = first.expect("it never fired");
+    assert_eq!(planted, plant, "it fired before it was planted");
+
+    let order = PlayerCommand {
+        player: 0,
+        command: Command::Move {
+            units: vec![spire],
+            target: FxVec2::from_ints(1600, 1600),
+            queue: false,
+        },
+    };
+    let start = w.state.units.pos[row];
+    w.tick(&[order]).unwrap();
+    for _ in 0..(plant - 2) {
+        w.tick(&[]).unwrap();
+        assert_eq!(w.state.units.pos[row], start, "it rolled before it packed");
+    }
+    for _ in 0..(10 * TICKS_PER_SECOND) {
+        w.tick(&[]).unwrap();
+    }
+    assert_eq!(w.state.units.deploy[row], 0, "it never packed");
+    assert_ne!(w.state.units.pos[row], start, "it never moved off");
 }
 
 #[test]

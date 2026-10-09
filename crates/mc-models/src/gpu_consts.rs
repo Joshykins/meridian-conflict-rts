@@ -538,6 +538,34 @@ shared! {
         pub const KICK_TIME: f32 = 0.07;
     }
 
+    /// A siege carriage's deploy (`Model::siege`, `models::Siege`; entity.wgsl
+    /// `siege_leg`, `siege_gun_fold`): four tread pods on legs, authored planted. Planting,
+    /// the pods splay out into an X, the legs stand and lift the body high over them, then
+    /// the gun rises from lying along the deck and turns to its mark, and last its folded
+    /// pieces swing out into place; packing runs it all the other way. Shares are of the
+    /// deploy (`UnitInstance::deploy`).
+    pub mod siege as "SIEGE_" {
+        /// Which piece of a leg a `rig::DEPLOY` vertex is, in rig bits `SHIFT..`: the upper
+        /// sleeve (turning about the hip), the lower blade (about the knee) and the pod.
+        /// They borrow the top `UPGRADE_AT` bits, which mean something only on refit
+        /// pieces and on houses, never on a leg. A `DEPLOY` vertex on the gun with none of
+        /// these is one of its folding pieces.
+        pub const SHIFT: u32 = 22;
+        pub const MASK: u32 = 0x3;
+        pub const UPPER: u32 = 1;
+        pub const LOWER: u32 = 2;
+        pub const POD: u32 = 3;
+        /// The pods splay out over the first part of the deploy, the body rises a little
+        /// after they start, the gun rises once the body is up, and its folding pieces
+        /// swing out last.
+        pub const SPREAD_END: f32 = 0.4;
+        pub const LIFT_START: f32 = 0.15;
+        pub const LIFT_END: f32 = 0.55;
+        pub const RAISE_START: f32 = 0.5;
+        pub const RAISE_END: f32 = 0.8;
+        pub const FOLD_START: f32 = 0.7;
+    }
+
     /// A VTOL's pods standing up and lying down with the hull's lean (`models::vtol_tilt`,
     /// entity.wgsl `vtol_tilt`).
     pub mod vtol as "VTOL_" {

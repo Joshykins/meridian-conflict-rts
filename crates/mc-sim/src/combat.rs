@@ -1101,7 +1101,8 @@ impl World {
                     units.flags[row] |= flag::HOLD;
                     units.deploy[row] -= 1;
                 }
-            } else if has_target && units.deploy[row] < motion.deploy_ticks {
+            } else if (has_target || motion.deploy_idle) && units.deploy[row] < motion.deploy_ticks
+            {
                 units.deploy[row] += 1;
             }
         }

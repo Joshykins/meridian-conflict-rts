@@ -80,3 +80,33 @@ fn both_run_on_tracks() {
         assert!(!model.hover && model.legs.is_none(), "{key}");
     }
 }
+
+/// The Spire plants on four pods: its siege rig is declared, and every leg piece lies
+/// clear of the centre lines, since the shader picks the leg by the side a vertex is on.
+#[test]
+fn the_spire_plants_on_four_pods() {
+    use crate::gpu_consts::siege;
+    let model = build_model("regency_skyspear").unwrap();
+    let rig = model.siege.expect("the Spire has a siege rig");
+    assert!(rig.lift > 0.0 && rig.stow < 0.0 && rig.fold > 0.0);
+    // Far off the legs are dropped; the pods still splay.
+    for (lod, mesh) in model.lods.iter().enumerate() {
+        let mut pieces = [0usize; 4];
+        for v in &mesh.vertices {
+            if v.rig & crate::rig::DEPLOY == 0 {
+                continue;
+            }
+            let piece = (v.rig >> siege::SHIFT) & siege::MASK;
+            pieces[piece as usize] += 1;
+            if piece != 0 {
+                assert!(
+                    v.pos[0].abs() > 1.0 && v.pos[1].abs() > 1.0,
+                    "a leg vertex at {:?} sits on a centre line",
+                    v.pos
+                );
+            }
+        }
+        let legs = if lod < 2 { &pieces[1..] } else { &pieces[3..] };
+        assert!(legs.iter().all(|&n| n > 0), "lod{lod} pieces {pieces:?}");
+    }
+}

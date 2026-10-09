@@ -407,6 +407,8 @@ fn bastion_carries_the_complete_t3_land_roster_with_physical_clearance() {
         .filter(|bp| bp.tech == 3 && bp.cargo_room().is_some())
         // Refit variants are alternate loadouts of one commander, not an army of commanders.
         .filter(|bp| !bp.has(mc_data::cat::COMMANDER) || bp.key == "aster_commander+eng_3")
+        // The Regency's Spire is a siege carriage too big for any hold, on purpose.
+        .filter(|bp| bp.key != "regency_t3_mobile_aa")
         .map(|bp| bp.key.clone())
         .collect();
     assert!(keys.iter().any(|k| k == "aster_t3_assault_bot"));

@@ -517,6 +517,10 @@ pub(crate) struct RawMotion {
     /// Zero (the default): it fires on the move.
     #[serde(default)]
     pub deploy: f64,
+    /// With `deploy`: it plants whenever it stands with nowhere to go, not only once it has
+    /// something to shoot, so one parked ahead of a raid is ready for it.
+    #[serde(default)]
+    pub deploy_idle: bool,
     /// A warship that fights broadside on (at sea or in the air): engaged and stopped, it
     /// lays its hull so the mark lies this many degrees off the bow, on whichever beam is
     /// nearer. Zero: it only turns to bring its main gun to bear.
@@ -1605,6 +1609,7 @@ impl Unit {
                     altitude: fx(m.altitude),
                     hover: m.hover,
                     deploy_ticks: ticks(m.deploy).clamp(0, 600) as u16,
+                    deploy_idle: m.deploy_idle,
                     broadside: Angle(
                         steps(m.broadside.clamp(0.0, 180.0)).round().min(32768.0) as u16
                     ),

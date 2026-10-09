@@ -1213,6 +1213,52 @@ fn stake_pose(p0: vec3<f32>, n0: vec3<f32>, spike: bool, planted: f32, s: f32) -
     return array<vec3<f32>, 2>(p, n);
 }
 
+// How far a siege carriage is planted (`gpu_consts::siege`), between ticks: 0 packed, 1 ready.
+fn siege_deploy(e: Entity, t: f32) -> f32 {
+    return clamp(mix(e.prev_deploy, e.deploy, t), 0.0, 1.0);
+}
+
+// How far below its authored (planted) height a siege carriage's body is at deploy `out`.
+fn siege_sink(model: ModelInfo, out: f32) -> f32 {
+    return model.siege[0].w * (1.0 - smoothstep(SIEGE_LIFT_START, SIEGE_LIFT_END, out));
+}
+
+// A siege carriage's leg piece (`models::Siege`), authored planted, at deploy `out`. The
+// leg is the one on the vertex's side and end. Its pod slides from beside the body out to
+// its planted place and turns out into the X; the hip comes down with the body; the sleeve
+// and the blade each turn about their own end to lie along the line from hip to knee, and
+// slide along each other as it shortens.
+fn siege_leg(p0: vec3<f32>, n0: vec3<f32>, piece: u32, model: ModelInfo, out: f32) -> array<vec3<f32>, 2> {
+    var p = p0;
+    var n = n0;
+    let side = vec3<f32>(select(-1.0, 1.0, p.x > 0.0), select(-1.0, 1.0, p.y > 0.0), 1.0);
+    let spread = smoothstep(0.0, SIEGE_SPREAD_END, out);
+    let hip0 = model.siege[0].xyz * side;
+    let knee0 = model.siege[1].xyz * side;
+    let hip = hip0 - vec3<f32>(0.0, 0.0, siege_sink(model, out));
+    let knee = vec3<f32>(mix(model.siege[2].xy, model.siege[1].xy, spread), model.siege[1].z) * side;
+    if piece == SIEGE_POD {
+        let turn = -(1.0 - spread) * model.siege[1].w * side.x * side.y;
+        p = rot_z(p - knee0, turn) + knee;
+        n = rot_z(n, turn);
+    } else {
+        let was = normalize(knee0 - hip0);
+        let now = normalize(knee - hip);
+        let axis = cross(was, now);
+        let turn = atan2(length(axis), dot(was, now));
+        let pivot0 = select(knee0, hip0, piece == SIEGE_UPPER);
+        let pivot = select(knee, hip, piece == SIEGE_UPPER);
+        if turn > 1e-4 {
+            let k = axis / length(axis);
+            p = rot_about(p - pivot0, k, turn) + pivot;
+            n = rot_about(n, k, turn);
+        } else {
+            p = p - pivot0 + pivot;
+        }
+    }
+    return array<vec3<f32>, 2>(p, n);
+}
+
 // A spacecraft (`ModelInfo::capital`, `models::capital`): legs or stern drives.
 fn capital_ship(model: ModelInfo) -> bool {
     return model.capital[0].w != 0.0 || model.capital[4].x != 0.0;
@@ -1651,6 +1697,18 @@ fn vs_main(in: VsIn) -> VsOut {
                 if model.crawl[0].w > 1.5 {
                     pitch -= tail_pose(e, model, walk, t, 15u)[5].x;
                 }
+                // A siege gun lies along the deck packed and its folding pieces swing out
+                // once it is up: they fold first, then the gun pitches.
+                if model.siege[3].z > 0.5 && limb == LIMB_ARM_GUN {
+                    let out = siege_deploy(e, t);
+                    if (in.rig & (RIG_DEPLOY | (SIEGE_MASK << SIEGE_SHIFT))) == RIG_DEPLOY {
+                        let hinge = vec3<f32>(model.siege[3].x, 0.0, model.siege[3].y);
+                        let fold = model.siege[2].w * (1.0 - smoothstep(SIEGE_FOLD_START, 1.0, out));
+                        p = rot_xz(p - hinge, fold) + hinge;
+                        n = rot_xz(n, fold);
+                    }
+                    pitch = mix(model.siege[2].z, pitch, smoothstep(SIEGE_RAISE_START, SIEGE_RAISE_END, out));
+                }
                 // A breech door swings on its hinge first, then rides the gun.
                 if (in.rig & BREECH_RIG) != 0u && model.breech.w != 0.0 {
                     let swing = model.breech.w * breech_open(e.prev_recoil, e.recoil, t);
@@ -1673,6 +1731,10 @@ fn vs_main(in: VsIn) -> VsOut {
         }
         // The turret glides between ticks like the hull does; stepping it ten times a second reads as jitter.
         var yaw = lerp_angle(e.prev_turret_yaw, e.turret_yaw, t);
+        // A siege gun lies straight along the deck packed and turns to its mark as it rises.
+        if model.siege[3].z > 0.5 {
+            yaw *= smoothstep(SIEGE_RAISE_START, SIEGE_RAISE_END, siege_deploy(e, t));
+        }
         if model.crawl[0].w > 1.5 {
             // A jointed tail (`tail_pose`): each segment turns about its joint, carried where
             // the ones under it put it; the turret's own pieces ride the last joint. The aim
@@ -2159,6 +2221,20 @@ fn vs_main(in: VsIn) -> VsOut {
             let posed = stake_pose(p, n, (in.rig & STAKE_RIG_SPIKE) != 0u, planted, s);
             p = posed[0];
             n = posed[1];
+        }
+    }
+    // A siege carriage: its legs splay and stand, and lift the body (gun and all) over them.
+    if model.siege[3].z > 0.5
+        && (e.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u
+    {
+        let out = siege_deploy(e, t);
+        let piece = (in.rig >> SIEGE_SHIFT) & SIEGE_MASK;
+        if (in.rig & RIG_DEPLOY) != 0u && piece != 0u && in.part != PART_TURRET {
+            let posed = siege_leg(p, n, piece, model, out);
+            p = posed[0];
+            n = posed[1];
+        } else {
+            p.z -= siege_sink(model, out);
         }
     }
     if walks && in.part != PART_LOCOMOTION {

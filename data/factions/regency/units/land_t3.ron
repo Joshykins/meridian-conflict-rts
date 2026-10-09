@@ -1,41 +1,45 @@
 // The Regency's tech 3 land units, made by the Anvil III. Models: `models::regency::*`; a model
 // authored at another size says so, and its tests tie these numbers to it.
 [
-    // Mobile anti-spaceship gun: a Pinch-fusion gun raised to the sky, the Sunspear's gun drawn
-    // small on a moving body, the Regency's answer to warships in the upper air that ARC
-    // meets with the Zenith and the Narwhal. It charges for a long beat, then pinches out one
+    // Mobile anti-spaceship gun: a siege carriage that plants to fire, the Sunspear's
+    // Pinch-fusion gun on four tread pods, the Regency's answer to warships in the upper air
+    // that ARC meets with the Narwhal at sea and the Zenith at home. It cannot fire on the
+    // move: stopped, it plants (`deploy`), its pods splaying out into an X and its legs
+    // lifting the body high, then its gun rises and unfolds; told to move, it packs first.
+    // Either way takes nine seconds. It plants whenever it stands still, so one parked
+    // ahead of a raid is ready for it. It charges for a long beat, then pinches out one
     // fast shot of fusion up at the hull, and shoots at nothing else: escorts keep it alive.
     //
-    // Balance: anchored on ARC's tech 3 anti-ship gun, the Narwhal (3800 mass, 40000 HP, 12000
-    // every 6 s at 3000 m), and the Zenith (tech 4, 40000 every 7 s at 3200 m), scaled down to
-    // a tech 3 unit a factory makes. Bent the Regency way: it hits harder for its mass (7000
-    // every 6 s, 0.65 DPS a mass point against the Narwhal's 0.53) from a shorter reach
-    // (2400 m), and is light (9000 HP), a gun that needs escorts. Three of them
-    // bring down an ARC frigate (55000 HP) in about 16 s.
+    // Balance: the Narwhal's land peer (3800 mass, 40000 HP, 12000 every 6 s at 3000 m,
+    // 0.53 DPS a mass point). Bent the Regency way: it hits harder for its mass (13000
+    // every 7 s, 0.58 a mass point) from a shorter reach (2800 m) on a lighter hull
+    // (26000 HP), and pays for both with the plant: nine seconds before the first shot,
+    // nine more before it can leave. One shot takes an ARC corvette; three, the Suzerain
+    // through its shield; two of them bring down an ARC frigate (55000 HP) in about 15 s.
     //
-    // Model: `regency_skyspear` (`models::regency::fusion_guns::skyspear`), authored at this
-    // size; `pivot`/`muzzle` are its trunnion and the middle of its charge.
+    // Model: `regency_skyspear` (`models::regency::fusion_guns::skyspear`), authored
+    // planted at this size; `pivot`/`muzzle` are its trunnion and the middle of its charge.
     (
         key: "regency_t3_mobile_aa",
         name: "Spire",
         role: "Mobile Anti-Ship Gun", title: "Anti-Ship",
         tech: 3,
         categories: ["Land", "AntiAir"],
-        health: 9000,
-        cost: (mass: 1800, energy: 18000, time: 6000),
-        radius: 7.0, height: 10.0,
-        vision: 600,
-        motion: (layer: Land, size: 1, speed: 24, accel: 18, turn: 70),
+        health: 26000,
+        cost: (mass: 3400, energy: 34000, time: 20000),
+        radius: 22.0, height: 42.0,
+        vision: 900,
+        motion: (layer: Land, size: 4, speed: 15, accel: 6, turn: 28, deploy: 9.0, deploy_idle: true),
         weapons: [(
             name: "Pinch-fusion Cannon",
-            damage: 7000, splash: 12, range: 2400, reload: 6.0, speed: 1350, trajectory: Direct,
-            turret_turn: 40, muzzle: (4.821, 0, 11.145), pivot: (0, 0, 5.4),
+            damage: 13000, splash: 16, range: 2800, reload: 7.0, speed: 1600, trajectory: Direct,
+            turret_turn: 24, muzzle: (12.97, 0, 39.333), pivot: (1, 0, 18.6),
             targets: ["Space"], color: Orange, red: 1.0,
             plasma_grade: Some(PinchFusion),
-            flash: 0.6, impact: 2.0, tracer: 2.0,
+            flash: 1.2, impact: 3.0, tracer: 3.0,
             sounds: (
-                fire: "regency_sunspear_fire", charge: "regency_sunspear_charge", charge_time: 2.2,
-                charge_volume: 1.6,
+                fire: "regency_sunspear_fire", charge: "regency_sunspear_charge", charge_time: 2.6,
+                charge_volume: 1.8,
                 impact: "regency_sunspear_hit", ground: "regency_sunspear_hit",
             ),
         )],

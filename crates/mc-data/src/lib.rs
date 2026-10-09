@@ -184,6 +184,9 @@ pub struct Motion {
     pub hover: bool,
     /// Ticks to plant or pack. Zero: it fires on the move.
     pub deploy_ticks: u16,
+    /// Plants whenever it stands with nowhere to go, not only with something to shoot
+    /// (`RawMotion::deploy_idle`).
+    pub deploy_idle: bool,
     /// Engaged and stopped, the hull lays the mark this far off the bow (`RawMotion::broadside`).
     /// Zero: no broadside.
     pub broadside: Angle,
@@ -1479,7 +1482,7 @@ impl Blueprints {
                     h.write_i64(m.accel.0);
                     h.write_i64(m.altitude.0);
                     h.write_u64(m.hover as u64);
-                    h.write_u64(m.deploy_ticks as u64);
+                    h.write_u64(m.deploy_ticks as u64 | (m.deploy_idle as u64) << 16);
                     h.write_u64(m.broadside.0 as u64);
                     h.write_u64(m.aim_arc as u64);
                     h.write_u64(

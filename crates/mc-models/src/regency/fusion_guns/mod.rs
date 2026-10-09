@@ -1,17 +1,17 @@
 //! The Regency's tech 3 mobile Pinch-fusion guns (docs/STYLE.md "The Regency suite"): the
 //! Sunspear's kind of gun taken off its keep and put on a body that moves.
 //!
-//! - `regency_skyspear` (`skyspear`): the mobile anti-spaceship gun. The Sunspear's
-//!   rails gun drawn small and raised to the sky, against warships in the upper air.
+//! - `regency_skyspear` (`skyspear`): the mobile anti-spaceship gun, a siege carriage on
+//!   four tread pods that splay and lift it to plant, the Sunspear's rails gun unfolding
+//!   and rising to the sky, against warships in the upper air.
 //! - `regency_fusion_howitzer` (`howitzer`): heavy artillery. A split pinch bore that
 //!   charges for a long beat and lobs one great fusion shot.
 //!
 //! Each gathers its charge in front of its bore between projectors, as the Sunspear does,
-//! and its `muzzle` is the middle of that charge. Each carries a caged fusion core on its
-//! turret's back (the Sunspear's, smaller) whose gimbal rings spin up through the charge
-//! (`rig::CHARGE_GEAR_MASK`).
-//!
-//! Both ride the same tracked body under lapped armour skirts (`chassis`).
+//! and its `muzzle` is the middle of that charge. The howitzer carries a caged fusion core
+//! on its turret's back (the Sunspear's, smaller) whose gimbal rings spin up through the
+//! charge (`rig::CHARGE_GEAR_MASK`) and rides a tracked body under lapped armour skirts
+//! (`chassis`); the anti-spaceship gun houses its fusion in a plated drum.
 
 mod chassis;
 mod executioner;
@@ -35,7 +35,7 @@ use super::turrets::sunspear;
 pub(super) use howitzer::{HEIGHT as HOWITZER_HEIGHT, RADIUS as HOWITZER_RADIUS};
 pub(super) use skyspear::{HEIGHT as SKYSPEAR_HEIGHT, RADIUS as SKYSPEAR_RADIUS};
 
-/// The anti-spaceship gun: the Sunspear's rails gun raised to the sky on a tracked body.
+/// The anti-spaceship gun: the Sunspear's rails gun on a siege carriage of four tread pods.
 pub(super) fn skyspear(b: &mut MeshBuilder, _tech: u8) {
     skyspear::draw(b);
 }

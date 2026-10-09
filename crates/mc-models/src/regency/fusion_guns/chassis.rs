@@ -25,7 +25,7 @@ pub(super) struct Hull {
 }
 
 impl Hull {
-    /// How much bigger than the Spire's body this one is: plates thicken with it.
+    /// How much bigger than a 3.4 m half-width body this one is: plates thicken with it.
     fn k(&self) -> f32 {
         self.half / 3.4
     }

@@ -111,6 +111,8 @@ fn engineers_can_build_the_fleet_on_site_and_cargo_sizes_fit_their_roles() {
         .units
         .iter()
         .filter(|u| u.faction == commander.faction && u.tech <= 3 && u.cargo_room().is_some())
+        // The Spire is a siege carriage too big for any hold, on purpose.
+        .filter(|u| u.key != "regency_t3_mobile_aa")
     {
         assert!(
             u.radius * 2 <= ark.width && u.height <= ark.clearance,

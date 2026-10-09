@@ -450,6 +450,8 @@ pub(crate) struct ModelInfo {
     /// A winged flier's rig (`models::Flight::gpu`), the hub's w its top speed in metres a
     /// tick. All zero for any other model.
     pub(crate) flight: [[f32; 4]; 4],
+    /// A siege carriage's deploy rig (`models::Siege::gpu`). All zero for any other model.
+    pub(crate) siege: [[f32; 4]; 4],
     /// Its skin (`Blueprints::skins`, renderer/skins.rs): its faction's, for a unit.
     pub(crate) skin: u32,
     /// Its surface marks in scene set 35 (renderer/surface_marks.rs): first | count << 24.
@@ -458,7 +460,7 @@ pub(crate) struct ModelInfo {
     pub(crate) _skin_pad2: u32,
 }
 
-const _: () = assert!(std::mem::size_of::<ModelInfo>() == 1136);
+const _: () = assert!(std::mem::size_of::<ModelInfo>() == 1200);
 
 // A prop's far level is the draw slot after its own levels.
 const _: () = assert!(models::LOD_COUNT as u32 == lod::FAR);
@@ -1142,6 +1144,7 @@ fn fallback_model(key: &str, radius: f32, height: f32) -> Model {
         discharge: None,
         vtol: None,
         flight: None,
+        siege: None,
     }
 }
 
@@ -1562,6 +1565,7 @@ impl Renderer {
                         top.map_or(6.0, |m| m.speed.to_f32()) / mc_core::TICKS_PER_SECOND as f32;
                     rig
                 }),
+                siege: model.siege.map_or([[0.0; 4]; 4], |s| s.gpu()),
                 cells: models::CellBlock::gpu(&model.cells).0,
                 cell_grid: models::CellBlock::gpu(&model.cells).1,
                 spin: model

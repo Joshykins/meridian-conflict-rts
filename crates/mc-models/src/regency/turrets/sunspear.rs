@@ -99,7 +99,7 @@ pub(crate) fn sunspear(b: &mut MeshBuilder, _tech: u8) {
             radiators(b);
             b.with_limb(rig::ARM_GUN, |b| {
                 gun_frame(b, &AUTHORED, |b| {
-                    rails(b, AUTHORED.len());
+                    rails(b, AUTHORED.len(), false);
                     pinch_coils(b);
                 })
             });
@@ -153,8 +153,10 @@ fn ringed(b: &mut MeshBuilder) {
 /// along its outer face, tied across the bore in bronze. At each rail's tip a plated head
 /// sleeved over it carries two gravity lenses on its inner face. The bore recoils; the
 /// rails part through the charge (`SPREAD`, the ties telescoping), and the heads slide
-/// out along them into the charge (`REACH`).
-pub(in crate::regency) fn rails(b: &mut MeshBuilder, len: f32) {
+/// out along them into the charge (`REACH`). With `fold`, the rails and their heads are a
+/// siege gun's folding pieces (`MeshBuilder::with_siege`), and nothing ties them across
+/// the bore.
+pub(in crate::regency) fn rails(b: &mut MeshBuilder, len: f32, fold: bool) {
     let fine = b.fine();
     collar(b, Vec3::ZERO, Vec3::Y, 1.6, 10.6);
     dark_plate(b);
@@ -163,52 +165,13 @@ pub(in crate::regency) fn rails(b: &mut MeshBuilder, len: f32) {
         &[[-3.0, 7.0, 4.4, 0.0], [2.5, 7.0, 4.0, 0.0]],
         &CHAMFERED,
     );
-    let ties: &[f32] = if fine { &[8.0, 15.0] } else { &[] };
+    let ties: &[f32] = if fine && !fold { &[8.0, 15.0] } else { &[] };
     b.mirror_y(|b| {
-        b.with_charge_gear(SPREAD, |b| {
-            dark_plate(b);
-            bar_through(
-                b,
-                &[
-                    (v3(1.0, 3.2, 0.0), Vec2::new(1.4, 3.4)),
-                    (v3(14.0, 3.6, 0.0), Vec2::new(1.2, 3.0)),
-                    (v3(22.0, 4.0, 0.0), Vec2::new(1.0, 2.6)),
-                    (v3(len + 0.2, 3.9, 0.0), Vec2::new(0.8, 2.0)),
-                ],
-                Vec3::Y,
-            );
-            Course {
-                count: if fine { 3 } else { 1 },
-                step: 6.0,
-                len: 7.0,
-                half: 1.2,
-                tip: 0.0,
-                thick: 0.3,
-                tail: 1.5,
-            }
-            .lay(
-                b,
-                &Frame::new(v3(len - 4.0, 4.35, 0.0), v3(-1.0, 0.05, 0.0), Vec3::Y),
-            );
-            if fine {
-                slit(b, v3(17.0, 3.04, 0.0), -Vec3::Y, Vec3::X, 4.0, 0.3);
-            }
-            // The ties' outer sleeves, riding out with the rail over their fixed middles.
-            metal(b);
-            for &x in ties {
-                for z in [-1.3f32, 1.3] {
-                    bar_through(
-                        b,
-                        &[
-                            (v3(x, 1.6, z), Vec2::new(0.62, 0.62)),
-                            (v3(x, 3.3, z), Vec2::new(0.62, 0.62)),
-                        ],
-                        Vec3::X,
-                    );
-                }
-            }
-        });
-        b.with_charge_gear(REACH, |b| lens_head(b, len));
+        if fold {
+            b.with_siege(0, |b| rail(b, len, ties));
+        } else {
+            rail(b, len, ties);
+        }
     });
     metal(b);
     for &x in ties {
@@ -247,6 +210,56 @@ pub(in crate::regency) fn rails(b: &mut MeshBuilder, len: f32) {
         coil_light(b, 6);
         hoop_on(b, v3(18.45, 0.0, 0.0), Vec3::X, 1.1, 0.3, 0.12, b.sides(10));
     });
+}
+
+/// One rail (+y side) with its head: the rail parts through the charge (`SPREAD`), its
+/// ties' outer sleeves (at `ties`) riding out with it, and the head slides out (`REACH`).
+fn rail(b: &mut MeshBuilder, len: f32, ties: &[f32]) {
+    let fine = b.fine();
+    b.with_charge_gear(SPREAD, |b| {
+        dark_plate(b);
+        bar_through(
+            b,
+            &[
+                (v3(1.0, 3.2, 0.0), Vec2::new(1.4, 3.4)),
+                (v3(14.0, 3.6, 0.0), Vec2::new(1.2, 3.0)),
+                (v3(22.0, 4.0, 0.0), Vec2::new(1.0, 2.6)),
+                (v3(len + 0.2, 3.9, 0.0), Vec2::new(0.8, 2.0)),
+            ],
+            Vec3::Y,
+        );
+        Course {
+            count: if fine { 3 } else { 1 },
+            step: 6.0,
+            len: 7.0,
+            half: 1.2,
+            tip: 0.0,
+            thick: 0.3,
+            tail: 1.5,
+        }
+        .lay(
+            b,
+            &Frame::new(v3(len - 4.0, 4.35, 0.0), v3(-1.0, 0.05, 0.0), Vec3::Y),
+        );
+        if fine {
+            slit(b, v3(17.0, 3.04, 0.0), -Vec3::Y, Vec3::X, 4.0, 0.3);
+        }
+        // The ties' outer sleeves, riding out with the rail over their fixed middles.
+        metal(b);
+        for &x in ties {
+            for z in [-1.3f32, 1.3] {
+                bar_through(
+                    b,
+                    &[
+                        (v3(x, 1.6, z), Vec2::new(0.62, 0.62)),
+                        (v3(x, 3.3, z), Vec2::new(0.62, 0.62)),
+                    ],
+                    Vec3::X,
+                );
+            }
+        }
+    });
+    b.with_charge_gear(REACH, |b| lens_head(b, len));
 }
 
 /// A rail's head (+y side): a plated sleeve over the rail's tip, overlapping it far enough

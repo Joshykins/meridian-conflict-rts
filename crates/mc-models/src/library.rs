@@ -237,6 +237,7 @@ fn build_fitted_made(
     let mut discharge = None;
     let mut vtol = None;
     let mut flight = None;
+    let mut siege = None;
     let lods: [MeshLod; LOD_COUNT] = std::array::from_fn(|lod| {
         let mut builder = MeshBuilder::new(lod, root);
         builder.set_modules(modules);
@@ -271,6 +272,7 @@ fn build_fitted_made(
             discharge = builder.discharge();
             vtol = builder.vtol();
             flight = builder.flight();
+            siege = builder.siege();
         }
         builder.finish()
     });
@@ -337,6 +339,7 @@ fn build_fitted_made(
         discharge,
         vtol,
         flight,
+        siege,
     })
 }
 
