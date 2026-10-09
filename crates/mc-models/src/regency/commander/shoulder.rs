@@ -276,14 +276,14 @@ fn hex_ring(t: f32, r: f32) -> Vec<Vec3> {
         .collect()
 }
 
-/// The muzzle collar's open front, an armoured lip with a red gasket round the bore, and
+/// The muzzle collar's open front, an armoured lip with a violet gasket round the bore, and
 /// the bore: a cavity sunk into the collar, the beam leaving the middle of its mouth.
 fn muzzle(b: &mut MeshBuilder, len: f32) {
     let outer = hex_ring(len, 0.52);
     let mouth = hex_ring(len, 0.32);
     machined(b);
     b.with_facets(|b| b.loft(&[hex_ring(len - 0.3, 0.6), outer.clone()], false, false));
-    b.paint(PLATING_DARK).pattern(pattern::EMBER_RIM);
+    b.paint(PLATING_DARK).pattern(pattern::NANITE_RIM);
     for k in 0..HEX.len() {
         let n = (k + 1) % HEX.len();
         b.face(&[outer[k], mouth[k], mouth[n], outer[n]]);

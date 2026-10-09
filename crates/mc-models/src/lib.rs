@@ -187,7 +187,10 @@ pub mod pattern {
     pub const EMBER_RIM: u32 = crate::gpu_consts::ember_plate::RIM;
     /// Precision Regency armour with finer scanned grain and recessed fasteners.
     pub const EMBER_MACHINED: u32 = crate::gpu_consts::ember_plate::MACHINED;
-    pub const LAST: u32 = EMBER_MACHINED;
+    /// Standard Regency armour with a violet gasket inside the face perimeter: nanite
+    /// gear's `EMBER_RIM`, brighter while the unit builds.
+    pub const NANITE_RIM: u32 = crate::gpu_consts::nanite::PATTERN_RIM;
+    pub const LAST: u32 = NANITE_RIM;
 }
 
 /// Which rigid part of the model a vertex belongs to. The vertex shader

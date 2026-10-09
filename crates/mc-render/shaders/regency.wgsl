@@ -87,7 +87,8 @@ fn regency_none() -> RegencyLook {
 // Regency plate, or Regency plate with nanite slots let in (both are coloured here).
 fn regency_pattern(p: u32) -> bool {
     return p == PAT_EMBER || p == NANITE_PATTERN_SLOT
-        || p == EMBER_PLATE_SLOT || p == EMBER_PLATE_RIM || p == EMBER_PLATE_MACHINED;
+        || p == EMBER_PLATE_SLOT || p == EMBER_PLATE_RIM || p == EMBER_PLATE_MACHINED
+        || p == NANITE_PATTERN_RIM;
 }
 
 // A nanite face's slot, down the middle of the face the long way: how far across from
@@ -145,6 +146,13 @@ fn reg_nanite_slot(i: RegencyIn) -> vec3<f32> {
     return vec3<f32>(across, along, half);
 }
 
+// How many times brighter nanite light burns: one at rest, while the unit builds
+// `NANITE_WORK_GLOW` on a quick beat.
+fn reg_nanite_work(i: RegencyIn) -> f32 {
+    let work = NANITE_WORK_GLOW * (0.75 + 0.25 * sin(i.time * NANITE_WORK_BEAT + i.unit * 31.0));
+    return mix(1.0, work, i.working);
+}
+
 // The slot cut in a nanite face: dark glazing, framed by a groove and a lit lip, the
 // nanites streaming along it in violet, thickening and thinning, a slow beat over them;
 // while the unit builds they race along it, burning several times brighter on a quick beat.
@@ -171,9 +179,7 @@ fn reg_nanite(i: RegencyIn, out_in: RegencyLook, fw: f32) -> RegencyLook {
     let churn = 0.5 + surf_fbm3(flow * 2.0, i.scale * 0.08, fw);
     let seen = surf_resolved(half, fw);
     let stream = mix(0.55, 0.25 + 1.3 * knot * churn, seen);
-    let idle_beat = 0.8 + 0.2 * sin(i.time * 1.7 + i.unit * 31.0);
-    let work_beat = NANITE_WORK_GLOW * (0.75 + 0.25 * sin(i.time * NANITE_WORK_BEAT + i.unit * 31.0));
-    let beat = mix(idle_beat, work_beat, i.working);
+    let beat = mix(0.8 + 0.2 * sin(i.time * 1.7 + i.unit * 31.0), reg_nanite_work(i), i.working);
     // Brightest down the slot's middle.
     let core = 1.0 - smoothstep(0.0, half, slot.x) * 0.6;
     let violet = vec3<f32>(NANITE_R, NANITE_G, NANITE_B);
@@ -404,10 +410,15 @@ fn regency_plate(i: RegencyIn) -> RegencyLook {
             out.tone *= 1.0 - 0.9 * (1.0-smoothstep(-fw, fw, d-half));
             out.glow = regency_lamp_light(i.skin) * lit;
         }
-    } else if i.optic == EMBER_PLATE_RIM {
+    } else if i.optic == EMBER_PLATE_RIM || i.optic == NANITE_PATTERN_RIM {
         let inset = max(i.scale * 0.028, o.small * 0.18);
         let lit = surf_band(o.e - inset, i.scale * 0.013, fw);
-        out.glow = regency_lamp_light(i.skin) * lit;
+        if i.optic == EMBER_PLATE_RIM {
+            out.glow = regency_lamp_light(i.skin) * lit;
+        } else {
+            out.glow = vec3<f32>(NANITE_R, NANITE_G, NANITE_B) * lit * NANITE_RIM_GLOW
+                * reg_nanite_work(i);
+        }
     }
     if i.nanite {
         out = reg_nanite(i, out, fw);

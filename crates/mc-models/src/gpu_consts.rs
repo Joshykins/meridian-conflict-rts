@@ -1087,6 +1087,12 @@ shared! {
         /// `pattern::NANITE_SLOT` (regency.wgsl): Regency plate with one slot let in down
         /// the middle of each long face, glazed, the nanites streaming along it in violet.
         pub const PATTERN_SLOT: u32 = 39;
+        /// `pattern::NANITE_RIM`: Regency plate with a violet gasket inside the face's
+        /// perimeter (the red `ember_plate::RIM` in the nanites' light), burning up with
+        /// the slots while the unit builds.
+        pub const PATTERN_RIM: u32 = 44;
+        /// How bright the rim burns at rest, against the violet's unit colour.
+        pub const RIM_GLOW: f32 = 3.0;
         /// Their violet (linear), kept low: bright violet blooms to white.
         pub const R: f32 = 0.66;
         pub const G: f32 = 0.12;

@@ -1772,6 +1772,7 @@ impl MeshBuilder {
                 | pattern::EMBER_SLOT
                 | pattern::EMBER_RIM
                 | pattern::EMBER_MACHINED
+                | pattern::NANITE_RIM
         );
         let frame = match self.framing {
             Framing::Flat => FaceFrame::flat(points, normal, if regency { 0.62 } else { 0.45 }),
