@@ -101,6 +101,9 @@ pub struct State {
     /// Gravitic lenses' links and the wells they hold on their targets (`lens.rs`).
     #[serde(default)]
     pub lenses: Vec<crate::lens::Tether>,
+    /// Surge shells' wakes rolling out from where they landed (`surge.rs`).
+    #[serde(default)]
+    pub surges: Vec<crate::surge::SurgeWake>,
     /// Poured lots under structures. They stay after the building dies.
     #[serde(default)]
     pub pads: Pads,
@@ -436,6 +439,7 @@ impl World {
             wells: Vec::new(),
             wakes: Vec::new(),
             lenses: Vec::new(),
+            surges: Vec::new(),
             pads: Pads::default(),
             terrain_edits: Vec::new(),
             props_dead: vec![0; map.props.len().div_ceil(64)],
@@ -837,6 +841,10 @@ impl World {
         if !self.state.lenses.is_empty() {
             let _t = mc_core::perf_span!("fn.run_lenses");
             self.run_lenses();
+        }
+        if !self.state.surges.is_empty() {
+            let _t = mc_core::perf_span!("fn.run_surges");
+            self.run_surges();
         }
         phase(&mut self.timings, "weapons");
 

@@ -388,6 +388,7 @@ impl Renderer {
             );
             self.upload_wake_shells(input.time);
             self.lens_fx.upload(input.time, input.alpha.clamp(0.0, 1.0));
+            self.surge_fx.upload();
             self.lens_flares.upload(input.time, camera);
             self.upload_lights(input.time, input.alpha.clamp(0.0, 1.0), camera);
         }
@@ -1031,6 +1032,11 @@ impl Renderer {
             // Cone weapons' wakes, shells of light added onto the scene (wake_shell.wgsl).
             self.timers.draws(&device, cmd, "scene.wake_shells");
             self.wake_shells.draw(&device, cmd, self.layouts.scene);
+            self.timers.end(&device, cmd);
+
+            // Surge shells' wakes, the swell and its burn added onto the scene (surge_fx.wgsl).
+            self.timers.draws(&device, cmd, "scene.surges");
+            self.surge_fx.draw(&device, cmd, self.layouts.scene);
             self.timers.end(&device, cmd);
 
             // Gravitic lenses, bending the scene the water sees through (lens_fx.wgsl).

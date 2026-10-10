@@ -97,6 +97,7 @@ pub mod store_lights;
 mod strafe;
 mod stranded;
 mod strike_drones;
+pub mod surge;
 pub mod survival;
 pub mod tables;
 mod target_pick;

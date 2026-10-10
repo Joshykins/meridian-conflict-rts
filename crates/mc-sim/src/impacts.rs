@@ -431,6 +431,12 @@ impl World {
                 ));
             }
         }
+        if sub_shot.is_none() {
+            // A surge shell's wake rolls out from wherever it burst (`surge.rs`).
+            let p = &self.state.projectiles;
+            let (blueprint, slot) = (p.blueprint[projectile], p.weapon[projectile]);
+            self.surge_struck(hit.point.xy(), blueprint, slot, owner, source);
+        }
         if weapon.discharge > 0.0 {
             // A charged shell: its charge strikes back up the last of its flight.
             #[expect(

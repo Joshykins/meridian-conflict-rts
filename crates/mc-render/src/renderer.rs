@@ -112,6 +112,7 @@ mod structure_pads;
 mod stun_fx;
 mod supernova_fx;
 pub(crate) mod surface_marks;
+pub(crate) mod surge_fx;
 mod survival_fx;
 mod terrain_lit;
 mod trail_fx;
@@ -983,6 +984,8 @@ pub struct Renderer {
     wake_shells: wake_shell::WakeShells,
     /// Gravitic lenses at work: charge, front, well (lens_fx.rs, lens_fx.wgsl).
     lens_fx: lens_fx::LensFx,
+    /// Surge shells' wakes: the swell and the burn it leaves (surge_fx.rs, surge_fx.wgsl).
+    surge_fx: surge_fx::SurgeFx,
     pad_footprints: Image,
     hull_plans: Image,
     font: Image,
@@ -2066,6 +2069,7 @@ impl Renderer {
         let nuke_volume = nuke_volume::NukeVolume::new(&gpu, &layouts, &passes, sky.noise_view())?;
         let wake_shells = wake_shell::WakeShells::new(&gpu, &layouts, &passes)?;
         let lens_fx = lens_fx::LensFx::new(&gpu, &layouts, &passes)?;
+        let surge_fx = surge_fx::SurgeFx::new(&gpu, &layouts, &passes)?;
         let post = post::Post::new(&gpu, passes.present, layouts.screen)?;
         let shafts = shafts::Shafts::new(&gpu, &layouts, &passes)?;
 
@@ -2593,6 +2597,7 @@ impl Renderer {
             nuke_volume,
             wake_shells,
             lens_fx,
+            surge_fx,
             pad_footprints,
             hull_plans,
             font,
@@ -3467,6 +3472,7 @@ impl Renderer {
         self.nuke_tick(frame, time, camera);
         self.write_regency_trails(time);
         self.lens_tick(frame, time);
+        self.surge_tick(time);
         self.stream_bursts(projectiles, time, camera);
         self.sea_tick(units, projectiles, time, camera);
         self.warp_tick(frame, time, camera);
@@ -4616,6 +4622,8 @@ impl Renderer {
                 self.effect_settings.shockwave_color = Some([0.24, 0.62, 1.0]);
             }
         }
+        // A surge shell's wake follows its blast, which is drawn as any shell's.
+        self.surge_event(event, time);
         if !self.heavy_rail_event(event, time)
             && !self.great_gun_event(event, time)
             && !self.bolt_rifle_event(event, time)
@@ -5685,6 +5693,7 @@ impl Drop for Renderer {
         self.nuke_volume.destroy(&self.gpu);
         self.wake_shells.destroy(&self.gpu);
         self.lens_fx.destroy(&self.gpu);
+        self.surge_fx.destroy(&self.gpu);
         self.post.destroy(&self.gpu);
         self.gtao.destroy(&self.gpu);
         self.terrain_lit.destroy(&self.gpu);

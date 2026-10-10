@@ -1419,6 +1419,25 @@ shared! {
         pub const BREAK: f32 = 0.6;
     }
 
+    /// A surge shell's wake, the Saker's (renderer/surge_fx.rs, surge_fx.wgsl): a low
+    /// ripple of light rolling out all round from the crater, and the ground it has rolled
+    /// over left veined with embers that pulse and die down.
+    pub mod surge_fx as "SURGE_FX_" {
+        /// Surges drawn at once; past it the oldest goes first (`surge_fx`).
+        pub const MAX_SURGES: u32 = 16;
+        /// The burnt disc: rings out from the crater to the front, and segments round it.
+        pub const RINGS: u32 = 40;
+        pub const SEGMENTS: u32 = 128;
+        /// The front's quads round its section.
+        pub const SECTION: u32 = 8;
+        /// Seconds a stretch of ground just passed burns bright before it settles to embers.
+        pub const FRESH: f32 = 0.45;
+        /// Seconds the embers take to die away at the end of the burn.
+        pub const FADE: f32 = 1.6;
+        /// Seconds the front takes to thin away once it has rolled out to its radius.
+        pub const SPENT: f32 = 0.5;
+    }
+
     /// A gravitic lens at work, the Lodestone's (renderer/lens_fx.rs, lens_fx.wgsl): its
     /// charge, the front it sends out, and the well it holds on its target.
     pub mod lens_fx as "LENS_FX_" {

@@ -220,6 +220,7 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 | Wake tank (T3) | Wake |
 | Battle scorpion, assault tripod (T4) | Harrow, Strider |
 | Four-legged siege walker (T4) | Colossus |
+| Surge artillery, a low four-legged gun carriage (T4) | Saker |
 | Raider, light tank, mobile anti-air (T1) | Marauder, Sledge, Brazier |
 | Light artillery (T1) | Mattock |
 | Battle tank / mobile anti-air (T2) | Glaive / Vane |
@@ -406,7 +407,15 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
       held on the target (the T4 battle scorpion).
     - **Pinch-fusion Beam:** a grade up, with fusion bursts strobing along
       it. The **Orbital Pinch-fusion Beam** is the campaign's glassing beam.
-  - **Indirect fire:** **Plasmeric Mortar**, **Plasmeric Howitzer**.
+  - **Indirect fire:** **Plasmeric Mortar**, **Plasmeric Howitzer**. The
+    **Surge Mortar** (the T4 Saker, `Weapon::surge`) lands as a Pinch-fusion
+    shell does, then lets go a wake through the ground that is nothing like the
+    Wake's wall of plasma: a low swell, a pale rose crest no taller than a man
+    over bent violet air, rolling out all round the crater, and behind it the
+    ground left in patches of wandering crimson cracks that pulse slowly, with
+    broken violet ripples running out through them, embers rising, until it
+    dies down (renderer/surge_fx.rs, surge_fx.wgsl). Never an even web of
+    cracks over the whole disc, never a solid plate of light.
   - **AA:** no flak (user call 2026-10-03). Tech 1 is a **Plasmeric
     Repeater** turned on the sky, bolts out of each tube in turn that strike
     the plane they are fired at. Tech 2 is the **Twin Pinched-plasmeric

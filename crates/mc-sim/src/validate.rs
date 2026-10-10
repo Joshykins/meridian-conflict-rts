@@ -82,6 +82,14 @@ impl State {
             .or_else(|| {
                 let owners: Vec<_> = self.lenses.iter().map(|t| t.owner).collect();
                 bad_owner("lenses", &owners)
+            })
+            .or_else(|| {
+                let surges: Vec<_> = self.surges.iter().map(|w| w.blueprint).collect();
+                bad_bp("surges", &surges)
+            })
+            .or_else(|| {
+                let owners: Vec<_> = self.surges.iter().map(|w| w.owner).collect();
+                bad_owner("surges", &owners)
             });
         problem.map_or(Ok(()), Err)
     }

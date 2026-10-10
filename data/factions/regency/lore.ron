@@ -77,6 +77,12 @@
             "Ruin Rocket Battery": "Eight rockets thrown out of its back in one quick ripple. Unguided and wild, they fall across the field and burst as pinch-fusion strikes.",
         },
     ),
+    "regency_t4_surge_artillery": (
+        lore: "A low gun carriage that crawls on four bent legs and plants them wide to fire. Its one long mortar throws a pinch-fusion shell that does not stop at the crater: the blast runs out through the ground in a wide ring and leaves everything it passed over smouldering.",
+        weapons: {
+            "Surge Mortar": "A heavy pinch-fusion shell lobbed far over the field. It lands as hard as any siege shell, then a low wake rolls out 180 metres all round the crater and the ground it crossed burns lightly for several seconds, wearing down everything of the enemy's standing on it.",
+        },
+    ),
     "regency_t5_seraph": (
         lore: "A winged machine that hangs over the field on its lifts. It does not march to a fight: it gathers itself, is gone, and comes down in the middle of the enemy, and its landing throws everything round it flat.",
         weapons: {

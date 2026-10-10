@@ -253,6 +253,9 @@ fn setup(w: &mut World) {
                 // The Regency gravitic lens: it plants, its front runs out to one of the
                 // south's army and a well holds on it, crushing and slowing (`lens.rs`).
                 add("regency_t3_gravitic_lens", 1, 700, 1250);
+                // The Regency surge artillery: it plants and lobs a shell into the south's
+                // army, whose wake rolls out round the crater and burns (`surge.rs`).
+                add("regency_t4_surge_artillery", 1, 300, 600);
             }
         }
     }
@@ -596,6 +599,7 @@ fn reference() -> Vec<u64> {
     let mut staged = false;
     let mut wing_out = false;
     let mut lens_strikes = 0;
+    let mut surging = 0;
     let hashes = (1..TICKS)
         .map(|t| {
             let commands = script(&mut w, t);
@@ -666,6 +670,7 @@ fn reference() -> Vec<u64> {
                     _ => {}
                 }
             }
+            surging += usize::from(!w.state.surges.is_empty());
             split += w
                 .events
                 .iter()
@@ -687,6 +692,8 @@ fn reference() -> Vec<u64> {
     assert!(dashes > 0, "the Seraph never dashed");
     // The lens's front struck and its well opened.
     assert!(lens_strikes > 0, "the gravitic lens never struck");
+    // A surge shell landed and its wake rolled out.
+    assert!(surging > 0, "no surge shell's wake rolled out");
     // The elevator's first platform brought its queue down after the snapshot.
     assert!(platforms > 0, "no elevator platform docked with units");
     // City blocks took shots, caught fire and came down.

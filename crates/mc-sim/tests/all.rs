@@ -98,6 +98,7 @@ mod straight_moves;
 mod stranded_ships;
 mod stream;
 mod strider;
+mod surge;
 mod survival;
 mod t2_artillery;
 mod thirty_two;

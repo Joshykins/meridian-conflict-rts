@@ -242,6 +242,50 @@
         mesh: "regency_colossus", icon: SiegeWalker,
         sounds: (death: "blast_large", moving: "regency_crawl", step: "regency_footfall"),
     ),
+    // The Saker: tech 4 mobile artillery, a low quadruped crawling on four bent legs with
+    // one long Surge Mortar on its back. It plants to fire (`deploy`: the legs step out
+    // and the body settles) and charges its shell for two seconds. The shell lands as any
+    // heavy shell does, hard over an ordinary blast, then lets go a wake (`surge`, mc-sim
+    // `surge.rs`; drawn by `surge_fx.rs`) that rolls out all round from the crater, low
+    // over the ground, to 180 m in three seconds, and leaves the ground it rolled over
+    // burning for six more: everything of the enemy's in it takes a light 40 a second,
+    // the same anywhere in it (never aircraft). One shell holds an area, not a unit.
+    //
+    // Balance: past the Kiln (5200 at 1600 m every 10 s) in reach and weight of shell,
+    // 7000 at 2600 m every 14 s, and the wake on top; far short of a map gun's reach. Not a
+    // brawler: less than half a Strider's armour, and it must plant.
+    //
+    // Model: `regency_saker` (`models::regency::saker`), authored at this size.
+    (
+        key: "regency_t4_surge_artillery",
+        name: "Saker",
+        role: "Surge Artillery", title: "Surge Artillery",
+        tech: 4,
+        categories: ["Land", "Artillery", "Experimental"],
+        health: 26000,
+        cost: (mass: 3200, energy: 32000, time: 19000),
+        radius: 26.0, height: 14.5,
+        footprint: (5, 5),
+        vision: 600,
+        motion: (layer: Land, size: 4, speed: 20, accel: 10, turn: 30, deploy: 6.0, deploy_idle: true),
+        weapons: [(
+            name: "Surge Mortar",
+            damage: 7000, splash: 32, range_min: 250, range: 2600, reload: 14.0, speed: 520,
+            trajectory: Ballistic, loft: 3, spread: 1.2,
+            surge: (radius: 180, speed: 60, damage: 40, linger: 6),
+            turret_turn: 20, muzzle: (30.427, 0, 11.093), pivot: (0.5, 0, 9.0),
+            targets: ["Structure", "Land", "Naval"], color: Orange, red: 1.0,
+            plasma_grade: Some(PinchFusion),
+            flash: 1.6, impact: 2.0, tracer: 2.4,
+            sounds: (
+                fire: "regency_sunspear_fire", charge: "regency_sunspear_charge", charge_time: 2.0,
+                charge_volume: 1.6,
+                impact: "regency_surge_hit", ground: "regency_surge_hit",
+            ),
+        )],
+        mesh: "regency_saker", icon: Artillery,
+        sounds: (death: "blast_large", moving: "regency_crawl"),
+    ),
     // The Seraph, the Regency's tier 5: a winged mecha that hangs over the ground on its
     // lifts (it hovers over land and water alike), an assassin among titans. It is fast
     // for anything its size, and it does not walk into a fight: once it sees enemies on the

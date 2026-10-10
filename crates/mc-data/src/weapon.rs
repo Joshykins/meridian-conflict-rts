@@ -250,6 +250,9 @@ pub struct Weapon {
     /// A gravitic lens (`RawWeapon::lens`): firing sends a front of gravity out to the
     /// target that opens a well on it where it strikes (`lens.rs`); no round flies.
     pub lens: Option<Lens>,
+    /// A surge shell (`RawWeapon::surge`): where it lands, a wake rolls out all round and
+    /// burns lightly over a wide disc for a while (mc-sim `surge.rs`).
+    pub surge: Option<crate::surge::Surge>,
     /// A strafing beam (`RawWeapon::strafe`): fixed in the hull, it rakes a line over the
     /// ground through its mark as the aircraft flies its run (`strafe.rs`).
     pub strafe: Option<Strafe>,

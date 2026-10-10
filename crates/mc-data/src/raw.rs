@@ -1378,6 +1378,9 @@ pub struct RawWeapon {
     /// A gravitic lens: holds a gravity well on its target (`RawLens`).
     #[serde(default)]
     pub lens: Option<RawLens>,
+    /// A surge shell: where it lands a wake rolls out all round (`crate::surge`).
+    #[serde(default)]
+    pub surge: Option<crate::surge::RawSurge>,
     /// A strafing beam (`RawStrafe`).
     #[serde(default)]
     pub strafe: Option<RawStrafe>,
@@ -1982,6 +1985,20 @@ impl Unit {
                      cone, a radius over zero and 0 <= slow <= 1"
                 )));
             }
+            if w.surge.is_some()
+                && (w.hitscan
+                    || w.beam
+                    || w.bore.is_some()
+                    || w.cone.is_some()
+                    || w.lens.is_some()
+                    || w.cloud.is_some()
+                    || w.cluster.is_some())
+            {
+                return Err(DataError::Invalid(format!(
+                    "{ctx}: a surge rides a shell that lands: no hitscan, beam, bore, cone, \
+                     lens, cloud or cluster"
+                )));
+            }
             if w.dash_only && w.cone.is_none() {
                 return Err(DataError::Invalid(format!(
                     "{ctx}: a dash_only weapon is a cone, let go at the unit's feet as it lands"
@@ -2170,6 +2187,10 @@ impl Unit {
                     radius: fx(l.radius),
                     slow: fx(l.slow),
                 }),
+                surge: match &w.surge {
+                    Some(s) => Some(s.compile(key, fx, TICKS_PER_SECOND)?),
+                    None => None,
+                },
                 sabot: match &w.sabot {
                     Some(s) => {
                         let (x, y, z) = s.throw;

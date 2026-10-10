@@ -16,6 +16,7 @@ pub mod regions;
 pub mod skins;
 pub mod sounds;
 pub mod strategic;
+pub mod surge;
 pub mod survival;
 mod weapon;
 pub mod weather;
@@ -1946,6 +1947,12 @@ impl Blueprints {
                 if let Some(l) = w.lens {
                     h.write_i64(l.radius.0);
                     h.write_i64(l.slow.0);
+                }
+                if let Some(s) = w.surge {
+                    for v in [s.radius, s.speed, s.damage] {
+                        h.write_i64(v.0);
+                    }
+                    h.write_u64(s.roll_ticks as u64 | (s.linger_ticks as u64) << 16);
                 }
                 if let Some(c) = w.cone {
                     h.write_u64(c.half.0 as u64);

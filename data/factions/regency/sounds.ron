@@ -574,6 +574,49 @@
                 Roll(at: 0.1, from: 300, to: 50, glide: 2.0, attack: 0.1, decay: 1.1, gain: 0.3, swell: 3, depth: 0.5, seed: 52),
             ],
         ),
+        // A Surge Mortar shell landing (the Saker): the Sunspear's strike, heavier. A
+        // crack and a great whump, a deep boom and growl; then the wake rolling out all
+        // round through the ground, a low groaning rumble that swells for a second and
+        // a half and recedes, the earth heaving and settling under it; then the seared
+        // ground smouldering, a soft crackle of embers fading out. No whoosh, no tone.
+        "regency_surge_hit": (
+            length: 6.5, peak: 0.9, room: 0.45,
+            layers: [
+                // The shell letting go: a crack, the whump, the slam into the ground.
+                Burst(low: 500, high: 2600, attack: 0.0003, decay: 0.009, gain: 9, seed: 8101),
+                Burst(low: 60, high: 550, attack: 0.001, decay: 0.1, gain: 18, seed: 8102),
+                Burst(at: 0.002, low: 25, high: 180, attack: 0.005, decay: 0.5, gain: 16, seed: 8103),
+                // The boom, deep and held.
+                Tone(from: 100, to: 36, glide: 0.3, attack: 0.002, decay: 0.4, gain: 1.5),
+                Tone(from: 50, to: 24, glide: 1.2, attack: 0.008, decay: 1.0, gain: 1.1),
+                // The fusion's growl, rough and long.
+                Fm(from: 84, to: 46, glide: 0.4, ratio: 0.5, index: 2.6, fade: 0.3, attack: 0.002, decay: 0.55, gain: 0.7),
+                Fm(at: 0.004, from: 170, to: 96, glide: 0.35, ratio: 0.5, index: 1.8, fade: 0.2, attack: 0.003, decay: 0.3, gain: 0.4),
+                Drive(1.7),
+                // The blast roaring off the crater.
+                Roll(at: 0.01, from: 1300, to: 160, glide: 1.0, attack: 0.02, decay: 0.6, gain: 0.5, swell: 12, depth: 0.6, seed: 8104),
+                // The wake through the ground: a deep groan that swells as it runs out
+                // and recedes, rough with the earth it shoves.
+                Fm(at: 0.15, from: 62, to: 42, glide: 3.0, ratio: 0.5, index: 2.4, fade: 2.0, attack: 1.2, decay: 0.9, gain: 0.32),
+                Roll(at: 0.1, from: 340, to: 110, glide: 3.0, attack: 1.3, decay: 0.95, gain: 0.5, swell: 3, depth: 0.6, seed: 8105),
+                // The front grinding along, widening to either side as it rolls out.
+                Roll(at: 0.2, from: 800, to: 280, glide: 3.0, attack: 1.0, decay: 0.85, gain: 0.5, swell: 7, depth: 0.7, pan: -0.5, seed: 8106),
+                Roll(at: 0.28, from: 780, to: 270, glide: 3.0, attack: 1.0, decay: 0.85, gain: 0.5, swell: 7, depth: 0.7, pan: 0.5, seed: 8107),
+                // The earth heaving under it, here and there, then settling.
+                Burst(at: 0.85, low: 35, high: 260, attack: 0.01, decay: 0.12, gain: 2.2, pan: -0.35, seed: 8108),
+                Burst(at: 1.4, low: 35, high: 240, attack: 0.012, decay: 0.14, gain: 2.0, pan: 0.4, seed: 8109),
+                Burst(at: 2.1, low: 30, high: 220, attack: 0.015, decay: 0.16, gain: 1.6, pan: -0.15, seed: 8110),
+                Burst(at: 2.8, low: 30, high: 200, attack: 0.02, decay: 0.18, gain: 1.1, pan: 0.25, seed: 8111),
+                // The seared ground smouldering: embers ticking and a low sizzle, fading.
+                Roll(at: 0.7, from: 1300, to: 700, glide: 4.0, attack: 0.7, decay: 1.4, gain: 0.3, swell: 95, depth: 1.0, pan: -0.3, seed: 8112),
+                Roll(at: 0.8, from: 1250, to: 650, glide: 4.0, attack: 0.7, decay: 1.4, gain: 0.3, swell: 105, depth: 1.0, pan: 0.3, seed: 8113),
+                Foam(at: 0.9, from: 900, to: 320, glide: 4.0, q: 0.8, attack: 0.8, decay: 1.3, gain: 0.16, swell: 30, depth: 1.0, seed: 8114),
+                Burst(at: 1.55, low: 400, high: 1600, attack: 0.0004, decay: 0.004, gain: 0.9, pan: 0.5, seed: 8115),
+                Burst(at: 2.35, low: 350, high: 1500, attack: 0.0004, decay: 0.005, gain: 0.8, pan: -0.45, seed: 8116),
+                Burst(at: 3.05, low: 400, high: 1600, attack: 0.0004, decay: 0.004, gain: 0.6, pan: 0.2, seed: 8117),
+                Burst(at: 3.9, low: 350, high: 1400, attack: 0.0004, decay: 0.005, gain: 0.45, pan: -0.25, seed: 8118),
+            ],
+        ),
 
         // AA salvo bolts emit one fire event each: one selected pulse per bolt.
         "regency_canopy_fire": (like: "regency_repeater", size: 0.95, peak: 0.34),
