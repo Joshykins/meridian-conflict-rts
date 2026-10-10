@@ -1,10 +1,10 @@
 //! The tech 3 mobile anti-spaceship gun: a siege carriage that plants to fire. A long
-//! faceted body rides four armoured tread pods, one at each corner on a short rigid arm
-//! out of a housing in its flank. Packed, the pods run beside the body like a four-tracked
-//! hull, the arms lying nearly flat, and the gun lies along the deck with its rails slid
+//! faceted body rides four armoured tread pods hinged at its corners, each on a stub arm
+//! out of a housing in its flank that the pod all but hides. Packed, the pods run beside
+//! the body like a four-tracked hull and the gun lies along the deck with its rails slid
 //! back down the turret's flanks. Planting (`Model::siege`, `gpu_consts::siege`), each pod
-//! turns in place out into an X, then the arms pivot down about their hips and push the
-//! body up over the pods; the gun rises to the sky and its rails slide out along the bore.
+//! swings out about its hinge like a gate into an X, then the stub arms pivot down and push
+//! the body up between the pods; the gun rises to the sky and its rails slide out.
 //!
 //! The gun is the Sunspear's own at [`S`] times its size: two tall rails either side of
 //! a short coiled bore, lens heads at their tips, the rails parting and the heads sliding
@@ -36,8 +36,8 @@ const S: f32 = 0.9;
 const NOSE: f32 = 15.0;
 const TAIL: f32 = -13.0;
 const HALF: f32 = 7.5;
-const BELLY: f32 = 8.0;
-const DECK: f32 = 12.5;
+const BELLY: f32 = 3.2;
+const DECK: f32 = 10.5;
 /// The turret's roof.
 const ROOF: f32 = DECK + 3.2;
 /// The gun's line: raised 60 degrees at rest, the Sunspear's bore at [`S`].
@@ -52,19 +52,22 @@ pub(super) const HOLD: f32 = 4.3 * S;
 /// How far back along the bore the rails lie packed, down the turret's flanks.
 const RETRACT: f32 = 12.0 * S;
 
-/// The front left arm, planted: its hip in the body's flank, its knee on the pod. Packed
-/// it lies [`PACKED_PITCH`] below level, planted 40 degrees.
-const HIP: Vec3 = Vec3::new(9.5, 6.0, 9.8);
-const ARM_LEN: f32 = 6.5;
-const ARM_WAY: Vec2 = Vec2::new(0.55, 0.835);
-const ARM_PITCH: f32 = 0.698;
-const PACKED_PITCH: f32 = 0.14;
-/// How far the front left pod turns out to the left, planted: the X.
-const SPLAY: f32 = 0.6;
-/// A pod: half its length, half its width, its height.
-const POD_SIZE: Vec3 = Vec3::new(6.2, 2.8, 5.0);
+/// The front left hinge arm, planted: its hip in a housing at the body's corner, its knee
+/// the hinge on the pod's inner face. A short stub the pod all but hides: packed it lies
+/// [`PACKED_PITCH`] below level, planted 50 degrees, which lifts the body.
+const HIP: Vec3 = Vec3::new(8.5, 6.8, 5.36);
+const ARM_LEN: f32 = 3.6;
+const ARM_WAY: Vec2 = Vec2::new(0.3, 0.954);
+const ARM_PITCH: f32 = 0.873;
+const PACKED_PITCH: f32 = 0.1;
+/// How far the front left pod swings out about its hinge, planted, like a gate: the X.
+const SPLAY: f32 = 0.5;
+/// A pod: half its length, half its width, its height. It runs out from its hinge, which
+/// sits on its inner face [`POD_BACK`] from its inner end.
+const POD_SIZE: Vec3 = Vec3::new(5.0, 2.6, 4.4);
+const POD_BACK: f32 = 1.2;
 /// The arm's width and depth.
-const ARM_THICK: Vec2 = Vec2::new(3.0, 2.6);
+const ARM_THICK: Vec2 = Vec2::new(3.2, 2.8);
 
 /// The front left arm's knee, planted.
 fn knee() -> Vec3 {
@@ -72,7 +75,7 @@ fn knee() -> Vec3 {
         - Vec3::Z * ARM_LEN * ARM_PITCH.sin()
 }
 
-/// The front left pod's middle, packed.
+/// The front left pod's hinge, packed.
 fn packed_knee() -> Vec2 {
     HIP.truncate() + ARM_WAY.normalize() * ARM_LEN * PACKED_PITCH.cos()
 }
@@ -91,7 +94,11 @@ pub(super) fn draw(b: &mut MeshBuilder) {
     });
     // Packed, its tracks run beside the body.
     let packed = packed_knee();
-    b.set_treads(packed.y, POD_SIZE.y * 2.0, -packed.x - POD_SIZE.x);
+    b.set_treads(
+        packed.y + POD_SIZE.y,
+        POD_SIZE.y * 2.0,
+        -packed.x - 2.0 * POD_SIZE.x + POD_BACK,
+    );
     b.set_dust_line(POD_SIZE.z);
     if b.coarse() {
         coarse(b, knee);
@@ -140,9 +147,7 @@ fn coarse(b: &mut MeshBuilder, knee: Vec3) {
     team_patch(b, -3.0, 0.0, 1.0, ROOF + 0.01);
     for (sx, sy) in CORNERS {
         b.with_siege(POD, |b| {
-            let frame = Affine3A::from_translation(v3(knee.x * sx, knee.y * sy, 0.0))
-                * Affine3A::from_rotation_z(SPLAY * sx * sy);
-            b.with(frame, |b| {
+            b.with(pod_frame(knee, sx, sy), |b| {
                 b.with_part(part::LOCOMOTION, |b| {
                     b.paint(TREAD);
                     let Vec3 { x: l, y: w, z: h } = POD_SIZE;
@@ -206,16 +211,26 @@ fn legs(b: &mut MeshBuilder, knee: Vec3) {
             collar(b, hip, Vec3::Y, ARM_THICK.y * 0.55, ARM_THICK.x + 0.4);
         });
         b.with_siege(POD, |b| {
-            let frame = Affine3A::from_translation(v3(knee.x, knee.y, 0.0))
-                * Affine3A::from_rotation_z(SPLAY * sx * sy);
-            b.with(frame, |b| pod(b, knee.z, sy));
+            // The hinge: a plated block on the pod's inner face round a bronze pin.
+            dark_plate(b);
+            b.with_facets(|b| b.cuboid(knee, v3(ARM_THICK.x + 0.8, 1.6, ARM_THICK.y + 0.8)));
+            collar(b, knee, Vec3::Y, ARM_THICK.y * 0.45, 2.4);
+            b.with(pod_frame(knee / side, sx, sy), |b| pod(b, sy));
         });
     }
 }
 
+/// A pod's own frame (`pod`'s), for the corner (`sx`, `sy`) of the front left `knee`: it
+/// runs out from its hinge, outboard of it, turned out about it into the X.
+fn pod_frame(knee: Vec3, sx: f32, sy: f32) -> Affine3A {
+    Affine3A::from_translation(v3(knee.x * sx, knee.y * sy, 0.0))
+        * Affine3A::from_rotation_z(SPLAY * sx * sy)
+        * Affine3A::from_translation(v3(sx * (POD_SIZE.x - POD_BACK), sy * POD_SIZE.y, 0.0))
+}
+
 /// A tread pod in its own frame (its middle on the ground at the origin, running along
-/// x), the knee's bracket on top at `knee_z`; `sy` the side of the body it is on.
-fn pod(b: &mut MeshBuilder, knee_z: f32, sy: f32) {
+/// x); `sy` the side of the body it is on.
+fn pod(b: &mut MeshBuilder, sy: f32) {
     let Vec3 { x: l, y: w, z: h } = POD_SIZE;
     b.with_part(part::LOCOMOTION, |b| {
         b.paint(TREAD);
@@ -293,18 +308,6 @@ fn pod(b: &mut MeshBuilder, knee_z: f32, sy: f32) {
     } else {
         b.face(&[quad[1], quad[0], quad[3], quad[2]]);
     }
-    // The knee's bracket: two plated cheeks and a bronze pin.
-    let cheek = ARM_THICK.x * 0.5 + 0.25;
-    b.mirror_y(|b| {
-        dark_plate(b);
-        b.beam(
-            v3(0.0, cheek, h - 0.1),
-            v3(0.0, cheek, knee_z + 0.6),
-            Vec2::new(1.8, 0.4),
-            Vec2::new(1.3, 0.4),
-        );
-    });
-    collar(b, v3(0.0, 0.0, knee_z), Vec3::Y, 0.7, cheek * 2.0 + 0.5);
     if b.fine() {
         red_slot(b, v3(l + 0.2, 0.0, 0.8 * h), Vec3::X, Vec3::Y, 1.2, 0.14);
     }
