@@ -104,6 +104,8 @@ pub(super) struct Queue<'a> {
     pub(super) inherit: Option<priority::Inherit>,
     /// What the front entry is (producing, building, upgrading), when it heads the queue.
     pub(super) front: Option<OrderKind>,
+    /// The maker itself is still going up: its queue waits for it, nothing under way.
+    pub(super) unbuilt: bool,
     /// The builder whose queue it is: another one closes the whole-queue tray.
     pub(super) unit: u32,
     /// The construction panel under the strip: a press there leaves the tray open.
@@ -313,6 +315,11 @@ fn head(ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue, head_w: f32) -> f32 {
         )
     } else if queue.paused {
         (format!("{waiting} waiting  \u{b7}  Z resumes"), BUILDING)
+    } else if queue.unbuilt {
+        (
+            format!("{total} queued  \u{b7}  starts once built"),
+            BUILDING,
+        )
     } else if let Some(note) = priority::note(s, queue.own_priority, queue.inherit) {
         note
     } else if queue.front.is_some() {

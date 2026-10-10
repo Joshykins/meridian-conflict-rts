@@ -368,6 +368,7 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
         .map(super::elevator::strip);
     let floor = if has_queue {
         // The switches speak for the whole selection, which may be split on them.
+        let unbuilt = has_flag(unit, flag::UNDER_CONSTRUCTION);
         let strip = queue::Queue {
             stacks: &stacks,
             progress: platform.map_or(queue.map_or(0.0, |q| q.progress), |p| p.1),
@@ -412,10 +413,13 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
             priority: super::priority::Mix::of(s, units),
             own_priority: unit.priority(),
             inherit: super::priority::inherited(s, unit),
+            // A factory still going up queues ahead, but makes nothing until it stands.
             front: queue
                 .and_then(|q| q.orders.first())
                 .map(|o| o.kind)
-                .filter(|&k| k == wanted || k == OrderKind::Upgrade),
+                .filter(|&k| k == wanted || k == OrderKind::Upgrade)
+                .filter(|_| !unbuilt),
+            unbuilt,
             unit: unit.unit_id,
             panel: r,
         };

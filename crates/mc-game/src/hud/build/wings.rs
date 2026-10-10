@@ -182,6 +182,7 @@ pub(super) fn draw(
         own_priority: carrier.priority(),
         inherit: priority::inherited(s, carrier),
         front: queued.first().map(|_| OrderKind::Build),
+        unbuilt: false,
         unit: carrier.unit_id,
         panel: r,
     };
