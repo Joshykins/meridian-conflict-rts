@@ -495,6 +495,7 @@ impl SoundLibrary {
                 &u.sounds.select,
                 &u.sounds.dash_charge,
                 &u.sounds.dash_leave,
+                &u.sounds.dash_arrive,
                 &u.sounds.dash_land,
             ]
             .into_iter()

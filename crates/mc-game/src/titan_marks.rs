@@ -660,16 +660,16 @@ fn surface(field: &Field, p: Vec2) -> f32 {
     field.renderer.surface_height(p)
 }
 
-fn project(ui: &Ui, field: &Field, p: Vec3) -> Option<Vec2> {
+pub(crate) fn project(ui: &Ui, field: &Field, p: Vec3) -> Option<Vec2> {
     field.camera.project(p).map(|q| q / ui.s)
 }
 
-fn ground(ui: &Ui, field: &Field, p: Vec2) -> Option<Vec2> {
+pub(crate) fn ground(ui: &Ui, field: &Field, p: Vec2) -> Option<Vec2> {
     project(ui, field, p.extend(surface(field, p) + 2.0))
 }
 
 /// A ring on the ground: solid, or dashed (every other segment).
-fn ring(
+pub(crate) fn ring(
     ui: &mut Ui,
     field: &Field,
     c: Vec2,
@@ -683,7 +683,7 @@ fn ring(
 }
 
 /// Part of a ring on the ground, from angle `a0` to `a1`.
-fn arc(
+pub(crate) fn arc(
     ui: &mut Ui,
     field: &Field,
     c: Vec2,
@@ -695,7 +695,7 @@ fn arc(
     dashed: bool,
 ) {
     let span = (a1 - a0).abs();
-    let segments = (((radius / 14.0) * span / TAU) as usize).clamp(8, 240) & !1;
+    let segments = (((radius / 14.0) * span / TAU) as usize).clamp(48, 240) & !1;
     let points: Vec<Option<Vec2>> = (0..=segments)
         .map(|i| {
             let a = a0 + (a1 - a0) * i as f32 / segments as f32;
@@ -716,7 +716,7 @@ fn arc(
 }
 
 /// A wash over the ground inside `radius` of `c`: a fan of triangles draped on the ground.
-fn disc(ui: &mut Ui, field: &Field, c: Vec2, radius: f32, color: ui::Color) {
+pub(crate) fn disc(ui: &mut Ui, field: &Field, c: Vec2, radius: f32, color: ui::Color) {
     let Some(mid) = ground(ui, field, c) else {
         return;
     };
@@ -738,7 +738,7 @@ fn disc(ui: &mut Ui, field: &Field, c: Vec2, radius: f32, color: ui::Color) {
 }
 
 /// A label on a dark backing, centred on `at`, with a bar of `tone` on its left.
-fn tag(ui: &mut Ui, at: Vec2, text: &str, tone: u32, alpha: f32) {
+pub(crate) fn tag(ui: &mut Ui, at: Vec2, text: &str, tone: u32, alpha: f32) {
     let w = ui.text_width(type_scale::MICRO, text) + 14.0;
     let r = ui::Rect::new(at.x - w * 0.5, at.y - 9.0, w, 18.0);
     ui.fill(r, ui::ink(0.72 * alpha));
@@ -746,7 +746,7 @@ fn tag(ui: &mut Ui, at: Vec2, text: &str, tone: u32, alpha: f32) {
     ui.text_centred(at.x + 1.0, at.y, type_scale::MICRO, rgb(tone, alpha), text);
 }
 
-fn seconds(s: f32) -> String {
+pub(crate) fn seconds(s: f32) -> String {
     if s >= 10.0 {
         format!("{:.0} s", s.ceil())
     } else {
@@ -777,7 +777,7 @@ fn label_room(ui: &Ui) -> ui::Rect {
 
 /// Where a titan's ring labels go: the world direction along which the most of `radii`
 /// land on screen clear of the HUD's panels, leaning right and down.
-fn label_bearing(ui: &Ui, field: &Field, c: Vec2, radii: &[f32]) -> f32 {
+pub(crate) fn label_bearing(ui: &Ui, field: &Field, c: Vec2, radii: &[f32]) -> f32 {
     let Some(at) = ground(ui, field, c) else {
         return 0.0;
     };
@@ -1114,7 +1114,7 @@ pub fn draw(ui: &mut Ui, field: &Field, alpha: f32, cursor: Option<Vec3>) {
 }
 
 /// A crosshair of four ticks round `g`.
-fn cross(ui: &mut Ui, g: Vec2, size: f32, color: ui::Color) {
+pub(crate) fn cross(ui: &mut Ui, g: Vec2, size: f32, color: ui::Color) {
     for d in [Vec2::X, Vec2::Y] {
         ui.stroke(g - d * size, g - d * size * 0.35, 1.8, color);
         ui.stroke(g + d * size * 0.35, g + d * size, 1.8, color);
@@ -1122,7 +1122,7 @@ fn cross(ui: &mut Ui, g: Vec2, size: f32, color: ui::Color) {
 }
 
 /// A dashed line from `a` to `b`, the dashes crawling toward `b`.
-fn crawl(ui: &mut Ui, a: Vec2, b: Vec2, width: f32, color: ui::Color, speed: f32) {
+pub(crate) fn crawl(ui: &mut Ui, a: Vec2, b: Vec2, width: f32, color: ui::Color, speed: f32) {
     let len = a.distance(b);
     if len < 2.0 {
         return;

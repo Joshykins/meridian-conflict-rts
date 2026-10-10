@@ -844,8 +844,17 @@ impl World {
                         // so it drags the shortest way on, not back across the field to
                         // whatever stands nearest the hull.
                         let dragging = weapon.beam && units.streaming[row];
+                        // A gun that keeps its aim (`Weapon::keep_aim`) takes the foe nearest
+                        // a point half its reach out along where it points, so it swings as
+                        // little as it can; searched round that point, its reach the gun's.
+                        let reach_half = weapon.range_max / 2;
+                        let aim_at = units.pos[row]
+                            + FxVec2::from_angle(units.heading[row] + units.weapon_yaw[row][w])
+                                * reach_half;
                         let from = if dragging {
                             units.beam_at[row]
+                        } else if weapon.keep_aim {
+                            aim_at
                         } else {
                             units.pos[row]
                                 + FxVec2::new(Fx::ZERO, side)
@@ -855,6 +864,8 @@ impl World {
                         // (`is_valid_target`): anything in reach lies within twice it.
                         let around = if dragging {
                             from.distance(units.pos[row])
+                        } else if weapon.keep_aim {
+                            reach_half
                         } else {
                             Fx::ZERO
                         };

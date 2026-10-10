@@ -1031,9 +1031,16 @@ pub(super) fn drawn_look(p: &ProjectileInstance) -> u32 {
 /// A Regency seeker (`Weapon::seeker`): a missile body that carries the seeker's look in
 /// `_pad[0]` as well (`mirror::plasma_look`; sprites.wgsl `cased_seeker`).
 pub(super) fn cased_seeker(p: &ProjectileInstance) -> bool {
+    let look = ((p._pad[0] - 1.0) * 0.5).floor() as u32;
     p.color & PROJECTILE_MISSILE != 0
         && p._pad[0] > 2.5
-        && ((p._pad[0] - 1.0) * 0.5).floor() as u32 == plasma_look::GRAVITIC_SEEKER
+        && (look == plasma_look::GRAVITIC_SEEKER || look == plasma_look::FUSION_SEEKER)
+}
+
+/// A cased seeker carrying pinch fusion (`plasma_look::FUSION_SEEKER`): its thrust burns
+/// fusion-hot.
+pub(super) fn fusion_seeker(p: &ProjectileInstance) -> bool {
+    cased_seeker(p) && ((p._pad[0] - 1.0) * 0.5).floor() as u32 == plasma_look::FUSION_SEEKER
 }
 
 fn smooth(a: f32, b: f32, x: f32) -> f32 {

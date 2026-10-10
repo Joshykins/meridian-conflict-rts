@@ -131,8 +131,14 @@ fn plasma_look(p: Projectile) -> u32 {
 // as well. Drawn as a faceted Regency body (`vs_missile`) with its charge glowing red
 // out of the tail in place of a motor flame; never a bare ball of plasma.
 fn cased_seeker(p: Projectile) -> bool {
+    let look = u32(floor((p.extras.z - 1.0) * 0.5));
     return (p.color & 0x100u) != 0u && p.extras.z > 2.5
-        && u32(floor((p.extras.z - 1.0) * 0.5)) == PLASMA_LOOK_GRAVITIC_SEEKER;
+        && (look == PLASMA_LOOK_GRAVITIC_SEEKER || look == PLASMA_LOOK_FUSION_SEEKER);
+}
+
+// A cased seeker carrying pinch fusion: its thrust burns fusion-hot (`PLASMA_LOOK_FUSION_SEEKER`).
+fn fusion_seeker(p: Projectile) -> bool {
+    return cased_seeker(p) && u32(floor((p.extras.z - 1.0) * 0.5)) == PLASMA_LOOK_FUSION_SEEKER;
 }
 
 // A cased seeker's charge and line work, as the strategic warhead's (nova.wgsl `NOVA_VIOLET`).
@@ -275,7 +281,8 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         head -= normalize(stride + vec3<f32>(0.0, 0.0, 1e-6)) * half_length;
         trace = half_length * select(0.9, 1.1, skim) * select(1.0, 2.4, boost);
         // A cased seeker has no motor: a short glow of its charge out of the tail.
-        trace *= select(1.0, 0.45, cased_seeker(p));
+        // One carrying pinch fusion thrusts longer.
+        trace *= select(1.0, select(0.45, 1.1, fusion_seeker(p)), cased_seeker(p));
     }
     if (p.color & 0x800u) != 0u {
         // An energy slug: a longer blue streak the wake hangs off.
@@ -463,6 +470,10 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         if cased_seeker(p) {
             // Its charge out of the tail, red right through: no flame.
             out.color = SEEKER_RED * 9.0;
+        }
+        if fusion_seeker(p) {
+            // Pinch fusion: white-hot through the prism's pink, far brighter.
+            out.color = vec3<f32>(1.0, 0.62, 0.7) * 22.0;
         }
     }
     if fade_beam {

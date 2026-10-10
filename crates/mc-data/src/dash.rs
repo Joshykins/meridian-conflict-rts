@@ -30,6 +30,11 @@ pub struct RawDash {
     pub windup: f64,
     /// Seconds it is gone between leaving and landing: out of the world, not seen or hit.
     pub transit: f64,
+    /// Seconds before it lands that the air where it comes down begins to crackle
+    /// (`DashArriving`, drawn and heard only), at most the transit. Zero (the default): no
+    /// warning.
+    #[serde(default)]
+    pub arrive: f64,
 }
 
 /// A dash, in ticks and fixed point (`RawDash`).
@@ -41,6 +46,7 @@ pub struct Dash {
     pub cooldown_ticks: u16,
     pub windup_ticks: u16,
     pub transit_ticks: u16,
+    pub arrive_ticks: u16,
 }
 
 impl RawDash {
@@ -58,15 +64,17 @@ impl RawDash {
             cooldown_ticks: ticks(self.cooldown),
             windup_ticks: ticks(self.windup),
             transit_ticks: ticks(self.transit),
+            arrive_ticks: ticks(self.arrive),
         };
         if !(self.min >= 0.0 && self.range > self.min)
             || self.gather <= 0.0
             || d.windup_ticks == 0
             || d.transit_ticks == 0
+            || d.arrive_ticks > d.transit_ticks
             || d.cooldown_ticks < d.windup_ticks
         {
             return Err(DataError::Invalid(format!(
-                "{key}: a dash needs a range past its min, a gather, a windup, a transit and a cooldown at least as long as the windup"
+                "{key}: a dash needs a range past its min, a gather, a windup, a transit (no shorter than its arrive) and a cooldown at least as long as the windup"
             )));
         }
         Ok(d)
@@ -81,7 +89,8 @@ impl Dash {
         h.write_u64(
             self.cooldown_ticks as u64
                 | (self.windup_ticks as u64) << 16
-                | (self.transit_ticks as u64) << 32,
+                | (self.transit_ticks as u64) << 32
+                | (self.arrive_ticks as u64) << 48,
         );
     }
 }

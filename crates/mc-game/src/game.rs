@@ -4452,6 +4452,7 @@ impl Game {
             );
             work::draw_tags(&mut ui, &field, alpha, |o| !self.is_enemy(o));
             crate::titan_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));
+            crate::dash_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));
             crate::warp_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));
             crate::destruct_marks::draw(&mut ui, &field, alpha);
             if self.pointer == Pointer::Attack {

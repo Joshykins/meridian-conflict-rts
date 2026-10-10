@@ -1749,7 +1749,8 @@ impl Blueprints {
                         | (w.split as u64) << 48
                         | (w.split_ordered as u64) << 49
                         | (w.on_dash as u64) << 50
-                        | (w.dash_only as u64) << 51,
+                        | (w.dash_only as u64) << 51
+                        | (w.keep_aim as u64) << 52,
                 );
                 h.write_u64(w.orbs as u64 | (w.orb_ticks as u64) << 8);
                 h.write_i64(w.proximity.0);

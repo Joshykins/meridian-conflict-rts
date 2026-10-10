@@ -1026,6 +1026,11 @@ pub struct RawWeapon {
     /// picks a target of its own. A cone (the Seraph's landing wave) rolls out all round.
     #[serde(default)]
     pub dash_only: bool,
+    /// Picking a target of its own, it takes the enemy nearest where it already points
+    /// rather than the one nearest the hull, so it swings as little as it can between
+    /// marks (the Seraph's forearm guns).
+    #[serde(default)]
+    pub keep_aim: bool,
     #[serde(default)]
     pub proximity: f64,
     /// Seconds the ground burns where a round lands; zero: it does not.
@@ -1375,10 +1380,12 @@ pub struct UnitSounds {
     /// Heard by its owner when the unit is selected. Left out, the library's
     /// `select` default for the unit's `icon` kind plays.
     pub select: Option<String>,
-    /// A dash (`crate::dash`): its windup, the unit leaving where it stood, and its
-    /// landing's shockwave.
+    /// A dash (`crate::dash`): its windup, the unit leaving where it stood, the air
+    /// charging where it is about to come down (`Dash::arrive_ticks` before), and its
+    /// landing.
     pub dash_charge: Option<String>,
     pub dash_leave: Option<String>,
+    pub dash_arrive: Option<String>,
     pub dash_land: Option<String>,
 }
 
@@ -1913,6 +1920,7 @@ impl Unit {
                 split_ordered: w.split_ordered,
                 on_dash: w.on_dash,
                 dash_only: w.dash_only,
+                keep_aim: w.keep_aim,
                 proximity: fx(w.proximity),
                 burn_ticks: ticks(w.burn).min(600) as u16,
                 burn_dps: fx(w.burn_dps.max(0.0)),

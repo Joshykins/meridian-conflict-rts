@@ -92,6 +92,8 @@ pub struct Weapon {
     pub on_dash: bool,
     /// Goes off only as its unit lands from a dash (`RawWeapon::dash_only`).
     pub dash_only: bool,
+    /// Takes the enemy nearest where it points (`RawWeapon::keep_aim`).
+    pub keep_aim: bool,
     pub proximity: Fx,
     pub burn_ticks: u16,
     /// Damage a second its burning ground does to each enemy standing in it.

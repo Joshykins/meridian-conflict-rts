@@ -123,7 +123,8 @@ fn dashes_into_the_middle_of_a_cluster() {
 }
 
 /// It charges, is gone, and lands: the windup's and the transit's ticks after it was
-/// seen charging. While it is gone it is out of the world, already at the mark.
+/// seen charging. While it is gone it is out of the world, already at the mark, and the
+/// air there crackles `arrive_ticks` before it lands.
 #[test]
 fn winds_up_then_lands() {
     let mut w = world(None);
@@ -166,8 +167,30 @@ fn winds_up_then_lands() {
         "out of the world"
     );
     assert_eq!(w.state.units.pos[r], mark, "already at the mark");
-    let (landed, to) = until_landed(&mut w, 60).expect("it landed");
+    let mut arriving = None;
+    let mut landed = None;
+    for _ in 0..60 {
+        w.tick(&[]).unwrap();
+        for e in &w.events {
+            match e {
+                SimEvent::DashArriving { to, .. } => arriving = Some((w.tick_count(), to.xy())),
+                SimEvent::DashLanded { to, .. } => landed = Some((w.tick_count(), to.xy())),
+                _ => {}
+            }
+        }
+        if landed.is_some() {
+            break;
+        }
+    }
+    let (landed, to) = landed.expect("it landed");
     assert_eq!(landed - charged, windup, "it lands as the transit ends");
+    let (warned, at) = arriving.expect("the air crackled where it would land");
+    assert_eq!(
+        landed - warned,
+        dash.arrive_ticks as u32,
+        "the warning leads the landing"
+    );
+    assert_eq!(at, mark);
     assert_eq!(to, mark);
     assert!(!w.state.units.has_flag(row(&w, seraph), flag::IN_FACTORY));
 }
@@ -491,4 +514,68 @@ fn its_repeaters_hit_a_titan_close_in() {
         landed * 10 >= fired * 9,
         "{landed} of {fired} repeater shots hit"
     );
+}
+
+/// The Seraph held where it stands (hold position: no dash), its guns free.
+fn held_seraph(w: &mut World, x: i32, y: i32) -> UnitId {
+    let seraph = add(w, SERAPH, 0, x, y, false);
+    w.tick(&[command(
+        0,
+        Command::SetFireState {
+            units: vec![seraph],
+            state: FireState::HoldPosition,
+        },
+    )])
+    .unwrap();
+    seraph
+}
+
+/// Its forearm guns (`keep_aim`) take the foe ahead of where they point over a nearer one
+/// behind it.
+#[test]
+fn the_forearms_take_the_foe_where_they_point() {
+    let mut w = world(None);
+    let seraph = held_seraph(&mut w, 2000, 2000);
+    let ahead = add(&mut w, BOT, 1, 2800, 2000, true);
+    let behind = add(&mut w, BOT, 1, 1450, 2000, true);
+    let r = row(&w, seraph);
+    let arm = w
+        .bp(r)
+        .weapons
+        .iter()
+        .position(|g| g.keep_aim)
+        .expect("a forearm gun");
+    for _ in 0..3 {
+        w.tick(&[]).unwrap();
+    }
+    let target = w.state.units.weapon_target[row(&w, seraph)][arm];
+    assert_eq!(
+        target, ahead,
+        "took {target:?}, not the one ahead ({behind:?} behind)"
+    );
+}
+
+/// Its forearm guns reach a spacecraft overhead.
+#[test]
+fn the_forearms_reach_a_spacecraft() {
+    let mut w = world(None);
+    let seraph = held_seraph(&mut w, 2000, 2000);
+    let ship = add(&mut w, "regency_t2_space_frigate", 1, 2400, 2000, true);
+    let r = row(&w, seraph);
+    let arms: Vec<usize> = (0..w.bp(r).weapons.len())
+        .filter(|&g| w.bp(r).weapons[g].keep_aim)
+        .collect();
+    let mut seen = false;
+    for _ in 0..80 {
+        w.tick(&[]).unwrap();
+        let r = row(&w, seraph);
+        if arms
+            .iter()
+            .any(|&g| w.state.units.weapon_target[r][g] == ship)
+        {
+            seen = true;
+            break;
+        }
+    }
+    assert!(seen, "the forearms never took the spacecraft");
 }

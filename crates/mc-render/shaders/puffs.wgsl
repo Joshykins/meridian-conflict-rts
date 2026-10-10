@@ -762,7 +762,9 @@ fn tube_ray(world: vec3<f32>, pos: vec3<f32>, tangent: vec3<f32>) -> TubeRay {
 fn strategic_trail(in: PuffOut) -> vec4<f32> {
     let age = in.state.x;
     let soot = in.appearance.w < 0.0;
-    let strength = abs(in.appearance.w);
+    // -2: soot behind a seeker carrying pinch fusion, its plume fusion-hot.
+    let fusion = in.appearance.w < -1.5;
+    let strength = select(abs(in.appearance.w), 1.0, fusion);
     let pos = in.roll;
     let half = max(length(in.appearance.xyz), 0.5);
     let tangent = in.appearance.xyz / half;
@@ -782,7 +784,7 @@ fn strategic_trail(in: PuffOut) -> vec4<f32> {
     let r = in.cloud_size * (1.0 + (n - 0.5) * 0.7 * ragged + (n2 - 0.5) * 0.25 * ragged);
     // Dense and white where the motor has just passed, going grey and thin as it spreads.
     let fade = smoothstep(0.0, 0.01, age) * pow(max(1.0 - age, 0.0), 1.2);
-    let column = mix(select(0.55, 0.95, soot), select(0.12, 0.45, soot), ragged) * strength * fade * (1.0 + (n2 - 0.5) * 0.6 * ragged);
+    let column = mix(select(0.55, 0.8, soot), select(0.12, 0.34, soot), ragged) * strength * fade * (1.0 + (n2 - 0.5) * 0.6 * ragged);
     // Optical depth straight through the middle, side on.
     let through = -log(1.0 - clamp(column, 0.0, 0.95));
     // The ray's Gaussian window along the axis, and the tent seen through it.
@@ -794,9 +796,9 @@ fn strategic_trail(in: PuffOut) -> vec4<f32> {
     }
     // Lit on the sun's side of the tube.
     let lit = 0.82 + 0.3 * clamp(dot(off / max(r, 0.01), globals.sun.xyz), -1.0, 1.0);
-    // Soot is near black fresh, going a dark grey as it thins.
+    // Soot is a dark charcoal grey fresh, going a lighter grey as it thins: never ink black.
     let white = mix(vec3<f32>(0.86, 0.86, 0.85), vec3<f32>(0.6, 0.61, 0.63), smoothstep(0.0, 0.7, age));
-    let black = mix(vec3<f32>(0.004, 0.0035, 0.005), vec3<f32>(0.022, 0.021, 0.024), smoothstep(0.0, 0.8, age));
+    let black = mix(vec3<f32>(0.04, 0.039, 0.042), vec3<f32>(0.1, 0.098, 0.104), smoothstep(0.0, 0.8, age));
     var color = select(white, black, soot)
         * (atmos.sun_color.rgb * 0.8 + atmos.sky_color.rgb * 0.9) * lit;
     let lamp = in.lamp / (1.0 + in.lamp * 0.08);
@@ -806,10 +808,12 @@ fn strategic_trail(in: PuffOut) -> vec4<f32> {
     if soot {
         // A seeker's engine plume: a thin fusion-hot jet down the middle of the smoke, white
         // at its heart through pink to red as it cools, never a wide red smear round it.
-        let heat = exp(-in.state.z * 12.0);
-        let jet = exp(-dot(off, off) / (0.16 * r * r));
-        let plume = mix(vec3<f32>(1.0, 0.03, 0.015), vec3<f32>(1.0, 0.72, 0.78), heat * heat);
-        color += plume * 9.0 * heat * jet;
+        // Behind a fusion-hot thrust it burns longer, whiter and far brighter.
+        let heat = exp(-in.state.z * select(12.0, 6.0, fusion));
+        let jet = exp(-dot(off, off) / (select(0.16, 0.26, fusion) * r * r));
+        let fresh = select(vec3<f32>(1.0, 0.72, 0.78), vec3<f32>(1.0, 0.9, 0.95), fusion);
+        let plume = mix(vec3<f32>(1.0, 0.03, 0.015), fresh, heat * heat);
+        color += plume * select(9.0, 22.0, fusion) * heat * jet;
     } else {
         color += vec3<f32>(1.0, 0.55, 0.2) * 5.0 * exp(-in.state.z);
     }

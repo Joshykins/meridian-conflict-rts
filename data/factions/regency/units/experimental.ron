@@ -250,11 +250,12 @@
     // `dash.rs`). A Rapid Fusion Repeater rides each forearm, the two taking turns; from
     // between its wings a battery of sixteen Gravitic Seekers goes up whenever there is
     // anything in reach, and all at once every time it lands from a dash (`on_dash`),
-    // arcing over and down on what stands all round it. No anti-air.
+    // arcing over and down on what stands all round it. No anti-air, but the forearms reach spacecraft.
     //
-    // Balance: a first pass. Half a Behemoth's price for a third of its health, the field
-    // included; about 7500 dps at 1000 m against the Behemoth's siege reach, and a dash
-    // that puts it under a siege gun's `range_min`. Raised on a lot by Artificer IIIs or the
+    // Balance: a first pass. Half a Behemoth's price for a third of its health, most of it
+    // in its hull field (220000 health under a 260000 field that comes back at 1200/s);
+    // about 7500 dps at 1000 m against the Behemoth's siege reach, the forearms reaching
+    // spacecraft too, and a dash that puts it under a siege gun's `range_min`. Raised on a lot by Artificer IIIs or the
     // Exarch's Engineering Suite III, like the tier 4s.
     //
     // Model: `regency_seraph` (`models::regency::seraph`), authored at a fifth size and
@@ -265,32 +266,34 @@
         role: "Strike Titan",
         tech: 5,
         categories: ["Land", "DirectFire", "Experimental"],
-        health: 420000,
+        health: 220000,
         cost: (mass: 60000, energy: 600000, time: 200000),
         radius: 75.0, height: 155.0,
         footprint: (13, 13),
         vision: 2000,
-        shield: (kind: Hull, health: 60000, regen: 300),
+        shield: (kind: Hull, health: 260000, regen: 1200),
         economy: (energy_upkeep: 2000),
         motion: (layer: Hover, size: 5, speed: 70, accel: 60, turn: 120),
         // Once it sees an enemy on the ground or the water between 400 m and 1800 m, with
-        // nothing at its feet, it charges for 1.5 s, is gone for 0.6 s and comes down in
-        // the middle of everything within 250 m of it, letting go its Seraphic Nova at its
-        // feet. Then 15 s to recharge. It dashes idle, chasing, on an attack-move or patrol,
+        // nothing at its feet, it charges for 1.5 s, is gone for 1.5 s (the air where it
+        // lands crackling faintly for the last 0.6 s of it) and comes down in the middle of
+        // everything within 250 m of it, letting go its Seraphic Nova at its feet. Then 15 s to recharge. It dashes idle, chasing, on an attack-move or patrol,
         // or at an attack order's mark; never on a move order, at hold fire or at hold
         // position.
-        dash: (range: 1800, min: 400, gather: 250, cooldown: 15, windup: 1.5, transit: 0.6),
+        dash: (range: 1800, min: 400, gather: 250, cooldown: 15, windup: 1.5, transit: 1.5, arrive: 0.6),
         weapons: [
             (
                 name: "Rapid Fusion Repeater",
-                // The left forearm's: a pinch-fusion bolt every half second. The torso turns
-                // to the mark and both forearms come up to it about the elbows; with nothing
-                // to shoot they hang at its sides, the guns pointed down (`rest_pitch`).
+                // The left forearm's: a pinch-fusion bolt every half second, at the ground,
+                // the sea or a spacecraft overhead. The torso turns to the mark and both
+                // forearms come up to it about the elbows; with nothing to shoot they hang at
+                // its sides, the guns pointed down (`rest_pitch`). Each takes the foe nearest
+                // where it already points (`keep_aim`), so it swings as little as it can.
                 damage: 1500, splash: 18, range: 1000, reload: 0.5, speed: 1600, trajectory: Ballistic,
                 loft: 0.3, flat_fire: true, turret_turn: 120, rest_pitch: -80,
                 muzzle: (37, 23.75, 76.25), pivot: (-1, 21.75, 77),
-                targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
-                plasma_grade: Some(PinchFusion),
+                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, red: 1.0,
+                plasma_grade: Some(PinchFusion), keep_aim: true,
                 flash: 1.3, impact: 1.8, tracer: 1.5,
                 sounds: (fire: "regency_sunspear_fire", impact: "regency_sunspear_hit", ground: "regency_sunspear_hit"),
             ),
@@ -300,8 +303,8 @@
                 damage: 1500, splash: 18, range: 1000, reload: 0.5, speed: 1600, trajectory: Ballistic,
                 loft: 0.3, flat_fire: true, turret_turn: 120, rest_pitch: -80,
                 muzzle: (37, -23.75, 76.25), pivot: (-1, -21.75, 77),
-                targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
-                plasma_grade: Some(PinchFusion),
+                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, red: 1.0,
+                plasma_grade: Some(PinchFusion), keep_aim: true,
                 flash: 1.3, impact: 1.8, tracer: 1.5,
                 sounds: (fire: "regency_sunspear_fire", impact: "regency_sunspear_hit", ground: "regency_sunspear_hit"),
             ),
@@ -348,7 +351,8 @@
         mesh: "regency_seraph", icon: WingedTitan,
         sounds: (
             death: "blast_colossal", moving: "aster_hover",
-            dash_charge: "regency_seraph_charge", dash_leave: "regency_seraph_vanish", dash_land: "regency_seraph_landing",
+            dash_charge: "regency_seraph_charge", dash_leave: "regency_seraph_vanish", dash_arrive: "regency_seraph_arrive",
+            dash_land: "regency_seraph_landing",
         ),
     ),
 ]

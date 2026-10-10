@@ -8,7 +8,11 @@
 //! - **Vanish** (`DashVanished`, at `from`): it goes in a flicker of white light, and
 //!   while it is gone flickers of light run along its path, one after another, out to
 //!   where it comes down, arriving as it does. Everything is laid at once, each piece
-//!   timed to its moment.
+//!   timed to its moment. The path is crossed in the first part of the gap; then it
+//!   is nowhere for a breath.
+//! - **Arriving** (`DashArriving`, the last of the gap): the air where it comes down
+//!   charges, faint at first: a few dry sparks of lightning over the ground, thickening,
+//!   and motes drawn in. No glow, no ball: only the crackle.
 //! - **Landing** (`DashLanded`): a blinding white light where it comes down, dust driven
 //!   out over the ground and a red-glassed crater; no ball or bubble of plasma at its
 //!   feet: the wave is the shockwave. The wave that rolls out from it is its `dash_only` cone's
@@ -29,6 +33,8 @@ use mc_sim::SimEvent;
 
 const GLOW: f32 = puff::WARP_GLOW as f32;
 const STREAK: f32 = puff::WARP_STREAK as f32;
+const ARC: f32 = puff::WARP_ARC as f32;
+const MOTE: f32 = puff::WARP_MOTE as f32;
 const RED: Vec3 = Vec3::new(1.0, 0.07, 0.04);
 const HOT: Vec3 = Vec3::new(1.0, 0.55, 0.5);
 const WHITE: Vec3 = Vec3::new(1.0, 0.96, 1.0);
@@ -39,6 +45,10 @@ const WHITE_FLASH: f32 = 9.0;
 /// cosmetic cap, so a long dash stays a line of flickers and does not flood the puffs.
 const FLICKER_STEP: f32 = 45.0;
 const MOST_FLICKERS: usize = 48;
+/// Seconds its path's flickers take to run out to the mark, however long it is gone.
+const PATH_SECONDS: f32 = 0.6;
+/// Sparks of lightning over where it comes down, while the air there charges.
+const ARRIVE_ARCS: usize = 26;
 
 impl Renderer {
     /// The dash's part of a sim event. Everything else about it is drawn as usual.
@@ -70,6 +80,16 @@ impl Renderer {
                 let (from, to) = (Vec3::from(from.to_f32()), Vec3::from(to.to_f32()));
                 self.vanish(from, r, h, time);
                 self.path_flickers(from, to, r, h, seconds, time);
+            }
+            SimEvent::DashArriving {
+                to,
+                ticks,
+                blueprint,
+                ..
+            } => {
+                let (r, h) = self.dash_hull(*blueprint);
+                let seconds = *ticks as f32 * self.tick_seconds.max(0.02);
+                self.arriving(Vec3::from(to.to_f32()), r, h, seconds, time);
             }
             SimEvent::DashLanded { to, blueprint, .. } => {
                 let (r, h) = self.dash_hull(*blueprint);
@@ -224,9 +244,9 @@ impl Renderer {
         }
     }
 
-    /// While it is gone (`seconds`), flickers of light along its path from `from` to `to`
-    /// (feet), one after another out to where it comes down, the last as it lands. The
-    /// path bows up a little between them.
+    /// Once it is gone (`seconds`), flickers of light along its path from `from` to `to`
+    /// (feet), one after another out to where it comes down, over the first
+    /// `PATH_SECONDS` of the gap. The path bows up a little between them.
     fn path_flickers(&mut self, from: Vec3, to: Vec3, r: f32, h: f32, seconds: f32, time: f32) {
         let lift = Vec3::Z * h * 0.55;
         let (a, b) = (from + lift, to + lift);
@@ -238,8 +258,9 @@ impl Renderer {
         for i in 0..n {
             let k = (i as f32 + 0.5 + 0.4 * self.scatter.signed()) / n as f32;
             let k = k.clamp(0.0, 1.0);
-            // Out along the path at the pace it is gone, a little ahead and behind.
-            let start = time + seconds * (0.08 + 0.9 * k) + 0.03 * self.scatter.signed();
+            // Out along the path over the first part of the gap, a little ahead and behind.
+            let start =
+                time + seconds.min(PATH_SECONDS) * (0.06 + 0.9 * k) + 0.03 * self.scatter.signed();
             let side = Vec3::new(-along.y, along.x, 0.0) * r * 0.5 * self.scatter.signed();
             let p = at(k) + side + Vec3::Z * r * 0.4 * self.scatter.signed();
             let heat = self.scatter.unit();
@@ -285,6 +306,71 @@ impl Renderer {
                     0.1,
                 );
             }
+        }
+    }
+
+    /// The air at `at` (where its feet come down) charging over the last `seconds` before
+    /// it lands: dry sparks of lightning, few and faint at first and thicker toward the
+    /// end, and motes drawn in toward its heart.
+    fn arriving(&mut self, at: Vec3, r: f32, h: f32, seconds: f32, time: f32) {
+        let ground = at
+            .truncate()
+            .extend(self.ground_height(at.truncate()).max(at.z));
+        let heart = ground + Vec3::Z * h * 0.5;
+        for i in 0..ARRIVE_ARCS {
+            // Bunched toward the end: the k-th spark at the square root of its share.
+            let k = ((i as f32 + self.scatter.unit()) / ARRIVE_ARCS as f32).sqrt();
+            let start = time + seconds * k;
+            let dir = Vec3::new(
+                self.scatter.signed(),
+                self.scatter.signed(),
+                0.7 * self.scatter.signed(),
+            )
+            .normalize_or(Vec3::Z);
+            let from = ground
+                + Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * r * 1.2
+                + Vec3::Z * h * self.scatter.unit() * 0.8;
+            let reach = r * (0.25 + 0.4 * self.scatter.unit());
+            let life = 0.08 + 0.06 * self.scatter.unit();
+            self.push_lit(
+                ARC,
+                from,
+                dir * reach,
+                start,
+                life,
+                (r * 0.05, r * 0.05),
+                RED.lerp(WHITE, 0.3 + 0.5 * k) * (1.5 + 3.0 * k),
+                0.0,
+            );
+            // Now and then the spark lights the ground under it a moment.
+            if i % 4 == 3 {
+                self.emp_fx.flashes.push(Flash {
+                    pos: from,
+                    start,
+                    life: 0.08,
+                    color: RED.lerp(WHITE, k) * (10.0 + 30.0 * k),
+                    range: r * 2.0,
+                    flicker: 0.8,
+                });
+            }
+        }
+        // Motes of charged light drawn in toward where it will stand.
+        for _ in 0..14 {
+            let k = self.scatter.unit();
+            let dir =
+                Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.3).normalize_or(Vec3::X);
+            let out = r * (1.0 + 1.0 * self.scatter.unit());
+            let life = 0.35;
+            self.push_lit(
+                MOTE,
+                heart + dir * out,
+                -dir * out / life,
+                time + (seconds - life).max(0.0) * k,
+                life,
+                (r * 0.03, r * 0.01),
+                RED.lerp(HOT, k) * 3.0,
+                0.0,
+            );
         }
     }
 

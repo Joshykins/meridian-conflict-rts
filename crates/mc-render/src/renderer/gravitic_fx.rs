@@ -7,9 +7,10 @@
 //!   the moment it is fired, with a hard red flash and a snap of filaments, no motor flame,
 //!   nothing gathered or held first. In flight every Regency missile (`Weapon::seeker`) is a
 //!   solid faceted body (sprites.wgsl `vs_missile`), graphite with violet line work, its
-//!   charge glowing violet at the tail, never a bare ball of plasma; and behind it a black
-//!   smoke tube (`seeker_smoke`). Violet and black are how a Regency missile reads as one a
-//!   missile defence can take, apart from ARC's white smoke. Where it strikes the lens lets
+//!   charge glowing violet at the tail, never a bare ball of plasma; and behind it a dark
+//!   grey smoke tube (`seeker_smoke`). Violet and dark grey are how a Regency missile reads
+//!   as one a missile defence can take, apart from ARC's white smoke. A seeker carrying pinch
+//!   fusion (the Seraph's, the Strider's) thrusts fusion-hot, white-pink and bright. Where it strikes the lens lets
 //!   go: it snaps in, then a hard red burst over a white heart, filaments torn out, globs
 //!   and spatter thrown out low, the ground glassed under it; a heavy one's many times
 //!   bigger, by its damage and `impact`. A seeker carrying pinch fusion
@@ -20,7 +21,7 @@
 //! Presentation only; the renderer's own clock.
 
 use super::nuke_fx::PUFF_STRATEGIC_TRAIL;
-use super::regency_guns_fx::cased_seeker;
+use super::regency_guns_fx::{cased_seeker, fusion_seeker};
 use super::Renderer;
 use crate::gpu_consts::puff;
 use glam::Vec3;
@@ -28,6 +29,7 @@ use mc_data::{BlueprintId, Weapon};
 use mc_sim::mirror::{
     ProjectileInstance, PROJECTILE_ENDS_SHIFT, PROJECTILE_FADE_BEAM, PROJECTILE_STARTS_SHIFT,
 };
+use std::collections::HashMap;
 
 const BURST: f32 = puff::PLASMA_BURST as f32;
 const GLOB: f32 = puff::PLASMA_GLOB as f32;
@@ -58,6 +60,42 @@ struct Glow {
 #[derive(Default)]
 pub(super) struct GraviticFx {
     glows: Vec<Glow>,
+    /// Which way each seeker's smoke left off last tick, by where it ended (the seeker's
+    /// drawn `pos` then, its `prev_pos` now): this tick's stretch bends on from it, so a
+    /// seeker arcing over lays one smooth tube, not a straight piece a tick.
+    bends: HashMap<[u32; 3], Vec3>,
+}
+
+/// One tick of a seeker's flight as its smoke follows it: a cubic from `from` to `to`
+/// leaving along `lead` and arriving along `tail`.
+struct Bend {
+    from: Vec3,
+    to: Vec3,
+    lead: Vec3,
+    tail: Vec3,
+}
+
+impl Bend {
+    /// The point `s` (0 to 1) of the way along, and which way it runs there.
+    fn at(&self, s: f32) -> (Vec3, Vec3) {
+        let len = self.from.distance(self.to);
+        let (m0, m1) = (self.lead * len, self.tail * len);
+        let (s2, s3) = (s * s, s * s * s);
+        let p = self.from * (2.0 * s3 - 3.0 * s2 + 1.0)
+            + m0 * (s3 - 2.0 * s2 + s)
+            + self.to * (-2.0 * s3 + 3.0 * s2)
+            + m1 * (s3 - s2);
+        let d = self.from * (6.0 * s2 - 6.0 * s)
+            + m0 * (3.0 * s2 - 4.0 * s + 1.0)
+            + self.to * (-6.0 * s2 + 6.0 * s)
+            + m1 * (3.0 * s2 - 2.0 * s);
+        (p, d.normalize_or(self.tail))
+    }
+}
+
+/// A point's exact bits: a seeker's end last tick is its start this tick, to the bit.
+fn key(p: Vec3) -> [u32; 3] {
+    [p.x.to_bits(), p.y.to_bits(), p.z.to_bits()]
 }
 
 impl GraviticFx {
@@ -318,9 +356,11 @@ impl Renderer {
         self.seeker_trails(projectiles, time);
     }
 
-    /// The black smoke each seeker in flight lays down the stretch it flies this tick, each
+    /// The dark smoke each seeker in flight lays down the stretch it flies this tick, each
     /// piece lit as the charge passes it. A cased seeker's leaves from its tail.
     fn seeker_trails(&mut self, projectiles: &[ProjectileInstance], time: f32) {
+        let last = std::mem::take(&mut self.plasma_fx.seekers.bends);
+        let mut bends = HashMap::with_capacity(last.len());
         for p in projectiles {
             if p.color & PROJECTILE_FADE_BEAM != 0 || !cased_seeker(p) {
                 continue;
@@ -329,10 +369,24 @@ impl Renderer {
             let ends = ((p.color >> PROJECTILE_ENDS_SHIFT) & 0xFF) as f32 / 255.0;
             let span = if ends > 0.0 { ends } else { 1.0 };
             let starts = (p.color >> PROJECTILE_STARTS_SHIFT) as f32 / 255.0;
-            let to = Vec3::from(p.pos);
-            let from = Vec3::from(p.prev_pos).lerp(to, (starts / span).min(1.0));
-            self.seeker_smoke(from, to, time, starts, span, p.size, behind);
+            let (start, to) = (Vec3::from(p.prev_pos), Vec3::from(p.pos));
+            let chord = (to - start).normalize_or_zero();
+            // It leaves the way it went last tick, and bends round to the chord's mirror
+            // of that: an arc that runs on smoothly into the next.
+            let lead = last.get(&key(start)).copied().unwrap_or(chord);
+            let tail = (2.0 * lead.dot(chord) * chord - lead).normalize_or(chord);
+            bends.insert(key(to), tail);
+            let path = Bend {
+                from: start,
+                to,
+                lead,
+                tail,
+            };
+            let fusion = fusion_seeker(p);
+            let from = (starts / span).min(1.0);
+            self.seeker_smoke(&path, from, time, starts, span, p.size, behind, fusion);
         }
+        self.plasma_fx.seekers.bends = bends;
     }
 
     /// A seeker's smoke down `from` to `to`, flown from `starts` to `span` of the tick, laid
@@ -343,30 +397,34 @@ impl Renderer {
     /// unbroken column.
     fn seeker_smoke(
         &mut self,
-        from: Vec3,
-        to: Vec3,
+        path: &Bend,
+        from: f32,
         time: f32,
         starts: f32,
         span: f32,
         size: f32,
         behind: f32,
+        fusion: bool,
     ) {
         let tick = self.tick_seconds.max(0.02);
-        let dir = (to - from).normalize_or_zero();
         let width = (1.6 + size * 0.5).min(4.0);
         let life = (3.0 + size * 0.6).min(6.0);
         // The tube's radius is 0.28 of a puff's size; a negative end size cools the glow
         // fast, over a few tens of metres. It only doubles as it hangs: spread wider, the
         // column thins to a haze.
         let tube = (width * 1.8, -width * 2.2 * 1.8);
+        let length = path.from.distance(path.to) * (1.0 - from);
         // A deliberate cosmetic cap on one stretch: a tick's flight is far under this many.
-        let n = (from.distance(to) / SMOKE_STEP).ceil().clamp(1.0, 8.0) as u32;
-        let step = from.distance(to) / n as f32;
+        let n = (length / SMOKE_STEP).ceil().clamp(1.0, 8.0) as u32;
+        let step = length / n as f32;
         for k in 0..n {
-            let at = from.lerp(to, k as f32 / n as f32) - dir * behind;
+            let s = from + (1.0 - from) * k as f32 / n as f32;
+            let (at, dir) = path.at(s);
+            let at = at - dir * behind;
             let f1 = (k + 1) as f32 / n as f32;
             let start = time + tick * (starts + (span - starts).max(0.0) * f1);
-            // Strength one, below zero for black smoke (`push_puff_with_motion`).
+            // Strength one, below zero for soot (`push_puff_with_motion`); -2 for soot behind a
+            // fusion-hot thrust (puffs.wgsl `strategic_trail`).
             self.push_puff_with_motion(
                 PUFF_STRATEGIC_TRAIL,
                 at,
@@ -374,7 +432,7 @@ impl Renderer {
                 start,
                 life,
                 tube,
-                Vec3::new(-1.0, 0.0, 0.0),
+                Vec3::new(if fusion { -2.0 } else { -1.0 }, 0.0, 0.0),
             );
         }
     }
@@ -421,6 +479,10 @@ mod tests {
         assert_eq!(
             crate::gpu_consts::plasma_look::GRAVITIC_SEEKER,
             mc_sim::mirror::PLASMA_LOOK_GRAVITIC_SEEKER
+        );
+        assert_eq!(
+            crate::gpu_consts::plasma_look::FUSION_SEEKER,
+            mc_sim::mirror::PLASMA_LOOK_FUSION_SEEKER
         );
     }
 }

@@ -22,6 +22,8 @@
 //! - **Transit**: its charge spent, it is out of the world (`IN_FACTORY`: not drawn, seen,
 //!   hit or ordered) for `Dash::transit_ticks`, already at the mark (`prev_pos` too, so
 //!   nothing is drawn sliding across the map). Nothing calls it off now.
+//!   `Dash::arrive_ticks` before it lands, the air where it comes down begins to crackle
+//!   (`DashArriving`, a warning drawn and heard only).
 //! - **Landing**: back in the world at the mark. Its `dash_only` weapons, cones, go off at
 //!   its feet: each a wake rolling out from where it stands (`wake.rs`), striking the
 //!   enemies its front passes over and stunning them if the cone says so; friends are not
@@ -334,6 +336,16 @@ impl World {
     fn step_dash_transit(&mut self, row: usize, dash: &Dash, s: DashState) -> Result<(), SimError> {
         let ticks = s.ticks + 1;
         self.state.units.dash[row].ticks = ticks;
+        if dash.arrive_ticks > 0 && ticks + dash.arrive_ticks == dash.transit_ticks {
+            let units = &self.state.units;
+            self.events.push(SimEvent::DashArriving {
+                unit: units.id(row),
+                to: s.to.extend(units.z[row]),
+                ticks: dash.arrive_ticks,
+                blueprint: units.blueprint[row],
+                owner: units.owner[row],
+            });
+        }
         if ticks < dash.transit_ticks {
             return Ok(());
         }

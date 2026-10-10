@@ -9,7 +9,8 @@
 //!   stunned hull's arcs following its stun, and a live dampener's low field hum.
 //! - The systems-reboot gesture as a stun starts to wear off.
 //! - A dash (mc-sim `dash.rs`), warp's short cousin: the unit's own `dash_charge` as it
-//!   winds up, `dash_leave` where it stood and `dash_land` where it comes down (its
+//!   winds up, `dash_leave` where it stood, `dash_arrive` faint where it is about to come
+//!   down and `dash_land` as it does (its
 //!   `UnitSounds`, so each dasher carries its own).
 //!
 //! A ship is heard by its size, never its tier: lower and louder the bigger its hull.
@@ -221,7 +222,12 @@ impl WarpSounds {
                 } => {
                     let b = blueprint.0 as u32;
                     let sound = dash_sound(&library, blueprints, b, |s| &s.dash_leave);
-                    play(sound, Vec3::from(from.to_f32()), radius(b), 1.0);
+                    play(sound, Vec3::from(from.to_f32()), radius(b), 1.3);
+                }
+                SimEvent::DashArriving { to, blueprint, .. } => {
+                    let b = blueprint.0 as u32;
+                    let sound = dash_sound(&library, blueprints, b, |s| &s.dash_arrive);
+                    play(sound, Vec3::from(to.to_f32()), radius(b), 1.0);
                 }
                 SimEvent::DashLanded { to, blueprint, .. } => {
                     let b = blueprint.0 as u32;

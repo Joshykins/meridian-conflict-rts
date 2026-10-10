@@ -850,11 +850,15 @@ shared! {
     pub mod plasma_look as "PLASMA_LOOK_" {
         /// A Regency seeker, any plasma `missile` (renderer/gravitic_fx.rs): a hard-edged
         /// plasma charge, a lavender-white heart in a violet body, held in a faint shimmering
-        /// gravity lens, a black smoke tube behind it. Violet and black read as a missile
+        /// gravity lens, a dark grey smoke tube behind it. Violet and dark grey read as a missile
         /// defence can take it. No motor, plume or body.
         /// `mc_sim::mirror::PLASMA_LOOK_GRAVITIC_SEEKER`; a test holds them equal.
         pub const GRAVITIC_SEEKER: u32 = 5;
         // retired: 6
+        /// A seeker carrying pinch fusion (`Weapon::fusion_strike`: the Seraph's, the
+        /// Strider's): the same body and smoke, but its charge burns fusion white-pink and
+        /// brighter out of the tail, a longer thrust. `mc_sim::mirror::PLASMA_LOOK_FUSION_SEEKER`.
+        pub const FUSION_SEEKER: u32 = 7;
     }
 
     /// A strategic launcher (models/aster/strategic.rs, entity.wgsl). The rounds word

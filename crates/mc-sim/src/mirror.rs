@@ -23,6 +23,7 @@ use std::collections::HashMap;
 mod batch;
 mod braid;
 pub mod city;
+mod dash;
 mod destruct;
 mod elevator;
 mod fog;
@@ -35,6 +36,7 @@ mod work;
 mod wrecks;
 
 pub use batch::{BatchView, UNIT_BATCH};
+pub use dash::{DashStage, DashView};
 pub use destruct::DestructView;
 pub use elevator::{crate_load, ElevatorPhase, ElevatorView};
 pub use fog::VisionDisc;
@@ -533,6 +535,15 @@ pub enum SimEvent {
     DashVanished {
         unit: UnitId,
         from: FxVec3,
+        to: FxVec3,
+        ticks: u16,
+        blueprint: BlueprintId,
+        owner: u8,
+    },
+    /// Gone in a dash, it comes down at `to` in `ticks`: the air there begins to crackle
+    /// (`Dash::arrive_ticks` before it lands).
+    DashArriving {
+        unit: UnitId,
         to: FxVec3,
         ticks: u16,
         blueprint: BlueprintId,
@@ -1078,6 +1089,9 @@ pub const PROJECTILE_MISSILE: u32 = 1 << 8;
 /// `mc_models::gpu_consts::plasma_look::GRAVITIC_SEEKER`
 /// is the shader's copy; a test holds them equal.
 pub const PLASMA_LOOK_GRAVITIC_SEEKER: u32 = 5;
+/// `plasma_look` of a seeker carrying pinch fusion (`Weapon::fusion_strike`): drawn as any
+/// seeker, its thrust fusion-hot. `mc_models::gpu_consts::plasma_look::FUSION_SEEKER`.
+pub const PLASMA_LOOK_FUSION_SEEKER: u32 = 7;
 /// Set in `ProjectileInstance::color` for a torpedo running under the water: no
 /// tracer, flame or casing in the air; a dark body, bubbles and a wake instead.
 pub const PROJECTILE_TORPEDO: u32 = 1 << 4;
@@ -1255,13 +1269,15 @@ const _: () = assert!(std::mem::size_of::<ProjectileInstance>() == 80);
 /// above 2): 1 a Pinched-plasmeric stream slug, 2 a Pinch-fusion slug strobing with fusion
 /// bursts, 3 a gravitic charge thrown curving onto its mark (`Weapon::curve`), 4 a
 /// Plasmeric bolt (a fat glowing teardrop, as a plasma repeater throws), 5 a seeker, any
-/// plasma `missile` (`Weapon::seeker`, `PLASMA_LOOK_GRAVITIC_SEEKER`), beside
+/// plasma `missile` (`Weapon::seeker`, `PLASMA_LOOK_GRAVITIC_SEEKER`; 7 one carrying pinch
+/// fusion, `PLASMA_LOOK_FUSION_SEEKER`), beside
 /// `PROJECTILE_MISSILE`: its faceted body is drawn in the Regency's look, violet at the
 /// tail, so every Regency missile reads as one a missile defence can take. Zero for
 /// anything else.
 pub fn plasma_look(weapon: &mc_data::Weapon) -> u32 {
     use mc_data::PlasmaGrade;
     match weapon.plasma_shot() {
+        _ if weapon.seeker() && weapon.fusion_strike => PLASMA_LOOK_FUSION_SEEKER,
         _ if weapon.seeker() => PLASMA_LOOK_GRAVITIC_SEEKER,
         Some(_) if weapon.curve.0 > 0 => 3,
         Some(PlasmaGrade::Pinched) => 1,
@@ -1455,6 +1471,8 @@ pub struct RenderFrame {
     pub planned_launches: Vec<crate::nukes::PlannedLaunch>,
     /// Capital ships in a jump that the viewer may see (`crate::warp`).
     pub warps: Vec<WarpView>,
+    /// Dashes under way that the viewer may see (`crate::dash`, `mirror/dash.rs`).
+    pub dashes: Vec<DashView>,
     /// Timed self-destructs counting down that the viewer may see (`crate::destruct`).
     pub destructs: Vec<DestructView>,
     /// The time left on the viewer's side's sites and upgrades whose work is moving
@@ -2739,6 +2757,7 @@ impl World {
             &mut frame.planned_launches,
         );
         self.write_warps(viewer, &mut frame.warps);
+        self.write_dashes(viewer, &mut frame.dashes);
         self.write_destructs(viewer, &mut frame.destructs);
         self.write_work_left(viewer, &mut frame.work_left);
         self.write_dampers(viewer, &mut frame.dampers);

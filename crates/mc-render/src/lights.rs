@@ -1092,6 +1092,16 @@ fn glow_of(p: &ProjectileInstance) -> Option<Glow> {
         // A Regency seeker (`mirror::plasma_look` in `_pad[0]` beside the missile bit): no
         // flame, its charge glowing violet at the tail.
         let look = ((p._pad[0] - 1.0) * 0.5).floor();
+        if p._pad[0] > 2.5 && look == crate::gpu_consts::plasma_look::FUSION_SEEKER as f32 {
+            // One carrying pinch fusion: its thrust lights what it passes, white-pink.
+            return Some(Glow {
+                from: from + back,
+                to: to + back,
+                color: Vec3::new(1.0, 0.6, 0.68) * 260.0,
+                range: 34.0,
+                line: false,
+            });
+        }
         if p._pad[0] > 2.5 && look == crate::gpu_consts::plasma_look::GRAVITIC_SEEKER as f32 {
             return Some(Glow {
                 from: from + back,

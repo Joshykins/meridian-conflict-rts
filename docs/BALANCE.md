@@ -75,18 +75,19 @@ Off the lines, measured the same way:
   40 Thunderheads kill it in 85 s, 25 in 140 s, 15 in 240 s; 40 Eclipses in 125 s; 100
   Kestrels in 120 s.
 - The Seraph (Regency T5 strike titan, 60000 mass, half a Behemoth; first pass 2026-10-09,
-  unplayed): 420000 health and a 60000 hull field (300/s), 2000 energy/s upkeep, hovering
-  at 70 m/s. Two Rapid Fusion Repeaters (1500 with 18 m splash every 0.5 s each, 1000 m,
-  taking turns: about 6000 dps) and sixteen Gravitic Seekers every 12 s (1100 each, 1300 m,
+  unplayed): 220000 health under a 260000 hull field (1200/s; 10-09: most of its weight
+  moved into the field), 2000 energy/s upkeep, hovering at 70 m/s. Two Rapid Fusion
+  Repeaters (1500 with 18 m splash every 0.5 s each, 1000 m, also at spacecraft, each
+  taking the foe nearest where it points; taking turns: about 6000 dps) and sixteen Gravitic Seekers every 12 s (1100 each, 1300 m,
   about 1500 dps averaged). Its dash (`dash` in the blueprint, mc-sim `dash.rs`): it sees
   ground or sea enemies 400 to 1800 m off, charges 1.5 s, is gone (unseen, unhittable)
-  0.6 s and comes down in the middle of everything within 250 m of the one it saw. As it
+  1.5 s, the air at the mark crackling faintly for its last 0.6 s, and comes down in the middle of everything within 250 m of the one it saw. As it
   lands its Seraphic Nova (a `dash_only` cone weapon, a full-circle wake) rolls out to
   320 m at 260 m/s (15000 at its feet to 3750 at the edge, enemies only, 1.5 s stun on all
   but experimentals, over hills and walls, stopped only by shield domes), its seekers all
   going up as it lands; then 15 s to recharge. Model 25% bigger since 10-09 (radius 75 m). Not at a move order, hold fire
   or hold position. It lands under a siege gun's `range_min` (the Behemoth's Tempest
-  900 m, rockets 600 m), so it is the Behemoth's ground answer; nothing against the air.
+  900 m, rockets 600 m), so it is the Behemoth's ground answer; nothing against aircraft, though its forearms reach spacecraft.
   Measured (mc-sim `tests/seraph.rs`): it kills four Striders and lives.
 - The Skyhook space elevator (ARC T5, 160000 mass / 1.6 M energy, `docs/ELEVATOR.md`):
   once its cable is clamped (24 s after it is finished) three crates land every 30 s with

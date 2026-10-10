@@ -405,19 +405,19 @@ fn seekers_spread_over_the_marks_in_reach() {
 /// for rockets"): each is a missile body with the seeker's look, the Strider's included.
 #[test]
 fn every_regency_missile_has_a_body() {
-    use mc_sim::mirror::{plasma_look, PLASMA_LOOK_GRAVITIC_SEEKER};
+    use mc_sim::mirror::{plasma_look, PLASMA_LOOK_FUSION_SEEKER, PLASMA_LOOK_GRAVITIC_SEEKER};
     let w = world();
     let mut seekers = 0;
     for unit in &w.blueprints.units {
         for weapon in unit.weapons.iter().filter(|w| w.seeker()) {
             seekers += 1;
-            assert_eq!(
-                plasma_look(weapon),
-                PLASMA_LOOK_GRAVITIC_SEEKER,
-                "{}: {}",
-                unit.key,
-                weapon.name
-            );
+            // One carrying pinch fusion has the seeker's body, its thrust fusion-hot.
+            let look = if weapon.fusion_strike {
+                PLASMA_LOOK_FUSION_SEEKER
+            } else {
+                PLASMA_LOOK_GRAVITIC_SEEKER
+            };
+            assert_eq!(plasma_look(weapon), look, "{}: {}", unit.key, weapon.name);
         }
     }
     assert!(seekers >= 8, "Regency missiles: {seekers}");

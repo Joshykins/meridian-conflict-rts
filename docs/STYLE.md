@@ -429,10 +429,12 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     faceted prow with violet chevrons, a violet ring and seams, and four small
     fins swept forward on the diagonals. The charge glows violet out of the
     tail in place of a motor flame. It leaves its cell with a hard red flash
-    and filaments snapping in on it, and lays a bold black smoke tube that
-    burns hot violet-white for a few metres behind the tail and then stays a
-    dense dark column as it hangs, never a thin violet haze.
-    Violet and black smoke are the sign of a Regency missile a defence can
+    and filaments snapping in on it, and lays a bold dark grey smoke tube,
+    smooth along its arc, that burns hot violet-white for a few metres behind
+    the tail and then stays a dense charcoal column as it hangs, never ink
+    black and never a thin violet haze. A seeker carrying pinch fusion (the
+    Seraph's, the Strider's) thrusts a longer, far brighter white-pink fusion
+    flare. Violet and dark grey smoke are the sign of a Regency missile a defence can
     take, set apart from ARC's white smoke; only the missiles are violet, so
     the lenses that crush them stay red. Where it strikes the lens snaps in and lets
     go: a hard red burst over a white heart, filaments torn out, globs and
