@@ -84,7 +84,7 @@ Off the lines, measured the same way:
   1.5 s, the air at the mark crackling faintly for its last 0.6 s, and comes down in the middle of everything within 250 m of the one it saw. As it
   lands its Seraphic Nova (a `dash_only` cone weapon, a full-circle wake) rolls out to
   320 m at 260 m/s (15000 at its feet to 3750 at the edge, enemies only, 1.5 s stun on all
-  but experimentals, over hills and walls, stopped only by shield domes), its seekers all
+  but experimentals, over hills and walls, and through shields: every Seraph weapon has `pierce_shields`, domes and hull fields alike), its seekers all
   going up as it lands; then 15 s to recharge. Model 25% bigger since 10-09 (radius 75 m). Not at a move order, hold fire
   or hold position. It lands under a siege gun's `range_min` (the Behemoth's Tempest
   900 m, rockets 600 m), so it is the Behemoth's ground answer; nothing against aircraft, though its forearms reach spacecraft.

@@ -336,6 +336,44 @@ fn the_wave_rolls_out_from_the_landing() {
     }
 }
 
+/// No enemy shield stops it: the wave passes through a dome it landed outside of and
+/// strikes (and stuns) the bot under it, leaving the dome untouched; and every one of
+/// its weapons pierces shields, the bolts and seekers too.
+#[test]
+fn shields_do_not_stop_it() {
+    let mut w = world(None);
+    w.state.players[1].free_build = true;
+    // Beyond its seekers' reach of the dome until it lands.
+    add(&mut w, SERAPH, 0, 300, 2000, false);
+    cluster(&mut w, 1700, 2000);
+    // A dome off the cluster's far side: over the bot, clear of where it lands.
+    let dome = add(&mut w, "aster_t2_shield", 1, 1700, 2380, true);
+    let covered = add(&mut w, BOT, 1, 1700, 2290, true);
+    until_landed(&mut w, 60).expect("it dashed");
+    let r = row(&w, dome);
+    let full = w.state.units.shield_hp[r];
+    assert!(
+        full > Fx::ZERO && w.state.units.shield_open[r] == u8::MAX,
+        "the dome is up as it lands"
+    );
+    roll_out(&mut w);
+    let u = &w.state.units;
+    if let Some(r) = u.row(covered) {
+        assert!(
+            u.health[r] < w.unit_max_health(r),
+            "the dome kept the wave off"
+        );
+        assert!(u.stun[r][0] > 0, "the dome kept the stun off");
+    }
+    // Its seekers may have brought the generator down since; if not, the wave left
+    // the dome as it was.
+    if let Some(r) = u.row(dome) {
+        assert!(u.shield_hp[r] >= full, "the dome took the wave");
+    }
+    let bp = w.blueprints.unit_by_key(SERAPH).unwrap();
+    assert!(bp.weapons.iter().all(|w| w.pierce_shields));
+}
+
 /// Four heavy tanks the landing does not kill, 150 m about `(x, y)`.
 fn heavy_cluster(w: &mut World, x: i32, y: i32) {
     for (dx, dy) in [(150, 0), (-150, 0), (0, 150), (0, -150)] {

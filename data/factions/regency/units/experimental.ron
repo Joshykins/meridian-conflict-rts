@@ -251,6 +251,8 @@
     // between its wings a battery of sixteen Gravitic Seekers goes up whenever there is
     // anything in reach, and all at once every time it lands from a dash (`on_dash`),
     // arcing over and down on what stands all round it. No anti-air, but the forearms reach spacecraft.
+    // No shield stops any of it (`pierce_shields`): its bolts, seekers and landing pass
+    // through domes and hull fields alike and strike what is under them.
     //
     // Balance: a first pass. Half a Behemoth's price for a third of its health, most of it
     // in its hull field (220000 health under a 260000 field that comes back at 1200/s);
@@ -293,7 +295,7 @@
                 loft: 0.3, flat_fire: true, turret_turn: 120, rest_pitch: -80,
                 muzzle: (37, 23.75, 76.25), pivot: (-1, 21.75, 77),
                 targets: ["Land", "Naval", "Structure", "Space"], color: Orange, red: 1.0,
-                plasma_grade: Some(PinchFusion), keep_aim: true,
+                plasma_grade: Some(PinchFusion), keep_aim: true, pierce_shields: true,
                 flash: 1.3, impact: 1.8, tracer: 1.5,
                 sounds: (fire: "regency_sunspear_fire", impact: "regency_sunspear_hit", ground: "regency_sunspear_hit"),
             ),
@@ -304,7 +306,7 @@
                 loft: 0.3, flat_fire: true, turret_turn: 120, rest_pitch: -80,
                 muzzle: (37, -23.75, 76.25), pivot: (-1, -21.75, 77),
                 targets: ["Land", "Naval", "Structure", "Space"], color: Orange, red: 1.0,
-                plasma_grade: Some(PinchFusion), keep_aim: true,
+                plasma_grade: Some(PinchFusion), keep_aim: true, pierce_shields: true,
                 flash: 1.3, impact: 1.8, tracer: 1.5,
                 sounds: (fire: "regency_sunspear_fire", impact: "regency_sunspear_hit", ground: "regency_sunspear_hit"),
             ),
@@ -329,7 +331,7 @@
                 missile: true, guided: true, vertical_launch: true, apogee: 260,
                 salvo: 16, salvo_delay: 0.1, split: true, split_ordered: true, on_dash: true,
                 intercept: 80, caliber: 1.2, flash: 1.2, impact: 1.4, shockwave: 1.0,
-                plasma_grade: Some(Gravitic), fusion_strike: true,
+                plasma_grade: Some(Gravitic), fusion_strike: true, pierce_shields: true,
                 sounds: (fire: "regency_gravitic_throw", impact: "regency_sunspear_hit", ground: "regency_sunspear_hit"),
             ),
             (
@@ -337,13 +339,13 @@
                 // The landing (`dash_only`): a wall of red plasma rolls out all round from its
                 // feet to 320 m in about a second and a quarter, the Wake's wave as a ring
                 // and a mobile nuke: 15000 where it lands, a quarter of that at its edge,
-                // and a 1.5 s stun on all but experimentals. It rolls over hills and walls;
-                // only a shield dome stops it.
+                // and a 1.5 s stun on all but experimentals. It rolls over hills and walls,
+                // and through shields.
                 damage: 15000, range: 320, reload: 15, hitscan: true, trajectory: Direct,
                 cone: (angle: 180, edge: 0.25, speed: 260, stun: 1.5), dash_only: true,
                 turret_turn: 0, arc: 360, mount: true, muzzle: (0, 0, 0),
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
-                plasma_grade: Some(Pinched),
+                plasma_grade: Some(Pinched), pierce_shields: true,
                 flash: 4.0, impact: 2.0, shockwave: 1.5,
                 sounds: (fire: "regency_seraph_wave"),
             ),

@@ -1736,7 +1736,8 @@ impl Blueprints {
                         | (w.intercepts as u64) << 6
                         | (w.keeps_aim as u64) << 7
                         | (w.flak as u64) << 8
-                        | (w.airburst as u64) << 9,
+                        | (w.airburst as u64) << 9
+                        | (w.pierce_shields as u64) << 10,
                 );
                 h.write_u64(w.cant.0 as u64 | (w.rest_pitch.0 as u64) << 16);
                 h.write_i64(w.skim.0);
