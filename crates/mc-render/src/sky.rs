@@ -18,6 +18,7 @@
 
 mod blast;
 mod regions;
+mod seed;
 mod shade;
 mod targets;
 
@@ -182,7 +183,7 @@ const _: () = assert!(
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable, Debug)]
 pub struct Disturber {
-    /// xy where it is now, radius (m), kind (0 wake, 1 blast, 2 hull).
+    /// xy where it is now, radius (m), kind (0 wake, 1 blast, 2 hull, `disturber::SEED`).
     a: [f32; 4],
     /// xy velocity (m/s), strength, age (s).
     b: [f32; 4],
@@ -530,6 +531,8 @@ pub struct Sky {
     /// Where every unit of the last tick stands, for the selection's clearings.
     units: Vec<Option<Vec2>>,
     blasts: Vec<(Vec2, f32, f32, f32)>,
+    /// Storm clouds joining the layer: where, how far round, since when (`seed.rs`).
+    seeds: Vec<(Vec2, f32, f32)>,
     clears: Vec<Vec4>,
     clear_strength: f32,
     rng: Rng,
@@ -965,6 +968,7 @@ impl Sky {
             flyers: Vec::new(),
             units: Vec::new(),
             blasts: Vec::new(),
+            seeds: Vec::new(),
             clears: Vec::new(),
             clear_strength: 0.0,
             rng,
@@ -1602,6 +1606,8 @@ impl Sky {
                 c: [0.0; 4],
             });
         }
+        let room = MAX_DISTURBERS - disturbers.len();
+        disturbers.extend(self.seed_disturbers(now, room));
         for (k, s) in self
             .storms
             .iter()

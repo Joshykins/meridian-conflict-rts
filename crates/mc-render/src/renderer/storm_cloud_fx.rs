@@ -10,15 +10,18 @@
 //!   own eased drift. They live in slots of their own at the end of the puff buffer
 //!   (`STORM_PUFF_SLOTS`), written again every tick, so a battle's smoke and sparks going
 //!   round the ring can never overwrite a cloud halfway through its life. A small dense
-//!   knot at first, it builds slowly into a dark thunderhead some 300 m across, grey-blue on its crown and near black under its base. Lit from inside
+//!   knot at first, it builds slowly into a dark thunderhead some 200 m across, grey-blue on its crown and near black under its base. Lit from inside
 //!   by lightning that flickers more often as it grows and all the time while it strikes,
 //!   and twice or so a stroke the sky lights (`Sky::strike`) with its far thunder.
 //! - **Bolt** (`CloudBolt`): a forked blue-white stroke from inside the base down to what
 //!   it strikes, struck again once or twice down the same channel, forks off its upper
 //!   part, the base lit round it and the touchdown flashing white. The burst where it lands
 //!   is the weapon's `ion_blast` (the ordinary `Impact`).
-//! - **Rain-out**: once the sim lets the seed go the cloud lingers `STORM_LINGER` seconds,
-//!   spreading and thinning, its base sagging, its lightning dying away.
+//! - **Joining the layer**: once the sim lets the seed go the cloud rises over
+//!   `STORM_LINGER` seconds to the base of the sky's cloud layer, spreading, lightening
+//!   from storm grey to an ordinary cloud's and thinning away as it goes, its lightning
+//!   dying; meanwhile its water is handed to the weather there (`Sky::seed`), so the
+//!   layer over a run's track thickens and drifts off with the rest.
 //!
 //! The drawn cloud follows the data: how wide it grows from the seed's bolt `radius`, and
 //! where it goes and when from the seed's own drift. Presentation only; the renderer's
@@ -40,10 +43,9 @@ const LINGER: f32 = puff::STORM_LINGER;
 /// keeps eight or so in the air at once, a seed a second, each lingering as it rains out).
 const LUMPS: usize = 40;
 /// Metres a grown cloud reaches from its middle at least, and as a share of the disc its
-/// bolts fall in, so it stays a big storm next to the aircraft that lets it go: some 300 m
-/// across. Each cloud is a little bigger or smaller than that (`lay_storm_cloud`).
-const LEAST_REACH: f32 = 140.0;
-const REACH_PER_RADIUS: f32 = 0.75;
+/// bolts fall in: some 200 m across, its bolts leaving from inside it. Each cloud is a little bigger or smaller than that (`lay_storm_cloud`).
+const LEAST_REACH: f32 = 95.0;
+const REACH_PER_RADIUS: f32 = 0.65;
 /// Puff slots kept for storm clouds at the end of the puff buffer, after the ring, the
 /// ground fires' and the missile trails' (renderer.rs `MAX_PUFFS`): room for about 150
 /// clouds, six or so Nimbus runs at once (a cloud lives some 23 s, a seed a second). A deliberate cosmetic cap: past it the
@@ -154,6 +156,9 @@ impl Renderer {
         for c in &mut clouds {
             if c.gone.is_none() && !views.iter().any(|v| v.serial == c.serial) {
                 c.gone = Some(time);
+                // Spent, it rises into the cloud layer and its water joins the sky's.
+                let (_, middle) = c.at(time);
+                self.sky.seed(middle.truncate(), c.reach * 1.6, time);
             }
         }
         clouds.retain(|c| c.gone.is_none_or(|gone| time < gone + LINGER));

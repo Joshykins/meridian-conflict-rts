@@ -8,7 +8,8 @@
 // Every lump of one cloud is laid at once, lowest first (so from above the crown covers
 // the base), and carried with the cloud as the seed drifts on behind the aircraft: the
 // drift eases to a stop as the sim's does (mc-sim `cloud_seed::path`), and the cloud swells as
-// it goes, each lump showing as the cloud grows past its own share.
+// it goes, each lump showing as the cloud grows past its own share. Spent, it rises into
+// the sky's cloud layer, lightening to an ordinary cloud's grey as it thins away there.
 
 fn is_storm_puff(kind: u32) -> bool {
     return kind == PUFF_STORM_CLOUD;
@@ -32,20 +33,24 @@ fn storm_puff_vertex(p: Puff, corner: vec2<f32>, t: f32, o: PuffOut) -> PuffOut 
     // A seed stays a small knot at first and builds slowly into its size
     // (storm_cloud_fx.rs `size_at`).
     let grown = 0.06 + 0.94 * f * f * (3.0 - 2.0 * f);
-    // Spent: it spreads and thins, its base sagging as it rains itself out.
+    // Spent: it rises into the sky's cloud layer, to a little over its base, spreading and
+    // settling flatter as it goes, and thins away into it (the weather takes its water
+    // there, sky/seed.rs).
     let spent = clamp((t - (p.life - PUFF_STORM_LINGER)) / PUFF_STORM_LINGER, 0.0, 1.0);
-    var offset = (p.pos - p.origin) * grown * (1.0 + 0.22 * spent);
-    let height = offset.z / reach;
-    offset.z -= spent * spent * reach * 0.3 * (1.0 - smoothstep(-0.3, 0.45, height));
+    let rising = spent * spent * (3.0 - 2.0 * spent);
+    let layer = cloud_floor(middle.xy) + atmos.layer.x + reach * 0.4;
+    let lifted = middle + vec3<f32>(0.0, 0.0, max(layer - middle.z, 0.0) * rising);
+    var offset = (p.pos - p.origin) * grown * (1.0 + 0.6 * rising);
+    offset.z *= 1.0 - 0.45 * rising;
     // Each billow churns slowly round its place.
     let s = p.params.w * 6.2832;
     offset += vec3<f32>(sin(t * 0.31 + s), cos(t * 0.27 + s * 1.7), 0.6 * sin(t * 0.4 + s * 2.3))
         * p.params.x * 0.07 * grown;
-    let pos = middle + offset;
+    let pos = lifted + offset;
     // It shows as the cloud grows past its share, swelling out of nothing.
     let shows = smoothstep(p.appearance.w, p.appearance.w + 0.14, f) * smoothstep(0.0, 0.35, t);
-    let size = p.params.x * grown * (0.55 + 0.45 * shows) * (1.0 + 0.3 * spent);
-    out.opacity *= shows * (1.0 - smoothstep(0.25, 1.0, spent));
+    let size = p.params.x * grown * (0.55 + 0.45 * shows) * (1.0 + 0.5 * rising);
+    out.opacity *= shows * (1.0 - smoothstep(0.45, 1.0, spent));
     if out.opacity < 0.004 {
         return out;
     }
@@ -63,7 +68,7 @@ fn storm_puff_vertex(p: Puff, corner: vec2<f32>, t: f32, o: PuffOut) -> PuffOut 
     out.world = effect_billboard_world(pos, corner, size);
     out.state = vec3<f32>(spent, p.params.z, p.params.w);
     // The cloud's middle and reach, for how high in it a pixel is (`storm_puff_color`).
-    out.roll = middle;
+    out.roll = lifted;
     out.cloud_size = reach;
     // No shield clips weather.
     out.origin = vec3<f32>(0.0, 0.0, 2.0e8);
@@ -107,11 +112,12 @@ fn storm_puff_color(in: PuffOut, d: f32) -> vec4<f32> {
     // As clouds.wgsl lights the sky's clouds: the sun through it, the sky from above
     // (hidden low in the heap), the land's light on its base. A storm's water is grey.
     let sun_light = atmos.sun_color.rgb * mix(1.0, atmos.sun_color.w, 0.8);
-    let direct = sun_light * (0.02 + 0.3 * lit) * mix(0.08, 1.0, crown * crown);
+    // Spent, it is no longer a storm: lit and coloured as the sky's own cloud.
+    let direct = sun_light * (0.02 + 0.3 * lit) * mix(mix(0.08, 1.0, crown * crown), 1.0, spent * 0.7);
     let sky = atmos.sky_color.rgb * mix(0.2, 0.9, crown) + atmos.ground_color.rgb * 0.25 * (1.0 - crown);
     // Wet and dark, darker in the folds and in some billows than others.
-    let albedo = vec3<f32>(0.33, 0.36, 0.43) * (0.85 + 0.25 * big.a) * (0.9 + 0.1 * fine.b)
-        * in.appearance.x;
+    let storm = vec3<f32>(0.33, 0.36, 0.43) * in.appearance.x;
+    let albedo = mix(storm, vec3<f32>(0.78, 0.8, 0.84), spent) * (0.85 + 0.25 * big.a) * (0.9 + 0.1 * fine.b);
     var color = (direct + sky) * albedo;
     // Lightning inside it: the sky's strokes (sky.rs `strike`) as the sky's clouds take
     // them, and the flashes in it (lights.rs), seen through the water as a blue-white glow

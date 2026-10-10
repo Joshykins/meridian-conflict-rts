@@ -227,6 +227,16 @@ fn cs_force(@builtin(global_invocation_id) id: vec3<u32>) {
         let r = d.a.z;
         let kind = d.a.w;
         let rel = xy - d.a.xy;
+        if kind == DISTURBER_SEED {
+            // A storm cloud joining the layer (sky/seed.rs): the cover round it gathers
+            // toward full while it rises into the layer, most at its middle, and is left
+            // to drift on the wind and heal back to the day's weather like any other.
+            if dot(rel, rel) > r * r * 9.0 { continue; }
+            let feeding = 1.0 - smoothstep(0.0, DISTURBER_SEED_FEEDS, d.b.w);
+            let gather = exp(-dot(rel, rel) / (r * r)) * d.b.z * feeding;
+            state.x += (max(state.x, 1.0) - state.x) * clamp(gather * dt * 0.5, 0.0, 1.0);
+            continue;
+        }
         if kind == KIND_BLAST && dot(rel, rel) > r * r * 36.0 {
             // Outside six radii both Gaussian influences are below 1e-8.
             // Avoid evaluating blast noise over the entire million-texel field.

@@ -151,7 +151,7 @@ fn a_run_lays_a_trail_of_clouds_that_strike_down_onto_what_it_crossed() {
             assert!(from.z > Fx::from_int(200));
             assert!(to.z < Fx::from_int(40), "down to the ground: {to:?}");
             assert!(
-                to.xy().distance(from.xy()) <= cloud.radius / 4 + Fx::from_int(10),
+                to.xy().distance(from.xy()) <= cloud.radius / 3 + Fx::from_int(10),
                 "under the cloud: {to:?} from {from:?}"
             );
         }

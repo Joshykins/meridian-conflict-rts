@@ -24,10 +24,10 @@ use crate::{SimError, SimEvent, Table, World};
 
 /// Metres below a cloud's middle its bolts leave from: the base of the cloud as drawn.
 const BASE_DROP: i32 = 20;
-/// How far out from the cloud's middle toward what it strikes a bolt leaves: three
-/// quarters of the way, inside the cloud as it is drawn.
-const BASE_OUT_NUM: i64 = 3;
-const BASE_OUT_DEN: i64 = 4;
+/// How far out from the cloud's middle toward what it strikes a bolt leaves: two thirds
+/// of the way, inside the cloud as it is drawn.
+const BASE_OUT_NUM: i64 = 2;
+const BASE_OUT_DEN: i64 = 3;
 /// Ticks a bolt is given: it lands on the first, one more in case it was let go from just
 /// over a rise.
 const BOLT_TICKS: u16 = 2;
@@ -121,7 +121,7 @@ impl World {
                 (xy.extend(ground), Handle::NONE)
             }
         };
-        // It leaves the part of the cloud's base over what it strikes, most of the way out
+        // It leaves the part of the cloud's base over what it strikes, two thirds of the way out
         // toward it, so it falls nearly straight down rather than slanting from the middle.
         let out = (to.xy() - centre.xy()) * Fx::ratio(BASE_OUT_NUM, BASE_OUT_DEN);
         let from = (centre.xy() + out).extend(centre.z - Fx::from_int(BASE_DROP));
