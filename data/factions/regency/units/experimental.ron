@@ -338,7 +338,7 @@
                 // feet to 320 m in about a second and a quarter, the Wake's wave as a ring
                 // and a mobile nuke: 15000 where it lands, a quarter of that at its edge,
                 // and a 1.5 s stun on all but experimentals. It rolls over hills and walls;
-                // only a shield dome stops it.
+                // only an enemy shield dome stops it, never its own side's.
                 damage: 15000, range: 320, reload: 15, hitscan: true, trajectory: Direct,
                 cone: (angle: 180, edge: 0.25, speed: 260, stun: 1.5), dash_only: true,
                 turret_turn: 0, arc: 360, mount: true, muzzle: (0, 0, 0),

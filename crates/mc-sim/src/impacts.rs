@@ -487,7 +487,7 @@ impl World {
                     let blocker = if weapon.torpedo {
                         None
                     } else {
-                        self.blast_blocker(hit.point, target, Some(r))
+                        self.blast_blocker(hit.point, target, Some(r), Some(owner))
                     };
                     (r, blocker)
                 })
@@ -504,6 +504,7 @@ impl World {
                             .blast_blocker(
                                 hit.point,
                                 xy.extend(self.terrain.height_at(xy) + Fx::ONE),
+                                None,
                                 None,
                             )
                             .is_none()
@@ -600,18 +601,24 @@ impl World {
         Ok(())
     }
 
-    /// First live membrane crossed by blast propagation, regardless of team.
-    /// The source and victim can share a dome: no membrane lies between them.
+    /// First live membrane crossed by blast propagation. The source and victim can
+    /// share a dome: no membrane lies between them. `by`: the side that let the blast
+    /// go, whose own and allied domes it passes through as its shots do
+    /// (`sweep_shields`); None (a death blast, a storm): every dome stops it.
     pub(crate) fn blast_blocker(
         &self,
         from: FxVec3,
         to: FxVec3,
         victim: Option<usize>,
+        by: Option<u8>,
     ) -> Option<usize> {
         let mut best = None;
         let mut first = Fx::MAX;
         for &row in &self.scratch.shielded {
-            if !self.state.units.slots.is_alive(row) || !self.shield_blocking(row) {
+            if !self.state.units.slots.is_alive(row)
+                || !self.shield_blocking(row)
+                || by.is_some_and(|by| !self.are_enemies(by, self.state.units.owner[row]))
+            {
                 continue;
             }
             let spec = self.bp(row).shield.unwrap();
@@ -678,7 +685,7 @@ impl World {
             }
             let damage = db.damage * db.falloff(reach);
             let target = self.state.units.pos[row].extend(self.state.units.z[row] + height / 2);
-            if let Some(shield) = self.blast_blocker(origin, target, Some(row)) {
+            if let Some(shield) = self.blast_blocker(origin, target, Some(row), None) {
                 if !charged.contains(&shield) {
                     charged.push(shield);
                     self.damage_shield(shield, damage);

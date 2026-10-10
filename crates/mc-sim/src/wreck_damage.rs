@@ -43,7 +43,7 @@ impl World {
             let bp = self.blueprints.unit(wrecks.blueprint[w]);
             let middle = wrecks.pos[w].extend(wrecks.z[w] + bp.height / 2);
             let reach = ((middle - center).length() - bp.radius / 2).max(Fx::ZERO);
-            if reach > radius || self.blast_blocker(center, middle, None).is_some() {
+            if reach > radius || self.blast_blocker(center, middle, None, None).is_some() {
                 continue;
             }
             let dealt = damage(reach);

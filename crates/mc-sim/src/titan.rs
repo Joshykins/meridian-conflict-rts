@@ -410,7 +410,7 @@ impl World {
                 let damage = per_tick * (Fx::ONE - edge * Fx::ratio(3, 5));
                 let bp = self.bp(r);
                 let target = self.state.units.pos[r].extend(self.state.units.z[r] + bp.height / 2);
-                match self.blast_blocker(point, target, Some(r)) {
+                match self.blast_blocker(point, target, Some(r), None) {
                     Some(shield) => {
                         if !charged.contains(&shield) {
                             self.damage_shield(shield, damage);
@@ -559,6 +559,7 @@ impl World {
                 at + FxVec3::new(Fx::ZERO, Fx::ZERO, Fx::ONE),
                 target,
                 Some(r),
+                None,
             ) {
                 Some(shield) => self.damage_shield(shield, spec.damage),
                 None => self.damage_unit(r, spec.damage, sabot.owner, sabot.source),

@@ -16,9 +16,10 @@
 //!   from it to `Cone::edge` of it at full range. A front with a stun (`Cone::stun_ticks`,
 //!   the Seraph's landing wave) stuns all but the experimentals it strikes.
 //! - **Cover:** the wake rolls over the ground, up hills and down, so the ground hides
-//!   nothing from it and the gun needs no line of fire (`World::needs_line`). A shield
-//!   dome between takes the hit for all it covers, once a wake, as a blast's is
-//!   (`blast_blocker`); a hull shield takes its own unit's share.
+//!   nothing from it and the gun needs no line of fire (`World::needs_line`). An enemy
+//!   shield dome between takes the hit for all it covers, once a wake, as a blast's is
+//!   (`blast_blocker`); the gun's own side's domes let it through. A hull shield takes
+//!   its own unit's share.
 //! - **The ground:** seared along the fan (stains) as the front passes, as a plasma
 //!   strike sears it, and the trees it passes over burn down.
 //!
@@ -163,7 +164,7 @@ impl World {
             let target = units.pos[t].extend(units.z[t] + bp.height / 2);
             // Every shield is read before any takes a hit: one the wake breaks still
             // covers the rest of what is under it this tick.
-            let blocker = self.blast_blocker(wake.from, target, Some(t));
+            let blocker = self.blast_blocker(wake.from, target, Some(t), Some(wake.owner));
             victims.push((t, damage, blocker));
         }
 

@@ -336,6 +336,44 @@ fn the_wave_rolls_out_from_the_landing() {
     }
 }
 
+/// A bot past the cluster under a dome owned by `dome_owner`, clear of where the
+/// Seraph lands: whether the landing's wave struck it.
+fn wave_under_dome(dome_owner: u8, dome: &str) -> bool {
+    let mut w = world(None);
+    for p in &mut w.state.players {
+        p.free_build = true;
+    }
+    // Beyond its seekers' reach of the dome until it lands.
+    add(&mut w, SERAPH, 0, 300, 2000, false);
+    cluster(&mut w, 1700, 2000);
+    let generator = add(&mut w, dome, dome_owner, 1700, 2380, true);
+    let covered = add(&mut w, BOT, 1, 1700, 2290, true);
+    until_landed(&mut w, 60).expect("it dashed");
+    let r = row(&w, generator);
+    assert!(
+        w.state.units.shield_hp[r] > Fx::ZERO && w.state.units.shield_open[r] == u8::MAX,
+        "the dome is up as it lands"
+    );
+    roll_out(&mut w);
+    let u = &w.state.units;
+    // Struck: stunned (its own hull field may have taken the damage).
+    u.row(covered).is_none_or(|r| u.stun[r][0] > 0)
+}
+
+/// Its own side's dome does not shelter the enemies under it from its wave; an enemy's
+/// dome does.
+#[test]
+fn only_an_enemy_dome_stops_the_wave() {
+    assert!(
+        wave_under_dome(0, "regency_t2_shield"),
+        "its own dome kept the wave off"
+    );
+    assert!(
+        !wave_under_dome(1, "aster_t2_shield"),
+        "an enemy dome let the wave through"
+    );
+}
+
 /// Four heavy tanks the landing does not kill, 150 m about `(x, y)`.
 fn heavy_cluster(w: &mut World, x: i32, y: i32) {
     for (dx, dy) in [(150, 0), (-150, 0), (0, 150), (0, -150)] {
