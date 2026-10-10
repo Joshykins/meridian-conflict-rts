@@ -96,6 +96,8 @@ straight into a match instead.
                          its upkeep asks for) | elevator (a space elevator with tanks,
                          gunships and tech 4s queued for its first platform)
                          | dash (a pack of red tanks for a unit that dashes, the Seraph)
+                         | fracture (a gravitic engine turned at once on a red camp 2 km
+                         down the range: tanks, power plants and gunships)
   --players N            player slots, 1-32 (default 2; slot 0 is you, the rest are AI)
   --teams N              split the players into N sides by where their zones lie (default: all alone)
   --observe              watch an all-AI match (no human slot; the camera opens on the whole map)
@@ -344,7 +346,7 @@ fn run() -> Result<(), String> {
             a if unit_shot::flag(&mut unit_shot, a, &mut value)? => {}
             "--afloat" => opts.afloat = true,
             "--hurt" => opts.hurt = value("--hurt")?.parse::<i16>().ok().filter(|p| (0..100).contains(p)).ok_or("--hurt takes a percentage under 100")? * 10,
-            "--scenario" => opts.scenario = Some(range::Scenario::parse(&value("--scenario")?).ok_or("--scenario takes under-fire, close, targets, build, work, salvage, upgrade, march, turn, destruct, lift, warp, warp-dampened, pause, short, elevator or dash")?),
+            "--scenario" => opts.scenario = Some(range::Scenario::parse(&value("--scenario")?).ok_or("--scenario takes under-fire, close, targets, build, work, salvage, upgrade, march, turn, destruct, lift, warp, warp-dampened, pause, short, elevator, dash or fracture")?),
             "--players" => opts.players = value("--players")?.parse().map_err(|_| "--players takes a number")?,
             "--teams" => opts.teams = value("--teams")?.parse().map_err(|_| "--teams takes a number")?,
             "--army" => opts.army = value("--army")?.parse().map_err(|_| "--army takes a number")?,

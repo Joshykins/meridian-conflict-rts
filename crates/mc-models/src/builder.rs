@@ -128,6 +128,7 @@ pub struct MeshBuilder {
     pit: Option<super::Pit>,
     excavation: Option<super::Excavation>,
     star_core: Option<[f32; 4]>,
+    gravity_core: Option<[f32; 4]>,
     beam_core: Option<[f32; 4]>,
     exhausts: Vec<super::Exhaust>,
     marks: Vec<super::Mark>,
@@ -197,6 +198,7 @@ impl MeshBuilder {
             pit: None,
             excavation: None,
             star_core: None,
+            gravity_core: None,
             beam_core: None,
             exhausts: Vec::new(),
             marks: Vec::new(),
@@ -956,6 +958,22 @@ impl MeshBuilder {
 
     pub fn star_core(&self) -> Option<[f32; 4]> {
         self.star_core
+    }
+
+    /// Records a gravitic engine's held gravity, its middle and how far round it the model
+    /// leaves open (given in the current frame), which the renderer draws as light; the
+    /// model's orbit pieces then turn by the engine's charge (`Model::gravity_core`).
+    pub fn set_gravity_core(&mut self, at: Vec3, clear: f32) {
+        let at = self.transform.transform_point3(at);
+        let r = self
+            .transform
+            .transform_vector3(Vec3::new(clear, 0.0, 0.0))
+            .length();
+        self.gravity_core = Some([at.x, at.y, at.z, r]);
+    }
+
+    pub fn gravity_core(&self) -> Option<[f32; 4]> {
+        self.gravity_core
     }
 
     /// Records the energy core a held beam is laid from: its lens's face and radius (given

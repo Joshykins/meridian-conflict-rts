@@ -68,7 +68,6 @@ pub(super) const CORE: [Vec3; 3] = [
     Vec3::new(0.0, 0.0, 112.0),
 ];
 /// How far round each core the model leaves open for the energy.
-#[cfg(test)]
 pub(super) const CORE_CLEAR: f32 = 20.0;
 
 /// A number from -1 to 1 for `seed`.
@@ -178,6 +177,7 @@ pub(super) fn crown(b: &mut MeshBuilder, _tech: u8) {
     let mut turning = rotors::stack(3, 31.0, 60.0, 0.2);
     turning.push(band(62.0, 42.0, -0.15));
     rotors::build(b, &turning);
+    b.set_gravity_core(CORE[0], CORE_CLEAR);
     for s in &shards {
         s.build(b);
     }
@@ -266,6 +266,7 @@ pub(super) fn open_ring(b: &mut MeshBuilder, _tech: u8) {
     let mut turning = rotors::stack(4, 51.0, 84.0, 0.16);
     turning.push(band(70.0, 66.0, -0.12));
     rotors::build(b, &turning);
+    b.set_gravity_core(CORE[1], CORE_CLEAR);
     for s in &shards {
         s.build(b);
     }
@@ -352,6 +353,7 @@ pub(super) fn split_pyramid(b: &mut MeshBuilder, _tech: u8) {
     site::prongs(b, 4, 34.0, 66.0, CORE[2], TAU / 8.0);
     let mut turning = rotors::stack(3, 27.0, 66.0, 0.2);
     turning.push(band(64.0, 40.0, -0.15));
+    b.set_gravity_core(CORE[2], CORE_CLEAR);
     rotors::build(b, &turning);
     for s in &shards {
         s.build(b);

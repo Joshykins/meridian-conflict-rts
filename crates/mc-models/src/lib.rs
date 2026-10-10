@@ -652,6 +652,11 @@ pub struct Model {
     /// A Regency power generator's star (xyz its middle, w its radius): drawn as light by the
     /// renderer (`renderer/star_core_fx.rs`) while the plant runs.
     pub star_core: Option<[f32; 4]>,
+    /// A gravitic engine's held gravity (xyz its middle, w how far round it the model
+    /// leaves open): the renderer draws the energy there (`renderer/gravitic_engine_fx`),
+    /// and the model's orbit pieces turn by the engine's charge, not the clock
+    /// (`ModelInfo::orbit_driven`).
+    pub gravity_core: Option<[f32; 4]>,
     /// The energy core a held beam is laid from (xyz its lens's face, w the lens's radius):
     /// charged and lit by the renderer with the beam (`renderer/lance_core_fx.rs`).
     pub beam_core: Option<[f32; 4]>,

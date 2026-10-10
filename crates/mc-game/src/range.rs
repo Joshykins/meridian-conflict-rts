@@ -13,6 +13,8 @@ use mc_sim::tables::flag;
 use mc_sim::{Command, Handle};
 use std::collections::HashSet;
 
+use batches::{elevator_batch, fracture_camp, FRACTURE_RANGE};
+
 pub const BLUE: u8 = 0;
 pub const RED: u8 = 1;
 pub const DEFAULT_SUBJECT: &str = "aster_t1_tank";
@@ -111,10 +113,13 @@ pub enum Scenario {
     /// A unit that dashes (`UnitBlueprint::dash`): a pack of red tanks two thirds of its
     /// reach down the range, and it comes down in the middle of them.
     Dash,
+    /// A gravitic engine (`UnitBlueprint::gravitic`, The Fallen) turned at once on a red
+    /// camp 2 km down the range: tanks, a few buildings and aircraft circling over them.
+    Fracture,
 }
 
 impl Scenario {
-    pub const ALL: [Scenario; 17] = [
+    pub const ALL: [Scenario; 18] = [
         Scenario::UnderFire,
         Scenario::PointBlank,
         Scenario::Targets,
@@ -132,6 +137,7 @@ impl Scenario {
         Scenario::Short,
         Scenario::Elevator,
         Scenario::Dash,
+        Scenario::Fracture,
     ];
 
     pub fn label(self) -> &'static str {
@@ -153,6 +159,7 @@ impl Scenario {
             Scenario::Short => "Short",
             Scenario::Elevator => "Elevator",
             Scenario::Dash => "Dash",
+            Scenario::Fracture => "Fracture",
         }
     }
 
@@ -175,6 +182,7 @@ impl Scenario {
             "short" => Scenario::Short,
             "elevator" => Scenario::Elevator,
             "dash" => Scenario::Dash,
+            "fracture" => Scenario::Fracture,
             _ => return None,
         })
     }
@@ -276,6 +284,10 @@ enum PendingOrder {
     Warp {
         pos: FxVec2,
     },
+    /// A gravitic engine tears its rift to here.
+    Fracture {
+        pos: FxVec2,
+    },
     Pause,
     /// Queue each of these, so many of each, in order (a space elevator's batch).
     ProduceMix {
@@ -347,6 +359,7 @@ impl PendingOrder {
                 pos,
                 queue: false,
             }],
+            PendingOrder::Fracture { pos } => vec![Command::Fracture { units: who, pos }],
             PendingOrder::Pause => vec![Command::SetPaused {
                 units: who,
                 paused: true,
@@ -810,56 +823,6 @@ fn attacker_for<'a>(
     })
 }
 
-/// `Scenario::Elevator`: from what the elevator brings down, a line of its heaviest tanks,
-/// a flight of gunships (or whatever armed aircraft it has), and tech-4 machines, enough to
-/// fill most of one platform, rallying east down the range.
-fn elevator_batch(
-    blueprints: &Blueprints,
-    bp: &UnitBlueprint,
-    pad: FxVec2,
-) -> Result<Staged, &'static str> {
-    let builds = bp
-        .builder
-        .as_ref()
-        .filter(|_| bp.elevator.is_some())
-        .ok_or("This Is Not a Space Elevator")?
-        .builds
-        .iter()
-        .map(|&id| blueprints.unit(id));
-    let layer = |b: &UnitBlueprint| b.motion.map(|m| m.layer);
-    let tank = builds
-        .clone()
-        .filter(|b| b.visual.icon == mc_data::IconKind::Tank && b.tech < 4)
-        .max_by_key(|b| b.tech)
-        .ok_or("It Brings Down No Tanks")?;
-    let air = builds
-        .clone()
-        .filter(|b| layer(b) == Some(mc_data::MoveLayer::Air) && !b.weapons.is_empty())
-        .min_by_key(|b| {
-            (
-                b.visual.icon != mc_data::IconKind::Gunship,
-                std::cmp::Reverse(b.tech),
-            )
-        })
-        .ok_or("It Brings Down No Aircraft")?;
-    let heavy = builds
-        .filter(|b| b.tech >= 4)
-        .min_by_key(|b| b.cost_mass)
-        .ok_or("It Brings Down No Experimentals")?;
-    // As many tech 4s as leave a little of the payload over, so some materials come
-    // down too: at least one, at most four.
-    let payload = bp.elevator.map_or(Fx::ZERO, |e| e.payload);
-    let room = payload * 9 / 10 - tank.cost_mass * 6 - air.cost_mass * 4;
-    let heavies = (room / heavy.cost_mass.max(Fx::ONE))
-        .floor_int()
-        .clamp(1, 4) as u8;
-    let order = PendingOrder::ProduceMix {
-        batch: [(tank.id, 6), (air.id, 4), (heavy.id, heavies)],
-        rally: pad + FxVec2::from_ints(520, 0),
-    };
-    Ok((Vec::new(), Some((bp.id, order))))
-}
-
 fn stage(
     scenario: Scenario,
     blueprints: &Blueprints,
@@ -1111,6 +1074,7 @@ fn stage(
                 None,
             ))
         }
+        Scenario::Fracture => fracture_camp(blueprints, bp, east(Fx::from_int(FRACTURE_RANGE), 0)),
         Scenario::Short => {
             let upkeep = bp.economy.energy_upkeep;
             let plant = blueprints
@@ -1453,5 +1417,6 @@ pub fn step_subject(blueprints: &Blueprints, from: BlueprintId, step: i32) -> Bl
     ids[(at as i32 + step).rem_euclid(n.max(1)) as usize]
 }
 
+mod batches;
 #[cfg(test)]
 mod tests;

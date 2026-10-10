@@ -284,7 +284,9 @@ struct ModelInfo {
     skin: u32,
     // Its surface marks in `surface_marks` (bindings.wgsl): first | count << 24.
     marks: u32,
-    _skin_pad1: u32,
+    // 1: its orbit pieces turn by the instance's phase (`deploy`, renderer
+    // gravitic_engine_fx), not the clock: a gravitic engine's machinery (`Model::gravity_core`).
+    orbit_driven: u32,
     _skin_pad2: u32,
 }
 

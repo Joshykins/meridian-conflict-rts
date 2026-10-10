@@ -229,6 +229,7 @@ fn build_fitted_made(
     let mut pit = None;
     let mut excavation = None;
     let mut star_core = None;
+    let mut gravity_core = None;
     let mut beam_core = None;
     let mut scans = false;
     let mut exhausts = Vec::new();
@@ -265,6 +266,7 @@ fn build_fitted_made(
             pit = builder.pit();
             excavation = builder.excavation();
             star_core = builder.star_core();
+            gravity_core = builder.gravity_core();
             beam_core = builder.beam_core();
             exhausts = builder.exhausts();
             marks = builder.marks();
@@ -332,6 +334,7 @@ fn build_fitted_made(
         pit,
         excavation,
         star_core,
+        gravity_core,
         beam_core,
         exhausts,
         marks,

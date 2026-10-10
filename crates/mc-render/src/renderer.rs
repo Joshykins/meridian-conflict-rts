@@ -460,7 +460,9 @@ pub(crate) struct ModelInfo {
     pub(crate) skin: u32,
     /// Its surface marks in scene set 35 (renderer/surface_marks.rs): first | count << 24.
     pub(crate) marks: u32,
-    pub(crate) _skin_pad1: u32,
+    /// 1: its orbit pieces turn by the instance's phase (`UnitInstance::deploy`, set by
+    /// renderer/gravitic_engine_fx), not the clock (`Model::gravity_core`).
+    pub(crate) orbit_driven: u32,
     pub(crate) _skin_pad2: u32,
 }
 
@@ -1130,6 +1132,7 @@ fn fallback_model(key: &str, radius: f32, height: f32) -> Model {
         pit: None,
         excavation: None,
         star_core: None,
+        gravity_core: None,
         beam_core: None,
         exhausts: Vec::new(),
         marks: Vec::new(),
@@ -1448,7 +1451,7 @@ impl Renderer {
             infos.push(ModelInfo {
                 skin,
                 marks: surface_marks.add(&model.marks),
-                _skin_pad1: 0,
+                orbit_driven: u32::from(model.gravity_core.is_some()),
                 _skin_pad2: 0,
                 slot: first_slot[at],
                 icon: *icon,
