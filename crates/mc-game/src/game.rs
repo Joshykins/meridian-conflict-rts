@@ -147,6 +147,9 @@ pub enum Targeting {
     /// A dasher (the Seraph) dashes to the point by hand once its dash is ready
     /// (`dash_marks.rs`, `hud/dash.rs`).
     Dash,
+    /// Gravitic engines tear a rift to the point and hold a well there
+    /// (`gravitic_marks.rs`, `hud/gravitic.rs`).
+    Fracture,
 }
 
 impl Targeting {
@@ -165,6 +168,7 @@ impl Targeting {
             Targeting::Strike => "Strike",
             Targeting::Warp => "Warp",
             Targeting::Dash => "Dash",
+            Targeting::Fracture => "Fracture",
         }
     }
 }
@@ -1814,6 +1818,7 @@ impl Game {
             Targeting::Strike => point.map(|pos| Command::Strike { units, pos, queue }),
             Targeting::Warp => point.map(|pos| Command::Warp { units, pos, queue }),
             Targeting::Dash => point.map(|pos| Command::Dash { units, pos, queue }),
+            Targeting::Fracture => point.map(|pos| Command::Fracture { units, pos }),
             // One warhead a click; the sim gives it to the silo with the most free.
             Targeting::Nuke => point.and_then(|pos| {
                 let silos = self.armed_silos();
@@ -2737,6 +2742,7 @@ impl Game {
             Targeting::Nuke => !self.armed_silos().is_empty(),
             Targeting::Warp => self.selection_warps(),
             Targeting::Dash => self.selection_takers().any(|b| b.dash.is_some()),
+            Targeting::Fracture => self.selection_takers().any(|b| b.gravitic.is_some()),
         };
         if able {
             self.view.patrol_posts.clear();
@@ -2921,6 +2927,9 @@ impl Game {
             // A titan's ability: a dasher's dash, or a giant's strike (`hud/titan.rs`).
             KeyCode::KeyJ if self.selection_takers().any(|b| b.dash.is_some()) => {
                 self.arm(Targeting::Dash)
+            }
+            KeyCode::KeyJ if self.selection_takers().any(|b| b.gravitic.is_some()) => {
+                self.arm(Targeting::Fracture)
             }
             KeyCode::KeyJ => self.arm(Targeting::Strike),
             KeyCode::KeyZ => self.toggle_paused(),
@@ -4464,6 +4473,7 @@ impl Game {
             work::draw_tags(&mut ui, &field, alpha, |o| !self.is_enemy(o));
             crate::titan_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));
             crate::dash_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));
+            crate::gravitic_marks::draw(&mut ui, &field, self.ground_under_cursor(renderer));
             crate::warp_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));
             crate::destruct_marks::draw(&mut ui, &field, alpha);
             if self.pointer == Pointer::Attack {

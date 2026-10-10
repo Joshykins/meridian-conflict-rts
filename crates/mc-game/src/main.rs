@@ -22,6 +22,7 @@ mod dash_marks;
 mod destruct_marks;
 mod formation_drag;
 mod game;
+mod gravitic_marks;
 mod headless;
 mod hud;
 mod issues;
