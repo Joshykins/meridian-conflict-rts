@@ -51,6 +51,8 @@
             // A titan: its own answer (titan_alerts.ron), the size of the thing in it.
             Titan: "select_titan",
             WingedTitan: "select_titan",
+            // The gravitic engine: a giant's answer too.
+            GraviticEngine: "select_titan",
             // The tier-4 walkers: the assault walker the titan's, the siege walker a bot's.
             AssaultWalker: "select_titan",
             SiegeWalker: "select_bot",
