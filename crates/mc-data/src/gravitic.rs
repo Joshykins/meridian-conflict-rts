@@ -3,7 +3,7 @@
 //! in a rift that runs out to the point, and where the rift strikes the ground shatters
 //! into a gravity well. The well holds until the engine is given another point, is
 //! stopped or dies: everything of the enemy's inside it is crushed (the same
-//! anywhere in it) and slowed, and an aircraft that is not an experimental is torn out of the sky.
+//! anywhere in it, aircraft a share of it) and slowed.
 //! A shield dome over it takes the crush instead of what is under it, and its own hit
 //! points go as a unit's would. mc-sim `gravitic.rs`.
 
@@ -25,9 +25,8 @@ pub struct RawGravitic {
     pub damage: f64,
     /// The share of its speed a unit in the well keeps.
     pub slow: f64,
-    /// Aircraft of this tech and under are torn out of the sky in it; above, they are
-    /// crushed and slowed like everything else.
-    pub downs: u8,
+    /// The share of `damage` an aircraft in the well takes; it is slowed in full.
+    pub air_damage: f64,
     /// Energy a second while it gathers, runs a rift or holds a well.
     pub upkeep: f64,
     /// Where the held gravity sits in the model (x forward, y left, z up, metres): the
@@ -54,8 +53,6 @@ pub struct GraviticSounds {
     pub hum: String,
     /// The well let go: the ground falling back.
     pub release: String,
-    /// An aircraft torn out of the sky.
-    pub downed: String,
 }
 
 /// A gravitic engine, in ticks and fixed point (`RawGravitic`).
@@ -68,7 +65,8 @@ pub struct Gravitic {
     /// A second.
     pub damage: Fx,
     pub slow: Fx,
-    pub downs: u8,
+    /// The share of `damage` an aircraft takes.
+    pub air_damage: Fx,
     /// A second.
     pub upkeep: Fx,
     pub core: FxVec3,
@@ -95,9 +93,10 @@ impl RawGravitic {
             .into_iter()
             .all(ok)
             || !share(self.slow)
+            || !share(self.air_damage)
         {
             return Err(DataError::Invalid(format!(
-                "{key}: a gravitic engine needs a gather, a speed and a radius, none of its numbers negative, and its slow share from 0 to 1"
+                "{key}: a gravitic engine needs a gather, a speed and a radius, none of its numbers negative, and its slow and air damage shares from 0 to 1"
             )));
         }
         let (x, y, z) = self.core;
@@ -109,7 +108,7 @@ impl RawGravitic {
             radius: fx(self.radius),
             damage: fx(self.damage),
             slow: fx(self.slow),
-            downs: self.downs,
+            air_damage: fx(self.air_damage),
             upkeep: fx(self.upkeep),
             core: FxVec3::new(fx(x), fx(y), fx(z)),
             sounds: self.sounds.clone(),
@@ -124,6 +123,7 @@ impl Gravitic {
             self.radius,
             self.damage,
             self.slow,
+            self.air_damage,
             self.upkeep,
             self.core.x,
             self.core.y,
@@ -131,14 +131,14 @@ impl Gravitic {
         ] {
             h.write_i64(v.0);
         }
-        h.write_u64(self.gather_ticks as u64 | (self.downs as u64) << 16);
+        h.write_u64(self.gather_ticks as u64);
     }
 
     /// Every sound it names, for the library's check.
-    pub fn sound_names(&self) -> [&String; 8] {
+    pub fn sound_names(&self) -> [&String; 7] {
         let s = &self.sounds;
         [
-            &s.gather, &s.launch, &s.rift, &s.strike, &s.hold, &s.hum, &s.release, &s.downed,
+            &s.gather, &s.launch, &s.rift, &s.strike, &s.hold, &s.hum, &s.release,
         ]
     }
 }

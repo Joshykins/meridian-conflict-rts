@@ -208,7 +208,10 @@ pub fn panel(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, count: usi
         cw,
         type_scale::MICRO,
         rgb(palette::FAINT, 1.0),
-        "Tears aircraft down  \u{b7}  a shield dome takes the crush for what is under it",
+        &format!(
+            "Aircraft take {:.0}% of the crush  \u{b7}  a shield dome takes it for what is under it",
+            g.air_damage.to_f32() * 100.0
+        ),
     );
 }
 

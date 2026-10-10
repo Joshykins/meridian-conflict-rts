@@ -434,13 +434,6 @@ pub enum SimEvent {
         pos: FxVec3,
         radius: Fx,
     },
-    /// A gravity well tore aircraft `unit` out of the sky at `pos`; it falls as a dead
-    /// aircraft does, thrown at the ground.
-    AircraftDowned {
-        unit: UnitId,
-        pos: FxVec3,
-        by: UnitId,
-    },
     /// A giant bore's storm at `pos` died before its time: the machine feeding it is gone.
     StormCollapsed {
         pos: FxVec3,

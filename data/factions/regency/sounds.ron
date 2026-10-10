@@ -1802,28 +1802,6 @@
                 Fm(at: 1.6, from: 136.345, to: 84.828, glide: 0.08, ratio: 0.5, index: 2.6, fade: 0.05, attack: 0.002, decay: 0.074, gain: 0.12, pan: -0.108),
             ],
         ),
-        // An aircraft torn out of the sky by a well: gravity seizing it with a hard low thump,
-        // the airframe wrenched (a short metal shriek and crack, its frame groaning), a spit of
-        // violet crackle, then the rush of air as it is thrown down at the ground.
-        "regency_fallen_downed": (
-            length: 2.4, peak: 0.6, room: 0.3,
-            layers: [
-                // The grab: gravity seizing the airframe, a hard low thump.
-                Burst(low: 40, high: 350, attack: 0.001, decay: 0.08, gain: 8, seed: 9001),
-                Tone(from: 110, to: 45, glide: 0.15, attack: 0.001, decay: 0.2, gain: 1.4),
-                // The wrench: the airframe torn, a short metal shriek and crack, its frame groaning.
-                Burst(at: 0.004, low: 400, high: 3000, attack: 0.0002, decay: 0.006, gain: 6, seed: 9002),
-                Fm(at: 0.006, from: 420, to: 160, glide: 0.25, ratio: 1.41, index: 2.4, fade: 0.12, attack: 0.002, decay: 0.16, gain: 0.45),
-                Sweep(at: 0.008, from: 2200, to: 700, glide: 0.2, q: 2, attack: 0.01, decay: 0.14, gain: 0.6, seed: 9003),
-                Fm(at: 0.05, from: 160, to: 70, glide: 0.6, ratio: 0.5, index: 2, fade: 0.4, attack: 0.02, decay: 0.4, gain: 0.5),
-                Drive(2.0),
-                // Violet crackle where it was gripped.
-                Roll(at: 0.003, from: 1700, to: 900, glide: 0.5, attack: 0.005, decay: 0.25, gain: 0.35, swell: 110, depth: 0.95, seed: 9004),
-                // The rush down: air tearing past as it is thrown at the ground, fluttering.
-                Sweep(at: 0.06, from: 1800, to: 350, glide: 1.6, q: 0.6, attack: 0.7, decay: 0.45, gain: 1.5, seed: 9005),
-                Roll(at: 0.05, from: 900, to: 200, glide: 1.6, attack: 0.6, decay: 0.45, gain: 1.2, swell: 14, depth: 0.6, seed: 9006),
-            ],
-        ),
         // ---- The Lodestone: the Regency's gravitic lens (tech 3) ----
         // The Lodestone (`regency_t3_gravitic_lens`): The Fallen's family on a gun a tank's size,
         // so shorter, tighter and nearer, with no lightning (nothing it does glows). Its weapon's

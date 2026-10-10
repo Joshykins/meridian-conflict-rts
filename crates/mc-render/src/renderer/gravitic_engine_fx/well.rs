@@ -15,15 +15,12 @@ use crate::renderer::stun_fx::Flash;
 use crate::renderer::{Renderer, PUFF_CLOD, PUFF_DUST, PUFF_SHOCK_DUST};
 use mc_sim::mirror::{RenderFrame, WellView, KIND_GHOST, KIND_PROP, KIND_WRECK};
 
-const STREAK: f32 = puff::WARP_STREAK as f32;
 const MOTE: f32 = puff::WARP_MOTE as f32;
 /// Slabs lifted over a well and shards circling it: a deliberate cosmetic cap.
 const WELL_SLABS: usize = 95;
 const WELL_SHARDS: usize = 60;
 /// Units in a well given arcs of their own each tick, at most (cosmetic).
 const MOST_CRUSHED: usize = 12;
-/// A downed aircraft is thrown at the ground this fast, m/s (mc-sim `gravitic::SLAM`).
-const SLAM: f32 = 60.0;
 
 impl Renderer {
     /// A blow through the ground: dust driven out over it in a ring and the trees pushed
@@ -306,7 +303,8 @@ impl Renderer {
             .iter()
             .filter(|u| u.owner_flags & hidden == 0 && (u.owner_flags & 0xFF) as u8 != e.owner)
             .filter(|u| Vec3::from(u.pos).truncate().distance(centre) < r)
-            // On the ground only: what flies over it is torn down, not crushed.
+            // On the ground only: an arc up to an aircraft would be a long beam, and the
+            // frame cannot tell one from a spacecraft, which the well never touches.
             .filter(|u| {
                 u.pos[2] - self.ground_height(Vec2::new(u.pos[0], u.pos[1])) < u.radius * 3.0 + 4.0
             })
@@ -371,69 +369,6 @@ impl Renderer {
                 5.0,
                 (radius * 0.04, radius * 0.14),
             );
-        }
-    }
-
-    /// An aircraft torn out of the sky at `pos`: a stroke of violet drags it to the ground,
-    /// and it lands in a burst.
-    pub(super) fn aircraft_downed(&mut self, pos: Vec3, time: f32) {
-        let ground = pos.truncate().extend(self.ground_height(pos.truncate()));
-        let drop = (pos.z - ground.z).max(1.0);
-        let fall = drop / SLAM;
-        // The grip: lightning from the ground up into it, a drag line down its fall.
-        let side = Vec3::X;
-        self.emp_kinks(
-            ground,
-            pos,
-            drop * 0.06,
-            side,
-            Vec3::Y,
-            time,
-            0.3,
-            1.6,
-            10,
-            BOLT,
-        );
-        self.push_lit(
-            STREAK,
-            pos,
-            Vec3::NEG_Z * drop,
-            time,
-            fall + 0.2,
-            (3.0, 3.0),
-            LILAC * 8.0,
-            0.0,
-        );
-        self.emp_fx.flashes.push(Flash {
-            pos,
-            start: time,
-            life: 0.3,
-            color: LILAC * 6000.0,
-            range: 120.0,
-            flicker: 0.8,
-        });
-        // It lands: a violet burst, dust and earth thrown up.
-        let land = time + fall;
-        self.push_effect(
-            (ground + Vec3::Z * 4.0).to_array(),
-            land,
-            30.0,
-            0.4,
-            effect::GRAVITIC as f32,
-            0.0,
-        );
-        for i in 0..14 {
-            let a = TAU * i as f32 / 14.0;
-            let dir = Vec3::new(a.cos(), a.sin(), 0.15);
-            self.push_puff(PUFF_SHOCK_DUST, ground, dir * 22.0, land, 3.0, (5.0, 14.0));
-        }
-        for _ in 0..10 {
-            let vel = Vec3::new(
-                self.scatter.signed() * 12.0,
-                self.scatter.signed() * 12.0,
-                18.0 + 14.0 * self.scatter.unit(),
-            );
-            self.push_puff(PUFF_CLOD, ground, vel, land, 2.5, (1.2, 0.6));
         }
     }
 }

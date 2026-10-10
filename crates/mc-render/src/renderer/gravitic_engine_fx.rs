@@ -17,8 +17,7 @@
 //!   the ground broken into plates across its reach and dust driven out; then the plates
 //!   lift and hang, grinding, shards of rock circle slowly over it, lightning crawls over
 //!   the ground and onto what it crushes, its edge a ring of cracks, the view bent over
-//!   it. An aircraft torn down is dragged to the ground by a stroke of violet and lands in
-//!   a burst. Let go, everything held up falls and the light dies.
+//!   it. Let go, everything held up falls and the light dies.
 //! - **Faltering** (`WellView::powered` false): the light dims and gutters, the machinery
 //!   winds down.
 //!
@@ -359,9 +358,6 @@ impl Renderer {
             }
             SimEvent::WellReleased { unit, pos, radius } => {
                 self.well_released(unit.0, Vec3::from(pos.to_f32()), radius.to_f32(), time)
-            }
-            SimEvent::AircraftDowned { pos, .. } => {
-                self.aircraft_downed(Vec3::from(pos.to_f32()), time)
             }
             _ => {}
         }

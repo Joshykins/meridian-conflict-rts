@@ -13,12 +13,11 @@
 //!   `Gravitic::radius`, and the well holds from then on. It strikes no blow of its own.
 //! - **The well** holds for as long as the engine stands and its side pays for it: each
 //!   tick the enemy's units in it take `Gravitic::damage` a second, the same anywhere in
-//!   it, keep only `Gravitic::slow` of their speed (`well_slow`), and an aircraft of
-//!   tech `Gravitic::downs` or under is torn out of the sky (`AircraftDowned`): it falls
-//!   as a dead aircraft does, thrown hard at the ground. Spacecraft are out of its reach.
+//!   it, and keep only `Gravitic::slow` of their speed (`well_slow`); an aircraft takes
+//!   `Gravitic::air_damage` of the crush and is slowed in full. Spacecraft are out of its
+//!   reach.
 //! - **Shields** counter it: a live dome reaching into the well takes the crush as a unit
-//!   does, and what stands under it is spared (neither
-//!   crushed nor torn down) while it holds. A hull field takes its unit's share.
+//!   does, and what stands under it is spared while it holds. A hull field takes its unit's share.
 //!
 //! Friends are never touched. The engine dies, and its well collapses (`WellReleased`).
 
@@ -211,7 +210,7 @@ impl World {
                 owner: w.owner,
                 source: w.source,
                 per_tick: Fx::ZERO,
-                aircraft: Aircraft::Downs(g.downs),
+                aircraft: Aircraft::Crushed(g.air_damage),
             };
             if self.well_catches(&area, row, pos) {
                 keep = keep.min(g.slow);
@@ -349,7 +348,7 @@ impl World {
             owner: w.owner,
             source: w.source,
             per_tick: g.damage / DT,
-            aircraft: Aircraft::Downs(g.downs),
+            aircraft: Aircraft::Crushed(g.air_damage),
         });
         let age = match w.phase {
             WellPhase::Holding { age } => age,

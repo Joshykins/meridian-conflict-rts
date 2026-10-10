@@ -5,8 +5,8 @@
 //! - **Shields first:** a live enemy dome reaching into the well takes it once, and what
 //!   stands under a dome that still holds is spared. A hull field takes its unit's share.
 //! - **Units:** every active enemy whose hull reaches into the well (`well_catches`),
-//!   never a spacecraft. Aircraft as `WellArea::aircraft` says: torn out of the sky up to
-//!   a tech, or spared outright.
+//!   never a spacecraft. Aircraft as `WellArea::aircraft` says: crushed with a share of
+//!   it, or spared outright.
 //! - **The ground:** the wrecks and city blocks in it wear down as a blast wears them.
 //!
 //! Friends are never touched. What each kind of well does besides (the engine's trees and
@@ -18,19 +18,17 @@ use mc_data::{cat, MoveLayer};
 use crate::shields::in_dome;
 use crate::spatial::kind;
 use crate::tables::UnitId;
-use crate::{SimEvent, World};
+use crate::World;
 
 /// Metres past the well a hull's middle may stand and still be found: more than the
 /// widest hull's radius, so the search never misses one the well's own test takes.
 const HULL_MARGIN: i32 = 60;
-/// A downed aircraft is thrown at the ground this fast, metres a tick (60 m/s).
-const SLAM: i32 = 6;
 
 /// What a well does to aircraft over it.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Aircraft {
-    /// Torn out of the sky, up to and including this tech; crushed as any unit above it.
-    Downs(u8),
+    /// Crushed with this share of the well's crush (a hull field too), and slowed in full.
+    Crushed(Fx),
     /// Untouched: neither crushed nor slowed.
     Spared,
 }
@@ -110,15 +108,10 @@ impl World {
             }
             let hull = bp.shield.is_some_and(|s| s.is_hull()) && self.shield_blocking(r);
             let air = bp.motion.is_some_and(|m| m.layer == MoveLayer::Air);
-            let ground = self
-                .terrain
-                .height_at(self.state.units.pos[r])
-                .max(self.terrain.water_level());
-            let downs = matches!(area.aircraft, Aircraft::Downs(tech) if bp.tech <= tech);
-            if air && !hull && downs && self.state.units.z[r] > ground + Fx::ONE {
-                self.down_aircraft(r, area.source, area.owner);
-                continue;
-            }
+            let per = match area.aircraft {
+                Aircraft::Crushed(share) if air => per * share,
+                _ => per,
+            };
             if hull {
                 self.damage_shield(r, per);
             } else {
@@ -129,22 +122,5 @@ impl World {
         let point = mark.extend(area.z + Fx::from_int(8));
         self.wear_wrecks(point, radius, |_| per);
         self.blast_structures(point, radius, crate::city::Blow::BLAST, |_| per);
-    }
-
-    /// Tears the aircraft in `row` out of the sky: it dies, thrown hard at the ground.
-    fn down_aircraft(&mut self, row: usize, source: UnitId, owner: u8) {
-        let units = &mut self.state.units;
-        // A dead aircraft falls with the way it last made (`despawn_unit`): this tick's
-        // drop is its throw at the ground.
-        units.prev_z[row] = units.z[row] + Fx::from_int(SLAM);
-        let pos = units.pos[row].extend(units.z[row]);
-        let id = units.id(row);
-        let health = units.health[row];
-        self.events.push(SimEvent::AircraftDowned {
-            unit: id,
-            pos,
-            by: source,
-        });
-        self.damage_unit(row, health, owner, source);
     }
 }

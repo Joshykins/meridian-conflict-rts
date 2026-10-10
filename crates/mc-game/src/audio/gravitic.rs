@@ -9,7 +9,7 @@
 //!   (and, quieter, from the nearest point of the open crack behind it); `strike` where it
 //!   lands, heard over the whole map; `hold` looped at the well; `hum` looped at the
 //!   engine while its rift runs and its well holds; `release` when a well is let go (a
-//!   rift or gathering that dies has none); `downed` as a well tears an aircraft down.
+//!   rift or gathering that dies has none).
 //! - A faltering engine (`WellView::powered` false) sags: its hold and hum drop in level
 //!   and in pitch, and its rings coast while a stalled gathering waits.
 //!
@@ -36,7 +36,6 @@ struct Ids {
     hold: Option<SoundId>,
     hum: Option<SoundId>,
     release: Option<SoundId>,
-    downed: Option<SoundId>,
 }
 
 impl Ids {
@@ -58,7 +57,6 @@ impl Ids {
             hold: id(&s.hold),
             hum: id(&s.hum),
             release: id(&s.release),
-            downed: id(&s.downed),
         }
     }
 }
@@ -100,8 +98,6 @@ const RELEASE_FAR: Far = Far(0.12, 4000.0);
 /// What is left of a faltering engine's hold and hum, and their pitch.
 const FALTER_GAIN: f32 = 0.3;
 const FALTER_PITCH: f32 = 0.86;
-/// Aircraft torn down in one tick that are each heard.
-const DOWNED_PER_TICK: usize = 3;
 /// Ticks an engine's blueprint is remembered after its work was last seen, so the
 /// sounds of a well let go as the engine dies still find it.
 const REMEMBER: u64 = 600;
@@ -165,7 +161,6 @@ impl GraviticSounds {
             })
         };
 
-        let mut downed = Vec::new();
         for event in &frame.events {
             let (unit, sound, at, reach, near): (_, Pick, [f32; 3], Far, f32) = match event {
                 SimEvent::RiftLaunched { unit, from, .. } => {
@@ -179,24 +174,12 @@ impl GraviticSounds {
                 SimEvent::WellReleased { unit, pos, radius } if radius.to_f32() > 0.0 => {
                     (unit, |i: Ids| i.release, pos.to_f32(), RELEASE_FAR, 1.1)
                 }
-                SimEvent::AircraftDowned { pos, by, .. } => {
-                    if let Some(sound) = engine(by.0).and_then(|b| ids(b).downed) {
-                        let (gain, pan) = hear(Vec3::from(pos.to_f32()));
-                        downed.push((sound, gain, pan));
-                    }
-                    continue;
-                }
                 _ => continue,
             };
             let Some(sound) = engine(unit.0).and_then(|b| sound(ids(b))) else {
                 continue;
             };
             let (gain, pan) = far(Vec3::from(at), reach, near);
-            audio.play_world(sound, gain.min(1.0), pan, 1.0);
-        }
-        // A squadron torn down at once is a few wrenches, the loudest, not a wall of them.
-        downed.sort_by(|a, b| b.1.total_cmp(&a.1));
-        for (sound, gain, pan) in downed.into_iter().take(DOWNED_PER_TICK) {
             audio.play_world(sound, gain.min(1.0), pan, 1.0);
         }
 

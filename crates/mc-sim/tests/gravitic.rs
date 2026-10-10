@@ -1,6 +1,6 @@
 //! The Fallen, the Regency's gravitic engine (`gravitic.rs`): aimed anywhere, it gathers,
 //! tears a rift through the ground to the point and holds a gravity well there that
-//! crushes and slows the enemy and tears their aircraft down, until it is aimed elsewhere
+//! crushes and slows the enemy (their aircraft with a quarter of it), until it is aimed elsewhere
 //! or stopped. A shield dome over the well takes the crush for what is under it.
 
 use mc_core::{Angle, Fx, FxVec2};
@@ -17,6 +17,7 @@ use std::sync::Arc;
 const ENGINE: &str = "regency_t5_gravitic_engine";
 const TANK: &str = "aster_t1_tank";
 const INTERCEPTOR: &str = "aster_t1_interceptor";
+const ASF: &str = "aster_t3_air_superiority";
 const DOME: &str = "aster_t3_shield";
 const GROUND: i32 = 40;
 /// A 4 km map.
@@ -220,36 +221,71 @@ fn the_well_slows_what_is_in_it() {
     );
 }
 
-/// An aircraft flying into the well is torn out of the sky and falls as a crash.
+/// An aircraft in the well takes a quarter of the crush: 200 a second, not 800.
 #[test]
-fn aircraft_are_torn_down() {
+fn aircraft_take_a_quarter_of_the_crush() {
+    let mut w = world();
+    let engine = add(&mut w, ENGINE, 0, AT.0, AT.1);
+    let plane = add(&mut w, INTERCEPTOR, 1, MARK.0, MARK.1);
+    let tank = add(&mut w, TANK, 1, MARK.0 + 60, MARK.1);
+    for u in [plane, tank] {
+        let r = row(&w, u);
+        w.state.units.health[r] = Fx::from_int(100_000);
+    }
+    let full = health(&w, plane);
+    aim(&mut w, engine, MARK);
+    assert!(struck(&mut w));
+    for _ in 0..9 {
+        run(&mut w, &[]);
+    }
+    assert_eq!(
+        health(&w, tank),
+        full - Fx::from_int(800),
+        "a second's crush"
+    );
+    assert_eq!(
+        health(&w, plane),
+        full - Fx::from_int(200),
+        "a quarter of it in the air"
+    );
+}
+
+/// An air superiority fighter flown straight across the well is slowed and hurt, but
+/// gets out alive.
+#[test]
+fn a_fighter_crossing_the_well_gets_out() {
     let mut w = world();
     let engine = add(&mut w, ENGINE, 0, AT.0, AT.1);
     aim(&mut w, engine, MARK);
     assert!(struck(&mut w));
-    let plane = add(&mut w, INTERCEPTOR, 1, MARK.0 - 900, MARK.1);
+    let plane = add(&mut w, ASF, 1, MARK.0 - 900, MARK.1);
+    let full = health(&w, plane);
     let fly = PlayerCommand {
         player: 1,
         command: Command::Move {
             units: vec![plane],
-            target: FxVec2::from_ints(MARK.0 + 900, MARK.1),
+            target: FxVec2::from_ints(MARK.0 + 1500, MARK.1),
             queue: false,
         },
     };
     run(&mut w, &[fly]);
-    let downed = until(&mut w, 300, |e| match e {
-        SimEvent::AircraftDowned { unit, .. } => Some(*unit),
-        _ => None,
-    });
-    assert_eq!(downed, Some(plane));
-    run(&mut w, &[]);
-    assert!(w.state.units.row(plane).is_none(), "it died");
+    let out = Fx::from_int(MARK.0 + 400);
+    for _ in 0..400 {
+        run(&mut w, &[]);
+        let Some(r) = w.state.units.row(plane) else {
+            panic!("the fighter died in the well");
+        };
+        if w.state.units.pos[r].x > out {
+            break;
+        }
+    }
+    let r = row(&w, plane);
+    assert!(w.state.units.pos[r].x > out, "it got across");
+    let left = health(&w, plane);
+    assert!(left < full, "the well hurt it");
     assert!(
-        w.state
-            .aircraft_crashes
-            .iter()
-            .any(|c| c.unit_id == plane.0 && c.velocity.z < -Fx::from_int(4)),
-        "it falls, thrown at the ground"
+        left * 2 > full,
+        "it got out with over half its health: {left} of {full}"
     );
 }
 

@@ -376,18 +376,19 @@
         // the ground at 900 m/s (a 10 km map's width in about 11 s) and shatters a well
         // 300 m round the point. It strikes no blow: from then on everything of the enemy's
         // anywhere in the well takes 800 a second, the same at its edge as at its heart,
-        // for as long as it holds, and keeps 35% of its speed; tech 1-3 aircraft are torn
-        // out of the sky. A shield dome over
+        // for as long as it holds, and keeps 35% of its speed. Aircraft take a quarter of it
+        // (200 a second): slowed, a Raptor crossing it gets out with over half its health,
+        // light aircraft and any that stay over it die. A shield dome over
         // the well takes the crush for what is under it. 8000 energy a second while it is
         // at work, nothing while it stands idle.
         gravitic: (
             gather: 15, speed: 900, radius: 300, damage: 800,
-            slow: 0.35, downs: 3, upkeep: 8000, core: (0, 0, 108),
+            slow: 0.35, air_damage: 0.25, upkeep: 8000, core: (0, 0, 108),
             sounds: (
                 gather: "regency_fallen_gather", launch: "regency_fallen_launch",
                 rift: "regency_fallen_rift", strike: "regency_fallen_strike",
                 hold: "regency_fallen_hold", hum: "regency_fallen_hum",
-                release: "regency_fallen_release", downed: "regency_fallen_downed",
+                release: "regency_fallen_release",
             ),
         ),
         mesh: "regency_gravitic_engine", icon: GraviticEngine,
