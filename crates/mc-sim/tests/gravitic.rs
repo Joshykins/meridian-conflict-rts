@@ -155,8 +155,8 @@ fn the_well_crushes_the_enemy_and_spares_friends() {
     let full = health(&w, heart);
     aim(&mut w, engine, MARK);
     assert!(struck(&mut w));
-    // One tick's crush as it strikes: 2400 a second, no blow on top.
-    let tick = Fx::from_int(240);
+    // One tick's crush as it strikes: 800 a second, no blow on top.
+    let tick = Fx::from_int(80);
     assert_eq!(health(&w, heart), full - tick, "no blow as it strikes");
     assert_eq!(
         health(&w, rim),
