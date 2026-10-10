@@ -6,7 +6,8 @@
 //              by whatever was pushed into motion
 //   cs_force   (state', flow') -> (state, flow)  drawn back toward the air mass
 //              and its storms, then disturbed
-// `state`: x cloud cover, y storm, z churn (turbulence), w rain (0-1).
+// `state`: x cloud cover, y storm (below zero: a Nimbus's seeded cloud, kind
+// `DISTURBER_SEED`), z churn (turbulence), w rain (0-1).
 // `flow`: xy local wind on top of the prevailing one (m/s), z the height of the
 // last wake through here (m), w how fresh that wake is (0-1). A wake is drawn
 // only near its own height: an aircraft cuts a streak through the cloud it
@@ -228,17 +229,20 @@ fn cs_force(@builtin(global_invocation_id) id: vec3<u32>) {
         let kind = d.a.w;
         let rel = xy - d.a.xy;
         if kind == DISTURBER_SEED {
-            // A Nimbus's storm cloud (sky/seed.rs): the cover and the storm gather within
-            // seconds toward its own at its middle, falling away to nothing at its edge, so
-            // each is a cloud of its own size (held at full over its whole disc, a trail of
-            // them merged into one deck); let go, it drifts on the wind and heals back like
-            // any other cloud.
+            // A Nimbus's storm cloud (sky/seed.rs): the cover gathers within seconds
+            // toward its own at its middle, falling away to nothing at its edge, so each is
+            // a cloud of its own size (held at full over its whole disc, a trail of them
+            // merged into one deck). The storm goes below zero, its mark (`b.y`): drawn
+            // at the bomber's height, not a tower. Let go, it drifts on the wind and heals
+            // back like any other cloud, the mark with it. A real storm keeps its own.
             let near = dot(rel, rel) / (r * r);
             if near > 1.5 { continue; }
             let shape = exp(-near * 2.5);
             let gather = clamp(shape * dt * 1.5, 0.0, 1.0);
             state.x += max(d.b.x * shape - state.x, 0.0) * gather;
-            state.y += max(d.b.y * shape - state.y, 0.0) * gather;
+            if state.y < 0.05 {
+                state.y += min(-d.b.y * shape - state.y, 0.0) * gather;
+            }
             continue;
         }
         if kind == KIND_BLAST && dot(rel, rel) > r * r * 36.0 {

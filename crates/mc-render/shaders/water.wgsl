@@ -357,7 +357,7 @@ fn sky_along(r: vec3<f32>) -> vec3<f32> {
         let at = eye.xy + d.xy * max(mid - eye.z, 0.0) / d.z;
         let w = weather_at(at);
         let cover = smoothstep(0.1, 0.6, w.x - (grad_noise2(at - atmos.wind.xy, 400.0) - 0.5) * 0.3);
-        let cloud = mix(atmos.sun_color.rgb * 0.34 + atmos.sky_color.rgb * 0.7, atmos.sky_color.rgb * 0.45, w.y);
+        let cloud = mix(atmos.sun_color.rgb * 0.34 + atmos.sky_color.rgb * 0.7, atmos.sky_color.rgb * 0.45, clamp(w.y, 0.0, 1.0));
         sky = mix(sky, cloud, cover * smoothstep(0.02, 0.2, d.z));
     }
     let sun = pow(max(dot(d, globals.sun.xyz), 0.0), 520.0);

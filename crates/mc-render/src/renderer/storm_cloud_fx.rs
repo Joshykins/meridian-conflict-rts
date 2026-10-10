@@ -6,8 +6,9 @@
 //! - **Cloud**: not drawn here at all. Each is a cell of the sky's own weather (`Sky::seed`,
 //!   clouds_sim.wgsl kind `disturber::SEED`): while it grows and strikes, the cover round it
 //!   gathers in a circle that swells with it, so the sky's ray-marched clouds draw it in
-//!   their own material and light: a flat sheet in the layer, in line with the run. A small knot
-//!   at first, it builds slowly to some 200 m across.
+//!   their own material and light, a heap round the height the bomber flies (the weather
+//!   marks it seeded), never thinned round the selection. A knot leaving the tail at
+//!   first, it builds slowly to some 200 m across.
 //! - **Lightning inside**: strokes that flicker in it more often as it grows and all the
 //!   time while it strikes, and twice or so a stroke the sky lights (`Sky::strike`) with its
 //!   far thunder.
@@ -37,11 +38,11 @@ const LEAST_REACH: f32 = 95.0;
 const REACH_PER_RADIUS: f32 = 0.65;
 /// Seconds a spent cloud is kept after the sim lets it go, for the lightning in it to die.
 const DYING: f32 = 3.0;
-/// The cover a grown cloud gathers the weather toward at its middle: thin enough that the
-/// sky draws it shallow, a flat sheet in the layer at about the height the aircraft flies
-/// (the layer is 150 to 530 m over the ground, the Nimbus at 380). No storm: the weather's
-/// storm stands cloud up into towers, and a trail of them rose into one towering bank.
-const COVER: f32 = 0.65;
+/// The cover a grown cloud gathers the weather toward at its middle. No storm, which would
+/// stand it up into a tower (a trail of them rose into one towering bank): the weather
+/// marks it as seeded instead, and the sky draws it round the height the Nimbus flies, so
+/// the trail comes out of the bomber (`Sky::set_seeds`).
+const COVER: f32 = 0.85;
 /// Strokes the sky lights inside one cloud (each with its thunder) before its bolts: a
 /// deliberate cap, so a wing of them does not take all the sky's flashes or drown the
 /// battle in thunder.
@@ -76,10 +77,10 @@ struct StormCloud {
     struck: bool,
 }
 
-/// How big a cloud `f` of the way grown is, as a share of grown: a small knot at first,
-/// building slowly into its size.
+/// How big a cloud `f` of the way grown is, as a share of grown: a knot big enough to see
+/// leaving the tail at once, building slowly into its size.
 fn size_at(f: f32) -> f32 {
-    0.06 + 0.94 * f * f * (3.0 - 2.0 * f)
+    0.3 + 0.7 * f * f * (3.0 - 2.0 * f)
 }
 
 /// How far grown seed `v` is: 0 let go, 1 grown.
@@ -94,7 +95,7 @@ impl StormCloud {
             at: self.middle.truncate(),
             radius: self.reach * size_at(self.grown) * 0.8,
             cover: COVER,
-            storm: 0.0,
+            height: self.middle.z,
         })
     }
 }

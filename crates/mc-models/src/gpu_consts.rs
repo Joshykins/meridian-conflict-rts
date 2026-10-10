@@ -717,6 +717,11 @@ shared! {
         /// A storm cloud in the weather (sky/seed.rs): round it the cover and the storm
         /// gather toward its own (`b.x`, `b.y`).
         pub const SEED: f32 = 3.0;
+        /// Metres a seeded cloud's base hangs under the height the Nimbus flies
+        /// (`Atmosphere::seeded`), and how deep it is: the bomber flies through its
+        /// middle, so the trail reads as coming out of it.
+        pub const SEED_UNDER: f32 = 60.0;
+        pub const SEED_DEPTH: f32 = 150.0;
     }
 
     /// Graphics quality bits (renderer `SceneQuality`), in `Globals.detail.w`.

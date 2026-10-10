@@ -195,7 +195,9 @@ fn clearing(p: vec3<f32>) -> f32 {
         keep *= mix(1.0, smoothstep(c.z * 0.55, c.z * 1.5, d), c.w);
     }
     if n > 0u && keep < 1.0 {
-        keep = mix(keep, 1.0, smoothstep(0.25, 0.55, clamp(weather_at(p.xy).y, 0.0, 1.0)));
+        // A Nimbus's seeded cloud is marked by a storm below zero (clouds_sim.wgsl).
+        let storm = weather_at(p.xy).y;
+        keep = mix(keep, 1.0, max(smoothstep(0.25, 0.55, storm), smoothstep(0.05, 0.3, -storm)));
     }
     // A bubble of clear air round the eye, as big as the view is close: down
     // among the clouds the battle stays in sight; from high up it is too
@@ -259,6 +261,10 @@ fn cloud_at(at: vec3<f32>, w: vec4<f32>, detail: f32) -> CloudSample {
         return out;
     }
     let storm = clamp(w.y, 0.0, 1.0);
+    // A Nimbus's seeded cloud (storm below zero, clouds_sim.wgsl `cs_force`): a firm
+    // heap the bomber flies through the middle of (`atmos.seeded`), wherever the day's
+    // bases hang; as the mark fades it settles back into the layer.
+    let seeded = smoothstep(0.05, 0.5, -w.y);
     // Height varies from cloud to cloud: bases wander (some hang low enough to
     // swallow a gunship, some sit over the jets), and where the
     // air is lifting (a field drifting with the wind) cumulus grows into tall
@@ -277,12 +283,13 @@ fn cloud_at(at: vec3<f32>, w: vec4<f32>, detail: f32) -> CloudSample {
     // overcast has few breaks.
     // (The weather's own cover: the map's is never over 1.)
     let deck_closed = smoothstep(1.5, 1.85, sky.cover);
-    let firm = max(smoothstep(0.42, 0.58, kind + storm * 0.5), deck_closed * 0.8);
+    let firm = max(max(smoothstep(0.42, 0.58, kind + storm * 0.5), deck_closed * 0.8), seeded * 0.6);
     // And in wide stretches of fair weather the heaps give way to a flat,
     // broken sheet (stratocumulus): shallow, lumpy underneath, full of holes.
-    let sheet = smoothstep(0.5, 0.6, grad_noise2(air + vec2<f32>(-5113.0, 3301.0), 5600.0 * max(sky.scale, 0.5))) * (1.0 - storm);
+    let sheet = smoothstep(0.5, 0.6, grad_noise2(air + vec2<f32>(-5113.0, 3301.0), 5600.0 * max(sky.scale, 0.5))) * (1.0 - storm) * (1.0 - seeded);
     let floor = cloud_floor(p.xy);
-    let base = floor + atmos.layer.x - storm * 80.0 + (grad_noise2(air - 377.0, 4300.0) - 0.5) * (240.0 + 120.0 * tall);
+    let day_base = floor + atmos.layer.x - storm * 80.0 + (grad_noise2(air - 377.0, 4300.0) - 0.5) * (240.0 + 120.0 * tall);
+    let base = mix(day_base, floor + atmos.seeded.x - DISTURBER_SEED_UNDER, seeded);
     let deck = atmos.layer.y - atmos.layer.x;
     let fair_top = floor + atmos.layer.y + deck * 2.6 * pow(lift, 2.2) * tall;
     // Thin cover makes shallow cloud; the fullest air the tallest.
@@ -312,7 +319,7 @@ fn cloud_at(at: vec3<f32>, w: vec4<f32>, detail: f32) -> CloudSample {
         }
         tall_storm = (storm * 2.0 + storm_near.z) / 6.0;
     }
-    let reach = mix(fair_depth, storm_depth, pow(tall_storm, 1.3));
+    let reach = mix(mix(fair_depth, storm_depth, pow(tall_storm, 1.3)), DISTURBER_SEED_DEPTH, seeded);
     if p.z <= base || p.z >= base + reach * (1.0 + TOP_LUMP * 0.5) {
         return out;
     }
@@ -385,7 +392,10 @@ fn cloud_at(at: vec3<f32>, w: vec4<f32>, detail: f32) -> CloudSample {
     // off on top; a storm towers, then spreads into an anvil.
     let fair = mix(smoothstep(0.0, 0.08, h) * (1.0 - h * h * 0.85), smoothstep(0.0, 0.2, h) * (1.0 - smoothstep(0.55, 1.0, h)), sheet);
     let tower = smoothstep(0.0, 0.04, h) * mix(1.0 - h * 0.25, 1.05, smoothstep(0.72, 0.9, h)) * (1.0 - smoothstep(0.88, 1.0, h));
-    let profile = mix(fair, tower, storm);
+    // A seeded cloud is a lumpy slab round the bomber's height, not a dome: drawn as a
+    // dome its gathered disc rose to a smooth cone.
+    let slab = smoothstep(0.0, 0.15, h) * (1.0 - smoothstep(0.5, 1.0, h));
+    let profile = mix(mix(fair, tower, storm), slab, seeded);
     // Full cover still keeps some of the billows' relief, so a deck or a
     // storm top reads as lumps and not a smooth sheet.
     // A sheet spreads further than heaps would in the same air.

@@ -719,6 +719,9 @@ struct Atmosphere {
     // Low cloud banks in the hollows (clouds.wgsl `mist_at`): x how thick, 0 none,
     // y how deep a bank lies over the smoothed land, metres.
     mist: vec4<f32>,
+    // x the height over the cloud floor a Nimbus's seeded clouds sit at (sky/seed.rs):
+    // where the weather's storm is below zero (clouds.wgsl `cloud_at`).
+    seeded: vec4<f32>,
 }
 
 // How much faster a wheeling storm's eye turns than its rim (sky.rs `VORTEX_SHEAR`).

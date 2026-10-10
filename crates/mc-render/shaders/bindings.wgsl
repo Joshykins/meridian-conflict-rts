@@ -781,7 +781,7 @@ fn cloud_shadow_coarse(world: vec3<f32>) -> f32 {
     // Edges broken up the way the drawn clouds' are: one fetch of the tiling noise.
     let ragged = textureSampleLevel(noise_map, repeat_sampler, tile_uv(xy - atmos.wind.xy, 900.0), 0.0).r;
     let cover = smoothstep(0.08, 0.55, w.x - (ragged - 0.5) * 0.35);
-    let depth = cover * (1.6 + w.y * 3.0);
+    let depth = cover * (1.6 + max(w.y, 0.0) * 3.0);
     // Never black: light scattered through and under the cloud still arrives.
     return mix(1.0, max(exp(-depth), 0.3), smoothstep(0.0, 0.08, w.x));
 }

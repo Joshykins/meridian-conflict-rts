@@ -153,6 +153,8 @@ pub(crate) struct Atmosphere {
     /// Low cloud banks in the hollows (clouds.wgsl `mist_at`): x how thick
     /// (`mist_amount`), y how deep a bank lies over the smoothed land, metres.
     pub(crate) mist: [f32; 4],
+    /// x the height over the cloud floor a Nimbus's seeded clouds sit at (sky/seed.rs).
+    pub(crate) seeded: [f32; 4],
 }
 
 /// A storm as clouds_sim.wgsl reads it.
@@ -177,7 +179,7 @@ const _: () = assert!(
             + MAX_VORTICES * 32
             + crate::gpu_consts::regions::MAX as usize * 32
             + crate::gpu_consts::regions::WALL_SEGMENTS as usize * 32
-            + 48
+            + 64
 );
 
 /// Something stirring the weather this frame. Mirrors clouds_sim.wgsl.
@@ -534,6 +536,8 @@ pub struct Sky {
     blasts: Vec<(Vec2, f32, f32, f32)>,
     /// The Nimbus's storm clouds in the weather (`seed.rs`).
     seeds: Vec<SeedCell>,
+    /// Over the cloud floor, the height seeded clouds are drawn at (`Atmosphere::seeded`).
+    seeded: f32,
     clears: Vec<Vec4>,
     clear_strength: f32,
     rng: Rng,
@@ -970,6 +974,7 @@ impl Sky {
             units: Vec::new(),
             blasts: Vec::new(),
             seeds: Vec::new(),
+            seeded: 0.0,
             clears: Vec::new(),
             clear_strength: 0.0,
             rng,
@@ -1466,6 +1471,7 @@ impl Sky {
         // moonlight is day-for-night, too strong to light a believable night sky.
         atmos.sun_color = light.sun.extend(1.0 - 0.96 * dark).to_array();
         atmos.sky_sun = light.sky_sun.extend(0.0).to_array();
+        atmos.seeded = [self.seeded, 0.0, 0.0, 0.0];
         atmos.mist = [
             mist_amount(self.weather.mist, self.hour),
             MIST_DEPTH,
