@@ -381,7 +381,7 @@
         // at work, nothing while it stands idle.
         gravitic: (
             gather: 15, speed: 900, radius: 300, damage: 2400,
-            slow: 0.35, downs: 3, upkeep: 8000, core: (0, 0, 120),
+            slow: 0.35, downs: 3, upkeep: 8000, core: (0, 0, 108),
             sounds: (
                 gather: "regency_fallen_gather", launch: "regency_fallen_launch",
                 rift: "regency_fallen_rift", strike: "regency_fallen_strike",
