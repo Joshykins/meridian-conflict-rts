@@ -19,6 +19,7 @@
 mod blast;
 mod regions;
 mod seed;
+pub(crate) use seed::SeedCell;
 mod shade;
 mod targets;
 
@@ -63,7 +64,7 @@ const DRAW_SET: &[Binding] = &[
 
 const SHADE_RES: u32 = 512;
 const NOISE_RES: u32 = 128;
-pub const MAX_DISTURBERS: usize = 128;
+pub const MAX_DISTURBERS: usize = 128 + seed::MOST_SEEDS;
 const MAX_STORMS: usize = 8;
 const MAX_CLEARS: usize = 8;
 const MAX_FLASHES: usize = 4;
@@ -531,8 +532,8 @@ pub struct Sky {
     /// Where every unit of the last tick stands, for the selection's clearings.
     units: Vec<Option<Vec2>>,
     blasts: Vec<(Vec2, f32, f32, f32)>,
-    /// Storm clouds joining the layer: where, how far round, since when (`seed.rs`).
-    seeds: Vec<(Vec2, f32, f32)>,
+    /// The Nimbus's storm clouds in the weather (`seed.rs`).
+    seeds: Vec<SeedCell>,
     clears: Vec<Vec4>,
     clear_strength: f32,
     rng: Rng,
@@ -1562,6 +1563,8 @@ impl Sky {
 
         // Stirrers: aircraft carried forward between ticks, blasts, hulls.
         let mut disturbers: Vec<Disturber> = Vec::with_capacity(MAX_DISTURBERS);
+        // The storm clouds first, with room of their own (`seed::MOST_SEEDS`).
+        disturbers.extend(self.seed_disturbers());
         let tick = frame.tick_seconds.max(0.02);
         for f in &self.flyers {
             let pos = f.prev.lerp(f.pos, frame.alpha);
@@ -1606,8 +1609,6 @@ impl Sky {
                 c: [0.0; 4],
             });
         }
-        let room = MAX_DISTURBERS - disturbers.len();
-        disturbers.extend(self.seed_disturbers(now, room));
         for (k, s) in self
             .storms
             .iter()

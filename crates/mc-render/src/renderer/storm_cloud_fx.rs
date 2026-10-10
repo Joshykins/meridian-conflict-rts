@@ -1,56 +1,45 @@
 //! The Storm Seeder's clouds as drawn (the Nimbus, mc-sim `cloud_seed.rs`): each seed in
-//! `RenderFrame::clouds` is a thunderhead that grows out of a knot of vapour at the tail
-//! as it drifts to a stop behind the aircraft (a run lays a trail of them), and each
-//! `SimEvent::CloudBolt` a bolt out of its base.
+//! `RenderFrame::clouds` is a thunderhead that builds behind the aircraft as the seed drifts
+//! to a stop (a run lays a trail of them), and each `SimEvent::CloudBolt` a bolt out of its
+//! base.
 //!
-//! - **Release** (`ShotFired`): nothing of its own, not even a muzzle flash: the cloud's
-//!   first knot is the seed being let go.
-//! - **Cloud** (once, when a seed is first seen): its lumps are laid at once
-//!   (storm_puffs.wgsl), lowest first, and carried and grown on the GPU along the seed's
-//!   own eased drift. They live in slots of their own at the end of the puff buffer
-//!   (`STORM_PUFF_SLOTS`), written again every tick, so a battle's smoke and sparks going
-//!   round the ring can never overwrite a cloud halfway through its life. A small dense
-//!   knot at first, it builds slowly into a dark thunderhead some 200 m across, grey-blue on its crown and near black under its base. Lit from inside
-//!   by lightning that flickers more often as it grows and all the time while it strikes,
-//!   and twice or so a stroke the sky lights (`Sky::strike`) with its far thunder.
+//! - **Cloud**: not drawn here at all. Each is a cell of the sky's own weather (`Sky::seed`,
+//!   clouds_sim.wgsl kind `disturber::SEED`): while it grows and strikes, the cover round it
+//!   gathers to full and its storm builds, in a circle that swells with it, so the sky's
+//!   ray-marched clouds draw it in their own material and light, as any storm. A small knot
+//!   at first, it builds slowly to some 200 m across.
+//! - **Lightning inside**: strokes that flicker in it more often as it grows and all the
+//!   time while it strikes, and twice or so a stroke the sky lights (`Sky::strike`) with its
+//!   far thunder.
 //! - **Bolt** (`CloudBolt`): a forked blue-white stroke from inside the base down to what
 //!   it strikes, struck again once or twice down the same channel, forks off its upper
 //!   part, the base lit round it and the touchdown flashing white. The burst where it lands
 //!   is the weapon's `ion_blast` (the ordinary `Impact`).
-//! - **Joining the layer**: once the sim lets the seed go the cloud rises over
-//!   `STORM_LINGER` seconds to the base of the sky's cloud layer, spreading, lightening
-//!   from storm grey to an ordinary cloud's and thinning away as it goes, its lightning
-//!   dying; meanwhile its water is handed to the weather there (`Sky::seed`), so the
-//!   layer over a run's track thickens and drifts off with the rest.
+//! - **Joining the layer**: once the sim lets the seed go it lets go of the weather: the
+//!   cloud it leaves is the sky's, drifting off on the wind and healing back to the day's
+//!   weather like any other.
+//! - **Release** (`ShotFired`): nothing of its own, not even a muzzle flash.
 //!
-//! The drawn cloud follows the data: how wide it grows from the seed's bolt `radius`, and
-//! where it goes and when from the seed's own drift. Presentation only; the renderer's
-//! own clock.
+//! How wide it grows follows the seed's bolt `radius`, where it goes and when the seed's
+//! own drift. Presentation only; the renderer's own clock.
 
 use glam::Vec3;
-use std::f32::consts::TAU;
 
-use super::{Puff, Renderer, GROUND_FIRE_SLOTS, PUFF_RING};
-use crate::gpu_consts::puff;
-use bytemuck::Zeroable;
+use super::Renderer;
+use crate::sky::SeedCell;
 use mc_sim::mirror::CloudView;
 use mc_sim::SimEvent;
 
-const PUFF_STORM: f32 = puff::STORM_CLOUD as f32;
-/// Seconds a cloud rains itself out after the sim lets it go (storm_puffs.wgsl).
-const LINGER: f32 = puff::STORM_LINGER;
-/// Lumps a cloud is built of: a deliberate cosmetic cap on what one cloud costs (a run
-/// keeps eight or so in the air at once, a seed a second, each lingering as it rains out).
-const LUMPS: usize = 40;
 /// Metres a grown cloud reaches from its middle at least, and as a share of the disc its
-/// bolts fall in: some 200 m across, its bolts leaving from inside it. Each cloud is a little bigger or smaller than that (`lay_storm_cloud`).
+/// bolts fall in: some 200 m across, its bolts leaving from inside it. Each cloud is a
+/// little bigger or smaller than that.
 const LEAST_REACH: f32 = 95.0;
 const REACH_PER_RADIUS: f32 = 0.65;
-/// Puff slots kept for storm clouds at the end of the puff buffer, after the ring, the
-/// ground fires' and the missile trails' (renderer.rs `MAX_PUFFS`): room for about 150
-/// clouds, six or so Nimbus runs at once (a cloud lives some 23 s, a seed a second). A deliberate cosmetic cap: past it the
-/// oldest clouds are let go first.
-pub(super) const STORM_PUFF_SLOTS: usize = 6144;
+/// Seconds a spent cloud is kept after the sim lets it go, for the lightning in it to die.
+const DYING: f32 = 3.0;
+/// How stormy a grown cloud is in the weather (1 the darkest, tallest storm): a modest
+/// storm, as a full one stood a trail of them up into one towering bank.
+const STORM: f32 = 0.35;
 /// Strokes the sky lights inside one cloud (each with its thunder) before its bolts: a
 /// deliberate cap, so a wing of them does not take all the sky's flashes or drown the
 /// battle in thunder.
@@ -59,7 +48,7 @@ const MOST_RUMBLES: u8 = 2;
 const BLUE_FLASH: f32 = 0.0;
 const WHITE_FLASH: f32 = 9.0;
 
-/// The clouds being drawn, by the seed's serial.
+/// The clouds in the weather, by the seed's serial.
 #[derive(Default)]
 pub(super) struct StormClouds {
     clouds: Vec<StormCloud>,
@@ -68,49 +57,44 @@ pub(super) struct StormClouds {
     last_tick: u32,
 }
 
-/// One seed's cloud: its lumps, and what they were laid with, so the lightning finds it
-/// where the GPU draws it.
-#[derive(Clone)]
+/// One seed's cloud: where it is and how grown, as last told by the sim.
+#[derive(Clone, Copy)]
 struct StormCloud {
-    /// Its lumps as laid, written to the storm slots every tick until they are spent.
-    lumps: Vec<Puff>,
     serial: u32,
-    /// When it was laid, its middle as drawn then, the drift it had left then, the seconds
-    /// it had left to grow (and drift) then, and how far grown it was then (0 a seed, 1
-    /// grown).
-    laid: f32,
-    origin: Vec3,
-    drift: Vec3,
-    grow_seconds: f32,
-    grown_then: f32,
-    /// Metres it reaches from its middle, grown.
+    /// Its middle and how far grown (0 a seed, 1 grown), as the sim last had it.
+    middle: Vec3,
+    grown: f32,
+    /// Metres it reaches from its middle, grown: its own, a little over or under the rest.
     reach: f32,
-    /// When the sim let it go: it rains out until `LINGER` after.
+    /// When the sim let it go: its lightning dies away over `DYING` after, and the weather
+    /// it left is the sky's.
     gone: Option<f32>,
     /// Strokes the sky has lit in it; whether one of its bolts has been seen from afar.
     rumbles: u8,
     struck: bool,
 }
 
-impl StormCloud {
-    /// How far grown it is at `now`, and where its middle is (storm_puffs.wgsl
-    /// `storm_growth`).
-    fn at(&self, now: f32) -> (f32, Vec3) {
-        let u = if self.grow_seconds > 0.0 {
-            ((now - self.laid) / self.grow_seconds).clamp(0.0, 1.0)
-        } else {
-            1.0
-        };
-        let f = self.grown_then + (1.0 - self.grown_then) * u;
-        let eased = 1.0 - (1.0 - u) * (1.0 - u);
-        (f, self.origin + self.drift * eased)
-    }
-}
-
-/// How big a cloud `f` of the way grown is, as a share of grown (storm_puffs.wgsl): a small
-/// knot at first, building slowly into its size.
+/// How big a cloud `f` of the way grown is, as a share of grown: a small knot at first,
+/// building slowly into its size.
 fn size_at(f: f32) -> f32 {
     0.06 + 0.94 * f * f * (3.0 - 2.0 * f)
+}
+
+/// How far grown seed `v` is: 0 let go, 1 grown.
+fn grown(v: &CloudView) -> f32 {
+    (v.age as f32 / v.grow.max(1) as f32).clamp(0.0, 1.0)
+}
+
+impl StormCloud {
+    /// What it puts into the weather: nothing once the sim has let it go.
+    fn cell(&self) -> Option<SeedCell> {
+        self.gone.is_none().then(|| SeedCell {
+            at: self.middle.truncate(),
+            radius: self.reach * size_at(self.grown) * 0.8,
+            cover: 0.9,
+            storm: STORM * self.grown,
+        })
+    }
 }
 
 impl Renderer {
@@ -145,8 +129,7 @@ impl Renderer {
         self.effect_origin = previous;
     }
 
-    /// Once a tick: lays the clouds of seeds seen for the first time, and lights them all
-    /// from inside.
+    /// Once a tick: the clouds into the weather, and lightning inside them.
     pub(super) fn storm_clouds_tick(&mut self, views: &[CloudView], sim_tick: u32, time: f32) {
         let tick = self.tick_seconds.max(0.02);
         let mut clouds = std::mem::take(&mut self.storm_clouds.clouds);
@@ -154,23 +137,30 @@ impl Renderer {
             clouds.clear();
         }
         for c in &mut clouds {
-            if c.gone.is_none() && !views.iter().any(|v| v.serial == c.serial) {
-                c.gone = Some(time);
-                // Spent, it rises into the cloud layer and its water joins the sky's.
-                let (_, middle) = c.at(time);
-                self.sky.seed(middle.truncate(), c.reach * 1.6, time);
+            match views.iter().find(|v| v.serial == c.serial) {
+                Some(v) => {
+                    c.middle = Vec3::from(v.pos);
+                    c.grown = grown(v);
+                }
+                None if c.gone.is_none() => c.gone = Some(time),
+                None => {}
             }
         }
-        clouds.retain(|c| c.gone.is_none_or(|gone| time < gone + LINGER));
-        // Oldest first: past the slots kept for them, the oldest clouds go first.
-        let mut held = clouds.iter().map(|c| c.lumps.len()).sum::<usize>();
-        while held > STORM_PUFF_SLOTS && !clouds.is_empty() {
-            held -= clouds.remove(0).lumps.len();
-        }
+        clouds.retain(|c| c.gone.is_none_or(|gone| time < gone + DYING));
         for v in views {
             if !clouds.iter().any(|c| c.serial == v.serial) {
-                let cloud = self.lay_storm_cloud(v, time, tick);
-                clouds.push(cloud);
+                // No two alike: each its own size, so a trail reads as weather.
+                let reach = (v.radius * REACH_PER_RADIUS).max(LEAST_REACH)
+                    * (0.85 + 0.3 * self.scatter.unit());
+                clouds.push(StormCloud {
+                    serial: v.serial,
+                    middle: Vec3::from(v.pos),
+                    grown: grown(v),
+                    reach,
+                    gone: None,
+                    rumbles: 0,
+                    struck: false,
+                });
             }
         }
         self.with_outbound(|r| {
@@ -178,107 +168,19 @@ impl Renderer {
                 r.storm_flicker(c, time, tick);
             }
         });
-        let mut slots = vec![Puff::zeroed(); STORM_PUFF_SLOTS];
-        for (slot, lump) in slots
-            .iter_mut()
-            .zip(clouds.iter().flat_map(|c| c.lumps.iter()))
-        {
-            *slot = *lump;
-        }
-        self.puffs.write(
-            ((PUFF_RING + GROUND_FIRE_SLOTS + super::nuke_fx::NUKE_PUFF_SLOTS) * size_of::<Puff>())
-                as u64,
-            bytemuck::cast_slice(&slots),
-        );
+        self.sky
+            .set_seeds(clouds.iter().filter_map(StormCloud::cell).collect());
         self.storm_clouds.clouds = clouds;
-    }
-
-    /// Lays all of seed `v`'s cloud at `time`, carried along the rest of its drift.
-    fn lay_storm_cloud(&mut self, v: &CloudView, time: f32, tick: f32) -> StormCloud {
-        let pos = Vec3::from(v.pos);
-        let step = Vec3::from(v.vel);
-        // Shots are drawn a tick behind the sim, gliding toward where it has them.
-        let drawn = pos - step;
-        // The drift eases out as a square (mc-sim `cloud_seed::path`): each step is shorter
-        // than the last by the same amount, so from `pos`, `left` steps from the end, the
-        // rest is `step * left² / (2 left + 1)`; and the tail of such an ease is one too.
-        // It grows over the same time, drifting or not (one let go from a hovering
-        // aircraft does not drift at all).
-        let left = v.grow.saturating_sub(v.age) as f32;
-        let (drift, grow_seconds) = if v.age <= v.grow {
-            (
-                step * (1.0 + left * left / (2.0 * left + 1.0)),
-                (left + 1.0) * tick,
-            )
-        } else {
-            (Vec3::ZERO, 0.0)
-        };
-        let grown_then = ((v.age as f32 - 1.0) / v.grow.max(1) as f32).clamp(0.0, 1.0);
-        // No two alike: each is its own size, height of crown, lean, stretch and shade of
-        // grey, so a trail of them reads as weather and not one cloud stamped down a line.
-        let reach =
-            (v.radius * REACH_PER_RADIUS).max(LEAST_REACH) * (0.85 + 0.3 * self.scatter.unit());
-        let tower = 0.7 + 0.6 * self.scatter.unit();
-        let lean = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * 0.25;
-        let turn = self.scatter.unit() * TAU;
-        let (stretch, sin, cos) = (0.75 + 0.5 * self.scatter.unit(), turn.sin(), turn.cos());
-        let tone = 0.85 + 0.3 * self.scatter.unit();
-        let life = (v.life.saturating_sub(v.age) as f32 + 1.0) * tick + LINGER;
-        // A heap: a flat base a third of its reach under its middle, a crown that rises
-        // highest in the middle; the inner lumps show first (the seed's knot), the outer
-        // as it grows.
-        let mut lumps: Vec<(Vec3, f32, f32)> = (0..LUMPS)
-            .map(|_| {
-                let a = self.scatter.unit() * TAU;
-                let r = self.scatter.unit().sqrt();
-                let crown = 1.0 - 0.6 * r * r;
-                let z = -0.3 + self.scatter.unit().powf(0.8) * (0.3 + 0.72 * crown) * tower;
-                let (x, y) = (a.cos() * r * 0.7 * stretch, a.sin() * r * 0.7 / stretch);
-                let flat = Vec3::new(x * cos - y * sin, x * sin + y * cos, 0.0);
-                // The crown leans off the base.
-                let offset = (flat + lean * (z + 0.3) + Vec3::Z * z) * reach;
-                let size = reach * (0.6 + 0.25 * self.scatter.unit()) * (1.0 - 0.2 * r);
-                let shows = (r * 0.85 + self.scatter.unit() * 0.25 - 0.2).clamp(0.0, 0.85);
-                (offset, size, shows)
-            })
-            .collect();
-        lumps.sort_by(|a, b| a.0.z.total_cmp(&b.0.z));
-        let lumps = lumps
-            .into_iter()
-            .map(|(offset, size, shows)| Puff {
-                appearance: [grow_seconds, grown_then, reach, shows],
-                origin: drawn.to_array(),
-                opacity: 1.0,
-                pos: (drawn + offset).to_array(),
-                start: time,
-                vel: drift.to_array(),
-                life: life + self.scatter.unit() * 0.8,
-                params: [size, tone, PUFF_STORM, self.scatter.unit()],
-            })
-            .collect();
-        StormCloud {
-            lumps,
-            serial: v.serial,
-            laid: time,
-            origin: drawn,
-            drift,
-            grow_seconds,
-            grown_then,
-            reach,
-            gone: None,
-            rumbles: 0,
-            struck: false,
-        }
     }
 
     /// This tick's lightning inside cloud `c`: now and then while it grows, more often
     /// the bigger it is, every tick while it strikes, dying away as it rains out.
     fn storm_flicker(&mut self, c: &mut StormCloud, now: f32, tick: f32) {
-        let (f, middle) = c.at(now);
+        let (f, middle) = (c.grown, c.middle);
         let r = c.reach * size_at(f);
         let (chance, strokes) = match c.gone {
             Some(gone) => {
-                let k = 1.0 - ((now - gone) / LINGER).clamp(0.0, 1.0);
+                let k = 1.0 - ((now - gone) / DYING).clamp(0.0, 1.0);
                 (0.6 * k * k, 1)
             }
             None if f >= 1.0 => (0.8, 2),
@@ -368,9 +270,9 @@ impl Renderer {
             .storm_clouds
             .clouds
             .iter_mut()
-            .filter(|c| c.at(time).1.truncate().distance(from.truncate()) < c.reach * 1.5)
+            .filter(|c| c.middle.truncate().distance(from.truncate()) < c.reach * 1.5)
             .min_by(|a, b| {
-                let d = |c: &StormCloud| c.at(time).1.distance(from);
+                let d = |c: &StormCloud| c.middle.distance(from);
                 d(a).total_cmp(&d(b))
             });
         if let Some(c) = nearest {

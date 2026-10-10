@@ -182,8 +182,9 @@ fn night_sky(d: vec3<f32>, mu: f32, px: f32) -> vec3<f32> {
 // ---- Clouds --------------------------------------------------------------------
 
 // 1 where clouds are drawn in full, 0 where they have been thinned away:
-// round the selection, and right in front of the eye so flying through the
-// layer never whites out the screen. (The middle of the screen is see-through
+// round the selection (but never a storm: it is opaque, and a Nimbus's trail of
+// them must not vanish round the bomber that laid it), and right in front of the
+// eye so flying through the layer never whites out the screen. (The middle of the screen is see-through
 // in the composite instead, a hologram of the cloud.)
 fn clearing(p: vec3<f32>) -> f32 {
     var keep = 1.0;
@@ -192,6 +193,9 @@ fn clearing(p: vec3<f32>) -> f32 {
         let c = atmos.clears[i];
         let d = distance(p.xy, c.xy);
         keep *= mix(1.0, smoothstep(c.z * 0.55, c.z * 1.5, d), c.w);
+    }
+    if n > 0u && keep < 1.0 {
+        keep = mix(keep, 1.0, smoothstep(0.25, 0.55, clamp(weather_at(p.xy).y, 0.0, 1.0)));
     }
     // A bubble of clear air round the eye, as big as the view is close: down
     // among the clouds the battle stays in sight; from high up it is too

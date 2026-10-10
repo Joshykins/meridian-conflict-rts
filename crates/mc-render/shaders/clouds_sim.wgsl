@@ -228,13 +228,17 @@ fn cs_force(@builtin(global_invocation_id) id: vec3<u32>) {
         let kind = d.a.w;
         let rel = xy - d.a.xy;
         if kind == DISTURBER_SEED {
-            // A storm cloud joining the layer (sky/seed.rs): the cover round it gathers
-            // toward full while it rises into the layer, most at its middle, and is left
-            // to drift on the wind and heal back to the day's weather like any other.
-            if dot(rel, rel) > r * r * 9.0 { continue; }
-            let feeding = 1.0 - smoothstep(0.0, DISTURBER_SEED_FEEDS, d.b.w);
-            let gather = exp(-dot(rel, rel) / (r * r)) * d.b.z * feeding;
-            state.x += (max(state.x, 1.0) - state.x) * clamp(gather * dt * 0.5, 0.0, 1.0);
+            // A Nimbus's storm cloud (sky/seed.rs): the cover and the storm gather within
+            // seconds toward its own at its middle, falling away to nothing at its edge, so
+            // each is a cloud of its own size (held at full over its whole disc, a trail of
+            // them merged into one deck); let go, it drifts on the wind and heals back like
+            // any other cloud.
+            let near = dot(rel, rel) / (r * r);
+            if near > 1.5 { continue; }
+            let shape = exp(-near * 2.5);
+            let gather = clamp(shape * dt * 1.5, 0.0, 1.0);
+            state.x += max(d.b.x * shape - state.x, 0.0) * gather;
+            state.y += max(d.b.y * shape - state.y, 0.0) * gather;
             continue;
         }
         if kind == KIND_BLAST && dot(rel, rel) > r * r * 36.0 {

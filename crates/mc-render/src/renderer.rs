@@ -179,16 +179,15 @@ const SHOCKWAVE_LON: u32 = 64;
 // Three times what it was: a giant's salvo of heavy rockets lays a dozen trail puffs each a
 // tick, and at 8192 the ring came round in two seconds and ate every longer-lived puff
 // (rocket trails, the storm's thunderhead) long before its time.
-pub const MAX_PUFFS: usize = 24576 + nuke_fx::NUKE_PUFF_SLOTS + storm_cloud_fx::STORM_PUFF_SLOTS;
+pub const MAX_PUFFS: usize = 24576 + nuke_fx::NUKE_PUFF_SLOTS;
 /// Tail of the puff buffer. Smoke over a fire is rewritten here every frame,
 /// so a carpet cannot wrap the ring and erase a column halfway through.
 const GROUND_FIRE_SLOTS: usize = 512;
 /// Trees burning at once, at most (a nuclear blast lights a forest).
 const MAX_BURNING_TREES: usize = 1536;
 /// The ring every puff goes round; then the ground fires' slots, then the missile trails'
-/// (`nuke_fx::NUKE_PUFF_SLOTS`), then the storm clouds' (`storm_cloud_fx::STORM_PUFF_SLOTS`).
-const PUFF_RING: usize =
-    MAX_PUFFS - GROUND_FIRE_SLOTS - nuke_fx::NUKE_PUFF_SLOTS - storm_cloud_fx::STORM_PUFF_SLOTS;
+/// (`nuke_fx::NUKE_PUFF_SLOTS`).
+const PUFF_RING: usize = MAX_PUFFS - GROUND_FIRE_SLOTS - nuke_fx::NUKE_PUFF_SLOTS;
 const MAX_GROUND_FIRES: usize = 256;
 /// Tail of the effect buffer, rewritten every frame so a fire is not pushed out of the ring.
 const EFFECT_RING: usize = MAX_EFFECTS - MAX_GROUND_FIRES;

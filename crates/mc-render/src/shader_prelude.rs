@@ -8,12 +8,12 @@
 //! `gpu_consts.rs`), and `bindings.wgsl` with `regions.wgsl` and `lights.wgsl` in
 //! front of those containing the line `//!use bindings` (`regions` alone for a
 //! shader that binds the atmosphere itself and says `//!use regions`); then `shore`, `habitat`, `streets`, `desert`, `rock`, `scars`, `surface`,
-//! `metal`, `regency`, `scenery`, `warp_hull`, `warp_puffs`, `plasma_puffs`, `gravity_puffs` and `storm_puffs` for their own `//!use` lines, in that order,
+//! `metal`, `regency`, `scenery`, `warp_hull`, `warp_puffs`, `plasma_puffs` and `gravity_puffs` for their own `//!use` lines, in that order,
 //! then `emp` (an EMP stun's look on a model), `wreck` (how a wreck lies and looks) and
 //! `flight` (a winged flier's rig) and `crawl` (a many-legged walker's legs).
 
 /// Files put in front of shaders, never compiled on their own.
-pub(crate) const PRELUDES: [&str; 26] = [
+pub(crate) const PRELUDES: [&str; 25] = [
     "common",
     "bindings",
     "regions",
@@ -34,7 +34,6 @@ pub(crate) const PRELUDES: [&str; 26] = [
     "warp_puffs",
     "plasma_puffs",
     "gravity_puffs",
-    "storm_puffs",
     "emp",
     "wreck",
     "nova",
@@ -62,7 +61,6 @@ pub(crate) struct Preludes {
     warp_puffs: String,
     plasma_puffs: String,
     gravity_puffs: String,
-    storm_puffs: String,
     emp: String,
     wreck: String,
     nova: String,
@@ -100,7 +98,6 @@ impl Preludes {
             warp_puffs: read("warp_puffs"),
             plasma_puffs: read("plasma_puffs"),
             gravity_puffs: read("gravity_puffs"),
-            storm_puffs: read("storm_puffs"),
             emp: read("emp"),
             wreck: read("wreck"),
             nova: read("nova"),
@@ -180,10 +177,6 @@ impl Preludes {
         // A gravitic engine's held energy (puffs.wgsl; needs bindings).
         if uses("gravity_puffs") {
             prelude = format!("{prelude}\n{}", self.gravity_puffs);
-        }
-        // A storm seed's cloud (puffs.wgsl; needs bindings).
-        if uses("storm_puffs") {
-            prelude = format!("{prelude}\n{}", self.storm_puffs);
         }
         // An EMP stun's look on a model (needs common).
         if uses("emp") {

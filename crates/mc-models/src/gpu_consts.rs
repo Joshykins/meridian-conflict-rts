@@ -714,10 +714,9 @@ shared! {
     /// What stirs the weather (sky.rs `Disturber`, clouds_sim.wgsl `cs_force`). The wake
     /// and blast kinds are still spelled out on both sides; new ones are declared here.
     pub mod disturber as "DISTURBER_" {
-        /// A storm cloud joining the layer (sky/seed.rs): the cover gathers round it.
+        /// A storm cloud in the weather (sky/seed.rs): round it the cover and the storm
+        /// gather toward its own (`b.x`, `b.y`).
         pub const SEED: f32 = 3.0;
-        /// Seconds a seed feeds the layer, about as long as its cloud takes to rise into it.
-        pub const SEED_FEEDS: f32 = 10.0;
     }
 
     /// Graphics quality bits (renderer `SceneQuality`), in `Globals.detail.w`.
@@ -862,17 +861,7 @@ shared! {
         /// `appearance.rgb` its brightness, `appearance.w` how hard it is wound (0 a slow
         /// drift, 1 the strands whipping round). Laid once a tick, two ticks long.
         pub const GRAVITY_VORTEX: u32 = 62;
-        /// A lump of a storm seed's cloud (renderer/storm_cloud_fx.rs, storm_puffs.wgsl): one
-        /// billow of a thunderhead, lit as the sky's clouds are. `origin` is the cloud's middle
-        /// when it was laid and `pos` the lump's place in the grown cloud; the cloud drifts
-        /// `vel` metres more over `appearance.x` seconds, easing to a stop, and grows from
-        /// `appearance.y` of the way there to grown over the same time; `appearance.z` is the
-        /// grown cloud's reach (metres), `appearance.w` how far grown it is when this lump
-        /// shows. `params.x` its size grown, `params.y` its cloud's shade (1 the usual grey).
-        /// Over its last `STORM_LINGER` seconds it rises into the sky's cloud layer, spreading,
-        /// lightening to an ordinary cloud's grey and thinning away.
-        pub const STORM_CLOUD: u32 = 63;
-        pub const STORM_LINGER: f32 = 10.0;
+        // retired: 63 (a storm seed's cloud lump; the sky draws those clouds now)
     }
 
     /// Colours of a fading beam (`ProjectileInstance::color` low bits under
