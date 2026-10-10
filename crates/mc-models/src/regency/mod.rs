@@ -26,6 +26,7 @@ mod cyst;
 mod engineer;
 mod eye;
 mod fusion_guns;
+mod gravitic_engine;
 mod guns;
 pub(crate) mod gunships;
 mod hatchery;
@@ -149,6 +150,26 @@ pub(super) const MODELS: &[ModelDef] = &[
         seraph::RADIUS,
         seraph::HEIGHT,
         seraph::seraph,
+    ),
+    // The tech 5 gravitic engine: a crown of blade-shards round a well, the energy held
+    // between them (`gravitic_engine`), three designs while one is picked.
+    ModelDef::new(
+        "regency_gravitic_engine",
+        gravitic_engine::RADIUS,
+        gravitic_engine::HEIGHT,
+        gravitic_engine::crown,
+    ),
+    ModelDef::new(
+        "regency_gravitic_engine~b",
+        gravitic_engine::RADIUS,
+        gravitic_engine::HEIGHT,
+        gravitic_engine::open_ring,
+    ),
+    ModelDef::new(
+        "regency_gravitic_engine~c",
+        gravitic_engine::RADIUS,
+        gravitic_engine::HEIGHT,
+        gravitic_engine::split_pyramid,
     ),
     // Factories: the land press works (`brood`), the air launch frame (`hatchery`), the
     // shell crouched on its legs behind the berth (`tidebrood`). All three upgrade in place
@@ -334,6 +355,9 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_colossus" => 11000,
         // A knight's body, two repeaters, sixteen cells and two wings of plated feathers.
         "regency_seraph" => 14000,
+        // A 22 x 22 tech 5 site: twelve plated shards, rotor rings, gantries, masts and
+        // their stays.
+        "regency_gravitic_engine" => 34000,
         "regency_wake_tank" => 5000,
         // Three armoured belts, layered crown, segmented lance and six rocket cells.
         "regency_executioner" => 7000,
