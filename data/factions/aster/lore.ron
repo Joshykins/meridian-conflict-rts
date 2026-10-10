@@ -101,7 +101,7 @@
     "aster_t4_storm_bomber": (
         lore: "Reach weather crews flew cloud seeders over the dry provinces for a generation before anyone thought to charge the seed. Under a Nimbus the forecast is one word.",
         weapons: {
-            "Storm Seeder": "A charged seed let go from the tail drifts out over the mark, swells into a thunderhead, and strikes down six times onto whatever is under it.",
+            "Storm Seeder": "A charged seed let go from the tail hangs in the aircraft's wake and swells into a thunderhead that strikes down again and again onto whatever is under it.",
             "Twin AA Gun": "Four small twin mounts, barrels linked: light rounds, long reach, enough to keep fighters off the wing.",
         },
     ),

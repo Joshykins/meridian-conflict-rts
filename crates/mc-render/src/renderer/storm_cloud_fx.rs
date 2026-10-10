@@ -45,10 +45,10 @@ const LUMPS: usize = 40;
 const LEAST_REACH: f32 = 140.0;
 const REACH_PER_RADIUS: f32 = 0.75;
 /// Puff slots kept for storm clouds at the end of the puff buffer, after the ring, the
-/// ground fires' and the missile trails' (renderer.rs `MAX_PUFFS`): room for about a
-/// hundred clouds, six or so Nimbus runs at once. A deliberate cosmetic cap: past it the
+/// ground fires' and the missile trails' (renderer.rs `MAX_PUFFS`): room for about 150
+/// clouds, six or so Nimbus runs at once (a cloud lives some 23 s, a seed a second). A deliberate cosmetic cap: past it the
 /// oldest clouds are let go first.
-pub(super) const STORM_PUFF_SLOTS: usize = 4096;
+pub(super) const STORM_PUFF_SLOTS: usize = 6144;
 /// Strokes the sky lights inside one cloud (each with its thunder) before its bolts: a
 /// deliberate cap, so a wing of them does not take all the sky's flashes or drown the
 /// battle in thunder.
