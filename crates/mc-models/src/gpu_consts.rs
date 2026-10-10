@@ -76,6 +76,11 @@ shared! {
         pub const RIM: u32 = 42;
         /// Precision armour with finer plate courses and recessed fasteners.
         pub const MACHINED: u32 = 43;
+        /// Plate in a deeper shade than the rest, the film over it near black (above
+        /// every other pattern byte: the city's run to 151).
+        pub const DEEP: u32 = 160;
+        /// How much of the plate's tone a deep plate keeps.
+        pub const DEEP_TONE: f32 = 0.38;
     }
 
     /// Courier stern door leaves: the side is attached to the whole leaf, including

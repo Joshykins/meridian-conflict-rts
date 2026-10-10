@@ -12,7 +12,7 @@ use crate::{pattern, rig};
 
 use super::super::commander::form::{ball, blade, ring, sleeve, KEEL, OCT};
 use super::super::kit::{dark_plate, metal, seam, v3};
-use super::super::machine::{collar, shaft};
+use super::super::machine::{armour, collar, shaft, Frame};
 use super::{ELBOW, MUZZLE, SHOULDER};
 
 /// The left arm (the right is its mirror).
@@ -31,9 +31,9 @@ fn upper(b: &mut MeshBuilder) {
     sleeve(
         b,
         &[
-            ring(a, Vec3::X, 0.7, 0.72),
-            ring(a.lerp(c, 0.45), Vec3::X, 0.78, 0.82),
-            ring(c, Vec3::X, 0.62, 0.66),
+            ring(a, Vec3::X, 0.85, 0.88),
+            ring(a.lerp(c, 0.45), Vec3::X, 0.98, 1.0),
+            ring(c, Vec3::X, 0.75, 0.8),
         ],
         &OCT,
     );
@@ -54,9 +54,9 @@ fn forearm(b: &mut MeshBuilder) {
     sleeve(
         b,
         &[
-            ring(ELBOW + v3(0.2, 0.0, 0.0), Vec3::Z, 0.62, 0.62),
-            ring(ELBOW + v3(1.2, 0.0, 0.0), Vec3::Z, 0.74, 0.7),
-            ring(wrist, Vec3::Z, 0.55, 0.55),
+            ring(ELBOW + v3(0.2, 0.0, 0.0), Vec3::Z, 0.75, 0.75),
+            ring(ELBOW + v3(1.2, 0.0, 0.0), Vec3::Z, 0.92, 0.86),
+            ring(wrist, Vec3::Z, 0.68, 0.66),
         ],
         &OCT,
     );
@@ -110,10 +110,31 @@ fn repeater(b: &mut MeshBuilder) {
         ],
         &OCT,
     );
-    // Heat collars round the chamber.
+    // Two lit strips down the receiver's flanks, either side of its keel: hanging at
+    // its side, they run down the forearm's front.
+    b.paint(PLATING_DARK).pattern(pattern::EMBER_SLOT);
+    for side in [1.0f32, -1.0] {
+        armour(
+            b,
+            &Frame::new(
+                bore(0.15) + v3(0.0, 0.34 * side, 0.4),
+                Vec3::X,
+                v3(0.0, 0.7 * side, 1.0),
+            ),
+            &[
+                [0.0, -0.09],
+                [2.9, -0.09],
+                [3.05, 0.0],
+                [2.9, 0.09],
+                [0.0, 0.09],
+            ],
+            0.08,
+        );
+    }
+    // Heat collars round the chamber's breech, behind the strips.
     metal(b);
-    for x in [1.2f32, 1.75, 2.3] {
-        collar(b, bore(x), Vec3::X, 0.66, 0.16);
+    for x in [-0.55f32, -0.15] {
+        collar(b, bore(x), Vec3::X, 0.56, 0.16);
     }
     // The bore, recessed between the rails.
     seam(b);

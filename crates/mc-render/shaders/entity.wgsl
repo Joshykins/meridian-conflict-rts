@@ -4465,6 +4465,8 @@ fn fs_hull_depth(in: VsOut) {
 
 // How much of a personal field shows when nothing is hitting it.
 const HULL_IDLE: f32 = 0.45;
+// How much of that the lattice itself keeps: its cells only a trace.
+const HULL_LATTICE_IDLE: f32 = 0.35;
 
 // fs_hull behind the clouds where it is past them (bindings.wgsl `past_clouds_at`): a
 // flying hull's field goes into the cloud with it.
@@ -4509,8 +4511,10 @@ fn fs_hull_lit(in: VsOut) -> vec4<f32> {
     let eye_dist = length(in.world - eye);
     let cell_px = select(HULL_HEX, SHIELD_LOOK_HULL_CELL * 0.6, prismatic) * globals.lod.x / max(eye_dist, 1.0);
     let hex_see = smoothstep(0.9, 4.5, cell_px);
-    let seam = pow(saturate((hx.x - 0.66) / 0.22), 1.45) * hex_see;
-    let plate = (1.0 - smoothstep(0.70, 0.90, hx.x)) * hex_see;
+    // At rest the lattice is a trace over the plates, so the unit's own detail reads
+    // through it; a hit (`hull_hits`) lights it at full strength.
+    let seam = pow(saturate((hx.x - 0.66) / 0.22), 1.45) * hex_see * HULL_LATTICE_IDLE;
+    let plate = (1.0 - smoothstep(0.70, 0.90, hx.x)) * hex_see * HULL_LATTICE_IDLE;
     let fres = pow(1.0 - facing, 2.1);
     let live = 0.68 + 0.32 * sin(time * 2.4);
     let dying = select(0.0, 1.0, ((s.packed >> 24u) & 1u) == 1u);

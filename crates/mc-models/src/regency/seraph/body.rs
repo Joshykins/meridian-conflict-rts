@@ -43,10 +43,10 @@ fn thigh(b: &mut MeshBuilder, hip: Vec3, knee: Vec3) {
     sleeve(
         b,
         &[
-            ring(at(0.05, 0.0), n, 0.95, 0.95),
-            ring(at(0.25, 0.12), n, 1.12, 1.18),
-            ring(at(0.6, 0.12), n, 1.0, 1.08),
-            ring(at(0.94, 0.05), n, 0.72, 0.8),
+            ring(at(0.05, 0.0), n, 1.1, 1.1),
+            ring(at(0.25, 0.15), n, 1.38, 1.42),
+            ring(at(0.6, 0.15), n, 1.24, 1.3),
+            ring(at(0.94, 0.05), n, 0.85, 0.92),
         ],
         &KEEL,
     );
@@ -62,7 +62,25 @@ fn thigh(b: &mut MeshBuilder, hip: Vec3, knee: Vec3) {
         0.26,
     );
     // The front plate, its point up at the hip.
-    blade(b, at(0.82, 1.15), -u + n * 0.06, n, 3.0, 0.78, 0.0, 0.28);
+    blade(b, at(0.82, 1.4), -u + n * 0.06, n, 3.0, 0.9, 0.0, 0.28);
+    if !b.fine() {
+        return;
+    }
+    // Lapped down the outside under the cuisse: a course of three, the lowest longest.
+    for (k, t) in [0.3f32, 0.52, 0.74].into_iter().enumerate() {
+        blade(
+            b,
+            at(t, 0.3) + Vec3::Y * 1.32,
+            u - n * 0.25,
+            Vec3::Y + n * 0.2,
+            1.3 + 0.25 * k as f32,
+            0.55,
+            0.3,
+            0.16,
+        );
+    }
+    // Behind: the hamstring's plate.
+    blade(b, at(0.15, -1.25), u - n * 0.1, -n, 2.6, 0.75, 0.0, 0.22);
 }
 
 fn shin(b: &mut MeshBuilder, knee: Vec3, ankle: Vec3) {
@@ -81,11 +99,11 @@ fn shin(b: &mut MeshBuilder, knee: Vec3, ankle: Vec3) {
     sleeve(
         b,
         &[
-            ring(at(0.08, 0.0), n, 0.8, 0.85),
-            ring(at(0.35, -0.1), n, 0.82, 1.0),
-            ring(at(0.68, -0.2), n, 0.95, 1.22),
-            ring(at(0.92, -0.14), n, 0.9, 1.1),
-            ring(at(1.02, -0.05), n, 0.7, 0.8),
+            ring(at(0.08, 0.0), n, 0.95, 1.0),
+            ring(at(0.35, -0.12), n, 1.0, 1.2),
+            ring(at(0.68, -0.24), n, 1.15, 1.45),
+            ring(at(0.92, -0.16), n, 1.08, 1.3),
+            ring(at(1.02, -0.05), n, 0.8, 0.9),
         ],
         &OCT,
     );
@@ -93,19 +111,19 @@ fn shin(b: &mut MeshBuilder, knee: Vec3, ankle: Vec3) {
     sleeve(
         b,
         &[
-            ring(at(0.24, 0.62), n, 0.92, 0.5),
-            ring(at(0.05, 0.92), n, 0.98, 0.66),
-            ring(at(-0.12, 1.1), n, 0.7, 0.44),
-            ring(at(-0.22, 1.5), n, 0.06, 0.06),
+            ring(at(0.24, 0.72), n, 1.1, 0.55),
+            ring(at(0.05, 1.08), n, 1.2, 0.74),
+            ring(at(-0.12, 1.3), n, 0.86, 0.5),
+            ring(at(-0.24, 1.75), n, 0.06, 0.06),
         ],
         &KEEL,
     );
     // The greave down the front, its point up under the guard.
-    blade(b, at(0.95, 1.12), -u + n * 0.1, n, 2.9, 1.0, 0.0, 0.3);
+    blade(b, at(0.95, 1.32), -u + n * 0.1, n, 2.9, 1.1, 0.0, 0.3);
     // Down the outside, swept up and back.
     blade(
         b,
-        at(0.92, -0.25) + Vec3::Y * 1.12,
+        at(0.92, -0.25) + Vec3::Y * 1.32,
         -u - n * 0.1,
         Vec3::Y,
         2.6,
@@ -117,7 +135,7 @@ fn shin(b: &mut MeshBuilder, knee: Vec3, ankle: Vec3) {
     b.paint(PLATING_DARK).pattern(pattern::EMBER_SLOT);
     armour(
         b,
-        &Frame::new(at(0.62, -1.42), -u, -n),
+        &Frame::new(at(0.62, -1.68), -u, -n),
         &[[-1.0, -0.42], [1.0, -0.42], [1.0, 0.42], [-1.0, 0.42]],
         0.14,
     );
@@ -125,10 +143,21 @@ fn shin(b: &mut MeshBuilder, knee: Vec3, ankle: Vec3) {
         return;
     }
     dark_plate(b);
+    // A second greave lapped over the shin's outside, its point up at the knee.
+    blade(
+        b,
+        at(0.7, 0.35) + Vec3::Y * 1.05,
+        -u + n * 0.15,
+        Vec3::Y + n * 0.35,
+        2.4,
+        0.6,
+        0.0,
+        0.18,
+    );
     // A fin swept back off the calf.
     blade(
         b,
-        at(0.4, -1.32),
+        at(0.4, -1.6),
         -n * 0.7 - u * 0.7,
         Vec3::Y,
         2.2,
@@ -149,9 +178,9 @@ fn foot(b: &mut MeshBuilder, ankle: Vec3, toe: Vec3) {
     sleeve(
         b,
         &[
-            ring(at(0.0, -0.15), n, 0.62, 0.78),
-            ring(at(0.3, 0.05), n, 0.72, 0.82),
-            ring(at(0.7, 0.08), n, 0.45, 0.48),
+            ring(at(0.0, -0.15), n, 0.75, 0.9),
+            ring(at(0.3, 0.05), n, 0.86, 0.96),
+            ring(at(0.7, 0.08), n, 0.55, 0.56),
             ring(at(1.0, 0.0), n, 0.08, 0.1),
         ],
         &OCT,
@@ -285,14 +314,28 @@ pub(super) fn torso(b: &mut MeshBuilder) {
             v3(1.0, 0.3, 0.35),
         );
         armour(b, &f, &swept(2.3, 0.9, -0.3, 0.6), 0.22);
-        // The breast vent beside the keel: its heat in the plate.
-        b.paint(PLATING_DARK).pattern(pattern::EMBER_SLOT);
+        // The breast vent beside the keel: a dark recess, three lit bars across it, the
+        // heat in their plates.
+        seam(b);
         armour(
             b,
-            &Frame::new(v3(1.55, 0.95, 17.6), v3(-0.2, 1.0, 0.0), v3(1.0, 0.25, 0.1)),
-            &[[0.0, -0.32], [1.3, -0.32], [1.15, 0.32], [0.0, 0.32]],
+            &Frame::new(v3(1.55, 0.45, 17.6), v3(-0.2, 1.0, 0.0), v3(1.0, 0.25, 0.1)),
+            &[[0.0, -0.72], [1.5, -0.72], [1.35, 0.72], [0.0, 0.72]],
             0.12,
         );
+        b.paint(PLATING_DARK).pattern(pattern::EMBER_SLOT);
+        for dz in [-0.45f32, 0.0, 0.45] {
+            armour(
+                b,
+                &Frame::new(
+                    v3(1.66, 0.55, 17.6 + dz),
+                    v3(-0.2, 1.0, 0.0),
+                    v3(1.0, 0.25, 0.1),
+                ),
+                &[[0.0, -0.17], [1.3, -0.17], [1.2, 0.17], [0.0, 0.17]],
+                0.08,
+            );
+        }
         dark_plate(b);
         pauldron(b);
     });
@@ -346,10 +389,10 @@ fn pauldron(b: &mut MeshBuilder) {
     sleeve(
         b,
         &[
-            ring(s + v3(1.45, 0.3, 0.2), Vec3::Z, 1.05, 1.05),
-            ring(s + v3(0.4, 0.55, 0.55), Vec3::Z, 1.35, 1.25),
-            ring(s + v3(-0.8, 0.5, 0.45), Vec3::Z, 1.25, 1.15),
-            ring(s + v3(-2.4, 0.35, 0.9), Vec3::Z, 0.15, 0.2),
+            ring(s + v3(1.6, 0.35, 0.2), Vec3::Z, 1.25, 1.2),
+            ring(s + v3(0.4, 0.65, 0.6), Vec3::Z, 1.6, 1.45),
+            ring(s + v3(-0.9, 0.6, 0.5), Vec3::Z, 1.45, 1.3),
+            ring(s + v3(-2.5, 0.4, 0.95), Vec3::Z, 0.15, 0.2),
         ],
         &ARCH,
     );
@@ -364,6 +407,22 @@ fn pauldron(b: &mut MeshBuilder) {
         &swept(2.0, 0.95, 0.3, 0.55),
         0.2,
     );
+    if !b.fine() {
+        return;
+    }
+    // Two more lapped under it down the outside, the arm's layered shoulder.
+    for (k, dz) in [-0.75f32, -1.35].into_iter().enumerate() {
+        armour(
+            b,
+            &Frame::new(
+                s + v3(0.75 - 0.15 * k as f32, 1.75 - 0.1 * k as f32, dz),
+                v3(-0.3, 0.2, -1.0),
+                v3(0.1, 1.0, 0.0),
+            ),
+            &swept(1.6, 0.85, 0.2, 0.5),
+            0.16,
+        );
+    }
 }
 
 /// The helm on its neck, idling about `NECK`: a narrow skull swept back into a crest, a
