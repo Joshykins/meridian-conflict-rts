@@ -1,20 +1,21 @@
-//! Storm seeds (`Weapon::cloud`, the Tempest's Storm Seeder): a shot that is a cloud.
+//! Storm seeds (`Weapon::cloud`, the Nimbus's Storm Seeder): a shot that is a cloud.
 //!
 //! The seed is aimed at nothing. It leaves the muzzle at the tail while any foe is in
 //! reach, and hangs where it was let go, carried on a little by the aircraft's way and
 //! slowing to a stop as it grows (`path`, toward the `mark` the weapons phase gives it), so
 //! a run lays a trail of clouds over what it crosses. It hits nothing as it drifts
 //! (`impacts.rs` passes it over).
-//! Grown, it lets fall its bolts, spread evenly over the `strike` time
-//! (`CloudSeed::bolts_by`), then it is gone.
+//! Grown, it lets fall its bolts over the `strike` time, each in its own share of it but
+//! at a moment of its own (`bolt_age`), so the clouds of a trail never strike in step;
+//! then it is gone.
 //!
 //! Each bolt is a sub-shot (`Projectiles::sub`, `Weapon::sub_shot`: an even share of the
 //! damage and the bolt's own splash) let go from the cloud's base, over what it strikes,
-//! straight at it, fast enough to land the tick it is let go. It strikes the foes under the cloud
-//! within its `radius`, nearest first, one a bolt and round again when there are more bolts
-//! than foes; the ground under the cloud when there are none, on a sunflower over the
-//! disc (`cluster::offset`). A dome over a foe takes the bolt, as it would a shell. No
-//! randomness: which bolt falls where follows from the seed's flight and what is under it.
+//! straight at it, fast enough to land the tick it is let go. It strikes one of the foes
+//! under the cloud within its `radius`, any of them; the ground somewhere under the cloud
+//! when there are none. A dome over a foe takes the bolt, as it would a shell. The luck of
+//! each bolt (when it falls, what it strikes) comes from the seed's serial and the bolt's
+//! number (`luck`), not the sim's dice: it follows from the shot alone.
 
 use mc_core::{Fx, FxVec2, FxVec3};
 
@@ -44,6 +45,26 @@ pub(crate) fn path(origin: FxVec3, mark: FxVec2, age: u16, grow: u16) -> FxVec3 
     (origin.xy() + (mark - origin.xy()) * eased).extend(origin.z)
 }
 
+/// Bolt `k`'s own luck in seed `serial`'s cloud, for `what` (when it falls, what it
+/// strikes, where on the ground): a hash, the same on every machine.
+fn luck(serial: u32, k: u8, what: u32) -> u32 {
+    let mut h = serial ^ (k as u32).wrapping_mul(0x9E37_79B9) ^ what.wrapping_mul(0x85EB_CA6B);
+    h ^= h >> 16;
+    h = h.wrapping_mul(0x7FEB_352D);
+    h ^= h >> 15;
+    h = h.wrapping_mul(0x846C_A68B);
+    h ^ (h >> 16)
+}
+
+/// The age (ticks since it was let go) at which bolt `k` of seed `serial` falls: in its
+/// own share of the strike, at a moment of its own within it.
+pub(crate) fn bolt_age(cloud: &mc_data::CloudSeed, serial: u32, k: u8) -> u16 {
+    let (strike, n) = (cloud.strike_ticks as u32, cloud.bolts.max(1) as u32);
+    let from = strike * k as u32 / n;
+    let span = (strike * (k as u32 + 1) / n - from).max(1);
+    cloud.grow_ticks + (from + luck(serial, k, 1) % span) as u16
+}
+
 impl World {
     /// Each seed's drift for this tick's step, and the bolts it lets fall this tick.
     /// `SimError::TableFull` if the projectile table cannot take them.
@@ -63,8 +84,8 @@ impl World {
             let (origin, mark) = (p.origin[i], p.mark[i].xy());
             p.vel[i] = path(origin, mark, age + 1, cloud.grow_ticks)
                 - path(origin, mark, age, cloud.grow_ticks);
-            let before = if age == 0 { 0 } else { cloud.bolts_by(age - 1) };
-            for k in before..cloud.bolts_by(age) {
+            let serial = p.serial[i];
+            for k in (0..cloud.bolts).filter(|&k| bolt_age(&cloud, serial, k) == age) {
                 falling.push((i, k));
             }
         }
@@ -88,7 +109,8 @@ impl World {
             return Ok(());
         };
         let mask = weapon.target_mask;
-        // The foes under it, nearest first (the id breaks a tie, so the order is total).
+        // The foes under it, nearest first (the id breaks a tie, so the order is total), to
+        // draw one from.
         let mut under: Vec<(Fx, UnitId, usize)> = Vec::new();
         let around = cloud.radius + self.index.max_radius();
         self.index.query(centre.xy(), around, kind::UNIT, |e| {
@@ -106,17 +128,18 @@ impl World {
             true
         });
         under.sort_by_key(|&(d, id, _)| (d, id.0));
-        let (to, target) = match under.get(k as usize % under.len().max(1)) {
+        let pick = luck(serial, k, 2) as usize % under.len().max(1);
+        let (to, target) = match under.get(pick) {
             Some(&(_, id, r)) => {
                 let u = &self.state.units;
                 let middle = u.z[r] + self.bp(r).height / 2;
                 (u.pos[r].extend(middle), id)
             }
             None => {
-                let spin = mc_core::Angle((serial.wrapping_mul(2_654_435_761) >> 16) as u16);
-                let xy = self.clamp_to_map(
-                    centre.xy() + crate::cluster::offset(k, cloud.bolts, cloud.radius, spin),
-                );
+                // Anywhere under the cloud, evenly over its disc.
+                let turn = mc_core::Angle((luck(serial, k, 3) >> 16) as u16);
+                let out = cloud.radius * Fx::ratio((luck(serial, k, 4) % 1024) as i64, 1024).sqrt();
+                let xy = self.clamp_to_map(centre.xy() + FxVec2::from_angle(turn) * out);
                 let ground = self.terrain.height_at(xy).max(self.terrain.water_level());
                 (xy.extend(ground), Handle::NONE)
             }
@@ -174,27 +197,35 @@ mod tests {
     }
 
     #[test]
-    fn every_bolt_falls_once_over_the_strike() {
+    fn every_bolt_falls_once_over_the_strike_out_of_step_with_its_neighbours() {
         let cloud = mc_data::CloudSeed {
-            grow_ticks: 40,
-            strike_ticks: 15,
-            bolts: 6,
+            grow_ticks: 70,
+            strike_ticks: 80,
+            bolts: 8,
             radius: Fx::from_int(150),
-            splash: Fx::from_int(25),
+            splash: Fx::from_int(26),
         };
-        assert_eq!(cloud.bolts_by(39), 0);
-        assert_eq!(cloud.bolts_by(40), 1, "the first falls as it is grown");
-        let mut fell = 0;
-        for age in 0..cloud.life_ticks() {
-            let before = if age == 0 { 0 } else { cloud.bolts_by(age - 1) };
-            assert!(cloud.bolts_by(age) >= before);
-            fell += cloud.bolts_by(age) - before;
+        let ages = |serial| {
+            (0..8)
+                .map(|k| bolt_age(&cloud, serial, k))
+                .collect::<Vec<_>>()
+        };
+        for serial in 1..50 {
+            let a = ages(serial);
+            for (k, &age) in a.iter().enumerate() {
+                // Each in its own tenth of the strike, all before the seed is gone.
+                assert!(
+                    age >= 70 + 10 * k as u16 && age < 80 + 10 * k as u16,
+                    "{a:?}"
+                );
+                assert!(age < cloud.life_ticks());
+            }
         }
-        assert_eq!(fell, 6);
-        assert_eq!(
-            cloud.bolts_by(cloud.life_ticks() - 1),
-            6,
-            "all before it is gone"
-        );
+        // Clouds let go a second apart do not strike on the same beat.
+        let beats = |serial| ages(serial).iter().map(|a| a % 10).collect::<Vec<_>>();
+        assert!((1..20).any(|s| beats(s) != beats(s + 1)));
+        assert!((1..20)
+            .map(beats)
+            .any(|b| b.windows(2).any(|w| w[0] != w[1])));
     }
 }

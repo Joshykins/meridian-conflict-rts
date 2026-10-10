@@ -1387,12 +1387,13 @@ pub struct RawCluster {
     pub splash: f64,
 }
 
-/// A storm seed (the Tempest's Storm Seeder): the shot is a cloud let go behind the
-/// aircraft that drifts out to over its mark at the height it was seeded, swelling as it
-/// goes, for `grow` seconds. Grown, it lets fall `bolts` lightning strikes over `strike`
-/// seconds, each straight down onto a foe under it within `radius` metres of its middle
-/// (onto the ground there when there is none), each with an even share of the weapon's
-/// `damage` and a blast `splash` metres round. Then it is spent. A direct, non-missile
+/// A storm seed (the Nimbus's Storm Seeder): the shot is a cloud let go behind the
+/// aircraft, aimed at nothing, that hangs about where it was let go at the height it was
+/// seeded, swelling for `grow` seconds. Grown, it lets fall `bolts` lightning strikes over
+/// `strike` seconds, each in its own share of that time at a moment of its own, each onto
+/// one of the foes under it within `radius` metres of its middle (onto the ground there
+/// when there is none), each with an even share of the weapon's `damage` and a blast
+/// `splash` metres round. Then it is spent. A direct, non-missile
 /// weapon on an aircraft; the seed itself hits nothing on its way.
 #[derive(Deserialize, Clone, Copy)]
 #[serde(deny_unknown_fields)]
