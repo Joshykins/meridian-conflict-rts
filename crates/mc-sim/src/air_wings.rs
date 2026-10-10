@@ -8,6 +8,11 @@
 //! The queue is the carrier's own (`Command::QueueWing`, `Command::CancelWing`), apart
 //! from its orders, so sailing it about never touches what it is building. A queue
 //! holds at most `MAX_WING_QUEUE` wings; more is refused (`Refusal::WingQueueFull`).
+//!
+//! As a factory's: a carrier on Repeat (`Command::SetRepeat`, `flag::REPEAT`) puts each
+//! wing it finishes back at the end of its queue; a paused one (`Command::SetPaused`)
+//! builds nothing; and its priority (`Command::SetPriority`) is the tier its wing is paid
+//! in during a stall.
 
 use crate::mirror::{Refusal, SimEvent};
 use crate::tables::{flag, Handle, UnitId};
@@ -86,7 +91,7 @@ impl World {
         index: u8,
         count: u8,
     ) -> Result<(), SimError> {
-        for row in self.owned(player, ids, 0) {
+        for row in self.owned_carriers(player, ids) {
             if self.wing(row, index).is_none() {
                 continue;
             }
@@ -106,10 +111,17 @@ impl World {
         Ok(())
     }
 
+    /// The carriers (units with `air_wings`) among `ids` that `player` owns.
+    pub(crate) fn owned_carriers(&self, player: u8, ids: &[UnitId]) -> Vec<usize> {
+        let mut rows = self.owned(player, ids, 0);
+        rows.retain(|&r| self.bp(r).air_wings.is_some());
+        rows
+    }
+
     /// `Command::CancelWing`: the last queued wing `index` off each carrier among `ids`.
     /// Cancelling the one under way loses what was put into it.
     pub(crate) fn cancel_wing(&mut self, player: u8, ids: &[UnitId], index: u8) {
-        for row in self.owned(player, ids, 0) {
+        for row in self.owned_carriers(player, ids) {
             let id = self.state.units.id(row);
             let Some(bay) = self.state.wings.bays.get_mut(&id) else {
                 continue;
@@ -193,8 +205,9 @@ impl World {
         Ok(())
     }
 
-    /// The wing done in full: its aircraft spawned aboard, ready to go off the deck.
-    /// Held at done while the unit table has no room for all of it.
+    /// The wing done in full: its aircraft spawned aboard, ready to go off the deck, and
+    /// on Repeat the same wing queued again at the back (it has just left the front, so
+    /// the queue has room). Held at done while the unit table has no room for all of it.
     fn finish_wing(&mut self, row: usize, id: UnitId) -> Result<(), SimError> {
         let bay = &self.state.wings.bays[&id];
         let Some(&index) = bay.queue.first() else {
@@ -224,8 +237,12 @@ impl World {
             self.events.push(SimEvent::UnitCompleted { unit, owner });
             launching.push(unit);
         }
+        let repeat = self.state.units.has_flag(row, flag::REPEAT);
         let bay = self.state.wings.bays.get_mut(&id).expect("bay");
         bay.queue.remove(0);
+        if repeat {
+            bay.queue.push(index);
+        }
         bay.progress = Fx::ZERO;
         bay.launching = launching;
         Ok(())

@@ -1,6 +1,7 @@
 //! The build card: everything about a blueprint, over the build tile the pointer is
 //! on. Its price, its figures (what it makes, spends and stores, what it pays back
-//! in, its adjacency), its lore and its armament.
+//! in, its adjacency), its lore and its armament. A carrier's air wing has the card of
+//! its aircraft, named for the wing and priced for all of it.
 
 use crate::hud::style::Domain;
 use crate::hud::{whole, Hud, ENERGY, MASS};
@@ -10,11 +11,17 @@ use mc_data::{Blueprints, UnitBlueprint};
 
 /// How the builder whose card it is turns out what it offers.
 #[derive(Clone, Copy)]
-pub(in crate::hud) enum Pace {
+pub(in crate::hud) enum Pace<'a> {
     /// Builds it at this build power.
     Build(f32),
     /// A space elevator: its platform brings it down free, out of a payload this big.
     Platform(f32),
+    /// A carrier: builds `count` of it at once as the wing `name`, at this build power.
+    Wing {
+        power: f32,
+        count: u32,
+        name: &'a str,
+    },
 }
 
 /// Everything about a blueprint, over the tile the pointer is on.
@@ -27,7 +34,7 @@ pub(in crate::hud) fn data_card(
     ui: &mut Ui,
     blueprints: &Blueprints,
     item: &UnitBlueprint,
-    pace: Pace,
+    pace: Pace<'_>,
     hint: &str,
     tile: Rect,
     bottom: f32,
@@ -161,39 +168,51 @@ pub(in crate::hud) fn data_card(
     let x = r.x + x;
     let pic = Rect::new(r.right() - 76.0, r.y + 8.0, 64.0, 64.0);
     hud.thumbs.draw(ui, item.id, pic, 1.0);
-    ui.text(
-        x,
-        r.y + 26.0,
-        type_scale::ITEM,
-        rgb(0xFFFFFF, 1.0),
-        &item.name,
-    );
+    // A wing by its own name, and how many of what it is.
+    let (title, line) = match pace {
+        Pace::Wing { count, name, .. } => (
+            name.to_owned(),
+            format!(
+                "{count} \u{d7} {}  \u{b7}  Tech {}  \u{b7}  {}",
+                item.name, item.tech, item.role
+            ),
+        ),
+        _ => (
+            item.name.clone(),
+            format!(
+                "Tech {}  \u{b7}  {}  \u{b7}  {}",
+                item.tech,
+                item.role,
+                Domain::of(item).label()
+            ),
+        ),
+    };
+    ui.text(x, r.y + 26.0, type_scale::ITEM, rgb(0xFFFFFF, 1.0), &title);
     let end = ui.text(
         x,
         r.y + 48.0,
         type_scale::MICRO,
         rgb(palette::TEXT, 1.0),
-        &format!(
-            "Tech {}  \u{b7}  {}  \u{b7}  {}",
-            item.tech,
-            item.role,
-            Domain::of(item).label()
-        ),
+        &line,
     );
     crate::hud::volatile::chip(ui, item, end + 8.0, r.y + 48.0);
 
     // The price: mass, energy, and how long this builder takes over it. An elevator's
     // platform brings it down free, taking its mass out of the payload.
-    let costs = match pace {
-        Pace::Build(power) => [
-            ("Materials", whole(item.cost_mass.to_f32()), MASS),
-            ("Energy", whole(item.cost_energy.to_f32()), ENERGY),
+    let built = |power: f32, n: f32| {
+        [
+            ("Materials", whole(item.cost_mass.to_f32() * n), MASS),
+            ("Energy", whole(item.cost_energy.to_f32() * n), ENERGY),
             (
                 "Time",
-                crate::hud::clock(item.build_time.to_f32() / power.max(0.1)),
+                crate::hud::clock(item.build_time.to_f32() * n / power.max(0.1)),
                 palette::TEXT,
             ),
-        ],
+        ]
+    };
+    let costs = match pace {
+        Pace::Build(power) => built(power, 1.0),
+        Pace::Wing { power, count, .. } => built(power, count as f32),
         Pace::Platform(payload) => [
             (
                 "Of Payload",

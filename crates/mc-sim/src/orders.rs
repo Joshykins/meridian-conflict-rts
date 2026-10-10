@@ -333,7 +333,10 @@ impl World {
                 Ok(())
             }
             Command::SetRepeat { factories, repeat } => {
-                for row in self.owned_factories(player, factories) {
+                // A carrier repeats its air wings (`air_wings.rs`).
+                let mut rows = self.owned_factories(player, factories);
+                rows.extend(self.owned_carriers(player, factories));
+                for row in rows {
                     let f = &mut self.state.units.flags[row];
                     *f = if *repeat {
                         *f | flag::REPEAT

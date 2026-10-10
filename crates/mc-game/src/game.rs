@@ -2264,6 +2264,19 @@ impl Game {
                     });
                 }
             }
+            HudAction::QueueWing(wing) => self.send(Command::QueueWing {
+                units: self.selected_ids(),
+                wing,
+                count: if self.shift { 5 } else { 1 },
+            }),
+            HudAction::CancelWing(wing) => {
+                for _ in 0..if self.shift { 5 } else { 1 } {
+                    self.send(Command::CancelWing {
+                        units: self.selected_ids(),
+                        wing,
+                    });
+                }
+            }
             HudAction::Cancel(blueprint) => {
                 for _ in 0..if self.shift { 5 } else { 1 } {
                     self.send(Command::CancelProduce {
@@ -2876,6 +2889,7 @@ impl Game {
                     let bp = self.blueprints.unit(BlueprintId(u.blueprint as u16));
                     bp.builder.as_ref().is_some_and(|b| !b.builds.is_empty())
                         || bp.upgrades_to.is_some()
+                        || bp.air_wings.is_some()
                 });
                 if builds {
                     self.hud.build_keys = true;
@@ -3003,21 +3017,7 @@ impl Game {
                     batch: on < of,
                 });
             }
-            // As the Repeat button: off if every factory repeats, all on otherwise.
-            KeyCode::KeyL if self.selection_has(cat::FACTORY) => {
-                let all = self
-                    .selected_units()
-                    .filter(|u| {
-                        self.blueprints
-                            .unit(BlueprintId(u.blueprint as u16))
-                            .has(cat::FACTORY)
-                    })
-                    .all(|u| hud::has_flag(u, flag::REPEAT));
-                self.send(Command::SetRepeat {
-                    factories: self.selected_ids(),
-                    repeat: !all,
-                });
-            }
+            KeyCode::KeyL if self.repeaters().next().is_some() => self.toggle_repeat(),
             KeyCode::Pause => self.toggle_pause(),
             KeyCode::Equal | KeyCode::NumpadAdd => self.step_speed(1),
             KeyCode::Minus | KeyCode::NumpadSubtract => self.step_speed(-1),

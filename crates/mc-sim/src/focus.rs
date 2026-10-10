@@ -93,11 +93,12 @@ fn reclaims(bp: &UnitBlueprint, blueprints: &Blueprints) -> bool {
                 .is_some_and(|d| blueprints.unit(d).reclaimer.is_some()))
 }
 
-/// Whether a unit of this kind has work a priority of its own can order: it builds,
-/// upgrades, refits or assembles rounds. A site under construction can be given one too
+/// Whether a unit of this kind has work a priority of its own can order: it builds
+/// (units, or a carrier's air wings), upgrades, refits or assembles rounds. A site under construction can be given one too
 /// (`World::set_priority`).
 pub fn prioritizable(blueprints: &Blueprints, bp: &UnitBlueprint) -> bool {
     bp.builder.is_some()
+        || bp.air_wings.is_some()
         || bp.upgrades_to.is_some()
         || bp.strategic.is_some()
         || blueprints.refit_set(bp.id).is_some()

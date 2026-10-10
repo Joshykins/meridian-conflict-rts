@@ -1814,3 +1814,4 @@ mod idle;
 mod priority;
 mod queue_tray;
 mod warp;
+mod wings;

@@ -2,7 +2,8 @@
 //! holding a strip of tiles that scrolls sideways, with a button per shelf
 //! above it to jump along it, an UPGRADE tab for what the
 //! selection can refit into, the queue it is working through above it, and a
-//! data card for whatever is hovered.
+//! data card for whatever is hovered. A carrier's air wings get the same panel, without
+//! the tiers (`wings.rs`).
 
 use super::icons;
 use super::selection::dps;
@@ -22,6 +23,7 @@ mod data_card;
 pub(super) mod queue;
 mod strip;
 pub(super) mod tray;
+mod wings;
 pub(super) use data_card::{data_card, Pace};
 pub(super) use queue::Split;
 use strip::{Slot, ARROW_W};
@@ -32,7 +34,7 @@ pub(super) const NAME: crate::ui::Style = crate::ui::style(mc_render::Face::Medi
 /// A construction tile's title (its role, "Land Factory"): bigger than a name.
 const TITLE: crate::ui::Style = crate::ui::style(mc_render::Face::Bold, 13.0, 0.4);
 pub(super) const TILE_GAP: f32 = 6.0;
-const QUEUE_H: f32 = 62.0;
+pub(super) const QUEUE_H: f32 = 62.0;
 pub const TIERS: u8 = 5;
 /// The tab past the tiers: refits.
 pub const UPGRADE_TAB: u8 = TIERS + 1;
@@ -44,6 +46,7 @@ const SELF_UPGRADE_POWER: i32 = 10;
 pub(super) fn has_strip(s: &Scene, bp: &UnitBlueprint) -> bool {
     bp.builder.as_ref().is_some_and(|b| !b.builds.is_empty())
         || bp.upgrades_to.is_some()
+        || bp.air_wings.is_some()
         || s.blueprints.refit_set(bp.id).is_some()
 }
 
@@ -55,6 +58,9 @@ struct Stack {
     upgrade: bool,
     /// Where the last entry of the stack stands: how the sim finds it to take it out.
     last: FxVec2,
+    /// A carrier's air wing, by its index in the carrier's `air_wings`: `blueprint` is
+    /// then its aircraft, and `count` how many wings.
+    wing: Option<u8>,
 }
 
 pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: Rect) {
@@ -80,6 +86,12 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
             && (!has_flag(u, flag::UNDER_CONSTRUCTION) || !bp.is_mobile())
     });
     let refits = upgrader.is_some_and(|(_, bp)| s.blueprints.refit_set(bp.id).is_some());
+    if builder_unit.is_none() && upgrader.is_none() && r.w >= TILE_W + 28.0 {
+        if let Some((carrier, air_wings)) = wings::carrier_of(s, units) {
+            wings::draw(hud, ui, s, units, carrier, air_wings, r);
+            return;
+        }
+    }
     if (builder_unit.is_none() && upgrader.is_none()) || r.w < TILE_W + 28.0 {
         hud.build_keys = false;
         hud.build_key = None;
@@ -170,6 +182,7 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
                 count: 1,
                 upgrade,
                 last: o.at,
+                wing: None,
             }),
         }
     }
@@ -292,31 +305,11 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
         },
     );
 
-    // How to drive the panel from the keyboard, at the header's right end.
-    let hint = if hud.build_keys {
-        "Tier 1\u{2013}5  \u{b7}  Shelf  \u{b7}  Item  \u{b7}  ESC"
-    } else {
-        "Keys"
-    };
-    let hw = ui.text_width(type_scale::MICRO, hint);
-    ui.fill(
-        Rect::new(r.right() - 36.0 - hw - 10.0, r.y + 12.0, hw + 32.0, 22.0),
-        ink(0.9),
-    );
-    key_cap(ui, r.right() - 34.0, r.y + 15.5, 'B', hud.build_keys);
-    ui.text_right(
-        r.right() - 40.0,
-        r.y + 23.0,
-        type_scale::MICRO,
-        rgb(
-            if hud.build_keys {
-                0xFFFFFF
-            } else {
-                palette::DIM
-            },
-            1.0,
-        ),
-        hint,
+    keys_hint(
+        hud,
+        ui,
+        r,
+        "Tier 1\u{2013}5  \u{b7}  Shelf  \u{b7}  Item  \u{b7}  ESC",
     );
     let grid = Rect::new(x, r.y + 44.0, cw - 10.0, r.bottom() - 8.0 - (r.y + 44.0));
     let mut hovered: Option<Hover> = None;
@@ -380,7 +373,12 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
             progress: platform.map_or(queue.map_or(0.0, |q| q.progress), |p| p.1),
             eta: platform.map_or(queue.and_then(|q| q.eta), |p| Some(p.2)),
             platform: platform.map(|p| p.0),
-            is_factory,
+            maker: if is_factory {
+                queue::Maker::Factory
+            } else {
+                queue::Maker::Builder
+            },
+            wings: &[],
             repeat: Split::count(
                 units
                     .iter()
@@ -451,6 +449,45 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
     }
 }
 
+/// How to drive the panel `r` from the keyboard, at its header's right end: B, and while
+/// the keys are live, what they pick (`live`).
+fn keys_hint(hud: &Hud, ui: &mut Ui, r: Rect, live: &str) {
+    let hint = if hud.build_keys { live } else { "Keys" };
+    let hw = ui.text_width(type_scale::MICRO, hint);
+    ui.fill(
+        Rect::new(r.right() - 36.0 - hw - 10.0, r.y + 12.0, hw + 32.0, 22.0),
+        ink(0.9),
+    );
+    key_cap(ui, r.right() - 34.0, r.y + 15.5, 'B', hud.build_keys);
+    ui.text_right(
+        r.right() - 40.0,
+        r.y + 23.0,
+        type_scale::MICRO,
+        rgb(
+            if hud.build_keys {
+                0xFFFFFF
+            } else {
+                palette::DIM
+            },
+            1.0,
+        ),
+        hint,
+    );
+}
+
+/// How many of a tile's item are queued, in a white chip over the foot of its picture.
+fn queued_badge(ui: &mut Ui, tr: Rect, count: &str) {
+    let badge = Rect::new(tr.right() - 25.0, tr.bottom() - 56.0, 21.0, 16.0);
+    ui.fill(badge, rgb(palette::TEXT, 0.95));
+    ui.text_centred(
+        badge.x + badge.w * 0.5,
+        badge.mid_y(),
+        type_scale::MICRO,
+        rgb(palette::INK, 1.0),
+        count,
+    );
+}
+
 /// A key cap: the letter in a small box, lit while the construction keys are live.
 pub fn key_cap(ui: &mut Ui, x: f32, y: f32, key: char, live: bool) {
     let r = Rect::new(x, y, 15.0, 15.0);
@@ -472,7 +509,7 @@ pub fn key_cap(ui: &mut Ui, x: f32, y: f32, key: char, live: bool) {
 const SHELF_H: f32 = 24.0;
 /// From the shelf buttons' top to the strip's: room under them for the bar of the
 /// shelf in view and the bracket over its tiles.
-const STRIP_DROP: f32 = SHELF_H + 12.0;
+pub(super) const STRIP_DROP: f32 = SHELF_H + 12.0;
 /// Tiles on the strip: a picture over a three-line caption, kept low so the
 /// panel stands no taller than it needs.
 pub(super) const STRIP_H: f32 = 106.0;
@@ -786,15 +823,7 @@ fn tiles<'a>(
             .map(|k| k.count)
             .sum();
         if queued > 0 {
-            let badge = Rect::new(tr.right() - 25.0, tr.bottom() - 56.0, 21.0, 16.0);
-            ui.fill(badge, rgb(palette::TEXT, 0.95));
-            ui.text_centred(
-                badge.x + badge.w * 0.5,
-                badge.mid_y(),
-                type_scale::MICRO,
-                rgb(palette::INK, 1.0),
-                &queued.to_string(),
-            );
+            queued_badge(ui, tr, &queued.to_string());
         }
         if t.clicked && locked.is_some() {
             ui.audio.play(Sfx::Deny);
@@ -1068,15 +1097,7 @@ fn climb_tile(
             rgb(BUILDING, 0.95),
         );
     } else if queued {
-        let badge = Rect::new(tr.right() - 25.0, tr.bottom() - 56.0, 21.0, 16.0);
-        ui.fill(badge, rgb(palette::TEXT, 0.95));
-        ui.text_centred(
-            badge.x + badge.w * 0.5,
-            badge.mid_y(),
-            type_scale::MICRO,
-            rgb(palette::INK, 1.0),
-            "1",
-        );
+        queued_badge(ui, tr, "1");
     }
     ui.fade = fade;
     if t.clicked {
@@ -1346,16 +1367,20 @@ fn upgrade_card(
     );
 }
 
-/// A name on one line, cut short with a full stop when it does not fit.
 /// A construction tile's foot: what it is (`title`, "Land Factory") over its name
 /// ("Forge"), then its price in materials. A unit without a title shows its name alone,
 /// in the title's place.
 fn caption(ui: &mut Ui, item: &UnitBlueprint, tr: Rect, glow: f32, price: f32) {
-    let x = tr.x + tr.w * 0.5;
     let (title, name) = match &item.title {
         Some(title) => (title.as_str(), Some(item.name.as_str())),
         None => (item.name.as_str(), None),
     };
+    tile_caption(ui, title, name, tr, glow, price);
+}
+
+/// A tile's foot: `title` big, `name` under it, then `price` in materials.
+fn tile_caption(ui: &mut Ui, title: &str, name: Option<&str>, tr: Rect, glow: f32, price: f32) {
+    let x = tr.x + tr.w * 0.5;
     // Big, in the names' semi-condensed bold; a long one closes up and comes down to
     // fit the tile before it is ever cut.
     let (st, title) = ui.fitted(TITLE, title, tr.w - 6.0);

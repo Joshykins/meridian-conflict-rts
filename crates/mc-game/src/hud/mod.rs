@@ -56,7 +56,6 @@ mod top_bar;
 mod unit_picker;
 mod volatile;
 pub mod warp;
-mod wings;
 
 use crate::audio::Sfx;
 use crate::game::{Mode, Targeting, View};
@@ -123,6 +122,10 @@ pub enum HudAction {
     Build(BlueprintId),
     /// Take one of these out of the selected factories' queues.
     Cancel(BlueprintId),
+    /// Queue this air wing (its index in `air_wings`) on the selected carriers.
+    QueueWing(u8),
+    /// Take the last of this air wing out of the selected carriers' queues.
+    CancelWing(u8),
     Target(Targeting),
     Stop,
     FormationPanel,
@@ -793,16 +796,6 @@ impl Hud {
                     let pw = silo::WIDTH.min(w - EDGE - x);
                     if pw > 200.0 {
                         silo::panel(self, ui, s, launcher, &l, Rect::new(x, deck_y, pw, DECK_H));
-                        x += pw + GAP;
-                    }
-                }
-                // A carrier's air wings: what it builds, the queue, the wing under way
-                // (`wings.rs`).
-                if let Some((carrier, wings, v)) = wings::carrier_of(s, &units) {
-                    let pw = wings::WIDTH.min(w - EDGE - x);
-                    if pw > 240.0 {
-                        let r = Rect::new(x, deck_y, pw, DECK_H);
-                        wings::panel(self, ui, s, carrier, wings, v, r);
                         x += pw + GAP;
                     }
                 }

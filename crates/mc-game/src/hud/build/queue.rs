@@ -1,7 +1,8 @@
 //! The queue strip over the construction panel: what the builder has queued, and the
-//! Repeat, Pause, Priority (`hud/priority.rs`) and Batch switches (`batch.rs`). A selection of several builders can be
-//! split on any switch; the buttons show how it is split and what a click will do. On a
-//! narrow screen the switches fold to their glyphs, so the strip always fits. A queue too
+//! Repeat, Pause, Priority (`hud/priority.rs`) and Batch switches (`batch.rs`). A
+//! carrier's air wings (`wings.rs`) get the same strip, without Batch. A selection of
+//! several builders can be split on any switch; the buttons show how it is split and what
+//! a click will do. On a narrow screen the switches fold to their glyphs, so the strip always fits. A queue too
 //! long for the strip opens whole over it (`tray.rs`).
 
 use super::{pause_mark, tip, Stack, BUILDING};
@@ -47,6 +48,29 @@ impl Split {
     }
 }
 
+/// Whose queue the strip shows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Maker {
+    /// An engineer's sites, or a structure's own upgrades.
+    Builder,
+    /// A factory's products.
+    Factory,
+    /// A carrier's air wings (`wings.rs`).
+    Carrier,
+}
+
+impl Maker {
+    /// It builds its queue over and over on Repeat.
+    fn repeats(self) -> bool {
+        self != Maker::Builder
+    }
+
+    /// A click on a queued tile adds one more of it.
+    fn adds(self) -> bool {
+        self != Maker::Builder
+    }
+}
+
 /// What the queue strip shows.
 pub(super) struct Queue<'a> {
     pub(super) stacks: &'a [Stack],
@@ -54,11 +78,15 @@ pub(super) struct Queue<'a> {
     pub(super) progress: f32,
     /// Seconds before the front entry is done at the pace it is going, when it is moving.
     pub(super) eta: Option<f32>,
-    /// A space elevator: what its platform is doing. Its queue is never built: the
-    /// progress and time are the wait for the next platform (`elevator::strip`).
+    /// What the head says the maker is doing, in place of its order's activity. A space
+    /// elevator: what its platform is doing (its queue is never built: the progress and
+    /// time are the wait for the next platform, `elevator::strip`). A carrier: launching
+    /// its last wing, which holds the next one.
     pub(super) platform: Option<&'static str>,
-    pub(super) is_factory: bool,
-    /// The selected factories that build their queues over and over.
+    pub(super) maker: Maker,
+    /// A carrier's air wings, which its stacks' `wing` index: empty for anyone else.
+    pub(super) wings: &'a [mc_data::Wing],
+    /// The selected factories (or carriers) that build their queues over and over.
     pub(super) repeat: Split,
     /// The selected factories in one batch: `on` counts those in the batch most of them
     /// share, so the switch is all on only when they are all linked in one.
@@ -131,8 +159,11 @@ fn layout(w: f32, queue: &Queue) -> &'static Layout {
         if queue.priority.any() {
             switches += l.gap + l.priority;
         }
-        if queue.is_factory {
-            switches += l.gap + l.switch + l.gap + super::batch::width(queue, l);
+        if queue.maker.repeats() {
+            switches += l.gap + l.switch;
+        }
+        if queue.maker == Maker::Factory {
+            switches += l.gap + super::batch::width(queue, l);
         }
         14.0 + l.head + 18.0 + 2.0 * (STACK_W + STACK_GAP) + 30.0 + switches + l.gap + 12.0
     };
@@ -154,18 +185,23 @@ pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue
     let end = head(ui, s, r, queue, l.head);
     let pause = queue.pause;
 
-    // Repeat, for a factory: build the queue over and over.
+    // Repeat, for a factory or a carrier: build the queue over and over.
     let mut right = r.right() - 12.0;
     let mut batch_right = None;
-    if queue.is_factory {
+    if queue.maker.repeats() {
         let tr = Rect::new(right - l.switch, r.y + (r.h - 34.0) * 0.5, l.switch, 34.0);
+        let (who, what) = if queue.maker == Maker::Carrier {
+            ("carriers", "The carrier builds its wings over and over.")
+        } else {
+            ("factories", "The factory builds its queue over and over.")
+        };
         let hint = if queue.repeat.mixed() {
             format!(
-                "{} of {} factories repeat.  Click: all repeat  \u{b7}  Right-Click: none do",
+                "{} of {} {who} repeat.  Click: all repeat  \u{b7}  Right-Click: none do",
                 queue.repeat.on, queue.repeat.of
             )
         } else {
-            "The factory builds its queue over and over.".to_owned()
+            what.to_owned()
         };
         let set = switch(
             hud,
@@ -250,7 +286,7 @@ pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue
         priority::control(hud, ui, tr, queue.priority, size, "queue-priority", 46.0);
         right = tr.x - l.gap;
     }
-    if queue.is_factory {
+    if queue.maker == Maker::Factory {
         batch_right = Some(right);
     }
     // Batch, for a factory, leftmost: it is the one that grows, and it grows away from
@@ -298,10 +334,10 @@ fn head(ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue, head_w: f32) -> f32 {
         (Some(kind), Some(first)) => (kind, first),
         _ => {
             // Nothing under way: the caption, over the count.
-            let label = if queue.is_factory {
-                "Production Queue"
-            } else {
-                "Build Queue"
+            let label = match queue.maker {
+                Maker::Factory => "Production Queue",
+                Maker::Carrier => "Air Wing Queue",
+                Maker::Builder => "Build Queue",
             };
             ui.fill(
                 Rect::new(x, r.mid_y() - 5.0, 3.0, 10.0),
@@ -347,8 +383,7 @@ fn head(ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue, head_w: f32) -> f32 {
         None if paused => "Paused",
         None => crate::hud::selection::activity(front),
     };
-    let item = s.blueprints.unit(first.blueprint);
-    let name = crate::hud::refit::queued_name(s.blueprints, first.blueprint).unwrap_or(&item.name);
+    let name = stack_name(s, queue, first);
     // One figure at the right: the time left while the work moves (the rail under it
     // shows how far along), the percentage while it stands still.
     let eta = queue.eta.filter(|_| !paused);
@@ -410,6 +445,16 @@ fn head(ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue, head_w: f32) -> f32 {
     }
     ui.text_fit_left(tx, r.y + 51.0, w, type_scale::MICRO, rgb(tone, 1.0), &note);
     x + head_w
+}
+
+/// What a stack is called: a wing by its name, a refit by its module's, anything else
+/// by its blueprint's.
+fn stack_name<'a>(s: &Scene<'a>, queue: &Queue<'a>, k: &Stack) -> &'a str {
+    if let Some(wing) = k.wing.and_then(|w| queue.wings.get(w as usize)) {
+        return &wing.name;
+    }
+    crate::hud::refit::queued_name(s.blueprints, k.blueprint)
+        .unwrap_or(&s.blueprints.unit(k.blueprint).name)
 }
 
 /// A switch button on the strip.
@@ -643,7 +688,7 @@ pub(super) fn stack_tile(
 ) {
     let Queue {
         progress,
-        is_factory,
+        maker,
         paused,
         ..
     } = *queue;
@@ -725,7 +770,16 @@ pub(super) fn stack_tile(
             // A tier is cancelled by its own blueprint too, with the tiers after it.
             hud.actions.push(HudAction::CancelRefit(k.blueprint));
         }
-    } else if is_factory {
+    } else if let Some(wing) = k.wing {
+        if t.clicked {
+            ui.audio.play(Sfx::Select);
+            hud.actions.push(HudAction::QueueWing(wing));
+        }
+        if t.right_clicked {
+            ui.audio.play(Sfx::Back);
+            hud.actions.push(HudAction::CancelWing(wing));
+        }
+    } else if maker.adds() {
         if t.clicked {
             ui.audio.play(Sfx::Select);
             hud.actions.push(HudAction::Build(k.blueprint));
@@ -747,10 +801,10 @@ pub(super) fn stack_tile(
             hint
         } else if k.upgrade {
             format!("Upgrade to {}  \u{b7}  Right-Click Cancels", item.name)
-        } else if is_factory {
+        } else if maker.adds() {
             format!(
                 "{}  \u{b7}  Click Adds  \u{b7}  Right-Click Removes",
-                item.name
+                stack_name(s, queue, k)
             )
         } else {
             format!("{}  \u{b7}  Right-Click Removes the Last", item.name)

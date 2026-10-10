@@ -1,15 +1,34 @@
-//! The selection's work switches: Pause (Z) holds its spending, and Priority says when
-//! its work is paid in a stall (`mc_sim::focus`). The buttons are the HUD's
+//! The selection's work switches: Pause (Z) holds its spending, Priority says when its
+//! work is paid in a stall (`mc_sim::focus`), and Repeat (L) has factories and carriers
+//! build their queues over and over. The buttons are the HUD's
 //! (`hud/selection/pause_order.rs`, `hud/build/queue.rs`, `hud/priority.rs`).
 
 use super::Game;
 use crate::hud;
-use mc_data::BlueprintId;
+use mc_data::{cat, BlueprintId};
 use mc_sim::focus::Priority;
+use mc_sim::mirror::UnitInstance;
 use mc_sim::tables::flag;
 use mc_sim::{Command, Handle};
 
 impl Game {
+    /// The selection's units that can repeat their queues: factories and carriers.
+    pub(super) fn repeaters(&self) -> impl Iterator<Item = &UnitInstance> {
+        self.selected_units().filter(|u| {
+            let bp = self.blueprints.unit(BlueprintId(u.blueprint as u16));
+            bp.has(cat::FACTORY) || bp.air_wings.is_some()
+        })
+    }
+
+    /// L, as the Repeat button: off if every factory and carrier repeats, all on otherwise.
+    pub(super) fn toggle_repeat(&mut self) {
+        let all = self.repeaters().all(|u| hud::has_flag(u, flag::REPEAT));
+        self.send(Command::SetRepeat {
+            factories: self.selected_ids(),
+            repeat: !all,
+        });
+    }
+
     /// Pauses (or resumes) the work of whatever in the selection has work to pause.
     pub(super) fn set_paused(&mut self, paused: bool) {
         let units: Vec<Handle> = self

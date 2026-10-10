@@ -178,6 +178,22 @@ fn doing(
         } else {
             (label, progress, palette::TEXT)
         }
+    } else if let Some(wing) = s
+        .view
+        .frame
+        .wings
+        .iter()
+        .find(|w| w.unit_id == u.unit_id)
+        .and_then(|v| v.queue.first())
+        .and_then(|&i| bp.air_wings.as_ref()?.wings.get(i as usize))
+    {
+        // A carrier at anchor building a wing (its own queue, apart from its orders).
+        let label = format!("{} {}", activity(OrderKind::Build), wing.name);
+        if u.paused() {
+            (format!("Paused  \u{b7}  {label}"), None, PAUSED)
+        } else {
+            (label, None, palette::TEXT)
+        }
     } else if u.paused() {
         ("Paused  \u{b7}  Z Resumes".to_owned(), None, PAUSED)
     } else if bp.motion.is_none() && bp.builder.is_none() {

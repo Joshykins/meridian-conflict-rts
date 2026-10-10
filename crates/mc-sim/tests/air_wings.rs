@@ -158,3 +158,92 @@ fn what_a_carrier_was_building_goes_down_with_it() {
     }
     assert!(!w.state.wings.bays.contains_key(&id));
 }
+
+#[test]
+fn a_carrier_on_repeat_queues_each_finished_wing_again() {
+    let mut w = sea();
+    let ship = carrier(&mut w);
+    let id = w.state.units.id(ship);
+    order(
+        &mut w,
+        Command::SetRepeat {
+            factories: vec![id],
+            repeat: true,
+        },
+    );
+    assert!(w.state.units.has_flag(ship, mc_sim::tables::flag::REPEAT));
+    order(
+        &mut w,
+        Command::QueueWing {
+            units: vec![id],
+            wing: 3,
+            count: 1,
+        },
+    );
+    let mut launched = false;
+    for _ in 0..20_000 {
+        w.tick(&[]).unwrap();
+        if !w.state.wings.bays[&id].launching.is_empty() {
+            launched = true;
+            break;
+        }
+    }
+    assert!(launched, "the wing was built");
+    let bay = &w.state.wings.bays[&id];
+    assert_eq!(bay.queue, vec![3], "and queued again behind itself");
+    assert_eq!(bay.progress, Fx::ZERO);
+}
+
+#[test]
+fn a_paused_carrier_builds_nothing_and_keeps_its_radar() {
+    let mut w = sea();
+    let ship = carrier(&mut w);
+    let id = w.state.units.id(ship);
+    order(
+        &mut w,
+        Command::SetPaused {
+            units: vec![id],
+            paused: true,
+        },
+    );
+    assert!(w.state.units.paused[ship], "a carrier's wing work pauses");
+    assert!(!mc_sim::pause::powers_down(w.bp(ship)));
+    order(
+        &mut w,
+        Command::QueueWing {
+            units: vec![id],
+            wing: 0,
+            count: 1,
+        },
+    );
+    for _ in 0..300 {
+        w.tick(&[]).unwrap();
+    }
+    assert_eq!(w.state.wings.bays[&id].progress, Fx::ZERO);
+    order(
+        &mut w,
+        Command::SetPaused {
+            units: vec![id],
+            paused: false,
+        },
+    );
+    for _ in 0..30 {
+        w.tick(&[]).unwrap();
+    }
+    assert!(w.state.wings.bays[&id].progress > Fx::ZERO, "resumed");
+}
+
+#[test]
+fn a_carrier_takes_a_priority_of_its_own() {
+    let mut w = sea();
+    let ship = carrier(&mut w);
+    let id = w.state.units.id(ship);
+    order(
+        &mut w,
+        Command::SetPriority {
+            units: vec![id],
+            priority: mc_sim::focus::Priority::First,
+        },
+    );
+    assert_eq!(w.state.units.priority[ship], mc_sim::focus::Priority::First);
+}

@@ -15,11 +15,12 @@ use crate::World;
 use mc_core::Fx;
 use mc_data::{Blueprints, UnitBlueprint};
 
-/// Whether a unit of this kind has something pausing stops: it builds, it can be
-/// upgraded or refitted, or it runs a powered system. Pausing anything else would
-/// do nothing.
+/// Whether a unit of this kind has something pausing stops: it builds (units, or a
+/// carrier's air wings), it can be upgraded or refitted, or it runs a powered system.
+/// Pausing anything else would do nothing.
 pub fn pausable(blueprints: &Blueprints, bp: &UnitBlueprint) -> bool {
     bp.builder.is_some()
+        || bp.air_wings.is_some()
         || bp.upgrades_to.is_some()
         || bp.strategic.is_some()
         || blueprints.refit_set(bp.id).is_some()
@@ -30,9 +31,10 @@ pub fn pausable(blueprints: &Blueprints, bp: &UnitBlueprint) -> bool {
 /// energy upkeep with it: a shield, radar, sonar, warp dampener or material fabricator
 /// that draws energy.
 /// A builder's pause holds its work only, so pausing the commander's
-/// building never drops its Personal Shield.
+/// building never drops its Personal Shield, nor a carrier's its radar.
 pub fn powers_down(bp: &UnitBlueprint) -> bool {
     bp.builder.is_none()
+        && bp.air_wings.is_none()
         && bp.economy.energy_upkeep > Fx::ZERO
         && (bp.shield.is_some()
             || bp.radar > Fx::ZERO

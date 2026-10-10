@@ -161,9 +161,21 @@ own queue of at most 8, more refused with `Refusal::WingQueueFull`). A wing is `
 `power`. Done, the aircraft are spawned stowed aboard (as on a staging base) and go off
 the bow one every `launch_gap`; once the last is up they fly guard round the carrier in
 one formation (`guard` metres, circling at half of it) until given other orders. A
-carrier that sinks takes its queue and what is aboard with it. The panel (`hud/wings.rs`)
-shows a tile a wing (click queues one, right-click takes the last off), the queue and the
-wing under way. Atoll: 8 Peregrines, 5 Hellkites, 4 Gannets, 3 Raptors; Mantlet: 8 Pilums,
+carrier that sinks takes its queue and what is aboard with it.
+
+A carrier works as a factory does. On Repeat (`Command::SetRepeat`, the L key) each wing
+it finishes goes back on the end of its queue; paused (Z, `Command::SetPaused`) it builds
+nothing but keeps its radar and the rest of its systems on; its own priority
+(`Command::SetPriority`, Last/Auto/First) is the tier its wing is paid in during a stall
+(on Auto it is paid evenly with the side's other work). Selected, it gets the
+factory's construction panel without the tiers or Batch (`hud/build/wings.rs`): a tile a
+wing with its aircraft's picture, the wing's name, "8 × Peregrine", the price of all of
+it, its item key (B, then A S D F) and a count while queued (click +1, Shift +5,
+right-click -1); the build card for a hovered wing (the aircraft's card, priced and timed
+for the whole wing at the carrier's power); and the factory queue strip over it, with
+the wings as stacks, the one under way filling, Repeat, Pause and Priority. The strip's
+head reads "Launching the Last Wing" while the last one is still going off the deck,
+which holds the next. Atoll: 8 Peregrines, 5 Hellkites, 4 Gannets, 3 Raptors; Mantlet: 8 Pilums,
 3 Reapers, 4 Tridents, 3 Partisans.
 
 ## The guard order
