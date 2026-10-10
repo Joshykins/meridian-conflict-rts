@@ -21,14 +21,14 @@ use crate::gpu_consts::siege::{ARM, POD};
 use crate::material::*;
 use crate::{part, Siege};
 
-use super::super::kit::{dark_plate, metal, seam, v3};
-use super::super::machine::{armour, collar, hoop_on, red_slot, Course, Frame};
+use super::super::kit::{dark_plate, metal, nanite_plate, seam, v3};
+use super::super::machine::{armour, collar, hoop, hoop_on, red_slot, Course, Frame};
 use super::super::turrets::sunspear;
-use super::{team_patch, turret_hull, yoke, Line};
+use super::{team_patch, Line};
 
 /// The blueprint's radius and height.
 pub(in crate::regency) const RADIUS: f32 = 22.0;
-pub(in crate::regency) const HEIGHT: f32 = 34.0;
+pub(in crate::regency) const HEIGHT: f32 = 37.0;
 
 /// The Sunspear's gun at this size.
 const S: f32 = 0.9;
@@ -38,11 +38,17 @@ const TAIL: f32 = -13.0;
 const HALF: f32 = 7.5;
 const BELLY: f32 = 6.2;
 const DECK: f32 = 11.2;
-/// The turret's roof: a low turntable, so the gun lies on the deck packed.
+/// The top of the turret's turntable, which the cheeks stand on.
 const ROOF: f32 = DECK + 0.9;
-/// The gun's line: raised 60 degrees at rest, the Sunspear's bore at [`S`].
+/// Half the slot between the turret's cheeks (wide enough for the rails parted through
+/// the charge) and the cheeks' outer faces.
+const SLOT: f32 = 4.4;
+const CHEEK: f32 = 6.0;
+/// The gun's line: raised 60 degrees at rest, the Sunspear's bore at [`S`]. The trunnion
+/// stands high enough between the cheeks that the breech clears the turntable at any
+/// elevation, and the gun lies level in the slot packed.
 pub(super) const LINE: Line = Line {
-    pivot: Vec3::new(1.0, 0.0, DECK + 1.9),
+    pivot: Vec3::new(1.0, 0.0, DECK + 4.3),
     pitch_deg: 60.0,
     len: 26.6 * S,
 };
@@ -108,22 +114,7 @@ pub(super) fn draw(b: &mut MeshBuilder) {
     legs(b, knee);
     body(b);
     b.with_part(part::TURRET, |b| {
-        turret_hull(
-            b,
-            &[[4.6, 2.4], [2.0, 4.4], [-4.6, 4.4], [-6.6, 2.6]],
-            DECK,
-            ROOF,
-        );
-        team_patch(b, -3.6, -1.0, 1.1, ROOF + 0.01);
-        yoke(
-            b,
-            LINE.pivot,
-            3.3,
-            0.7,
-            [-1.6, 3.0],
-            [ROOF - 0.2, LINE.pivot.z + 1.2],
-        );
-        fusion_drum(b, v3(-4.4, 0.0, DECK + 1.5));
+        turret(b);
         b.set_charge_gear(LINE.pivot, S);
         LINE.gun(b, |b| {
             b.with(Affine3A::from_scale(Vec3::splat(S)), |b| {
@@ -161,6 +152,15 @@ fn coarse(b: &mut MeshBuilder, knee: Vec3) {
         });
     }
     b.with_part(part::TURRET, |b| {
+        // The cheeks' outer faces alone.
+        dark_plate(b);
+        b.mirror_y(|b| {
+            let face: Vec<Vec3> = CHEEK_PROFILE
+                .iter()
+                .map(|&[x, z]| v3(x, CHEEK, z))
+                .collect();
+            b.face(&face)
+        });
         LINE.gun(b, |b| {
             dark_plate(b);
             b.cylinder_between(Vec3::ZERO, v3(LINE.len * 0.7, 0.0, 0.0), 1.4, 1.1, 3);
@@ -399,11 +399,195 @@ fn body(b: &mut MeshBuilder) {
             v3(TAIL * 0.55 - 0.7, 0.0, deck + 0.01),
         ])
     });
+    deck_fittings(b);
 }
 
-/// The fusion drum lying across the deck behind the turntable at `c`, short enough for the
-/// rails to lie either side of it packed: a plated cylinder in a cradle of plates, bronze end caps, its
-/// light only through slits along its top.
+/// The turret's turntable in plan, half of it (`turret_hull`'s way), from the front round to
+/// the back: long enough to carry the cheeks, the crutch and the rail saddles.
+const TURNTABLE: [[f32; 2]; 4] = [[6.8, 3.6], [4.8, 6.2], [-7.0, 6.2], [-8.4, 4.4]];
+/// The cheeks' side profile (x, z): low at the front, standing over the trunnion, sloping
+/// down behind it.
+const CHEEK_PROFILE: [[f32; 2]; 5] = [
+    [-8.2, ROOF],
+    [6.6, ROOF],
+    [2.8, DECK + 5.8],
+    [-1.8, DECK + 5.8],
+    [-7.6, DECK + 3.2],
+];
+
+/// The turret: a faceted turntable on a drum and a bronze race, and on it two tall
+/// armoured cheeks either side of a slot the gun lies in packed and rises out of planted,
+/// the trunnion pin through both. A forked crutch at the slot's front takes the barrel's
+/// sleeve packed, two saddles at its back take the rails, and the fusion drum lies
+/// between them.
+fn turret(b: &mut MeshBuilder) {
+    let sides = b.sides(16);
+    dark_plate(b);
+    b.prism(v3(0.0, 0.0, DECK), sides, 5.6, 5.6, 0.45);
+    let plan: Vec<[f32; 2]> = TURNTABLE
+        .iter()
+        .copied()
+        .chain(TURNTABLE.iter().rev().map(|&[x, y]| [x, -y]))
+        .collect();
+    b.with_facets(|b| {
+        b.loft_z(
+            &plan,
+            &[
+                Section::new(DECK + 0.4, 0.94),
+                Section::new(ROOF - 0.25, 1.0),
+                Section::new(ROOF, 0.97),
+            ],
+        )
+    });
+    metal(b);
+    hoop(b, v3(0.0, 0.0, DECK + 0.4), 5.7, 0.3, 0.25, sides);
+    b.mirror_y(|b| {
+        dark_plate(b);
+        b.with_facets(|b| b.extrude_y(&CHEEK_PROFILE, SLOT, CHEEK));
+        // Swept plates lapped down the cheek's outer face, and a nanite-glazed plate
+        // along its crown.
+        Course {
+            count: if b.fine() { 3 } else { 2 },
+            step: 3.6,
+            len: 4.6,
+            half: 0.9,
+            tip: -0.4,
+            thick: 0.3,
+            tail: 0.8,
+        }
+        .lay(
+            b,
+            &Frame::new(v3(4.4, CHEEK, ROOF + 1.3), -Vec3::X, Vec3::Y),
+        );
+        if b.mid() {
+            Course {
+                count: 2,
+                step: 3.0,
+                len: 3.6,
+                half: 0.7,
+                tip: 0.3,
+                thick: 0.25,
+                tail: 0.6,
+            }
+            .lay(
+                b,
+                &Frame::new(v3(2.2, CHEEK, DECK + 4.6), -Vec3::X, Vec3::Y),
+            );
+        }
+        nanite_plate(b);
+        armour(
+            b,
+            &Frame::new(v3(2.6, (SLOT + CHEEK) * 0.5, DECK + 5.8), -Vec3::X, Vec3::Z),
+            &[[0.0, -0.5], [0.0, 0.5], [4.0, 0.5], [4.4, 0.0], [4.0, -0.5]],
+            0.25,
+        );
+        // A bronze boss round the pin's end.
+        metal(b);
+        hoop_on(
+            b,
+            LINE.pivot + Vec3::Y * (CHEEK + 0.15),
+            Vec3::Y,
+            1.5,
+            0.35,
+            0.3,
+            sides,
+        );
+        // The rail saddles at the slot's back: the rails lie in them packed.
+        dark_plate(b);
+        b.with_facets(|b| b.block(v3(-8.5, 2.0, ROOF - 0.1), v3(-6.7, 4.0, DECK + 2.75)));
+    });
+    collar(b, LINE.pivot, Vec3::Y, 1.0, CHEEK * 2.0 + 0.5);
+    // The crutch: a fork at the slot's front that the barrel's sleeve settles into.
+    dark_plate(b);
+    b.with_facets(|b| {
+        b.block(v3(5.2, -0.9, ROOF - 0.1), v3(6.4, 0.9, DECK + 2.7));
+        b.mirror_y(|b| b.block(v3(5.2, 0.9, ROOF - 0.1), v3(6.4, 1.7, DECK + 3.2)));
+    });
+    fusion_drum(b, v3(-4.6, 0.0, ROOF + 1.7));
+    team_patch(b, -8.2, -7.0, 1.4, ROOF + 0.01);
+}
+
+/// What stands on the deck round the turret, which sweeps 9.6 m from its axis: inside that
+/// nothing stands higher than the turntable's underside. A fixed collar
+/// round its drum, plated bulwarks down the deck's edges, a raised prow with a nanite
+/// glazed crest ahead of it, and the engine deck aft, its heat sinks glazed.
+fn deck_fittings(b: &mut MeshBuilder) {
+    let sides = b.sides(20);
+    metal(b);
+    hoop(b, v3(0.0, 0.0, DECK), 5.9, 0.4, 0.3, sides);
+    b.mirror_y(|b| {
+        dark_plate(b);
+        armour(
+            b,
+            &Frame::new(v3(4.0, 6.1, DECK), -Vec3::X, Vec3::Z),
+            &super::super::machine::swept(11.5, 0.45, 0.0, 0.9),
+            0.3,
+        );
+        // The forward deck: a hatch plate either side of the turret's nose, glazed down
+        // its middle, under the turntable's sweep.
+        armour(
+            b,
+            &Frame::new(v3(9.4, 2.9, DECK), -Vec3::X, Vec3::Z),
+            &[[0.0, -1.0], [0.0, 1.4], [2.8, 2.0], [4.6, 0.6], [4.0, -1.0]],
+            0.3,
+        );
+        nanite_plate(b);
+        armour(
+            b,
+            &Frame::new(v3(8.9, 3.1, DECK + 0.3), -Vec3::X, Vec3::Z),
+            &[
+                [0.0, -0.25],
+                [0.0, 0.25],
+                [2.8, 0.25],
+                [3.2, 0.0],
+                [2.8, -0.25],
+            ],
+            0.08,
+        );
+    });
+    // The prow, outside the sweep: a swept plate over the glacis, a nanite crest down
+    // its middle.
+    dark_plate(b);
+    let prow = Frame::new(v3(9.8, 0.0, DECK), Vec3::X, Vec3::Z);
+    armour(
+        b,
+        &prow,
+        &[[0.0, -3.4], [0.0, 3.4], [1.6, 2.6], [3.0, 0.0], [1.6, -2.6]],
+        0.6,
+    );
+    nanite_plate(b);
+    armour(
+        b,
+        &Frame::new(prow.at(0.3, 0.0, 0.6), Vec3::X, Vec3::Z),
+        &[[0.0, -0.45], [0.0, 0.45], [2.0, 0.2], [2.0, -0.2]],
+        0.2,
+    );
+    // The engine deck: a sloped plated block, glazed heat sinks across its top.
+    dark_plate(b);
+    b.with_facets(|b| {
+        b.extrude_y(
+            &[
+                [-12.7, DECK - 0.2],
+                [-9.9, DECK - 0.2],
+                [-9.9, DECK + 0.5],
+                [-10.8, DECK + 1.1],
+                [-12.7, DECK + 1.1],
+            ],
+            -3.4,
+            3.4,
+        )
+    });
+    nanite_plate(b);
+    let fins = if b.fine() { 4 } else { 2 };
+    for i in 0..fins {
+        let x = -12.3 + i as f32 * 1.6 / (fins - 1).max(1) as f32;
+        b.block(v3(x, -2.9, DECK + 1.0), v3(x + 0.3, 2.9, DECK + 1.5));
+    }
+}
+
+/// The fusion drum lying across the turret's slot behind the breech at `c`, short enough
+/// for the rails to lie either side of it packed: a plated cylinder in a cradle of plates,
+/// bronze end caps, its light only through slits along its top.
 fn fusion_drum(b: &mut MeshBuilder, c: Vec3) {
     let sides = b.sides(14);
     dark_plate(b);
