@@ -194,15 +194,6 @@ pub(super) fn draw(
             name: &wing.name,
         };
         let hint = "Click +1  \u{b7}  Shift +5  \u{b7}  Right-Click -1";
-        data_card(
-            hud,
-            ui,
-            s.blueprints,
-            aircraft,
-            pace,
-            hint,
-            tile,
-            floor - GAP,
-        );
+        data_card(hud, ui, s, aircraft, pace, hint, tile, floor - GAP);
     }
 }
