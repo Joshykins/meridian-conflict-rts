@@ -225,6 +225,8 @@ pub struct News {
     pub owner: u8,
     /// The titan's name ("Behemoth").
     pub name: String,
+    /// Its role ("Siege Titan", "Strike Titan"): what its card calls it.
+    pub role: String,
     /// Its strategic icon: the figure on its card.
     pub icon: mc_data::IconKind,
     pub at: Vec2,
@@ -311,6 +313,7 @@ impl Charge {
             unit: self.unit,
             owner: self.owner,
             name: bp.name.clone(),
+            role: bp.role.clone(),
             icon: bp.visual.icon,
             at,
         });
@@ -340,6 +343,7 @@ impl Titans {
             unit: u.unit_id,
             owner,
             name: bp.name.clone(),
+            role: bp.role.clone(),
             icon: bp.visual.icon,
             at: Vec2::new(u.pos[0], u.pos[1]),
         });

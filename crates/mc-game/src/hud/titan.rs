@@ -1,4 +1,4 @@
-//! A tier-5 titan (the Behemoth) in the HUD. What `titan_marks.rs` follows turns into:
+//! A tier-5 titan (the Behemoth, the Seraph, the Fallen) in the HUD. What `titan_marks.rs` follows turns into:
 //!
 //! - Calls and cards: an enemy titan sighted, its lot spotted, ours standing up, each with
 //!   its own horn (`data/sounds/titan_alerts.ron`) and a card that stays up a while; a
@@ -28,6 +28,7 @@ struct Card {
     kind: NewsKind,
     unit: u32,
     name: String,
+    role: String,
     icon: mc_data::IconKind,
     at: Vec2,
     age: f32,
@@ -69,6 +70,7 @@ pub fn alerts(hud: &mut Hud, ui: &mut Ui, s: &Scene, dt: f32) {
                 kind: n.kind,
                 unit: n.unit,
                 name: n.name.clone(),
+                role: n.role.clone(),
                 icon: n.icon,
                 at: n.at,
                 age: 0.0,
@@ -111,16 +113,24 @@ pub fn alerts(hud: &mut Hud, ui: &mut Ui, s: &Scene, dt: f32) {
         let Some(first) = group.first() else { continue };
         let n = group.len();
         let name = &first.name;
+        // Each titan is called by its own role ("Tier 5 strike titan"); a group of
+        // different kinds is just titans.
+        let role = first.role.to_lowercase();
+        let roles = if group.iter().all(|c| c.role == first.role) {
+            format!("{role}s")
+        } else {
+            "titans".to_owned()
+        };
         let (title, sub, tone, loud) = match (kind, n) {
             (NewsKind::Sighted, 1) => (
                 format!("Enemy {name} sighted"),
-                "Tier 5 siege titan  \u{b7}  its great bore levels a base".to_owned(),
+                format!("Tier 5 {role}"),
                 palette::BAD,
                 true,
             ),
             (NewsKind::Sighted, _) => (
                 format!("{n} enemy titans sighted"),
-                "Tier 5 siege titans on the field".to_owned(),
+                format!("Tier 5 {roles} on the field"),
                 palette::BAD,
                 true,
             ),
@@ -138,13 +148,13 @@ pub fn alerts(hud: &mut Hud, ui: &mut Ui, s: &Scene, dt: f32) {
             ),
             (_, 1) => (
                 format!("{name} online"),
-                "Tier 5 siege titan ready for orders".to_owned(),
+                format!("Tier 5 {role} ready for orders"),
                 TITAN,
                 false,
             ),
             _ => (
                 format!("{n} titans online"),
-                "Tier 5 siege titans ready for orders".to_owned(),
+                format!("Tier 5 {roles} ready for orders"),
                 TITAN,
                 false,
             ),
