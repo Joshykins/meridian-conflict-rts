@@ -563,6 +563,12 @@ pub(crate) struct RawMotion {
     /// instead of pathing round them. Land only.
     #[serde(default)]
     pub stride: bool,
+    /// A hover titan riding high on its lift (the Seraph): it floats straight over every
+    /// unit and structure in its way, rising over what is under it, and over steep ground
+    /// and the sea, instead of pathing round them. Another titan still stands in its way.
+    /// Hover only.
+    #[serde(default)]
+    pub floats: bool,
     /// A hover aircraft that hangs still near what it fights (the Reaper), its guns laid
     /// on it, instead of circling it as a gunship does. Air hover only.
     #[serde(default)]
@@ -1728,6 +1734,11 @@ impl Unit {
                         "{key}: only a land walker strides"
                     )));
                 }
+                if m.floats && m.layer != MoveLayer::Hover {
+                    return Err(DataError::Invalid(format!(
+                        "{key}: only a hover unit floats over what it meets"
+                    )));
+                }
                 if m.hangs && !(m.layer == MoveLayer::Air && m.hover) {
                     return Err(DataError::Invalid(format!(
                         "{key}: only a hover aircraft hangs over its mark"
@@ -1766,6 +1777,7 @@ impl Unit {
                         0x8000
                     },
                     stride: m.stride,
+                    floats: m.floats,
                     hangs: m.hangs,
                     above_weather: m.above_weather,
                     stand_off: m.stand_off,

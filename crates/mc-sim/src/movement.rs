@@ -293,6 +293,16 @@ impl World {
                         }
                     }
                 }
+                // A floater rises over a roof and settles past it on its lift, not in a step.
+                Some(mo) if mo.floats => {
+                    let remaining = want_z - self.state.units.z[row];
+                    let limit = mo.speed / 2 / DT;
+                    if remaining.abs() <= Fx::ratio(1, 4) {
+                        remaining
+                    } else {
+                        (remaining / 3).clamp(-limit, limit)
+                    }
+                }
                 _ => want_z - self.state.units.z[row],
             };
             let want_bank = match self.bp(row).motion {
@@ -630,9 +640,10 @@ impl World {
                 });
         }
 
-        // A strider stands wherever it can put its feet: structures are under it, not round it.
+        // A strider stands wherever it can put its feet, and a floater anywhere at all:
+        // structures are under them, not round them.
         let standing_on_blocked =
-            !motion.stride && !self.nav.passable(motion.layer, motion.size_class, pos);
+            !motion.passes_over() && !self.nav.passable(motion.layer, motion.size_class, pos);
         let stranded = standing_on_blocked.then(|| self.stranded(row, pos, radius, motion));
         let moving = units.flags[row] & flag::HAS_FIELD != 0 && units.flags[row] & flag::HOLD == 0;
         let goal = formation.map(|f| f.goal).unwrap_or(units.move_goal[row]);
@@ -656,7 +667,7 @@ impl World {
             dir = stranded.dir;
         } else if moving {
             if motion.layer == MoveLayer::Air
-                || motion.stride
+                || motion.passes_over()
                 || ((formation.is_some() || dist <= DIRECT_RADIUS)
                     && self
                         .nav
@@ -909,8 +920,8 @@ impl World {
                 )
             };
             let ok = |p: FxVec2| {
-                if motion.stride {
-                    return self.stride_footing(p);
+                if motion.passes_over() {
+                    return self.passing_footing(&motion, p);
                 }
                 if self.nav.passable(motion.layer, motion.size_class, p) {
                     return true;

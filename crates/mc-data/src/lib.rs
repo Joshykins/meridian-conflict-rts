@@ -197,6 +197,8 @@ pub struct Motion {
     pub aim_arc: u16,
     /// Strides straight over structures, slopes and shallow water (`RawMotion::stride`).
     pub stride: bool,
+    /// Floats straight over units, structures, slopes and the sea (`RawMotion::floats`).
+    pub floats: bool,
     /// Hangs still near what it fights instead of circling it (`RawMotion::hangs`).
     pub hangs: bool,
     /// Cruises above the weather: reached only along the line of sight
@@ -204,6 +206,15 @@ pub struct Motion {
     pub above_weather: bool,
     /// Fights from a circle near its reach instead of making runs (`RawMotion::stand_off`).
     pub stand_off: bool,
+}
+
+impl Motion {
+    /// Goes straight over what stands in its way, a striding walker or a floating titan:
+    /// the nav grid is nothing to it.
+    #[inline]
+    pub fn passes_over(&self) -> bool {
+        self.stride || self.floats
+    }
 }
 
 /// A giant walker's crushing footfall (`RawStomp`).
@@ -1608,7 +1619,10 @@ impl Blueprints {
                     h.write_u64(m.broadside.0 as u64);
                     h.write_u64(m.aim_arc as u64);
                     h.write_u64(
-                        m.stride as u64 | (m.hangs as u64) << 1 | (m.stand_off as u64) << 2,
+                        m.stride as u64
+                            | (m.hangs as u64) << 1
+                            | (m.stand_off as u64) << 2
+                            | (m.floats as u64) << 3,
                     );
                     h.write_u64(m.above_weather as u64);
                 }

@@ -10,6 +10,7 @@
 
 use crate::spatial::{kind, SpatialIndex, NO_OWNER};
 use crate::tables::flag;
+use crate::titan::Over;
 use crate::World;
 use mc_core::{Fx, FxVec2};
 use mc_data::MoveLayer;
@@ -168,16 +169,16 @@ impl World {
     /// touching, with room for the pushes. They are found on an index of the
     /// proposed spots, built for the purpose.
     fn contact_pairs(&self, rows: &[usize], at: &[FxVec2]) -> Vec<(usize, usize)> {
-        // What the pairing asks of each hull, looked up once: radius, naval, strider.
-        // Flight spacing belongs to formations, not ground hull contacts.
-        let hulls: Vec<Option<(Fx, bool, bool)>> = rows
+        // What the pairing asks of each hull, looked up once: radius, naval, and whether
+        // it goes over others. Flight spacing belongs to formations, not ground hull contacts.
+        let hulls: Vec<Option<(Fx, bool, Over)>> = rows
             .iter()
             .map(|&row| {
                 let motion = self.bp(row).motion.unwrap();
                 (motion.layer != MoveLayer::Air).then_some((
                     self.bp(row).radius,
                     motion.layer == MoveLayer::Naval,
-                    motion.stride,
+                    Over::of(self.bp(row)),
                 ))
             })
             .collect();
@@ -193,20 +194,19 @@ impl World {
                 .parallel_map_chunks(rows.len(), CHUNK, |_, range| {
                     let mut pairs = Vec::new();
                     for i in range {
-                        let Some((radius, naval, stride)) = hulls[i] else {
+                        let Some((radius, naval, over)) = hulls[i] else {
                             continue;
                         };
                         let first = pairs.len();
                         let reach = radius + Fx::ONE + CONTACT_PUSH_ROOM;
                         spots.query(at[i], reach, kind::UNIT, |e| {
                             let j = e.row as usize;
-                            let Some((_, other_naval, other_stride)) = hulls[j] else {
+                            let Some((_, other_naval, other_over)) = hulls[j] else {
                                 return true;
                             };
                             // A dived submarine slips under a floating hull, and it over it.
                             if j > i
-                                && !stride
-                                && !other_stride
+                                && !over.passes(other_over)
                                 && !(naval && other_naval && self.hulls_pass(rows[i], rows[j]))
                             {
                                 pairs.push((i, j));

@@ -39,10 +39,11 @@ impl World {
         };
         let air = layer == MoveLayer::Air;
         // Striders go where they can put their feet, the sea included, and step over
-        // whatever stands there: the nav grid and the crowd are nothing to them.
+        // whatever stands there, and floaters go anywhere: the nav grid and the crowd are
+        // nothing to them.
         let striders = rows
             .iter()
-            .all(|&r| self.bp(r).motion.is_some_and(|m| m.stride));
+            .all(|&r| self.bp(r).motion.is_some_and(|m| m.passes_over()));
         // Everything that could stand in the layout's way anywhere the search
         // below looks, gathered once and binned by 16 m cell: the slots of a
         // big block over a few hundred spots are then checked against these.
@@ -82,7 +83,11 @@ impl World {
             offsets.iter().all(|offset| {
                 let pos = candidate + *offset;
                 if striders {
-                    return self.stride_footing(pos);
+                    return rows.iter().all(|&r| {
+                        self.bp(r)
+                            .motion
+                            .is_some_and(|m| self.passing_footing(&m, pos))
+                    });
                 }
                 if !self.terrain.in_bounds(pos) || !self.nav.passable(layer, size, pos) {
                     return false;

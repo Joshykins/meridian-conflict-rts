@@ -317,7 +317,9 @@
         vision: 2000,
         shield: (kind: Hull, health: 260000, regen: 1200),
         economy: (energy_upkeep: 2000),
-        motion: (layer: Hover, size: 5, speed: 70, accel: 60, turn: 120),
+        // It floats straight over the units and structures in its way, rising over their
+        // roofs, and over cliffs and the sea; only another titan stands in its way.
+        motion: (layer: Hover, size: 5, speed: 70, accel: 60, turn: 120, floats: true),
         // Once it sees an enemy on the ground or the water between 400 m and 1800 m, with
         // nothing at its feet, it charges for 1.5 s, is gone for 1.5 s (the air where it
         // lands crackling faintly for the last 0.6 s of it) and comes down in the middle of

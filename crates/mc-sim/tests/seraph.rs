@@ -700,3 +700,105 @@ fn a_dash_by_hand_waits_for_the_recharge() {
     assert!(second - first >= cooldown, "went before its recharge");
     assert!(to.distance(FxVec2::from_ints(1000, 2000)) <= Fx::from_int(8));
 }
+
+const FACTORY: &str = "regency_t1_land_factory";
+
+fn move_to(w: &mut World, seraph: UnitId, x: i32, y: i32) {
+    w.tick(&[command(
+        0,
+        Command::Move {
+            units: vec![seraph],
+            target: FxVec2::from_ints(x, y),
+            queue: false,
+        },
+    )])
+    .unwrap();
+}
+
+/// Ticks until the Seraph is within 50 m of `(x, y)`, up to `limit`: the most it strayed
+/// off the line `y` on the way, and the highest it rode over the ground.
+fn float_to(w: &mut World, seraph: UnitId, x: i32, y: i32, limit: u32) -> (Fx, Fx) {
+    let (mut strayed, mut highest) = (Fx::ZERO, Fx::ZERO);
+    let goal = FxVec2::from_ints(x, y);
+    for _ in 0..limit {
+        w.tick(&[]).unwrap();
+        let r = row(w, seraph);
+        let pos = w.state.units.pos[r];
+        strayed = strayed.max((pos.y - Fx::from_int(y)).abs());
+        highest = highest.max(w.state.units.z[r] - Fx::from_int(GROUND));
+        if pos.distance(goal) <= Fx::from_int(50) {
+            return (strayed, highest);
+        }
+    }
+    let r = row(w, seraph);
+    panic!(
+        "it never got there: at {:?} z {}",
+        w.state.units.pos[r], w.state.units.z[r]
+    );
+}
+
+/// A factory in its way: it floats straight over it, rising over the roof, and comes
+/// back down to the ground beyond.
+#[test]
+fn floats_over_a_structure_in_its_way() {
+    let mut w = world(None);
+    let seraph = add(&mut w, SERAPH, 0, 500, 2000, true);
+    add(&mut w, FACTORY, 0, 1000, 2000, true);
+    move_to(&mut w, seraph, 1500, 2000);
+    let (strayed, highest) = float_to(&mut w, seraph, 1500, 2000, 300);
+    assert!(
+        strayed <= Fx::from_int(2),
+        "went round it: {strayed} m off the line"
+    );
+    let roof = w.blueprints.unit_by_key(FACTORY).unwrap().height;
+    assert!(
+        highest >= roof - Fx::from_int(5),
+        "rode {highest} m up over a roof {roof} m high"
+    );
+    for _ in 0..30 {
+        w.tick(&[]).unwrap();
+    }
+    let z = w.state.units.z[row(&w, seraph)];
+    assert_eq!(z, Fx::from_int(GROUND), "it settles back down past it");
+}
+
+/// A crowd of tanks in its way: it floats over them, shoving none aside.
+#[test]
+fn floats_over_a_crowd_without_shoving_it() {
+    let mut w = world(None);
+    let seraph = add(&mut w, SERAPH, 0, 500, 2000, true);
+    let crowd: Vec<(UnitId, FxVec2)> = (0..5)
+        .flat_map(|i| [(900 + i * 40, 1980), (900 + i * 40, 2020)])
+        .map(|(x, y)| (add(&mut w, BOT, 0, x, y, true), FxVec2::from_ints(x, y)))
+        .collect();
+    move_to(&mut w, seraph, 1500, 2000);
+    let (strayed, _) = float_to(&mut w, seraph, 1500, 2000, 300);
+    assert!(
+        strayed <= Fx::from_int(2),
+        "went round them: {strayed} m off the line"
+    );
+    for (bot, at) in crowd {
+        let moved = w.state.units.pos[row(&w, bot)].distance(at);
+        assert!(moved <= Fx::ONE, "shoved a tank {moved} m aside");
+    }
+}
+
+/// Another titan is not floated over: the two shove each other as hulls do.
+#[test]
+fn another_titan_stands_in_its_way() {
+    let mut w = world(None);
+    let seraph = add(&mut w, SERAPH, 0, 500, 2000, true);
+    let colossus = add(&mut w, "regency_t4_colossus", 0, 1000, 2000, true);
+    move_to(&mut w, seraph, 1500, 2000);
+    let touch = w.bp(row(&w, seraph)).radius + w.bp(row(&w, colossus)).radius;
+    let mut closest = Fx::from_int(10_000);
+    for _ in 0..300 {
+        w.tick(&[]).unwrap();
+        let (a, b) = (row(&w, seraph), row(&w, colossus));
+        closest = closest.min(w.state.units.pos[a].distance(w.state.units.pos[b]));
+    }
+    assert!(
+        closest >= touch / 2,
+        "floated through a titan: {closest} m apart, hulls touch at {touch} m"
+    );
+}

@@ -9,7 +9,7 @@
 //! A casing is worth nothing: it never becomes a wreck.
 
 use mc_core::{Angle, Fx, FxVec2, FxVec3, StateHasher};
-use mc_data::{cat, BlueprintId, MoveLayer, Storm};
+use mc_data::{cat, BlueprintId, Motion, MoveLayer, Storm, UnitBlueprint};
 use serde::{Deserialize, Serialize};
 
 use crate::spatial::kind;
@@ -269,6 +269,40 @@ pub(crate) fn hash_giants(s: &State, h: &mut StateHasher) {
     }
 }
 
+/// How far a floating titan's hull origin may sink under the top of what it floats over:
+/// the Seraph's toes hang some 8 m over its origin, so they clear a roof by about 4 m.
+const FLOAT_CLEARANCE: Fx = Fx::from_int(4);
+/// Widest footprint `float_z` looks for round its reach, metres: a big factory's.
+const TALLEST_RADIUS: Fx = Fx::from_int(64);
+
+/// What decides whether two hulls go over each other rather than shove.
+#[derive(Clone, Copy)]
+pub(crate) struct Over {
+    strides: bool,
+    floats: bool,
+    titan: bool,
+}
+
+impl Over {
+    pub(crate) fn of(bp: &UnitBlueprint) -> Over {
+        let motion = bp.motion;
+        Over {
+            strides: motion.is_some_and(|m| m.stride),
+            floats: motion.is_some_and(|m| m.floats),
+            titan: bp.categories & cat::EXPERIMENTAL != 0,
+        }
+    }
+
+    /// A striding walker steps over anything (what it steps on is another matter,
+    /// `run_stomps`); a floating titan floats over anything but another titan.
+    pub(crate) fn passes(self, other: Over) -> bool {
+        self.strides
+            || other.strides
+            || (self.floats && !other.titan)
+            || (other.floats && !self.titan)
+    }
+}
+
 /// How deep a strider wades: it walks the bottom where the water over it is shallower
 /// than this, and stops at the edge of anything deeper. A strider stands hundreds of
 /// metres tall, and the deepest sea on the maps is about 80 m: it wades every sea there
@@ -283,11 +317,49 @@ impl World {
             && self.terrain.height_at(pos) >= self.terrain.water_level() - STRIDE_WADE
     }
 
-    /// Whether one of `a` and `b` is a striding walker: it steps over the other, and the
-    /// two never shove each other. What it steps on is another matter (`run_stomps`).
+    /// Where a unit that goes straight over things (`Motion::passes_over`) can be: a
+    /// strider where it can put its feet, a floater anywhere on the map.
+    pub(crate) fn passing_footing(&self, motion: &Motion, pos: FxVec2) -> bool {
+        if motion.stride {
+            self.stride_footing(pos)
+        } else {
+            self.terrain.in_bounds(pos)
+        }
+    }
+
+    /// How high a floating titan rides at `pos`: over the ground or the sea (`surface`),
+    /// and over the top of whatever it floats over, under it or a second's float away on
+    /// any side, so it is already up when it comes over a roof. Another titan is not
+    /// floated over (`Over::passes`), so it does not lift it.
+    pub(crate) fn float_z(&self, row: usize, pos: FxVec2, surface: Fx, motion: &Motion) -> Fx {
+        let reach = self.bp(row).radius / 2 + motion.speed;
+        let units = &self.state.units;
+        let mut top = surface;
+        self.index
+            .query(pos, reach + TALLEST_RADIUS, kind::UNIT, |e| {
+                let other = e.row as usize;
+                if other == row
+                    || !self.unit_entry_is_current(e)
+                    || e.pos.distance(pos) > reach + e.radius
+                    || units.has_flag(other, flag::IN_FACTORY)
+                {
+                    return true;
+                }
+                let bp = self.bp(other);
+                if bp.categories & cat::EXPERIMENTAL == 0
+                    && bp.motion.is_none_or(|m| m.layer != MoveLayer::Air)
+                {
+                    top = top.max(units.z[other] + bp.height - FLOAT_CLEARANCE);
+                }
+                true
+            });
+        top
+    }
+
+    /// Whether one of `a` and `b` goes over the other, so the two never shove each other
+    /// (`Over::passes`).
     pub(crate) fn steps_over(&self, a: usize, b: usize) -> bool {
-        let strides = |r: usize| self.bp(r).motion.is_some_and(|m| m.stride);
-        strides(a) || strides(b)
+        Over::of(self.bp(a)).passes(Over::of(self.bp(b)))
     }
 
     /// Footfalls of the striding walkers that moved this tick: `before` is each one's

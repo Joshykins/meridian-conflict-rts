@@ -1317,7 +1317,7 @@ impl World {
             return Ok(());
         }
         self.stop_moving(row);
-        if motion.layer == MoveLayer::Air || motion.stride {
+        if motion.layer == MoveLayer::Air || motion.passes_over() {
             // Air flies a straight line: the nav grid is for hulls that cannot
             // cross water, slopes or structures.
             let units = &mut self.state.units;
@@ -3211,6 +3211,9 @@ impl World {
                         .unwrap_or(surface);
                     surface.max(roofs) + m.altitude
                 }
+            }
+            Some(m) if m.floats && !self.state.units.has_flag(row, flag::IN_FACTORY) => {
+                self.float_z(row, pos, surface, &m)
             }
             _ => surface,
         }
