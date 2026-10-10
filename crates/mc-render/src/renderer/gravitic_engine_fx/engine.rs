@@ -221,20 +221,22 @@ impl Renderer {
         let have = self.gravitic_engine_fx.slabs.count(e.id, false);
         for _ in have..want.min(have + 3) {
             let a = TAU * self.scatter.unit();
-            let r = inner * 1.04 + (reach - inner * 1.04) * self.scatter.unit().sqrt();
-            let scale = 1.5 + 2.4 * self.scatter.unit() * (1.0 - 0.4 * (r - inner) / e.radius);
+            // Crowded up against the foot, where the ground breaks worst.
+            let r = inner * 1.03 + (reach - inner * 1.03) * 0.7 * self.scatter.unit().powi(2);
+            let scale = 2.0 + 2.8 * self.scatter.unit() * (1.0 - 0.4 * (r - inner) / e.radius);
             let piece = Piece {
                 ground: e.base.z,
                 engine: e.id,
                 model: slab_model(self.scatter.unit()),
                 at: e.base.truncate() + Vec2::new(a.cos(), a.sin()) * r,
-                heading: TAU * self.scatter.unit(),
+                heading: a + std::f32::consts::PI + 0.5 * self.scatter.signed(),
                 scale,
                 born: time + self.scatter.unit() * dt,
                 rise: 0.5 + self.scatter.unit(),
-                lift: (0.2 + 1.6 * self.scatter.unit()) * scale,
-                pitch: 0.12 + 0.35 * self.scatter.signed(),
-                roll: 0.3 * self.scatter.signed(),
+                lift: (0.3 + 1.4 * self.scatter.unit()) * scale,
+                // Tipped up on their edge toward the foot, as if the ground were pulled in.
+                pitch: 0.2 + 0.45 * self.scatter.unit(),
+                roll: 0.35 * self.scatter.signed(),
                 motion: Motion::Heave,
                 seed: self.scatter.unit(),
             };
@@ -268,13 +270,14 @@ impl Renderer {
             self.gravitic_engine_fx.slabs.add(piece);
         }
         // Dust shaken up off the breaking ground, more as it gathers.
-        let puffs = (1.0 + 7.0 * p) as usize;
+        // Low, broad and few: dust shaken up and rolling off the ground, not puffs of cotton.
+        let puffs = (0.6 + 2.6 * p + self.scatter.unit()) as usize;
         for _ in 0..puffs {
             let a = TAU * self.scatter.unit();
-            let r = inner + (reach - inner) * self.scatter.unit();
+            let r = inner + (reach - inner) * self.scatter.unit() * 0.8;
             let at = e.base.truncate() + Vec2::new(a.cos(), a.sin()) * r;
             let at = at.extend(self.ground_height(at));
-            let kind = if self.scatter.unit() < 0.3 {
+            let kind = if self.scatter.unit() < 0.6 {
                 PUFF_SHOCK_DUST
             } else {
                 PUFF_DUST
@@ -286,10 +289,10 @@ impl Renderer {
             self.push_puff(
                 kind,
                 at,
-                Vec3::new(a.cos(), a.sin(), 0.0) * 2.0 + Vec3::Z * (2.0 + 6.0 * p),
+                Vec3::new(a.cos(), a.sin(), 0.0) * (3.0 + 5.0 * p) + Vec3::Z * (0.8 + 2.0 * p),
                 born,
-                life,
-                (e.radius * 0.04, e.radius * (0.1 + 0.08 * p)),
+                life + 2.0,
+                (e.radius * 0.08, e.radius * (0.22 + 0.12 * p)),
             );
         }
         // Motes of violet light drawn up off the cracks toward the column.

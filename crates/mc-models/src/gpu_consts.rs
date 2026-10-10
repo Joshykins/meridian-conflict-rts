@@ -1343,7 +1343,7 @@ shared! {
         pub const KIND_HEAT: u32 = 0;
         pub const KIND_LENS: u32 = 1;
         /// The most a gravity lens shifts the scene, output pixels.
-        pub const LENS_MAX_PX: f32 = 28.0;
+        pub const LENS_MAX_PX: f32 = 18.0;
     }
 
     /// Lens flares on bright points (renderer/lens_flare.rs, screen.wgsl `lens_flare`).

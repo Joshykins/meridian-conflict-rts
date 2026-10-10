@@ -455,7 +455,10 @@ fn rift_one(r: Rift, xy: vec2<f32>, px: f32, s_in: CraterShade) -> CraterShade {
             let width = (0.5 + 2.6 * (1.0 - share)) * mix(0.6, 1.3, hash21(vec2<f32>(k + 9.0, seed)));
             let ray = (1.0 - smoothstep(width * 0.5, width + px, off)) * (1.0 - smoothstep(run - 25.0, run, dl));
             // The light down in it: a thin bright line at its floor, not the whole gap.
-            let floor_line = (1.0 - smoothstep(0.0, width * 0.3 + px * 0.5, off)) * (1.0 - smoothstep(run - 25.0, run, dl));
+            // Never thinner than a pixel and a bit, its light spread thinner instead.
+            let line_w = max(width * 0.3, px * 1.3);
+            let floor_line = (1.0 - smoothstep(0.0, line_w, off)) * min(width * 0.3 / line_w * 1.8, 1.0)
+                * (1.0 - smoothstep(run - 25.0, run, dl));
             let cell = 16.0;
             let warp = vec2<f32>(grad_noise2(d + o, 21.0), grad_noise2(d - o, 21.0)) - 0.5;
             let cells = crater_cells(d / cell + o * 0.1 + warp * 0.9);
@@ -518,7 +521,7 @@ fn rift_one(r: Rift, xy: vec2<f32>, px: f32, s_in: CraterShade) -> CraterShade {
                 * smoothstep(lo, lo + 12.0, dl) * (1.0 - smoothstep(hi - 20.0, hi, dl)) * shattered;
             let rim = exp(-pow((dl - edge) / max(reach * 0.03, 3.0), 2.0)) * shattered;
             // Plates tipped every way, more toward the heart.
-            let tilt = (0.1 + 0.32 * cells.y) * heave * disc * (1.0 - 0.5 * dl / reach);
+            let tilt = (0.04 + 0.14 * cells.y) * heave * disc * (1.0 - 0.5 * dl / reach);
             s.slope += vec2<f32>(cos(cells.y * 53.0), sin(cells.y * 53.0)) * tilt;
             // Only some cracks are lit at a time: light crawls through the network in
             // patches; they all burn white for a moment as the shatter passes.

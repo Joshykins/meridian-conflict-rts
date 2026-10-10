@@ -394,7 +394,7 @@ impl Renderer {
             }
             if let Some(v) = e.view.filter(|v| v.stage == WellStage::Holding) {
                 let mark = Vec3::from(v.mark);
-                let strength = if v.powered { 0.3 } else { 0.08 };
+                let strength = if v.powered { 0.2 } else { 0.06 };
                 lenses.push((
                     mark.distance(eye),
                     GpuHeatPlume {
