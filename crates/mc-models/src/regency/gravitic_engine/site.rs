@@ -90,34 +90,11 @@ fn angle_gap(a: f32, c: f32) -> f32 {
 }
 
 /// The well: an open floor of `r` under the energy, its rim wall `rim` high with the
-/// owner's colour round its top, stepping down inside to the floor in `steps`.
-pub(super) fn well(b: &mut MeshBuilder, r: f32, rim: f32, steps: usize) {
+/// owner's colour round its top.
+pub(super) fn well(b: &mut MeshBuilder, r: f32, rim: f32) {
     let segs = if b.fine() { 32 } else { 16 };
     dark_plate(b);
-    b.with_facets(|b| {
-        hoop(b, Vec3::Z * (rim * 0.5), r + 4.0, 8.0, rim, segs);
-        if b.coarse() {
-            return;
-        }
-        // Steps down inside the rim, each lower and further in.
-        let tread = r * 0.5 / steps as f32;
-        for i in 0..steps {
-            let h = rim * (1.0 - (i + 1) as f32 / (steps + 1) as f32);
-            if i % 2 == 0 {
-                seam(b);
-            } else {
-                dark_plate(b);
-            }
-            hoop(
-                b,
-                Vec3::Z * (h * 0.5),
-                r - tread * (i as f32 + 0.5),
-                tread + 0.4,
-                h,
-                segs,
-            );
-        }
-    });
+    b.with_facets(|b| hoop(b, Vec3::Z * (rim * 0.5), r + 4.0, 8.0, rim, segs));
     b.paint(TEAM);
     hoop(b, Vec3::Z * (rim + 0.1), r + 4.0, 5.0, 0.2, segs);
     if b.coarse() {
@@ -139,16 +116,9 @@ pub(super) fn well(b: &mut MeshBuilder, r: f32, rim: f32, steps: usize) {
 /// `count` prongs standing round the well at `r`, their tips leaning in to hold the
 /// energy at `core` from below: plated, a graphite knuckle at each bend, glazed down their
 /// inner faces.
-pub(super) fn prongs(
-    b: &mut MeshBuilder,
-    count: usize,
-    r: f32,
-    reach: f32,
-    core: Vec3,
-    phase: f32,
-) {
+pub(super) fn prongs(b: &mut MeshBuilder, count: usize, r: f32, reach: f32, core: Vec3) {
     for k in 0..count {
-        let a = TAU * k as f32 / count as f32 + phase;
+        let a = TAU * k as f32 / count as f32;
         let d = v3(a.cos(), a.sin(), 0.0);
         let side = v3(-a.sin(), a.cos(), 0.0);
         let foot = d * r;

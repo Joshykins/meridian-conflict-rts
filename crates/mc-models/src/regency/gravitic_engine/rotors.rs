@@ -13,6 +13,8 @@ use std::f32::consts::TAU;
 use glam::Vec3;
 
 use crate::builder::MeshBuilder;
+use crate::material::PLATING_DARK;
+use crate::pattern;
 
 use super::super::kit::{dark_plate, metal, nanite_plate, seam, v3};
 use super::super::machine::{armour, hoop, swept, Frame};
@@ -27,6 +29,9 @@ pub(super) struct Rotor {
     pub(super) inner: f32,
     pub(super) vanes: usize,
     pub(super) rate: f32,
+    /// Its drum's faces are rimmed in violet (`pattern::NANITE_RIM`), so it reads turning
+    /// through the gaps; it is drawn in fewer, broader panels.
+    pub(super) lit: bool,
 }
 
 /// A stack of `count` rotors rising out of a well of radius `r` to `top`, each a step
@@ -44,6 +49,7 @@ pub(super) fn stack(count: usize, r: f32, top: f32, rate: f32) -> Vec<Rotor> {
                 inner: r * s - (r * 0.26).max(5.0),
                 vanes: 8 + 4 * (count - k),
                 rate: rate * (1.0 + 0.45 * k as f32) * if k % 2 == 0 { 1.0 } else { -1.0 },
+                lit: k % 2 == 1,
             }
         })
         .collect()
@@ -58,10 +64,18 @@ pub(super) fn build(b: &mut MeshBuilder, rotors: &[Rotor]) {
 }
 
 fn ring(b: &mut MeshBuilder, r: &Rotor, k: usize) {
-    let segs = if b.fine() { 36 } else { 18 };
+    let segs = match (r.lit, b.fine()) {
+        (true, _) => 12,
+        (false, true) => 36,
+        (false, false) => 18,
+    };
     let (mid, w, h) = ((r.outer + r.inner) * 0.5, r.outer - r.inner, r.z1 - r.z0);
     b.with_facets(|b| {
-        dark_plate(b);
+        if r.lit {
+            b.paint(PLATING_DARK).pattern(pattern::NANITE_RIM);
+        } else {
+            dark_plate(b);
+        }
         hoop(b, Vec3::Z * (r.z0 + h * 0.5), mid, w, h, segs);
         if b.coarse() {
             return;
@@ -96,7 +110,7 @@ fn ring(b: &mut MeshBuilder, r: &Rotor, k: usize) {
         let a = TAU * (i as f32 + 0.5 * (k % 2) as f32) / vanes as f32;
         let d = v3(a.cos(), a.sin(), 0.0);
         let along = v3(-a.sin(), a.cos(), 0.0) * way;
-        if i % 3 == 0 && b.fine() {
+        if i % 2 == 0 {
             nanite_plate(b);
         } else {
             dark_plate(b);

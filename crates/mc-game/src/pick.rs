@@ -118,7 +118,7 @@ fn to_segment(p: Vec2, a: Vec2, b: Vec2) -> (f32, f32) {
 fn icon_px(kind: IconKind) -> f32 {
     if matches!(
         kind,
-        IconKind::Titan | IconKind::WingedTitan | IconKind::Elevator
+        IconKind::Titan | IconKind::WingedTitan | IconKind::Elevator | IconKind::GraviticEngine
     ) {
         icon::TITAN_PX
     } else {

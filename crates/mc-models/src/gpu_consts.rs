@@ -177,6 +177,8 @@ shared! {
         pub const SIEGE_WALKER: u32 = 39;
         /// The assault walker's shape number (`IconKind::AssaultWalker`; `icon_shape`'s case).
         pub const ASSAULT_WALKER: u32 = 40;
+        /// The gravitic engine's shape number (`IconKind::GraviticEngine`; `icon_shape`'s case).
+        pub const GRAVITIC_ENGINE: u32 = 41;
         /// `ModelInfo::icon` bit: the model is a mobile unit.
         pub const MOBILE: u32 = 0x10000;
         /// `ModelInfo::icon` bit: the unit flies.

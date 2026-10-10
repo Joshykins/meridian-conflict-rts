@@ -140,6 +140,9 @@ pub enum IconKind {
     /// A reverse-kneed assault walker in profile: a hunched hull with a launcher hump,
     /// a low pointed head and the gun arm out in front.
     AssaultWalker = 40,
+    /// A tier-5 gravitic engine from the front: a crown of shards leaning in to a point
+    /// over a well, on a broken ground line. Framed like the [`IconKind::Titan`].
+    GraviticEngine = 41,
 }
 
 /// One unit's entry in a faction's `lore.ron`: its own text, and its weapons' by weapon name.

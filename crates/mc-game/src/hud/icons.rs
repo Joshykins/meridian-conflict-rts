@@ -467,6 +467,7 @@ pub fn strategic(ui: &mut Ui, kind: IconKind, tech: u8, c: Vec2, r: f32, color: 
         IconKind::Titan => titan(ui, c, r, color),
         IconKind::Elevator => elevator(ui, c, r, color),
         IconKind::WingedTitan => winged_titan(ui, c, r, color),
+        IconKind::GraviticEngine => gravitic_engine(ui, c, r, color),
         IconKind::SiegeWalker => siege_walker(ui, c, r, color),
         IconKind::AssaultWalker => assault_walker(ui, c, r, color),
         IconKind::Salvage | IconKind::SalvageCarrier | IconKind::SalvageDrone => {
@@ -625,6 +626,7 @@ pub fn elevator(ui: &mut Ui, c: Vec2, r: f32, color: Color) {
 pub fn figure(ui: &mut Ui, kind: IconKind, c: Vec2, r: f32, color: Color) {
     match kind {
         IconKind::WingedTitan => winged_titan(ui, c, r, color),
+        IconKind::GraviticEngine => gravitic_engine(ui, c, r, color),
         _ => titan(ui, c, r, color),
     }
 }
@@ -719,6 +721,21 @@ pub fn winged_titan(ui: &mut Ui, c: Vec2, r: f32, color: Color) {
     }
     pen.limb((-0.08, -0.14), (-0.15, -0.88), 0.08, 0.025);
     pen.limb((0.08, -0.14), (0.16, -0.66), 0.08, 0.025);
+    tier5_frame(ui, c, r, color);
+}
+
+/// A tier-5 gravitic engine from the front, as `icons.wgsl` draws it
+/// (`sd_gravitic_engine`): a crown of shards leaning in to a point over its well, on a
+/// broken ground line. Framed as a tier 5 where there is room.
+pub fn gravitic_engine(ui: &mut Ui, c: Vec2, r: f32, color: Color) {
+    let mut pen = Pen::new(ui, c, r, color);
+    pen.limb((0.0, -0.36), (0.0, 0.98), 0.1, 0.02);
+    for s in [-1.0, 1.0] {
+        pen.rect((s * 0.5, -0.66), (0.36, 0.07));
+        pen.limb((s * 0.34, -0.58), (s * 0.1, 0.8), 0.1, 0.02);
+        pen.limb((s * 0.68, -0.58), (s * 0.24, 0.5), 0.09, 0.02);
+    }
+    pen.limb((0.0, -0.5), (0.0, -0.5), 0.1, 0.1);
     tier5_frame(ui, c, r, color);
 }
 

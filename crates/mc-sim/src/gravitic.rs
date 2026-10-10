@@ -10,15 +10,14 @@
 //!   straight to the point at `Gravitic::step` a tick, splitting the ground: the trees on
 //!   its line are torn up and the ground is scarred. It harms nothing on its way.
 //! - **The strike** (`RiftStruck`): the ground round the point shatters out to
-//!   `Gravitic::radius`: everything of the enemy's in it takes `Gravitic::impact`, the
-//!   whole at the heart, falling to the `edge` share at the rim.
-//! - **The well** holds from then on, for as long as the engine stands and its side pays
-//!   for it: each tick the enemy's units in it take their share of `Gravitic::damage` a
-//!   second, keep only `Gravitic::slow` of their speed (`well_slow`), and an aircraft of
+//!   `Gravitic::radius`, and the well holds from then on. It strikes no blow of its own.
+//! - **The well** holds for as long as the engine stands and its side pays for it: each
+//!   tick the enemy's units in it take `Gravitic::damage` a second, the same anywhere in
+//!   it, keep only `Gravitic::slow` of their speed (`well_slow`), and an aircraft of
 //!   tech `Gravitic::downs` or under is torn out of the sky (`AircraftDowned`): it falls
 //!   as a dead aircraft does, thrown hard at the ground. Spacecraft are out of its reach.
-//! - **Shields** counter it: a live dome reaching into the well takes the crush, its share
-//!   by where its rim lies, as a unit does, and what stands under it is spared (neither
+//! - **Shields** counter it: a live dome reaching into the well takes the crush as a unit
+//!   does, and what stands under it is spared (neither
 //!   crushed nor torn down) while it holds. A hull field takes its unit's share.
 //!
 //! Friends are never touched. The engine dies, and its well collapses (`WellReleased`).
@@ -100,14 +99,6 @@ pub(crate) fn hash_wells(wells: &[GravityWell], h: &mut StateHasher) {
     for w in wells {
         w.hash(h);
     }
-}
-
-/// The share of the heart's crush at `d` metres from the well's middle: all of it over the
-/// inner third, falling evenly to `edge` at `radius`.
-fn share(d: Fx, radius: Fx, edge: Fx) -> Fx {
-    let inner = radius / 3;
-    let past = ((d - inner) / (radius - inner).max(Fx::ONE)).clamp(Fx::ZERO, Fx::ONE);
-    Fx::ONE - (Fx::ONE - edge) * past
 }
 
 impl World {
@@ -298,12 +289,15 @@ impl World {
                             pos: w.mark.extend(w.z),
                             radius: g.radius,
                         });
-                        self.crush(&w, &g, g.impact, true);
+                        if w.powered {
+                            self.crush(&w, &g);
+                        }
+                        w.phase = WellPhase::Holding { age: 1 };
                     }
                 }
                 WellPhase::Holding { age } => {
                     if w.powered {
-                        self.crush(&w, &g, g.damage / DT, false);
+                        self.crush(&w, &g);
                     }
                     w.phase = WellPhase::Holding {
                         age: age.saturating_add(1),
@@ -342,13 +336,13 @@ impl World {
         self.add_stain(front, width * 2, 90);
     }
 
-    /// One tick's crush over the well (`per` at its heart), or the strike's (`struck`):
-    /// shields first, then everything of the enemy's they do not cover.
-    fn crush(&mut self, w: &GravityWell, g: &Gravitic, per: Fx, struck: bool) {
-        let (mark, radius, edge) = (w.mark, g.radius, g.edge);
+    /// One tick's crush over the well, the same everywhere in it: shields first, then
+    /// everything of the enemy's they do not cover.
+    fn crush(&mut self, w: &GravityWell, g: &Gravitic) {
+        let (mark, radius, per) = (w.mark, g.radius, g.damage / DT);
         let floor = self.dome_floor();
-        // Domes reaching into the well take their share, by where the rim lies; what
-        // stands under one is spared while it holds.
+        // Domes reaching into the well take the crush; what stands under one is spared
+        // while it holds.
         let mut domes = Vec::new();
         for &row in &self.scratch.shielded {
             if !self.state.units.slots.is_alive(row)
@@ -362,15 +356,15 @@ impl World {
             let d = self.state.units.pos[row].distance(mark) - r;
             if d <= radius {
                 let center = self.state.units.pos[row].extend(self.state.units.z[row]);
-                domes.push((row, center, r, d.max(Fx::ZERO)));
+                domes.push((row, center, r));
             }
         }
-        for &(row, _, _, d) in &domes {
-            self.damage_shield(row, per * share(d, radius, edge));
+        for &(row, ..) in &domes {
+            self.damage_shield(row, per);
         }
         // A dome the crush just broke covers nothing.
         domes.retain(|&(row, ..)| self.shield_blocking(row));
-        let covered = |p: FxVec3| domes.iter().any(|&(_, c, r, _)| in_dome(p, c, r, floor));
+        let covered = |p: FxVec3| domes.iter().any(|&(_, c, r)| in_dome(p, c, r, floor));
 
         let mut struck_units = Vec::new();
         self.index
@@ -383,12 +377,12 @@ impl World {
                 {
                     let d = self.state.units.pos[r].distance(mark) - self.bp(r).radius;
                     if d <= radius {
-                        struck_units.push((r, d.max(Fx::ZERO)));
+                        struck_units.push(r);
                     }
                 }
                 true
             });
-        for (r, d) in struck_units {
+        for r in struck_units {
             let bp = self.bp(r);
             let body = self.state.units.pos[r].extend(self.state.units.z[r] + bp.height / 2);
             if covered(body) {
@@ -404,25 +398,22 @@ impl World {
                 self.down_aircraft(r, w.source, w.owner);
                 continue;
             }
-            let damage = per * share(d, radius, edge);
             if hull {
-                self.damage_shield(r, damage);
+                self.damage_shield(r, per);
             } else {
-                self.damage_unit(r, damage, w.owner, w.source);
+                self.damage_unit(r, per, w.owner, w.source);
             }
         }
 
         let point = mark.extend(w.z + Fx::from_int(8));
-        self.wear_wrecks(point, radius, |d| per * share(d, radius, edge));
-        self.blast_structures(point, radius, crate::city::Blow::BLAST, |d| {
-            per * share(d, radius, edge)
-        });
+        self.wear_wrecks(point, radius, |_| per);
+        self.blast_structures(point, radius, crate::city::Blow::BLAST, |_| per);
         let age = match w.phase {
             WellPhase::Holding { age } => age,
             _ => 0,
         };
         // The ground goes on breaking under it: the trees, and the scar.
-        if struck || age % 5 == 0 {
+        if age % 5 == 0 {
             let mut trees = Vec::new();
             self.prop_index.query(mark, radius, kind::PROP, |e| {
                 let prop = e.row as usize;
@@ -442,7 +433,7 @@ impl World {
                 });
             }
         }
-        if struck || age % 20 == 0 {
+        if age % 20 == 0 {
             self.add_stain(mark, radius, 140);
         }
     }
@@ -462,22 +453,5 @@ impl World {
             by: source,
         });
         self.damage_unit(row, health, owner, source);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn the_crush_is_whole_over_the_inner_third_and_falls_to_the_edge() {
-        let r = Fx::from_int(300);
-        let edge = Fx::ratio(1, 3);
-        assert_eq!(share(Fx::ZERO, r, edge), Fx::ONE);
-        assert_eq!(share(Fx::from_int(100), r, edge), Fx::ONE);
-        assert_eq!(share(r, r, edge), edge);
-        assert_eq!(share(Fx::from_int(400), r, edge), edge);
-        let mid = share(Fx::from_int(200), r, edge);
-        assert!(mid > edge && mid < Fx::ONE);
     }
 }
