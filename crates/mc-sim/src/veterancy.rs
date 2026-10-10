@@ -1,7 +1,9 @@
 //! Combat rank: a unit keeps a kill count, and five ranks of veterancy.
 //!
 //! Rank is earned from the share of damage a unit dealt to something that
-//! then died. Each rank raises max health and, slightly, how fast it heals.
+//! then died, weighed by what the victim cost against what the unit cost:
+//! killing its own price in mass is one kill-equivalent. Each rank raises max
+//! health and, slightly, how fast it heals.
 
 use crate::tables::*;
 use crate::World;
@@ -24,7 +26,8 @@ pub fn veterancy_regen(base_regen: Fx, base_health: Fx, level: u8) -> Fx {
     base_regen * (10 + level) / 10 + base_health * level / 4000
 }
 
-/// Kill-equivalents needed to leave `level` for the next. Grows by one each rank.
+/// Kill-equivalents (the unit's own mass cost, killed) needed to leave `level`
+/// for the next. Grows by one each rank.
 pub fn veterancy_need(level: u8) -> Fx {
     Fx::from_int(level.min(VETERANCY_MAX.saturating_sub(1)) as i32 + 1)
 }
@@ -72,7 +75,7 @@ impl World {
     }
 
     /// The victim is dead: the killer takes the kill, and everyone who hurt it
-    /// is paid their share of one kill-equivalent.
+    /// is paid their share of the victim's mass, over their own mass.
     pub(crate) fn settle_kill(&mut self, victim: usize, killer: UnitId, killer_player: u8) {
         if (killer_player as usize) < self.state.players.len() {
             self.state.players[killer_player as usize].units_killed += 1;
@@ -101,7 +104,8 @@ impl World {
         }
         let credits = std::mem::take(&mut self.state.units.damage[victim]);
         let total = credits.iter().fold(Fx::ZERO, |a, &(_, d)| a + d);
-        if total <= Fx::ZERO {
+        let worth = self.kill_worth(victim);
+        if total <= Fx::ZERO || worth <= Fx::ZERO {
             return;
         }
         let mut awards: Vec<(usize, Fx)> = credits
@@ -114,13 +118,32 @@ impl World {
                 {
                     return None;
                 }
-                Some((row, dmg / total))
+                // A free unit counts as costing one mass, so its share stays finite.
+                let own = self.bp(row).cost_mass.max(Fx::ONE);
+                Some((row, worth * (dmg / total) / own))
             })
             .collect();
         awards.sort_by_key(|&(row, _)| row);
         for (row, share) in awards {
             self.grant_veterancy(row, share);
         }
+    }
+
+    /// Mass the victim is worth to its killers: its cost, or for a site what
+    /// has been built of it, so a site killed fresh pays next to nothing.
+    fn kill_worth(&self, victim: usize) -> Fx {
+        let bp = self.bp(victim);
+        if !self
+            .state
+            .units
+            .has_flag(victim, flag::UNDER_CONSTRUCTION | flag::IN_FACTORY)
+            || bp.build_time <= Fx::ZERO
+        {
+            return bp.cost_mass;
+        }
+        let built =
+            (self.state.units.build_progress[victim] / bp.build_time).clamp(Fx::ZERO, Fx::ONE);
+        bp.cost_mass * built
     }
 
     fn grant_veterancy(&mut self, row: usize, share: Fx) {
@@ -248,6 +271,67 @@ mod tests {
         );
         assert_eq!(pa + pb, Fx::ONE);
         assert_eq!(w.state.players[0].units_killed, 1);
+    }
+
+    #[test]
+    fn kills_are_weighed_by_mass() {
+        let mut w = test_world();
+        let light = w.blueprints.id_of("aster_t1_tank").unwrap();
+        let heavy = w.blueprints.id_of("aster_t2_tank").unwrap();
+        let small = w
+            .spawn_unit(light, 0, FxVec2::from_ints(500, 512), Angle::ZERO, true)
+            .unwrap();
+        let big = w
+            .spawn_unit(heavy, 0, FxVec2::from_ints(540, 512), Angle::ZERO, true)
+            .unwrap();
+        let (light_mass, heavy_mass) = (w.bp(small).cost_mass, w.bp(big).cost_mass);
+        assert!(heavy_mass > light_mass * 2);
+
+        // The cheap tank kills the dear one and is paid its price over its own.
+        let victim = w
+            .spawn_unit(heavy, 1, FxVec2::from_ints(700, 512), Angle::ZERO, true)
+            .unwrap();
+        let hp = w.state.units.health[victim];
+        w.damage_unit(victim, hp, 0, w.state.units.id(small));
+        let mut earned = heavy_mass / light_mass;
+        let mut level = 0;
+        while earned >= veterancy_need(level) {
+            earned -= veterancy_need(level);
+            level += 1;
+        }
+        assert!(level >= 1);
+        assert_eq!(w.state.units.veterancy[small], level);
+        assert_eq!(w.state.units.veterancy_progress[small], earned);
+
+        // The dear tank kills a cheap one and gets only a fraction of a rank.
+        let victim = w
+            .spawn_unit(light, 1, FxVec2::from_ints(760, 512), Angle::ZERO, true)
+            .unwrap();
+        let hp = w.state.units.health[victim];
+        w.damage_unit(victim, hp, 0, w.state.units.id(big));
+        assert_eq!(w.state.units.veterancy[big], 0);
+        assert_eq!(
+            w.state.units.veterancy_progress[big],
+            light_mass / heavy_mass
+        );
+    }
+
+    #[test]
+    fn a_fresh_site_pays_next_to_nothing() {
+        let mut w = test_world();
+        let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
+        let shooter = w
+            .spawn_unit(tank, 0, FxVec2::from_ints(500, 512), Angle::ZERO, true)
+            .unwrap();
+        let site = w
+            .spawn_unit(tank, 1, FxVec2::from_ints(700, 512), Angle::ZERO, true)
+            .unwrap();
+        w.state.units.flags[site] |= flag::UNDER_CONSTRUCTION;
+        w.state.units.build_progress[site] = w.bp(site).build_time / 10;
+        let hp = w.state.units.health[site];
+        w.damage_unit(site, hp, 0, w.state.units.id(shooter));
+        assert_eq!(w.state.units.veterancy[shooter], 0);
+        assert_eq!(w.state.units.veterancy_progress[shooter], Fx::ONE / 10);
     }
 
     #[test]
