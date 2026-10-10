@@ -5,8 +5,8 @@
 //!
 //! - **Cloud**: not drawn here at all. Each is a cell of the sky's own weather (`Sky::seed`,
 //!   clouds_sim.wgsl kind `disturber::SEED`): while it grows and strikes, the cover round it
-//!   gathers to full and its storm builds, in a circle that swells with it, so the sky's
-//!   ray-marched clouds draw it in their own material and light, as any storm. A small knot
+//!   gathers in a circle that swells with it, so the sky's ray-marched clouds draw it in
+//!   their own material and light: a flat sheet in the layer, in line with the run. A small knot
 //!   at first, it builds slowly to some 200 m across.
 //! - **Lightning inside**: strokes that flicker in it more often as it grows and all the
 //!   time while it strikes, and twice or so a stroke the sky lights (`Sky::strike`) with its
@@ -37,9 +37,11 @@ const LEAST_REACH: f32 = 95.0;
 const REACH_PER_RADIUS: f32 = 0.65;
 /// Seconds a spent cloud is kept after the sim lets it go, for the lightning in it to die.
 const DYING: f32 = 3.0;
-/// How stormy a grown cloud is in the weather (1 the darkest, tallest storm): a modest
-/// storm, as a full one stood a trail of them up into one towering bank.
-const STORM: f32 = 0.35;
+/// The cover a grown cloud gathers the weather toward at its middle: thin enough that the
+/// sky draws it shallow, a flat sheet in the layer at about the height the aircraft flies
+/// (the layer is 150 to 530 m over the ground, the Nimbus at 380). No storm: the weather's
+/// storm stands cloud up into towers, and a trail of them rose into one towering bank.
+const COVER: f32 = 0.65;
 /// Strokes the sky lights inside one cloud (each with its thunder) before its bolts: a
 /// deliberate cap, so a wing of them does not take all the sky's flashes or drown the
 /// battle in thunder.
@@ -91,8 +93,8 @@ impl StormCloud {
         self.gone.is_none().then(|| SeedCell {
             at: self.middle.truncate(),
             radius: self.reach * size_at(self.grown) * 0.8,
-            cover: 0.9,
-            storm: STORM * self.grown,
+            cover: COVER,
+            storm: 0.0,
         })
     }
 }
