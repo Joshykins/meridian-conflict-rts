@@ -190,6 +190,8 @@ fn setup(w: &mut World) {
         }
         // Room for what the Reclaimers bring in.
         add("aster_mass_storage", 1, 500, 150);
+        // An Atoll at sea that builds a wing aboard and launches it (`air_wings.rs`).
+        add("aster_t3_carrier", 1, 2900, 650);
         // A Roost under the aircraft (`staging.rs`).
         add("aster_t1_airbase", 1, 850, 380);
         match player {
@@ -496,6 +498,38 @@ fn script(w: &mut World, tick: u32) -> Vec<PlayerCommand> {
                 },
             }]
         }
+        // Each side's Atoll builds a torpedo wing, holding its own fire so its missiles
+        // leave the rest of the match be.
+        6 => (0u8..2)
+            .flat_map(|player| {
+                let atoll = w.blueprints.id_of("aster_t3_carrier").unwrap();
+                let u = &w.state.units;
+                let units = u
+                    .slots
+                    .iter()
+                    .filter(|&r| u.owner[r] == player && u.blueprint[r] == atoll)
+                    .map(|r| u.id(r))
+                    .collect();
+                let units: Vec<UnitId> = units;
+                [
+                    PlayerCommand {
+                        player,
+                        command: Command::SetFireState {
+                            units: units.clone(),
+                            state: mc_sim::FireState::HoldFire,
+                        },
+                    },
+                    PlayerCommand {
+                        player,
+                        command: Command::QueueWing {
+                            units,
+                            wing: 2,
+                            count: 1,
+                        },
+                    },
+                ]
+            })
+            .collect(),
         // The south's gunships go down on their Roost (`staging.rs`), and are fired back
         // out of its tunnels.
         5 => {
@@ -560,6 +594,7 @@ fn reference() -> Vec<u64> {
     let mut dashes = 0;
     let mut bolts = 0;
     let mut staged = false;
+    let mut wing_out = false;
     let mut lens_strikes = 0;
     let hashes = (1..TICKS)
         .map(|t| {
@@ -590,6 +625,7 @@ fn reference() -> Vec<u64> {
                 .slots
                 .iter()
                 .any(|r| u.hangar[r] != mc_sim::tables::Handle::NONE && u.blueprint[r] != courier);
+            wing_out |= w.state.wings.bays.values().any(|b| !b.launching.is_empty());
             if t == SNAPSHOT_AT {
                 held_at_snapshot = held;
                 let u = &w.state.units;
@@ -643,6 +679,8 @@ fn reference() -> Vec<u64> {
     assert!(well_at_snapshot, "no gravity well held at the snapshot");
     // The storm bomber's clouds struck down.
     assert!(bolts > 0, "no storm cloud let a bolt fall");
+    // A carrier's wing came aboard and went off its deck.
+    assert!(wing_out, "no air wing was built");
     // The gunships went down on their Roost.
     assert!(staged, "no aircraft went down on a staging base");
     // The Seraph dashed into the south's army.
