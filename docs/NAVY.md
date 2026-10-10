@@ -132,7 +132,7 @@ sea after a battle pays for the battle.
 | Moray | 2 | Hunter-killer submarine | Six guided torpedo tubes, sonar, stern interceptor tubes; a deck gun that only works surfaced. |
 | Nautilus | 2 | Shield boat | A bubble over the fleet. Unarmed. |
 | Leviathan | 3 | Battleship | Three triple turrets of heavy guns, secondary guns, weak AA. The hero. |
-| Atoll | 3 | Air-defence carrier | Twelve hatched long-range SAM cells (2,800 m), fleet radar (4,000 m), interceptor tubes. No gun. |
+| Atoll | 3 | Air-defence carrier | A broad hull with an enclosed flight tunnel: aircraft land through a mouth in the stern and launch out of the bow. Twelve hatched long-range SAM cells (2,800 m), fleet radar (4,000 m), interceptor tubes. No gun. |
 | Kraken | 3 | Strategic submarine | Eight tubes; four sea-skimming cruise missiles per salvo, launched dived. |
 | Breakwater | 1 | Torpedo launcher | A moored float firing attack torpedoes at hulls within 600 m (past a Barracuda); refitted to tier 2 (two launchers, 800 m). |
 | Fathom | 3 | Seabed torpedo launcher | Built on the seabed in deep water; heavy torpedoes at hulls and interceptors at torpedoes from four batteries (1,000 m); only sonar finds it, only torpedoes reach it. |
@@ -251,8 +251,6 @@ Software previews of every hull: `MODEL_DUMP_DIR=DIR cargo test -p mc-models --l
 
 ## Not done
 
-- The Atoll's flight deck is for show: it does not dock, mend, launch or build aircraft yet.
-  How that should work is undecided, as it needs aircraft mechanics the game lacks.
 - The AI builds the new hulls as naval units but knows nothing about their roles.
 - Size-5 hulls (Leviathan, Atoll) have not been checked out of a Wharf or through the
   shipped maps' channels.

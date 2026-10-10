@@ -1294,6 +1294,38 @@ shared! {
         pub const PATTERN: u32 = 36;
     }
 
+    /// A carrier's flight lane (`pattern::FLIGHT_LANE`, surface.wgsl): the apron's chevrons
+    /// turned to point the way aircraft roll, forward (+x), down a lit lane whose edge
+    /// lamps run forward, toward the bow, from the stern threshold to the launch.
+    pub mod flight_lane as "FLIGHT_LANE_" {
+        /// `pattern::FLIGHT_LANE`.
+        pub const PATTERN: u32 = 45;
+    }
+
+    /// The Atoll's deck (`pattern::LOUVRE`, `TRIM`, `TRENCH`, `CIRCUIT`, surface.wgsl): the
+    /// fine repeated detail of a capital deck, drawn by the surface instead of in mesh.
+    pub mod carrier_deck as "CDECK_" {
+        /// `pattern::LOUVRE`: parallel slats across the face's long axis inside a plain
+        /// rim, each raked so it laps the next and casts a line of shadow.
+        pub const LOUVRE: u32 = 46;
+        /// `pattern::TRIM`: a warm bronze band, worn at its edges, cut in lengths.
+        pub const TRIM: u32 = 47;
+        /// `pattern::TRENCH`: a dark wall of ribs at the ends of bays of uneven length, some
+        /// sunk, some with a lit slot.
+        pub const TRENCH: u32 = 48;
+        /// `pattern::CIRCUIT`: a service panel, its field cut with inset runs that turn
+        /// corners and end in square pads.
+        pub const CIRCUIT: u32 = 49;
+        /// `pattern::HULL_PLATE`: the carrier's armour, laid like a warship's in strakes of
+        /// uneven depth cut into plates of uneven length, each its own shade, some with a
+        /// hatch, a grille or a second seam; no ports, lamps or stencils. Nothing repeats.
+        pub const HULL: u32 = 50;
+        /// Metres from one louvre slat to the next.
+        pub const LOUVRE_PITCH: f32 = 0.7;
+        /// Metres from one trench rib to the next.
+        pub const RIB_PITCH: f32 = 2.4;
+    }
+
     /// Kind bits of a ground stain's `strength_seed` (ground.wgsl `fs_stain`,
     /// grass_gen.wgsl `cs_gather_stains`); neither set is a plain scorch.
     pub mod stain as "STAIN_" {

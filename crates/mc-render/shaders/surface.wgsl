@@ -793,7 +793,9 @@ fn ws_lamp(i: SurfaceIn, plate: WarshipPlate) -> vec2<f32> {
     return vec2<f32>(distance(plate.p, at), k);
 }
 
-fn surf_relief_warship(i: SurfaceIn, st: vec2<f32>, gap: f32, bevel: f32) -> f32 {
+// `crewed`: a ship's lit ports and stencils; without them, plain patched armour (the
+// carrier's hull, `CDECK_HULL`).
+fn surf_relief_warship(i: SurfaceIn, st: vec2<f32>, gap: f32, bevel: f32, crewed: bool) -> f32 {
     let plate = ws_plate(i, st);
     // Strake seams are welded deep; the butts between plates in a strake shallower.
     let dy = plate.half.y - abs(plate.p.y);
@@ -818,13 +820,15 @@ fn surf_relief_warship(i: SurfaceIn, st: vec2<f32>, gap: f32, bevel: f32) -> f32
             h -= 0.6 * (1.0 - f) * smoothstep(0.0, bevel, e);
         }
     }
-    let ports = ws_ports(i, plate);
-    h -= 0.4 * ports.w * smoothstep(-gap, gap, ports.y);
+    if crewed {
+        let ports = ws_ports(i, plate);
+        h -= 0.4 * ports.w * smoothstep(-gap, gap, ports.y);
+    }
     return h;
 }
 
 // The armour's paint, tone, ports and lamps (`surface_at`'s case).
-fn surf_warship(i: SurfaceIn, st: vec2<f32>, out_in: Surface, scuff: f32, lamp: f32) -> Surface {
+fn surf_warship(i: SurfaceIn, st: vec2<f32>, out_in: Surface, scuff: f32, lamp: f32, crewed: bool) -> Surface {
     var out = out_in;
     let fw = max(i.px, 1e-4);
     let gap = i.scale * 0.012;
@@ -853,7 +857,7 @@ fn surf_warship(i: SurfaceIn, st: vec2<f32>, out_in: Surface, scuff: f32, lamp: 
         let pitch = 2.0 * bank.half.y / surf_fit(2.0 * bank.half.y, i.scale * 0.09);
         let f = fract((bank.p.y + bank.half.y) / pitch);
         out.cavity *= 1.0 - 0.75 * surf_step(e, 0.0, fw) * surf_step(f, 0.5, fw / pitch);
-    } else if style == 4u {
+    } else if style == 4u && crewed {
         // A stencil: a dark label with lines of print.
         let q = plate.p - vec2<f32>(-plate.half.x * 0.4, plate.half.y * 0.35);
         let label = vec2<f32>(min(plate.half.x * 0.28, i.scale * 0.6), min(plate.half.y * 0.16, i.scale * 0.12));
@@ -867,6 +871,10 @@ fn surf_warship(i: SurfaceIn, st: vec2<f32>, out_in: Surface, scuff: f32, lamp: 
     // Plates are chipped at their seams, worse as the ship is hurt.
     let chipped = 1.0 - smoothstep(0.0, bevel * (0.7 + 2.0 * hurt), min(dx, dy));
     out.bare = max(out.bare, chipped * smoothstep(0.8 - 0.5 * hurt, 0.97 - 0.45 * hurt, scuff + chipped * 0.3));
+    if !crewed {
+        // The carrier's armour is clean: no grime runs down it.
+        return out;
+    }
     // Grime run down the walls from every strake seam, streaked.
     let wall = 1.0 - smoothstep(0.35, 0.55, i.up);
     let below = saturate(1.0 - (plate.half.y - plate.p.y) / (plate.half.y * 2.0 + 1e-3));
@@ -1045,6 +1053,77 @@ fn surf_seam_depth(i: SurfaceIn) -> f32 {
     return select(i.seams, min(i.seams, 1.0), i.structure);
 }
 
+// ---- carrier deck (`CDECK_*`) ------------------------------------------------
+
+// The trim's bronze: a warm, half-dull brass, darker than the safety orange.
+const CDECK_BRONZE: vec3<f32> = vec3<f32>(0.36, 0.27, 0.15);
+// A bay's slot light: the ARC emitters' cold near-white blue.
+const CDECK_SLOT: vec3<f32> = vec3<f32>(0.55, 0.78, 1.0);
+
+// Louvres at `st` (`CDECK_LOUVRE`): x the relief, y how much of a gap between slats is
+// there. Slats repeat along the face's long axis inside a plain rim, each one raked so
+// it laps the next.
+fn surf_cdeck_louvre(i: SurfaceIn, st: vec2<f32>) -> vec2<f32> {
+    let rim = clamp(min(i.half.x, i.half.y) * 0.12, 0.05, 0.4);
+    let e = surf_edge(st, i.half - vec2<f32>(rim));
+    var along = st.x;
+    var span = i.half.x - rim;
+    if i.half.y > i.half.x && !i.wraps {
+        along = st.y;
+        span = i.half.y - rim;
+    }
+    // Each face's slats their own pitch.
+    let want = CDECK_LOUVRE_PITCH * (0.7 + 0.6 * i.seed);
+    let pitch = 2.0 * max(span, 0.05) / surf_fit(2.0 * max(span, 0.05), want);
+    let f = fract((along + span) / pitch);
+    let gap = select(0.0, 1.0, f > 0.72);
+    let slat = select(1.0 - 0.4 * f / 0.72, 0.15, f > 0.72);
+    let inside = smoothstep(0.0, 0.03, e);
+    return vec2<f32>(mix(1.0, slat, inside), gap * inside);
+}
+
+// A trench wall at `st` (`CDECK_TRENCH`): x the relief, y the slot light. Ribs stand
+// along s at the ends of bays of uneven length, one to a few `CDECK_RIB_PITCH` long; some
+// bays are sunk into the wall and some stand flush, and only some carry a lit slot, at a
+// height of their own.
+fn surf_cdeck_trench(i: SurfaceIn, st: vec2<f32>, fw: f32) -> vec2<f32> {
+    let n = surf_fit(2.0 * i.half.x, CDECK_RIB_PITCH);
+    let pitch = 2.0 * i.half.x / n;
+    let x = st.x + i.half.x;
+    let run = ws_run(x, n, pitch, floor(i.seed * 251.0) + 0.5, 0.55);
+    // Metres from the nearest rib's middle.
+    let d = min(x - run.x, run.y - x);
+    let rib = 1.0 - smoothstep(0.22, 0.3, d);
+    let sunk = step(0.3, run.z);
+    let bay = smoothstep(0.0, 0.06, i.half.y - abs(st.y) - 0.15) * sunk;
+    let h = mix(1.0, mix(0.55, 1.0, rib), bay);
+    let lit = step(0.55, hash11(run.z * 37.0 + 0.2));
+    let at = i.half.y * (0.2 + 0.5 * hash11(run.z * 11.0));
+    let slot = surf_step(d, 0.6, fw) * (1.0 - surf_step(abs(st.y - at), i.half.y * 0.045, fw)) * bay * lit;
+    return vec2<f32>(h - 0.35 * slot, slot);
+}
+
+// A service panel at `st` (`CDECK_CIRCUIT`): x how much of an inset run or the panel's
+// inner rim is there, y a run's square end pad. Each cell of the panel carries one run
+// in from its edge that turns a corner and ends in a pad; some cells are blank.
+fn surf_cdeck_circuit(i: SurfaceIn, st: vec2<f32>, fw: f32) -> vec2<f32> {
+    // Each panel's runs laid on a grid of its own size and offset.
+    let cell = 1.4 + 1.0 * i.seed;
+    let q = st + i.half + vec2<f32>(i.seed * 7.0, i.seed * 3.0);
+    let g = floor(q / cell);
+    let p = q - g * cell;
+    let r = hash21(g + vec2<f32>(i.seed * 17.0, 2.3));
+    let r2 = hash21(g.yx + vec2<f32>(5.1, i.seed * 7.0));
+    let at = vec2<f32>(mix(0.35, cell - 0.35, r2), mix(0.35, cell - 0.35, r));
+    let w = 0.05;
+    let run_x = (1.0 - surf_step(p.x, at.x, fw)) * surf_band(p.y - at.y, w, fw);
+    let run_y = surf_step(p.y, at.y - w, fw) * surf_band(p.x - at.x, w, fw);
+    let pad = 1.0 - surf_step(max(abs(p.x - at.x), abs(p.y - at.y)), 0.14, fw);
+    let rim = surf_band(surf_edge(st, i.half - vec2<f32>(0.25)), 0.04, fw);
+    let on = step(0.25, r * 0.7 + r2 * 0.3);
+    return vec2<f32>(max(max(run_x, run_y) * on, rim), pad * on);
+}
+
 fn surf_relief(i: SurfaceIn, st: vec2<f32>) -> f32 {
     let bevel = surf_seam_size(i).x;
     let gap = surf_seam_size(i).y;
@@ -1059,7 +1138,13 @@ fn surf_relief(i: SurfaceIn, st: vec2<f32>) -> f32 {
         case MELT_PATTERN: { h = 1.0; }
         case 2u: { h = min(h, surf_relief_shutter(i, st)); }
         case 3u: { h *= surf_relief_deck(i, st); }
-        case 4u: {}
+        case 4u, FLIGHT_LANE_PATTERN, CDECK_TRIM: {}
+        case CDECK_LOUVRE: { h = min(h, surf_cdeck_louvre(i, st).x); }
+        case CDECK_TRENCH: { h = min(h, surf_cdeck_trench(i, st, max(i.px, 1e-4)).x); }
+        case CDECK_CIRCUIT: {
+            let c = surf_cdeck_circuit(i, st, max(i.px, 1e-4));
+            h = min(h, 1.0 - 0.45 * c.x + 0.1 * c.y);
+        }
         case 5u: { h = min(h, surf_relief_furnace(i, st, bevel)); }
         case 9u: {
             if small > i.scale * 0.3 {
@@ -1073,9 +1158,9 @@ fn surf_relief(i: SurfaceIn, st: vec2<f32>) -> f32 {
             h = min(h, 0.55 + 0.45 * surf_rise(d, 0.03, 0.12));
         }
         case 11u: {}
-        case WARSHIP_PATTERN: {
+        case WARSHIP_PATTERN, CDECK_HULL: {
             if small > i.scale * 0.3 {
-                h = min(h, surf_relief_warship(i, st, gap, bevel));
+                h = min(h, surf_relief_warship(i, st, gap, bevel, i.pattern == WARSHIP_PATTERN));
             }
         }
         // A hull's facets are one skin: no outline where two meet. Its seams are paint.
@@ -1378,11 +1463,16 @@ fn surface_at(i: SurfaceIn) -> Surface {
                 let core = surf_band(st.x - sweep, i.scale * 0.015, fw);
                 out.emissive = SURF_AMBER * (grid * (0.12 + i.working * (0.5 + 2.6 * scan)) + i.working * core * 5.0) * lamp * 0.5;
             }
-            case 4u: {
+            case 4u, FLIGHT_LANE_PATTERN: {
                 // Apron: chevrons toward the way out, edge lights that run outward while the factory builds.
+                // A flight lane's chevrons point forward, the way aircraft roll, and its lamps
+                // always run that way.
+                let fore = i.pattern == FLIGHT_LANE_PATTERN;
+                let sx = select(1.0, -1.0, fore);
+                let working = select(i.working, max(i.working, 0.4), fore);
                 let lane = 1.0 - surf_step(abs(st.y), i.half.y * 0.5, fw);
                 let period = i.scale * 0.85;
-                let v = fract((st.x - abs(st.y) * 0.9) / period) * period;
+                let v = fract((sx * st.x - abs(st.y) * 0.9) / period) * period;
                 let chevron = surf_band(v - period * 0.5, period * 0.16, fw) * lane
                     * surf_step(surf_edge(st, i.half), i.scale * 0.2, fw);
                 out.paint = vec4<f32>(SURF_SAFETY, chevron * 0.9);
@@ -1395,7 +1485,7 @@ fn surface_at(i: SurfaceIn) -> Surface {
                 let housing = 1.0 - surf_step(lampd, i.scale * 0.085, fw);
                 let run = pow(1.0 - fract(i.time * 1.1 - k / n * 1.0), 5.0);
                 out.paint = mix(out.paint, vec4<f32>(0.02, 0.02, 0.025, 1.0), housing);
-                out.emissive = SURF_AMBER * bulb * lamp * mix(0.5, 0.25 + 7.0 * run, i.working);
+                out.emissive = SURF_AMBER * bulb * lamp * mix(0.5, 0.25 + 7.0 * run, working);
                 out.cavity = 1.0 - 0.3 * surf_band(d_face, gap * 0.8, fw);
             }
             case 5u: {
@@ -1498,9 +1588,33 @@ fn surface_at(i: SurfaceIn) -> Surface {
                 out.rough = -0.35 * wet * (1.0 - weed) + 0.3 * weed;
                 out.cavity = 1.0 - 0.3 * surf_band(d_face, gap * 0.8, fw) * outlined;
             }
-            case WARSHIP_PATTERN: {
+            case CDECK_LOUVRE: {
+                let l = surf_cdeck_louvre(i, st);
+                out.cavity = (1.0 - 0.3 * surf_band(d_face, gap * 0.8, fw) * outlined) * (1.0 - 0.55 * l.y);
+            }
+            case CDECK_TRIM: {
+                // Lengths of bronze, each its own shade, a seam between them.
+                let k = floor((st.x + i.half.x) / 4.0);
+                let shade = 0.86 + 0.28 * hash21(vec2<f32>(k, i.seed * 31.0));
+                out.paint = vec4<f32>(CDECK_BRONZE * shade, 1.0);
+                let seam = surf_band(fract((st.x + i.half.x) / 4.0) * 4.0 - 0.02, 0.02, fw);
+                out.cavity = 1.0 - 0.4 * max(seam, surf_band(d_face, gap * 0.8, fw) * outlined);
+                out.rough = -0.15;
+            }
+            case CDECK_TRENCH: {
+                let t = surf_cdeck_trench(i, st, fw);
+                out.cavity = mix(0.75, 1.0, smoothstep(0.5, 0.95, t.x));
+                out.paint = vec4<f32>(vec3<f32>(0.02, 0.025, 0.03), 0.9 * t.y);
+                out.emissive = CDECK_SLOT * t.y * lamp * 0.45 * i.lit;
+            }
+            case CDECK_CIRCUIT: {
+                let c = surf_cdeck_circuit(i, st, fw);
+                out.cavity = (1.0 - 0.45 * c.x) * (1.0 - 0.3 * surf_band(d_face, gap * 0.8, fw) * outlined);
+                out.paint = vec4<f32>(vec3<f32>(0.32, 0.34, 0.36), 0.6 * c.y);
+            }
+            case WARSHIP_PATTERN, CDECK_HULL: {
                 if small > i.scale * 0.3 {
-                    out = surf_warship(i, st, out, scuff, lamp);
+                    out = surf_warship(i, st, out, scuff, lamp, i.pattern == WARSHIP_PATTERN);
                 } else {
                     out.cavity = 1.0 - 0.3 * surf_band(d_face, gap * 0.8, fw) * outlined;
                 }

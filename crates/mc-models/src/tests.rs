@@ -673,7 +673,7 @@ fn meshes_are_valid() {
                     // The quay's cross-bracing, half in the water (its piles are let down
                     // onto the seabed by the shader, `part::PILE`).
                     -9.0
-                } else if CAPITAL_SHIPS.contains(&model.key.as_str())
+                } else if CAPITAL_SHIPS.contains(&base_key(&model.key))
                     || model.key == "submarine_strategic"
                     || base_key(&model.key) == "submarine_titan"
                 {
@@ -776,6 +776,10 @@ fn solids_face_outward() {
 /// Factories and core mines are the largest models by far (96 and 84 m lots) and
 /// there are few of them.
 const FACTORY_TRIANGLES: usize = 6000;
+/// The Atoll (`carrier`): a 116 m deck built to a dense reference, its flanks' belts,
+/// sponsons and doors, the deck's fittings, the tunnel and the citadel's terraces modelled
+/// at full detail over the capital budget; the fine detail is still the surface's.
+const AIR_CARRIER_TRIANGLES: usize = 9000;
 /// The Leviathan, the navy's hero: more than a factory's budget for its layered detail,
 /// and nine Arc Cannons (the Trebuchet's howitzer tube, about 700 triangles each).
 const BATTLESHIP_TRIANGLES: usize = 15000;
@@ -982,7 +986,9 @@ fn lods_reduce_and_respect_budgets() {
         } else if model.key == "battleship" {
             // 142 m hero hull: layered sides, a stepped pagoda, three triple Arc Cannon houses.
             BATTLESHIP_TRIANGLES
-        } else if CAPITAL_SHIPS.contains(&model.key.as_str()) {
+        } else if model.key == "carrier" {
+            AIR_CARRIER_TRIANGLES
+        } else if CAPITAL_SHIPS.contains(&base_key(&model.key)) {
             FACTORY_TRIANGLES
         } else if WARSHIPS.contains(&base_key(&model.key)) {
             // A design variant (`mesh~name`) has its hull's budget.
@@ -2814,38 +2820,42 @@ fn moray_and_kraken_hulls() {
     }
 }
 
-/// The Atoll: no gun houses, the fleet radar turning on the island's mast, two blocks of
-/// six cells, plasma glow, and the capital-ship budgets.
+/// The Atoll: no gun houses, the fleet radar turning on a mast, two blocks of six cells,
+/// no modelled glow (it is the surface's), and its budgets.
 #[test]
 fn carrier_radar_cells_and_budgets() {
     let bp = BLUEPRINTS.iter().find(|bp| bp.mesh == "carrier").unwrap();
-    let model = built(bp);
-    assert!(model.houses.is_empty(), "carrier: no gun houses");
+    carrier_checks("carrier", bp.radius, bp.height, bp.tech);
+}
+
+fn carrier_checks(key: &str, radius: f32, height: f32, tech: u8) {
+    let model = build_model_scaled(key, radius, height, tech).unwrap();
+    assert!(model.houses.is_empty(), "{key}: no gun houses");
     assert!(
         model.lods[0]
             .vertices
             .iter()
             .any(|v| v.part == part::SPINNER),
-        "carrier: radar turns"
+        "{key}: radar turns"
     );
-    assert!(model.spinner_pivot[2] > 18.0, "carrier: radar on the mast");
+    assert!(model.spinner_pivot[2] > 18.0, "{key}: radar on the mast");
     assert_eq!(
         model.cells.iter().map(|c| (c.nx, c.ny)).collect::<Vec<_>>(),
         [(3, 2), (3, 2)],
-        "carrier: two blocks of six cells"
+        "{key}: two blocks of six cells"
     );
     for (lod, mesh) in model.lods.iter().enumerate() {
         let team_up = crate::wears_team(&model, mesh, true);
-        assert!(team_up, "carrier lod{lod}: no team colour seen from above");
+        assert!(team_up, "{key} lod{lod}: no team colour seen from above");
         assert!(
             mesh.vertices
                 .iter()
                 .any(|v| v.material == material::PLATING),
-            "carrier lod{lod}: no plating"
+            "{key} lod{lod}: no plating"
         );
         assert!(
             mesh.vertices.iter().all(|v| v.part != part::LOCOMOTION),
-            "carrier lod{lod}: running gear"
+            "{key} lod{lod}: running gear"
         );
         let floor = mesh
             .vertices
@@ -2854,31 +2864,34 @@ fn carrier_radar_cells_and_budgets() {
             .fold(f32::MAX, f32::min);
         assert!(
             (-12.0..-0.4).contains(&floor),
-            "carrier lod{lod}: keel at {floor}"
+            "{key} lod{lod}: keel at {floor}"
         );
     }
     assert!(
         model.lods[0]
             .vertices
             .iter()
-            .any(|v| v.material == material::GLOW),
-        "carrier: plasma glow"
+            .all(|v| v.material != material::GLOW),
+        "{key}: glow is the surface's, not modelled"
     );
     let [full, mid, coarse] = [0, 1, 2].map(|lod| triangles(&model.lods[lod]));
-    assert!((250..=6000).contains(&full), "carrier: {full} triangles");
+    assert!(
+        (250..=AIR_CARRIER_TRIANGLES).contains(&full),
+        "{key}: {full} triangles"
+    );
     assert!(
         mid as f32 <= full as f32 * crate::REDUCED_SHARE + 20.0,
-        "carrier: mid {mid} of {full}"
+        "{key}: mid {mid} of {full}"
     );
-    assert!(coarse < 60, "carrier: coarse {coarse}");
+    assert!(coarse < 60, "{key}: coarse {coarse}");
     let top = model.lods[0]
         .vertices
         .iter()
         .map(|v| v.pos[2])
         .fold(f32::MIN, f32::max);
     assert!(
-        (0.8 * 24.0..=1.25 * 24.0).contains(&top),
-        "carrier: top {top}"
+        (0.8 * height..=1.25 * height).contains(&top),
+        "{key}: top {top}"
     );
     let reach = model.lods[0]
         .vertices
@@ -2886,10 +2899,10 @@ fn carrier_radar_cells_and_budgets() {
         .map(|v| v.pos[0].hypot(v.pos[1]))
         .fold(f32::MIN, f32::max);
     assert!(
-        (0.75 * 60.0..=1.3 * 60.0).contains(&reach),
-        "carrier: reach {reach}"
+        (0.75 * radius..=1.3 * radius).contains(&reach),
+        "{key}: reach {reach}"
     );
-    println!("carrier triangles {full}/{mid}/{coarse}, top {top:.1}, reach {reach:.1}");
+    println!("{key} triangles {full}/{mid}/{coarse}, top {top:.1}, reach {reach:.1}");
 }
 
 /// The Marlin and the Manta: every gun house at its data pivot (both drawn 1.2 times

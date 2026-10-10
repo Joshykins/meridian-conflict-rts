@@ -570,24 +570,26 @@
         cost: (mass: 3400, energy: 30600, time: 20400),
         radius: 60, height: 24,
         vision: 900, radar: 4000,
-        // Four interceptor lasers: the island's, and three on deck-edge sponsons.
+        // Four interceptor lasers: the citadel's, the plateau's aft corners, and the port
+        // ramp aft.
         anti_missile: 350,
-        anti_missile_mounts: [(-20.0, -13.3, 16.75), (36.0, 15.4, 9.1), (36.0, -15.4, 9.1), (-54.0, 16.1, 9.1)],
+        anti_missile_mounts: [(45.6, 0.0, 19.5), (36.0, 14.4, 11.7), (36.0, -14.4, 11.7), (-40.0, 13.6, 11.5)],
         economy: (energy_upkeep: 120),
         motion: (layer: Naval, size: 5, speed: 33, accel: 7, turn: 18),
         // The fleet's long arm against air: a Skyguard's reach afloat (a little short of the
-        // fixed site's), no gun of any kind. Twelve hatched cells in two blocks on the
-        // island's plinth, fore block first; a salvo spreads over the aircraft in range.
+        // fixed site's), no gun of any kind. Twelve hatched cells in two blocks flush in the
+        // deck either side of the flight tunnel, port block first; a salvo spreads over the
+        // aircraft in range.
         weapons: [
             (
                 name: "Long Range SAM",
                 damage: 1400, range: 2800, reload: 15, speed: 520, trajectory: Direct,
-                turret_turn: 0, arc: 360, muzzle: (-15.1, -13.4, 6.8),
+                turret_turn: 0, arc: 360, muzzle: (-16.8, 10.1, 5.7),
                 muzzles: [
-                    (-15.1, -13.4, 6.8), (-9.5, -10.6, 6.8), (-12.3, -13.4, 6.8),
-                    (-15.1, -10.6, 6.8), (-9.5, -13.4, 6.8), (-12.3, -10.6, 6.8),
-                    (-40.5, -13.4, 6.8), (-34.9, -10.6, 6.8), (-37.7, -13.4, 6.8),
-                    (-40.5, -10.6, 6.8), (-34.9, -13.4, 6.8), (-37.7, -10.6, 6.8),
+                    (-16.8, 10.1, 5.7), (-11.2, 12.9, 5.7), (-14.0, 10.1, 5.7),
+                    (-16.8, 12.9, 5.7), (-11.2, 10.1, 5.7), (-14.0, 12.9, 5.7),
+                    (-16.8, -12.9, 5.7), (-11.2, -10.1, 5.7), (-14.0, -12.9, 5.7),
+                    (-16.8, -10.1, 5.7), (-11.2, -12.9, 5.7), (-14.0, -10.1, 5.7),
                 ],
                 salvo: 12, salvo_delay: 0.3, split: true, hatch: 0.6, caliber: 0.9,
                 targets: ["Air"], color: Orange, missile: true, guided: true, vertical_launch: true,
@@ -604,11 +606,12 @@
                 sounds: (fire: "torpedo_launch", impact: "torpedo_hit", ground: "torpedo_hit"),
             ),
         ],
-        // Aircraft come in over the stern onto the deck, fill and mend in the hangar,
-        // and leave off the bow catapult.
+        // Aircraft fly in through the landing mouth in the stern and touch down on the
+        // flight tunnel's floor inside the hull, fill and mend there, and leave off the
+        // catapult out of the launch mouth in the bow face (`carrier::FLIGHT_DECK`).
         staging: (
             radius: 2400, pads: 6, refuel: 12, repair: 0.05, launch_gap: 0.6,
-            land: (-40, 0, 8.5), launch: [(45, 0, 8.5, 0)],
+            land: (-50, 0, 1.5), launch: [(58, 0, 1.5, 0)],
         ),
         // Its own air wings, built aboard a wing at a time and launched together: they
         // form up and fly guard round it until sent off.

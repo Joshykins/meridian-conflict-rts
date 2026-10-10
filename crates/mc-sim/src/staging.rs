@@ -43,6 +43,9 @@ const APPROACH: i32 = 500;
 const ON_APPROACH: i32 = 140;
 /// Close enough over the landing point to come down on it.
 const TOUCHDOWN: i32 = 60;
+/// On a deck flown into from astern (a carrier's tunnel): close enough to be inside the
+/// stern mouth, so it is not taken aboard out over the water.
+const TOUCHDOWN_ASTERN: i32 = 20;
 /// The glide down to the deck starts this far out.
 const GLIDE: i32 = 450;
 /// Looked at twice a second, spread over the rows.
@@ -241,7 +244,12 @@ impl World {
             let head = self.state.units.order_head[row];
             self.state.orders.order[head as usize].radius = Fx::ONE;
         }
-        if pos.distance(land) <= Fx::from_int(TOUCHDOWN)
+        let touchdown = if s.directional() {
+            TOUCHDOWN_ASTERN
+        } else {
+            TOUCHDOWN
+        };
+        if pos.distance(land) <= Fx::from_int(touchdown)
             && self.pads_free(base)
             && self.state.units.deploy[base] >= s.door_ticks
         {

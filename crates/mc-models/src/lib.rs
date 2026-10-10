@@ -171,6 +171,20 @@ pub mod pattern {
     /// cut into plates of uneven length, the odd hatch, grille or stencil, rows of lit
     /// orange ports along the walls, running lamps at the seams (`gpu_consts::warship`).
     pub const WARSHIP: u32 = crate::gpu_consts::warship::PATTERN;
+    /// A carrier's flight lane: chevrons pointing forward (+x), the way aircraft roll, and
+    /// edge lamps running toward the bow (`gpu_consts::flight_lane`).
+    pub const FLIGHT_LANE: u32 = crate::gpu_consts::flight_lane::PATTERN;
+    /// Louvres: raked slats across the face's long axis in a plain rim (`gpu_consts::carrier_deck`).
+    pub const LOUVRE: u32 = crate::gpu_consts::carrier_deck::LOUVRE;
+    /// A warm bronze trim band (`gpu_consts::carrier_deck`).
+    pub const TRIM: u32 = crate::gpu_consts::carrier_deck::TRIM;
+    /// A dark wall of ribs and uneven bays along s, some with a lit slot (`gpu_consts::carrier_deck`).
+    pub const TRENCH: u32 = crate::gpu_consts::carrier_deck::TRENCH;
+    /// The carrier's armour: a warship's uneven strakes and plates, each its own shade, with
+    /// no ports, lamps or stencils (`gpu_consts::carrier_deck`).
+    pub const HULL_PLATE: u32 = crate::gpu_consts::carrier_deck::HULL;
+    /// A service panel cut with inset circuit runs (`gpu_consts::carrier_deck`).
+    pub const CIRCUIT: u32 = crate::gpu_consts::carrier_deck::CIRCUIT;
     /// A fabricator's matter (`GLOW_MATERIALS` faces): lit by how hard it works, flashing at
     /// each stroke, sputtering when short of energy, dark at rest (`gpu_consts::fab`).
     pub const FAB_MATTER: u32 = crate::gpu_consts::fab::PATTERN_MATTER;
