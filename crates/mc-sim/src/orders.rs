@@ -514,6 +514,13 @@ impl World {
                 carrier,
                 queue,
             } => self.order_board(player, units, *carrier, *queue),
+            Command::QueueWing { units, wing, count } => {
+                self.queue_wing(player, units, *wing, *count)
+            }
+            Command::CancelWing { units, wing } => {
+                self.cancel_wing(player, units, *wing);
+                Ok(())
+            }
             Command::Stage { units, base, queue } => self.order_stage(player, units, *base, *queue),
             Command::Land {
                 units,

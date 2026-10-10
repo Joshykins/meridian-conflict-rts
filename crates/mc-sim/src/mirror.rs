@@ -20,6 +20,7 @@ use mc_core::{Fx, FxVec3, TICKS_PER_SECOND};
 use mc_data::{BlueprintId, Trajectory, WeaponColor};
 use std::collections::HashMap;
 
+mod air;
 mod batch;
 pub mod city;
 mod clouds;
@@ -27,7 +28,6 @@ mod dash;
 mod destruct;
 mod elevator;
 mod fog;
-mod fuel;
 mod gravitic;
 mod lens;
 mod links;
@@ -38,13 +38,13 @@ mod warp;
 mod work;
 mod wrecks;
 
+pub use air::{FuelView, WingView};
 pub use batch::{BatchView, UNIT_BATCH};
 pub use clouds::CloudView;
 pub use dash::{DashStage, DashView};
 pub use destruct::DestructView;
 pub use elevator::{crate_load, ElevatorPhase, ElevatorView};
 pub use fog::VisionDisc;
-pub use fuel::FuelView;
 pub use gravitic::{WellStage, WellView};
 pub use lens::LensView;
 pub use links::LinkView;
@@ -84,6 +84,8 @@ pub enum Refusal {
     MineReach,
     /// A dash by hand may not come down nearer than its least reach (`Dash::min`).
     DashTooClose,
+    /// A carrier queues at most `air_wings::MAX_WING_QUEUE` wings.
+    WingQueueFull,
 }
 
 impl Refusal {
@@ -105,6 +107,10 @@ impl Refusal {
             ),
             Refusal::MineReach => "A core mine cannot stand inside another mine's reach".to_owned(),
             Refusal::DashTooClose => "Too close to dash: pick ground farther off".to_owned(),
+            Refusal::WingQueueFull => format!(
+                "A carrier queues at most {} wings",
+                crate::air_wings::MAX_WING_QUEUE
+            ),
         }
     }
 }
@@ -1555,6 +1561,8 @@ pub struct RenderFrame {
     pub destructs: Vec<DestructView>,
     /// Aircraft tanks the viewer may see (`crate::staging`).
     pub fuel: Vec<FuelView>,
+    /// The viewer's carriers' air wing queues (`crate::air_wings`).
+    pub wings: Vec<WingView>,
     /// The time left on the viewer's side's sites and upgrades whose work is moving
     /// (`work::WorkLeft`), by the unit as drawn.
     pub work_left: Vec<WorkLeft>,
@@ -2832,6 +2840,7 @@ impl World {
         self.write_clouds(&mut frame.clouds);
         self.write_destructs(viewer, &mut frame.destructs);
         self.write_fuel(viewer, &mut frame.fuel);
+        self.write_wings(viewer, &mut frame.wings);
         self.write_work_left(viewer, &mut frame.work_left);
         self.write_dampers(viewer, &mut frame.dampers);
         self.write_mends(viewer, &mut frame.mends, &mut frame.repair_fields);

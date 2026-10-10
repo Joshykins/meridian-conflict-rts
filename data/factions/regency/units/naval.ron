@@ -440,8 +440,18 @@
         ],
         // Aircraft come down on the stern deck, fill and mend aboard, and leave off the bow.
         staging: (
-            radius: 2400, pads: 6, refuel: 12, repair: 0.05, launch_gap: 1.2,
+            radius: 2400, pads: 6, refuel: 12, repair: 0.05, launch_gap: 0.6,
             land: (-40, 0, 8), launch: [(45, 0, 8, 0)],
+        ),
+        // Its own air wings, built aboard and launched together, to guard round it.
+        air_wings: (
+            power: 300, guard: 1600,
+            wings: [
+                (name: "Fighter Wing", aircraft: "regency_t2_interceptor", count: 8),
+                (name: "Strike Wing", aircraft: "regency_t3_assault_aircraft", count: 3),
+                (name: "Torpedo Wing", aircraft: "regency_t2_torpedo_bomber", count: 4),
+                (name: "Superiority Wing", aircraft: "regency_t3_air_superiority", count: 3),
+            ],
         ),
         mesh: "regency_carrier", icon: Ship,
         sounds: (death: "blast_large", moving: "ship_engine"),

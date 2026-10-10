@@ -218,6 +218,16 @@ impl World {
             self.flows[row].wanted[0] += want[0];
             self.flows[row].wanted[1] += want[1];
         }
+        // Air wings building aboard carriers (`air_wings.rs`): paid like a launcher's round.
+        let wings = self.wing_jobs();
+        for &(row, _, want, tier) in &wings {
+            let p = self.state.units.owner[row] as usize;
+            demand[p].0 += want[0];
+            demand[p].1 += want[1];
+            tiers[p][tier].add(want, false);
+            self.flows[row].wanted[0] += want[0];
+            self.flows[row].wanted[1] += want[1];
+        }
         // Drones going up on their carriers (`air_support.rs`): paid in the tier the
         // carrier's own priority or else the side's materials priority puts them in, and
         // shown on the carrier.
@@ -374,6 +384,17 @@ impl World {
             self.flows[row].used[0] += want[0] * e;
             self.flows[row].used[1] += want[1] * e;
             self.advance_launchers(row, rate * e);
+        }
+        for &(row, rate, want, tier) in &wings {
+            let p = self.state.units.owner[row] as usize;
+            let e = paid[p][tier];
+            power[p][tier].0 += rate;
+            power[p][tier].1 += rate * e;
+            spent[p].0 += want[0] * e;
+            spent[p].1 += want[1] * e;
+            self.flows[row].used[0] += want[0] * e;
+            self.flows[row].used[1] += want[1] * e;
+            self.advance_wing(row, rate * e);
         }
         for job in &drones {
             let p = self.state.units.owner[job.drone] as usize;

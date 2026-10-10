@@ -267,3 +267,21 @@ fn a_carrier_takes_aircraft_in_over_the_stern_and_launches_them_off_the_bow() {
         "off the bow: {off:?}"
     );
 }
+
+#[test]
+fn an_aircraft_set_down_on_the_ground_fills_slowly() {
+    let mut w = land();
+    let fighter = spawn(&mut w, "aster_t1_interceptor", 1000, 1000);
+    let full = range_of(&w, fighter);
+    w.state.units.fuel[fighter] = Fx::ZERO;
+    // An idle fighter comes down where it stopped.
+    for _ in 0..600 {
+        w.tick(&[]).unwrap();
+    }
+    let ground = w.state.units.z[fighter];
+    assert!(
+        w.state.units.fuel[fighter] > Fx::ZERO,
+        "filling on the ground at z {ground:?}"
+    );
+    assert!(w.state.units.fuel[fighter] < full / 2, "but slowly");
+}

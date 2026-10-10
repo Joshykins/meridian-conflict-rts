@@ -2,6 +2,9 @@
 //! and flies slower and turns wider once it is dry. It fills again, and mends, aboard a
 //! staging base (`UnitBlueprint::staging`): an airfield, a carrier.
 //!
+//! Set down on bare ground (an idle aircraft lands where it can), it fills slowly by
+//! itself, a full tank in three minutes.
+//!
 //! A free aircraft (no order, or guarding or patrolling) goes down on its own:
 //! - within a base's radius once it is under `NEEDY_FUEL` of a tank or `NEEDY_HEALTH` of
 //!   its health;
@@ -29,6 +32,9 @@ const NEEDY_HEALTH: (i32, i32) = (7, 10);
 const RESERVE: i32 = 2000;
 /// A loitering aircraft burns at least this share of what it burns at full speed.
 const IDLE_BURN: (i32, i32) = (2, 5);
+/// Ticks an empty tank takes to fill on bare ground: three minutes, against seconds on
+/// a staging base.
+const GROUND_REFUEL_TICKS: i32 = 180 * TICKS_PER_SECOND as i32;
 /// Dry: the share of its speed, acceleration and turn an aircraft keeps.
 const DRY: (i32, i32) = (1, 2);
 /// How far astern of a directional deck the approach starts.
@@ -90,7 +96,7 @@ impl World {
             if !self.state.units.is_active(row) {
                 continue;
             }
-            self.burn(row);
+            self.burn(row, tank.range);
             if (self.state.tick as usize + row).is_multiple_of(LOOK_EVERY) {
                 self.send_down(row, &bases, tank.range)?;
             }
@@ -126,16 +132,19 @@ impl World {
         }
     }
 
-    /// Burns this tick's fuel, while it is up.
-    fn burn(&mut self, row: usize) {
+    /// Burns this tick's fuel while it is up; set down on the ground, it fills slowly
+    /// (`GROUND_REFUEL_TICKS` from empty).
+    fn burn(&mut self, row: usize, range: Fx) {
         let Some(motion) = self.bp(row).motion else {
             return;
         };
         let units = &self.state.units;
-        if units.has_flag(row, flag::IN_FACTORY)
-            || units.fuel[row] <= Fx::ZERO
-            || units.z[row] <= self.ground_z(row, units.pos[row]) + Fx::from_int(2)
-        {
+        if units.has_flag(row, flag::IN_FACTORY) {
+            return;
+        }
+        if units.z[row] <= self.ground_z(row, units.pos[row]) + Fx::from_int(2) {
+            let fuel = &mut self.state.units.fuel[row];
+            *fuel = (*fuel + range / GROUND_REFUEL_TICKS).min(range);
             return;
         }
         let pace = units.speed[row].max(motion.speed * IDLE_BURN.0 / IDLE_BURN.1);
@@ -236,7 +245,7 @@ impl World {
             && self.pads_free(base)
             && self.state.units.deploy[base] >= s.door_ticks
         {
-            self.go_aboard(row, base, s.land);
+            self.stow_aboard(row, base);
             return Ok(());
         }
         self.ensure_moving(row, land, land)
@@ -292,7 +301,10 @@ impl World {
     }
 
     /// Stows the aircraft in `row` aboard `base`, keeping its queue for when it leaves.
-    fn go_aboard(&mut self, row: usize, base: usize, land: FxVec3) {
+    pub(crate) fn stow_aboard(&mut self, row: usize, base: usize) {
+        let Some(land) = self.bp(base).staging.map(|s| s.land) else {
+            return;
+        };
         self.stop_moving(row);
         let at = self.ship_point(base, land.xy());
         let z = self.state.units.z[base] + land.z;

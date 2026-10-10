@@ -129,6 +129,7 @@ impl World {
                     }
                 }
                 s.elevators.hash(h);
+                s.wings.hash(h);
             },
             &|h| {
                 if let Some(survival) = &s.survival {

@@ -152,6 +152,20 @@ point (a carrier) is approached from astern and left off the bow; a Roost opens 
 hatch (`doors`, driven in `Units::deploy`) for an aircraft coming down and fires it out
 of its corner tunnels. A Roost upgrades in place, keeping what it holds.
 
+## Carrier air wings (2026-10-10)
+
+A unit with `air_wings:` (the Atoll, the Mantlet) builds wings aboard, apart from its
+orders (`mc-sim/src/air_wings.rs`, `Command::QueueWing` / `CancelWing`, the carrier's
+own queue of at most 8, more refused with `Refusal::WingQueueFull`). A wing is `count`
+(3 to 10) of one of its faction's aircraft, paid and built as one job with the carrier's
+`power`. Done, the aircraft are spawned stowed aboard (as on a staging base) and go off
+the bow one every `launch_gap`; once the last is up they fly guard round the carrier in
+one formation (`guard` metres, circling at half of it) until given other orders. A
+carrier that sinks takes its queue and what is aboard with it. The panel (`hud/wings.rs`)
+shows a tile a wing (click queues one, right-click takes the last off), the queue and the
+wing under way. Atoll: 8 Peregrines, 5 Hellkites, 4 Gannets, 3 Raptors; Mantlet: 8 Pilums,
+3 Reapers, 4 Tridents, 3 Partisans.
+
 ## The guard order
 
 **Guard** (`Command::Guard`, `OrderKind::Guard`) is for any armed mobile unit, and

@@ -136,6 +136,9 @@ pub struct State {
     /// Space elevators' clocks: their cables, platforms and deliveries (`elevator.rs`).
     #[serde(default)]
     pub elevators: crate::elevator::Elevators,
+    /// Carriers' air wing queues (`air_wings.rs`).
+    #[serde(default)]
+    pub wings: crate::air_wings::WingBays,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -448,6 +451,7 @@ impl World {
             next_batch: 0,
             strategic: Default::default(),
             elevators: Default::default(),
+            wings: Default::default(),
         };
         let water = terrain.water_level();
         let ore = crate::mines::OreGrid::new(&map.ore, size, |p| terrain.height_at(p) > water);
@@ -723,6 +727,10 @@ impl World {
         {
             let _t = mc_core::perf_span!("fn.run_elevators");
             self.run_elevators()?;
+        }
+        {
+            let _t = mc_core::perf_span!("fn.run_air_wings");
+            self.run_air_wings()?;
         }
         {
             let _t = mc_core::perf_span!("fn.run_staging");

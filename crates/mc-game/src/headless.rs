@@ -321,6 +321,32 @@ pub fn screenshot(
                 world.tick(&[]).map_err(|e| e.to_string())?;
             }
         }
+        // A selected carrier gets wings to show: one of its first wing under way, two of
+        // its second waiting.
+        let u = &world.state.units;
+        let carrier = u.slots.iter().find(|&r| {
+            u.owner[r] == 0
+                && world.bp(r).key.contains(key.trim_end_matches('*'))
+                && world.bp(r).air_wings.is_some()
+        });
+        if let Some(row) = carrier {
+            let units = vec![u.id(row)];
+            let orders: Vec<mc_sim::PlayerCommand> = [(0u8, 1u8), (1, 2)]
+                .iter()
+                .map(|&(wing, count)| mc_sim::PlayerCommand {
+                    player: 0,
+                    command: mc_sim::Command::QueueWing {
+                        units: units.clone(),
+                        wing,
+                        count,
+                    },
+                })
+                .collect();
+            world.tick(&orders).map_err(|e| e.to_string())?;
+            for _ in 0..40 {
+                world.tick(&[]).map_err(|e| e.to_string())?;
+            }
+        }
     }
     if shot.plans {
         plan_a_base(&mut world)?;

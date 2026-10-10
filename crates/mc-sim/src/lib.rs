@@ -23,6 +23,7 @@ pub mod ai;
 pub mod ai_config;
 pub use ai_config::{AiConfig, Difficulty, Doctrine, Skill, INCOME_RANGE};
 mod air_support;
+pub mod air_wings;
 pub mod aircraft_crash;
 mod approach;
 mod area_work;

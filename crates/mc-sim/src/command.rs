@@ -309,6 +309,18 @@ pub enum Command {
         carrier: UnitId,
         queue: bool,
     },
+    /// `count` more of the wing at `wing` in each carrier's `air_wings` list, on its own
+    /// queue (`air_wings.rs`).
+    QueueWing {
+        units: Vec<UnitId>,
+        wing: u8,
+        count: u8,
+    },
+    /// The last queued wing at `wing` off each carrier's queue.
+    CancelWing {
+        units: Vec<UnitId>,
+        wing: u8,
+    },
     /// Aircraft among these with a tank go down on the friendly staging base `base` to
     /// fill and mend, and leave again when done (`staging.rs`).
     Stage {
@@ -463,6 +475,8 @@ impl Command {
             | Command::Guard { units, .. }
             | Command::Board { units, .. }
             | Command::Stage { units, .. }
+            | Command::QueueWing { units, .. }
+            | Command::CancelWing { units, .. }
             | Command::Land { units, .. }
             | Command::Unload { units }
             | Command::TakeOff { units }

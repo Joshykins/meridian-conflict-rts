@@ -665,6 +665,30 @@ impl Staging {
     }
 }
 
+/// Air wings (`mc_sim::air_wings`): a carrier builds a wing at a time aboard, `count`
+/// aircraft paid and built as one, and launches them together off its deck, to form up
+/// round it.
+#[derive(Clone, Debug)]
+pub struct AirWings {
+    /// Build power it puts into the wing under way.
+    pub power: Fx,
+    /// The guard area a launched wing flies round the carrier (it circles at half of it).
+    pub guard: Fx,
+    pub wings: Vec<Wing>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Wing {
+    pub name: String,
+    pub aircraft: BlueprintId,
+    pub count: u8,
+}
+
+/// Most kinds of wing a carrier offers.
+pub const MAX_WINGS: usize = 6;
+/// How many aircraft a wing has.
+pub const WING_SIZE: std::ops::RangeInclusive<u8> = 3..=10;
+
 /// Most launch points a staging base has.
 pub const MAX_LAUNCHES: usize = 4;
 
@@ -923,6 +947,8 @@ pub struct UnitBlueprint {
     pub fuel: Option<Fuel>,
     /// Takes aircraft in to refuel and mend.
     pub staging: Option<Staging>,
+    /// Builds air wings aboard.
+    pub air_wings: Option<AirWings>,
     /// A projected dome, or a hull wrap that only covers this unit.
     pub shield: Option<Shield>,
     pub upgrades_to: Option<BlueprintId>,
@@ -1413,6 +1439,22 @@ impl Blueprints {
                 anti_missile_look: f.anti_missile_look,
             });
         }
+        // A carrier's wings are its own faction's aircraft.
+        for u in &units {
+            let Some(a) = &u.air_wings else { continue };
+            for w in &a.wings {
+                let made = &units[w.aircraft.index()];
+                if made.faction != u.faction
+                    || !made.motion.is_some_and(|m| m.layer == MoveLayer::Air)
+                    || made.fuel.is_none()
+                {
+                    return Err(DataError::Invalid(format!(
+                        "{}: wing {} is of {}, not one of its faction's aircraft with a tank",
+                        u.key, w.name, made.key
+                    )));
+                }
+            }
+        }
         // A builder puts up only its own faction's structures. Mobile units may also come
         // from the roster its faction stands in on while it has no units of its own.
         for u in &units {
@@ -1764,6 +1806,16 @@ impl Blueprints {
             }
             match &u.fuel {
                 Some(f) => h.write_i64(f.range.0),
+                None => h.write_u64(u64::MAX),
+            }
+            match &u.air_wings {
+                Some(a) => {
+                    h.write_i64(a.power.0);
+                    h.write_i64(a.guard.0);
+                    for w in &a.wings {
+                        h.write_u64(w.aircraft.0 as u64 | (w.count as u64) << 16);
+                    }
+                }
                 None => h.write_u64(u64::MAX),
             }
             match &u.staging {

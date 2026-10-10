@@ -479,6 +479,9 @@ pub(crate) struct Unit {
     /// Where aircraft come down to refuel and mend ([`crate::Staging`]).
     #[serde(default)]
     pub staging: Option<RawStaging>,
+    /// Builds air wings aboard ([`crate::AirWings`]).
+    #[serde(default)]
+    pub air_wings: Option<RawAirWings>,
     #[serde(default)]
     pub shield: Option<RawShield>,
     #[serde(default)]
@@ -922,6 +925,25 @@ pub(crate) struct RawStaging {
     /// None: nothing to open.
     #[serde(default)]
     pub doors: Option<f64>,
+}
+
+/// Air wings a carrier builds aboard, one at a time with `power`.
+#[derive(Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RawAirWings {
+    pub power: f64,
+    /// Metres round the carrier a launched wing guards.
+    pub guard: f64,
+    pub wings: Vec<RawWing>,
+}
+
+/// One kind of wing: `count` of the aircraft `aircraft`, built and launched together.
+#[derive(Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RawWing {
+    pub name: String,
+    pub aircraft: String,
+    pub count: u8,
 }
 
 fn default_launch_gap() -> f64 {
@@ -2276,6 +2298,39 @@ impl Unit {
             water_build: self.water_build,
             seabed: self.seabed,
             drone: self.drone.as_ref().map(|k| lookup(k, key)).transpose()?,
+            air_wings: match &self.air_wings {
+                Some(a)
+                    if a.power <= 0.0
+                        || a.guard <= 0.0
+                        || a.wings.is_empty()
+                        || a.wings.len() > crate::MAX_WINGS
+                        || self.staging.is_none()
+                        || a.wings.iter().any(|w| !crate::WING_SIZE.contains(&w.count)) =>
+                {
+                    return Err(DataError::Invalid(format!(
+                        "{key}: air wings need build power, staging to launch them from, and 1 to {} wings of {} to {} aircraft",
+                        crate::MAX_WINGS,
+                        crate::WING_SIZE.start(),
+                        crate::WING_SIZE.end(),
+                    )));
+                }
+                Some(a) => {
+                    let mut wings = Vec::with_capacity(a.wings.len());
+                    for w in &a.wings {
+                        wings.push(crate::Wing {
+                            name: w.name.clone(),
+                            aircraft: lookup(&w.aircraft, key)?,
+                            count: w.count,
+                        });
+                    }
+                    Some(crate::AirWings {
+                        power: fx(a.power),
+                        guard: fx(a.guard),
+                        wings,
+                    })
+                }
+                None => None,
+            },
             drone_radius: fx(self.drone_radius),
             drone_sockets: self
                 .drone_sockets
