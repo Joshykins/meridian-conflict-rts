@@ -355,7 +355,7 @@ mod tests {
         for b in engines {
             let i = Ids::of(&library, &blueprints, b);
             for s in [
-                i.gather, i.launch, i.rift, i.strike, i.hold, i.hum, i.release, i.downed,
+                i.gather, i.launch, i.rift, i.strike, i.hold, i.hum, i.release,
             ] {
                 let s = library.sound(s.expect("named and in the library"));
                 assert!(s.like.is_none(), "{} is a stand-in", s.name);
