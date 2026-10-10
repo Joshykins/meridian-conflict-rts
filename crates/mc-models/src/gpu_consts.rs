@@ -210,6 +210,14 @@ shared! {
         pub const COUNT_SHIFT: u32 = 8;
         /// A section's second instance: the hull's inside, seen through its torn ends.
         pub const INNER: u32 = 0x1000;
+        /// A wreck's thrown turret (wreck.wgsl `turret_throw`, renderer/wreck_throw.rs):
+        /// the gravity it falls under, m/s², a little over real so a light one snaps;
+        /// the hull reach, metres, at which it is thrown as light and as heavy as any;
+        /// and the first of the three salts its throw is drawn from.
+        pub const THROW_GRAVITY: f32 = 18.0;
+        pub const THROW_LIGHT: f32 = 2.0;
+        pub const THROW_HEAVY: f32 = 18.0;
+        pub const THROW_SALT: u32 = 41;
     }
 
     /// A seabed installation's spire (`icon::SEABED`, models/aster/naval/seabed_defense.rs):

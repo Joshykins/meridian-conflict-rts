@@ -1594,7 +1594,7 @@ fn vs_main(in: VsIn) -> VsOut {
     var rest = false;
     if (e.owner_flags & KIND_WRECK) != 0u && !falling {
         // A fresh wreck carries its age (`mirror::UnitInstance::gait`); one long settled lies as it fell.
-        p = wrecked(p, in.part, model, hash11(f32(e.unit_id & 0xFFFFu)), e.turret_yaw, wreck.age, e.health, wreck);
+        p = wrecked(p, in.part, model, e.unit_id, hash11(f32(e.unit_id & 0xFFFFu)), e.turret_yaw, wreck.age, e.health, wreck);
         // A section lies about its own middle.
         p.x -= wreck.centre;
     } else if in.part == PART_TURRET && !(limb >= LIMB_HOUSE && limb < LIMB_HOUSE + 4u) {

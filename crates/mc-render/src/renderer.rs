@@ -50,6 +50,7 @@ mod dash_fx;
 mod dive_fx;
 mod drive_swing;
 pub use capture::Shot;
+mod burn_site;
 mod city_fx;
 mod clearing;
 mod cliff_rocks;
@@ -120,6 +121,8 @@ mod wing_fx;
 mod work_beams;
 mod wreck_finish;
 mod wreck_fx;
+mod wreck_throw;
+use burn_site::BurnSite;
 pub(crate) use effect_barriers::EffectBarrier;
 pub use ore_fields::OreClaim;
 pub use post::Antialiasing;
@@ -695,17 +698,6 @@ pub(crate) struct TrackMark {
 }
 
 /// Small deterministic generator for effect scatter. Presentation only.
-/// What `damage_fires` needs to know about a blueprint's model.
-#[derive(Clone)]
-struct BurnSite {
-    grid: models::burns::BurnGrid,
-    reach: f32,
-    /// The model's bounds radius: what a wreck section's stretch is in shares of.
-    bounds: f32,
-    height: f32,
-    turret_pivot: Vec3,
-}
-
 struct Scatter(u32);
 
 impl Scatter {
@@ -1351,14 +1343,7 @@ impl Renderer {
             excavations.push(model.excavation.clone().zip(model.pit));
             stars.push(model.star_core);
             beam_cores.push(model.beam_core);
-            burn_sites.push(BurnSite {
-                grid: models::burns::BurnGrid::bake(&model.lods[0]),
-                // As `entity.wgsl` hands them to the surface shader, so the marks agree.
-                reach: model.surface_reach.max(1.0),
-                bounds: model.bounds_radius.max(1.0),
-                height: plan_h.max(1.0),
-                turret_pivot: Vec3::from(model.turret_pivot),
-            });
+            burn_sites.push(BurnSite::of(&model, plan_h));
             drawn_as.push((model_list.len(), icon, bps.look(bp.id)));
             model_list.push((model, icon));
         }
@@ -3347,6 +3332,7 @@ impl Renderer {
         self.aircraft_crash_trails(units, time, camera);
         self.damage_smoke(units, time, camera);
         self.wreck_smoke(units, time, camera);
+        self.turret_landings(units, time, camera);
         self.wreck_finish(units, &frame.events, time, camera);
         drop(part);
         let part = mc_core::perf_span!("cpu.upload.events");

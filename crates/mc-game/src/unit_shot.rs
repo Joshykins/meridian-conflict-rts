@@ -427,6 +427,15 @@ fn staged_props(map: &MapFile) -> Vec<Prop> {
         .collect()
 }
 
+/// Seconds since a wreck was left, or the longest time for one long settled.
+fn fresh_age(u: &UnitInstance) -> f32 {
+    if u.gait[2] > 0.5 {
+        u.gait[1]
+    } else {
+        f32::MAX
+    }
+}
+
 /// The unit to frame; once it is destroyed (`--scenario destruct`), its settled wreck,
 /// every piece of it when it broke up.
 fn find_subject(world: &World, frame: &RenderFrame, key: &str) -> Result<UnitInstance, String> {
@@ -447,11 +456,14 @@ fn find_subject(world: &World, frame: &RenderFrame, key: &str) -> Result<UnitIns
     let settled = |u: &&UnitInstance| {
         u.owner_flags & KIND_WRECK != 0 && u.packed == 0 && u.refit_modules & WRECK_INNER == 0
     };
+    // The newest wreck: the warm shot server's range may still hold one an earlier
+    // shot left, long settled somewhere else.
     let first = frame
         .units
         .iter()
         .filter(settled)
-        .find(|u| is_key(u))
+        .filter(|u| is_key(u))
+        .min_by(|a, b| fresh_age(a).total_cmp(&fresh_age(b)))
         .copied()
         .ok_or_else(|| format!("{key} is not on the range to shoot (not built?)"))?;
     let pieces: Vec<&UnitInstance> = frame

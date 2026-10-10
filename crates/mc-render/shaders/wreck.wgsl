@@ -75,6 +75,61 @@ fn wreck_bury(model: ModelInfo, w: WreckPose, health: f32) -> f32 {
     return share * h / (1.0 + h / 40.0);
 }
 
+// How a wreck's turret is thrown off its ring, the same for the wreck every time it is
+// drawn, and the same as `renderer/wreck_throw.rs` works out where and when it comes
+// down. The heavier the turret (the bigger the hull it sat on), the lower and shorter
+// it is thrown: a tank's is blown clear over the hull, a titan's is heaved off its ring
+// and topples down beside it. All under one gravity, so a big one falls as long as its
+// height takes and reads as heavy.
+struct TurretThrow {
+    r1: f32,
+    r2: f32,
+    r3: f32,
+    // Zero for a light turret, one for the heaviest.
+    heft: f32,
+    // Where its pivot comes down (model metres), the upward speed it leaves with, and
+    // seconds in the air.
+    land: vec3<f32>,
+    lift: f32,
+    flight: f32,
+    // Metres it skids on after landing, ploughs into the dirt, and hops back up.
+    skid: f32,
+    dig: f32,
+    hop: f32,
+}
+
+// Zero to one, fixed for a wreck and a salt (`renderer/wreck_fx.rs hash`).
+fn wreck_hash(id: u32, salt: u32) -> f32 {
+    var n = (id * 0x9E3779B9u) ^ (salt * 0x85EBCA6Bu);
+    n = n ^ (n >> 15u);
+    n = n * 0x2C1B3C6Du;
+    n = n ^ (n >> 12u);
+    n = n * 0x297A2D39u;
+    n = n ^ (n >> 15u);
+    return f32(n >> 8u) / 16777216.0;
+}
+
+fn turret_throw(id: u32, pivot: vec3<f32>, height: f32, reach: f32) -> TurretThrow {
+    var o: TurretThrow;
+    o.r1 = wreck_hash(id, WRECK_THROW_SALT);
+    o.r2 = wreck_hash(id, WRECK_THROW_SALT + 1u);
+    o.r3 = wreck_hash(id, WRECK_THROW_SALT + 2u);
+    o.heft = smoothstep(WRECK_THROW_LIGHT, WRECK_THROW_HEAVY, reach);
+    // Thrown clear to one side or the other, never along the hull, where it would land in it.
+    let away = select(-1.5707963, 1.5707963, o.r3 > 0.5) + (o.r2 - 0.5) * 1.1;
+    let thrown = reach * mix(1.0, 0.8, o.heft) * (0.95 + o.r1 * 0.25);
+    o.land = vec3<f32>(vec2<f32>(cos(away), sin(away)) * thrown, height * 0.16);
+    let rise = mix(height * 0.4 + 1.2, height * 0.08 + 1.0, o.heft) * (0.85 + o.r2 * 0.3);
+    o.lift = sqrt(2.0 * WRECK_THROW_GRAVITY * rise);
+    let fall = max(pivot.z + rise - o.land.z, 0.0);
+    o.flight = o.lift / WRECK_THROW_GRAVITY + sqrt(2.0 * fall / WRECK_THROW_GRAVITY);
+    let along = length(o.land.xy - pivot.xy) / o.flight;
+    o.skid = min(along * mix(0.05, 0.2, o.heft), reach * 0.15);
+    o.dig = height * 0.05 * o.heft;
+    o.hop = rise * 0.15;
+    return o;
+}
+
 // A model vertex after the unit was destroyed. The same intact mesh, wrecked a
 // different way for every wreck (`seed`, zero to one): the turret is blown off
 // its ring and lies beside the hull, the hull is crumpled by a smooth field
@@ -86,10 +141,11 @@ fn wreck_bury(model: ModelInfo, w: WreckPose, health: f32) -> f32 {
 //
 // `age` is seconds since the wreck was left. The turret does not appear where it
 // lands: it leaves its ring at the yaw it died at (`yaw`), flies a ballistic arc
-// tumbling as it goes, and hops once when it hits the ground. The hull crumples
-// over the blast's first moments. A wreck long settled passes a large `age`. A hull
-// that went down in the sea keeps its turret, and slumps slowly onto the seabed.
-fn wrecked(pos: vec3<f32>, part: u32, model: ModelInfo, seed: f32, yaw: f32, age: f32, health: f32, w: WreckPose) -> vec3<f32> {
+// (`turret_throw`) tumbling as it goes, and lands as heavy as it is: a light one hops,
+// a heavy one ploughs in, skids and rocks to rest. The hull crumples over the blast's
+// first moments. A wreck long settled passes a large `age`. A hull that went down in
+// the sea keeps its turret, and slumps slowly onto the seabed.
+fn wrecked(pos: vec3<f32>, part: u32, model: ModelInfo, id: u32, seed: f32, yaw: f32, age: f32, health: f32, w: WreckPose) -> vec3<f32> {
     let r1 = hash11(seed * 173.3 + 1.7);
     let r2 = hash11(seed * 311.9 + 5.3);
     let r3 = hash11(seed * 97.1 + 9.1);
@@ -101,33 +157,35 @@ fn wrecked(pos: vec3<f32>, part: u32, model: ModelInfo, seed: f32, yaw: f32, age
     var p = pos;
     if part == PART_TURRET && !sank {
         let pivot = model.turret_pivot.xyz;
-        // Thrown clear to one side or the other, never along the hull, where it would land in it.
-        let away = select(-1.5707963, 1.5707963, r3 > 0.5) + (r2 - 0.5) * 1.1;
-        let thrown = reach * (0.95 + r1 * 0.25);
-        let land = vec3<f32>(vec2<f32>(cos(away), sin(away)) * thrown, height * 0.16);
-        // The arc's rise over the straight line, and the time it takes under a heavy,
-        // game-scale gravity so it reads as blown off, not floated off.
-        let apex = height * 0.8 + reach * 0.3;
-        let flight = clamp(2.0 * sqrt(2.0 * apex / 30.0), 0.5, 2.2);
-        let s = clamp(age / flight, 0.0, 1.0);
-        // Spin at a steady rate through the flight; one in three turns a full somersault
-        // on the way, so it lands the same way up either way.
-        let flip = select(0.0, 6.2831853, r2 > 0.66);
-        var q = rot_z(p - pivot, mix(yaw, (r1 - 0.5) * 5.0, s));
-        q = rot_x(q, (0.3 + r2 * 0.45 + flip) * s);
-        q = rot_y(q, (r3 - 0.5) * 0.5 * s);
-        var at = mix(pivot, land, s);
-        at.z += 4.0 * apex * s * (1.0 - s);
-        // One hop where it hits, a tenth of the arc's height.
-        let after = age - flight;
-        let hop = flight * 0.3;
-        if after > 0.0 && after < hop {
-            let h = after / hop;
-            at.z += apex * 0.1 * 4.0 * h * (1.0 - h);
+        let thrown = turret_throw(id, pivot, height, reach);
+        let s = clamp(age / thrown.flight, 0.0, 1.0);
+        // A small turret tumbles, one in three turning a full somersault on the way; a
+        // heavy one only rolls over toward the side it lands on.
+        let flip = select(0.0, 6.2831853, thrown.r2 > 0.66 && thrown.heft < 0.15);
+        let spin = mix(1.0, 0.3, thrown.heft);
+        var q = rot_z(p - pivot, yaw + (thrown.r1 - 0.5) * 5.0 * spin * s);
+        q = rot_x(q, (0.3 + thrown.r2 * 0.45 + flip) * s);
+        q = rot_y(q, (thrown.r3 - 0.5) * 0.5 * s);
+        let t = s * thrown.flight;
+        var at = vec3<f32>(mix(pivot.xy, thrown.land.xy, s), pivot.z + thrown.lift * t - 0.5 * WRECK_THROW_GRAVITY * t * t);
+        // Down: it ploughs into the dirt, skids on along its flight and rocks to rest; a
+        // light one hops once instead, a heavy one hardly at all.
+        let after = age - thrown.flight;
+        if after > 0.0 {
+            let dir = normalize(thrown.land.xy - pivot.xy + vec2<f32>(1e-4, 0.0));
+            at += vec3<f32>(dir * thrown.skid * (1.0 - exp(-after * 5.0)), 0.0);
+            at.z -= thrown.dig * smoothstep(0.0, 0.12, after);
+            let rock = 0.2 * thrown.heft * exp(-after * 3.0) * sin(after * 9.0);
+            q = rot_y(q, rock);
+            let hop = thrown.hop * (1.0 - thrown.heft);
+            let up = 2.0 * sqrt(2.0 * hop / WRECK_THROW_GRAVITY);
+            if after < up {
+                at.z += sqrt(2.0 * WRECK_THROW_GRAVITY * hop) * after - 0.5 * WRECK_THROW_GRAVITY * after * after;
+            }
         }
-        p = q + at;
-        p.z = max(p.z, 0.02);
-        return p;
+        // What goes below the ground is in it, hidden by the ground: pressing it flat
+        // onto the surface laid a bright plate under the turret.
+        return q + at;
     }
     // Out of the sky or on a blast it crumples at once; on the seabed it slumps slowly,
     // on from the pose it went down in.
