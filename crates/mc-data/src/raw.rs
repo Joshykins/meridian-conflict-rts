@@ -1303,6 +1303,9 @@ pub struct RawWeapon {
     /// A shot that breaks into sub-shots on its way down (`RawCluster`).
     #[serde(default)]
     pub cluster: Option<RawCluster>,
+    /// A storm seed: the shot is a cloud that lets fall lightning (`RawCloud`).
+    #[serde(default)]
+    pub cloud: Option<RawCloud>,
     #[serde(default)]
     pub sounds: WeaponSounds,
 }
@@ -1319,6 +1322,23 @@ pub struct RawCluster {
     pub count: u8,
     pub radius: f64,
     pub height: f64,
+    pub splash: f64,
+}
+
+/// A storm seed (the Tempest's Storm Seeder): the shot is a cloud let go behind the
+/// aircraft that drifts out to over its mark at the height it was seeded, swelling as it
+/// goes, for `grow` seconds. Grown, it lets fall `bolts` lightning strikes over `strike`
+/// seconds, each straight down onto a foe under it within `radius` metres of its middle
+/// (onto the ground there when there is none), each with an even share of the weapon's
+/// `damage` and a blast `splash` metres round. Then it is spent. A direct, non-missile
+/// weapon on an aircraft; the seed itself hits nothing on its way.
+#[derive(Deserialize, Clone, Copy)]
+#[serde(deny_unknown_fields)]
+pub struct RawCloud {
+    pub grow: f64,
+    pub strike: f64,
+    pub bolts: u8,
+    pub radius: f64,
     pub splash: f64,
 }
 
@@ -1390,6 +1410,9 @@ pub struct UnitSounds {
     pub dash_gone: Option<String>,
     pub dash_arrive: Option<String>,
     pub dash_land: Option<String>,
+    /// Heard where the unit is as it is finished: an aircraft raised on a lot lifting off
+    /// it (the Nimbus).
+    pub takeoff: Option<String>,
 }
 
 fn one() -> u8 {
@@ -1786,6 +1809,30 @@ impl Unit {
                     )));
                 }
             }
+            if w.cloud.is_some()
+                && (self
+                    .motion
+                    .as_ref()
+                    .is_none_or(|m| m.layer != MoveLayer::Air)
+                    || w.trajectory != Trajectory::Direct
+                    || w.missile
+                    || w.hitscan
+                    || w.torpedo
+                    || w.curve > 0.0
+                    || w.cluster.is_some())
+            {
+                return Err(DataError::Invalid(format!(
+                    "{ctx}: a storm seed is a direct, non-missile shot from an aircraft"
+                )));
+            }
+            if let Some(c) = w.cloud {
+                if !(1..=crate::weapon::MAX_BOLTS).contains(&c.bolts) || c.grow <= 0.0 {
+                    return Err(DataError::Invalid(format!(
+                        "{ctx}: a storm seed grows for a while and lets fall 1 to {} bolts",
+                        crate::weapon::MAX_BOLTS
+                    )));
+                }
+            }
             if w.curve > 0.0
                 && (w.trajectory != Trajectory::Direct || w.missile || w.hitscan || w.torpedo)
             {
@@ -2036,6 +2083,13 @@ impl Unit {
                     count: c.count,
                     radius: fx(c.radius.clamp(0.0, 400.0)),
                     height: fx(c.height.clamp(0.0, 4000.0)),
+                    splash: fx(c.splash.clamp(0.0, 500.0)),
+                }),
+                cloud: w.cloud.map(|c| crate::CloudSeed {
+                    grow_ticks: ticks(c.grow).clamp(1, 600) as u16,
+                    strike_ticks: ticks(c.strike).clamp(0, 600) as u16,
+                    bolts: c.bolts,
+                    radius: fx(c.radius.clamp(0.0, 800.0)),
                     splash: fx(c.splash.clamp(0.0, 500.0)),
                 }),
                 sounds: w.sounds.clone(),

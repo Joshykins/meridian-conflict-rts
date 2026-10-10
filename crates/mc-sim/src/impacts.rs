@@ -42,6 +42,7 @@ impl World {
         self.steer_curving_shots();
         self.steer_orb_shots();
         self.split_cluster_shots()?;
+        self.steer_cloud_seeds()?;
         drop(span);
         let span = mc_core::perf_span!("shots.sweep");
         let count = self.state.projectiles.len();
@@ -166,6 +167,10 @@ impl World {
     fn sweep_projectile(&self, i: usize, domes: &[usize]) -> Option<Hit> {
         let p = &self.state.projectiles;
         let weapon = &self.blueprints.unit(p.blueprint[i]).weapons[p.weapon[i] as usize];
+        // A storm seed is a cloud: it drifts through whatever is in its way (`cloud_seed.rs`).
+        if weapon.cloud.is_some() && p.sub[i] == 0 {
+            return None;
+        }
         let mut vel = p.vel[i];
         if weapon.trajectory == Trajectory::Ballistic {
             vel.z -= GRAVITY;

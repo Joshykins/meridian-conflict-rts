@@ -1,0 +1,84 @@
+// The Nimbus (`aster_t4_storm_bomber`) and its Storm Seeder (`cloud` on the weapon,
+// mc-sim `cloud_seed.rs`): its engines, its lift off the lot, the seed let go from the
+// tail, and each bolt its cloud lets fall.
+(
+    sounds: {
+        // The engines: a huge flying wing's turbofans heard as one deep roar, a low hum
+        // beating slowly under it and the air buffeting round the wing. Loops seamlessly
+        // (every tone and wobble a whole number of times in 6 s).
+        "nimbus_engine": (
+            length: 6.0, peak: 0.4, room: 0.0, looped: true,
+            layers: [
+                Drone(freq: 36, gain: 0.2, wobble: 0.16667, depth: 0.1),
+                Drone(freq: 36.3333, gain: 0.12, wobble: 0.16667, depth: 0.08, pan: 0.2),
+                Drone(freq: 72, gain: 0.14, wobble: 0.33333, depth: 0.12, pan: -0.15),
+                Drone(freq: 108, gain: 0.08, wobble: 0.5, depth: 0.2),
+                Rumble(freq: 150, q: 0.8, gain: 2.4, wobble: 0.33333, depth: 0.25),
+                Rumble(freq: 420, q: 0.9, gain: 3.6, wobble: 0.5, depth: 0.3, pan: -0.2),
+                Rumble(freq: 1100, q: 0.7, gain: 1.8, wobble: 0.66667, depth: 0.35, pan: 0.2),
+                Wind(freq: 520, q: 0.8, gain: 2.2, swell: 0.5, depth: 0.6, sway: 0.4),
+                Drive(1.2),
+            ],
+        ),
+        // Lifting off its lot as it is finished (`takeoff`): the engines winding up from a
+        // growl to the full roar, the ground let go of with a deep push, the wash rolling
+        // away over the ground.
+        "nimbus_takeoff": (
+            length: 9.5, peak: 0.5, room: 0.3,
+            layers: [
+                Fm(from: 30, to: 48, glide: 3.5, ratio: 0.5, index: 1.6, fade: 3.0, attack: 1.2, decay: 1.8, gain: 0.5),
+                Fm(at: 0.3, from: 60, to: 96, glide: 3.2, ratio: 1.0, index: 1.2, fade: 2.5, attack: 1.4, decay: 1.5, gain: 0.3),
+                Roll(from: 160, to: 900, glide: 3.0, attack: 1.6, decay: 2.2, gain: 2.2, swell: 2.0, depth: 0.35, seed: 7101),
+                Roll(at: 0.2, from: 90, to: 420, glide: 3.0, attack: 1.8, decay: 2.4, gain: 2.0, swell: 1.2, depth: 0.4, pan: -0.25, seed: 7102),
+                Burst(at: 1.6, low: 28, high: 220, attack: 0.02, decay: 0.3, gain: 5.0),
+                Tone(at: 1.6, from: 46, to: 24, glide: 1.0, attack: 0.01, decay: 1.2, gain: 0.8),
+                Drive(1.3),
+                Sweep(at: 1.7, from: 420, to: 60, glide: 3.0, q: 0.8, attack: 0.2, decay: 1.6, gain: 5.0, pan: 0.25),
+            ],
+        ),
+        // A seed let go, once a second: a heavy pressurised whoomph out of the tail, the
+        // charged vapour hissing out after it with a few dry snaps, done inside the second.
+        "storm_seed": (
+            length: 1.0, peak: 0.26, room: 0.15,
+            layers: [
+                Burst(low: 60, high: 520, attack: 0.004, decay: 0.07, gain: 7.0),
+                Tone(from: 82, to: 36, glide: 0.18, attack: 0.004, decay: 0.2, gain: 0.45),
+                Roll(at: 0.01, from: 900, to: 220, glide: 0.5, attack: 0.02, decay: 0.22, gain: 2.4, swell: 6.0, depth: 0.4, seed: 7201),
+                Drive(1.25),
+                Sweep(at: 0.02, from: 1700, to: 520, glide: 0.45, q: 0.7, attack: 0.03, decay: 0.2, gain: 1.6),
+                Hiss(at: 0.05, freq: 900, q: 0.8, attack: 0.04, decay: 0.16, gain: 0.25, pan: 0.2),
+                Burst(at: 0.09, low: 500, high: 1800, attack: 0.0003, decay: 0.004, gain: 1.6, pan: -0.3),
+                Burst(at: 0.17, low: 450, high: 1600, attack: 0.0003, decay: 0.004, gain: 1.2, pan: 0.35),
+                Burst(at: 0.3, low: 400, high: 1500, attack: 0.0003, decay: 0.004, gain: 0.8, pan: -0.1),
+            ],
+        ),
+        // A bolt out of the cloud: a close lightning strike, the air tearing open in a
+        // ripple of cracks, a hard thump, the burst where it lands, and thunder rolling
+        // off the cloud in waves and dying away low. No buzz: not the bore's voice.
+        "storm_bolt": (
+            length: 4.5, peak: 0.9, room: 0.9,
+            layers: [
+                // The tear: a ripple of cracks down the channel over a few tens of ms.
+                Burst(low: 700, high: 2400, attack: 0.0002, decay: 0.006, gain: 10),
+                Burst(at: 0.008, low: 500, high: 2200, attack: 0.0002, decay: 0.007, gain: 8, pan: 0.2),
+                Burst(at: 0.019, low: 600, high: 2300, attack: 0.0002, decay: 0.006, gain: 7, pan: -0.25),
+                Burst(at: 0.031, low: 400, high: 1900, attack: 0.0002, decay: 0.008, gain: 6, pan: 0.1),
+                Burst(at: 0.046, low: 450, high: 2000, attack: 0.0002, decay: 0.007, gain: 5, pan: -0.15),
+                Burst(at: 0.064, low: 350, high: 1600, attack: 0.0003, decay: 0.01, gain: 4, pan: 0.3),
+                Burst(at: 0.002, low: 150, high: 900, attack: 0.0006, decay: 0.05, gain: 10),
+                // The thump, and the burst where it lands.
+                Burst(at: 0.004, low: 40, high: 420, attack: 0.002, decay: 0.22, gain: 10),
+                Tone(at: 0.004, from: 110, to: 38, glide: 0.3, attack: 0.002, decay: 0.45, gain: 0.9),
+                Tone(at: 0.01, from: 55, to: 26, glide: 0.8, attack: 0.006, decay: 0.9, gain: 0.7),
+                Drive(1.5),
+                // The thunder: rolling off the cloud and the land in waves, darkening.
+                Sweep(at: 0.12, from: 900, to: 160, glide: 1.4, q: 0.6, attack: 0.06, decay: 0.8, gain: 6.0, pan: 0.3),
+                Roll(at: 0.2, from: 900, to: 180, glide: 2.2, attack: 0.15, decay: 1.0, gain: 1.6, swell: 2.5, depth: 0.7, pan: -0.3, seed: 7301),
+                Roll(at: 0.7, from: 600, to: 120, glide: 2.6, attack: 0.3, decay: 1.2, gain: 1.3, swell: 1.4, depth: 0.75, pan: 0.35, seed: 7302),
+                Roll(at: 0.4, from: 220, to: 60, glide: 3.0, attack: 0.4, decay: 1.3, gain: 0.8, swell: 0.8, depth: 0.6, seed: 7303),
+                Sweep(at: 1.3, from: 500, to: 110, glide: 1.8, q: 0.6, attack: 0.25, decay: 1.0, gain: 4.0, pan: -0.2),
+                Drive(1.2),
+            ],
+        ),
+    },
+)

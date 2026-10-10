@@ -171,6 +171,10 @@ fn aim_error(rng: &mut mc_core::Rng, spread: u16) -> (i32, i32) {
     }
 }
 
+/// A storm seed drifts on, while it grows, as far as the aircraft flew in this share of
+/// that time (`cloud_seed.rs`): one third, so it is left behind and slows to a stop.
+const CLOUD_CARRY: i32 = 3;
+
 /// Ticks a ballistic shell is given past its flight to its mark (`Projectiles::ticks_left`),
 /// so one that falls short of the ground there still comes down: a shell's `ticks_left`
 /// less this is the ticks before it lands.
@@ -2312,6 +2316,11 @@ impl World {
                 }
                 let dist = delta.length().max(Fx::ONE);
                 match weapon.trajectory {
+                    // A storm seed is steered out to its mark by `cloud_seed.rs`.
+                    Trajectory::Direct if weapon.cloud.is_some() => (
+                        FxVec3::ZERO,
+                        weapon.cloud.map_or(1, |c| c.life_ticks() as i32),
+                    ),
                     Trajectory::Direct => {
                         let dir = delta.extend(aim_z - muzzle.z).normalize();
                         (
@@ -2385,6 +2394,15 @@ impl World {
                 let shot = self.state.projectiles.len() - 1;
                 self.state.projectiles.target[shot] = t.unit.map_or(Handle::NONE, |t| units.id(t));
                 self.state.projectiles.mark[shot] = aim.extend(aim_z);
+                if let Some(cloud) = weapon.cloud {
+                    // A storm seed is aimed at nothing: it hangs where it was let go, carried
+                    // on a little by the aircraft's way as it slows (`cloud_seed.rs`), so a
+                    // run lays a trail of them.
+                    let carried = FxVec2::from_angle(units.heading[row]) * (units.speed[row] / DT);
+                    let drift = carried * Fx::ratio(cloud.grow_ticks as i64, CLOUD_CARRY as i64);
+                    self.state.projectiles.mark[shot] = (muzzle.xy() + drift).extend(muzzle.z);
+                    self.state.projectiles.target[shot] = Handle::NONE;
+                }
                 if weapon.missile {
                     self.state.projectiles.hp[shot] = weapon.casing_hp();
                 }

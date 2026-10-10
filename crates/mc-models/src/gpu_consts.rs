@@ -838,6 +838,16 @@ shared! {
         /// `appearance.rgb` its brightness, `appearance.w` how hard it is wound (0 a slow
         /// drift, 1 the strands whipping round). Laid once a tick, two ticks long.
         pub const GRAVITY_VORTEX: u32 = 62;
+        /// A lump of a storm seed's cloud (renderer/storm_cloud_fx.rs, storm_puffs.wgsl): one
+        /// billow of a thunderhead, lit as the sky's clouds are. `origin` is the cloud's middle
+        /// when it was laid and `pos` the lump's place in the grown cloud; the cloud drifts
+        /// `vel` metres more over `appearance.x` seconds, easing to a stop, and grows from
+        /// `appearance.y` of the way there to grown over the same time; `appearance.z` is the
+        /// grown cloud's reach (metres), `appearance.w` how far grown it is when this lump
+        /// shows. `params.x` its size grown, `params.y` its cloud's shade (1 the usual grey). It thins out over its last `STORM_LINGER`
+        /// seconds, its base sinking as it rains out.
+        pub const STORM_CLOUD: u32 = 63;
+        pub const STORM_LINGER: f32 = 3.5;
     }
 
     /// Colours of a fading beam (`ProjectileInstance::color` low bits under

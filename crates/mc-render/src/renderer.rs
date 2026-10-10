@@ -106,6 +106,7 @@ mod shield_upload;
 pub(crate) mod skins;
 mod stake_fx;
 mod star_core_fx;
+mod storm_cloud_fx;
 mod structure_pads;
 mod stun_fx;
 mod supernova_fx;
@@ -900,6 +901,8 @@ pub struct Renderer {
     /// The Carillon's stored plasma orbs (renderer/orb_fx.rs).
     orb_fx: orb_fx::OrbFx,
     giant_fx: titan_fx::GiantFx,
+    /// The Storm Seeder's clouds and bolts (renderer/storm_cloud_fx.rs).
+    storm_clouds: storm_cloud_fx::StormClouds,
     heavy_rail: heavy_rail_fx::HeavyRailFx,
     /// EMP stuns and warp dampeners in the world (stun_fx.rs, damper_fx.rs).
     emp_fx: stun_fx::EmpFx,
@@ -2510,6 +2513,7 @@ impl Renderer {
             star_core_fx: star_core_fx::StarCoreFx::new(stars),
             orb_fx: orb_fx::OrbFx::default(),
             giant_fx: titan_fx::GiantFx::default(),
+            storm_clouds: storm_cloud_fx::StormClouds::default(),
             heavy_rail: heavy_rail_fx::HeavyRailFx::default(),
             emp_fx: stun_fx::EmpFx::default(),
             great_gun: great_gun_fx::GreatGunFx::default(),
@@ -3371,6 +3375,7 @@ impl Renderer {
         self.ground_contact(units, time, camera);
         self.storm_beams(time);
         self.storms_tick(time);
+        self.storm_clouds_tick(&frame.clouds, frame.tick, time);
         self.mine_blows(units, time, camera);
         self.aircraft_trails(units, time, camera);
         self.heat_haze.note(units, self.tick_seconds);
@@ -4606,6 +4611,7 @@ impl Renderer {
             && !self.great_gun_event(event, time)
             && !self.bolt_rifle_event(event, time)
             && !self.arc_howitzer_event(event, time)
+            && !self.storm_cloud_event(event, time)
         {
             self.effects_of_inner(event, time);
         }

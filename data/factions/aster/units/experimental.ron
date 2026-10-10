@@ -139,6 +139,92 @@
         sounds: (death: "blast_colossal", moving: "breacher_walk", step: "breacher_step"),
     ),
     (
+        // A huge bomber that makes its own weather. While any foe is in reach its Storm
+        // Seeder lets a seed of charged cloud go from the tail every second, aimed at
+        // nothing: each hangs where it was let go, so a run lays a trail of them over what it
+        // crosses, swells into a thunderhead, and grown, strikes down four times onto the
+        // foes under it, each bolt bursting where it lands (`cloud`, mc-sim `cloud_seed.rs`).
+        // Small twin AA mounts keep fighters honest: little damage, long reach. Lasers burn
+        // missiles out of the air round it and a hull field lies over its plates. It flies
+        // runs like any bomber. Raised on a lot like the Fulgur.
+        key: "aster_t4_storm_bomber",
+        name: "Nimbus",
+        role: "Storm Bomber",
+        title: "Storm Bomber",
+        tech: 4,
+        categories: ["Air", "Experimental"],
+        health: 52000,
+        cost: (mass: 4000, energy: 48000, time: 24000),
+        radius: 110, height: 24,
+        footprint: (8, 19),
+        vision: 1300,
+        // Each gun mount turns about its own pivot, not on the seeder's aim.
+        hull_mounts: true,
+        shield: (kind: Hull, health: 18000, regen: 120),
+        // The lasers burn missiles within this of the hull, a sphere: from 380 m up it still
+        // covers about 560 m of ground. Their heads sit on the sponsons behind the wing (the
+        // model's `nimbus::body::LASERS`).
+        anti_missile: 680, anti_missile_lasers: 2,
+        anti_missile_mounts: [(-20, 8.6, 8.2), (-20, -8.6, 8.2)],
+        // The field and the lasers draw power.
+        economy: (energy_upkeep: 300),
+        motion: (layer: Air, size: 0, speed: 75, accel: 18, turn: 22, altitude: 380, hover: false),
+        weapons: [
+            (
+                // Four bolts of 400, each a blast 26 m round, from a seed every second: about
+                // 1600 a second while all of them find something under the trail.
+                // The seed leaves from the middle of the dispenser's mouth in the tail.
+                name: "Storm Seeder",
+                damage: 1600, range: 600, reload: 1.0, speed: 100, trajectory: Direct,
+                // Nothing turns: the seed always leaves the dispenser's mouth at the tail, so
+                // the mouth is its own pivot, whatever the aim.
+                turret_turn: 720, muzzle: (-46.5, 0, 7.2), pivot: (-46.5, 0, 7.2),
+                cloud: (grow: 3.5, strike: 1.5, bolts: 4, radius: 200, splash: 26),
+                targets: ["Land", "Naval", "Structure"], color: Blue,
+                flash: 0.0, impact: 2.6, shockwave: 1.6, ion_blast: 26,
+                sounds: (fire: "storm_seed", impact: "storm_bolt", ground: "storm_bolt"),
+            ),
+            (
+                // Four small twin mounts, barrels linked, each turning on its own: dorsal fore
+                // and aft on the deck, one out on each wing. Pivots and barrel ends (the mount
+                // facing the nose) are the model's: `models::aster::air::nimbus`
+                // (`tests/nimbus.rs`).
+                name: "Twin AA Gun",
+                damage: 10, range: 650, reload: 0.5, salvo: 2, salvo_batch: 2, speed: 900, trajectory: Direct,
+                turret_turn: 220, muzzle: (12.6, 0, 13.8), pivot: (9, 0, 13.8), mount: true,
+                muzzles: [(12.6, 0.4, 13.8), (12.6, -0.4, 13.8)],
+                targets: ["Air"], color: Orange, tracer: 0.6,
+                sounds: (fire: "autocannon", impact: "shell_light"),
+            ),
+            (
+                name: "Twin AA Gun",
+                damage: 10, range: 650, reload: 0.5, salvo: 2, salvo_batch: 2, speed: 900, trajectory: Direct,
+                turret_turn: 220, facing: 180, muzzle: (-16.4, 0, 13.8), pivot: (-20, 0, 13.8), mount: true,
+                muzzles: [(-16.4, 0.4, 13.8), (-16.4, -0.4, 13.8)],
+                targets: ["Air"], color: Orange, tracer: 0.6,
+                sounds: (fire: "autocannon", impact: "shell_light"),
+            ),
+            (
+                name: "Twin AA Gun",
+                damage: 10, range: 650, reload: 0.5, salvo: 2, salvo_batch: 2, speed: 900, trajectory: Direct,
+                turret_turn: 220, facing: 90, muzzle: (-5.4, 48, 8.5), pivot: (-9, 48, 8.5), mount: true,
+                muzzles: [(-5.4, 48.4, 8.5), (-5.4, 47.6, 8.5)],
+                targets: ["Air"], color: Orange, tracer: 0.6,
+                sounds: (fire: "autocannon", impact: "shell_light"),
+            ),
+            (
+                name: "Twin AA Gun",
+                damage: 10, range: 650, reload: 0.5, salvo: 2, salvo_batch: 2, speed: 900, trajectory: Direct,
+                turret_turn: 220, facing: -90, muzzle: (-5.4, -48, 8.5), pivot: (-9, -48, 8.5), mount: true,
+                muzzles: [(-5.4, -47.6, 8.5), (-5.4, -48.4, 8.5)],
+                targets: ["Air"], color: Orange, tracer: 0.6,
+                sounds: (fire: "autocannon", impact: "shell_light"),
+            ),
+        ],
+        mesh: "storm_bomber", icon: Bomber,
+        sounds: (death: "blast_colossal", moving: "nimbus_engine", takeoff: "nimbus_takeoff"),
+    ),
+    (
         // The first tier 5: a two-legged siege walker nearly five hundred metres tall, raised
         // on a lot of its own like the Fulgur. It strides straight over structures and slopes
         // rather than round them, and wades any sea on the maps with the water below its

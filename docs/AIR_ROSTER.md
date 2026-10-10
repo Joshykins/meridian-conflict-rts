@@ -16,6 +16,7 @@ All units are available through the existing tiered factories and engineer/comma
 | 3 | Eclipse | Fast strategic bomber; one AEB bomb that bursts as the electric bore's blast |
 | 3 | Thunderhead | Armored, shielded assault aircraft; forward rotary cannon and forward AA |
 | 3 | Argus | High-flying radar, sonar and missile interception; guards a point or friendly unit |
+| 4 | Nimbus | Storm bomber, raised on a lot; flies runs, seeding a trail of clouds from its tail while foes are in reach, each grows and strikes down four bolts; small twin AA mounts, anti-missile lasers and a hull field |
 
 Aircraft circle on the **Guard** order (Ctrl+G; see [The guard order](#the-guard-order)): press on a point or a friendly unit and drag out the area. They fly halfway between its centre and its edge, and follow the ally if one was picked. Shift queues a guard; Stop cancels it. If the ally is destroyed, the aircraft keep circling its last position. Move and attack commands replace a guard normally. (The separate Orbit order and its **O** key were merged into Guard on 2026-09-26.)
 

@@ -3,7 +3,8 @@
 use mc_core::{Angle, Fx, FxVec3};
 
 use crate::{
-    Bore, Cluster, Cone, PlasmaGrade, Sabot, Strafe, Trajectory, WeaponColor, WeaponSounds,
+    Bore, CloudSeed, Cluster, Cone, PlasmaGrade, Sabot, Strafe, Trajectory, WeaponColor,
+    WeaponSounds,
 };
 
 /// The widest circle, metres, a `Bombard` order may spread a gun's shots over unless
@@ -13,6 +14,10 @@ pub const BOMBARD_RADIUS: f64 = 250.0;
 /// The most sub-shots a cluster shot (`Weapon::cluster`) may break into: a data limit,
 /// refused at load, so one split never floods the projectile table.
 pub const MAX_CLUSTER: u8 = 16;
+
+/// The most lightning bolts one storm seed (`Weapon::cloud`) may let fall: a data limit,
+/// refused at load.
+pub(crate) const MAX_BOLTS: u8 = 16;
 
 /// The most orbs an orb battery (`Weapon::orbs`) holds: one bit each in what the renderer is told.
 pub const MAX_ORBS: usize = 32;
@@ -209,6 +214,9 @@ pub struct Weapon {
     pub sabot: Option<Sabot>,
     /// A shot that breaks into sub-shots on its way down (`RawCluster`).
     pub cluster: Option<Cluster>,
+    /// A storm seed: the shot is a cloud that lets fall lightning (`RawCloud`, mc-sim
+    /// `cloud_seed.rs`).
+    pub cloud: Option<CloudSeed>,
     /// How far a stream gun's tracers lean from deep orange to red, zero to one.
     /// Cosmetic: not in the content hash.
     pub red: f32,
@@ -283,6 +291,15 @@ impl Weapon {
     /// even share of the damage, its own splash, and no further split. `None` for any other
     /// weapon.
     pub fn sub_shot(&self) -> Option<Weapon> {
+        if let Some(c) = self.cloud {
+            // A storm seed's bolts: an even share each, and the bolt's own blast.
+            return Some(Weapon {
+                damage: self.damage / c.bolts.max(1) as i32,
+                splash: c.splash,
+                cloud: None,
+                ..self.clone()
+            });
+        }
         let c = self.cluster?;
         Some(Weapon {
             damage: self.damage / c.count.max(1) as i32,
@@ -295,8 +312,12 @@ impl Weapon {
 
     /// The damage behind an impact of this weapon's that blasted `splash` metres round: a
     /// cluster's piece (`sub_shot`) when that is its pieces' splash and not the whole
-    /// shot's, else the whole damage. For what is drawn and heard, not for the sim.
+    /// shot's, a storm seed's bolt always (the seed itself never lands), else the whole
+    /// damage. For what is drawn and heard, not for the sim.
     pub fn landed_damage(&self, splash: Fx) -> Fx {
+        if let Some(c) = self.cloud {
+            return self.damage / c.bolts.max(1) as i32;
+        }
         match self.cluster {
             Some(c) if splash == c.splash && splash != self.splash => {
                 self.damage / c.count.max(1) as i32

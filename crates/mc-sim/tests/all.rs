@@ -90,6 +90,7 @@ mod seraph;
 mod shield;
 mod site_map;
 mod skyguard;
+mod storm_bomber;
 mod straight_moves;
 mod stranded_ships;
 mod stream;

@@ -2,6 +2,7 @@
 //!use warp_puffs
 //!use plasma_puffs
 //!use gravity_puffs
+//!use storm_puffs
 // Particles that are not light: dust off the tracks, gun smoke, clods of earth
 // thrown by an impact, and the sparks that go with them. Like the flashes they
 // are written once and animate on the GPU from their birth time.
@@ -214,6 +215,9 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
     }
     if is_gravity_puff(kind) {
         return gravity_puff_vertex(p, corner, age, out);
+    }
+    if is_storm_puff(kind) {
+        return storm_puff_vertex(p, corner, t, out);
     }
     var pos: vec3<f32>;
     // How far a casing has tumbled (radians), frozen once it lies still.
@@ -838,6 +842,9 @@ fn puff_color(in: PuffOut) -> vec4<f32> {
     }
     if is_gravity_puff(kind) {
         return gravity_puff_color(in);
+    }
+    if is_storm_puff(kind) {
+        return storm_puff_color(in, d);
     }
     if kind != PUFF_TRAIL && kind != PUFF_ARC && kind != PUFF_BOMB_TRAIL && kind != PUFF_STRATEGIC_TRAIL && kind != PUFF_PLUME && kind != PUFF_PLASMA_PLUME && kind != PUFF_PLASMA_BOLT && kind != PUFF_SHRAPNEL && kind != PUFF_ION && kind != PUFF_THRUST && kind != PUFF_LAMP_CONE && kind != PUFF_COLUMN && kind != PUFF_VEIL && d > 1.0 {
         return vec4<f32>(0.0);

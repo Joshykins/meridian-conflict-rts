@@ -22,6 +22,7 @@ use std::collections::HashMap;
 
 mod batch;
 pub mod city;
+mod clouds;
 mod dash;
 mod destruct;
 mod elevator;
@@ -36,6 +37,7 @@ mod work;
 mod wrecks;
 
 pub use batch::{BatchView, UNIT_BATCH};
+pub use clouds::CloudView;
 pub use dash::{DashStage, DashView};
 pub use destruct::DestructView;
 pub use elevator::{crate_load, ElevatorPhase, ElevatorView};
@@ -213,6 +215,15 @@ pub enum SimEvent {
         pos: FxVec3,
         vel: FxVec3,
         count: u8,
+        owner: u8,
+        blueprint: BlueprintId,
+        weapon: u8,
+    },
+    /// A storm seed (`Weapon::cloud`) let a bolt fall from its base at `from` onto `to`
+    /// (`cloud_seed.rs`); the bolt lands this tick, as any shot's `Impact`.
+    CloudBolt {
+        from: FxVec3,
+        to: FxVec3,
         owner: u8,
         blueprint: BlueprintId,
         weapon: u8,
@@ -1516,6 +1527,8 @@ pub struct RenderFrame {
     pub dashes: Vec<DashView>,
     /// Gravitic engines' work that the viewer may see (`crate::gravitic`, `mirror/gravitic.rs`).
     pub wells: Vec<WellView>,
+    /// Storm seeds in the air (`mirror::clouds`).
+    pub clouds: Vec<CloudView>,
     /// Timed self-destructs counting down that the viewer may see (`crate::destruct`).
     pub destructs: Vec<DestructView>,
     /// The time left on the viewer's side's sites and upgrades whose work is moving
@@ -2139,8 +2152,11 @@ impl World {
                 0
             }
         };
+        // A storm seed and its bolts are drawn as cloud and lightning (`clouds`,
+        // `SimEvent::CloudBolt`), not as slugs: passed over with the beams.
         let hitscan = |blueprint: BlueprintId, weapon: u8| {
-            self.blueprints.unit(blueprint).weapons[weapon as usize].hitscan
+            let w = &self.blueprints.unit(blueprint).weapons[weapon as usize];
+            w.hitscan || w.cloud.is_some()
         };
         for i in 0..s.projectiles.len() {
             // A hitscan weapon is a fading beam the renderer draws from the fire and
@@ -2788,6 +2804,7 @@ impl World {
         self.write_warps(viewer, &mut frame.warps);
         self.write_dashes(viewer, &mut frame.dashes);
         self.write_wells(viewer, &mut frame.wells);
+        self.write_clouds(&mut frame.clouds);
         self.write_destructs(viewer, &mut frame.destructs);
         self.write_work_left(viewer, &mut frame.work_left);
         self.write_dampers(viewer, &mut frame.dampers);

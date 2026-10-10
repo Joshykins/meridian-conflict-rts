@@ -42,6 +42,7 @@ pub(crate) use courier::{
 mod drone;
 mod gannet;
 mod kestrel;
+pub(crate) mod nimbus;
 mod peregrine;
 mod petrel;
 mod raptor;
@@ -477,6 +478,8 @@ pub(crate) fn superiority(b: &mut MeshBuilder, _: u8) {
 pub(crate) fn strategic(b: &mut MeshBuilder, _: u8) {
     eclipse::build(b);
 }
+/// The Nimbus: tech 4 storm bomber, sowing thunderheads from its tail ([`nimbus`]).
+pub(crate) use nimbus::build as storm_bomber;
 /// The Thunderhead: an unmanned, hard-chined armoured tub built round its gun. The
 /// Avenger's seven barrels run out of a channel between two armoured cheeks, well past
 /// them, and swivel a little in their mount. A Talon rocket hangs under each wing.

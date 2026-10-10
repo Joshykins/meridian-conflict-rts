@@ -96,6 +96,8 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("interceptor_t2", 5.0, 2.4, air::interceptor_t2),
     ModelDef::new("superiority", 7.0, 3.2, air::superiority),
     ModelDef::new("strategic_bomber", 16.0, 4.5, air::strategic),
+    // The Nimbus, authored at its unit's size.
+    ModelDef::new("storm_bomber", 110.0, 24.0, air::storm_bomber),
     ModelDef::new("assault_air", 12.0, 5.5, air::assault),
     ModelDef::new("aa_gun", 6.0, 7.0, aa::gun),
     ModelDef::new("flak_battery", 10.0, 8.0, aa::flak_battery),

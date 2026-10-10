@@ -277,6 +277,37 @@ pub struct Cluster {
     pub splash: Fx,
 }
 
+/// A storm seed (`RawCloud`): the shot is a cloud that drifts from the muzzle to over its
+/// mark in `grow_ticks`, swelling as it goes, then lets fall `bolts` lightning strikes over
+/// `strike_ticks`, each on a foe under it within `radius` (on the ground there when none
+/// is), with an even share of the damage and a blast `splash` metres round.
+#[derive(Clone, Copy, Debug)]
+pub struct CloudSeed {
+    pub grow_ticks: u16,
+    pub strike_ticks: u16,
+    pub bolts: u8,
+    pub radius: Fx,
+    pub splash: Fx,
+}
+
+impl CloudSeed {
+    /// Ticks a seed is in the air: it grows, strikes, and is gone the tick after its last bolt.
+    pub fn life_ticks(&self) -> u16 {
+        self.grow_ticks + self.strike_ticks + 1
+    }
+
+    /// Bolts let fall by the end of age `age` (ticks since it was seeded): none while it
+    /// grows, then spread evenly over the strike, the first on the tick it is grown.
+    pub fn bolts_by(&self, age: u16) -> u8 {
+        if age < self.grow_ticks {
+            return 0;
+        }
+        let into = (age - self.grow_ticks) as u32;
+        let spread = self.strike_ticks.max(1) as u32;
+        (into * self.bolts as u32 / spread + 1).min(self.bolts as u32) as u8
+    }
+}
+
 /// A giant bore's lightning storm (`RawStorm`): grows over `ticks` to `radius`, `damage`
 /// a second at its heart.
 #[derive(Clone, Copy, Debug)]
@@ -1797,6 +1828,13 @@ impl Blueprints {
                     h.write_i64(c.edge.0);
                     h.write_i64(c.speed.0);
                     h.write_u64(c.stun_ticks as u64);
+                }
+                if let Some(c) = w.cloud {
+                    h.write_u64(c.grow_ticks as u64);
+                    h.write_u64(c.strike_ticks as u64);
+                    h.write_u64(c.bolts as u64);
+                    h.write_i64(c.radius.0);
+                    h.write_i64(c.splash.0);
                 }
                 if let Some(c) = w.cluster {
                     h.write_u64(c.count as u64);

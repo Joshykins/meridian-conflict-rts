@@ -98,6 +98,13 @@
             "Thermobaric Rocket Pods": "Two launchers in the hump on its back, rippled out over the ground ahead; every rocket bursts as a fuel-air charge and leaves it burning.",
         },
     ),
+    "aster_t4_storm_bomber": (
+        lore: "Reach weather crews flew cloud seeders over the dry provinces for a generation before anyone thought to charge the seed. Under a Nimbus the forecast is one word.",
+        weapons: {
+            "Storm Seeder": "A charged seed let go from the tail drifts out over the mark, swells into a thunderhead, and strikes down six times onto whatever is under it.",
+            "Twin AA Gun": "Four small twin mounts, barrels linked: light rounds, long reach, enough to keep fighters off the wing.",
+        },
+    ),
     "aster_t5_titan": (
         lore: "Nothing on Meridia stops a Behemoth. It walks over what it cannot be bothered to walk round, and the ground remembers every step.",
         weapons: {

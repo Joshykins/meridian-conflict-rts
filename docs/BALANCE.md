@@ -53,6 +53,18 @@ Off the lines, measured the same way:
   Each rocket also leaves 16 s of burning ground (40 a second to each enemy in it), which a
   clump standing in the field pays for many times. Raised on a lot by Mason IIIs like the
   Fulgur; it carries nothing for the air.
+- Nimbus (ARC T4 storm bomber, 4000 mass): 52000 health plus an 18000 hull field, and two
+  lasers that burn missiles within 680 m (the Argus's). It flies runs like any bomber, and
+  while any foe is within 600 m its Storm Seeder lets a cloud go from the tail every second,
+  aimed at nothing: a run lays a trail of them. Each hangs about where it was let go, grows
+  for 3.5 s, then lets four bolts of 400 (26 m blasts) fall over 1.5 s onto the foes within
+  200 m of it, nearest first. About 1600 dps while every bolt finds something, but late and
+  only along its track: what is not under the trail when the clouds are grown is missed (the
+  bolts fall on the ground there), and domes take bolts as they take shells. Four small twin
+  AA mounts (10 a barrel, both barrels together every 0.5 s, 650 m, past a Sparrow's 480)
+  are about 160 dps against aircraft in all: enough to see off light air, not a fighter
+  wing. Air is its counter: slow (75 m/s), and it turns wide. A first pass, unplayed (mc-sim
+  `tests/storm_bomber.rs`).
 
 - Strategic weapons (`docs/NUKES.md`): the Sunfall silo (T4, 9000 mass) assembles warheads
   of 6000 mass / 120000 energy in about 300 s at its own power (60), holds 2, and each does

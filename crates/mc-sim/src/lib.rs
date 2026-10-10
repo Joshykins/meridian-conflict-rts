@@ -32,6 +32,7 @@ pub mod batch;
 mod body;
 mod bore_lay;
 pub mod city;
+mod cloud_seed;
 mod cluster;
 pub mod combat;
 pub mod command;

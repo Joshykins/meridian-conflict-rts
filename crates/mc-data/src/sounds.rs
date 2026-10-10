@@ -498,6 +498,7 @@ impl SoundLibrary {
                 &u.sounds.dash_gone,
                 &u.sounds.dash_arrive,
                 &u.sounds.dash_land,
+                &u.sounds.takeoff,
             ]
             .into_iter()
             .flatten()

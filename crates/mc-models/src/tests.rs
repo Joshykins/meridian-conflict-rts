@@ -11,6 +11,7 @@ use super::{
 
 mod breacher;
 mod cells;
+mod nimbus;
 mod pod_racks;
 
 /// The blueprints in `data/factions/aster/units/*.ron` that matter to a model.
@@ -934,6 +935,10 @@ fn lods_reduce_and_respect_budgets() {
             // The tech 5 Skyhook: a 312 m lot, one a match; three 160 m clamp towers and
             // their jaws, the cable and the cargo platform (each design has the one budget).
             30000
+        } else if model.key == "storm_bomber" {
+            // The tech 4 Nimbus: a 220 m bomber, one or two a match; a layered body, a
+            // bridged tail, four AA mounts, two laser heads and the seed dispenser.
+            super::aster::air::nimbus::TRIANGLES
         } else if model.key == "breacher" {
             // The tech 4 Breacher: a 67 m walker, two rigged legs, two six-barrel arm guns
             // with their drums, two sixteen-cell rocket launchers and layered plating.

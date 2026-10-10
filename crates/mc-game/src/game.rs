@@ -349,6 +349,8 @@ struct UnitSoundIds {
     /// mine's hammer blow, one per blow its `gait` counts.
     step: Option<(mc_data::SoundId, f32)>,
     select: Option<mc_data::SoundId>,
+    /// Heard as it is finished (`UnitSounds::takeoff`).
+    takeoff: Option<mc_data::SoundId>,
     weapons: Vec<WeaponSoundIds>,
 }
 
@@ -3191,6 +3193,7 @@ impl Game {
                         .get(&u.visual.icon))
                     .or(d.select.get(&u.visual.icon))
                     .and_then(|n| library.id_of(n)),
+                takeoff: id(&u.sounds.takeoff, &None),
                 weapons: u
                     .weapons
                     .iter()
@@ -3525,6 +3528,20 @@ impl Game {
                     26.0,
                     0.0,
                 ),
+                // An aircraft raised on a lot lifts off it as it is finished.
+                mc_sim::SimEvent::UnitCompleted { unit, .. } => {
+                    let Some(u) = self.view.frame.units.iter().find(|u| u.unit_id == unit.0) else {
+                        continue;
+                    };
+                    let Some(takeoff) = table
+                        .units
+                        .get(u.blueprint as usize)
+                        .and_then(|s| s.takeoff)
+                    else {
+                        continue;
+                    };
+                    (3, Some(takeoff), u.pos, 60.0, 0.0)
+                }
                 _ => continue,
             };
             let Some(sound) = sound else { continue };

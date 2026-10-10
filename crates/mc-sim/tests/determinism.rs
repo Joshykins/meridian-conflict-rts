@@ -226,6 +226,9 @@ fn setup(w: &mut World) {
                 // Two rotary guns on one unit, each with its own spin (`Weapon::rotary`),
                 // and pods that set the ground alight.
                 add("aster_t4_breacher", 1, 1200, 950);
+                // A storm bomber out over the south's army: it lays a trail of seeds that
+                // grow and strike down bolts (`cloud_seed.rs`).
+                add("aster_t4_storm_bomber", 1, 1000, 3000);
                 // A map gun, and a powered radar that finds the south's silo for it.
                 add("aster_t4_artillery", 1, 300, 250);
                 add("aster_t3_power", 1, 700, 150);
@@ -527,6 +530,7 @@ fn reference() -> Vec<u64> {
     let (mut on_blocks, mut alight, mut down) = (0, 0, 0);
     let mut platforms = 0;
     let mut dashes = 0;
+    let mut bolts = 0;
     let hashes = (1..TICKS)
         .map(|t| {
             let commands = script(&mut w, t);
@@ -586,6 +590,7 @@ fn reference() -> Vec<u64> {
                         platforms += 1
                     }
                     mc_sim::SimEvent::DashLanded { .. } => dashes += 1,
+                    mc_sim::SimEvent::CloudBolt { .. } => bolts += 1,
                     _ => {}
                 }
             }
@@ -600,6 +605,8 @@ fn reference() -> Vec<u64> {
     eprintln!("determinism: city {on_blocks} shots on blocks, {alight} alight, {down} down");
     // The gravitic engine's well struck before the snapshot and holds across it.
     assert!(well_at_snapshot, "no gravity well held at the snapshot");
+    // The storm bomber's clouds struck down.
+    assert!(bolts > 0, "no storm cloud let a bolt fall");
     // The Seraph dashed into the south's army.
     assert!(dashes > 0, "the Seraph never dashed");
     // The elevator's first platform brought its queue down after the snapshot.
