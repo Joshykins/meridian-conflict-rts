@@ -355,4 +355,22 @@
             dash_land: "regency_seraph_landing",
         ),
     ),
+    (
+        // The Regency's second tier 5: a gravitic engine. A crown of black shards leaning
+        // in over a well, holding a mass of violet gravity between them while it runs.
+        // Given a point anywhere on the map it gathers, then breaks the ground open in a
+        // rift that runs out to the point; where it strikes the ground shatters into a
+        // gravity well that holds until the engine is given another point.
+        key: "regency_t5_gravitic_engine",
+        name: "The Fallen",
+        role: "Gravitic Engine", title: "Gravitic Engine",
+        tech: 5,
+        categories: ["Land", "Strategic", "Experimental"],
+        health: 900000,
+        cost: (mass: 100000, energy: 1000000, time: 340000),
+        radius: 125, height: 240, footprint: (22, 22), hull: (19, 19),
+        vision: 600,
+        mesh: "regency_gravitic_engine", icon: Titan,
+        sounds: (death: "blast_colossal"),
+    ),
 ]

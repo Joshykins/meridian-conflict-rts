@@ -78,6 +78,10 @@
             "Gravitic Seeker Battery": "Sixteen seekers thrown up from between its wings whenever anything is near, and all at once as it lands; they arc over and fall on everything round it.",
         },
     ),
+    "regency_t5_gravitic_engine": (
+        lore: "A crown of black shards around a well of held gravity. Given a point anywhere in the world, it tears the ground open toward it; where the rift ends the ground breaks apart, aircraft are dragged out of the sky, and everything caught there is crushed slowly until the engine looks elsewhere.",
+        weapons: {},
+    ),
     "regency_t1_engineer": (
         lore: "A construction craft that rides a gravity lift over land and sea alike and builds with the nanite emitter on its arm.",
         weapons: {},
