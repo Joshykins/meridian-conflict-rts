@@ -4,6 +4,10 @@
 //! the model's height and draws a fixed number of pixels wide. A click on either picks
 //! the unit. For most units the two nearly coincide; a titan's icon floats 240 m up and
 //! is twice the size of any other, so aiming at the body alone missed it.
+//!
+//! The body is the unit's standing column, from its feet to its full height, as wide as
+//! the unit: a titan's torso stands 300 m and more over its feet, and a disc round its
+//! shins (or the point at its feet, for a drag box) missed everything a player aims at.
 
 use glam::{Vec2, Vec3};
 use mc_data::{BlueprintId, Blueprints, IconKind};
@@ -38,19 +42,20 @@ pub(crate) fn unit_at(
             continue;
         }
         let pos = Vec3::from(u.pos);
-        // The body: a disc the unit's size round its middle.
-        let body = pos + Vec3::Z * u.radius * 0.5;
-        let body_reach = (u.radius * scale / (body - eye).length().max(1.0)).max(MIN_REACH);
+        let height = bp.height.to_f32();
+        // The body: the column from its feet to its top, the unit's size across.
+        let body = column(camera, pos, height).and_then(|(feet, top)| {
+            let (d, along) = to_segment(pixel, feet, top);
+            let at = pos + Vec3::Z * height * along;
+            let reach = (u.radius * scale / (at - eye).length().max(1.0)).max(MIN_REACH);
+            (d <= reach).then_some(d)
+        });
         // The icon: where icons.wgsl centres it, half its drawn width round that.
-        let icon_at = pos + Vec3::Z * bp.height.to_f32() * 0.5;
-        let icon_reach = (icon_px(bp.visual.icon) * 0.5).max(MIN_REACH);
-        let hit = [(body, body_reach), (icon_at, icon_reach)]
-            .into_iter()
-            .filter_map(|(at, reach)| {
-                let d = camera.project(at)?.distance(pixel);
-                (d <= reach).then_some(d)
-            })
-            .reduce(f32::min);
+        let icon = camera
+            .project(pos + Vec3::Z * height * 0.5)
+            .map(|at| at.distance(pixel))
+            .filter(|&d| d <= (icon_px(bp.visual.icon) * 0.5).max(MIN_REACH));
+        let hit = body.into_iter().chain(icon).reduce(f32::min);
         if let Some(d) = hit {
             if best.is_none_or(|(bd, _)| d < bd) {
                 best = Some((d, i));
@@ -58,6 +63,54 @@ pub(crate) fn unit_at(
         }
     }
     best.map(|(_, i)| i)
+}
+
+/// Whether any of a unit's standing column (`pos` up `height`) is drawn inside the
+/// screen rectangle `min..max`: a drag box over a titan's torso takes it.
+pub(crate) fn column_in_box(camera: &Camera, pos: Vec3, height: f32, min: Vec2, max: Vec2) -> bool {
+    let Some((feet, top)) = column(camera, pos, height) else {
+        return false;
+    };
+    // Clip the drawn column to the box, one side at a time (Liang-Barsky).
+    let d = top - feet;
+    let (mut enter, mut leave) = (0.0f32, 1.0f32);
+    for (p, q) in [
+        (-d.x, feet.x - min.x),
+        (d.x, max.x - feet.x),
+        (-d.y, feet.y - min.y),
+        (d.y, max.y - feet.y),
+    ] {
+        if p == 0.0 {
+            if q < 0.0 {
+                return false;
+            }
+        } else if p < 0.0 {
+            enter = enter.max(q / p);
+        } else {
+            leave = leave.min(q / p);
+        }
+    }
+    enter <= leave
+}
+
+/// Where a unit's feet (`pos`) and top (`height` over them) are drawn. A top behind the
+/// camera falls back to the feet, and the other way round.
+fn column(camera: &Camera, pos: Vec3, height: f32) -> Option<(Vec2, Vec2)> {
+    let feet = camera.project(pos);
+    let top = camera.project(pos + Vec3::Z * height);
+    match (feet, top) {
+        (Some(f), Some(t)) => Some((f, t)),
+        (Some(p), None) | (None, Some(p)) => Some((p, p)),
+        (None, None) => None,
+    }
+}
+
+/// How far `p` is from the segment `a..b`, and how far along it (0 at `a`, 1 at `b`)
+/// the nearest point lies.
+fn to_segment(p: Vec2, a: Vec2, b: Vec2) -> (f32, f32) {
+    let d = b - a;
+    let along = ((p - a).dot(d) / d.length_squared().max(f32::EPSILON)).clamp(0.0, 1.0);
+    (p.distance(a + d * along), along)
 }
 
 /// How wide icons.wgsl draws an icon, in pixels. Only the tier 5s' (a titan's, a space
@@ -120,5 +173,64 @@ mod tests {
         // Clear of the icon, nothing.
         let pixel = icon - Vec2::Y * icon::TITAN_PX * 1.5;
         assert_eq!(unit_at(&[titan], &blueprints, &camera, pixel), None);
+    }
+
+    /// Close in, looking across at it, where its torso stands well clear of its icon.
+    fn near_camera(at: Vec3) -> Camera {
+        let mut camera = far_camera(at);
+        camera.distance = 2500.0;
+        camera
+    }
+
+    #[test]
+    fn a_click_on_a_titans_torso_picks_it() {
+        let blueprints = blueprints();
+        let at = Vec3::new(12000.0, 12000.0, 0.0);
+        let camera = near_camera(at);
+        let titan = titan_at(&blueprints, at);
+        let torso = camera.project(at + Vec3::Z * 420.0).expect("on screen");
+        let icon = camera.project(at + Vec3::Z * 240.0).expect("on screen");
+        assert!(
+            torso.distance(icon) > icon::TITAN_PX,
+            "the torso is clear of the icon"
+        );
+        assert_eq!(unit_at(&[titan], &blueprints, &camera, torso), Some(0));
+        // Well to the side of it, nothing.
+        let beside = torso + Vec2::X * 400.0;
+        assert_eq!(unit_at(&[titan], &blueprints, &camera, beside), None);
+    }
+
+    #[test]
+    fn a_drag_box_over_a_titans_torso_takes_it() {
+        let blueprints = blueprints();
+        let at = Vec3::new(12000.0, 12000.0, 0.0);
+        let camera = near_camera(at);
+        let height = blueprints
+            .unit_by_key("aster_t5_titan")
+            .expect("titan")
+            .height
+            .to_f32();
+        let torso = camera.project(at + Vec3::Z * 420.0).expect("on screen");
+        let feet = camera.project(at).expect("on screen");
+        let half = Vec2::splat(20.0);
+        assert!(
+            !(feet.cmpge(torso - half).all() && feet.cmple(torso + half).all()),
+            "the box leaves its feet out"
+        );
+        assert!(column_in_box(
+            &camera,
+            at,
+            height,
+            torso - half,
+            torso + half
+        ));
+        let aside = torso + Vec2::X * 400.0;
+        assert!(!column_in_box(
+            &camera,
+            at,
+            height,
+            aside - half,
+            aside + half
+        ));
     }
 }

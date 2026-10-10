@@ -1515,11 +1515,9 @@ impl Game {
             {
                 continue;
             }
-            let Some(p) = self.camera.project(Vec3::from(u.pos)) else {
-                continue;
-            };
-            if p.cmpge(min).all() && p.cmple(max).all() {
-                let bp = self.blueprints.unit(BlueprintId(u.blueprint as u16));
+            let bp = self.blueprints.unit(BlueprintId(u.blueprint as u16));
+            let pos = Vec3::from(u.pos);
+            if crate::pick::column_in_box(&self.camera, pos, bp.height.to_f32(), min, max) {
                 if !bp.is_mobile() {
                     structures.push(u.unit_id);
                 } else if bp.builder.is_some() {
