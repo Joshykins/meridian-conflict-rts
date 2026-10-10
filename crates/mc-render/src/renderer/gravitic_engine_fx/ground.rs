@@ -6,8 +6,8 @@
 //! snaps. Let go, a record's light dies over a few seconds and its plates settle, and it
 //! stays as a dark scar until newer breaks push the oldest out.
 //!
-//! A gravitic lens's trail (`rift::TRAIL`, fed by `lens_fx`) shares the records: a narrow
-//! furrow under its front's path, keyed by the lens's unit. Its scar does not stay: let go,
+//! A gravitic lens's trail (`rift::TRAIL`, fed by `lens_fx`) shares the records: a crack
+//! split under its front's path, with broken ground and branching cracks either side, keyed by the lens's unit. Its scar does not stay: let go,
 //! it fades out over `TRAIL_SCAR` seconds and its record is dropped.
 
 use ash::vk;

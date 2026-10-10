@@ -15,12 +15,13 @@
 //!   violet wake; small arcs crackle off it, back along its way and down to the ground,
 //!   and its light falls on what it passes. Far off it is drawn larger, so it reads at a
 //!   game's zoom. It leaves a short corridor of rippled air and kicks dust off the ground.
-//! - **Trail**: under its path the front presses a narrow furrow into the ground
+//! - **Trail**: under its path the front splits the ground, the Fallen's rift in small
 //!   (`rift::TRAIL`, drawn by the terrain from the gravitic engines' records,
-//!   `gravitic_engine_fx::ground`): its floor rippled across, lips shoved up either side,
-//!   a violet seam down it burning behind the head and cooling in about a second to
-//!   embers, which pulse in toward the well while it holds. Let go, the light dies and
-//!   the dark furrow fades out over some seconds. Trails keep to their own share of the
+//!   `gravitic_engine_fx::ground`): a jagged crack, the ground either side broken into
+//!   tipped plates, cracks branching off it at a slant. Violet light down in the crack
+//!   burns behind the head and cools in about a second to embers, which pulse in toward
+//!   the well while it holds. Let go, the light dies and the cracks fade out over some
+//!   seconds. Trails keep to their own share of the
 //!   records (`rift::TRAILS`), the oldest going first.
 //! - **Strike** (`LensStruck`): a violet ring of bent air snaps inward onto the target,
 //!   arcs run in from round the well's edge, a dark flash throws off a ragged violet ring
@@ -59,8 +60,8 @@ const SPECK_DRAG: f32 = 1.8;
 /// The Regency's violet, the Fallen's: for the glint of what a lens draws in and the
 /// light its arcs and front throw.
 const VIOLET: Vec3 = Vec3::new(0.55, 0.16, 1.0);
-/// Half the width of the furrow a front presses into the ground, metres.
-const TRAIL_WIDTH: f32 = 3.8;
+/// The reach of the cracks a front splits the ground with either side of its path, metres.
+const TRAIL_WIDTH: f32 = 5.0;
 /// What a trail is fed (`RiftGround::trail_run`): embers, pulses toward the well, -,
 /// its head, its scar; while the front runs, and while the well holds.
 const TRAIL_RUNNING: [f32; 5] = [0.1, 0.0, 0.0, 1.0, 1.0];

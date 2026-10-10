@@ -341,7 +341,7 @@ fn melt_shade(xy: vec2<f32>, alt: f32, albedo_in: vec3<f32>, rough_in: f32, px: 
 // Three kinds of break, each shaded over whatever ground it lies on: cracks running out
 // round the engine's foot as it gathers (`RIFT_FOOT`), the rift's fissure opening behind
 // its front from the foot to the mark (`RIFT_LINE`), and the well's ground broken into
-// plates (`RIFT_WELL`); and a gravitic lens's narrow furrow (`RIFT_TRAIL`, lens_fx.rs).
+// plates (`RIFT_WELL`); and a gravitic lens's trail of cracks (`RIFT_TRAIL`, lens_fx.rs).
 // The cracks glow violet with white-hot hearts while the engine feeds them (`Rift::glow`,
 // which the CPU eases, dims and flickers), and the plates beside them are tilted up (`time.w`, read through the normal). Once let go the light goes out
 // and the cracks stay as a dark scar, the plates settling flat. Detail under a pixel is
@@ -376,10 +376,11 @@ fn rift_one(r: Rift, xy: vec2<f32>, px: f32, s_in: CraterShade) -> CraterShade {
     var spill = 0.0;
     var broken = 0.0;
     if kind == RIFT_TRAIL {
-        // A gravitic lens's trail: a narrow furrow pressed into the ground under its
-        // front's path, its floor rippled across, earth shoved up in lips either side;
-        // a violet seam down it burns behind the head, cools to embers (pulsing toward
-        // the well while it holds), and goes out; the scar fades (`time.w`).
+        // A gravitic lens's trail: the Fallen's rift in small. A jagged crack splits the
+        // ground under its front's path, the ground either side broken into plates tipped
+        // toward it, and cracks branch off it at a slant, each its own length. Violet light
+        // burns down in the crack behind the head, cools to embers (pulsing toward the
+        // well while it holds) and goes out; the scar fades (`time.w`).
         let start = r.line.xy;
         let span = r.line.zw - start;
         let along = span / max(length(span), 1.0);
@@ -388,55 +389,93 @@ fn rift_one(r: Rift, xy: vec2<f32>, px: f32, s_in: CraterShade) -> CraterShade {
         let at = dot(rel, along);
         let across = dot(rel, side);
         let front = min(age * r.time.y, r.time.z);
-        if at < 0.0 || at > front + reach || abs(across) > reach * 3.0 {
+        if at < -reach || at > front + reach || abs(across) > reach * 4.0 {
             return s;
         }
-        // It wanders a little off the straight, so it reads torn rather than ruled.
-        let wander = (grad_noise2(vec2<f32>(at, 0.0) + o, 70.0) - 0.5) * reach * 0.9
-            + (grad_noise2(vec2<f32>(at * 1.3, 4.0) - o, 11.0) - 0.5) * reach * 0.25;
+        // It wanders off the straight line, broadly and in short jags.
+        let wander = (grad_noise2(vec2<f32>(at, 0.0) + o, 70.0) - 0.5) * reach * 1.6
+            + (grad_noise2(vec2<f32>(at * 1.7, 5.0) - o, 16.0) - 0.5) * reach * 0.9
+            + (grad_noise2(vec2<f32>(at * 3.1, 8.0) + o, 4.0) - 0.5) * reach * 0.3;
         let t = across - wander;
         let reached = 1.0 - smoothstep(front - 2.0, front + 1.0, at);
-        // Pinched where it leaves the lens's feet.
-        let foot = smoothstep(3.0, 18.0, at);
-        let width = reach * (0.8 + 0.4 * grad_noise2(vec2<f32>(at, 9.0) + o, 23.0)) * (0.45 + 0.55 * foot);
-        let x = t / width;
-        // Its edges ragged: crumbled in and out a little, more finely than it wanders.
-        let crumble = (grad_noise2(vec2<f32>(at, t) + o * 2.0, 2.5) - 0.5) * 0.35;
-        let ax = abs(x) + crumble;
         let scar = heave * reached;
-        let furrow = (1.0 - smoothstep(0.75, 1.0 + px / width, ax)) * scar;
-        let lip_x = (ax - 1.2) / 0.3;
-        let lip = exp(-lip_x * lip_x) * scar;
-        // Pressed ripples across its floor a few metres apart, bowed back from the way
-        // it ran; swapped for their average where they are under a pixel.
-        let wave = (at + ax * width * 0.7) / 3.4 * 6.2831853;
-        let fine = 1.0 - smoothstep(0.6, 1.6, px / 3.4 * 6.0);
-        // Its walls and lips through the normal: the floor sunk, the lips raised.
-        s.slope += side * sign(t) * (min(ax, 1.0) * 0.5 * furrow - lip_x * lip * 0.3)
-            + along * cos(wave) * 0.12 * furrow * fine;
-        // Pressed bare and scorched: dark earth, not the colour of what grew there.
-        a = mix(a, a * 0.25 + vec3<f32>(0.03, 0.024, 0.02), furrow * (0.8 + 0.12 * sin(wave) * fine));
-        // The lips: dry earth thrown up, paler than the ground round it.
-        a = mix(a, vec3<f32>(0.1, 0.085, 0.065), lip * 0.6);
-        broken = furrow * 0.8;
+        // Narrow and pinched where it leaves the lens's feet, gaping in places.
+        let foot = smoothstep(2.0, 16.0, at);
+        let gap = reach * (0.1 + 0.16 * grad_noise2(vec2<f32>(at, 11.0) + o, 13.0)) * (0.35 + 0.65 * foot);
+        let fissure = (1.0 - smoothstep(gap * 0.5, gap + px * 0.7, abs(t))) * scar;
+        // Plates broken off either side, tipped up toward the crack.
+        let cell = reach * 0.5;
+        let q = vec2<f32>(at, t) / cell + o * 0.1;
+        let warp = vec2<f32>(grad_noise2(xy + o, cell * 1.6), grad_noise2(xy - o, cell * 1.6)) - 0.5;
+        let cells = crater_cells(q + warp * 0.9);
+        // The broken band runs out raggedly, wider in places.
+        let spread = reach * (1.4 + 1.2 * grad_noise2(vec2<f32>(at, 21.0) + o, 17.0));
+        let band = (1.0 - smoothstep(reach * 0.5, spread, abs(t))) * scar;
+        let gape = grad_noise2(vec2<f32>(at, t) * 0.8 + o * 3.0, cell * 1.3);
+        let crack = crater_crack(cells.x, 0.04 + 0.06 * gape * gape, px / cell) * band;
+        let toward = -side * sign(t);
+        s.slope += (toward * (0.1 + 0.35 * cells.y) * (1.0 - fissure)
+            + vec2<f32>(cos(cells.y * 41.0), sin(cells.y * 41.0)) * 0.06) * band;
+        // Cracks branching off it, at uneven gaps to one side or the other, slanting on the
+        // way the front ran at angles of their own and bending as they go, jagged, each its
+        // own length, narrowing out. A branch reaches at most 3.2 reach x 1.4 and its jags
+        // on from its root: 27 m at the Lodestone's 5 m reach, inside the five steps looked
+        // at.
+        let step_m = 6.0;
+        var branch = 0.0;
+        var branch_floor = 0.0;
+        let k0 = floor(at / step_m);
+        for (var j = 0; j < 5; j++) {
+            let k = k0 - f32(j);
+            let h = hash21(vec2<f32>(k, seed * 1.3));
+            let way = select(-1.0, 1.0, h > 0.5);
+            let long = hash21(vec2<f32>(k + 5.0, seed));
+            let run = reach * mix(0.5, 3.2, long * long);
+            let out = t * way;
+            if out <= 0.0 || out > run || hash21(vec2<f32>(k + 9.0, seed * 0.7)) < 0.25 {
+                continue;
+            }
+            let root = (k + hash21(vec2<f32>(k + 3.0, seed))) * step_m;
+            let slant = mix(0.15, 0.9, hash21(vec2<f32>(k + 7.0, seed)));
+            let share = out / run;
+            let bend = (hash21(vec2<f32>(k + 13.0, seed)) - 0.3) * 0.7 * share;
+            let jag = (grad_noise2(vec2<f32>(out, k * 7.7) + o, 3.0) - 0.5) * reach * 0.7
+                + (grad_noise2(vec2<f32>(out * 2.3, k * 3.1) - o, 1.1) - 0.5) * reach * 0.2;
+            let off = abs(at - root - out * (slant + bend) - jag);
+            let w = max(gap * mix(1.2, 0.7, long) * (1.1 - share), 0.06);
+            let fade = 1.0 - smoothstep(0.7, 1.0, share);
+            let line = (1.0 - smoothstep(w * 0.5, w + px * 0.7, off)) * fade;
+            branch = max(branch, line);
+            // Its light a thin line at its floor, never under a pixel and a bit.
+            let lw = max(w * 0.25, px * 1.2);
+            let lit = (1.0 - smoothstep(0.0, lw, off)) * min(w * 0.25 / lw * 1.6, 1.0) * fade;
+            branch_floor = max(branch_floor, lit * (1.0 - share));
+        }
+        branch *= scar;
+        broken = max(max(band * 0.7, fissure), branch);
         // The light: hot behind the head, cooling as it falls behind (`RIFT_TRAIL_COOL`),
         // embers fed while the lens holds, pulsing in toward the well.
         let passed = age - at / max(r.time.y, 1.0);
         let hot = select(0.0, exp(-passed / RIFT_TRAIL_COOL), passed >= 0.0) * r.glow.w;
         let pulse = pow(0.5 + 0.5 * sin((at / 55.0 - now * 1.5) * 6.2831853), 4.0);
         let ember = glow * (1.0 + r.glow.y * (1.8 * pulse - 0.45));
-        let flick = 0.6 + 0.4 * smoothstep(0.3, 0.7, grad_noise2(vec2<f32>(at, 7.0) + o + vec2<f32>(now * 4.0, 0.0), 13.0));
-        // The embers glow in patches, drifting along it, not as one ruled line.
-        let seep = 0.05 + 0.95 * smoothstep(0.4, 0.75, grad_noise2(vec2<f32>(at - now * 9.0, 2.0) + o, 26.0));
-        let heat = (hot * 0.7 + ember * seep) * flick * reached;
-        // A thin seam down its floor, never under a pixel and a bit: its light spread
-        // thinner instead.
-        let seam_at = (grad_noise2(vec2<f32>(at * 0.8, 3.0) + o, 8.0) - 0.5) * width * 0.5;
-        let seam_w = max(width * 0.16, px * 1.4);
-        let seam = (1.0 - smoothstep(0.0, seam_w, abs(t - seam_at))) * min(width * 0.16 / seam_w * 1.6, 1.0);
-        let in_furrow = 1.0 - smoothstep(0.7, 1.0 + px / width, ax);
-        light = seam * heat + in_furrow * heat * 0.08;
-        spill = heat * 0.14 * exp(-ax / 0.9);
+        // The embers glow in patches, crawling along it, never one ruled line.
+        let seep = 0.1 + 0.9 * smoothstep(0.35, 0.75, grad_noise2(vec2<f32>(at - now * 6.0, 2.0) + o, 17.0));
+        // Even burning hot the light comes and goes along it.
+        let patchy = 0.3 + 0.7 * smoothstep(0.3, 0.6, grad_noise2(vec2<f32>(at, 31.0) + o, 11.0));
+        let heat = (hot * 0.8 * patchy + ember * seep) * reached;
+        // The light is down in the crack: a thin seam at its floor, wandering from wall to
+        // wall, never under a pixel and a bit; the branches and the plates' cracks dimmer.
+        let seam_at = (grad_noise2(vec2<f32>(at * 0.9, 3.0) + o, 4.0) - 0.5) * gap * 0.8;
+        let seam_w = max(gap * 0.3, px * 1.3);
+        let seam = (1.0 - smoothstep(0.0, seam_w, abs(t - seam_at))) * min(gap * 0.3 / seam_w * 1.6, 1.0) * reached;
+        let near = 1.0 - smoothstep(0.0, reach * 1.2, abs(t));
+        light = (seam + fissure * 0.35 + branch_floor * scar * 0.9 + crack * 0.8 * near * gape) * heat;
+        spill = heat * 0.12 * exp(-abs(t) / max(gap * 3.0, 1.0));
+        a = mix(a, vec3<f32>(0.006, 0.005, 0.008), max(fissure, branch * 0.85));
+        // Crushed earth and dust over the broken band, darker near the crack.
+        a = mix(a, a * vec3<f32>(0.4, 0.37, 0.38), band * (0.45 + 0.4 * near));
+        a *= 1.0 - 0.8 * crack;
     } else if kind == RIFT_LINE {
         let start = r.line.xy;
         let span = r.line.zw - start;

@@ -1357,9 +1357,9 @@ shared! {
         pub const LINE: u32 = 1;
         /// The well: the ground broken into plates over its reach, its edge a ring of cracks.
         pub const WELL: u32 = 2;
-        /// A gravitic lens's trail (the Lodestone's, renderer/lens_fx.rs): a narrow furrow
-        /// pressed into the ground under its front, violet in its seam behind the head,
-        /// cooling to embers, then a dark scar that fades away.
+        /// A gravitic lens's trail (the Lodestone's, renderer/lens_fx.rs): a jagged crack
+        /// split under its front, broken ground and branching cracks either side, violet
+        /// down in it behind the head, cooling to embers, then a dark scar that fades away.
         pub const TRAIL: u32 = 3;
         /// Seconds the trail's seam takes to cool behind the front (to a third).
         pub const TRAIL_COOL: f32 = 0.6;
