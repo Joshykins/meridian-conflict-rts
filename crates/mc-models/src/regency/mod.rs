@@ -152,24 +152,12 @@ pub(super) const MODELS: &[ModelDef] = &[
         seraph::seraph,
     ),
     // The tech 5 gravitic engine: a crown of blade-shards round a well, the energy held
-    // between them (`gravitic_engine`), three designs while one is picked.
+    // between them (`gravitic_engine`).
     ModelDef::new(
         "regency_gravitic_engine",
         gravitic_engine::RADIUS,
         gravitic_engine::HEIGHT,
         gravitic_engine::crown,
-    ),
-    ModelDef::new(
-        "regency_gravitic_engine~b",
-        gravitic_engine::RADIUS,
-        gravitic_engine::HEIGHT,
-        gravitic_engine::open_ring,
-    ),
-    ModelDef::new(
-        "regency_gravitic_engine~c",
-        gravitic_engine::RADIUS,
-        gravitic_engine::HEIGHT,
-        gravitic_engine::split_pyramid,
     ),
     // Factories: the land press works (`brood`), the air launch frame (`hatchery`), the
     // shell crouched on its legs behind the berth (`tidebrood`). All three upgrade in place
