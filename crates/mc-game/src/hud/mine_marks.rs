@@ -1086,7 +1086,8 @@ fn ghost_readout(
         })
         .collect();
     let share = grid.share(fx, reach, &others);
-    let rate = share.rate(&mine).to_f32();
+    // As this side is paid it.
+    let rate = share.rate(&mine).to_f32() * s.income_dial(s.view.local)[0];
     let efficiency = share.efficiency(&mine).to_f32();
     let cost = s.blueprints.unit(bp).cost_mass.to_f32();
     let z = overview_height(s.map, site);

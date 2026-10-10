@@ -310,3 +310,16 @@ fn a_refit_that_makes_resources_goes_first_with_either_of_them() {
     // A refit that makes nothing is not moved.
     assert_eq!(at(First, First, shield), Even);
 }
+
+#[test]
+fn a_units_own_income_figure_is_after_its_sides_income_dial() {
+    let mut w = world();
+    let reactor = spawn(&mut w, "aster_t1_power", 300, 300, 1000);
+    let row = w.state.units.row(reactor).unwrap();
+    let made = |w: &World| w.flows[row].made[1];
+    let base = made(&w);
+    assert!(base > Fx::ZERO);
+    w.state.players[0].income_permille[1] = 3000;
+    w.tick(&[]);
+    assert_eq!(made(&w), base * 3);
+}

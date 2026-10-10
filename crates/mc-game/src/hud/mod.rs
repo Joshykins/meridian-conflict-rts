@@ -242,6 +242,16 @@ impl Scene<'_> {
         crate::sim_thread::queue_of(&self.view.status.queues, u.unit_id)
     }
 
+    /// What `owner` is paid of its income, `[mass, energy]` as factors
+    /// (`PlayerStatus::income_dial`).
+    fn income_dial(&self, owner: u8) -> [f32; 2] {
+        self.view
+            .status
+            .players
+            .get(owner as usize)
+            .map_or([1.0; 2], |p| p.income_dial)
+    }
+
     fn team_color(&self, owner: u8) -> Color {
         let c = self.view.colors[owner as usize % mc_core::MAX_PLAYERS];
         [c[0], c[1], c[2], 1.0]

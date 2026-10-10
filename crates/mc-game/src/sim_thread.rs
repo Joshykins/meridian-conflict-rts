@@ -31,6 +31,10 @@ pub struct PlayerStatus {
     /// income once every mine is fully grown.
     pub mine_growth: f32,
     pub energy_income: f32,
+    /// What the side is paid of its mass and energy income, as factors: the seat's
+    /// set-up multiplier or the test range's dial. Previews made from blueprints are
+    /// turned by it.
+    pub income_dial: [f32; 2],
     pub mass_demand: f32,
     pub energy_demand: f32,
     /// What was really spent: the demand as far as the stall let it be paid.
@@ -269,6 +273,7 @@ pub fn status_of(world: &World, worst: u64) -> SimStatus {
                 reclaim_income: f(p.reclaim_income),
                 mine_growth: 0.0,
                 energy_income: f(p.energy_income),
+                income_dial: p.income_permille.map(|v| v as f32 / 1000.0),
                 mass_demand: f(p.mass_demand),
                 energy_demand: f(p.energy_demand),
                 mass_spent: f(p.mass_spent),

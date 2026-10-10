@@ -4,10 +4,10 @@
 //! its aircraft, named for the wing and priced for all of it.
 
 use crate::hud::style::Domain;
-use crate::hud::{whole, Hud, ENERGY, MASS};
+use crate::hud::{whole, Hud, Scene, ENERGY, MASS};
 use crate::ui::{palette, rgb, type_scale, Rect, Ui};
 use mc_core::TICKS_PER_SECOND;
-use mc_data::{Blueprints, UnitBlueprint};
+use mc_data::UnitBlueprint;
 
 /// How the builder whose card it is turns out what it offers.
 #[derive(Clone, Copy)]
@@ -32,7 +32,7 @@ pub(in crate::hud) enum Pace<'a> {
 pub(in crate::hud) fn data_card(
     hud: &Hud,
     ui: &mut Ui,
-    blueprints: &Blueprints,
+    s: &Scene,
     item: &UnitBlueprint,
     pace: Pace<'_>,
     hint: &str,
@@ -52,20 +52,32 @@ pub(in crate::hud) fn data_card(
         ));
     }
     let e = &item.economy;
+    // Income as this side is paid it.
+    let dial = s.income_dial(s.view.local);
     for (label, v, tone, sign) in [
-        ("Materials Income", e.mass_income, MASS, "+"),
-        ("Energy Income", e.energy_income, ENERGY, "+"),
-        ("Energy Upkeep", e.energy_upkeep, ENERGY, "-"),
-        ("Materials Storage", e.mass_storage, MASS, "+"),
-        ("Energy Storage", e.energy_storage, ENERGY, "+"),
+        (
+            "Materials Income",
+            e.mass_income.to_f32() * dial[0],
+            MASS,
+            "+",
+        ),
+        (
+            "Energy Income",
+            e.energy_income.to_f32() * dial[1],
+            ENERGY,
+            "+",
+        ),
+        ("Energy Upkeep", e.energy_upkeep.to_f32(), ENERGY, "-"),
+        ("Materials Storage", e.mass_storage.to_f32(), MASS, "+"),
+        ("Energy Storage", e.energy_storage.to_f32(), ENERGY, "+"),
     ] {
-        if v.to_f32() > 0.0 {
-            rows.push((label.into(), format!("{sign}{}", whole(v.to_f32())), tone));
+        if v > 0.0 {
+            rows.push((label.into(), format!("{sign}{}", whole(v)), tone));
         }
     }
     // A fabricator: what it makes with its upkeep paid, and how soon that buys it back.
     if let Some(f) = item.fabricator {
-        let rate = f.mass.to_f32();
+        let rate = f.mass.to_f32() * dial[0];
         rows.push(("Makes".into(), format!("+{rate:.0} materials/s"), MASS));
         if rate > 0.0 {
             rows.push((
@@ -77,7 +89,7 @@ pub(in crate::hud) fn data_card(
             rows.push(("Energy per Material".into(), format!("{per:.0}"), ENERGY));
         }
     }
-    rows.extend(crate::hud::adjacency::card_rows(blueprints, item));
+    rows.extend(crate::hud::adjacency::card_rows(s.blueprints, item));
     if let Some(r) = &item.reclaimer {
         let charge = if r.charge_ticks > 0 {
             format!(

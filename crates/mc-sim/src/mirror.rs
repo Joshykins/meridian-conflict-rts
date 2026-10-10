@@ -1117,7 +1117,7 @@ pub struct MineVein {
     pub field: u16,
     /// Hectares of its ore in the mine's territory.
     pub ore: f32,
-    /// Materials per second it adds once reached.
+    /// Materials per second it adds once reached, after its side's income dial.
     pub rate: f32,
     /// Seconds from the mine's finishing to the drift arriving, and seconds left.
     pub dig: f32,
@@ -1131,9 +1131,14 @@ pub struct MineView {
     pub land: crate::mines::Share,
     /// Zero to one: what its territory gives over what its whole circle would.
     pub share: f32,
-    /// Materials per second now, and once every drift is dug.
+    /// Materials per second now, and once every drift is dug, as its side is paid them
+    /// (after the income dial).
     pub rate: f32,
     pub full: f32,
+    /// What its side is paid of mass income, as a factor (the income dial): `rate` and
+    /// `full` are turned by it already; a preview made from another blueprint is turned
+    /// by it too.
+    pub dial: f32,
     /// Seconds it has been digging.
     pub age: f32,
     /// Metres out from it the land it works reaches by now.
@@ -3013,26 +3018,39 @@ impl World {
             return Vec::new();
         };
         let tps = TICKS_PER_SECOND as f32;
+        let dial = self.mass_dial(row);
         m.veins
             .iter()
             .map(|v| MineVein {
                 field: v.field,
                 ore: v.ore.to_f32(),
-                rate: (v.ore * (spec.per_hectare - spec.ground).max(Fx::ZERO)).to_f32(),
+                rate: (v.ore * (spec.per_hectare - spec.ground).max(Fx::ZERO)).to_f32() * dial,
                 dig: v.reached_at as f32 / tps,
                 eta: v.reached_at.saturating_sub(m.age) as f32 / tps,
             })
             .collect()
     }
 
+    /// What the owner of `row` is paid of its mass income, as a factor: the seat's
+    /// set-up multiplier or the test range's dial.
+    fn mass_dial(&self, row: usize) -> f32 {
+        let owner = self.state.units.owner[row] as usize;
+        self.state
+            .players
+            .get(owner)
+            .map_or(1.0, |p| p.income_permille[0] as f32 / 1000.0)
+    }
+
     fn mine_view(&self, row: usize) -> Option<MineView> {
         let spec = self.bp(row).mine?;
         let m = self.state.mines.by_unit.get(&self.state.units.id(row))?;
+        let dial = self.mass_dial(row);
         Some(MineView {
             land: m.land,
             share: m.land.efficiency(&spec).to_f32(),
-            rate: m.rate(&spec).to_f32(),
-            full: m.full_rate(&spec).to_f32(),
+            rate: m.rate(&spec).to_f32() * dial,
+            full: m.full_rate(&spec).to_f32() * dial,
+            dial,
             age: m.age as f32 / TICKS_PER_SECOND as f32,
             spread: m.spread().to_f32(),
         })

@@ -47,6 +47,15 @@ fn ratio(have: Fx, want: Fx) -> Fx {
     }
 }
 
+/// `v` turned by an income dial (`Player::income_permille`, thousandths).
+pub(crate) fn dialed(v: Fx, permille: u16) -> Fx {
+    if permille == 1000 {
+        v
+    } else {
+        v * permille as i32 / 1000
+    }
+}
+
 /// One unit's part in its side's economy this tick, in units per tick: `[mass, energy]`.
 /// Not state; the mirror reports it to the interface.
 #[derive(Clone, Copy, Default, Debug)]
@@ -115,9 +124,11 @@ impl World {
             upkeep[p] += e.energy_upkeep / DT;
             capacity[p].0 += e.mass_storage;
             capacity[p].1 += e.energy_storage;
+            // A unit's own figure is what its side is paid: after the income dial.
+            let dial = self.state.players[p].income_permille;
             let flow = &mut self.flows[row];
-            flow.made[0] += e.mass_income / DT;
-            flow.made[1] += e.energy_income / DT;
+            flow.made[0] += dialed(e.mass_income / DT, dial[0]);
+            flow.made[1] += dialed(e.energy_income / DT, dial[1]);
             flow.wanted[1] += e.energy_upkeep / DT;
         }
         // A seat's set-up multiplier or the test range can turn a side's income up or down,
@@ -126,10 +137,7 @@ impl World {
         for (p, pl) in self.state.players.iter().enumerate() {
             capacity[p].0 += pl.bonus_storage[0];
             capacity[p].1 += pl.bonus_storage[1];
-            let e = pl.income_permille[1];
-            if e != 1000 {
-                income[p].1 = income[p].1 * e as i32 / 1000;
-            }
+            income[p].1 = dialed(income[p].1, pl.income_permille[1]);
         }
 
         // Builders: gather what each wants to do this tick.
@@ -269,10 +277,7 @@ impl World {
         let mine_lost = self.mine_income(&mut income, &powered);
         self.fabricator_income(&mut income, &powered);
         for (p, pl) in self.state.players.iter().enumerate() {
-            let m = pl.income_permille[0];
-            if m != 1000 {
-                income[p].0 = income[p].0 * m as i32 / 1000;
-            }
+            income[p].0 = dialed(income[p].0, pl.income_permille[0]);
         }
 
         // How much of each tier each player can cover, in turn, each out of what the

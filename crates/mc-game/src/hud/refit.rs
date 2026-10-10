@@ -601,17 +601,19 @@ fn card(
     let power = |b: &UnitBlueprint| b.builder.as_ref().map_or(0.0, |x| x.power.to_f32());
     diff("Build Power", power(from), power(to), "", palette::TEXT);
     let (ea, eb) = (&from.economy, &to.economy);
+    // Income as the unit's side is paid it.
+    let dial = s.income_dial((u.owner_flags & 0xFF) as u8);
     diff(
         "Materials Income",
-        ea.mass_income.to_f32(),
-        eb.mass_income.to_f32(),
+        ea.mass_income.to_f32() * dial[0],
+        eb.mass_income.to_f32() * dial[0],
         " / s",
         MASS,
     );
     diff(
         "Energy Income",
-        ea.energy_income.to_f32(),
-        eb.energy_income.to_f32(),
+        ea.energy_income.to_f32() * dial[1],
+        eb.energy_income.to_f32() * dial[1],
         " / s",
         ENERGY,
     );

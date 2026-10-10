@@ -579,7 +579,8 @@ impl World {
             if row >= self.flows.len() {
                 self.flows.resize(row + 1, Default::default());
             }
-            self.flows[row].made[0] += made;
+            self.flows[row].made[0] +=
+                crate::economy::dialed(made, self.state.players[p].income_permille[0]);
         }
         lost
     }
@@ -601,7 +602,8 @@ impl World {
             if row >= self.flows.len() {
                 self.flows.resize(row + 1, Default::default());
             }
-            self.flows[row].made[0] += made;
+            self.flows[row].made[0] +=
+                crate::economy::dialed(made, self.state.players[p].income_permille[0]);
         }
     }
 

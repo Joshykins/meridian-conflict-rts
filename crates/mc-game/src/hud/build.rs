@@ -440,7 +440,7 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
                         .to_owned()
                 }
             };
-            data_card(hud, ui, s.blueprints, item, pace, &hint, tile, floor - GAP);
+            data_card(hud, ui, s, item, pace, &hint, tile, floor - GAP);
         }
         Some(Hover::Climb(i, tile)) => {
             upgrade_card(hud, ui, s, unit, bp, &line, i, reached, tile, floor - GAP)
@@ -1154,13 +1154,25 @@ fn upgrade_card(
         rows.push(("Build Power", power(from), power(next), ""));
     }
     let e = (&from.economy, &next.economy);
-    for (label, a, b) in [
-        ("Materials Income", e.0.mass_income, e.1.mass_income),
-        ("Energy Income", e.0.energy_income, e.1.energy_income),
-        ("Energy Upkeep", e.0.energy_upkeep, e.1.energy_upkeep),
+    // Income as the unit's side is paid it.
+    let dial = s.income_dial((u.owner_flags & 0xFF) as u8);
+    for (label, a, b, k) in [
+        (
+            "Materials Income",
+            e.0.mass_income,
+            e.1.mass_income,
+            dial[0],
+        ),
+        (
+            "Energy Income",
+            e.0.energy_income,
+            e.1.energy_income,
+            dial[1],
+        ),
+        ("Energy Upkeep", e.0.energy_upkeep, e.1.energy_upkeep, 1.0),
     ] {
         if a.to_f32() + b.to_f32() > 0.0 {
-            rows.push((label, a.to_f32(), b.to_f32(), ""));
+            rows.push((label, a.to_f32() * k, b.to_f32() * k, ""));
         }
     }
     // A shield: how much it takes, how far it reaches, how fast it fills.
@@ -1199,20 +1211,15 @@ fn upgrade_card(
         let was = if from.id == current.id {
             view.rate
         } else {
-            super::mine::rate_on(from, &view.land)
+            super::mine::rate_on(from, &view)
         };
         rows.insert(
             0,
-            (
-                "Materials / s",
-                was,
-                super::mine::rate_on(next, &view.land),
-                "",
-            ),
+            ("Materials / s", was, super::mine::rate_on(next, &view), ""),
         );
     }
     // A fabricator: what it makes now and at the next tier.
-    let made = |bp: &UnitBlueprint| bp.fabricator.map(|f| f.mass.to_f32());
+    let made = |bp: &UnitBlueprint| bp.fabricator.map(|f| f.mass.to_f32() * dial[0]);
     if let (Some(a), Some(b)) = (made(from), made(next)) {
         rows.insert(0, ("Materials / s", a, b, ""));
     }

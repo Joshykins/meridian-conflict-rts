@@ -52,21 +52,23 @@ pub fn flows(s: &Scene, u: &UnitInstance, bp: &UnitBlueprint) -> (Flow, Flow) {
                 used: q.energy_used,
             },
         ),
-        None => rated(bp),
+        None => rated(bp, s.income_dial((u.owner_flags & 0xFF) as u8)),
     }
 }
 
-/// What a blueprint makes, a fabricator's materials included, and costs to keep running.
-fn rated(bp: &UnitBlueprint) -> (Flow, Flow) {
+/// What a blueprint makes, a fabricator's materials included, as a side with income
+/// `dial` is paid it, and costs to keep running.
+fn rated(bp: &UnitBlueprint, dial: [f32; 2]) -> (Flow, Flow) {
     let e = &bp.economy;
     let upkeep = e.energy_upkeep.to_f32();
     (
         Flow {
-            made: e.mass_income.to_f32() + bp.fabricator.map_or(0.0, |f| f.mass.to_f32()),
+            made: (e.mass_income.to_f32() + bp.fabricator.map_or(0.0, |f| f.mass.to_f32()))
+                * dial[0],
             ..Default::default()
         },
         Flow {
-            made: e.energy_income.to_f32(),
+            made: e.energy_income.to_f32() * dial[1],
             wanted: upkeep,
             used: upkeep,
         },
@@ -195,9 +197,22 @@ mod tests {
             .expect("blueprints");
         let bp = blueprints.unit(blueprints.id_of("aster_t2_fabricator").expect("fabricator"));
         let made = bp.fabricator.expect("a fabricator").mass.to_f32();
-        let (mass, energy) = rated(bp);
+        let (mass, energy) = rated(bp, [1.0; 2]);
         assert!(made > 0.0);
         assert_eq!(mass.made, made + bp.economy.mass_income.to_f32());
         assert_eq!(energy.used, bp.economy.energy_upkeep.to_f32());
+    }
+
+    #[test]
+    fn a_side_on_an_income_multiplier_sees_what_it_is_paid() {
+        let blueprints = Blueprints::load(&Blueprints::locate_data_dir().expect("data dir"))
+            .expect("blueprints");
+        let bp = blueprints.unit(blueprints.id_of("aster_t2_fabricator").expect("fabricator"));
+        let (base, base_e) = rated(bp, [1.0; 2]);
+        let (mass, energy) = rated(bp, [3.0, 2.0]);
+        assert_eq!(mass.made, base.made * 3.0);
+        assert_eq!(energy.made, base_e.made * 2.0);
+        // Upkeep is not income: the dial leaves it alone.
+        assert_eq!(energy.used, base_e.used);
     }
 }

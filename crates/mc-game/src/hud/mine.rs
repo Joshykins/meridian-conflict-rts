@@ -24,9 +24,11 @@ pub fn views<'a>(s: &Scene<'a>, units: &[&UnitInstance]) -> Vec<(MineView, &'a U
         .collect()
 }
 
-/// Materials per second a mine of `bp` would make on this territory.
-pub fn rate_on(bp: &UnitBlueprint, land: &mc_sim::mines::Share) -> f32 {
-    bp.mine.map_or(0.0, |m| land.rate(&m).to_f32())
+/// Materials per second a mine of `bp` would make on `view`'s territory, as its side
+/// is paid them.
+pub fn rate_on(bp: &UnitBlueprint, view: &MineView) -> f32 {
+    bp.mine
+        .map_or(0.0, |m| view.land.rate(&m).to_f32() * view.dial)
 }
 
 /// What upgrading to the next tier adds per second, and the seconds the
@@ -44,7 +46,7 @@ pub fn upgrade_gain(
 /// Each upgrade costs the difference between the tiers, so the climb costs the
 /// difference between its ends.
 pub fn climb_gain(bp: &UnitBlueprint, to: &UnitBlueprint, view: &MineView) -> Option<(f32, f32)> {
-    let gain = rate_on(to, &view.land) - rate_on(bp, &view.land);
+    let gain = rate_on(to, view) - rate_on(bp, view);
     let cost = (to.cost_mass - bp.cost_mass).to_f32().max(0.0);
     (gain > 0.0).then(|| (gain, cost / gain))
 }
