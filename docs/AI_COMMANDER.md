@@ -252,6 +252,12 @@ Ground rules learnt in the tournaments (each is a comment at its code):
 - a wave that cannot fill goes with three quarters of its mark after two minutes
   gathering and with half after four: a Hard side on 7 a second waited a whole
   match for a 380-mass wave and never attacked;
+- an army held at home (Pressure off) goes once it holds a minute of income, at
+  least 3000 mass, and that mark never shrinks with waiting: held at nothing, two
+  aggressive sides on an island map kept 436 000 and 122 000 mass at home;
+- on a side with no land route its army is its hovercraft, and a target counts
+  as reached where a hovercraft can float (`army_reaches`): asked only whether
+  home's ground reached them, a hover army of 663 never found a target;
 - the tier path never takes the side's only factory: upgrading it stops the army;
 - one army, not a trickle: while a wave is out fighting, what gathers behind it
   joins it once it is worth a thousand mass (waves of two and three thousand met a

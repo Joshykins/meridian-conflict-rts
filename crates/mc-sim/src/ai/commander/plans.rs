@@ -26,6 +26,8 @@ const MARGIN: i32 = 12;
 const COMMIT: u32 = 1800;
 /// Mass traded before a plan's record counts for or against it.
 const EVIDENCE: Fx = Fx::from_int(1200);
+/// Least mass an army held at home (Pressure off) gathers before it goes.
+const HELD_ARMY: i32 = 3000;
 
 /// A personality, as tastes over the plans (`docs/AI_COMMANDER.md`, "Personalities").
 struct Taste {
@@ -736,11 +738,16 @@ impl World {
                 0
             };
             let want = match o.kind {
-                // Off: the army holds at home and answers raids. Otherwise a wave is
-                // so many seconds of income: sized by what had been seen, the first
-                // wave waited nine minutes while the enemy took the map.
+                // Off: the army holds at home and answers raids, until it holds a
+                // minute of income (more than an all-in wave): then it is more than
+                // home needs, and goes. Held at nothing, two aggressive sides on an
+                // island map kept 436 000 and 122 000 mass of hover tanks at home
+                // while the factories made more.
+                // Otherwise a wave is so many seconds of income: sized by what had
+                // been seen, the first wave waited nine minutes while the enemy took
+                // the map.
                 OpKind::Army => match pressure {
-                    Stake::Off => Fx::ZERO,
+                    Stake::Off => Fx::from_int(HELD_ARMY.max(i * 60)),
                     Stake::Probe => Fx::from_int(150 + i * 10),
                     Stake::Invest => Fx::from_int(300 + i * 18),
                     Stake::AllIn => Fx::from_int(700 + i * 40),
@@ -758,7 +765,10 @@ impl World {
             // Two minutes gathering: go with three quarters; four: with half. A Hard
             // side on 7 a second waited all match for a 380-mass wave that never
             // filled, and never once attacked.
+            // An army held at home goes at its full mark, however long it waits.
+            let held = o.kind == OpKind::Army && pressure == Stake::Off;
             o.want = match waited {
+                _ if held => want,
                 0 | 1 => want,
                 2 | 3 => want * 3 / 4,
                 _ => want / 2,

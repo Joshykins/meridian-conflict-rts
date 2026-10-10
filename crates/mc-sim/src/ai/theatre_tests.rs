@@ -137,3 +137,33 @@ fn an_unarmed_radar_ship_is_no_project() {
     let vigil = w.blueprints.id_of("aster_t2_sensor_ship").unwrap();
     assert_eq!(projects::project_kind(w.blueprints.unit(vigil)), None);
 }
+
+#[test]
+fn a_hover_army_crosses_the_sea_to_the_enemy_island() {
+    let mut w = islands(false);
+    w.state.players[0].controller = Controller::Ai;
+    for i in 0..20 {
+        spawn(
+            &mut w,
+            "aster_t2_hover",
+            400 + (i % 5) * 30,
+            500 + (i / 5) * 30,
+        );
+    }
+    // Something of theirs to go for, on their island, seen.
+    let mine = w.blueprints.id_of("aster_core_mine").unwrap();
+    w.spawn_unit(mine, 1, FxVec2::from_ints(3500, 3500), Angle::ZERO, true)
+        .unwrap();
+    for _ in 0..6000 {
+        w.tick(&[] as &[crate::PlayerCommand]).unwrap();
+    }
+    // Its targets were asked only whether home's ground reached them, and an
+    // island's never does: the army held at home all match.
+    let c = &w.state.ai[0].commander;
+    assert!(
+        c.trades[super::commander::state::OpKind::Army as usize].killed > Fx::ZERO,
+        "the hover army never went: {}\n{}",
+        c.summary(),
+        c.op_lines().join("\n")
+    );
+}

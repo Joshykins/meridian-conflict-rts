@@ -6,13 +6,15 @@ use super::Ctx;
 use crate::command::Command;
 use crate::World;
 use mc_core::{Fx, FxVec2};
-use mc_data::cat;
+use mc_data::{cat, MoveLayer};
 
 /// Enemy damage a second worth one mass of fighting strength: a T1 tank is about
 /// 20 damage a second for 100 mass.
 pub(in crate::ai) const THREAT_MASS: i32 = 5;
 /// A group falls back, as a group, once what it faces is this many times it.
 const OUTMATCHED: Fx = Fx::from_int(2);
+/// How near a target a hovercraft must be able to float for a hover army to go for it.
+const HOVER_NEAR: i32 = 256;
 /// How far from its rally point a gathering wave goes after enemy groups it beats.
 const PREY_REACH: i32 = 2500;
 /// Enemy mass below which an incursion is left to the turrets: a scout.
@@ -77,7 +79,7 @@ impl World {
                     soft_kind
                 } else {
                     structure || bp.has(cat::COMMANDER)
-                }) && (ashore || ctx.can_walk(c.pos))
+                }) && (ashore || self.army_reaches(ctx, c.pos))
             })
             .filter_map(|c| {
                 let threat = self.enemy_strength_at(ctx, c.pos, Fx::from_int(700), Target::Land);
@@ -110,7 +112,7 @@ impl World {
                 (!soft)
                     .then_some(ctx.enemy_start)
                     .flatten()
-                    .filter(|s| ctx.can_walk(*s))
+                    .filter(|s| self.army_reaches(ctx, *s))
             })
     }
 
@@ -190,7 +192,7 @@ impl World {
                 .min_by_key(|p| (p.distance_sq(centre), p.x, p.y));
             let charge = guns.filter(|g| {
                 self.enemy_strength_at(ctx, *g, Fx::from_int(700), Target::Land) * 4 <= mass * 5
-                    && ctx.can_walk(*g)
+                    && self.army_reaches(ctx, *g)
             });
             match charge {
                 Some(g) => {
@@ -285,7 +287,7 @@ impl World {
                                 super::super::Stance::Raid,
                             )
                             .filter(|t| {
-                                ctx.can_walk(*t)
+                                self.army_reaches(ctx, *t)
                                     && self.enemy_strength_at(
                                         ctx,
                                         *t,
@@ -569,13 +571,26 @@ impl World {
                         Some(super::profile::Domain::Land | super::profile::Domain::Hover)
                     )
                     && c.pos.distance(at) <= Fx::from_int(PREY_REACH)
-                    && ctx.can_walk(c.pos)
+                    && self.army_reaches(ctx, c.pos)
             })
             .map(|c| c.pos)
             .filter(|&p| {
                 self.enemy_strength_at(ctx, p, Fx::from_int(700), Target::Land) * 6 <= mass * 5
             })
             .min_by_key(|p| (p.distance_sq(at), p.x, p.y))
+    }
+
+    /// Whether the land army can get to `p`: walk there from home or, on a side with
+    /// no land route, whose army is its hovercraft alone (`ops::fits`), float there.
+    /// Asked only whether home's ground reached them, a hover army of 663 on an
+    /// island map never found a target and held at home for half an hour.
+    pub(in crate::ai) fn army_reaches(&self, ctx: &Ctx, p: FxVec2) -> bool {
+        ctx.can_walk(p)
+            || (!ctx.land_route
+                && self
+                    .nav
+                    .nearest_passable(MoveLayer::Hover, 0, p)
+                    .is_some_and(|g| g.distance(p) <= Fx::from_int(HOVER_NEAR)))
     }
 
     /// Whether `row` has nothing more to do, or stands where it was sent near `to`.
