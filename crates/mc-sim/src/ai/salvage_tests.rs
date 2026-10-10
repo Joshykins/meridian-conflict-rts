@@ -97,6 +97,29 @@ fn a_field_near_home_gets_a_tower_and_a_covered_one_does_not() {
 }
 
 #[test]
+fn a_field_whose_tower_found_no_lot_is_left_for_a_while() {
+    let mut w = world();
+    field(&mut w, 700, 500, 8);
+    field(&mut w, 300, 1500, 4);
+    let engineer = spawn(&mut w, "aster_t1_engineer", 320, 320);
+    let start = w.state.players[0].start;
+    let census = w.survey_own(0);
+    let intel = Intel::default();
+    let mut planned = w.plan_counts(0, &census);
+    planned.salvage = w.wreck_fields(start, &intel);
+    let first = w.salvage_job(engineer, &planned, &|_| true).unwrap();
+    // No lot by the big field this think: the next think goes to the other one,
+    // where every idle engineer used to choose the same tower again forever.
+    w.note_failed_sites(0, &[], &[(first.blueprint, first.near)]);
+    let next = w.salvage_job(engineer, &planned, &|_| true).unwrap();
+    assert!(next.near.distance(FxVec2::from_ints(345, 1515)) < Fx::from_int(250));
+    // Three minutes on, it is tried again.
+    w.state.tick += crate::ai::commander::economy::BLOCKED_FOR;
+    let again = w.salvage_job(engineer, &planned, &|_| true).unwrap();
+    assert_eq!(again.near, first.near);
+}
+
+#[test]
 fn factories_make_a_cheap_salvager_while_wrecks_lie_about_and_idle_ones_go_to_them() {
     let mut w = world();
     let air = spawn(&mut w, "aster_t2_air_factory", 400, 300);

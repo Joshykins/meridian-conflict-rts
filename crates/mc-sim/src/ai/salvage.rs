@@ -3,6 +3,7 @@
 //! that is safe to work. Reclaim is cheap and quick to pay back, so a field is worth a
 //! tower long before it is worth an army.
 
+use super::commander::economy::BLOCKED_FOR;
 use super::{Census, Intel, Job, Place, Planned};
 use crate::World;
 use mc_core::{Fx, FxVec2};
@@ -100,20 +101,38 @@ impl World {
         }
         let blueprint = self.pick_reclaimer(row)?;
         let reach = self.blueprints.unit(blueprint).reclaimer?.range;
-        let field = planned.salvage.iter().find(|f| {
-            f.mass >= Fx::from_int(TOWER_FIELD)
-                && allow(f.at)
-                && planned
-                    .towers
-                    .iter()
-                    .all(|&(at, r)| at.distance(f.at) > r * Fx::ratio(3, 4))
-        })?;
+        let owner = self.state.units.owner[row] as usize;
         // Back from the wrecks toward home a little, so the tower's lot is clear of them.
-        let near = super::offset_toward(
-            field.at,
-            self.state.players[self.state.units.owner[row] as usize].start,
-            reach / 4,
-        );
+        let near_of =
+            |f: &Field| super::offset_toward(f.at, self.state.players[owner].start, reach / 4);
+        // A place no lot was found at lately is left alone for a while, as the
+        // solver's wants are: a field of sunk ships off the coast had every idle
+        // engineer choose its tower, find no lot and stand idle, every think for
+        // twenty minutes, while the store overflowed.
+        let tick = self.state.tick;
+        let blocked = |near: FxVec2| {
+            self.state.ai[owner]
+                .commander
+                .eco
+                .blocked_wants
+                .iter()
+                .any(|&(b, p, t)| {
+                    b == blueprint && tick < t + BLOCKED_FOR && p.distance(near) < Fx::from_int(300)
+                })
+        };
+        let near = planned
+            .salvage
+            .iter()
+            .filter(|f| {
+                f.mass >= Fx::from_int(TOWER_FIELD)
+                    && allow(f.at)
+                    && planned
+                        .towers
+                        .iter()
+                        .all(|&(at, r)| at.distance(f.at) > r * Fx::ratio(3, 4))
+            })
+            .map(near_of)
+            .find(|&near| !blocked(near))?;
         Some(Job {
             blueprint,
             near,
