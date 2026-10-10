@@ -103,6 +103,19 @@ impl Renderer {
             VIOLET.lerp(LILAC, 0.3 * c) * (0.6 + 3.4 * c * c) * flicker,
             (0.15 + 0.85 * c).min(1.0),
         );
+        // A second, wider sheath round it, fainter and wound slower: the energy in layers,
+        // filling the room between the shards so it shows through their gaps.
+        let sheath = e.radius * (0.1 + 0.16 * c);
+        self.push_lit(
+            VORTEX,
+            foot + Vec3::Z * tall * 0.08,
+            Vec3::Z * tall * 0.84,
+            time,
+            dt * 2.0,
+            (sheath, sheath),
+            VIOLET * (0.3 + 1.2 * c * c) * flicker,
+            0.35 * c,
+        );
         if !near {
             return;
         }

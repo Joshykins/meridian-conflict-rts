@@ -19,9 +19,9 @@ use mc_sim::mirror::WellView;
 const GLOW: f32 = puff::WARP_GLOW as f32;
 /// How fast the rift runs, m/s, as the effects time it; the sim's front corrects it each
 /// tick (`RiftGround::line_cap`).
-const SPEED: f32 = 900.0;
+pub(super) const SPEED: f32 = 900.0;
 /// Half the width of the band of broken ground either side of the fissure, metres.
-const WIDTH: f32 = 26.0;
+pub(super) const WIDTH: f32 = 26.0;
 /// Metres between the slabs thrown up along it, each side, at least; a long rift spaces
 /// them out so it never has more than `MOST_ALONG` a side (a deliberate cosmetic cap).
 const SLAB_STEP: f32 = 13.0;

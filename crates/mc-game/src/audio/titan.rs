@@ -8,10 +8,13 @@
 //! - A rotary gun's `spin`: heard as its barrels start to turn (`Weapon::spin_up`).
 //! - A giant rail gun's spent sabot bursting where it lands (`SimEvent::SabotLanded`).
 //! - The trees a giant or a settling capital ship knocks over (`trees.rs`).
+//! - A gravitic engine's rift gathering, tearing out and striking, felt as the ground
+//!   shaking (`rift_jolts.rs`).
 //!
 //! Heard the moment it happens, however far, like a nuclear blast (game.rs
 //! `nuke_sounds`): the user wants a sound with its event, not the real lag of sound.
 
+mod rift_jolts;
 mod trees;
 mod tremor;
 
@@ -197,6 +200,10 @@ impl GiantSounds {
         self.spin_speed = speeds;
 
         for event in events {
+            if let Some(jolt) = rift_jolts::rift_jolt(event) {
+                jolts.push(jolt);
+                continue;
+            }
             if let SimEvent::SabotLanded {
                 pos,
                 blueprint,

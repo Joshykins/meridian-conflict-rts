@@ -293,6 +293,7 @@ impl Renderer {
             let Some(v) = e.view else {
                 continue;
             };
+            self.catch_up(e, &v, time);
             match v.stage {
                 WellStage::Gathering => {}
                 WellStage::Running => self.rift_running(e, &v, time, camera),
@@ -307,6 +308,37 @@ impl Renderer {
                 stored.run = Vec3::from(v.front)
                     .truncate()
                     .distance(Vec3::from(v.from).truncate());
+            }
+        }
+    }
+
+    /// A rift or well under way that the renderer missed the start of (it was out of
+    /// sight, or the renderer is new): its broken ground and rock laid as they stand now,
+    /// without the flash of their start.
+    fn catch_up(&mut self, e: &Engine, v: &WellView, time: f32) {
+        let from = Vec2::from_slice(&v.from[..2]);
+        let mark = Vec2::from_slice(&v.mark[..2]);
+        let length = from.distance(mark);
+        let ground = &mut self.gravitic_engine_fx.ground;
+        match v.stage {
+            WellStage::Gathering => {}
+            WellStage::Running => {
+                if !ground.has_live(e.id, crate::gpu_consts::rift::LINE) {
+                    ground.line(e.id, from, mark, rift::SPEED, rift::WIDTH, time - v.seconds);
+                }
+            }
+            WellStage::Holding => {
+                if !ground.has_live(e.id, crate::gpu_consts::rift::LINE) {
+                    let began = time - v.seconds - length / rift::SPEED;
+                    ground.line(e.id, from, mark, rift::SPEED, rift::WIDTH, began);
+                    ground.line_cap(e.id, length);
+                }
+                if !ground.has_live(e.id, crate::gpu_consts::rift::WELL) {
+                    let began = time - v.seconds;
+                    ground.well(e.id, mark, v.radius, began);
+                    let z = self.ground_height(mark).max(v.mark[2]);
+                    self.well_rock(e.id, mark, z, v.radius.max(20.0), time);
+                }
             }
         }
     }

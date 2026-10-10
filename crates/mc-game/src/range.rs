@@ -116,10 +116,18 @@ pub enum Scenario {
     /// A gravitic engine (`UnitBlueprint::gravitic`, The Fallen) turned at once on a red
     /// camp 2 km down the range: tanks, a few buildings and aircraft circling over them.
     Fracture,
+    /// `Fracture`, then the well held a while: the engine falters (paused, `FALTER_AT`),
+    /// takes up again, and is stopped (`LET_GO_AT`), letting the well go.
+    FractureLetGo,
 }
 
+/// `Scenario::FractureLetGo`'s ticks: the engine paused, taken up again, stopped.
+pub const FALTER_AT: u32 = 230;
+pub const RESUME_AT: u32 = 260;
+pub const LET_GO_AT: u32 = 300;
+
 impl Scenario {
-    pub const ALL: [Scenario; 18] = [
+    pub const ALL: [Scenario; 19] = [
         Scenario::UnderFire,
         Scenario::PointBlank,
         Scenario::Targets,
@@ -138,6 +146,7 @@ impl Scenario {
         Scenario::Elevator,
         Scenario::Dash,
         Scenario::Fracture,
+        Scenario::FractureLetGo,
     ];
 
     pub fn label(self) -> &'static str {
@@ -160,6 +169,7 @@ impl Scenario {
             Scenario::Elevator => "Elevator",
             Scenario::Dash => "Dash",
             Scenario::Fracture => "Fracture",
+            Scenario::FractureLetGo => "Let Go",
         }
     }
 
@@ -183,6 +193,7 @@ impl Scenario {
             "elevator" => Scenario::Elevator,
             "dash" => Scenario::Dash,
             "fracture" => Scenario::Fracture,
+            "fracture-release" => Scenario::FractureLetGo,
             _ => return None,
         })
     }
@@ -1074,7 +1085,9 @@ fn stage(
                 None,
             ))
         }
-        Scenario::Fracture => fracture_camp(blueprints, bp, east(Fx::from_int(FRACTURE_RANGE), 0)),
+        Scenario::Fracture | Scenario::FractureLetGo => {
+            fracture_camp(blueprints, bp, east(Fx::from_int(FRACTURE_RANGE), 0))
+        }
         Scenario::Short => {
             let upkeep = bp.economy.energy_upkeep;
             let plant = blueprints

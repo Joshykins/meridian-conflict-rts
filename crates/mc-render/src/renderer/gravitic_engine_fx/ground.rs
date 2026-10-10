@@ -98,6 +98,13 @@ impl RiftGround {
             .find(|r| r.engine == engine && r.kind == kind && r.released.is_none())
     }
 
+    /// Whether the engine has a break of `kind` it is still working.
+    pub(super) fn has_live(&self, engine: u32, kind: u32) -> bool {
+        self.records
+            .iter()
+            .any(|r| r.engine == engine && r.kind == kind && r.released.is_none())
+    }
+
     fn push(&mut self, engine: u32, kind: u32, gpu: GpuRift) {
         if self.records.len() >= rift::MAX as usize {
             // A deliberate cap (cosmetic): the oldest scar the engines have let go goes

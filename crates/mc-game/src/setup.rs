@@ -1013,6 +1013,30 @@ pub fn late_orders(opts: &Options, world: &mc_sim::World, t: u32) -> Vec<PlayerC
             },
         }];
     }
+    if opts.scene == Scene::Range && opts.scenario == Some(crate::range::Scenario::FractureLetGo) {
+        // The engine falters, takes up again, and is stopped: its well let go.
+        use crate::range::{FALTER_AT, LET_GO_AT, RESUME_AT};
+        let subject = world.blueprints.id_of(&opts.subject);
+        let units: Vec<_> = u
+            .slots
+            .iter()
+            .filter(|&r| u.owner[r] == 0 && Some(u.blueprint[r]) == subject)
+            .map(|r| u.id(r))
+            .collect();
+        let command = match t {
+            FALTER_AT => Command::SetPaused {
+                units,
+                paused: true,
+            },
+            RESUME_AT => Command::SetPaused {
+                units,
+                paused: false,
+            },
+            LET_GO_AT => Command::Stop { units },
+            _ => return Vec::new(),
+        };
+        return vec![PlayerCommand { player: 0, command }];
+    }
     if opts.scene != Scene::Wreckage || t != WRECKAGE_LATE_KILL {
         return Vec::new();
     }

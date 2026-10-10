@@ -3526,7 +3526,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             let earth = 1.0 - smoothstep(0.9, 1.6, below);
             var look = rock.color * vec3<f32>(0.42, 0.4, 0.42);
             look = mix(look, vec3<f32>(0.075, 0.058, 0.042) * grain, earth);
-            look = mix(look, vec3<f32>(0.055, 0.07, 0.03) * grain, turf);
+            look = mix(look, vec3<f32>(0.085, 0.1, 0.045) * grain, turf);
             m.albedo = look;
             m.roughness = mix(rock.roughness, 0.95, earth);
         }

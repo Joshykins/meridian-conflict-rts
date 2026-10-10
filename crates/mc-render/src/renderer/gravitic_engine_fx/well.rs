@@ -18,7 +18,7 @@ use mc_sim::mirror::{RenderFrame, WellView, KIND_GHOST, KIND_PROP, KIND_WRECK};
 const STREAK: f32 = puff::WARP_STREAK as f32;
 const MOTE: f32 = puff::WARP_MOTE as f32;
 /// Slabs lifted over a well and shards circling it: a deliberate cosmetic cap.
-const WELL_SLABS: usize = 150;
+const WELL_SLABS: usize = 95;
 const WELL_SHARDS: usize = 60;
 /// Units in a well given arcs of their own each tick, at most (cosmetic).
 const MOST_CRUSHED: usize = 12;
@@ -140,14 +140,22 @@ impl Renderer {
                 BOLT,
             );
         }
-        // The plates lift as the shatter passes them; shards of rock rise and start round.
+        self.well_rock(unit, centre, ground.z, r, time);
+    }
+
+    /// The well's plates lifting as the shatter passes them from `time`, and shards of rock
+    /// rising and starting round.
+    pub(super) fn well_rock(&mut self, unit: u32, centre: Vec2, ground_z: f32, r: f32, time: f32) {
+        let ground = centre.extend(ground_z);
         for i in 0..WELL_SLABS {
             let d =
                 r * (0.03 + 0.95 * ((i as f32 + self.scatter.unit()) / WELL_SLABS as f32).sqrt());
             let a = TAU * self.scatter.unit();
             let at = centre + Vec2::new(a.cos(), a.sin()) * d;
             let inner = 1.0 - d / r;
-            let scale = 1.4 + 2.6 * self.scatter.unit();
+            // Mostly middling plates, a few great ones and a scatter of small.
+            let scale = 0.6 + 3.6 * self.scatter.unit().powi(2);
+            let steep = if self.scatter.unit() < 0.2 { 1.1 } else { 0.45 };
             let piece = Piece {
                 ground: ground.z,
                 engine: unit,
@@ -157,9 +165,9 @@ impl Renderer {
                 scale,
                 born: time + d / (r * 3.0),
                 rise: 1.5 + 2.5 * self.scatter.unit(),
-                lift: (1.0 + 7.0 * inner * self.scatter.unit() + 1.5 * self.scatter.unit()) * scale,
-                pitch: 0.4 * self.scatter.signed() * (0.4 + inner),
-                roll: 0.4 * self.scatter.signed() * (0.4 + inner),
+                lift: 1.5 + 22.0 * inner * self.scatter.unit().powi(2) + 3.0 * self.scatter.unit(),
+                pitch: steep * self.scatter.signed() * (0.4 + inner),
+                roll: steep * self.scatter.signed() * (0.4 + inner),
                 motion: Motion::Hover,
                 seed: self.scatter.unit(),
             };
