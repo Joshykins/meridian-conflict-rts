@@ -3,6 +3,11 @@
 //! comes down in the middle of them, and its landing lets go a wave that rolls out over
 //! everything round it.
 //!
+//! - **By hand** (`Command::Dash`, `OrderKind::Dash`): the order waits for the dash to be
+//!   ready, then it charges for the point itself, as far toward it as it reaches, on the
+//!   nearest ground it can stand on: no cluster is gathered. A point nearer than
+//!   `Dash::min` is refused (`Refusal::DashTooClose`). It is the player's order, so it
+//!   goes at hold fire and hold position too. The order is done as it goes.
 //! - **When**: its dash is ready (`Dash::cooldown_ticks` after its last landing), it is
 //!   free to pick its fights (idle, chasing on its own, on an attack-move or patrol, or
 //!   under an attack order; fire at will; not stunned), and an enemy it sees on the ground
@@ -35,9 +40,10 @@ use mc_core::{Fx, FxVec2};
 use mc_data::{cat, dash::Dash, MoveLayer};
 use serde::{Deserialize, Serialize};
 
-use crate::mirror::SimEvent;
+use crate::mirror::{Refusal, SimEvent};
 use crate::spatial::kind;
-use crate::tables::{flag, FireState, OrderKind};
+use crate::tables::{flag, FireState, Order, OrderKind, UnitId};
+use crate::Handle;
 use crate::{SimError, World};
 
 /// What a dash may strike and be drawn to: anything on the ground or the water.
@@ -85,6 +91,8 @@ enum Leave {
     Free { chase: bool },
     /// An attack order on this row.
     On(usize),
+    /// A dash by hand (`OrderKind::Dash`): to the point it was given.
+    Ordered,
 }
 
 impl World {
@@ -129,15 +137,18 @@ impl World {
     /// Whether `row` may dash, and why.
     fn dash_leave(&self, row: usize) -> Option<Leave> {
         let units = &self.state.units;
-        if !units.is_active(row)
-            || self.stunned(row)
-            || units.has_flag(row, flag::PASSIVE)
-            || units.fire_state[row] != FireState::FireAtWill
-            || units.hangar[row] != crate::Handle::NONE
-        {
+        if !units.is_active(row) || self.stunned(row) || units.hangar[row] != crate::Handle::NONE {
             return None;
         }
-        let Some(o) = self.state.orders.front(units, row) else {
+        let front = self.state.orders.front(units, row);
+        // The player's own dash goes whatever the stance.
+        if front.is_some_and(|o| o.kind == OrderKind::Dash) {
+            return Some(Leave::Ordered);
+        }
+        if units.has_flag(row, flag::PASSIVE) || units.fire_state[row] != FireState::FireAtWill {
+            return None;
+        }
+        let Some(o) = front else {
             return Some(Leave::Free { chase: false });
         };
         match o.kind {
@@ -162,12 +173,83 @@ impl World {
     }
 
     fn look_for_dash(&mut self, row: usize, dash: &Dash) {
-        let Some(leave) = self.dash_leave(row) else {
+        let Some(leave) = self.dash_leave(row).filter(|&l| l != Leave::Ordered) else {
             return;
         };
         let Some(to) = self.dash_mark(row, dash, leave) else {
             return;
         };
+        self.begin_windup(row, dash, to);
+    }
+
+    /// `Command::Dash`: an order to each unit among `ids` with a dash, refused once for a
+    /// point nearer than its least reach.
+    pub(crate) fn order_dash(
+        &mut self,
+        player: u8,
+        ids: &[UnitId],
+        pos: FxVec2,
+        queue: bool,
+    ) -> Result<(), SimError> {
+        let pos = self.clamp_to_map(pos);
+        let rows: Vec<usize> = self
+            .owned(player, ids, 0)
+            .into_iter()
+            .filter(|&r| self.bp(r).dash.is_some())
+            .collect();
+        let mut refused = false;
+        for row in rows {
+            let Some(dash) = self.bp(row).dash else {
+                continue;
+            };
+            if !queue && self.state.units.pos[row].distance(pos) < dash.min {
+                refused = true;
+                continue;
+            }
+            self.give(
+                row,
+                crate::orders::order(OrderKind::Dash, pos, Handle::NONE),
+                queue,
+            )?;
+        }
+        if refused {
+            self.refuse(player, Refusal::DashTooClose);
+        }
+        Ok(())
+    }
+
+    /// `OrderKind::Dash` at the front of the queue: waits (holding still) for the dash to
+    /// be ready, then charges for the point, as far toward it as it reaches.
+    pub(crate) fn run_dash_order(&mut self, row: usize, o: &Order) -> Result<(), SimError> {
+        let Some(dash) = self.bp(row).dash else {
+            self.finish_order(row);
+            return Ok(());
+        };
+        let s = self.state.units.dash[row];
+        if s.phase != DashPhase::Ready {
+            return Ok(());
+        }
+        self.stop_moving(row);
+        if s.cooldown > 0 || self.stunned(row) || !self.state.units.is_active(row) {
+            return Ok(());
+        }
+        let from = self.state.units.pos[row];
+        let gap = from.distance(o.pos);
+        let aim = if gap > dash.range {
+            from + (o.pos - from).normalize() * dash.range
+        } else {
+            o.pos
+        };
+        match self.dash_ground(row, aim) {
+            Some(to) if to.distance(from) >= dash.min => self.begin_windup(row, &dash, to),
+            // Queued from farther off, it ended up too close: nothing to dash to.
+            _ => self.finish_order(row),
+        }
+        Ok(())
+    }
+
+    /// It stops and begins its charge for `to`.
+    fn begin_windup(&mut self, row: usize, dash: &Dash, to: FxVec2) {
         let from = self.state.units.pos[row];
         self.stop_moving(row);
         let units = &mut self.state.units;
@@ -194,6 +276,8 @@ impl World {
         let units = &self.state.units;
         let (pos, owner) = (units.pos[row], units.owner[row]);
         let target = match leave {
+            // A dash by hand goes to its point (`run_dash_order`), never a cluster.
+            Leave::Ordered => return None,
             Leave::On(t) => {
                 let gap = units.pos[t].distance(pos);
                 (self.dash_foe(owner, t) && gap >= dash.min && gap <= dash.range).then_some(t)?
@@ -295,9 +379,13 @@ impl World {
         let to = self
             .dash_ground(row, s.to)
             .unwrap_or(self.state.units.pos[row]);
-        if leave == (Leave::Free { chase: true }) {
+        match leave {
             // Its own chase ends where it lands, and the walk home behind it with it.
-            self.clear_orders(row)?;
+            Leave::Free { chase: true } => self.clear_orders(row)?,
+            // The player's dash is done as it goes: whatever comes next waits for it to
+            // land (`dash_held`).
+            Leave::Ordered => self.finish_order(row),
+            _ => {}
         }
         self.vanish(row, dash, to);
         Ok(())

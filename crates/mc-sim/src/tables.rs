@@ -640,6 +640,8 @@ pub enum OrderKind {
     /// Head for `pos` reclaiming the wrecks along the way, and with a `radius`, every
     /// wreck within it of `pos` (`reclaim_area.rs`). `target`: the wreck last taken up.
     ReclaimArea,
+    /// Dash to `pos` by hand once the dash is ready (`dash.rs`); done as it goes.
+    Dash,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]

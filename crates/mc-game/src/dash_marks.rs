@@ -12,8 +12,10 @@
 //! - Gone: its path to the mark, a point of light running down it, and the mark pulsing
 //!   white with the seconds to its arrival.
 //! - Landed: its wave's front rolling out to the reach, and where it stops.
-//! - Aiming an attack with a dasher picked: its wave at the pointer, and whether the
-//!   point lies in its dash band, too close or too far.
+//! - Aiming a dash by hand (`Targeting::Dash`, J) or an attack with a dasher picked: its
+//!   wave where it would come down (at the pointer, or as far toward it as it reaches),
+//!   and whether the point lies in its dash band, too close or too far. Lines only:
+//!   nothing is washed over the ground round a selected unit.
 //!
 //! The owner's side sees all of it; the other side sees a dash where it sees the dasher
 //! charging or the ground it comes down on (`mirror/dash.rs`).
@@ -30,7 +32,7 @@ use mc_sim::mirror::{DashStage, DashView, UnitInstance};
 use std::f32::consts::TAU;
 
 /// A dash's marks: the Regency's red, and the white-hot of its charge.
-const DASH: u32 = 0xFF4A5E;
+pub const DASH: u32 = 0xFF4A5E;
 const HOT: u32 = 0xFFE2E8;
 
 const TPS: f32 = mc_core::TICKS_PER_SECOND as f32;
@@ -73,7 +75,7 @@ pub fn draw(ui: &mut Ui, field: &Field, alpha: f32, cursor: Option<Vec3>) {
         .collect();
     let aiming = matches!(
         view.mode,
-        Mode::Target(Targeting::Attack | Targeting::Bombard | Targeting::Strike)
+        Mode::Target(Targeting::Attack | Targeting::Bombard | Targeting::Strike | Targeting::Dash)
     );
     for u in &picked {
         if busy.contains(&u.unit_id) {
@@ -107,15 +109,8 @@ fn band(ui: &mut Ui, field: &Field, u: &UnitInstance, alpha: f32) {
     let full = dash.cooldown_ticks.max(1) as f32 / TPS;
     let ready = left <= 0.0;
     let breathe = 0.5 + 0.5 * (t * 2.2).sin();
-    // The ground it may come down on, washed faintly; its reach, and the too-close edge.
-    disc(
-        ui,
-        field,
-        c,
-        hi,
-        rgb(DASH, if ready { 0.035 } else { 0.02 }),
-    );
-    disc(ui, field, c, lo, rgb(0x000000, 0.05));
+    // Its reach and the too-close edge: lines only, nothing washed over the ground, so
+    // what stands inside stays plain to see and to pick.
     let edge = if ready { 0.55 + 0.3 * breathe } else { 0.35 };
     ring(ui, field, c, hi, 2.0, rgb(DASH, edge), false, 0.0);
     ring(
@@ -381,31 +376,41 @@ fn under_way(ui: &mut Ui, field: &Field, d: &DashView, enemy: bool, alpha: f32) 
     }
 }
 
-/// Aiming an attack with a dasher picked: its wave at the pointer, and whether it would
-/// dash there.
+/// Aiming a dash by hand, or an attack, with a dasher picked: its wave where it would
+/// come down, and whether it would dash there.
 fn aim(ui: &mut Ui, field: &Field, u: &UnitInstance, at: Vec3) {
     let bp = bp_of(field, BlueprintId(u.blueprint as u16));
     let Some(dash) = bp.dash else {
         return;
     };
     let t = ui.time;
-    let c = at.truncate();
     let from = Vec2::new(u.pos[0], u.pos[1]);
-    let d = from.distance(c);
+    let pointer = at.truncate();
+    let d = from.distance(pointer);
     let (lo, hi) = (dash.min.to_f32(), dash.range.to_f32());
+    let by_hand = field.view.mode == Mode::Target(Targeting::Dash);
+    // A dash by hand past its reach goes as far toward the point as it reaches.
+    let c = if by_hand && d > hi {
+        from + (pointer - from).normalize_or_zero() * hi
+    } else {
+        pointer
+    };
     let (verdict, good) = if d < lo {
         (format!("Too close to dash ({})", metres(lo)), false)
+    } else if d > hi && by_hand {
+        (
+            format!("Past its reach: comes down {} out", metres(hi)),
+            true,
+        )
     } else if d > hi {
         (format!("Out of dash reach ({})", metres(hi)), false)
     } else {
         (format!("Dashes in  \u{b7}  {}", metres(d)), true)
     };
+    let at = c.extend(at.z);
     let tone = if good { DASH } else { palette::WARN };
     let (wave_name, wave) = wave_of(bp).unwrap_or(("Landing", bp.radius.to_f32() * 3.0));
     let breathe = 0.5 + 0.5 * (t * 3.0).sin();
-    if good {
-        disc(ui, field, c, wave, rgb(DASH, 0.05));
-    }
     ring(
         ui,
         field,

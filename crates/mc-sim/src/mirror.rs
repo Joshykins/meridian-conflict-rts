@@ -75,6 +75,8 @@ pub enum Refusal {
     FactoryQueueFull,
     /// A core mine may not stand inside another mine's reach (`World::mine_in_the_way`).
     MineReach,
+    /// A dash by hand may not come down nearer than its least reach (`Dash::min`).
+    DashTooClose,
 }
 
 impl Refusal {
@@ -95,6 +97,7 @@ impl Refusal {
                 crate::orders::MAX_FACTORY_QUEUE
             ),
             Refusal::MineReach => "A core mine cannot stand inside another mine's reach".to_owned(),
+            Refusal::DashTooClose => "Too close to dash: pick ground farther off".to_owned(),
         }
     }
 }

@@ -579,3 +579,90 @@ fn the_forearms_reach_a_spacecraft() {
     }
     assert!(seen, "the forearms never took the spacecraft");
 }
+
+fn dash_to(w: &mut World, seraph: UnitId, x: i32, y: i32) {
+    w.tick(&[command(
+        0,
+        Command::Dash {
+            units: vec![seraph],
+            pos: FxVec2::from_ints(x, y),
+            queue: false,
+        },
+    )])
+    .unwrap();
+}
+
+/// By hand, with nothing in sight and at hold position, it dashes to the point given.
+#[test]
+fn a_dash_by_hand_goes_where_it_is_sent() {
+    let mut w = world(None);
+    let seraph = held_seraph(&mut w, 1000, 2000);
+    dash_to(&mut w, seraph, 2000, 2400);
+    let (_, to) = until_landed(&mut w, 60).expect("it dashed");
+    assert!(
+        to.distance(FxVec2::from_ints(2000, 2400)) <= Fx::from_int(8),
+        "landed at {to:?}"
+    );
+    assert!(w
+        .state
+        .orders
+        .front(&w.state.units, row(&w, seraph))
+        .is_none());
+}
+
+/// Past its reach it goes as far toward the point as it reaches.
+#[test]
+fn a_dash_by_hand_past_its_reach_stops_at_its_reach() {
+    let mut w = world(None);
+    let seraph = add(&mut w, SERAPH, 0, 500, 2000, false);
+    let range = w
+        .blueprints
+        .unit_by_key(SERAPH)
+        .unwrap()
+        .dash
+        .unwrap()
+        .range;
+    dash_to(&mut w, seraph, 3900, 2000);
+    let (_, to) = until_landed(&mut w, 60).expect("it dashed");
+    let gap = to.distance(FxVec2::from_ints(500, 2000));
+    assert!(
+        (gap - range).abs() <= Fx::from_int(8),
+        "came down {gap} m off, reach {range}"
+    );
+}
+
+/// Too close is refused, and nothing happens.
+#[test]
+fn a_dash_by_hand_too_close_is_refused() {
+    let mut w = world(None);
+    let seraph = held_seraph(&mut w, 1000, 2000);
+    dash_to(&mut w, seraph, 1200, 2000);
+    assert!(w.events.iter().any(|e| matches!(
+        e,
+        SimEvent::CommandRefused {
+            reason: mc_sim::mirror::Refusal::DashTooClose,
+            ..
+        }
+    )));
+    assert!(until_landed(&mut w, 40).is_none(), "it dashed anyway");
+}
+
+/// Given while it recharges, the order waits for the dash, then goes.
+#[test]
+fn a_dash_by_hand_waits_for_the_recharge() {
+    let mut w = world(None);
+    let seraph = held_seraph(&mut w, 1000, 2000);
+    dash_to(&mut w, seraph, 2000, 2000);
+    let (first, _) = until_landed(&mut w, 60).expect("first dash");
+    dash_to(&mut w, seraph, 1000, 2000);
+    let cooldown = w
+        .blueprints
+        .unit_by_key(SERAPH)
+        .unwrap()
+        .dash
+        .unwrap()
+        .cooldown_ticks as u32;
+    let (second, to) = until_landed(&mut w, cooldown + 60).expect("second dash");
+    assert!(second - first >= cooldown, "went before its recharge");
+    assert!(to.distance(FxVec2::from_ints(1000, 2000)) <= Fx::from_int(8));
+}

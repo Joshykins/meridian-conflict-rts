@@ -522,6 +522,7 @@ impl World {
             Command::Unload { units } => self.order_unload(player, units),
             Command::TakeOff { units } => self.order_take_off(player, units),
             Command::Warp { units, pos, queue } => self.order_warp(player, units, *pos, *queue),
+            Command::Dash { units, pos, queue } => self.order_dash(player, units, *pos, *queue),
             Command::LaunchNuke { units, pos } => {
                 self.launch_nuke(player, units, *pos);
                 Ok(())
@@ -1443,6 +1444,7 @@ impl World {
                 OrderKind::Board => self.run_board(row, &o)?,
                 OrderKind::Land | OrderKind::Unload => self.run_land(row, &o)?,
                 OrderKind::Warp => self.run_warp_order(row, &o)?,
+                OrderKind::Dash => self.run_dash_order(row, &o)?,
                 OrderKind::ReclaimArea => self.run_reclaim_area(row, &o)?,
             }
             // A salvage vehicle, boat or aircraft clears what it passes as it goes.

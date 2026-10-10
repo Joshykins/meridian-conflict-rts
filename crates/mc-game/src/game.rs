@@ -144,6 +144,9 @@ pub enum Targeting {
     Strike,
     /// Capital ships with a warp drive charge it and jump toward the point (`warp_marks.rs`).
     Warp,
+    /// A dasher (the Seraph) dashes to the point by hand once its dash is ready
+    /// (`dash_marks.rs`, `hud/dash.rs`).
+    Dash,
 }
 
 impl Targeting {
@@ -161,6 +164,7 @@ impl Targeting {
             Targeting::Nuke => "Launch Warhead",
             Targeting::Strike => "Strike",
             Targeting::Warp => "Warp",
+            Targeting::Dash => "Dash",
         }
     }
 }
@@ -1809,6 +1813,7 @@ impl Game {
             }),
             Targeting::Strike => point.map(|pos| Command::Strike { units, pos, queue }),
             Targeting::Warp => point.map(|pos| Command::Warp { units, pos, queue }),
+            Targeting::Dash => point.map(|pos| Command::Dash { units, pos, queue }),
             // One warhead a click; the sim gives it to the silo with the most free.
             Targeting::Nuke => point.and_then(|pos| {
                 let silos = self.armed_silos();
@@ -2731,6 +2736,7 @@ impl Game {
             Targeting::Unload => self.selection_lifts(),
             Targeting::Nuke => !self.armed_silos().is_empty(),
             Targeting::Warp => self.selection_warps(),
+            Targeting::Dash => self.selection_takers().any(|b| b.dash.is_some()),
         };
         if able {
             self.view.patrol_posts.clear();
@@ -2912,6 +2918,11 @@ impl Game {
             KeyCode::KeyY => self.toggle_stance(FireState::HoldFire),
             KeyCode::KeyV => self.toggle_dive(),
             KeyCode::KeyO => self.arm(Targeting::Warp),
+            // A titan's ability: a dasher's dash, or a giant's strike (`hud/titan.rs`).
+            KeyCode::KeyJ if self.selection_takers().any(|b| b.dash.is_some()) => {
+                self.arm(Targeting::Dash)
+            }
+            KeyCode::KeyJ => self.arm(Targeting::Strike),
             KeyCode::KeyZ => self.toggle_paused(),
             // With a silo picked, N arms the launch; otherwise it hides the minimap.
             KeyCode::KeyN

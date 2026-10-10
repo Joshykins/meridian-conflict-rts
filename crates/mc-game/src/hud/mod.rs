@@ -13,6 +13,7 @@ mod armament;
 mod build;
 mod builders;
 pub mod cargo;
+mod dash;
 mod economy;
 mod economy_panel;
 mod elevator;
@@ -794,10 +795,16 @@ impl Hud {
                     }
                 }
                 // A tier-5 titan's great bore and its strike (`titan.rs`).
+                // A dasher's dash and its button in the same place (`dash.rs`).
                 if let Some((titan, count)) = titan::titan_of(s, &units) {
                     let pw = titan::WIDTH.min(w - EDGE - x);
                     if pw > 220.0 {
-                        titan::panel(self, ui, s, titan, count, Rect::new(x, deck_y, pw, DECK_H));
+                        let r = Rect::new(x, deck_y, pw, DECK_H);
+                        if s.bp(titan).dash.is_some() {
+                            dash::panel(self, ui, s, titan, count, r);
+                        } else {
+                            titan::panel(self, ui, s, titan, count, r);
+                        }
                         x += pw + GAP;
                     }
                 }
@@ -963,6 +970,7 @@ pub fn cursor_hint(
                 Targeting::Land | Targeting::Unload => style::Family::Transport.tone(),
                 Targeting::Nuke => silo::WARHEAD,
                 Targeting::Warp => warp::WARP,
+                Targeting::Dash => crate::dash_marks::DASH,
             },
         ),
         Mode::Place(b) => {

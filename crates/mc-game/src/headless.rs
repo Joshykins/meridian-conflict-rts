@@ -671,6 +671,7 @@ pub fn screenshot(
             "ground" => crate::game::Targeting::Strike,
             "reclaim" => crate::game::Targeting::Reclaim,
             "warp" => crate::game::Targeting::Warp,
+            "dash" => crate::game::Targeting::Dash,
             _ => crate::game::Targeting::Nuke,
         });
     }

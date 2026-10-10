@@ -390,6 +390,14 @@ pub enum Command {
         units: Vec<UnitId>,
         priority: crate::focus::Priority,
     },
+    /// Units among these with a dash (the Seraph's) dash to `pos` by hand, once their
+    /// dash is ready: as far toward it as they reach, never nearer than their least
+    /// (`dash.rs`).
+    Dash {
+        units: Vec<UnitId>,
+        pos: FxVec2,
+        queue: bool,
+    },
 }
 
 impl Command {
@@ -447,7 +455,8 @@ impl Command {
             | Command::LaunchNuke { units, .. }
             | Command::SetAutoBuild { units, .. }
             | Command::QueueRounds { units, .. }
-            | Command::Warp { units, .. } => units.len(),
+            | Command::Warp { units, .. }
+            | Command::Dash { units, .. } => units.len(),
 
             Command::Produce { factories, .. }
             | Command::CancelProduce { factories, .. }
