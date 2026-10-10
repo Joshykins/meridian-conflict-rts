@@ -119,6 +119,8 @@ impl CapitalSounds {
             gliding.extend(super::warp::gliding(&library, blueprints));
             // And the space elevators' sirens and platform loops (audio/elevator.rs).
             gliding.extend(super::elevator::gliding(&library, blueprints));
+            // And a gravitic engine's well and hum, which sag as it falters (audio/gravitic.rs).
+            gliding.extend(super::gravitic::gliding(&library, blueprints));
             audio.set_gliding(&gliding);
         }
         let mut drives = Vec::new();

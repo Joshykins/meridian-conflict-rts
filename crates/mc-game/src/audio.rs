@@ -25,6 +25,8 @@ pub(crate) mod beams;
 pub mod capital;
 pub(crate) mod elevator;
 pub(crate) mod flight;
+pub(crate) mod gravitic;
+pub(crate) mod held;
 pub(crate) mod intercept;
 pub(crate) mod listener;
 pub mod music;
@@ -137,6 +139,8 @@ struct Mixer {
     clock: u64,
     voices: Vec<Voice>,
     loops: Vec<LoopVoice>,
+    /// Long sounds held while something goes on (`held.rs`).
+    held: Vec<held::HeldVoice>,
     volumes: Volumes,
     /// Loops whose pitch follows each `set_loops` call instead of staying where it began:
     /// an engine that works harder (capital ships' drives, `capital.rs`).
@@ -168,6 +172,7 @@ impl Shared {
                 clock: 0,
                 voices: Vec::new(),
                 loops: Vec::new(),
+                held: Vec::new(),
                 volumes,
                 gliding: Vec::new(),
             }),
@@ -230,7 +235,11 @@ impl Shared {
                     world: synthesise_world(rate, &library),
                 });
                 // Loops hold buffers of the bank they were started from, and ids may have moved.
-                shared.mixer().loops.clear();
+                {
+                    let mut m = shared.mixer();
+                    m.loops.clear();
+                    m.held.clear();
+                }
                 *shared.bank.write().unwrap_or_else(|e| e.into_inner()) = Some(bank);
                 log::info!(
                     "audio: {} sounds ready in {:.0} ms at {rate} Hz",
@@ -346,6 +355,7 @@ impl Mixer {
         }
         self.loops
             .retain(|l| l.target != [0.0; 2] || l.gain[0].max(l.gain[1]) > 1e-4);
+        held::mix(&mut self.held, out, channels, effects);
         for s in out.iter_mut() {
             // Many voices at once may add up past full scale; bend instead of clipping.
             *s = if s.abs() > 0.8 {
@@ -656,6 +666,7 @@ impl Audio {
         for l in &mut m.loops {
             l.target = [0.0; 2];
         }
+        held::release(&mut m.held);
         m.voices.retain(|v| !v.world || v.at >= 0.0);
         for v in m.voices.iter_mut().filter(|v| v.world) {
             v.released = true;
@@ -691,6 +702,7 @@ impl Audio {
                         let mut m = shared.mixer();
                         m.voices.clear();
                         m.loops.clear();
+                        m.held.clear();
                     }
                     *shared.bank.write().unwrap_or_else(|e| e.into_inner()) = None;
                     shared.synthesise_in_background();
