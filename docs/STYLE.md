@@ -640,6 +640,20 @@ quarters. The thermobaric launchers sit in a hump on its back, raked steeply ove
 head. "Advanced" here means faceted plates lapped over a dark core, with thin seams of
 blue light at some of the joins, never broad glowing panels.
 
+The Regency's gravitic engine (The Fallen, tech 5) is drawn as gravity, never fire:
+violet light with white-hot hearts, no orange, heavy and grounded
+(renderer/gravitic_engine_fx). As it gathers, the machinery in its crown whirs up from a
+crawl (its orbit pieces turn by a phase the renderer runs up, `ModelInfo::orbit_driven`),
+a column of violet strands twists round a white thread between the shards (never a ball
+of light), bending the view round it, and lightning jumps to the shards and, as it
+fills, down to the ground; round its foot the ground cracks with light in the cracks,
+slabs tip up toward it and shards of rock lift and circle it. The rift is a fissure lit
+from its floor with a white head, slabs thrown up either side; it stays as a scar, lit
+with light pulsing toward the well while it holds, dark once let go. The well is the
+ground broken into plates, a few great lit fissures and cracks lit in crawling patches,
+its slabs lifted and grinding and shards circling over it. No sphere of bent air
+anywhere (it reads as a bubble): a blow shows as dust driven over the ground.
+
 ## Ground contact
 
 Tracked vehicles mark the ground and raise dust while they move. Marks fade
