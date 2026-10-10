@@ -303,6 +303,9 @@ shared! {
         pub const BARK_SHAGGY: u32 = 4;
         /// Rock: bedded red sandstone, its laminae level in the model.
         pub const ROCK_BEDDED: u32 = 1;
+        /// Rock: a slab of ground a gravitic engine tore up (`rift_slabs.rs`): turf over
+        /// earth over dark rock down from its top at z 0.
+        pub const ROCK_RIFT: u32 = 3;
         /// Rock: a cliff's jointed face (`cliffs.rs`), coloured as the wall it stands on.
         pub const ROCK_CLIFF: u32 = 2;
         /// Concrete: cast mass concrete, its lifts and block joints showing.

@@ -115,6 +115,11 @@ impl Renderer {
             }
             let center = Vec2::from(center.to_f32());
             let at = Vec2::new(instance.pos[0], instance.pos[1]);
+            // Torn up by a gravitic engine's rift or well: thrown down, not vaporized.
+            if let Some(away) = self.gravitic_engine_fx.tears_away(center, at) {
+                self.blow_down_tree(*prop, away, time);
+                continue;
+            }
             // It goes when the front gets to it, not when the sim struck it off.
             let start = fronts
                 .iter()

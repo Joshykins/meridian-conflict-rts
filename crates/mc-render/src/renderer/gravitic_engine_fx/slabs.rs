@@ -40,6 +40,9 @@ pub(super) struct Piece {
     /// A slab (`SLAB_KEYS` index) or, past them, a shard.
     pub(super) model: u32,
     pub(super) at: Vec2,
+    /// The ground there, roughly (the vertex shader stands it on the true ground; the
+    /// cull wants it near).
+    pub(super) ground: f32,
     pub(super) heading: f32,
     pub(super) scale: f32,
     pub(super) born: f32,
@@ -179,7 +182,7 @@ impl Slabs {
                 }
             };
             let pitch = if p.pitch.abs() < 1e-3 { 1e-3 } else { p.pitch };
-            let pos = [p.at.x, p.at.y, 0.0];
+            let pos = [p.at.x, p.at.y, h.piece.ground + p.lift];
             let size = if h.piece.model < SLAB_KEYS.len() as u32 {
                 mc_models::rift_slabs::SLAB_HALF
             } else {

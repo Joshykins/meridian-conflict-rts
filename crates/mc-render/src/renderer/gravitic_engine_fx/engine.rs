@@ -209,8 +209,9 @@ impl Renderer {
         for _ in have..want.min(have + 3) {
             let a = TAU * self.scatter.unit();
             let r = inner * 1.04 + (reach - inner * 1.04) * self.scatter.unit().sqrt();
-            let scale = 0.8 + 1.4 * self.scatter.unit() * (1.0 - 0.4 * (r - inner) / e.radius);
+            let scale = 1.5 + 2.4 * self.scatter.unit() * (1.0 - 0.4 * (r - inner) / e.radius);
             let piece = Piece {
+                ground: e.base.z,
                 engine: e.id,
                 model: slab_model(self.scatter.unit()),
                 at: e.base.truncate() + Vec2::new(a.cos(), a.sin()) * r,
@@ -234,6 +235,7 @@ impl Renderer {
             let r = e.radius * (1.05 + 0.9 * self.scatter.unit());
             let at = e.base.truncate() + Vec2::new(a.cos(), a.sin()) * r;
             let piece = Piece {
+                ground: e.base.z,
                 engine: e.id,
                 model: shard_model(self.scatter.unit()),
                 at,
@@ -303,14 +305,12 @@ impl Renderer {
         let beat = (seconds * (0.8 + 1.6 * p)).fract();
         if beat < dt * (0.8 + 1.6 * p) {
             let at = e.base;
-            self.push_shockwave(
-                (at + Vec3::Z * 2.0).to_array(),
+            self.gravity_wave(
+                at + Vec3::Z * 2.0,
                 time,
                 e.radius * (1.6 + 1.2 * p),
                 1.1,
                 0.25 + 0.5 * p,
-                0.0,
-                Vec3::ZERO,
             );
         }
     }

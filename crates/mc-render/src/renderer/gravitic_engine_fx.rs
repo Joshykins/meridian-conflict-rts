@@ -155,6 +155,30 @@ impl GraviticEngineFx {
         self.slabs.clear();
     }
 
+    /// A tree at `at` the sim struck off with `center` as the reason: if that is an
+    /// engine's rift front or well, the way it is thrown (out from the rift's line or the
+    /// well's middle).
+    pub(super) fn tears_away(&self, center: Vec2, at: Vec2) -> Option<Vec2> {
+        self.engines.iter().find_map(|e| {
+            let v = e.view?;
+            let from = Vec2::from_slice(&v.from[..2]);
+            let mark = Vec2::from_slice(&v.mark[..2]);
+            let front = Vec2::from_slice(&v.front[..2]);
+            match v.stage {
+                WellStage::Gathering => None,
+                WellStage::Holding if center.distance(mark) < 1.0 => {
+                    Some((at - mark).normalize_or(Vec2::X))
+                }
+                _ if center.distance(front) < 200.0 => {
+                    let along = (mark - from).normalize_or(Vec2::X);
+                    let side = Vec2::new(-along.y, along.x);
+                    Some(side * (at - from).dot(side).signum())
+                }
+                _ => None,
+            }
+        })
+    }
+
     fn holds_gravity(&self, u: &UnitInstance) -> Option<[f32; 4]> {
         let hidden = KIND_WRECK | KIND_GHOST | STATE_RADAR;
         if u.owner_flags & hidden != 0 || u.build < 1.0 {
@@ -338,7 +362,7 @@ impl Renderer {
             }
             if let Some(v) = e.view.filter(|v| v.stage == WellStage::Holding) {
                 let mark = Vec3::from(v.mark);
-                let strength = if v.powered { 0.45 } else { 0.12 };
+                let strength = if v.powered { 0.3 } else { 0.08 };
                 lenses.push((
                     mark.distance(eye),
                     GpuHeatPlume {

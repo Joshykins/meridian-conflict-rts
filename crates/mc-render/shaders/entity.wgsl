@@ -3517,6 +3517,19 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         n = rock.normal;
         m.albedo = rock.color * (0.75 + rock.ao * 0.25);
         m.roughness = rock.roughness;
+        if ((in.model_class >> 16u) & 0xFFu) == SCENERY_ROCK_RIFT {
+            // Ground a gravitic engine tore up (rift_slabs.rs): turf on its top, earth
+            // under that, dark rock below, by how far under its top (z 0) a point lies.
+            let below = -in.local.z + 0.15 * (rock.ao - 0.5);
+            let grain = clamp(dot(rock.color, vec3<f32>(0.3, 0.59, 0.11)) * 3.0, 0.6, 1.4);
+            let turf = 1.0 - smoothstep(0.2, 0.45, below);
+            let earth = 1.0 - smoothstep(0.9, 1.6, below);
+            var look = rock.color * vec3<f32>(0.42, 0.4, 0.42);
+            look = mix(look, vec3<f32>(0.075, 0.058, 0.042) * grain, earth);
+            look = mix(look, vec3<f32>(0.055, 0.07, 0.03) * grain, turf);
+            m.albedo = look;
+            m.roughness = mix(rock.roughness, 0.95, earth);
+        }
         if ((in.model_class >> 16u) & 0xFFu) == SCENERY_ROCK_BEDDED {
             let px = max(length(dpdx(in.world)), length(dpdy(in.world)));
             let look = bedded_sandstone(m.albedo, in.local, n, px);

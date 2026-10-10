@@ -26,7 +26,8 @@ const MOST_CRUSHED: usize = 12;
 const SLAM: f32 = 60.0;
 
 impl Renderer {
-    /// A violet pressure ring (`push_shockwave` in the engine's light).
+    /// A blow through the ground: dust driven out over it in a ring and the trees pushed
+    /// over by it, but no sphere of bent air (that reads as a bubble round it).
     pub(super) fn gravity_wave(
         &mut self,
         at: Vec3,
@@ -35,12 +36,8 @@ impl Renderer {
         life: f32,
         strength: f32,
     ) {
-        let was = self
-            .effect_settings
-            .shockwave_color
-            .replace([0.7, 0.4, 1.0]);
-        self.push_shockwave(at.to_array(), time, radius, life, strength, 0.0, Vec3::ZERO);
-        self.effect_settings.shockwave_color = was;
+        self.tree_blasts.record(at, time, radius, strength, false);
+        self.shockwave_ground_dust(at, time, radius, life, strength, Vec3::ZERO);
     }
 
     /// The rift strikes `pos`: the ground shatters `radius` round and the well takes hold.
@@ -54,7 +51,7 @@ impl Renderer {
         self.push_effect(
             heart.to_array(),
             time,
-            r * 0.55,
+            r * 0.35,
             0.45,
             effect::GRAVITIC as f32,
             0.0,
@@ -62,16 +59,16 @@ impl Renderer {
         self.push_effect(
             heart.to_array(),
             time + 0.05,
-            r * 0.3,
-            1.1,
+            r * 0.2,
+            0.6,
             effect::GRAVITIC as f32,
             0.0,
         );
         self.lens_flares.flash(
             heart,
             Flare {
-                color: WHITE * 45.0,
-                size: r * 1.3,
+                color: WHITE * 20.0,
+                size: r * 0.9,
             },
             time,
             0.7,
@@ -80,7 +77,7 @@ impl Renderer {
             pos: heart,
             start: time,
             life: 0.9,
-            color: WHITE.lerp(LILAC, 0.5) * 9.0e4,
+            color: WHITE.lerp(LILAC, 0.5) * 5.0e4,
             range: (r * 3.0).min(1200.0),
             flicker: 0.2,
         });
@@ -150,8 +147,9 @@ impl Renderer {
             let a = TAU * self.scatter.unit();
             let at = centre + Vec2::new(a.cos(), a.sin()) * d;
             let inner = 1.0 - d / r;
-            let scale = 0.8 + 1.6 * self.scatter.unit();
+            let scale = 1.4 + 2.6 * self.scatter.unit();
             let piece = Piece {
+                ground: ground.z,
                 engine: unit,
                 model: slab_model(self.scatter.unit()),
                 at,
@@ -171,6 +169,7 @@ impl Renderer {
             let d = r * (0.1 + 0.85 * self.scatter.unit());
             let a = TAU * self.scatter.unit();
             let piece = Piece {
+                ground: ground.z,
                 engine: unit,
                 model: shard_model(self.scatter.unit()),
                 at: centre + Vec2::new(a.cos(), a.sin()) * d,
@@ -213,12 +212,12 @@ impl Renderer {
         fx.ground.feed(
             e.id,
             rift::WELL,
-            [0.75 * dim, 0.0, 0.6, 0.0, if powered { 1.0 } else { 0.6 }],
+            [0.6 * dim, 0.0, 0.6, 0.0, if powered { 1.0 } else { 0.6 }],
         );
         fx.ground.feed(
             e.id,
             rift::LINE,
-            [0.6 * dim, if powered { 1.0 } else { 0.2 }, 0.5, 0.0, 0.8],
+            [0.45 * dim, if powered { 1.0 } else { 0.2 }, 0.3, 0.0, 0.8],
         );
         let ground = centre.extend(self.ground_height(centre).max(v.mark[2]));
         fx_lamp(
@@ -299,6 +298,10 @@ impl Renderer {
             .iter()
             .filter(|u| u.owner_flags & hidden == 0 && (u.owner_flags & 0xFF) as u8 != e.owner)
             .filter(|u| Vec3::from(u.pos).truncate().distance(centre) < r)
+            // On the ground only: what flies over it is torn down, not crushed.
+            .filter(|u| {
+                u.pos[2] - self.ground_height(Vec2::new(u.pos[0], u.pos[1])) < u.radius * 3.0 + 4.0
+            })
             .map(|u| (Vec3::from(u.pos), u.radius.max(2.0)))
             .collect();
         // A deliberate cap (cosmetic): the first few in the list get arcs.

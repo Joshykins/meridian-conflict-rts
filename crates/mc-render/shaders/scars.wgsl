@@ -351,8 +351,8 @@ fn melt_shade(xy: vec2<f32>, alt: f32, albedo_in: vec3<f32>, rough_in: f32, px: 
 // violet, lavender, white.
 fn rift_rgb(t: f32) -> vec3<f32> {
     let k = clamp(t, 0.0, 1.6);
-    var c = mix(vec3<f32>(0.2, 0.012, 0.5), vec3<f32>(0.56, 0.1, 1.0), smoothstep(0.05, 0.45, k));
-    c = mix(c, vec3<f32>(0.85, 0.62, 1.0), smoothstep(0.6, 1.0, k));
+    var c = mix(vec3<f32>(0.14, 0.012, 0.5), vec3<f32>(0.4, 0.08, 1.0), smoothstep(0.05, 0.45, k));
+    c = mix(c, vec3<f32>(0.72, 0.55, 1.0), smoothstep(0.6, 1.0, k));
     c = mix(c, vec3<f32>(1.0, 0.94, 1.0), smoothstep(1.0, 1.45, k));
     return c * (k * 1.6 + k * k * k * 5.0);
 }
@@ -413,9 +413,18 @@ fn rift_one(r: Rift, xy: vec2<f32>, px: f32, s_in: CraterShade) -> CraterShade {
         let pulse = pow(0.5 + 0.5 * sin((at / 210.0 - now * 1.9) * 6.2831853), 5.0);
         let head = exp(-max(front - at, 0.0) / 70.0) * r.glow.w;
         let heat = glow * (1.0 + r.glow.y * (1.5 * pulse - 0.35)) + head * 1.3;
-        light = fissure * heat * (0.85 + 0.3 * r.glow.z) + crack * heat * 0.5 * (1.0 - smoothstep(0.0, reach * 1.6, abs(t)));
-        spill = heat * 0.22 * exp(-abs(t) / max(gap * 3.0, 1.0)) * reached;
+        // The light is down in it: a thin seam at its floor, wandering from wall to wall,
+        // burning in patches; the rest of the gap a dim violet, its walls dark.
+        let seam_at = (grad_noise2(vec2<f32>(at * 0.9, 3.0) + o, 9.0) - 0.5) * gap * 0.8;
+        let seam = (1.0 - smoothstep(0.0, gap * 0.22 + px * 0.6, abs(t - seam_at))) * reached;
+        let seep = 0.45 + 0.55 * smoothstep(0.25, 0.75, grad_noise2(vec2<f32>(at, 7.0) + o + vec2<f32>(now * 2.0, 0.0), 38.0));
+        let near_seam = 1.0 - smoothstep(0.0, reach * 0.9, abs(t));
+        light = (seam * (0.9 + 0.5 * r.glow.z) + fissure * 0.3) * heat * seep
+            + crack * heat * 0.12 * near_seam;
+        spill = heat * 0.1 * exp(-abs(t) / max(gap * 2.5, 1.0)) * reached;
         a = mix(a, vec3<f32>(0.006, 0.005, 0.008), fissure);
+        // Dust and crushed earth over the broken band, darker near the fissure.
+        a = mix(a, a * vec3<f32>(0.55, 0.5, 0.5), band * (0.4 + 0.4 * near_seam));
         a *= 1.0 - 0.75 * crack;
     } else {
         let centre = r.line.xy;
@@ -425,71 +434,104 @@ fn rift_one(r: Rift, xy: vec2<f32>, px: f32, s_in: CraterShade) -> CraterShade {
         let outward = d / max(dl, 1e-3);
         if kind == RIFT_FOOT {
             let inner = r.shape.z;
-            if dl > reach + 12.0 || dl < inner * 0.8 {
+            // How far out the breaking has got this way: a ragged front, not a circle.
+            let ragged = (grad_noise2(outward * 2.2 + o, 1.0) - 0.5) * 0.5
+                + (grad_noise2(outward * 7.0 - o, 1.0) - 0.5) * 0.2;
+            let front = inner + (reach - inner) * (1.0 + ragged);
+            if dl > front + 30.0 || dl < inner * 0.8 {
                 return s;
             }
-            // Main cracks run out from the foot, each its own length, wandering.
-            let rays = 22.0;
+            // A few great fissures run out from the foot, each its own length, wandering
+            // and jagged; the ground between breaks into plates by smaller cracks.
+            let rays = 9.0;
             let u = ang / 6.2831853 * rays + seed * 7.0;
             let k = floor(u + 0.5);
-            let wob = (grad_noise2(vec2<f32>(dl, k * 13.1) + o, 30.0) - 0.5) * 0.9
-                + (grad_noise2(vec2<f32>(dl * 2.0, k * 5.3) - o, 9.0) - 0.5) * 0.3;
-            let off = abs(u - k - wob * 0.45) * dl * 6.2831853 / rays;
-            let run = inner + (reach - inner) * mix(0.35, 1.0, hash21(vec2<f32>(k, seed * 3.1)));
+            let jag = (grad_noise2(vec2<f32>(dl, k * 13.1) + o, 45.0) - 0.5) * 1.1
+                + (grad_noise2(vec2<f32>(dl * 2.0, k * 5.3) - o, 11.0) - 0.5) * 0.35
+                + (hash21(vec2<f32>(k, seed * 1.7)) - 0.5) * 0.5;
+            let off = abs(u - k - jag * 0.45) * dl * 6.2831853 / rays;
+            let run = inner + (front - inner) * mix(0.45, 1.05, hash21(vec2<f32>(k, seed * 3.1)));
             let share = clamp((dl - inner) / max(run - inner, 1.0), 0.0, 1.0);
-            let width = 0.6 + 3.2 * (1.0 - share);
-            let ray = (1.0 - smoothstep(width * 0.5, width + px, off)) * (1.0 - smoothstep(run - 18.0, run, dl));
-            // The ground shattered close round the foot.
-            let apron = smoothstep(inner * 0.85, inner, dl)
-                * (1.0 - smoothstep(inner + (reach - inner) * 0.2, inner + (reach - inner) * 0.6, dl));
-            let cell = 7.0;
-            let cells = crater_cells(d / cell + o * 0.1);
-            let crack = crater_crack(cells.x, 0.06, px / cell) * apron;
-            s.slope += (outward * 0.2 + vec2<f32>(cos(cells.y * 37.0), sin(cells.y * 37.0)) * 0.12) * apron * heave * (0.3 + 0.7 * cells.y);
-            let heat = glow * (1.15 - 0.6 * share);
-            light = max(ray, crack * 0.7) * heat;
-            spill = heat * 0.12 * ray;
-            broken = max(ray, apron * 0.6);
+            let width = (0.5 + 2.6 * (1.0 - share)) * mix(0.6, 1.3, hash21(vec2<f32>(k + 9.0, seed)));
+            let ray = (1.0 - smoothstep(width * 0.5, width + px, off)) * (1.0 - smoothstep(run - 25.0, run, dl));
+            // The light down in it: a thin bright line at its floor, not the whole gap.
+            let floor_line = (1.0 - smoothstep(0.0, width * 0.3 + px * 0.5, off)) * (1.0 - smoothstep(run - 25.0, run, dl));
+            let cell = 16.0;
+            let warp = vec2<f32>(grad_noise2(d + o, 21.0), grad_noise2(d - o, 21.0)) - 0.5;
+            let cells = crater_cells(d / cell + o * 0.1 + warp * 0.9);
+            let apron = 1.0 - smoothstep(front - 40.0, front, dl);
+            let gape = grad_noise2(d * 0.7 + o * 3.0, 30.0);
+            let crack = crater_crack(cells.x, 0.02 + 0.05 * gape * gape, px / cell) * apron * smoothstep(inner * 0.95, inner * 1.02, dl);
+            s.slope += (outward * 0.15 + vec2<f32>(cos(cells.y * 37.0), sin(cells.y * 37.0)) * 0.1)
+                * apron * heave * (0.2 + 0.8 * cells.y) * (1.0 - smoothstep(inner, front, dl));
+            // Light seeps up patchily, brightest near the foot.
+            let seep = 0.35 + 0.65 * smoothstep(0.3, 0.7, grad_noise2(d + o * 2.0 + vec2<f32>(now * 3.0, 0.0), 24.0));
+            let heat = glow * (1.1 - 0.65 * share) * seep;
+            light = floor_line * heat * 1.5 + ray * heat * 0.55 + crack * heat * 0.35 * gape;
+            spill = heat * 0.08 * ray;
+            broken = max(ray, apron * 0.5);
             a = mix(a, vec3<f32>(0.006, 0.005, 0.008), ray * 0.9);
-            a *= 1.0 - 0.7 * crack;
+            a *= 1.0 - 0.75 * crack;
         } else {
             if dl > reach * 1.35 {
                 return s;
             }
             // The shatter runs out from the middle as the rift strikes.
             let shattered = 1.0 - smoothstep(age * r.time.y - 25.0, age * r.time.y, dl);
-            let edge = reach * (1.0 + (grad_noise2(outward * 3.0 + o, 1.0) - 0.5) * 0.08);
-            let disc = (1.0 - smoothstep(edge * 0.95, edge * 1.02, dl)) * shattered;
-            let cell = max(reach * 0.055, 6.0);
-            let warp = vec2<f32>(grad_noise2(d + o, cell * 1.7), grad_noise2(d - o, cell * 1.7)) - 0.5;
-            let q = d / cell + o * 0.1 + warp * 0.8;
+            let edge = reach * (1.0 + (grad_noise2(outward * 3.0 + o, 1.0) - 0.5) * 0.1
+                + (grad_noise2(outward * 11.0 - o, 1.0) - 0.5) * 0.04);
+            let disc = (1.0 - smoothstep(edge * 0.94, edge * 1.01, dl)) * shattered;
+            // Plates of every size: big ones out toward the edge, broken small at the heart.
+            let cell = max(reach * mix(0.035, 0.075, smoothstep(0.0, reach, dl)), 6.0);
+            let warp = vec2<f32>(grad_noise2(d + o, cell * 2.3), grad_noise2(d - o, cell * 2.3)) - 0.5;
+            let q = d / cell + o * 0.1 + warp * 1.3;
             let cells = crater_cells(q);
-            let small = crater_cells(q * 2.6 + 17.0);
+            let small = crater_cells(q * 2.7 + 17.0);
             let pc = px / cell;
-            let gape = grad_noise2(d * 1.3 + o * 4.0, cell * 0.9);
-            let crack = crater_crack(cells.x, 0.03 + 0.06 * gape, pc) * disc;
-            let fine = crater_crack(small.x, 0.05, pc * 2.6) * disc * (1.0 - smoothstep(0.0, reach * 0.7, dl)) * 0.6;
-            // Its edge: short cracks crossing the rim all round it, and a faint ring of light.
-            let rays = 64.0;
-            let u = ang / 6.2831853 * rays + seed * 5.0;
+            let gape = grad_noise2(d * 1.3 + o * 4.0, cell * 1.4);
+            let crack = crater_crack(cells.x, 0.015 + 0.07 * gape * gape, pc) * disc;
+            let fine = crater_crack(small.x, 0.04, pc * 2.7) * disc * (1.0 - smoothstep(0.0, reach * 0.5, dl)) * 0.6;
+            // A few great fissures from the heart out to the edge, where the most light is.
+            let rays = 5.0;
+            let u = ang / 6.2831853 * rays + seed * 3.0;
             let k = floor(u + 0.5);
-            let off = abs(u - k) * dl * 6.2831853 / rays;
-            let lo = reach * mix(0.8, 0.95, hash21(vec2<f32>(k, seed)));
-            let hi = reach * mix(1.05, 1.3, hash21(vec2<f32>(k + 3.0, seed)));
-            let rim_ray = (1.0 - smoothstep(0.8, 1.6 + px, off)) * smoothstep(lo, lo + 10.0, dl) * (1.0 - smoothstep(hi - 15.0, hi, dl)) * shattered;
-            let rim = exp(-pow((dl - edge) / max(reach * 0.035, 3.0), 2.0)) * shattered;
+            let jag = (grad_noise2(vec2<f32>(dl, k * 7.7) + o, 60.0) - 0.5) * 1.2
+                + (grad_noise2(vec2<f32>(dl * 2.1, k * 3.1) - o, 14.0) - 0.5) * 0.35;
+            let off = abs(u - k - jag * 0.4) * dl * 6.2831853 / rays;
+            let run = edge * mix(0.35, 1.05, hash21(vec2<f32>(k, seed * 2.3)));
+            // Each starts out from the heart a way of its own.
+            let root = edge * 0.25 * hash21(vec2<f32>(k + 11.0, seed));
+            let fw = (1.0 + 3.0 * (1.0 - dl / max(run, 1.0))) * smoothstep(0.0, reach * 0.06, dl);
+            let fissure = (1.0 - smoothstep(fw * 0.5, fw + px, off)) * (1.0 - smoothstep(run - 30.0, run, dl))
+                * smoothstep(root, root + 20.0, dl) * shattered;
+            // Its edge: cracks crossing the rim here and there, uneven, jagged.
+            let rim_rays = 90.0;
+            let ur = ang / 6.2831853 * rim_rays + seed * 5.0;
+            let kr = floor(ur + 0.5);
+            let there = step(0.72, hash21(vec2<f32>(kr, seed + 1.7)));
+            let rjag = (grad_noise2(vec2<f32>(dl, kr * 3.3) + o, 18.0) - 0.5) * 0.9;
+            let roff = abs(ur - kr - rjag * 0.45) * dl * 6.2831853 / rim_rays;
+            let lo = edge * mix(0.82, 0.97, hash21(vec2<f32>(kr, seed)));
+            let hi = edge * mix(1.03, 1.28, hash21(vec2<f32>(kr + 3.0, seed)));
+            let rw = mix(0.5, 2.2, hash21(vec2<f32>(kr + 5.0, seed)));
+            let rim_ray = there * (1.0 - smoothstep(rw * 0.5, rw + px, roff))
+                * smoothstep(lo, lo + 12.0, dl) * (1.0 - smoothstep(hi - 20.0, hi, dl)) * shattered;
+            let rim = exp(-pow((dl - edge) / max(reach * 0.03, 3.0), 2.0)) * shattered;
             // Plates tipped every way, more toward the heart.
             let tilt = (0.1 + 0.32 * cells.y) * heave * disc * (1.0 - 0.5 * dl / reach);
             s.slope += vec2<f32>(cos(cells.y * 53.0), sin(cells.y * 53.0)) * tilt;
-            // Light crawls through the cracks, and they burn white as the shatter passes.
-            let crawl = smoothstep(0.5, 0.85, grad_noise2(d * 0.012 + vec2<f32>(now * 0.21, -now * 0.17) + o, 1.0));
-            let strike = 1.4 * exp(-age / 1.1);
-            let heat = glow * (0.55 + 0.75 * crawl) + strike * shattered;
-            light = (crack + fine * 0.5 + rim_ray * 0.8) * heat + rim * glow * 0.12;
-            spill = heat * 0.05 * disc;
-            broken = max(disc * 0.8, rim_ray);
-            a = mix(a, a * 0.55 + vec3<f32>(0.012, 0.01, 0.016), disc * 0.65);
-            a *= 1.0 - 0.8 * max(crack, rim_ray);
+            // Only some cracks are lit at a time: light crawls through the network in
+            // patches; they all burn white for a moment as the shatter passes.
+            let crawl = smoothstep(0.55, 0.85, grad_noise2(d * 0.01 + vec2<f32>(now * 0.23, -now * 0.19) + o, 1.0));
+            let lit = 0.15 + 0.85 * max(crawl, smoothstep(0.62, 0.8, grad_noise2(d + o * 6.0, cell * 3.0)));
+            let strike = 1.5 * exp(-age / 0.9);
+            let heat = glow + strike * shattered;
+            light = (crack * lit * 0.8 + fine * 0.35 * lit + fissure * (0.5 + 0.4 * crawl) + rim_ray * 0.3) * heat
+                + rim * glow * 0.08;
+            spill = heat * 0.04 * disc + heat * 0.15 * fissure;
+            broken = max(disc * 0.8, max(rim_ray, fissure));
+            a = mix(a, a * 0.5 + vec3<f32>(0.012, 0.01, 0.016), disc * 0.6);
+            a *= 1.0 - 0.8 * max(max(crack, rim_ray), fissure);
         }
     }
     s.albedo = a;

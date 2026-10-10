@@ -156,7 +156,7 @@ impl Renderer {
             .line_cap(e.id, (run + SPEED * dt * 1.2).min(length));
         let dim = if v.powered { 1.0 } else { 0.3 };
         fx.ground
-            .feed(e.id, rift::LINE, [0.9 * dim, 0.0, 1.0, 1.0, 1.0]);
+            .feed(e.id, rift::LINE, [0.6 * dim, 0.0, 0.5, 1.0, 1.0]);
         let along = (mark - from) / length;
         let side = Vec2::new(-along.y, along.x);
         let was = e.run.min(run);
@@ -186,11 +186,16 @@ impl Renderer {
             let start = time + (s - was).max(0.0) / SPEED;
             let near = at.distance(focus) < reach;
             for sign in [-1.0f32, 1.0] {
-                let out = WIDTH * (0.35 + 0.9 * self.scatter.unit());
+                // Uneven: here a gap, there a slab heaved far out, never a kerb.
+                if self.scatter.unit() < 0.3 {
+                    continue;
+                }
+                let out = WIDTH * (0.3 + 1.6 * self.scatter.unit().powi(2));
                 let p = at + side * sign * out + along * self.scatter.signed() * step * 0.4;
-                let scale = 0.6 + 1.2 * self.scatter.unit();
+                let scale = 1.0 + 1.6 * self.scatter.unit();
                 let throw = 6.0 + 16.0 * self.scatter.unit();
                 let piece = Piece {
+                    ground: self.ground_height(p),
                     engine: e.id,
                     model: if self.scatter.unit() < 0.8 {
                         slab_model(self.scatter.unit())
@@ -205,7 +210,7 @@ impl Renderer {
                     lift: 0.0,
                     // Tipped up toward the fissure as it lands on its far edge.
                     pitch: 0.15 * self.scatter.signed(),
-                    roll: sign * (0.35 + 0.55 * self.scatter.unit()),
+                    roll: sign * (0.2 + 0.9 * self.scatter.unit()),
                     motion: Motion::Thrown {
                         vel: (side * sign * (2.0 + 6.0 * self.scatter.unit())).extend(throw),
                     },
@@ -237,7 +242,7 @@ impl Renderer {
                 continue;
             }
             // Lightning crawling along the fissure just behind the head.
-            if k % 2 == 0 {
+            if k % 5 == 0 {
                 let a = (at - along * step * 2.0).extend(0.0);
                 let b = (at + along * step * (1.0 + self.scatter.unit())).extend(0.0);
                 let a = a.truncate().extend(self.ground_height(a.truncate()) + 1.5);

@@ -3446,6 +3446,8 @@ impl Renderer {
         self.arc_howitzer_tick(units, &frame.houses, time);
         self.write_bore_strokes(time);
         self.heavy_rail_tick(units, &frame.houses, projectiles, time);
+        // Before the strokes are written (`emp_tick`): its lightning is among them.
+        self.gravitic_engine_tick(frame, time, camera);
         self.emp_tick(frame, units, time, camera);
         self.great_gun_tick(projectiles, time);
         self.missile_trails(projectiles, time, camera);
@@ -3454,7 +3456,6 @@ impl Renderer {
         self.stream_bursts(projectiles, time, camera);
         self.sea_tick(units, projectiles, time, camera);
         self.warp_tick(frame, time, camera);
-        self.gravitic_engine_tick(frame, time, camera);
     }
 
     /// The rounds of a stream gun's shot (`Weapon::rounds`) have no sim impact of their

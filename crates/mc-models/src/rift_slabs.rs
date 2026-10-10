@@ -16,6 +16,7 @@ use super::builder::MeshBuilder;
 use super::cliffs::{Block, Roll};
 use super::library::ModelDef;
 use super::material::ROCK;
+use crate::gpu_consts::scenery;
 
 /// Half a slab's width at scale 1, metres, and its depth under the surface.
 pub const SLAB_HALF: f32 = 6.0;
@@ -41,7 +42,7 @@ pub(super) const MODELS: &[ModelDef] = &[
 /// A plate of broken ground: a box cut round its sides into an uneven polygon, then its
 /// underside wedged.
 fn slab(b: &mut MeshBuilder, seed: u32) {
-    b.paint(ROCK);
+    b.paint(ROCK).pattern(scenery::ROCK_RIFT);
     let mut roll = Roll { seed, n: 0 };
     let (hx, hy) = (
         SLAB_HALF * roll.next(0.8, 1.0),
@@ -74,22 +75,23 @@ fn slab(b: &mut MeshBuilder, seed: u32) {
     b.with_facets(|b| block.emit(b, true));
 }
 
-/// A lump of rock torn out of the ground: taller than wide, its top broken to a ridge.
+/// A lump of ground torn out: taller than wide, its top the ground's surface at z = 0 and
+/// its body running down from it, broken to a wedge underneath.
 fn shard(b: &mut MeshBuilder, seed: u32) {
-    b.paint(ROCK);
+    b.paint(ROCK).pattern(scenery::ROCK_RIFT);
     let mut roll = Roll { seed, n: 0 };
     let h = SHARD_HEIGHT * roll.next(0.8, 1.0);
     let mut block = Block::cuboid(
-        Vec3::new(-SHARD_HALF, -SHARD_HALF * 0.8, 0.0),
-        Vec3::new(SHARD_HALF, SHARD_HALF * 0.8, h),
+        Vec3::new(-SHARD_HALF, -SHARD_HALF * 0.8, -h),
+        Vec3::new(SHARD_HALF, SHARD_HALF * 0.8, 0.0),
     );
     let cuts = if b.coarse() { 2 } else { 6 };
     for _ in 0..cuts {
         let a = roll.next(0.0, std::f32::consts::TAU);
-        let up = roll.next(-0.6, 1.2);
-        let n = Vec3::new(a.cos(), a.sin(), up).normalize();
-        let centre = Vec3::new(0.0, 0.0, h * 0.5);
-        let reach = SHARD_HALF * roll.next(0.5, 0.9) + up.max(0.0) * h * 0.35;
+        let down = roll.next(-1.2, 0.5);
+        let n = Vec3::new(a.cos(), a.sin(), down).normalize();
+        let centre = Vec3::new(0.0, 0.0, -h * 0.5);
+        let reach = SHARD_HALF * roll.next(0.5, 0.9) + (-down).max(0.0) * h * 0.35;
         block.cut(n, n.dot(centre) + reach);
     }
     b.with_facets(|b| block.emit(b, true));
@@ -100,7 +102,7 @@ mod tests {
     use super::super::build_model;
     use super::{SHARD_KEYS, SLAB_KEYS};
 
-    /// Every piece builds at every level, and a slab's top stays at the ground (z 0).
+    /// Every piece builds at every level, and its top stays at the ground (z 0).
     #[test]
     fn every_slab_and_shard_builds_and_slabs_sit_flush() {
         for key in SLAB_KEYS.iter().chain(&SHARD_KEYS) {
@@ -109,7 +111,7 @@ mod tests {
                 assert!(!lod.indices.is_empty(), "{key}: an empty level");
             }
         }
-        for key in SLAB_KEYS {
+        for key in SLAB_KEYS.iter().chain(&SHARD_KEYS) {
             let model = build_model(key).expect("in the catalogue");
             let top = model.lods[0]
                 .vertices
