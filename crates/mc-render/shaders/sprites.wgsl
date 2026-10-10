@@ -494,7 +494,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
             out.color = vec3<f32>(1.0 - smoothstep(0.72, 1.0, age));
             var look = select(6.0, 6.3, p.aim.w == FADE_BEAM_HELD_FUSION);
             look = select(look, 6.45, p.aim.w == FADE_BEAM_HELD_STAR);
-            look = select(look, 6.55, p.aim.w == FADE_BEAM_HELD_STAR_HALO);
+            look = select(look, 6.52, p.aim.w == FADE_BEAM_HELD_STAR_HALO);
             out.shape = vec2<f32>(-distance(head, tail), look);
             // Its width in metres (green), to swell out of the muzzle rather than start as a
             // flat edge (`fs_sprite`).
@@ -991,7 +991,7 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
                 + white * pow(across, 7.0) * 10.0 * dense;
             return vec4<f32>(rgb * smoothstep(0.0, 0.35, u) * in.color.r, 1.0);
         }
-        if in.shape.y > 6.55 {
+        if in.shape.y > 6.57 {
             // A plasma shot's trail (shape.y 6.6 to 7.0 over its life): a hot thread in a
             // thin sheath, and as it cools it breaks into stretches that go out on their own,
             // sharp-edged, never a soft haze.
@@ -1008,7 +1008,9 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
             return vec4<f32>(in.color * (thread + sheath) * alive, 1.0);
         }
         if in.shape.y > 6.5 {
-            // The star's halo: a soft translucent veil round the beam. It flares out of the
+            // The star's halo: a soft translucent veil round the beam. Its look is 6.52, well
+            // clear of the trails' 6.6 and over: interpolated, a look on a branch's edge
+            // flickers into the next, which drew its width (green) as colour. It flares out of the
             // muzzle as a cone over a couple of its widths, never starting as a flat edge.
             // Slow broad sheets of plasma stream down it, twisting about it, so it reads as
             // flowing gas and never a solid tube; it thins to nothing at its rim and is faint

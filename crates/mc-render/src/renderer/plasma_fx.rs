@@ -26,6 +26,7 @@ use mc_data::{BlueprintId, PlasmaGrade, Trajectory, Weapon};
 use mc_sim::mirror::{ProjectileInstance, StainInstance, UnitInstance, PROJECTILE_FADE_BEAM};
 use std::mem::size_of;
 
+use super::water_fx::PUFF_STEAM;
 use super::{beam_score, rail_fx, Renderer, MAX_PROJECTILES, PUFF_SPARK, PUFF_TREE_SMOKE};
 
 /// Fade-beam colour of a held beam and of a charge (sprites.wgsl).
@@ -68,6 +69,8 @@ struct Held {
     new: bool,
     /// Where it last glassed the ground.
     glassed: Option<Vec2>,
+    /// It last struck the sea: no plasma spills over the water.
+    boiling: bool,
 }
 
 /// A thrown charge swelling at its muzzle.
@@ -222,6 +225,7 @@ impl Renderer {
                 struck: false,
                 new: true,
                 glassed: None,
+                boiling: false,
             }),
         }
     }
@@ -247,7 +251,18 @@ impl Renderer {
         let Some((i, _)) = best else {
             return;
         };
-        let h = &mut fx.held[i];
+        // Into the sea it strikes the water, not the seabed: it ends at the surface and
+        // boils it, and melts nothing under it.
+        let muzzle = fx.held[i].from[1];
+        let sea = (!on_unit).then(|| self.at_sea(at, 1.0)).flatten();
+        let at = match sea {
+            Some(water) if muzzle.z > water => muzzle.lerp(
+                at,
+                ((muzzle.z - water) / (muzzle.z - at.z).max(0.01)).min(1.0),
+            ),
+            _ => at,
+        };
+        let h = &mut self.plasma_fx.held[i];
         h.to[1] = at;
         if h.new {
             h.to[0] = at;
@@ -260,6 +275,12 @@ impl Renderer {
         // beam raking fast over the ground (a strafe) lays the stretch it crossed since
         // its last pool too, so it leaves an unbroken line.
         let last = h.glassed;
+        h.boiling = sea.is_some();
+        if h.boiling {
+            h.glassed = None;
+            self.beam_boils(at, width, star, time);
+            return;
+        }
         let glass = !on_unit && last.is_none_or(|g| g.distance(at.truncate()) > GLASS_STEP);
         if glass {
             h.glassed = Some(at.truncate());
@@ -357,6 +378,39 @@ impl Renderer {
             .normalize_or_zero();
             let speed = 14.0 + self.scatter.unit() * 18.0;
             self.push_puff(PUFF_SPARK, at, spray * speed, time, 0.5, (0.22, 0.08));
+        }
+    }
+
+    /// Where a held beam strikes the sea: the water flashes to steam round it, white puffs
+    /// rolling up and out off the surface and a ring running out over the water. Every
+    /// tick the beam holds.
+    fn beam_boils(&mut self, at: Vec3, width: f32, star: bool, time: f32) {
+        let s = if star { 1.6 } else { 1.0 };
+        self.push_lit(
+            puff::WARP_GLOW as f32,
+            at + Vec3::Z * width * 0.3,
+            Vec3::ZERO,
+            time,
+            0.12,
+            (width * 1.1 * s, width * 1.5 * s),
+            Vec3::new(1.0, 0.92, 0.85) * 5.0,
+            0.0,
+        );
+        for _ in 0..2 {
+            let out =
+                Vec3::new(self.scatter.signed(), self.scatter.signed(), 1.6).normalize_or_zero();
+            let speed = 6.0 + self.scatter.unit() * 8.0;
+            self.push_puff(
+                PUFF_STEAM,
+                at,
+                out * speed * s,
+                time,
+                2.5,
+                (width * 1.2 * s, width * 4.0 * s),
+            );
+        }
+        if self.scatter.unit() < 0.25 {
+            self.push_ripple(at, time, width * 6.0 * s, 1.6, 0.0, 0.6);
         }
     }
 
@@ -547,7 +601,7 @@ impl Renderer {
                 let mut halo = held_instance(HELD_BEAM, h.from, h.to, h.width * HALO, start, life);
                 halo.aim[3] = fade_beam::HELD_STAR_HALO;
                 out.push(halo);
-                if h.struck {
+                if h.struck && !h.boiling {
                     // Plasma spreading out over the ground from the strike (ground.wgsl).
                     let fade = 1.0 - ((time - h.last - tick * 1.5) / CUT).clamp(0.0, 1.0);
                     fx.spills.push(StainInstance {
