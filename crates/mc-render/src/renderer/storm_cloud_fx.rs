@@ -43,6 +43,12 @@ const DYING: f32 = 3.0;
 /// marks it as seeded instead, and the sky draws it round the height the Nimbus flies, so
 /// the trail comes out of the bomber (`Sky::set_seeds`).
 const COVER: f32 = 0.85;
+/// A cloud joins the one its owner let go just before it, if that one was let go within
+/// these seconds and lies within these metres: the weather fills the stretch between, so
+/// a run lays one unbroken streak and not a string of dots. Nearest first, so two Nimbus
+/// flying side by side each keep their own.
+const LINK_SECONDS: f32 = 2.5;
+const LINK_REACH: f32 = 320.0;
 /// Strokes the sky lights inside one cloud (each with its thunder) before its bolts: a
 /// deliberate cap, so a wing of them does not take all the sky's flashes or drown the
 /// battle in thunder.
@@ -64,6 +70,11 @@ pub(super) struct StormClouds {
 #[derive(Clone, Copy)]
 struct StormCloud {
     serial: u32,
+    owner: u8,
+    /// When it was first seen, renderer seconds, and the serial of the cloud before it
+    /// in its streak (`LINK_SECONDS`).
+    born: f32,
+    link: Option<u32>,
     /// Its middle and how far grown (0 a seed, 1 grown), as the sim last had it.
     middle: Vec3,
     grown: f32,
@@ -89,10 +100,16 @@ fn grown(v: &CloudView) -> f32 {
 }
 
 impl StormCloud {
-    /// What it puts into the weather: nothing once the sim has let it go.
-    fn cell(&self) -> Option<SeedCell> {
+    /// What it puts into the weather, reaching back to the cloud before it in its streak
+    /// among `clouds`: nothing once the sim has let it go.
+    fn cell(&self, clouds: &[StormCloud]) -> Option<SeedCell> {
+        let back = self
+            .link
+            .and_then(|serial| clouds.iter().find(|c| c.serial == serial))
+            .map(|c| c.middle.truncate());
         self.gone.is_none().then(|| SeedCell {
             at: self.middle.truncate(),
+            back,
             radius: self.reach * size_at(self.grown) * 0.8,
             cover: COVER,
             height: self.middle.z,
@@ -155,8 +172,19 @@ impl Renderer {
                 // No two alike: each its own size, so a trail reads as weather.
                 let reach = (v.radius * REACH_PER_RADIUS).max(LEAST_REACH)
                     * (0.85 + 0.3 * self.scatter.unit());
+                let middle = Vec3::from(v.pos);
+                let link = clouds
+                    .iter()
+                    .filter(|c| c.owner == v.owner && time - c.born < LINK_SECONDS)
+                    .map(|c| (c.middle.distance(middle), c.serial))
+                    .filter(|(d, _)| *d < LINK_REACH)
+                    .min_by(|a, b| a.0.total_cmp(&b.0))
+                    .map(|(_, serial)| serial);
                 clouds.push(StormCloud {
                     serial: v.serial,
+                    owner: v.owner,
+                    born: time,
+                    link,
                     middle: Vec3::from(v.pos),
                     grown: grown(v),
                     reach,
@@ -172,7 +200,7 @@ impl Renderer {
             }
         });
         self.sky
-            .set_seeds(clouds.iter().filter_map(StormCloud::cell).collect());
+            .set_seeds(clouds.iter().filter_map(|c| c.cell(&clouds)).collect());
         self.storm_clouds.clouds = clouds;
     }
 

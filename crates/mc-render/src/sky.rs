@@ -190,7 +190,8 @@ pub struct Disturber {
     a: [f32; 4],
     /// xy velocity (m/s), strength, age (s).
     b: [f32; 4],
-    /// z height (m) it moves at; the rest spare.
+    /// z height (m) it moves at; the rest spare. A seed: xy the cloud before it in its
+    /// streak, z 1 if it has one (sky/seed.rs).
     c: [f32; 4],
 }
 

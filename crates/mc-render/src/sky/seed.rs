@@ -16,6 +16,9 @@ pub(super) const MOST_SEEDS: usize = 96;
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct SeedCell {
     pub(crate) at: Vec2,
+    /// The cloud before it in its streak, where it is now: the cell fills the whole
+    /// stretch back to it, so a run is one unbroken streak.
+    pub(crate) back: Option<Vec2>,
     /// Metres round `at` it fills, most at its middle.
     pub(crate) radius: f32,
     /// The cover (0-1) the weather there gathers toward.
@@ -27,7 +30,12 @@ pub(crate) struct SeedCell {
 impl Sky {
     /// The storm clouds in the weather now, in place of the last set.
     pub(crate) fn set_seeds(&mut self, mut seeds: Vec<SeedCell>) {
-        seeds.retain(|s| s.radius > 0.0 && s.radius.is_finite() && s.at.is_finite());
+        seeds.retain(|s| {
+            s.radius > 0.0
+                && s.radius.is_finite()
+                && s.at.is_finite()
+                && s.back.is_none_or(|b| b.is_finite())
+        });
         seeds.truncate(MOST_SEEDS);
         // Over the cloud floor, the heights of the seeds now; the last kept once they are
         // all spent, for the marks they leave to fade at the same height.
@@ -43,7 +51,10 @@ impl Sky {
         self.seeds.iter().map(|s| Disturber {
             a: [s.at.x, s.at.y, s.radius, SEED],
             b: [s.cover, 1.0, 0.0, 0.0],
-            c: [0.0; 4],
+            c: match s.back {
+                Some(b) => [b.x, b.y, 1.0, 0.0],
+                None => [0.0; 4],
+            },
         })
     }
 }

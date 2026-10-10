@@ -30,7 +30,7 @@ struct Disturber {
     a: vec4<f32>,
     // xy velocity (m/s), strength, age (s)
     b: vec4<f32>,
-    // z height it moves at (m)
+    // z height it moves at (m); a seed: xy the cloud before it in its streak, z 1 if any
     c: vec4<f32>,
 }
 
@@ -235,7 +235,14 @@ fn cs_force(@builtin(global_invocation_id) id: vec3<u32>) {
             // merged into one deck). The storm goes below zero, its mark (`b.y`): drawn
             // at the bomber's height, not a tower. Let go, it drifts on the wind and heals
             // back like any other cloud, the mark with it. A real storm keeps its own.
-            let near = dot(rel, rel) / (r * r);
+            // Reaching back to the cloud before it in its streak (`c.xy`, `c.z` 1): the
+            // whole stretch between, so a run is one streak and not a string of dots.
+            var off = rel;
+            if d.c.z > 0.0 {
+                let span = d.c.xy - d.a.xy;
+                off = rel - span * clamp(dot(rel, span) / max(dot(span, span), 1.0), 0.0, 1.0);
+            }
+            let near = dot(off, off) / (r * r);
             if near > 1.5 { continue; }
             let shape = exp(-near * 2.5);
             let gather = clamp(shape * dt * 1.5, 0.0, 1.0);
