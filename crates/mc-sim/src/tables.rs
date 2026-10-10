@@ -249,6 +249,9 @@ pub struct Units {
     /// A land unit in a lift ship's hold: that ship (`transport.rs`). `NONE` otherwise. A stored unit is
     /// also `IN_FACTORY`, so nothing can see, hit or order it.
     pub hangar: Vec<UnitId>,
+    /// An aircraft's fuel left, in metres of flight at full speed (`staging.rs`). Zero for
+    /// a unit with no tank.
+    pub fuel: Vec<Fx>,
     /// `Bombard`: the point each weapon is laying on, chosen after its last salvo.
     pub ground_aim: Vec<[FxVec2; MAX_WEAPONS]>,
     /// A capital ship's warp drive: where it is in a jump, and its recharge (`warp.rs`).
@@ -345,6 +348,7 @@ impl Units {
             priority: Vec::new(),
             destruct: Vec::new(),
             hangar: Vec::new(),
+            fuel: Vec::new(),
             ground_aim: Vec::new(),
             warp: Vec::new(),
             stun: Vec::new(),
@@ -427,6 +431,7 @@ impl Units {
         put(&mut self.priority, row, crate::focus::Priority::Even);
         put(&mut self.destruct, row, 0);
         put(&mut self.hangar, row, Handle::NONE);
+        put(&mut self.fuel, row, Fx::ZERO);
         // Far from any map: the first bombardment picks a point.
         put(
             &mut self.ground_aim,
@@ -549,6 +554,7 @@ impl Units {
                     | (self.destruct[row] as u64) << 32,
             );
             h.write_u64(self.hangar[row].0 as u64);
+            h.write_i64(self.fuel[row].0);
             for p in self.ground_aim[row] {
                 h.write_i64(p.x.0);
                 h.write_i64(p.y.0);
@@ -642,6 +648,9 @@ pub enum OrderKind {
     ReclaimArea,
     /// Dash to `pos` by hand once the dash is ready (`dash.rs`); done as it goes.
     Dash,
+    /// An aircraft goes down on the staging base in `target` to refuel and mend, and
+    /// leaves again when done (`staging.rs`). `radius`: one once round astern of a carrier.
+    Stage,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]

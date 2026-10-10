@@ -253,6 +253,9 @@ pub struct Mark {
     /// Shield fill, zero to one. Negative: the unit has no bubble, so the
     /// line above health stays off.
     pub shield: f32,
+    /// Fuel fill, zero to one. Negative: the unit has no tank (or is not ours), so
+    /// the line under health stays off.
+    pub fuel: f32,
 }
 
 impl Mark {

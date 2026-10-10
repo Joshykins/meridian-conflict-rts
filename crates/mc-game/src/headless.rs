@@ -740,6 +740,7 @@ pub fn screenshot(
                 kind: 0,
                 work: crate::game::unit_bar_work(u, &view.status.queues),
                 shield: crate::game::unit_bar_shield(u.unit_id, &frame.shields),
+                fuel: crate::game::unit_bar_fuel(u.unit_id, &frame.fuel),
             }
         })
         .collect();
@@ -760,6 +761,7 @@ pub fn screenshot(
                 kind: mc_render::gpu_consts::mark::HOVER | mc_render::gpu_consts::mark::RECLAIM,
                 work: -1.0,
                 shield: -1.0,
+                fuel: -1.0,
             });
         }
     }

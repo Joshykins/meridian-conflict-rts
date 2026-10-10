@@ -583,6 +583,7 @@ impl World {
         // the later barrel midway between the earlier one's shots.
         // A submarine goes down as soon as it is out and about.
         self.state.units.dive_goal[row] = bp.dive.is_some();
+        self.state.units.fuel[row] = bp.fuel.map_or(Fx::ZERO, |f| f.range);
         for (w, weapon) in bp.weapons.iter().enumerate() {
             if bp.weapons[..w].iter().any(|o| o.name == weapon.name) {
                 self.state.units.weapon_cooldown[row][w] = weapon.reload_ticks / 2 + 1;
@@ -722,6 +723,10 @@ impl World {
         {
             let _t = mc_core::perf_span!("fn.run_elevators");
             self.run_elevators()?;
+        }
+        {
+            let _t = mc_core::perf_span!("fn.run_staging");
+            self.run_staging()?;
         }
         {
             let _t = mc_core::perf_span!("fn.lose_orphaned_cargo");

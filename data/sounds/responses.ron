@@ -25,6 +25,8 @@
             Artillery: "select_artillery",
             AntiAir: "select_anti_air",
             Factory: "select_factory",
+            // An airfield answers like the air factories it serves.
+            AirStaging: "select_factory",
             Extractor: "select_extractor",
             Power: "select_power",
             Storage: "select_storage",

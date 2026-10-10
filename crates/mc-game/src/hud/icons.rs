@@ -468,6 +468,7 @@ pub fn strategic(ui: &mut Ui, kind: IconKind, tech: u8, c: Vec2, r: f32, color: 
         IconKind::Elevator => elevator(ui, c, r, color),
         IconKind::WingedTitan => winged_titan(ui, c, r, color),
         IconKind::GraviticEngine => gravitic_engine(ui, c, r, color),
+        IconKind::AirStaging => air_staging(ui, c, r, color),
         IconKind::SiegeWalker => siege_walker(ui, c, r, color),
         IconKind::AssaultWalker => assault_walker(ui, c, r, color),
         IconKind::Salvage | IconKind::SalvageCarrier | IconKind::SalvageDrone => {
@@ -737,6 +738,16 @@ pub fn gravitic_engine(ui: &mut Ui, c: Vec2, r: f32, color: Color) {
     }
     pen.limb((0.0, -0.5), (0.0, -0.5), 0.1, 0.1);
     tier5_frame(ui, c, r, color);
+}
+
+/// An air staging base, as `icons.wgsl` draws it (case 42): a bunker in the ground and a
+/// V over it pointing down into it.
+pub fn air_staging(ui: &mut Ui, c: Vec2, r: f32, color: Color) {
+    let mut pen = Pen::new(ui, c, r, color);
+    pen.rect((0.0, -0.46), (0.78, 0.22));
+    for s in [-1.0, 1.0] {
+        pen.limb((s * 0.52, 0.62), (0.0, 0.04), 0.13, 0.13);
+    }
 }
 
 /// A four-legged siege walker in profile, as `icons.wgsl` draws it (`sd_siege_walker`):

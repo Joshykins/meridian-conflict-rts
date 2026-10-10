@@ -514,6 +514,7 @@ impl World {
                 carrier,
                 queue,
             } => self.order_board(player, units, *carrier, *queue),
+            Command::Stage { units, base, queue } => self.order_stage(player, units, *base, *queue),
             Command::Land {
                 units,
                 pos,
@@ -1451,6 +1452,7 @@ impl World {
                 OrderKind::Warp => self.run_warp_order(row, &o)?,
                 OrderKind::Dash => self.run_dash_order(row, &o)?,
                 OrderKind::ReclaimArea => self.run_reclaim_area(row, &o)?,
+                OrderKind::Stage => self.run_stage(row, &o)?,
             }
             // A salvage vehicle, boat or aircraft clears what it passes as it goes.
             if matches!(
@@ -3177,7 +3179,9 @@ impl World {
                     && !self.state.units.has_flag(row, flag::IN_FACTORY) =>
             {
                 let units = &self.state.units;
-                if units.drone_parent[row] == Handle::NONE
+                if let Some(z) = self.stage_glide_z(row, pos, surface + m.altitude) {
+                    z
+                } else if units.drone_parent[row] == Handle::NONE
                     && self.bp(row).drone.is_none()
                     && !self.bp(row).carried_drone
                     && units.order_head[row] == NO_ORDER
@@ -3319,11 +3323,13 @@ impl World {
     }
 
     /// The commander, a factory, an economy structure (mine, vault, reclaim tower),
-    /// an intel tower, and a shield generator: the next tier is built onto the same
-    /// unit. Other structures are replaced by their successor.
+    /// an intel tower, a shield generator, and an air staging base (what it holds stays
+    /// aboard): the next tier is built onto the same unit. Other structures are replaced
+    /// by their successor.
     pub(crate) fn upgrades_in_place(&self, row: usize) -> bool {
         let bp = self.bp(row);
         bp.is_mobile()
+            || bp.staging.is_some()
             || bp.has(cat::FACTORY)
             || bp.has(cat::ECONOMY)
             || bp.has(cat::INTEL)

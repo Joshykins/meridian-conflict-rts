@@ -190,6 +190,7 @@ pub fn activity(kind: OrderKind) -> &'static str {
         OrderKind::Unload => "Unloading",
         OrderKind::Warp => "Warping",
         OrderKind::Dash => "Dashing",
+        OrderKind::Stage => "Refuelling",
     }
 }
 

@@ -27,6 +27,7 @@ mod dash;
 mod destruct;
 mod elevator;
 mod fog;
+mod fuel;
 mod gravitic;
 mod lens;
 mod links;
@@ -43,6 +44,7 @@ pub use dash::{DashStage, DashView};
 pub use destruct::DestructView;
 pub use elevator::{crate_load, ElevatorPhase, ElevatorView};
 pub use fog::VisionDisc;
+pub use fuel::FuelView;
 pub use gravitic::{WellStage, WellView};
 pub use lens::LensView;
 pub use links::LinkView;
@@ -1551,6 +1553,8 @@ pub struct RenderFrame {
     pub clouds: Vec<CloudView>,
     /// Timed self-destructs counting down that the viewer may see (`crate::destruct`).
     pub destructs: Vec<DestructView>,
+    /// Aircraft tanks the viewer may see (`crate::staging`).
+    pub fuel: Vec<FuelView>,
     /// The time left on the viewer's side's sites and upgrades whose work is moving
     /// (`work::WorkLeft`), by the unit as drawn.
     pub work_left: Vec<WorkLeft>,
@@ -2827,6 +2831,7 @@ impl World {
         self.write_wells(viewer, &mut frame.wells);
         self.write_clouds(&mut frame.clouds);
         self.write_destructs(viewer, &mut frame.destructs);
+        self.write_fuel(viewer, &mut frame.fuel);
         self.write_work_left(viewer, &mut frame.work_left);
         self.write_dampers(viewer, &mut frame.dampers);
         self.write_mends(viewer, &mut frame.mends, &mut frame.repair_fields);

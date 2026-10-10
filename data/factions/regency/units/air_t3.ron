@@ -22,6 +22,8 @@
         radius: 9.8, height: 3.0,
         vision: 1000,
         motion: (layer: Air, size: 0, speed: 255, accel: 114, turn: 100, altitude: 300, hover: false),
+        // Kilometres of flight at full speed: over a big map and back.
+        fuel: (range: 50),
         weapons: [(
             name: "Pinch-fusion Rifle",
             damage: 660, splash: 5, range: 350, reload: 1.0, speed: 1500, trajectory: Direct,
@@ -53,6 +55,7 @@
         radius: 16, height: 3.6,
         vision: 1000,
         motion: (layer: Air, size: 0, speed: 210, accel: 95, turn: 62, altitude: 300, hover: false),
+        fuel: (range: 60),
         weapons: [(
             name: "Pinch-fusion Bomb",
             damage: 5600, splash: 55, range: 950, reload: 10, speed: 100, trajectory: Ballistic, loft: 0.4,
@@ -83,6 +86,7 @@
         // so a fighter cruising at 300 m and flak are short of it; SAMs and heavy flak
         // are not.
         motion: (layer: Air, size: 0, speed: 340, accel: 110, turn: 48, altitude: 900, hover: false, above_weather: true),
+        fuel: (range: 80),
         weapons: [],
         mesh: "regency_augur", icon: Intel,
         sounds: (death: "blast_small", moving: "aster_jet"),

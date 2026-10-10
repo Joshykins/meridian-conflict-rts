@@ -108,6 +108,7 @@ impl World {
                     continue;
                 }
                 if let Some(motion) = this.bp(row).motion {
+                    let motion = this.fuelled_motion(row, &motion);
                     let engaged = attack_altitudes[row].is_some();
                     out.push(this.move_unit(row, &motion, formation[row], engaged));
                 }

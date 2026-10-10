@@ -334,6 +334,15 @@
     "aster_t1_reclaimer": (
         lore: "A salvage mast with one slow head. It charges its beam before each pull, and reaches further than any engineer can walk in a minute.",
     ),
+    "aster_t1_airbase": (
+        lore: "A buried hangar: aircraft drop through its hatch to be fuelled and mended below, then are fired back out of its launch tunnels into the sky it guards.",
+    ),
+    "aster_t2_airbase": (
+        lore: "The Roost dug deeper: more berths below, four tunnels instead of two, and a reach that covers a whole front.",
+    ),
+    "aster_t3_airbase": (
+        lore: "A hangar the size of a small town under the ground, turning a wing round in the time it takes to land.",
+    ),
     "aster_t2_reclaimer": (
         lore: "The Scavenger raised another storey, its head re-wound for a longer, harder pull.",
     ),

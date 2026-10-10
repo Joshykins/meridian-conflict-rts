@@ -24,6 +24,8 @@
         radius: 8, height: 3.6,
         vision: 560,
         motion: (layer: Air, size: 0, speed: 82, accel: 30, turn: 120, altitude: 65, hover: true),
+        // Kilometres of flight at full speed: over a big map and back.
+        fuel: (range: 50),
         weapons: [
             (
                 // A salvo of six, 0.35 s apart, every 9 s: about 150 a second while the bays
@@ -86,6 +88,7 @@
         radius: 14, height: 6,
         vision: 1000,
         motion: (layer: Air, size: 0, speed: 130, accel: 45, turn: 80, altitude: 90, hover: false),
+        fuel: (range: 45),
         weapons: [
             (
                 // Both beams strike every tick they rake, 110 each where they land, the

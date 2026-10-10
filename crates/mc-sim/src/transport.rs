@@ -766,7 +766,7 @@ impl World {
     }
 
     /// Every tick, after orders: what was in the hold of a ship that is gone dies,
-    /// unseen, with it.
+    /// unseen, with it, and so does an aircraft aboard a staging base that is gone.
     pub(crate) fn lose_orphaned_cargo(&mut self) -> Result<(), SimError> {
         let rows: Vec<usize> = self.state.units.slots.iter().collect();
         for row in rows {
@@ -776,7 +776,7 @@ impl World {
                     .state
                     .units
                     .row(ship)
-                    .is_some_and(|s| self.bp(s).transport.is_some())
+                    .is_some_and(|s| self.bp(s).transport.is_some() || self.bp(s).staging.is_some())
             {
                 continue;
             }

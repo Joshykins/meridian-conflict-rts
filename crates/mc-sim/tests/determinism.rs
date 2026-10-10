@@ -190,6 +190,8 @@ fn setup(w: &mut World) {
         }
         // Room for what the Reclaimers bring in.
         add("aster_mass_storage", 1, 500, 150);
+        // A Roost under the aircraft (`staging.rs`).
+        add("aster_t1_airbase", 1, 850, 380);
         match player {
             0 => {
                 add("aster_t5_titan", 1, 1000, 900);
@@ -494,6 +496,29 @@ fn script(w: &mut World, tick: u32) -> Vec<PlayerCommand> {
                 },
             }]
         }
+        // The south's gunships go down on their Roost (`staging.rs`), and are fired back
+        // out of its tunnels.
+        5 => {
+            let (gunship, roost) = (
+                w.blueprints.id_of("aster_t1_rotor_gunship").unwrap(),
+                w.blueprints.id_of("aster_t1_airbase").unwrap(),
+            );
+            let u = &w.state.units;
+            let of = |bp| {
+                u.slots
+                    .iter()
+                    .filter(move |&r| u.owner[r] == 0 && u.blueprint[r] == bp)
+            };
+            let base = of(roost).map(|r| u.id(r)).next().unwrap();
+            vec![PlayerCommand {
+                player: 0,
+                command: Command::Stage {
+                    units: of(gunship).map(|r| u.id(r)).collect(),
+                    base,
+                    queue: false,
+                },
+            }]
+        }
         // A timed self-destruct still counting down when the snapshot is taken.
         t if t == SNAPSHOT_AT - 20 => vec![PlayerCommand {
             player: 1,
@@ -534,6 +559,7 @@ fn reference() -> Vec<u64> {
     let mut platforms = 0;
     let mut dashes = 0;
     let mut bolts = 0;
+    let mut staged = false;
     let mut lens_strikes = 0;
     let hashes = (1..TICKS)
         .map(|t| {
@@ -559,6 +585,11 @@ fn reference() -> Vec<u64> {
                 batches_sent += 1;
             }
             last_held = held;
+            let u = &w.state.units;
+            staged |= u
+                .slots
+                .iter()
+                .any(|r| u.hangar[r] != mc_sim::tables::Handle::NONE && u.blueprint[r] != courier);
             if t == SNAPSHOT_AT {
                 held_at_snapshot = held;
                 let u = &w.state.units;
@@ -612,6 +643,8 @@ fn reference() -> Vec<u64> {
     assert!(well_at_snapshot, "no gravity well held at the snapshot");
     // The storm bomber's clouds struck down.
     assert!(bolts > 0, "no storm cloud let a bolt fall");
+    // The gunships went down on their Roost.
+    assert!(staged, "no aircraft went down on a staging base");
     // The Seraph dashed into the south's army.
     assert!(dashes > 0, "the Seraph never dashed");
     // The lens's front struck and its well opened.

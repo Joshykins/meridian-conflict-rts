@@ -309,6 +309,13 @@ pub enum Command {
         carrier: UnitId,
         queue: bool,
     },
+    /// Aircraft among these with a tank go down on the friendly staging base `base` to
+    /// fill and mend, and leave again when done (`staging.rs`).
+    Stage {
+        units: Vec<UnitId>,
+        base: UnitId,
+        queue: bool,
+    },
     /// Capital ships among these fly to `pos` and set down on the nearest ground that
     /// takes them, the only way they ever land; lift ships lower the ramp, and with
     /// `unload` everything in the hold walks out.
@@ -455,6 +462,7 @@ impl Command {
             | Command::SetPriority { units, .. }
             | Command::Guard { units, .. }
             | Command::Board { units, .. }
+            | Command::Stage { units, .. }
             | Command::Land { units, .. }
             | Command::Unload { units }
             | Command::TakeOff { units }

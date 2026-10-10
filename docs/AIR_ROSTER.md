@@ -124,11 +124,35 @@ terrain look-ahead; the hull, muzzle and exhaust follow the actual flight slope.
 The cannon keeps firing below cruise altitude. Its heavier rapid report sits
 above a quieter engine bed, with no separate pullout sound. Bomb release is quieter.
 
-## The guard order
+## Fuel and air staging (2026-10-10)
 
-The Roost airbase and the logistics network (Gates, Moorages, Junctions) were
-removed on 2026-09-25. The Roost model is parked in `models/aster/airbase.rs`, and
-no unit uses it.
+Aircraft with a `fuel: (range: km)` block burn their tank while up: the distance they
+fly, and at least two fifths of their full-speed burn while they loiter or hover, so a
+tank is `range` kilometres at full speed. Ranges are set so most aircraft can cross a big
+map (16 km, 22 across the diagonal) and come back: fighters 45-50 km, bombers 50-60, gunships
+40-45, scouts 70-80, the Argus 90. Lift ships, drones and experimentals carry no tank. Dry,
+an aircraft keeps half its speed, acceleration and turn (`World::fuelled_motion`), and
+its fuel line under the health bar turns red. An enemy's tanks are not shown.
+
+A unit with a `staging:` block takes aircraft in (`mc-sim/src/staging.rs`): the Roost I-III
+(`aster_t1_airbase`, mesh `airbase`) and the carriers (Atoll, Mantlet). A *free* aircraft
+(no order, guarding or patrolling; not one in a fight or on a player's move) goes down on
+its own:
+- within a base's `radius` once under 60% fuel or 70% health;
+- from anywhere once its fuel is down to the way to the nearest base plus 2 km.
+
+It is sent with `OrderKind::Stage` pushed in front of what it was doing, and goes back
+to that when it leaves. Right-clicking a friendly base with aircraft selected sends them
+too (`Command::Stage`). A base takes `pads` at a time (the others wait over it); aboard,
+an aircraft is stowed like lift ship cargo (`Units::hangar`, `IN_FACTORY`), rides with
+the base, fills in `refuel` seconds from empty and mends `repair` of its health a second,
+and dies with the base. Full and mended it leaves off the `launch` points in turn, one
+every `launch_gap` seconds. A base whose single launch point differs from its landing
+point (a carrier) is approached from astern and left off the bow; a Roost opens its
+hatch (`doors`, driven in `Units::deploy`) for an aircraft coming down and fires it out
+of its corner tunnels. A Roost upgrades in place, keeping what it holds.
+
+## The guard order
 
 **Guard** (`Command::Guard`, `OrderKind::Guard`) is for any armed mobile unit, and
 for any aircraft, armed or not.

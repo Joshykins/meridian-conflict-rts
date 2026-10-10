@@ -22,6 +22,8 @@
         radius: 3.5, height: 1.4,
         vision: 1100, radar: 3600,
         motion: (layer: Air, size: 0, speed: 270, accel: 110, turn: 95, altitude: 260),
+        // Kilometres of flight at full speed: over a big map and back.
+        fuel: (range: 70),
         weapons: [],
         mesh: "regency_flechette", icon: Scout,
         // A stand-in: ARC's jet until the Regency has a drive sound of their own.
@@ -42,6 +44,7 @@
         radius: 3.6, height: 1.6,
         vision: 480,
         motion: (layer: Air, size: 0, speed: 125, accel: 34, turn: 74, altitude: 200),
+        fuel: (range: 45),
         weapons: [(
             name: "Twin Plasmeric Repeater",
             damage: 16, range: 210, reload: 0.35, speed: 480, trajectory: Direct,
@@ -71,6 +74,7 @@
         radius: 5.6, height: 2.2,
         vision: 520,
         motion: (layer: Air, size: 0, speed: 86, accel: 22, turn: 44, altitude: 200),
+        fuel: (range: 50),
         weapons: [(
             name: "Plasmeric Bomb",
             damage: 110, splash: 18, range: 320, reload: 5.0, salvo: 3, salvo_delay: 0.2,

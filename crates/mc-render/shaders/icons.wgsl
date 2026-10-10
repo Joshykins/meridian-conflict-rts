@@ -15,6 +15,8 @@ struct Mark {
     work: f32,
     // Shield fill, zero to one. Negative: no shield line.
     shield: f32,
+    // Fuel fill, zero to one. Negative: no fuel line.
+    fuel: f32,
 }
 
 @group(1) @binding(0) var<storage, read> marks: array<Mark>;
@@ -400,6 +402,14 @@ fn icon_shape(shape: u32, p: vec2<f32>) -> f32 {
         // its well, on a broken ground line (`hud/icons.rs` draws the same; `fs_icon`
         // frames it as a tier 5).
         case 41u: { return sd_gravitic_engine(p); }
+        // An air staging base: the bunker in the ground, and a V over it pointing down
+        // into it (`hud/icons.rs` draws the same).
+        case 42u: {
+            let bunker = sd_box(p - vec2<f32>(0.0, -0.46), vec2<f32>(0.74, 0.18)) - 0.04;
+            let v = min(sd_segment(p, vec2<f32>(-0.52, 0.62), vec2<f32>(0.0, 0.04)),
+                sd_segment(p, vec2<f32>(0.52, 0.62), vec2<f32>(0.0, 0.04))) - 0.13;
+            return min(bunker, v);
+        }
         default: { return sd_box(p, vec2<f32>(0.6)); }
     }
 }
@@ -621,6 +631,7 @@ struct MarkOut {
     @location(2) @interpolate(flat) health: f32,
     @location(3) @interpolate(flat) build: f32,
     @location(4) @interpolate(flat) shield: f32,
+    @location(5) @interpolate(flat) fuel: f32,
 }
 
 struct RingOut {
@@ -800,7 +811,8 @@ fn fs_ring(in: RingOut) -> @location(0) vec4<f32> {
 }
 
 // Status bars sit on the ground at the unit's feet, as wide as the hull.
-// Shield (always blue, whatever the faction's dome colour) on top, health, then construction. Pixel heights must match fs_bar.
+// Shield (always blue, whatever the faction's dome colour) on top, health, fuel, then
+// construction. Pixel heights must match fs_bar.
 @vertex
 fn vs_bar(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u32) -> MarkOut {
     let mark = marks[instance];
@@ -813,12 +825,14 @@ fn vs_bar(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u32
     let half_w = max(e.radius * 0.8 * px, 16.0);
     let show_build = mark.work >= 0.0;
     let show_shield = mark.shield >= 0.0;
+    let show_fuel = mark.fuel >= 0.0;
     let health_h = 6.0;
     let shield_h = 4.0;
+    let fuel_h = 3.0;
     let build_h = 5.0;
     let gap = 2.0;
     let up = select(0.0, shield_h + gap, show_shield);
-    let down = select(0.0, build_h + gap, show_build);
+    let down = select(0.0, build_h + gap, show_build) + select(0.0, fuel_h + gap, show_fuel);
     let half_h = 0.5 * (health_h + up + down);
     // South of the footprint, so the stack sits on the ground in front of the hull.
     let mid_y = -max(e.radius * 0.6 * px, 6.0) - half_h - 2.0;
@@ -835,6 +849,7 @@ fn vs_bar(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u32
     out.health = e.health;
     out.build = mark.work;
     out.shield = mark.shield;
+    out.fuel = mark.fuel;
     return out;
 }
 
@@ -866,16 +881,18 @@ fn fs_bar(in: MarkOut) -> @location(0) vec4<f32> {
     let health_color = mix(vec3<f32>(1.0, 0.12, 0.05), vec3<f32>(0.2, 1.0, 0.3), smoothstep(0.2, 0.7, in.health));
     let show_shield = in.shield >= 0.0;
     let show_build = in.build >= 0.0;
+    let show_fuel = in.fuel >= 0.0;
     // Before any branch, so the derivative is taken over the whole quad.
     let per_px = fwidth(in.uv.x);
     let health_h = 6.0;
     let shield_h = 4.0;
+    let fuel_h = 3.0;
     let build_h = 5.0;
     let gap = 2.0;
     let up = select(0.0, shield_h + gap, show_shield);
-    let down = select(0.0, build_h + gap, show_build);
+    let down = select(0.0, build_h + gap, show_build) + select(0.0, fuel_h + gap, show_fuel);
     let total = health_h + up + down;
-    // uv.y = +1 at the top of the stack: shield, then health, then construction.
+    // uv.y = +1 at the top of the stack: shield, then health, fuel, then construction.
     let y = (1.0 - in.uv.y) * 0.5 * total;
     var cursor = 0.0;
     if show_shield {
@@ -892,6 +909,18 @@ fn fs_bar(in: MarkOut) -> @location(0) vec4<f32> {
         return bar_fill(row_uv(in.uv.x, y, cursor, health_h), in.health, health_color, per_px, health_h);
     }
     cursor += health_h;
+    if show_fuel {
+        if y < cursor + gap {
+            return vec4<f32>(0.0);
+        }
+        cursor += gap;
+        if y < cursor + fuel_h {
+            // Pale gold; red once dry, when the aircraft limps.
+            let dry = select(vec3<f32>(1.0, 0.82, 0.3), vec3<f32>(1.0, 0.12, 0.05), in.fuel <= 0.0);
+            return bar_fill(row_uv(in.uv.x, y, cursor, fuel_h), in.fuel, dry, per_px, fuel_h);
+        }
+        cursor += fuel_h;
+    }
     if show_build {
         if y < cursor + gap {
             return vec4<f32>(0.0);

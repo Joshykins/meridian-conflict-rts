@@ -1,5 +1,5 @@
-//! The Roost: an airbase dug into the ground. Parked: no unit uses it since the airbase
-//! was removed (2026-09-25); kept so the model can come back.
+//! The Roost: the ARC's air staging base (`aster_t1_airbase` and its upgrades), dug into
+//! the ground. Aircraft come down through its hatch to refuel and mend (`mc_sim::staging`).
 //!
 //! Almost nothing stands above the lot. A graphite deck covers the works; in its
 //! middle a round shaft, wide enough for a cluster of aircraft side by side, goes
@@ -8,9 +8,8 @@
 //! (`UnitInstance::deploy`, 0 shut to 1 open). The shaft is the model's pit, so
 //! it shows through the opening. At the corners, launch tunnels come up out of
 //! the ground: open portals with lit throats, a roof over them, a lane leading
-//! away. The sim puts an aircraft at the back of a tunnel and runs it out of the
-//! mouth (`tunnels` and `run` in the unit file: the mouths here and there are the
-//! same numbers). A low operations house stands on one arm; fuel on the other.
+//! away. The sim lets an aircraft out of a tunnel's mouth (`staging.launch` in the unit
+//! file: the mouths here and there are the same numbers). A low operations house stands on one arm; fuel on the other.
 //!
 //! Tier 1 has two tunnels; tier 2 opens the other two corners; tier 3 adds
 //! floodlight masts at the arms' ends and a search radar on the house. Later
@@ -25,12 +24,12 @@ use crate::builder::MeshBuilder;
 use crate::material::*;
 use crate::{part, pattern, Pit};
 
-/// Half the square the shaft and its hatch cover (`mc_sim::airbase::SHAFT_HALF`).
+/// Half the square the shaft and its hatch cover (the landing point is its middle).
 const WELL_SQUARE: f32 = 18.5;
 /// Height of the shaft's opening plane (`ModelInfo::pit`; entity.wgsl's `AIRBASE_OPEN`):
 /// just over the ground, and under everything that closes the hatch.
 const SHAFT_OPEN: f32 = 0.3;
-/// The lift at the bottom of the shaft: its top is `mc_sim::airbase::SHAFT_FLOOR`.
+/// The lift at the bottom of the shaft.
 const FLOOR: f32 = -21.8;
 /// The deck's top, and its cross: the arms' half width and the lot's half size.
 const DECK: f32 = 1.6;

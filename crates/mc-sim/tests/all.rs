@@ -13,6 +13,7 @@ mod air_landing;
 mod air_patrol_smooth;
 mod air_refinements;
 mod air_roster;
+mod air_staging;
 mod air_waypoints;
 mod aircraft_crash;
 mod atoll;

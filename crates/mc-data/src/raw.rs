@@ -143,6 +143,8 @@ pub enum IconKind {
     /// A tier-5 gravitic engine from the front: a crown of shards leaning in to a point
     /// over a well, on a broken ground line. Framed like the [`IconKind::Titan`].
     GraviticEngine = 41,
+    /// An air staging base: a bunker in the ground and a V over it pointing down into it.
+    AirStaging = 42,
 }
 
 /// One unit's entry in a faction's `lore.ron`: its own text, and its weapons' by weapon name.
@@ -471,6 +473,12 @@ pub(crate) struct Unit {
     /// Mends every friendly unit around it ([`crate::RepairField`]).
     #[serde(default)]
     pub repair_field: Option<RawRepairField>,
+    /// An aircraft's tank ([`crate::Fuel`]).
+    #[serde(default)]
+    pub fuel: Option<RawFuel>,
+    /// Where aircraft come down to refuel and mend ([`crate::Staging`]).
+    #[serde(default)]
+    pub staging: Option<RawStaging>,
     #[serde(default)]
     pub shield: Option<RawShield>,
     #[serde(default)]
@@ -880,6 +888,44 @@ pub(crate) struct RawWarp {
 pub struct RawRepairField {
     pub radius: f64,
     pub rate: f64,
+}
+
+/// An aircraft's tank: `range` kilometres of flight at full speed.
+#[derive(Deserialize, Clone, Copy)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RawFuel {
+    pub range: f64,
+}
+
+/// An air staging base: aircraft within `radius` metres that run low come down on it.
+#[derive(Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RawStaging {
+    pub radius: f64,
+    /// Aircraft it takes in at once.
+    pub pads: u8,
+    /// Seconds an empty tank takes to fill.
+    pub refuel: f64,
+    /// Share of its full health an aircraft aboard mends a second.
+    pub repair: f64,
+    /// Where aircraft come down, `(x, y, z)` in the model's frame (default: the middle).
+    #[serde(default)]
+    pub land: (f64, f64, f64),
+    /// Where they leave from, `(x, y, z, heading in degrees)`, taken in turn (default:
+    /// where they came down, nose along the base). At most `MAX_LAUNCHES`.
+    #[serde(default)]
+    pub launch: Vec<(f64, f64, f64, f64)>,
+    /// Seconds between two launches.
+    #[serde(default = "default_launch_gap")]
+    pub launch_gap: f64,
+    /// Seconds its hatch takes to open for an aircraft coming down (`Units::deploy`).
+    /// None: nothing to open.
+    #[serde(default)]
+    pub doors: Option<f64>,
+}
+
+fn default_launch_gap() -> f64 {
+    1.0
 }
 
 /// A warp dampener's field.
@@ -2417,6 +2463,60 @@ impl Unit {
                     radius: fx(f.radius),
                     rate: fx(f.rate),
                 }),
+                None => None,
+            },
+            fuel: match self.fuel {
+                Some(f)
+                    if f.range <= 0.0
+                        || !self
+                            .motion
+                            .as_ref()
+                            .is_some_and(|m| m.layer == MoveLayer::Air) =>
+                {
+                    return Err(DataError::Invalid(format!(
+                        "{key}: fuel is for aircraft, with a range above 0"
+                    )));
+                }
+                Some(f) => Some(crate::Fuel {
+                    range: fx(f.range * 1000.0),
+                }),
+                None => None,
+            },
+            staging: match &self.staging {
+                Some(s)
+                    if s.radius <= 0.0
+                        || s.pads == 0
+                        || s.refuel <= 0.0
+                        || !(s.repair > 0.0 && s.repair <= 1.0)
+                        || s.launch_gap <= 0.0
+                        || s.launch.len() > crate::MAX_LAUNCHES
+                        || s.doors.is_some_and(|d| d <= 0.0) =>
+                {
+                    return Err(DataError::Invalid(format!(
+                        "{key}: staging needs a radius, pads, a refuel time, a launch gap and a repair rate above 0, at most 1, door time above 0 and at most {} launches", crate::MAX_LAUNCHES
+                    )));
+                }
+                Some(s) => {
+                    let land = FxVec3::new(fx(s.land.0), fx(s.land.1), fx(s.land.2));
+                    let mut launch = [(land, Angle::ZERO); crate::MAX_LAUNCHES];
+                    for (to, l) in launch.iter_mut().zip(&s.launch) {
+                        *to = (
+                            FxVec3::new(fx(l.0), fx(l.1), fx(l.2)),
+                            Angle(steps(l.3).round() as i64 as u16),
+                        );
+                    }
+                    Some(crate::Staging {
+                        radius: fx(s.radius),
+                        pads: s.pads,
+                        refuel_ticks: ticks(s.refuel).max(1),
+                        repair: fx(s.repair),
+                        land,
+                        launch,
+                        launches: s.launch.len().max(1) as u8,
+                        launch_ticks: ticks(s.launch_gap).clamp(1, 600) as u16,
+                        door_ticks: s.doors.map_or(0, |d| ticks(d).clamp(1, 600) as u16),
+                    })
+                }
                 None => None,
             },
             shield: self.shield.as_ref().map(|s| {

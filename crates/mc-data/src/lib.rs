@@ -637,6 +637,48 @@ pub struct RepairField {
     pub rate: Fx,
 }
 
+/// An aircraft's tank (`mc_sim::staging`): it burns while the aircraft is up and fills
+/// again on a staging base. Empty, the aircraft flies slower and turns wider.
+#[derive(Clone, Copy, Debug)]
+pub struct Fuel {
+    /// Metres of flight a full tank lasts at full speed.
+    pub range: Fx,
+}
+
+/// An air staging base (`mc_sim::staging`): free aircraft within `radius` that are low on
+/// fuel or hurt come down on it, `pads` at a time, fill and mend aboard, and leave again.
+/// In the model's frame, x along the heading.
+#[derive(Clone, Copy, Debug)]
+pub struct Staging {
+    pub radius: Fx,
+    pub pads: u8,
+    /// Ticks an empty tank takes to fill.
+    pub refuel_ticks: u32,
+    /// Share of its full health an aircraft aboard mends a second.
+    pub repair: Fx,
+    /// Where aircraft come down.
+    pub land: FxVec3,
+    /// Where they leave from, and their heading off the base's, taken in turn: the
+    /// first `launches` of them.
+    pub launch: [(FxVec3, Angle); MAX_LAUNCHES],
+    pub launches: u8,
+    /// Ticks between two launches.
+    pub launch_ticks: u16,
+    /// Ticks its hatch takes to open for an aircraft coming down; zero: no hatch.
+    pub door_ticks: u16,
+}
+
+impl Staging {
+    /// A deck that is landed on at one end and left from the other (a carrier): aircraft
+    /// come in from astern along it.
+    pub fn directional(&self) -> bool {
+        self.launches == 1 && self.launch[0].0 != self.land
+    }
+}
+
+/// Most launch points a staging base has.
+pub const MAX_LAUNCHES: usize = 4;
+
 /// A warp dampener (`mc_sim::warp`): an enemy ship whose jump ends inside `radius` of it is
 /// dragged through a slow, torn warp and thrown out hurt and stunned.
 #[derive(Clone, Copy, Debug)]
@@ -888,6 +930,10 @@ pub struct UnitBlueprint {
     pub warp_damper: Option<WarpDamper>,
     /// Mends the friendly units around it.
     pub repair_field: Option<RepairField>,
+    /// An aircraft's tank.
+    pub fuel: Option<Fuel>,
+    /// Takes aircraft in to refuel and mend.
+    pub staging: Option<Staging>,
     /// A projected dome, or a hull wrap that only covers this unit.
     pub shield: Option<Shield>,
     pub upgrades_to: Option<BlueprintId>,
@@ -1724,6 +1770,31 @@ impl Blueprints {
                 Some(f) => {
                     h.write_i64(f.radius.0);
                     h.write_i64(f.rate.0);
+                }
+                None => h.write_u64(u64::MAX),
+            }
+            match &u.fuel {
+                Some(f) => h.write_i64(f.range.0),
+                None => h.write_u64(u64::MAX),
+            }
+            match &u.staging {
+                Some(s) => {
+                    h.write_i64(s.radius.0);
+                    h.write_u64(
+                        s.pads as u64
+                            | (s.launch_ticks as u64) << 8
+                            | (s.door_ticks as u64) << 24
+                            | (s.launches as u64) << 40,
+                    );
+                    h.write_u64(s.refuel_ticks as u64);
+                    h.write_i64(s.repair.0);
+                    let launch = s.launch.iter().take(s.launches as usize);
+                    for (v, a) in std::iter::once((s.land, Angle::ZERO)).chain(launch.copied()) {
+                        h.write_i64(v.x.0);
+                        h.write_i64(v.y.0);
+                        h.write_i64(v.z.0);
+                        h.write_u64(a.0 as u64);
+                    }
                 }
                 None => h.write_u64(u64::MAX),
             }

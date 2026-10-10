@@ -1052,6 +1052,7 @@ impl Game {
             } else {
                 unit_bar_shield(u.unit_id, &self.view.frame.shields)
             },
+            fuel: unit_bar_fuel(u.unit_id, &self.view.frame.fuel),
         }
     }
 
@@ -1990,6 +1991,20 @@ impl Game {
                     factories: units,
                     from: Handle(u.unit_id),
                 });
+            } else if !self.is_enemy(owner)
+                && self
+                    .blueprints
+                    .unit(BlueprintId(u.blueprint as u16))
+                    .staging
+                    .is_some()
+                && self.selection_takers().any(|b| b.fuel.is_some())
+            {
+                // Aircraft onto a friendly airfield or carrier: down to fill and mend.
+                return Some(Command::Stage {
+                    units,
+                    base: Handle(u.unit_id),
+                    queue,
+                });
             } else if owner == self.view.local
                 && self
                     .blueprints
@@ -2075,7 +2090,7 @@ impl Game {
                 | Command::ReclaimArea { .. },
             ) => Pointer::Reclaim,
             Some(Command::Move { .. } | Command::Land { .. }) => Pointer::Move,
-            Some(Command::Board { .. }) => Pointer::Board,
+            Some(Command::Board { .. } | Command::Stage { .. }) => Pointer::Board,
             Some(Command::Warp { .. }) => Pointer::Warp,
             Some(_) => Pointer::Arrow,
             None => Pointer::Denied,
@@ -4725,6 +4740,14 @@ pub(crate) fn unit_bar_shield(unit_id: u32, shields: &[ShieldInstance]) -> f32 {
         .iter()
         .find(|s| s.unit_id == unit_id)
         .map_or(-1.0, |s| s.health.clamp(0.0, 1.0))
+}
+
+/// The fuel line under a unit's health bar: its tank's fill, or -1 for none (an enemy's
+/// tank is not in the frame).
+pub(crate) fn unit_bar_fuel(unit_id: u32, fuel: &[mc_sim::mirror::FuelView]) -> f32 {
+    fuel.iter()
+        .find(|f| f.unit_id == unit_id)
+        .map_or(-1.0, |f| f.fill.clamp(0.0, 1.0))
 }
 
 /// Unit under the cursor, else the first of the selection.

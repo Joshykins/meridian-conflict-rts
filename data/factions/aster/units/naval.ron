@@ -604,6 +604,12 @@
                 sounds: (fire: "torpedo_launch", impact: "torpedo_hit", ground: "torpedo_hit"),
             ),
         ],
+        // Aircraft come in over the stern onto the deck, fill and mend in the hangar,
+        // and leave off the bow catapult.
+        staging: (
+            radius: 2400, pads: 6, refuel: 12, repair: 0.05, launch_gap: 1.2,
+            land: (-40, 0, 8.5), launch: [(45, 0, 8.5, 0)],
+        ),
         mesh: "carrier", icon: Ship,
         sounds: (death: "blast_large", moving: "ship_engine"),
     ),

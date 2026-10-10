@@ -41,6 +41,7 @@ pub(crate) fn bar_marks(view: &View, friend: impl Fn(u8) -> bool, marks: &mut Ve
                 kind: Mark::BARS_ONLY,
                 work,
                 shield: unit_bar_shield(units[i].unit_id, &view.frame.shields),
+                fuel: crate::game::unit_bar_fuel(units[i].unit_id, &view.frame.fuel),
             });
         }
     };

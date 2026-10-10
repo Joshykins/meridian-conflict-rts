@@ -438,6 +438,11 @@
                 sounds: (fire: "torpedo_launch", impact: "torpedo_hit", ground: "torpedo_hit"),
             ),
         ],
+        // Aircraft come down on the stern deck, fill and mend aboard, and leave off the bow.
+        staging: (
+            radius: 2400, pads: 6, refuel: 12, repair: 0.05, launch_gap: 1.2,
+            land: (-40, 0, 8), launch: [(45, 0, 8, 0)],
+        ),
         mesh: "regency_carrier", icon: Ship,
         sounds: (death: "blast_large", moving: "ship_engine"),
     ),
