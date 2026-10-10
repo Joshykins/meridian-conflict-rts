@@ -672,6 +672,7 @@ pub fn screenshot(
             "reclaim" => crate::game::Targeting::Reclaim,
             "warp" => crate::game::Targeting::Warp,
             "dash" => crate::game::Targeting::Dash,
+            "fracture" => crate::game::Targeting::Fracture,
             _ => crate::game::Targeting::Nuke,
         });
     }
@@ -953,6 +954,7 @@ pub fn screenshot(
         crate::cover_marks::draw(&mut ui, &field, site);
         crate::titan_marks::draw(&mut ui, &field, 1.0, pointer);
         crate::dash_marks::draw(&mut ui, &field, 1.0, pointer);
+        crate::gravitic_marks::draw(&mut ui, &field, pointer);
         crate::warp_marks::draw(&mut ui, &field, 1.0, pointer);
         crate::destruct_marks::draw(&mut ui, &field, 1.0);
         if let (Some(deg), Some(at)) = (formation_aim, pointer) {

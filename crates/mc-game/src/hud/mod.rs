@@ -19,6 +19,7 @@ mod economy_panel;
 mod elevator;
 mod focus;
 pub mod free_camera;
+mod gravitic;
 mod groups;
 pub mod icons;
 mod issue_mark;
@@ -808,6 +809,15 @@ impl Hud {
                         x += pw + GAP;
                     }
                 }
+                // A gravitic engine's well and its fracture button there too (`gravitic.rs`).
+                if let Some((engine, count)) = gravitic::engine_of(s, &units) {
+                    let pw = titan::WIDTH.min(w - EDGE - x);
+                    if pw > 220.0 {
+                        let r = Rect::new(x, deck_y, pw, DECK_H);
+                        gravitic::panel(self, ui, s, engine, count, r);
+                        x += pw + GAP;
+                    }
+                }
                 // A space elevator's crates and next payload, beside its build menu
                 // (`elevator.rs`): the menu keeps its room first, so on a narrow screen the
                 // panel shrinks, and then goes.
@@ -971,6 +981,7 @@ pub fn cursor_hint(
                 Targeting::Nuke => silo::WARHEAD,
                 Targeting::Warp => warp::WARP,
                 Targeting::Dash => crate::dash_marks::DASH,
+                Targeting::Fracture => crate::gravitic_marks::WELL,
             },
         ),
         Mode::Place(b) => {
