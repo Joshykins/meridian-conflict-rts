@@ -1244,10 +1244,6 @@ pub struct RawWeapon {
     /// can reach a submerged hull. Direct trajectory only.
     #[serde(default)]
     pub torpedo: bool,
-    /// Its shots, blasts and waves pass through every shield, dome or hull field, and
-    /// strike what is under it (the Seraph's). False (the default): a shield takes them.
-    #[serde(default)]
-    pub pierce_shields: bool,
     /// A torpedo's own look, over the one its faction's torpedoes have. Cosmetic.
     #[serde(default)]
     pub torpedo_look: Option<TorpedoLook>,
@@ -1978,7 +1974,6 @@ impl Unit {
                 casings: w.casings.clamp(0.0, 40.0) as f32,
                 red: w.red.clamp(0.0, 1.0) as f32,
                 torpedo: w.torpedo,
-                pierce_shields: w.pierce_shields,
                 torpedo_look: w.torpedo_look,
                 skim: fx(w.skim),
                 apogee: fx(w.apogee),

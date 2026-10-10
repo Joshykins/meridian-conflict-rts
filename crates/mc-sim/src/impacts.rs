@@ -294,10 +294,8 @@ impl World {
                         let depth = (girth * girth - off).max(Fx::ZERO).sqrt() * Fx::ratio(8, 10);
                         let back = (depth / vel.length().max(Fx::EPSILON)).min(t);
                         // A hull field is the unit: shots that would land on the
-                        // armour land on the wrap instead. A torpedo runs under it,
-                        // and a shield-piercing shot through it.
+                        // armour land on the wrap instead. A torpedo runs under it.
                         let on_hull = !weapon.torpedo
-                            && !weapon.pierce_shields
                             && self.shield_blocking(row)
                             && self.bp(row).shield.is_some_and(|s| s.is_hull());
                         best = Some(Hit {
@@ -353,11 +351,11 @@ impl World {
         let owner = self.state.projectiles.owner[projectile];
         // A torpedo in the water runs under the skirt of every dome. One still
         // falling from an aircraft breaks on it like anything else.
-        // A shield-piercing shot (`Weapon::pierce_shields`) passes through them all.
         let p = &self.state.projectiles;
-        let weapon =
-            &self.blueprints.unit(p.blueprint[projectile]).weapons[p.weapon[projectile] as usize];
-        if weapon.pierce_shields || (weapon.torpedo && from.z <= self.terrain.water_level()) {
+        if self.blueprints.unit(p.blueprint[projectile]).weapons[p.weapon[projectile] as usize]
+            .torpedo
+            && from.z <= self.terrain.water_level()
+        {
             return;
         }
         // Hull fields are the unit they wrap; the unit sweep already charges
@@ -485,9 +483,8 @@ impl World {
                 .map(|r| {
                     let target = self.state.units.pos[r]
                         .extend(self.state.units.z[r] + self.bp(r).height / 2);
-                    // A torpedo bursts under the skirt, and a shield-piercing blast
-                    // passes through: no shield takes it.
-                    let blocker = if weapon.torpedo || weapon.pierce_shields {
+                    // A torpedo bursts under the skirt: no shield takes it.
+                    let blocker = if weapon.torpedo {
                         None
                     } else {
                         self.blast_blocker(hit.point, target, Some(r))
@@ -526,7 +523,6 @@ impl World {
                     continue;
                 }
                 if !weapon.torpedo
-                    && !weapon.pierce_shields
                     && self.shield_blocking(r)
                     && self.bp(r).shield.is_some_and(|s| s.is_hull())
                 {

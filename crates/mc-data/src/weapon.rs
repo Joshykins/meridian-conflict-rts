@@ -214,8 +214,6 @@ pub struct Weapon {
     pub red: f32,
     /// Runs under the water, homing, and can hit a submerged hull (nothing else can).
     pub torpedo: bool,
-    /// Passes through every shield, dome or hull field (`RawWeapon::pierce_shields`).
-    pub pierce_shields: bool,
     /// A torpedo's own look (`TorpedoLook`); `None`: its faction's, or `Sprint` for an
     /// interceptor. Cosmetic: not in the content hash.
     pub torpedo_look: Option<crate::TorpedoLook>,
