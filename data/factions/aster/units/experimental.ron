@@ -183,7 +183,8 @@
                 cloud: (grow: 7.0, strike: 8.0, bolts: 8, radius: 150, splash: 26),
                 targets: ["Land", "Naval", "Structure"], color: Blue,
                 flash: 0.0, impact: 2.6, shockwave: 1.6, ion_blast: 26,
-                sounds: (fire: "storm_seed", impact: "storm_bolt", ground: "storm_bolt"),
+                // Heard as a loop while it seeds (`hold`), not a shot a second.
+                sounds: (hold: "storm_seeding", impact: "storm_bolt", ground: "storm_bolt"),
             ),
             (
                 // Four small twin mounts, barrels linked, each turning on its own: dorsal fore

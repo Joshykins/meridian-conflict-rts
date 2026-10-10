@@ -10,6 +10,9 @@ pub struct CloudView {
     /// The shot's serial: never zero, never reused in a match.
     pub serial: u32,
     pub owner: u8,
+    /// The gun it came from.
+    pub blueprint: mc_data::BlueprintId,
+    pub weapon: u8,
     /// Its middle this tick, and its drift, metres a tick.
     pub pos: [f32; 3],
     pub vel: [f32; 3],
@@ -35,6 +38,8 @@ impl World {
             out.push(CloudView {
                 serial: p.serial[i],
                 owner: p.owner[i],
+                blueprint: p.blueprint[i],
+                weapon: p.weapon[i],
                 pos: p.pos[i].to_f32(),
                 vel: p.vel[i].to_f32(),
                 age: p.age[i],

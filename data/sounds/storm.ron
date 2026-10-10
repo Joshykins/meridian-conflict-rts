@@ -36,20 +36,24 @@
                 Sweep(at: 1.7, from: 420, to: 60, glide: 3.0, q: 0.8, attack: 0.2, decay: 1.6, gain: 5.0, pan: 0.25),
             ],
         ),
-        // A seed let go, once a second: a heavy pressurised whoomph out of the tail, the
-        // charged vapour hissing out after it with a few dry snaps, done inside the second.
-        "storm_seed": (
-            length: 1.0, peak: 0.26, room: 0.15,
+        // The Storm Seeder at work, heard as long as it is seeding (`hold`, audio/seeding.rs),
+        // not a shot a second: charged vapour rushing out of the tail under pressure, a low
+        // hum of the charge under it, and now and then a dry crackle in the spray. No attack
+        // of its own, so it fades in and out with the seeding.
+        "storm_seeding": (
+            length: 4.0, peak: 0.24, room: 0.25, looped: true,
             layers: [
-                Burst(low: 60, high: 520, attack: 0.004, decay: 0.07, gain: 7.0),
-                Tone(from: 82, to: 36, glide: 0.18, attack: 0.004, decay: 0.2, gain: 0.45),
-                Roll(at: 0.01, from: 900, to: 220, glide: 0.5, attack: 0.02, decay: 0.22, gain: 2.4, swell: 6.0, depth: 0.4, seed: 7201),
-                Drive(1.25),
-                Sweep(at: 0.02, from: 1700, to: 520, glide: 0.45, q: 0.7, attack: 0.03, decay: 0.2, gain: 1.6),
-                Hiss(at: 0.05, freq: 900, q: 0.8, attack: 0.04, decay: 0.16, gain: 0.25, pan: 0.2),
-                Burst(at: 0.09, low: 500, high: 1800, attack: 0.0003, decay: 0.004, gain: 1.6, pan: -0.3),
-                Burst(at: 0.17, low: 450, high: 1600, attack: 0.0003, decay: 0.004, gain: 1.2, pan: 0.35),
-                Burst(at: 0.3, low: 400, high: 1500, attack: 0.0003, decay: 0.004, gain: 0.8, pan: -0.1),
+                Rumble(freq: 240, q: 0.6, gain: 1.2, wobble: 0.3, depth: 0.25),
+                Rumble(freq: 820, q: 0.8, gain: 0.8, wobble: 0.5, depth: 0.35, pan: -0.15),
+                Rumble(freq: 2100, q: 1.0, gain: 0.35, wobble: 0.75, depth: 0.4, pan: 0.15),
+                Drone(freq: 55, gain: 0.3, wobble: 0.25, depth: 0.1),
+                Drone(freq: 82.5, gain: 0.12, wobble: 0.5, depth: 0.15),
+                Burst(at: 0.41, low: 600, high: 2200, attack: 0.0003, decay: 0.004, gain: 0.5, pan: -0.4),
+                Burst(at: 0.44, low: 500, high: 1900, attack: 0.0003, decay: 0.003, gain: 0.35, pan: -0.35),
+                Burst(at: 1.63, low: 700, high: 2400, attack: 0.0003, decay: 0.004, gain: 0.45, pan: 0.3),
+                Burst(at: 2.38, low: 550, high: 2000, attack: 0.0003, decay: 0.005, gain: 0.4, pan: 0.05),
+                Burst(at: 2.42, low: 650, high: 2300, attack: 0.0003, decay: 0.003, gain: 0.3, pan: 0.1),
+                Burst(at: 3.27, low: 600, high: 2100, attack: 0.0003, decay: 0.004, gain: 0.45, pan: -0.2),
             ],
         ),
         // A bolt out of the cloud: a close lightning strike, the air tearing open in a

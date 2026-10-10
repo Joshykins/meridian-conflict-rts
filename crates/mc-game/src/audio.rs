@@ -34,6 +34,7 @@ pub(crate) mod listener;
 pub mod music;
 pub(crate) mod rounds;
 pub mod salvo;
+pub(crate) mod seeding;
 pub mod stakes;
 pub mod titan;
 pub(crate) mod volley;

@@ -7,8 +7,8 @@
 //!   clouds_sim.wgsl kind `disturber::SEED`): while it grows and strikes, the cover round it
 //!   gathers in a circle that swells with it, so the sky's ray-marched clouds draw it in
 //!   their own material and light, a heap round the height the bomber flies (the weather
-//!   marks it seeded), never thinned round the selection. A knot leaving the tail at
-//!   first, it builds slowly to some 200 m across.
+//!   marks it seeded), never thinned round the selection. Already a fair cloud as it
+//!   leaves the tail, it builds to some 270 m across.
 //! - **Lightning inside**: strokes that flicker in it more often as it grows and all the
 //!   time while it strikes, and twice or so a stroke the sky lights (`Sky::strike`) with its
 //!   far thunder.
@@ -32,10 +32,10 @@ use mc_sim::mirror::CloudView;
 use mc_sim::SimEvent;
 
 /// Metres a grown cloud reaches from its middle at least, and as a share of the disc its
-/// bolts fall in: some 200 m across, its bolts leaving from inside it. Each cloud is a
+/// bolts fall in: some 270 m across, its bolts leaving from inside it. Each cloud is a
 /// little bigger or smaller than that.
-const LEAST_REACH: f32 = 95.0;
-const REACH_PER_RADIUS: f32 = 0.65;
+const LEAST_REACH: f32 = 130.0;
+const REACH_PER_RADIUS: f32 = 0.9;
 /// Seconds a spent cloud is kept after the sim lets it go, for the lightning in it to die.
 const DYING: f32 = 3.0;
 /// The cover a grown cloud gathers the weather toward at its middle. No storm, which would
@@ -88,10 +88,10 @@ struct StormCloud {
     struck: bool,
 }
 
-/// How big a cloud `f` of the way grown is, as a share of grown: a knot big enough to see
-/// leaving the tail at once, building slowly into its size.
+/// How big a cloud `f` of the way grown is, as a share of grown: already a fair cloud as
+/// it leaves the tail, so the trail forms close behind the aircraft, building into its size.
 fn size_at(f: f32) -> f32 {
-    0.3 + 0.7 * f * f * (3.0 - 2.0 * f)
+    0.45 + 0.55 * f * f * (3.0 - 2.0 * f)
 }
 
 /// How far grown seed `v` is: 0 let go, 1 grown.

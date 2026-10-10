@@ -3374,6 +3374,12 @@ impl Game {
                 // Heard as its loop (`held_beam_loops`), not a shot and a strike a tick.
                 continue;
             }
+            if crate::audio::seeding::is_seed_release(event, bps, |b, w| {
+                table.units[b.index()].weapons[w as usize].hold
+            }) {
+                // Heard as its loop while it seeds (`seeding_loops`), not a shot a second.
+                continue;
+            }
             let (kind, sound, pos, weight, delay) = match event {
                 mc_sim::SimEvent::ShotFired {
                     pos,
@@ -3809,6 +3815,13 @@ impl Game {
         // Held beams (the Regency's): one loop per sound, heard from where they fire.
         loops.extend(crate::audio::beams::held_beam_loops(
             &self.view.frame.events,
+            bps,
+            |b, w| table.units[b.index()].weapons[w as usize].hold,
+            |p| self.hear(p),
+        ));
+        // Storm seeders: one loop per sound while they seed, heard from the seeds just let go.
+        loops.extend(crate::audio::seeding::seeding_loops(
+            &self.view.frame.clouds,
             bps,
             |b, w| table.units[b.index()].weapons[w as usize].hold,
             |p| self.hear(p),

@@ -245,7 +245,7 @@ fn cs_force(@builtin(global_invocation_id) id: vec3<u32>) {
             let near = dot(off, off) / (r * r);
             if near > 1.5 { continue; }
             let shape = exp(-near * 2.5);
-            let gather = clamp(shape * dt * 1.5, 0.0, 1.0);
+            let gather = clamp(shape * dt * 3.0, 0.0, 1.0);
             state.x += max(d.b.x * shape - state.x, 0.0) * gather;
             if state.y < 0.05 {
                 state.y += min(-d.b.y * shape - state.y, 0.0) * gather;
