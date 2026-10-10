@@ -398,6 +398,12 @@ pub enum Command {
         pos: FxVec2,
         queue: bool,
     },
+    /// Gravitic engines among these tear a rift to `pos`, anywhere on the map, and hold a
+    /// well there, letting go of the one they held (`gravitic.rs`).
+    Fracture {
+        units: Vec<UnitId>,
+        pos: FxVec2,
+    },
 }
 
 impl Command {
@@ -456,7 +462,8 @@ impl Command {
             | Command::SetAutoBuild { units, .. }
             | Command::QueueRounds { units, .. }
             | Command::Warp { units, .. }
-            | Command::Dash { units, .. } => units.len(),
+            | Command::Dash { units, .. }
+            | Command::Fracture { units, .. } => units.len(),
 
             Command::Produce { factories, .. }
             | Command::CancelProduce { factories, .. }

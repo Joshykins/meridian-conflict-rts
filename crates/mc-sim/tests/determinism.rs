@@ -239,6 +239,10 @@ fn setup(w: &mut World) {
                 add("regency_t5_seraph", 1, 600, 1300);
                 // Its upkeep has a plant of its own, or the dampener goes dark.
                 add("aster_t3_power", 1, 1000, 150);
+                // The Regency gravitic engine: it gathers, its rift runs across the map, and
+                // its well holds over the south across the snapshot, crushing, slowing and
+                // tearing aircraft down (`gravitic.rs`); a store of energy pays for it.
+                add("regency_t5_gravitic_engine", 1, 1200, 1900);
             }
         }
     }
@@ -252,6 +256,10 @@ fn setup(w: &mut World) {
         },
     });
     w.tick(&spawns).unwrap();
+    // The north's store pays the gravitic engine's upkeep, past what its plants make.
+    let north = &mut w.state.players[1];
+    north.bonus_storage[1] += Fx::from_int(600_000);
+    north.energy += Fx::from_int(500_000);
     // The north's AA start hurt, for the Exarch's repair field to mend.
     let aa = w.blueprints.id_of("aster_t1_aa").unwrap();
     for row in w.state.units.slots.iter().collect::<Vec<_>>() {
@@ -463,6 +471,23 @@ fn script(w: &mut World, tick: u32) -> Vec<PlayerCommand> {
                 },
             }]
         }
+        4 => {
+            let engine = w.blueprints.id_of("regency_t5_gravitic_engine").unwrap();
+            let u = &w.state.units;
+            let units = u
+                .slots
+                .iter()
+                .filter(|&r| u.blueprint[r] == engine)
+                .map(|r| u.id(r))
+                .collect();
+            vec![PlayerCommand {
+                player: 1,
+                command: Command::Fracture {
+                    units,
+                    pos: FxVec2::from_ints(1450, 1500),
+                },
+            }]
+        }
         // A timed self-destruct still counting down when the snapshot is taken.
         t if t == SNAPSHOT_AT - 20 => vec![PlayerCommand {
             player: 1,
@@ -498,6 +523,7 @@ fn reference() -> Vec<u64> {
     let (mut last_held, mut batches_sent, mut held_at_snapshot) = (0, 0, 0);
     let courier = w.blueprints.id_of("aster_t2_lift_ship").unwrap();
     let mut stunned_at_snapshot = false;
+    let mut well_at_snapshot = false;
     let (mut on_blocks, mut alight, mut down) = (0, 0, 0);
     let mut platforms = 0;
     let mut dashes = 0;
@@ -532,6 +558,11 @@ fn reference() -> Vec<u64> {
                     .slots
                     .iter()
                     .any(|r| u.blueprint[r] == courier && u.stun[r][0] > 0);
+                well_at_snapshot = w
+                    .state
+                    .wells
+                    .iter()
+                    .any(|x| matches!(x.phase, mc_sim::gravitic::WellPhase::Holding { .. }));
             }
             intercepted += w
                 .events
@@ -567,6 +598,8 @@ fn reference() -> Vec<u64> {
         })
         .collect();
     eprintln!("determinism: city {on_blocks} shots on blocks, {alight} alight, {down} down");
+    // The gravitic engine's well struck before the snapshot and holds across it.
+    assert!(well_at_snapshot, "no gravity well held at the snapshot");
     // The Seraph dashed into the south's army.
     assert!(dashes > 0, "the Seraph never dashed");
     // The elevator's first platform brought its queue down after the snapshot.

@@ -27,6 +27,7 @@ mod dash;
 mod destruct;
 mod elevator;
 mod fog;
+mod gravitic;
 mod links;
 mod mend;
 mod units;
@@ -40,6 +41,7 @@ pub use dash::{DashStage, DashView};
 pub use destruct::DestructView;
 pub use elevator::{crate_load, ElevatorPhase, ElevatorView};
 pub use fog::VisionDisc;
+pub use gravitic::{WellStage, WellView};
 pub use links::LinkView;
 pub use walls::{join_walls, WALL_JOINS};
 pub use warp::{UNIT_IN_WARP, UNIT_WARP_DAMPED, UNIT_WARP_NANITE};
@@ -368,6 +370,42 @@ pub enum SimEvent {
         owner: u8,
         blueprint: BlueprintId,
         weapon: u8,
+    },
+    /// A gravitic engine began gathering for a rift from `core` to `mark`, leaving in
+    /// `ticks` (`gravitic.rs`); sent again when it is turned on a new point.
+    RiftGathering {
+        unit: UnitId,
+        core: FxVec3,
+        mark: mc_core::FxVec2,
+        ticks: u16,
+        blueprint: BlueprintId,
+    },
+    /// Its rift tore out of the ground at `from` and runs to `mark`, striking in `ticks`.
+    RiftLaunched {
+        unit: UnitId,
+        from: FxVec3,
+        mark: FxVec3,
+        ticks: u16,
+    },
+    /// The rift struck at `pos`: the ground shattered `radius` round and the well holds.
+    RiftStruck {
+        unit: UnitId,
+        pos: FxVec3,
+        radius: Fx,
+    },
+    /// The engine let go (aimed elsewhere, stopped, or gone): its well at `pos` collapses
+    /// (`radius`), or its rift or gathering dies there (radius zero).
+    WellReleased {
+        unit: UnitId,
+        pos: FxVec3,
+        radius: Fx,
+    },
+    /// A gravity well tore aircraft `unit` out of the sky at `pos`; it falls as a dead
+    /// aircraft does, thrown at the ground.
+    AircraftDowned {
+        unit: UnitId,
+        pos: FxVec3,
+        by: UnitId,
     },
     /// A giant bore's storm at `pos` died before its time: the machine feeding it is gone.
     StormCollapsed {
@@ -1476,6 +1514,8 @@ pub struct RenderFrame {
     pub warps: Vec<WarpView>,
     /// Dashes under way that the viewer may see (`crate::dash`, `mirror/dash.rs`).
     pub dashes: Vec<DashView>,
+    /// Gravitic engines' work that the viewer may see (`crate::gravitic`, `mirror/gravitic.rs`).
+    pub wells: Vec<WellView>,
     /// Timed self-destructs counting down that the viewer may see (`crate::destruct`).
     pub destructs: Vec<DestructView>,
     /// The time left on the viewer's side's sites and upgrades whose work is moving
@@ -2761,6 +2801,7 @@ impl World {
         );
         self.write_warps(viewer, &mut frame.warps);
         self.write_dashes(viewer, &mut frame.dashes);
+        self.write_wells(viewer, &mut frame.wells);
         self.write_destructs(viewer, &mut frame.destructs);
         self.write_work_left(viewer, &mut frame.work_left);
         self.write_dampers(viewer, &mut frame.dampers);

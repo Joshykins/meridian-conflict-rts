@@ -48,6 +48,7 @@ pub mod focus;
 pub mod fog;
 mod formation_destination;
 pub mod formations;
+pub mod gravitic;
 mod guard;
 mod held;
 mod hover_flight;

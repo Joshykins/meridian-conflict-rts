@@ -96,6 +96,7 @@ impl World {
             &|h| {
                 crate::titan::hash_giants(s, h);
                 crate::wake::hash_wakes(s, h);
+                crate::gravitic::hash_wells(&s.wells, h);
             },
             &|h| {
                 s.strategic.hash(h);

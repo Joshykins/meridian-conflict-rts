@@ -9,6 +9,7 @@
 
 pub mod dash;
 pub mod elevator;
+pub mod gravitic;
 mod raw;
 pub mod refit;
 pub mod regions;
@@ -822,6 +823,8 @@ pub struct UnitBlueprint {
     pub stomp: Option<Stomp>,
     /// Dashes into the middle of the enemies it sees and lands as a shockwave.
     pub dash: Option<dash::Dash>,
+    /// Tears a rift to any point and holds a gravity well there.
+    pub gravitic: Option<gravitic::Gravitic>,
     pub motion: Option<Motion>,
     pub economy: Economy,
     /// A core mine: makes materials out of the ground around it.
@@ -1537,6 +1540,10 @@ impl Blueprints {
             }
             match &u.dash {
                 Some(d) => d.hash(&mut h),
+                None => h.write_u64(u64::MAX),
+            }
+            match &u.gravitic {
+                Some(g) => g.hash(&mut h),
                 None => h.write_u64(u64::MAX),
             }
             h.write_u64(u.water_build as u64);

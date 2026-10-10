@@ -159,6 +159,7 @@ impl World {
             Command::Stop { units } => {
                 for row in self.owned_or_rising(player, units) {
                     self.clear_orders(row)?;
+                    self.release_well(row);
                 }
                 Ok(())
             }
@@ -523,6 +524,10 @@ impl World {
             Command::TakeOff { units } => self.order_take_off(player, units),
             Command::Warp { units, pos, queue } => self.order_warp(player, units, *pos, *queue),
             Command::Dash { units, pos, queue } => self.order_dash(player, units, *pos, *queue),
+            Command::Fracture { units, pos } => {
+                self.order_fracture(player, units, *pos);
+                Ok(())
+            }
             Command::LaunchNuke { units, pos } => {
                 self.launch_nuke(player, units, *pos);
                 Ok(())

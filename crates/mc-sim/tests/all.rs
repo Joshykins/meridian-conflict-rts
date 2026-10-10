@@ -45,6 +45,7 @@ mod fog;
 mod formation_terrain;
 mod formations;
 mod frigate;
+mod gravitic;
 mod guard;
 mod javelin_role;
 mod lift_ship;

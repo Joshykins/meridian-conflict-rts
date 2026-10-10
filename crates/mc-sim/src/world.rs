@@ -92,6 +92,9 @@ pub struct State {
     /// Spent sabots in the air, thrown from a giant rail gun (`titan.rs`).
     #[serde(default)]
     pub sabots: Vec<crate::titan::FallingSabot>,
+    /// Gravitic engines' rifts and the wells they hold (`gravitic.rs`).
+    #[serde(default)]
+    pub wells: Vec<crate::gravitic::GravityWell>,
     /// Cone weapons' wakes rolling out over the ground (`wake.rs`).
     #[serde(default)]
     pub wakes: Vec<crate::wake::Wake>,
@@ -426,6 +429,7 @@ impl World {
             fires: crate::tables::Fires::default(),
             storms: Vec::new(),
             sabots: Vec::new(),
+            wells: Vec::new(),
             wakes: Vec::new(),
             pads: Pads::default(),
             terrain_edits: Vec::new(),
@@ -806,6 +810,10 @@ impl World {
         {
             let _t = mc_core::perf_span!("fn.run_giants");
             self.run_giants()?;
+        }
+        {
+            let _t = mc_core::perf_span!("fn.run_gravitic");
+            self.run_gravitic()?;
         }
         if !self.state.wakes.is_empty() {
             let _t = mc_core::perf_span!("fn.run_wakes");

@@ -427,6 +427,10 @@ pub(crate) struct Unit {
     /// Dashes into the middle of the enemies it sees ([`crate::dash::Dash`]).
     #[serde(default)]
     pub dash: Option<crate::dash::RawDash>,
+    /// Tears a rift to any point and holds a gravity well there
+    /// ([`crate::gravitic::Gravitic`]).
+    #[serde(default)]
+    pub gravitic: Option<crate::gravitic::RawGravitic>,
     #[serde(default)]
     pub motion: Option<RawMotion>,
     #[serde(default)]
@@ -2224,6 +2228,15 @@ impl Unit {
             },
             strategic: match &self.strategic {
                 Some(s) => Some(s.compile(key, fx, TICKS_PER_SECOND)?),
+                None => None,
+            },
+            gravitic: match &self.gravitic {
+                Some(_) if self.motion.is_some() => {
+                    return Err(DataError::Invalid(format!(
+                        "{key}: a gravitic engine is a structure"
+                    )));
+                }
+                Some(g) => Some(g.compile(key, fx, TICKS_PER_SECOND)?),
                 None => None,
             },
             elevator: match &self.elevator {

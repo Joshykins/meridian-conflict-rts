@@ -909,6 +909,15 @@
         // out. The wave (its weapon's fire, played with the landing): no crack of its own,
         // the wall of plasma tearing out all round, wide in both ears, rolling for over a
         // second, then thunder going off long and low with the ground slapping it back.
+        // The Fallen (`regency_t5_gravitic_engine`): stand-ins until its own are written.
+        "regency_fallen_gather": (like: "regency_seraph_charge", size: 1.6, peak: 0.6),
+        "regency_fallen_launch": (like: "regency_seraph_vanish", size: 1.5, peak: 0.8),
+        "regency_fallen_rift": (like: "regency_crawl", size: 1.4, peak: 0.4),
+        "regency_fallen_strike": (like: "regency_seraph_landing", size: 1.5, peak: 0.9),
+        "regency_fallen_hold": (like: "regency_crawl", size: 1.8, peak: 0.4),
+        "regency_fallen_hum": (like: "regency_crawl", size: 2.0, peak: 0.3),
+        "regency_fallen_release": (like: "regency_seraph_wave", size: 1.3, peak: 0.6),
+        "regency_fallen_downed": (like: "regency_seraph_arrive", size: 1.2, peak: 0.5),
         "regency_seraph_charge": (
             length: 1.5, peak: 0.6, room: 0.25,
             layers: [
