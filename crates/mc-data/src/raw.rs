@@ -1375,11 +1375,12 @@ pub struct UnitSounds {
     /// Heard by its owner when the unit is selected. Left out, the library's
     /// `select` default for the unit's `icon` kind plays.
     pub select: Option<String>,
-    /// A dash (`crate::dash`): its windup, the unit leaving where it stood, the air
-    /// charging where it is about to come down (`Dash::arrive_ticks` before), and its
-    /// landing.
+    /// A dash (`crate::dash`): its windup, the unit leaving where it stood, a loop heard
+    /// along its path while it is gone (`dash_gone`), the air charging where it is about
+    /// to come down (`Dash::arrive_ticks` before), and its landing.
     pub dash_charge: Option<String>,
     pub dash_leave: Option<String>,
+    pub dash_gone: Option<String>,
     pub dash_arrive: Option<String>,
     pub dash_land: Option<String>,
 }

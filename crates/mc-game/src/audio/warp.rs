@@ -9,9 +9,11 @@
 //!   stunned hull's arcs following its stun, and a live dampener's low field hum.
 //! - The systems-reboot gesture as a stun starts to wear off.
 //! - A dash (mc-sim `dash.rs`), warp's short cousin: the unit's own `dash_charge` as it
-//!   winds up, `dash_leave` where it stood, `dash_arrive` faint where it is about to come
-//!   down and `dash_land` as it does (its
-//!   `UnitSounds`, so each dasher carries its own).
+//!   winds up, `dash_leave` where it stood, `dash_gone` (a loop) travelling from there
+//!   to its mark while it is gone, `dash_arrive` where it is about to come down and
+//!   `dash_land` as it does (its `UnitSounds`, so each dasher carries its own). While it
+//!   charges the rest of the battle starts to step back, and while it is gone it is held
+//!   right down (`Audio::duck_world`), coming back in under the landing.
 //!
 //! A ship is heard by its size, never its tier: lower and louder the bigger its hull.
 //! Each sound is looked up per blueprint as `<moving>_<name>` (its `moving` sound's
@@ -21,13 +23,17 @@
 use super::Audio;
 use glam::Vec3;
 use mc_data::{Blueprints, SoundId, SoundLibrary, UnitBlueprint};
-use mc_sim::mirror::{DamperView, KIND_WRECK};
+use mc_sim::mirror::{DamperView, DashStage, DashView, KIND_WRECK};
 use mc_sim::tables::WarpPhase;
 use mc_sim::{RenderFrame, SimEvent};
 use std::collections::HashMap;
 
 /// A stun at or over this is full; the first tick under it, the systems start back.
 const STUN_FULL: f32 = 0.999;
+
+/// How far the rest of the battle is held down while a dasher is gone (`DASH_DUCK` of
+/// its gain off), heard in full: about 11 dB.
+const DASH_DUCK: f32 = 0.72;
 
 #[derive(Clone, Copy, Default)]
 struct Ids {
@@ -71,9 +77,69 @@ impl Ids {
     }
 }
 
+/// A dasher's sounds as the duck and the crossing want them.
+#[derive(Clone, Default)]
+struct DashIds {
+    gone: Option<SoundId>,
+    /// Its dash's own sounds and its landing weapons', heard through the duck.
+    own: Vec<SoundId>,
+}
+
+impl DashIds {
+    fn of(library: &SoundLibrary, bp: &UnitBlueprint) -> DashIds {
+        let s = &bp.sounds;
+        let landing = bp.weapons.iter().filter(|w| w.dash_only).flat_map(|w| {
+            let w = &w.sounds;
+            [&w.fire, &w.impact, &w.ground]
+        });
+        let mut own: Vec<SoundId> = [
+            &s.dash_charge,
+            &s.dash_leave,
+            &s.dash_gone,
+            &s.dash_arrive,
+            &s.dash_land,
+        ]
+        .into_iter()
+        .chain(landing)
+        .filter_map(|n| n.as_deref().and_then(|n| library.id_of(n)))
+        .collect();
+        own.sort_by_key(|s| s.0);
+        own.dedup();
+        DashIds {
+            gone: s.dash_gone.as_deref().and_then(|n| library.id_of(n)),
+            own,
+        }
+    }
+}
+
+/// How far a dash holds the rest of the battle down (0..1) at `heard` (its gain where
+/// the ear is): building over its charge, all the way while it is gone, and let go as
+/// it lands (the mixer brings the battle back in slowly under the landing).
+fn dash_duck(d: &DashView, heard: f32) -> f32 {
+    let p = (d.ticks as f32 / d.length.max(1) as f32).clamp(0.0, 1.0);
+    let depth = match d.stage {
+        DashStage::Charging => 0.4 * p * p,
+        DashStage::Gone => 1.0,
+        DashStage::Landed => 0.0,
+    };
+    DASH_DUCK * depth * (heard * 1.5).min(1.0)
+}
+
+/// The crossing while a dasher is gone, `p` of the way through: (where it is heard, its
+/// gain, its pitch). Thunder that comes in out of the vanish, rolls along the path and
+/// swells as it nears the mark, a little higher as it comes.
+fn dash_crossing(d: &DashView, p: f32) -> (Vec3, f32, f32) {
+    let at = Vec3::from(d.from).lerp(Vec3::from(d.to), p.clamp(0.0, 1.0));
+    let fade_in = (p / 0.12).min(1.0);
+    (at, fade_in * (0.45 + 0.55 * p * p), 0.92 + 0.16 * p)
+}
+
 #[derive(Default)]
 pub struct WarpSounds {
     ids: HashMap<u32, Ids>,
+    dash_ids: HashMap<u32, DashIds>,
+    /// The duck last asked of the mixer, so a quiet battle is not asked every tick.
+    duck: f32,
     damper_hum: Option<SoundId>,
     damper_surge: Option<SoundId>,
     generation: Option<u32>,
@@ -135,6 +201,7 @@ impl WarpSounds {
         if self.generation != Some(generation) {
             self.generation = Some(generation);
             self.ids.clear();
+            self.dash_ids.clear();
             self.damper_hum = library.id_of("warp_damper_hum");
             self.damper_surge = library.id_of("warp_damper_surge");
         }
@@ -276,6 +343,32 @@ impl WarpSounds {
                 }
                 _ => {}
             }
+        }
+        // Dashes: the crossing heard along the path, and the battle stepping back.
+        let mut duck = 0.0f32;
+        let mut spared: Vec<SoundId> = Vec::new();
+        for d in &frame.dashes {
+            let b = d.blueprint.0 as u32;
+            let Some(bp) = blueprints.units.get(b as usize) else {
+                continue;
+            };
+            let di = self
+                .dash_ids
+                .entry(b)
+                .or_insert_with(|| DashIds::of(&library, bp));
+            let heard = hear(Vec3::from(d.from)).0.max(hear(Vec3::from(d.to)).0);
+            duck = duck.max(dash_duck(d, heard));
+            spared.extend_from_slice(&di.own);
+            if d.stage == DashStage::Gone {
+                let p = d.ticks as f32 / d.length.max(1) as f32;
+                let (at, loud, pitch) = dash_crossing(d, p);
+                let r = bp.radius.to_f32();
+                want(di.gone, at, r, loud, pitch);
+            }
+        }
+        if duck > 0.0 || self.duck > 0.0 {
+            audio.duck_world(duck, &spared);
+            self.duck = duck;
         }
         // Stunned hulls arcing, and their systems coming back.
         let now = self.tick;

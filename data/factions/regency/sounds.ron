@@ -896,19 +896,22 @@
         "regency_supernova_small": (like: "regency_supernova", size: 0.585, peak: 0.6),
         // The Seraph's dash (`dash_*` in its sounds). The charge, 1.5 s where it stands:
         // a field engaging, then a rough growl and its octave climbing, air drawn in and
-        // a sizzle crackling thicker, all gathering tighter and brighter, ending on a short
-        // drawn breath just as it goes. The vanish: a thunderclap snapping shut, four hard
-        // electric cracks on top of each other with a bright metal edge, the air slamming
-        // in on a short hard sub thump, a tearing rip that is cut off a tenth of a second
-        // later by a second crack, then short dark thunder. The arrival, 0.6 s at the
-        // landing spot while it is still gone, faint: dry static ticks far apart, then
-        // running together, a thin fizz rising and the air swelling very low under it, all
-        // stopping dead as it lands. The landing, heard over the whole map: a blinding
-        // stacked crack, a huge slam and a sub thump that hits at once, a growl driven
-        // hard and dense electric crackle spitting all round, thick at first and thinning
-        // out. The wave (its weapon's fire, played with the landing): no crack of its own,
-        // the wall of plasma tearing out all round, wide in both ears, rolling for over a
-        // second, then thunder going off long and low with the ground slapping it back.
+        // a sizzle crackling thicker, the ground pressure heaving under it, all gathering
+        // tighter, ending on a short drawn breath just as it goes. The vanish: one hard
+        // electric snap with a slam and a sub-bass drop under it that hits at once and
+        // holds, the air slammed shut a tenth of a second later, then thunder going off
+        // long and low from both sides. While it is gone (3 s), the loop heard along its
+        // path: far-off thunder and a jet's roar going over high up, the sub breathing
+        // under it, swelling toward the mark (`audio/warp.rs`; the rest of the battle is
+        // held down under it). The arrival, the last second at the landing spot: the roar
+        // diving in, growing and rising, the pressure building very low, crackle running
+        // together, all stopping dead as it lands. The landing, heard over the whole map:
+        // a crack, a huge slam and a sub thump that hits at once and holds for seconds, a
+        // growl driven hard, crackle spitting all round and thinning, thunder rolling off
+        // for three seconds with the ground slapping it back. The wave (its weapon's fire,
+        // played with the landing): no crack of its own, the wall of plasma tearing out
+        // all round, wide in both ears, rolling for over a second, then thunder going off
+        // long and low with the ground slapping it back.
         "regency_seraph_charge": (
             length: 1.5, peak: 0.6, room: 0.25,
             layers: [
@@ -922,6 +925,9 @@
                 Fm(at: 0.08, from: 104, to: 300, glide: 1.34, ratio: 0.5, index: 1.7, fade: 6.0, attack: 1.3, decay: 0.03, gain: 0.45),
                 // The gathering tightening late: a third voice joining over the last half.
                 Fm(at: 0.7, from: 200, to: 450, glide: 0.68, ratio: 0.5, index: 1.3, fade: 3.0, attack: 0.68, decay: 0.025, gain: 0.3),
+                // The ground pressure under it: a sub heave swelling over the second half.
+                Tone(at: 0.55, from: 34, to: 52, glide: 0.75, attack: 0.72, decay: 0.03, gain: 0.7),
+                Roll(at: 0.6, from: 90, to: 160, glide: 0.7, attack: 0.68, decay: 0.03, gain: 0.6, swell: 6, depth: 0.6, seed: 9308),
                 Drive(1.6),
                 // Air drawn in toward it, its band rising as it fills.
                 Sweep(at: 0.05, from: 380, to: 2300, glide: 1.33, q: 0.9, attack: 1.33, decay: 0.03, gain: 0.75, seed: 9303),
@@ -945,130 +951,146 @@
             ],
         ),
         "regency_seraph_vanish": (
-            length: 1.2, peak: 0.9, room: 0.2,
+            length: 3.0, peak: 0.9, room: 0.35,
             layers: [
-                // The crack: four hard electric snaps on top of each other inside five
-                // milliseconds, the first the brightest, so it hits as one.
-                Burst(low: 1500, high: 6500, attack: 0.0001, decay: 0.003, gain: 14, seed: 9321),
-                Burst(at: 0.0012, low: 700, high: 4500, attack: 0.0001, decay: 0.005, gain: 16, seed: 9322),
-                Burst(at: 0.003, low: 300, high: 3000, attack: 0.0002, decay: 0.012, gain: 18, seed: 9332),
-                Burst(at: 0.005, low: 150, high: 2200, attack: 0.0003, decay: 0.03, gain: 16, seed: 9333),
-                // A bright metal edge on it that is gone at once.
-                Fm(from: 1500, to: 700, glide: 0.04, ratio: 1.41, index: 2.2, fade: 0.025, attack: 0.0004, decay: 0.035, gain: 0.6),
-                // The implosion: the air slammed shut into where it stood, a sub thump that
-                // hits at once and is pulled in short.
-                Burst(at: 0.001, low: 30, high: 280, attack: 0.0015, decay: 0.09, gain: 26, seed: 9334),
-                Tone(from: 150, to: 40, glide: 0.09, attack: 0.0008, decay: 0.15, gain: 2.6),
-                Tone(from: 70, to: 30, glide: 0.25, attack: 0.002, decay: 0.24, gain: 1.6),
-                Fm(from: 110, to: 45, glide: 0.15, ratio: 0.5, index: 2.6, fade: 0.12, attack: 0.001, decay: 0.16, gain: 1.0),
-                // The rip: a tearing crackle that climbs for a tenth of a second and is cut off.
-                Roll(at: 0.004, from: 900, to: 3000, glide: 0.11, attack: 0.1, decay: 0.008, gain: 1.3, swell: 140, depth: 0.95, seed: 9323),
-                Burst(at: 0.01, low: 400, high: 2800, attack: 0.095, decay: 0.006, gain: 5, pan: 0.25, seed: 9335),
-                // Gone: the gap snapping shut, a second crack and slam where the rip stops.
-                Burst(at: 0.112, low: 600, high: 4500, attack: 0.0001, decay: 0.004, gain: 12, seed: 9336),
-                Burst(at: 0.113, low: 40, high: 900, attack: 0.001, decay: 0.05, gain: 16, seed: 9337),
-                Tone(at: 0.113, from: 110, to: 36, glide: 0.1, attack: 0.001, decay: 0.12, gain: 1.6),
-                Drive(2.8),
-                // What is left: the clap going off as thunder, short and dark.
-                Roll(at: 0.02, from: 1200, to: 90, glide: 0.6, attack: 0.02, decay: 0.24, gain: 0.7, swell: 9, depth: 0.6, seed: 9324),
-                Roll(at: 0.13, from: 500, to: 50, glide: 0.8, attack: 0.03, decay: 0.28, gain: 0.55, swell: 4, depth: 0.5, pan: 0.3, seed: 9325),
+                // The snap: two electric cracks on top of each other, kept down so the
+                // slam under them carries the weight.
+                Burst(low: 1200, high: 5500, attack: 0.0001, decay: 0.004, gain: 4, seed: 9321),
+                Burst(at: 0.002, low: 300, high: 2800, attack: 0.0002, decay: 0.014, gain: 6, seed: 9322),
+                Fm(from: 1300, to: 600, glide: 0.04, ratio: 1.41, index: 2.0, fade: 0.025, attack: 0.0004, decay: 0.03, gain: 0.3),
+                // The slam and the sub drop: hitting at once, deep, and held.
+                Burst(at: 0.001, low: 40, high: 500, attack: 0.001, decay: 0.12, gain: 10, seed: 9334),
+                Burst(at: 0.002, low: 22, high: 180, attack: 0.002, decay: 0.45, gain: 22, seed: 9337),
+                Tone(from: 140, to: 34, glide: 0.35, attack: 0.0008, decay: 0.55, gain: 3.2),
+                Tone(from: 64, to: 24, glide: 1.4, attack: 0.002, decay: 1.3, gain: 2.2),
+                Fm(from: 110, to: 38, glide: 0.8, ratio: 0.5, index: 2.6, fade: 0.5, attack: 0.002, decay: 0.75, gain: 1.2),
+                Fm(from: 220, to: 80, glide: 0.5, ratio: 0.5, index: 1.6, fade: 0.3, attack: 0.003, decay: 0.35, gain: 0.5),
+                // The air slammed shut where it stood: a second, duller slam.
+                Burst(at: 0.11, low: 35, high: 700, attack: 0.002, decay: 0.09, gain: 10, seed: 9336),
+                Tone(at: 0.11, from: 95, to: 30, glide: 0.3, attack: 0.002, decay: 0.4, gain: 1.6),
+                Drive(3.0),
+                // A tearing rip that climbs a tenth of a second and is cut off by the slam.
+                Roll(at: 0.004, from: 700, to: 2400, glide: 0.1, attack: 0.09, decay: 0.008, gain: 0.7, swell: 120, depth: 0.9, seed: 9323),
+                // Thunder going off, long and low, from both sides.
+                Roll(at: 0.03, from: 1100, to: 70, glide: 1.2, attack: 0.04, decay: 0.7, gain: 1.0, swell: 6, depth: 0.6, seed: 9324),
+                Roll(at: 0.15, from: 600, to: 45, glide: 2.2, attack: 0.12, decay: 1.0, gain: 0.85, swell: 3, depth: 0.55, pan: -0.45, seed: 9325),
+                Roll(at: 0.32, from: 520, to: 40, glide: 2.2, attack: 0.15, decay: 0.95, gain: 0.75, swell: 2.5, depth: 0.55, pan: 0.45, seed: 9326),
                 // A last couple of sparks spat out of the empty air.
-                Burst(at: 0.19, low: 400, high: 2400, attack: 0.0002, decay: 0.006, gain: 0.35, pan: 0.4, seed: 9328),
-                Burst(at: 0.31, low: 350, high: 2000, attack: 0.0002, decay: 0.006, gain: 0.2, pan: -0.5, seed: 9329),
+                Burst(at: 0.21, low: 400, high: 2200, attack: 0.0002, decay: 0.006, gain: 0.3, pan: 0.4, seed: 9328),
+                Burst(at: 0.37, low: 350, high: 1900, attack: 0.0002, decay: 0.006, gain: 0.2, pan: -0.5, seed: 9329),
+            ],
+        ),
+        "regency_seraph_gone": (
+            length: 4.0, peak: 0.6, room: 0.3, looped: true,
+            layers: [
+                // The sub breathing, slow and very low.
+                Drone(freq: 36, gain: 0.22, wobble: 0.5, depth: 0.45),
+                Drone(freq: 54, gain: 0.1, wobble: 0.75, depth: 0.5, pan: 0.15),
+                Rumble(freq: 75, q: 0.7, gain: 1.1, wobble: 0.5, depth: 0.5),
+                // The jet's roar going over, high up: a broad roar breathing, its band
+                // drifting, and a thinner tearing hiss above it.
+                Wind(freq: 380, q: 0.6, gain: 0.9, swell: 0.6, depth: 0.55, sway: 0.7, seed: 9401),
+                Wind(freq: 1300, q: 0.9, gain: 0.3, swell: 1.2, depth: 0.7, sway: 0.5, pan: -0.3, seed: 9402),
+                // Far-off thunder rolling in from one side and the other.
+                Roll(at: 0.2, from: 520, to: 60, glide: 1.6, attack: 0.25, decay: 0.55, gain: 0.9, swell: 4, depth: 0.6, pan: -0.5, seed: 9403),
+                Roll(at: 1.5, from: 420, to: 50, glide: 1.4, attack: 0.3, decay: 0.5, gain: 0.75, swell: 3, depth: 0.6, pan: 0.55, seed: 9404),
+                Roll(at: 2.6, from: 600, to: 55, glide: 1.0, attack: 0.2, decay: 0.35, gain: 0.85, swell: 5, depth: 0.6, pan: 0.1, seed: 9405),
             ],
         ),
         "regency_seraph_arrive": (
-            length: 0.7, peak: 0.32, room: 0.0,
+            length: 1.05, peak: 0.6, room: 0.0,
             layers: [
-                // The pressure: the air under the landing spot swelling, very low.
-                Roll(from: 70, to: 150, glide: 0.6, attack: 0.58, decay: 0.012, gain: 0.8, swell: 3, depth: 0.4, seed: 9381),
-                // A thin fizz rising as the air charges.
-                Sweep(at: 0.05, from: 900, to: 2600, glide: 0.55, q: 1.6, attack: 0.53, decay: 0.012, gain: 0.3, seed: 9382),
-                // Static: fast random crackle coming up out of nothing.
-                Roll(at: 0.12, from: 1200, to: 2400, glide: 0.48, attack: 0.46, decay: 0.012, gain: 0.45, swell: 120, depth: 0.95, seed: 9383),
-                // Dry ticks, far apart at first, then running together.
-                Burst(at: 0.04, low: 700, high: 3500, attack: 0.0002, decay: 0.003, gain: 0.25, pan: -0.3, seed: 9384),
-                Burst(at: 0.15, low: 600, high: 3200, attack: 0.0002, decay: 0.003, gain: 0.3, pan: 0.4, seed: 9385),
-                Burst(at: 0.24, low: 800, high: 3800, attack: 0.0002, decay: 0.003, gain: 0.35, pan: 0.1, seed: 9386),
-                Burst(at: 0.31, low: 650, high: 3300, attack: 0.0002, decay: 0.004, gain: 0.4, pan: -0.5, seed: 9387),
-                Burst(at: 0.36, low: 700, high: 3600, attack: 0.0002, decay: 0.003, gain: 0.45, pan: 0.3, seed: 9388),
-                Burst(at: 0.405, low: 600, high: 3000, attack: 0.0002, decay: 0.004, gain: 0.5, pan: -0.1, seed: 9389),
-                Burst(at: 0.44, low: 750, high: 3700, attack: 0.0002, decay: 0.003, gain: 0.55, pan: 0.55, seed: 9390),
-                Burst(at: 0.47, low: 650, high: 3400, attack: 0.0002, decay: 0.004, gain: 0.6, pan: -0.4, seed: 9391),
-                Burst(at: 0.495, low: 700, high: 3500, attack: 0.0002, decay: 0.003, gain: 0.65, pan: 0.2, seed: 9392),
-                Burst(at: 0.515, low: 600, high: 3100, attack: 0.0002, decay: 0.004, gain: 0.7, pan: -0.25, seed: 9393),
-                Burst(at: 0.535, low: 800, high: 3800, attack: 0.0002, decay: 0.003, gain: 0.75, pan: 0.45, seed: 9394),
-                Burst(at: 0.55, low: 650, high: 3300, attack: 0.0002, decay: 0.004, gain: 0.8, pan: -0.55, seed: 9395),
-                Burst(at: 0.565, low: 700, high: 3600, attack: 0.0002, decay: 0.003, gain: 0.85, pan: 0.05, seed: 9396),
-                Burst(at: 0.577, low: 600, high: 3200, attack: 0.0002, decay: 0.004, gain: 0.9, pan: 0.35, seed: 9397),
-                Burst(at: 0.588, low: 750, high: 3700, attack: 0.0002, decay: 0.003, gain: 0.95, pan: -0.2, seed: 9398),
-                Burst(at: 0.597, low: 650, high: 3400, attack: 0.0002, decay: 0.003, gain: 1.0, pan: 0.15, seed: 9399),
+                // The pressure building under the landing spot, very low.
+                Tone(from: 28, to: 60, glide: 1.0, attack: 0.95, decay: 0.012, gain: 0.9),
+                Roll(from: 60, to: 180, glide: 1.0, attack: 0.95, decay: 0.012, gain: 1.0, swell: 5, depth: 0.5, seed: 9381),
+                // The growl of it coming, rising.
+                Fm(at: 0.1, from: 45, to: 110, glide: 0.9, ratio: 0.5, index: 2.2, fade: 4.0, attack: 0.85, decay: 0.012, gain: 0.6),
+                Drive(1.5),
+                // The roar diving in, its band climbing as it nears.
+                Sweep(from: 250, to: 1800, glide: 1.0, q: 0.7, attack: 0.95, decay: 0.012, gain: 1.0, seed: 9382),
+                Roll(at: 0.05, from: 400, to: 1400, glide: 0.95, attack: 0.9, decay: 0.012, gain: 0.7, swell: 9, depth: 0.6, seed: 9385),
+                // Static running together over the last half.
+                Roll(at: 0.4, from: 1100, to: 2300, glide: 0.6, attack: 0.58, decay: 0.012, gain: 0.45, swell: 120, depth: 0.95, seed: 9383),
+                // A few hard ticks closing in at the end.
+                Burst(at: 0.72, low: 500, high: 2600, attack: 0.0002, decay: 0.004, gain: 0.5, pan: -0.3, seed: 9384),
+                Burst(at: 0.84, low: 450, high: 2400, attack: 0.0002, decay: 0.004, gain: 0.6, pan: 0.4, seed: 9386),
+                Burst(at: 0.92, low: 500, high: 2600, attack: 0.0002, decay: 0.004, gain: 0.7, pan: -0.1, seed: 9387),
+                Burst(at: 0.97, low: 450, high: 2500, attack: 0.0002, decay: 0.004, gain: 0.8, pan: 0.25, seed: 9388),
+                Burst(at: 1.0, low: 500, high: 2600, attack: 0.0002, decay: 0.004, gain: 0.9, pan: -0.2, seed: 9389),
             ],
         ),
         "regency_seraph_landing": (
-            length: 3.5, peak: 0.9, room: 0.3,
+            length: 4.2, peak: 0.9, room: 0.4,
             layers: [
                 // The crack: hard bright snaps stacked inside six milliseconds, then the slam.
-                Burst(low: 1500, high: 6500, attack: 0.0001, decay: 0.003, gain: 18, seed: 9341),
-                Burst(at: 0.001, low: 800, high: 5000, attack: 0.0001, decay: 0.005, gain: 20, seed: 9348),
-                Burst(at: 0.0025, low: 400, high: 3500, attack: 0.0002, decay: 0.01, gain: 22, seed: 9349),
-                Burst(at: 0.004, low: 200, high: 2200, attack: 0.0003, decay: 0.03, gain: 22, seed: 9342),
-                Fm(from: 1400, to: 600, glide: 0.05, ratio: 1.41, index: 2.2, fade: 0.03, attack: 0.0004, decay: 0.04, gain: 0.8),
-                Burst(at: 0.001, low: 50, high: 700, attack: 0.0005, decay: 0.1, gain: 26, seed: 9343),
-                Burst(at: 0.002, low: 25, high: 220, attack: 0.0015, decay: 0.35, gain: 22, seed: 9344),
-                // The sub thump: hitting at once, deep and held.
-                Tone(from: 170, to: 48, glide: 0.1, attack: 0.0006, decay: 0.3, gain: 2.8),
-                Tone(from: 80, to: 30, glide: 0.5, attack: 0.001, decay: 0.7, gain: 1.6),
-                Tone(from: 42, to: 26, glide: 1.2, attack: 0.008, decay: 1.2, gain: 1.0),
+                Burst(low: 1300, high: 6000, attack: 0.0001, decay: 0.003, gain: 6, seed: 9341),
+                Burst(at: 0.001, low: 600, high: 4000, attack: 0.0001, decay: 0.006, gain: 7, seed: 9348),
+                Burst(at: 0.003, low: 200, high: 2200, attack: 0.0003, decay: 0.03, gain: 10, seed: 9342),
+                Fm(from: 1300, to: 600, glide: 0.05, ratio: 1.41, index: 2.0, fade: 0.03, attack: 0.0004, decay: 0.04, gain: 0.35),
+                Burst(at: 0.001, low: 40, high: 600, attack: 0.0008, decay: 0.16, gain: 24, seed: 9343),
+                Burst(at: 0.002, low: 20, high: 200, attack: 0.002, decay: 0.6, gain: 26, seed: 9344),
+                // The sub thump: hitting at once, deep, and held for seconds.
+                Tone(from: 160, to: 42, glide: 0.25, attack: 0.0006, decay: 0.55, gain: 3.4),
+                Tone(from: 75, to: 26, glide: 1.0, attack: 0.001, decay: 1.2, gain: 2.4),
+                Tone(from: 40, to: 22, glide: 2.0, attack: 0.01, decay: 1.8, gain: 1.4),
                 // The growl: rough, with a metal edge that dies fast.
-                Fm(from: 130, to: 55, glide: 0.5, ratio: 0.5, index: 2.8, fade: 0.5, attack: 0.002, decay: 0.8, gain: 1.0),
+                Fm(from: 130, to: 45, glide: 0.9, ratio: 0.5, index: 2.8, fade: 0.7, attack: 0.002, decay: 1.1, gain: 1.3),
                 Fm(from: 260, to: 120, glide: 0.35, ratio: 0.5, index: 1.8, fade: 0.35, attack: 0.003, decay: 0.4, gain: 0.6),
                 Fm(at: 0.003, from: 96, to: 60, glide: 0.2, ratio: 1.41, index: 2.0, fade: 0.08, attack: 0.002, decay: 0.12, gain: 0.5),
                 // The air torn open round it.
                 Roll(at: 0.01, from: 1400, to: 200, glide: 1.2, attack: 0.02, decay: 0.6, gain: 1.0, swell: 10, depth: 0.6, seed: 9345),
                 // Electric crackle all round, driven in with the rest: thick at first, thinning out.
-                Burst(at: 0.025, low: 315, high: 1208, attack: 0.0004, decay: 0.012, gain: 4.10, pan: 0.51),
-                Burst(at: 0.027, low: 179, high: 1939, attack: 0.0004, decay: 0.009, gain: 4.18, pan: -0.13),
-                Burst(at: 0.032, low: 367, high: 1021, attack: 0.0004, decay: 0.019, gain: 4.25, pan: -0.44),
-                Burst(at: 0.051, low: 181, high: 2081, attack: 0.0004, decay: 0.015, gain: 4.03, pan: -0.45),
-                Burst(at: 0.067, low: 218, high: 1493, attack: 0.0004, decay: 0.013, gain: 5.00, pan: 0.11),
-                Burst(at: 0.083, low: 242, high: 1111, attack: 0.0004, decay: 0.015, gain: 5.18, pan: -0.20),
-                Burst(at: 0.100, low: 182, high: 2055, attack: 0.0004, decay: 0.007, gain: 4.25, pan: 0.29),
-                Burst(at: 0.112, low: 310, high: 1853, attack: 0.0004, decay: 0.015, gain: 4.72, pan: -0.32),
-                Burst(at: 0.146, low: 274, high: 1067, attack: 0.0004, decay: 0.015, gain: 4.75, pan: 0.60),
-                Burst(at: 0.177, low: 297, high: 2147, attack: 0.0004, decay: 0.022, gain: 3.89, pan: -0.13),
-                Burst(at: 0.212, low: 227, high: 1901, attack: 0.0004, decay: 0.013, gain: 5.40, pan: -0.68),
-                Burst(at: 0.233, low: 310, high: 1596, attack: 0.0004, decay: 0.017, gain: 4.64, pan: 0.13),
-                Burst(at: 0.250, low: 197, high: 1452, attack: 0.0004, decay: 0.014, gain: 4.75, pan: -0.70),
-                Burst(at: 0.284, low: 378, high: 1482, attack: 0.0004, decay: 0.017, gain: 5.04, pan: -0.24),
-                Burst(at: 0.368, low: 331, high: 1244, attack: 0.0004, decay: 0.016, gain: 18.37, pan: -0.45),
-                Burst(at: 0.380, low: 276, high: 1714, attack: 0.0004, decay: 0.012, gain: 21.05, pan: -0.67),
-                Burst(at: 0.401, low: 292, high: 1180, attack: 0.0004, decay: 0.019, gain: 20.80, pan: -0.35),
-                Burst(at: 0.421, low: 333, high: 2298, attack: 0.0004, decay: 0.020, gain: 21.32, pan: -0.56),
-                Burst(at: 0.428, low: 268, high: 2248, attack: 0.0004, decay: 0.010, gain: 17.77, pan: 0.14),
-                Burst(at: 0.440, low: 152, high: 1198, attack: 0.0004, decay: 0.013, gain: 16.67, pan: 0.11),
-                Burst(at: 0.560, low: 413, high: 2164, attack: 0.0004, decay: 0.016, gain: 18.27, pan: -0.07),
-                Burst(at: 0.659, low: 350, high: 1715, attack: 0.0004, decay: 0.012, gain: 13.05, pan: 0.21),
-                Burst(at: 0.662, low: 184, high: 1327, attack: 0.0004, decay: 0.013, gain: 13.05, pan: 0.16),
-                Burst(at: 0.668, low: 227, high: 1998, attack: 0.0004, decay: 0.008, gain: 14.65, pan: -0.76),
-                Burst(at: 0.786, low: 342, high: 1204, attack: 0.0004, decay: 0.016, gain: 17.43, pan: 0.16),
-                Burst(at: 0.829, low: 209, high: 1899, attack: 0.0004, decay: 0.022, gain: 14.15, pan: -0.03),
-                Burst(at: 0.836, low: 202, high: 1601, attack: 0.0004, decay: 0.018, gain: 14.15, pan: 0.31),
-                Burst(at: 0.889, low: 255, high: 1981, attack: 0.0004, decay: 0.012, gain: 15.07, pan: 0.66),
-                Burst(at: 0.999, low: 302, high: 2216, attack: 0.0004, decay: 0.020, gain: 14.23, pan: -0.38),
-                Burst(at: 1.040, low: 235, high: 1628, attack: 0.0004, decay: 0.018, gain: 12.97, pan: 0.45),
-                Burst(at: 1.078, low: 264, high: 2155, attack: 0.0004, decay: 0.019, gain: 15.17, pan: 0.56),
-                Burst(at: 1.240, low: 355, high: 1364, attack: 0.0004, decay: 0.009, gain: 11.45, pan: 0.37),
-                Burst(at: 1.380, low: 240, high: 1700, attack: 0.0004, decay: 0.012, gain: 11.20, pan: -0.55),
-                Burst(at: 1.520, low: 300, high: 2000, attack: 0.0004, decay: 0.010, gain: 9.85, pan: 0.42),
-                Burst(at: 1.788, low: 293, high: 1867, attack: 0.0004, decay: 0.010, gain: 9.77, pan: 0.73),
-                Burst(at: 1.910, low: 328, high: 1646, attack: 0.0004, decay: 0.007, gain: 7.23, pan: -0.05),
-                Burst(at: 2.004, low: 397, high: 2178, attack: 0.0004, decay: 0.022, gain: 8.83, pan: -0.80),
-                Burst(at: 2.596, low: 326, high: 2217, attack: 0.0004, decay: 0.007, gain: 7.23, pan: 0.66),
+                Burst(at: 0.025, low: 315, high: 1208, attack: 0.0004, decay: 0.012, gain: 2.05, pan: 0.51),
+                Burst(at: 0.027, low: 179, high: 1939, attack: 0.0004, decay: 0.009, gain: 2.09, pan: -0.13),
+                Burst(at: 0.032, low: 367, high: 1021, attack: 0.0004, decay: 0.019, gain: 2.12, pan: -0.44),
+                Burst(at: 0.051, low: 181, high: 2081, attack: 0.0004, decay: 0.015, gain: 2.02, pan: -0.45),
+                Burst(at: 0.067, low: 218, high: 1493, attack: 0.0004, decay: 0.013, gain: 2.50, pan: 0.11),
+                Burst(at: 0.083, low: 242, high: 1111, attack: 0.0004, decay: 0.015, gain: 2.59, pan: -0.20),
+                Burst(at: 0.100, low: 182, high: 2055, attack: 0.0004, decay: 0.007, gain: 2.12, pan: 0.29),
+                Burst(at: 0.112, low: 310, high: 1853, attack: 0.0004, decay: 0.015, gain: 2.36, pan: -0.32),
+                Burst(at: 0.146, low: 274, high: 1067, attack: 0.0004, decay: 0.015, gain: 2.38, pan: 0.60),
+                Burst(at: 0.177, low: 297, high: 2147, attack: 0.0004, decay: 0.022, gain: 1.95, pan: -0.13),
+                Burst(at: 0.212, low: 227, high: 1901, attack: 0.0004, decay: 0.013, gain: 2.70, pan: -0.68),
+                Burst(at: 0.233, low: 310, high: 1596, attack: 0.0004, decay: 0.017, gain: 2.32, pan: 0.13),
+                Burst(at: 0.250, low: 197, high: 1452, attack: 0.0004, decay: 0.014, gain: 2.38, pan: -0.70),
+                Burst(at: 0.284, low: 378, high: 1482, attack: 0.0004, decay: 0.017, gain: 2.52, pan: -0.24),
+                Burst(at: 0.368, low: 331, high: 1244, attack: 0.0004, decay: 0.016, gain: 9.19, pan: -0.45),
+                Burst(at: 0.380, low: 276, high: 1714, attack: 0.0004, decay: 0.012, gain: 10.53, pan: -0.67),
+                Burst(at: 0.401, low: 292, high: 1180, attack: 0.0004, decay: 0.019, gain: 10.40, pan: -0.35),
+                Burst(at: 0.421, low: 333, high: 2298, attack: 0.0004, decay: 0.020, gain: 10.66, pan: -0.56),
+                Burst(at: 0.428, low: 268, high: 2248, attack: 0.0004, decay: 0.010, gain: 8.88, pan: 0.14),
+                Burst(at: 0.440, low: 152, high: 1198, attack: 0.0004, decay: 0.013, gain: 8.34, pan: 0.11),
+                Burst(at: 0.560, low: 413, high: 2164, attack: 0.0004, decay: 0.016, gain: 9.13, pan: -0.07),
+                Burst(at: 0.659, low: 350, high: 1715, attack: 0.0004, decay: 0.012, gain: 6.53, pan: 0.21),
+                Burst(at: 0.662, low: 184, high: 1327, attack: 0.0004, decay: 0.013, gain: 6.53, pan: 0.16),
+                Burst(at: 0.668, low: 227, high: 1998, attack: 0.0004, decay: 0.008, gain: 7.33, pan: -0.76),
+                Burst(at: 0.786, low: 342, high: 1204, attack: 0.0004, decay: 0.016, gain: 8.71, pan: 0.16),
+                Burst(at: 0.829, low: 209, high: 1899, attack: 0.0004, decay: 0.022, gain: 7.08, pan: -0.03),
+                Burst(at: 0.836, low: 202, high: 1601, attack: 0.0004, decay: 0.018, gain: 7.08, pan: 0.31),
+                Burst(at: 0.889, low: 255, high: 1981, attack: 0.0004, decay: 0.012, gain: 7.54, pan: 0.66),
+                Burst(at: 0.999, low: 302, high: 2216, attack: 0.0004, decay: 0.020, gain: 7.12, pan: -0.38),
+                Burst(at: 1.040, low: 235, high: 1628, attack: 0.0004, decay: 0.018, gain: 6.49, pan: 0.45),
+                Burst(at: 1.078, low: 264, high: 2155, attack: 0.0004, decay: 0.019, gain: 7.58, pan: 0.56),
+                Burst(at: 1.240, low: 355, high: 1364, attack: 0.0004, decay: 0.009, gain: 5.72, pan: 0.37),
+                Burst(at: 1.380, low: 240, high: 1700, attack: 0.0004, decay: 0.012, gain: 5.60, pan: -0.55),
+                Burst(at: 1.520, low: 300, high: 2000, attack: 0.0004, decay: 0.010, gain: 4.92, pan: 0.42),
+                Burst(at: 1.788, low: 293, high: 1867, attack: 0.0004, decay: 0.010, gain: 4.88, pan: 0.73),
+                Burst(at: 1.910, low: 328, high: 1646, attack: 0.0004, decay: 0.007, gain: 3.62, pan: -0.05),
+                Burst(at: 2.004, low: 397, high: 2178, attack: 0.0004, decay: 0.022, gain: 4.42, pan: -0.80),
+                Burst(at: 2.596, low: 326, high: 2217, attack: 0.0004, decay: 0.007, gain: 3.62, pan: 0.66),
                 Drive(3.6),
                 // The sizzle the crackle spits out of, fading.
                 Roll(at: 0.02, from: 1800, to: 700, glide: 2.0, attack: 0.01, decay: 0.8, gain: 0.25, swell: 100, depth: 0.95, seed: 9346),
-                Foam(at: 0.03, from: 1100, to: 400, glide: 2.5, q: 0.8, attack: 0.05, decay: 0.9, gain: 0.6, swell: 30, depth: 0.85, seed: 9347),
+                Foam(at: 0.03, from: 1100, to: 400, glide: 2.5, q: 0.8, attack: 0.05, decay: 0.9, gain: 0.45, swell: 30, depth: 0.85, seed: 9347),
+                // Thunder rolling off for seconds, from both sides, and the ground
+                // slapping it back.
+                Roll(at: 0.1, from: 800, to: 50, glide: 3.0, attack: 0.15, decay: 1.4, gain: 1.1, swell: 3, depth: 0.55, seed: 9350),
+                Roll(at: 0.35, from: 500, to: 40, glide: 3.0, attack: 0.3, decay: 1.3, gain: 0.8, swell: 2, depth: 0.5, pan: -0.5, seed: 9351),
+                Roll(at: 0.6, from: 480, to: 40, glide: 3.0, attack: 0.3, decay: 1.2, gain: 0.75, swell: 2, depth: 0.5, pan: 0.5, seed: 9352),
+                Burst(at: 0.7, low: 35, high: 400, attack: 0.005, decay: 0.2, gain: 1.6, pan: -0.35, seed: 9353),
+                Tone(at: 0.7, from: 55, to: 28, glide: 0.4, attack: 0.008, decay: 0.45, gain: 0.45, pan: -0.35),
+                Burst(at: 1.25, low: 30, high: 350, attack: 0.008, decay: 0.25, gain: 1.2, pan: 0.4, seed: 9354),
+                Tone(at: 1.25, from: 50, to: 26, glide: 0.45, attack: 0.01, decay: 0.5, gain: 0.35, pan: 0.4),
             ],
         ),
         "regency_seraph_wave": (

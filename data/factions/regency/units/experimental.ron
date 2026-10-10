@@ -280,7 +280,7 @@
         // everything within 250 m of it, letting go its Seraphic Nova at its feet. Then 15 s to recharge. It dashes idle, chasing, on an attack-move or patrol,
         // or at an attack order's mark; never on a move order, at hold fire or at hold
         // position.
-        dash: (range: 1800, min: 400, gather: 250, cooldown: 15, windup: 1.5, transit: 1.5, arrive: 0.6),
+        dash: (range: 1800, min: 400, gather: 250, cooldown: 15, windup: 1.5, transit: 3.0, arrive: 1.0),
         weapons: [
             (
                 name: "Rapid Fusion Repeater",
@@ -351,7 +351,8 @@
         mesh: "regency_seraph", icon: WingedTitan,
         sounds: (
             death: "blast_colossal", moving: "aster_hover",
-            dash_charge: "regency_seraph_charge", dash_leave: "regency_seraph_vanish", dash_arrive: "regency_seraph_arrive",
+            dash_charge: "regency_seraph_charge", dash_leave: "regency_seraph_vanish", dash_gone: "regency_seraph_gone",
+            dash_arrive: "regency_seraph_arrive",
             dash_land: "regency_seraph_landing",
         ),
     ),

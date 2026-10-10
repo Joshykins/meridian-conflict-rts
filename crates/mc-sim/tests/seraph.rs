@@ -206,14 +206,10 @@ fn the_cooldown_holds_the_next_dash() {
     }
     let (first, _) = until_landed(&mut w, 60).expect("first dash");
     cluster(&mut w, 1000, 3200);
-    let cooldown = w
-        .blueprints
-        .unit_by_key(SERAPH)
-        .unwrap()
-        .dash
-        .unwrap()
-        .cooldown_ticks as u32;
-    let (second, to) = until_landed(&mut w, cooldown + 40).expect("second dash");
+    let dash = w.blueprints.unit_by_key(SERAPH).unwrap().dash.unwrap();
+    let cooldown = dash.cooldown_ticks as u32;
+    let gap = dash.windup_ticks as u32 + dash.transit_ticks as u32;
+    let (second, to) = until_landed(&mut w, cooldown + gap + 20).expect("second dash");
     assert!(
         second - first >= cooldown,
         "dashed again {} ticks after landing, recharge {cooldown}",
