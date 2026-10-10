@@ -83,6 +83,7 @@ mod lance_core_fx;
 mod laser_fx;
 mod launch_fx;
 pub(crate) mod lens_flare;
+pub(crate) mod lens_fx;
 mod lift_fx;
 mod map_look;
 mod mine_fx;
@@ -469,7 +470,7 @@ pub(crate) struct ModelInfo {
     pub(crate) _skin_pad2: u32,
 }
 
-const _: () = assert!(std::mem::size_of::<ModelInfo>() == 1200);
+const _: () = assert!(std::mem::size_of::<ModelInfo>() == 1216);
 
 // A prop's far level is the draw slot after its own levels.
 const _: () = assert!(models::LOD_COUNT as u32 == lod::FAR);
@@ -977,6 +978,8 @@ pub struct Renderer {
     nuke_volume: nuke_volume::NukeVolume,
     /// Cone weapons' wakes as shells of light (wake_shell.rs, wake_fx.rs).
     wake_shells: wake_shell::WakeShells,
+    /// Gravitic lenses at work: charge, front, well (lens_fx.rs, lens_fx.wgsl).
+    lens_fx: lens_fx::LensFx,
     pad_footprints: Image,
     hull_plans: Image,
     font: Image,
@@ -2059,6 +2062,7 @@ impl Renderer {
 
         let nuke_volume = nuke_volume::NukeVolume::new(&gpu, &layouts, &passes, sky.noise_view())?;
         let wake_shells = wake_shell::WakeShells::new(&gpu, &layouts, &passes)?;
+        let lens_fx = lens_fx::LensFx::new(&gpu, &layouts, &passes)?;
         let post = post::Post::new(&gpu, passes.present, layouts.screen)?;
         let shafts = shafts::Shafts::new(&gpu, &layouts, &passes)?;
 
@@ -2585,6 +2589,7 @@ impl Renderer {
             sky,
             nuke_volume,
             wake_shells,
+            lens_fx,
             pad_footprints,
             hull_plans,
             font,
@@ -3458,6 +3463,7 @@ impl Renderer {
         self.missile_trails(projectiles, time, camera);
         self.nuke_tick(frame, time, camera);
         self.write_regency_trails(time);
+        self.lens_tick(frame, time);
         self.stream_bursts(projectiles, time, camera);
         self.sea_tick(units, projectiles, time, camera);
         self.warp_tick(frame, time, camera);
@@ -4612,6 +4618,7 @@ impl Renderer {
             && !self.bolt_rifle_event(event, time)
             && !self.arc_howitzer_event(event, time)
             && !self.storm_cloud_event(event, time)
+            && !self.lens_event(event, time)
         {
             self.effects_of_inner(event, time);
         }
@@ -5674,6 +5681,7 @@ impl Drop for Renderer {
         self.sky.destroy(&self.gpu);
         self.nuke_volume.destroy(&self.gpu);
         self.wake_shells.destroy(&self.gpu);
+        self.lens_fx.destroy(&self.gpu);
         self.post.destroy(&self.gpu);
         self.gtao.destroy(&self.gpu);
         self.terrain_lit.destroy(&self.gpu);

@@ -5,7 +5,7 @@
 //! A crown of six great black blade-shards standing round a well, leaning in and twisting
 //! as they rise to close to a point high over it, open gaps between them all the way up
 //! and between their points; six short shards stand low before the gaps. Each shard
-//! (`shard`) is a faceted graphite core under courses of dark plate, its points the
+//! (`super::shard`) is a faceted graphite core under courses of dark plate, its points the
 //! plates' swept edges, its inner faces glazed so the held energy shows through them.
 //! Between the shards' feet stand the works (`works`): gantries spanning blade to blade,
 //! coil drums, conduits running in to the well; round them tall spike masts, their stays
@@ -27,7 +27,6 @@
 //! `NANITE_RIM`, `EMBER_RIM`, `EMBER_SLOT`), never a lit piece of mesh.
 
 mod rotors;
-mod shard;
 mod site;
 #[cfg(test)]
 mod tests;
@@ -35,12 +34,12 @@ mod works;
 
 use glam::{Vec2, Vec3};
 
-use crate::builder::{hash_unit, MeshBuilder};
+use crate::builder::MeshBuilder;
 use crate::material::TEAM;
 
 use super::kit::v3;
+use super::shard::{jitter, Shard};
 use rotors::Rotor;
-use shard::Shard;
 
 /// The unit file's size.
 pub(super) const RADIUS: f32 = 125.0;
@@ -55,11 +54,6 @@ const RING_TOP: f32 = 9.0;
 pub(super) const CORE: Vec3 = Vec3::new(0.0, 0.0, 108.0);
 /// How far round the core the model leaves open for the energy.
 pub(super) const CORE_CLEAR: f32 = 20.0;
-
-/// A number from -1 to 1 for `seed`.
-fn jitter(seed: u32) -> f32 {
-    hash_unit(0x6a71, seed) * 2.0 - 1.0
-}
 
 /// A block on the ground from `a` to `c` (their heights ignored), `half` its half width,
 /// standing `h.0` high at `a` and `h.1` at `c`: footings and anchor blocks.
@@ -119,6 +113,7 @@ fn crown_shards() -> Vec<Shard> {
             skew: if k % 2 == 0 { 0.7 } else { -0.5 },
             plates: 5,
             seed: k as u32,
+            scale: 1.0,
         });
     }
     for k in 0..6 {
@@ -132,6 +127,7 @@ fn crown_shards() -> Vec<Shard> {
             skew: if k % 2 == 0 { -0.6 } else { 0.6 },
             plates: 2,
             seed: 10 + k as u32,
+            scale: 1.0,
         });
     }
     shards

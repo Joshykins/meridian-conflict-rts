@@ -50,6 +50,12 @@
             "Pinch-fusion Howitzer": "One great charge of fusion thrown high, landing as a blinding strike that melts a pool into the ground and leaves a knot of fusion burning over it.",
         },
     ),
+    "regency_t3_gravitic_lens": (
+        lore: "A walking shard of the great gravitic engines: it plants, opens its crown, and lays a well of gravity over one target that follows it wherever it runs, crushing everything near it and dragging it to a crawl.",
+        weapons: {
+            "Gravitic Well Projector": "A link of held gravity thrown onto one target; where it lands a small well opens and stays on the target until it dies, crushing what stands round it and slowing it more the longer it is held.",
+        },
+    ),
     "regency_t3_wake_tank": (
         lore: "A heavy hover tank built round one wide projector; when it lets go, a fan of plasma rolls out over the ground ahead and nothing standing in it is spared.",
         weapons: {

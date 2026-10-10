@@ -74,6 +74,7 @@ pub mod perf;
 mod bore;
 pub mod placement;
 pub use mc_core::print_heads;
+pub mod lens;
 mod ranks;
 pub mod reclaim;
 mod reclaim_area;
@@ -105,6 +106,7 @@ mod validate;
 pub mod veterancy;
 pub mod wake;
 pub mod warp;
+mod well_area;
 pub mod world;
 mod wreck_damage;
 

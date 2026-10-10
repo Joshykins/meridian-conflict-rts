@@ -78,6 +78,10 @@ impl State {
             .or_else(|| {
                 let owners: Vec<_> = self.wakes.iter().map(|w| w.owner).collect();
                 bad_owner("wakes", &owners)
+            })
+            .or_else(|| {
+                let owners: Vec<_> = self.lenses.iter().map(|t| t.owner).collect();
+                bad_owner("lenses", &owners)
             });
         problem.map_or(Ok(()), Err)
     }

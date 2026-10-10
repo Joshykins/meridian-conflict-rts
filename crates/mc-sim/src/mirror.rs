@@ -28,6 +28,7 @@ mod destruct;
 mod elevator;
 mod fog;
 mod gravitic;
+mod lens;
 mod links;
 mod mend;
 mod units;
@@ -43,6 +44,7 @@ pub use destruct::DestructView;
 pub use elevator::{crate_load, ElevatorPhase, ElevatorView};
 pub use fog::VisionDisc;
 pub use gravitic::{WellStage, WellView};
+pub use lens::LensView;
 pub use links::LinkView;
 pub use walls::{join_walls, WALL_JOINS};
 pub use warp::{UNIT_IN_WARP, UNIT_WARP_DAMPED, UNIT_WARP_NANITE};
@@ -380,6 +382,28 @@ pub enum SimEvent {
         owner: u8,
         blueprint: BlueprintId,
         weapon: u8,
+    },
+    /// A gravitic lens (weapon `weapon` of `unit`) let a front of gravity go from `from`
+    /// toward `target` (`lens.rs`).
+    LensLaunched {
+        unit: UnitId,
+        weapon: u8,
+        target: UnitId,
+        from: FxVec3,
+    },
+    /// Its front struck `target` at `pos`: the well opens `radius` round it.
+    LensStruck {
+        unit: UnitId,
+        weapon: u8,
+        target: UnitId,
+        pos: FxVec3,
+        radius: Fx,
+    },
+    /// The lens let go; its well collapses at `pos` (`None`: its target is gone).
+    LensReleased {
+        unit: UnitId,
+        weapon: u8,
+        pos: Option<FxVec3>,
     },
     /// A gravitic engine began gathering for a rift from `core` to `mark`, leaving in
     /// `ticks` (`gravitic.rs`); sent again when it is turned on a new point.
@@ -1525,6 +1549,9 @@ pub struct RenderFrame {
     pub warps: Vec<WarpView>,
     /// Dashes under way that the viewer may see (`crate::dash`, `mirror/dash.rs`).
     pub dashes: Vec<DashView>,
+    /// Gravitic lenses' fronts and wells that the viewer may see (`crate::lens`,
+    /// `mirror/lens.rs`).
+    pub lenses: Vec<LensView>,
     /// Gravitic engines' work that the viewer may see (`crate::gravitic`, `mirror/gravitic.rs`).
     pub wells: Vec<WellView>,
     /// Storm seeds in the air (`mirror::clouds`).
@@ -2803,6 +2830,7 @@ impl World {
         );
         self.write_warps(viewer, &mut frame.warps);
         self.write_dashes(viewer, &mut frame.dashes);
+        self.write_lenses(viewer, &mut frame.lenses);
         self.write_wells(viewer, &mut frame.wells);
         self.write_clouds(&mut frame.clouds);
         self.write_destructs(viewer, &mut frame.destructs);

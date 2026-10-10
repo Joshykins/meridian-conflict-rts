@@ -243,8 +243,9 @@ struct ModelInfo {
     // count, y the tail's root height, z its top (`rig::TAIL`); then per pair hip (w: where
     // in the cycle its left foot lifts), knee, foot tip; w of [0] the tail's joint count.
     // Then [13..19) the tail's joints two to a vec4 (x, z, x, z), [19] the pincer's
-    // shoulder (w 1 when it has pincers), [20] its jaw hinge. Size mirrors CRAWL_SLOTS.
-    crawl: array<vec4<f32>, 21>,
+    // shoulder (w 1 when it has pincers), [20] its jaw hinge, [BRACE_SLOT] the brace's sink
+    // and widen (`crawl.wgsl`). Size mirrors CRAWL_SLOTS.
+    crawl: array<vec4<f32>, 22>,
     // A reverse-kneed walker's left hock at rest (xyz, between the knee and the ankle) and how
     // much of the leg's swing the tarsus below it follows (w). All zero for any other model.
     leg_hock: vec4<f32>,

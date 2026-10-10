@@ -22,20 +22,18 @@
 //!
 //! Friends are never touched. The engine dies, and its well collapses (`WellReleased`).
 
-use mc_core::{Fx, FxVec2, FxVec3, StateHasher, TICKS_PER_SECOND};
-use mc_data::{cat, gravitic::Gravitic, MoveLayer};
+use mc_core::{Fx, FxVec2, StateHasher, TICKS_PER_SECOND};
+use mc_data::gravitic::Gravitic;
 use serde::{Deserialize, Serialize};
 
-use crate::shields::in_dome;
 use crate::spatial::kind;
 use crate::tables::UnitId;
+use crate::well_area::{Aircraft, WellArea};
 use crate::{SimError, SimEvent, World};
 
 const DT: i32 = TICKS_PER_SECOND as i32;
 /// Metres either side of the rift's front where it tears the trees up.
 const RIFT_WIDTH: i32 = 16;
-/// A downed aircraft is thrown at the ground this fast, metres a tick (60 m/s).
-const SLAM: i32 = 6;
 
 /// Where an engine's work is.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -193,14 +191,9 @@ impl World {
         if self.state.wells.is_empty() {
             return speed;
         }
-        let owner = self.state.units.owner[row];
-        let reach = self.bp(row).radius;
         let mut keep = Fx::ONE;
         for w in &self.state.wells {
-            if !w.powered
-                || !matches!(w.phase, WellPhase::Holding { .. })
-                || !self.are_enemies(w.owner, owner)
-            {
+            if !w.powered || !matches!(w.phase, WellPhase::Holding { .. }) {
                 continue;
             }
             let Some(g) = self
@@ -211,7 +204,16 @@ impl World {
             else {
                 continue;
             };
-            if pos.distance(w.mark) - reach <= g.radius {
+            let area = WellArea {
+                mark: w.mark,
+                z: w.z,
+                radius: g.radius,
+                owner: w.owner,
+                source: w.source,
+                per_tick: Fx::ZERO,
+                aircraft: Aircraft::Downs(g.downs),
+            };
+            if self.well_catches(&area, row, pos) {
                 keep = keep.min(g.slow);
             }
         }
@@ -336,78 +338,19 @@ impl World {
         self.add_stain(front, width * 2, 90);
     }
 
-    /// One tick's crush over the well, the same everywhere in it: shields first, then
-    /// everything of the enemy's they do not cover.
+    /// One tick's crush over the well, the same everywhere in it (`well_area.rs`), then
+    /// the ground going on breaking under it.
     fn crush(&mut self, w: &GravityWell, g: &Gravitic) {
-        let (mark, radius, per) = (w.mark, g.radius, g.damage / DT);
-        let floor = self.dome_floor();
-        // Domes reaching into the well take the crush; what stands under one is spared
-        // while it holds.
-        let mut domes = Vec::new();
-        for &row in &self.scratch.shielded {
-            if !self.state.units.slots.is_alive(row)
-                || !self.shield_blocking(row)
-                || self.bp(row).shield.is_some_and(|s| s.is_hull())
-                || !self.are_enemies(w.owner, self.state.units.owner[row])
-            {
-                continue;
-            }
-            let r = self.dome_radius(row);
-            let d = self.state.units.pos[row].distance(mark) - r;
-            if d <= radius {
-                let center = self.state.units.pos[row].extend(self.state.units.z[row]);
-                domes.push((row, center, r));
-            }
-        }
-        for &(row, ..) in &domes {
-            self.damage_shield(row, per);
-        }
-        // A dome the crush just broke covers nothing.
-        domes.retain(|&(row, ..)| self.shield_blocking(row));
-        let covered = |p: FxVec3| domes.iter().any(|&(_, c, r)| in_dome(p, c, r, floor));
-
-        let mut struck_units = Vec::new();
-        self.index
-            .query(mark, radius + Fx::from_int(60), kind::UNIT, |e| {
-                let r = e.row as usize;
-                if self.unit_entry_is_current(e)
-                    && self.state.units.is_active(r)
-                    && self.are_enemies(w.owner, self.state.units.owner[r])
-                    && !self.bp(r).has(cat::SPACE)
-                {
-                    let d = self.state.units.pos[r].distance(mark) - self.bp(r).radius;
-                    if d <= radius {
-                        struck_units.push(r);
-                    }
-                }
-                true
-            });
-        for r in struck_units {
-            let bp = self.bp(r);
-            let body = self.state.units.pos[r].extend(self.state.units.z[r] + bp.height / 2);
-            if covered(body) {
-                continue;
-            }
-            let hull = bp.shield.is_some_and(|s| s.is_hull()) && self.shield_blocking(r);
-            let air = bp.motion.is_some_and(|m| m.layer == MoveLayer::Air);
-            let ground = self
-                .terrain
-                .height_at(self.state.units.pos[r])
-                .max(self.terrain.water_level());
-            if air && !hull && bp.tech <= g.downs && self.state.units.z[r] > ground + Fx::ONE {
-                self.down_aircraft(r, w.source, w.owner);
-                continue;
-            }
-            if hull {
-                self.damage_shield(r, per);
-            } else {
-                self.damage_unit(r, per, w.owner, w.source);
-            }
-        }
-
-        let point = mark.extend(w.z + Fx::from_int(8));
-        self.wear_wrecks(point, radius, |_| per);
-        self.blast_structures(point, radius, crate::city::Blow::BLAST, |_| per);
+        let (mark, radius) = (w.mark, g.radius);
+        self.crush_area(&WellArea {
+            mark,
+            z: w.z,
+            radius,
+            owner: w.owner,
+            source: w.source,
+            per_tick: g.damage / DT,
+            aircraft: Aircraft::Downs(g.downs),
+        });
         let age = match w.phase {
             WellPhase::Holding { age } => age,
             _ => 0,
@@ -436,22 +379,5 @@ impl World {
         if age % 20 == 0 {
             self.add_stain(mark, radius, 140);
         }
-    }
-
-    /// Tears the aircraft in `row` out of the sky: it dies, thrown hard at the ground.
-    fn down_aircraft(&mut self, row: usize, source: UnitId, owner: u8) {
-        let units = &mut self.state.units;
-        // A dead aircraft falls with the way it last made (`despawn_unit`): this tick's
-        // drop is its throw at the ground.
-        units.prev_z[row] = units.z[row] + Fx::from_int(SLAM);
-        let pos = units.pos[row].extend(units.z[row]);
-        let id = units.id(row);
-        let health = units.health[row];
-        self.events.push(SimEvent::AircraftDowned {
-            unit: id,
-            pos,
-            by: source,
-        });
-        self.damage_unit(row, health, owner, source);
     }
 }

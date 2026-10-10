@@ -48,6 +48,7 @@ mod frigate;
 mod gravitic;
 mod guard;
 mod javelin_role;
+mod lens;
 mod lift_ship;
 mod line_of_fire;
 mod map_wreckage;

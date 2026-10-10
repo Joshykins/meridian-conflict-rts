@@ -113,6 +113,9 @@ pub enum Scenario {
     /// A unit that dashes (`UnitBlueprint::dash`): a pack of red tanks two thirds of its
     /// reach down the range, and it comes down in the middle of them.
     Dash,
+    /// A gun that holds a well on what it strikes (`Weapon::lens`, the Lodestone): a pack
+    /// of red medium tanks, passive, a sixth of its reach down the range.
+    Pack,
     /// A gravitic engine (`UnitBlueprint::gravitic`, The Fallen) turned at once on a red
     /// camp 2 km down the range: tanks, a few buildings and aircraft circling over them.
     Fracture,
@@ -127,7 +130,7 @@ pub const RESUME_AT: u32 = 260;
 pub const LET_GO_AT: u32 = 300;
 
 impl Scenario {
-    pub const ALL: [Scenario; 19] = [
+    pub const ALL: [Scenario; 20] = [
         Scenario::UnderFire,
         Scenario::PointBlank,
         Scenario::Targets,
@@ -145,6 +148,7 @@ impl Scenario {
         Scenario::Short,
         Scenario::Elevator,
         Scenario::Dash,
+        Scenario::Pack,
         Scenario::Fracture,
         Scenario::FractureLetGo,
     ];
@@ -168,6 +172,7 @@ impl Scenario {
             Scenario::Short => "Short",
             Scenario::Elevator => "Elevator",
             Scenario::Dash => "Dash",
+            Scenario::Pack => "Pack",
             Scenario::Fracture => "Fracture",
             Scenario::FractureLetGo => "Let Go",
         }
@@ -192,6 +197,7 @@ impl Scenario {
             "short" => Scenario::Short,
             "elevator" => Scenario::Elevator,
             "dash" => Scenario::Dash,
+            "pack" => Scenario::Pack,
             "fracture" => Scenario::Fracture,
             "fracture-release" => Scenario::FractureLetGo,
             _ => return None,
@@ -1069,6 +1075,42 @@ fn stage(
                 (40, 30),
                 (0, -90),
                 (0, 90),
+            ];
+            Ok((
+                pack.iter()
+                    .map(|&(along, across)| Command::DebugSpawn {
+                        owner: RED,
+                        blueprint: tank,
+                        pos: east(out + Fx::from_int(along), across),
+                        heading: Angle::HALF_TURN,
+                        count: 1,
+                        flags: flag::PASSIVE,
+                        build: 1000,
+                    })
+                    .collect(),
+                None,
+            ))
+        }
+        Scenario::Pack => {
+            let weapon = bp
+                .weapons
+                .iter()
+                .find(|w| w.lens.is_some())
+                .ok_or("This Unit Holds No Well")?;
+            // Medium tanks: a well takes some seconds to crush one, then lets go.
+            let tank = blueprints
+                .id_of("aster_t2_tank")
+                .or_else(|| blueprints.id_of(DEFAULT_SUBJECT))
+                .ok_or("No Tank To Hold")?;
+            let out = weapon.range_max / 6;
+            let pack = [
+                (0, 0),
+                (-12, -16),
+                (-10, 18),
+                (14, -8),
+                (16, 14),
+                (2, 34),
+                (-4, -36),
             ];
             Ok((
                 pack.iter()

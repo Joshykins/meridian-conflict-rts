@@ -27,6 +27,7 @@ mod engineer;
 mod eye;
 mod fusion_guns;
 mod gravitic_engine;
+mod gravitic_lens;
 mod guns;
 pub(crate) mod gunships;
 mod hatchery;
@@ -46,6 +47,7 @@ mod scorpion;
 mod scout;
 mod seeker_hover;
 mod seraph;
+mod shard;
 mod sonar;
 pub(crate) mod space;
 mod strategic;
@@ -111,6 +113,14 @@ pub(super) const MODELS: &[ModelDef] = &[
         fusion_guns::SKYSPEAR_RADIUS,
         fusion_guns::SKYSPEAR_HEIGHT,
         fusion_guns::skyspear,
+    ),
+    // The tech 3 gravitic sniper: a body hung between four shard legs that lean in to hold
+    // its gravity over it (`gravitic_lens`).
+    ModelDef::new(
+        "regency_gravitic_lens",
+        gravitic_lens::RADIUS,
+        gravitic_lens::HEIGHT,
+        gravitic_lens::lens,
     ),
     ModelDef::new(
         "regency_fusion_howitzer",
@@ -366,6 +376,8 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_ward" => 6000,
         // A skirted tracked body, a turret, the gun and its caged core.
         "regency_skyspear" | "regency_fusion_howitzer" => 8000,
+        // Four plated shard legs, their thighs, a body and its well.
+        "regency_gravitic_lens" => 6000,
         // Strategic: an 8 x 8 launch complex, and a 4 x 4 array; a few a match.
         "regency_nuke_silo" => 9000,
         "regency_nuke_defense" => 6000,
@@ -408,6 +420,8 @@ pub(super) fn reduced_share(key: &str) -> Option<f32> {
         "regency_hover_tank" | "regency_raider" | "regency_mobile_aa" => Some(0.5),
         // Faceted plates and skirts that keep their sides when reduced.
         "regency_skyspear" | "regency_fusion_howitzer" => Some(0.52),
+        // Faceted shards and a plated body that keep their sides when reduced.
+        "regency_gravitic_lens" => Some(0.55),
         // Plated hulls, heads and legs: faceted solids that keep their sides when reduced.
         "regency_strider" | "regency_wake_tank" | "regency_colossus" | "regency_seraph" => {
             Some(0.5)

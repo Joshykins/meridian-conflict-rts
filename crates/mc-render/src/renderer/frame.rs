@@ -387,6 +387,7 @@ impl Renderer {
                 &self.gravitic_engine_fx.lenses,
             );
             self.upload_wake_shells(input.time);
+            self.lens_fx.upload(input.time, input.alpha.clamp(0.0, 1.0));
             self.lens_flares.upload(input.time, camera);
             self.upload_lights(input.time, input.alpha.clamp(0.0, 1.0), camera);
         }
@@ -1030,6 +1031,12 @@ impl Renderer {
             // Cone weapons' wakes, shells of light added onto the scene (wake_shell.wgsl).
             self.timers.draws(&device, cmd, "scene.wake_shells");
             self.wake_shells.draw(&device, cmd, self.layouts.scene);
+            self.timers.end(&device, cmd);
+
+            // Gravitic lenses, bending the scene the water sees through (lens_fx.wgsl).
+            self.timers.draws(&device, cmd, "scene.lenses");
+            self.lens_fx
+                .draw(&device, cmd, self.layouts.water, self.water_set);
             self.timers.end(&device, cmd);
 
             self.timers.draws(&device, cmd, "scene.rings");

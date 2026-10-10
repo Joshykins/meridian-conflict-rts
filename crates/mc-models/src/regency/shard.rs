@@ -1,4 +1,5 @@
-//! A shard: one of the engine's great blades. A faceted core of dark graphite works, keeled
+//! A shard: one of the Regency's gravitic blades, the Fallen's great crown (`gravitic_engine`)
+//! and the Lens's legs (`gravitic_lens`), drawn at any size by its `scale`. A faceted core of dark graphite works, keeled
 //! along its back and drawn to a sharp edge either side, its point leaning off to one side
 //! like a broken blade. Dark plates are laid up its back in overlapping courses, each
 //! pitched so its upper end stands proud, its point a spike; a graphite rib shows under
@@ -8,13 +9,17 @@
 
 use glam::Vec3;
 
-use crate::builder::MeshBuilder;
+use crate::builder::{hash_unit, MeshBuilder};
 use crate::material::PLATING_DARK;
 use crate::pattern;
 
-use super::super::kit::{dark_plate, metal, nanite_plate};
-use super::super::machine::{armour, collar, swept, Frame};
-use super::jitter;
+use super::kit::{dark_plate, metal, nanite_plate};
+use super::machine::{armour, collar, swept, Frame};
+
+/// A number from -1 to 1 for `seed`.
+pub(super) fn jitter(seed: u32) -> f32 {
+    hash_unit(0x6a71, seed) * 2.0 - 1.0
+}
 
 /// How a shard narrows up its length: `(t, width, sideways)`, `t` from foot (0) to point
 /// (1); the width as a share of its foot's, and how far its middle has moved toward the
@@ -49,6 +54,9 @@ pub(super) struct Shard {
     /// Courses of plate up its back.
     pub(super) plates: usize,
     pub(super) seed: u32,
+    /// Its size against the Fallen's (1): the plates' thickness and how far they stand
+    /// off it, and the smallest plate it lays, go with it.
+    pub(super) scale: f32,
 }
 
 impl Shard {
@@ -189,7 +197,7 @@ impl Shard {
                     [self.depth * 0.25, self.half * 0.06],
                     [self.depth * 0.25, -self.half * 0.06],
                 ],
-                0.8,
+                0.8 * self.scale,
             );
         }
         // The hinge it would open on.
@@ -233,7 +241,7 @@ impl Shard {
         let mid1 = (r1[i] + r1[j]) * 0.5;
         let along = mid1 - mid0;
         let width = (a - c).length().min((r1[i] - r1[j]).length() * 1.6);
-        if width < 1.0 || along.length() < 1.0 {
+        if width < self.scale || along.length() < self.scale {
             return None;
         }
         let u = along.normalize();
@@ -258,7 +266,7 @@ impl Shard {
         } else {
             self.plates.div_ceil(2)
         };
-        let thick = (self.depth * 0.16).clamp(0.6, 1.6);
+        let thick = (self.depth * 0.16).clamp(0.6 * self.scale, 1.6 * self.scale);
         for k in 0..count {
             let t0 = 0.1 + 0.78 * k as f32 / count as f32;
             let t1 = 0.1 + 0.78 * (k + 1) as f32 / count as f32;
@@ -271,7 +279,7 @@ impl Shard {
                 }
                 let tip = 0.5 * jitter(self.seed * 31 + k as u32 * 7 + s as u32);
                 let lean = 0.035 + 0.02 * jitter(self.seed * 17 + k as u32);
-                let rib = self.plate(b, (KEEL, sh), (t0, t1), 0.25, lean, thick, tip);
+                let rib = self.plate(b, (KEEL, sh), (t0, t1), 0.25 * self.scale, lean, thick, tip);
                 if let (Some((a, c)), true) = (rib, b.fine()) {
                     metal(b);
                     let sides = b.sides(6);
@@ -284,21 +292,21 @@ impl Shard {
     /// Plates down its flanks, between the back and the edge, staggered against the back's.
     fn flank_plates(&self, b: &mut MeshBuilder) {
         let count = if b.fine() { self.plates + 1 } else { 1 };
-        let thick = (self.depth * 0.12).clamp(0.5, 1.2);
+        let thick = (self.depth * 0.12).clamp(0.5 * self.scale, 1.2 * self.scale);
         dark_plate(b);
         for k in 0..count {
             let t0 = 0.05 + 0.7 * (k as f32 + 0.5) / count as f32;
             let t1 = t0 + 0.72 / count as f32;
             for &sh in &SHOULDER {
                 let e = if sh == SHOULDER[0] { EDGE[0] } else { EDGE[1] };
-                self.plate(b, (sh, e), (t0, t1), 0.2, 0.05, thick, 0.7);
+                self.plate(b, (sh, e), (t0, t1), 0.2 * self.scale, 0.05, thick, 0.7);
             }
         }
     }
 
     /// Glazed plates on its inner faces, the held energy showing through them.
     fn inner_plates(&self, b: &mut MeshBuilder) {
-        let thick = (self.depth * 0.1).clamp(0.5, 1.0);
+        let thick = (self.depth * 0.1).clamp(0.5 * self.scale, self.scale);
         nanite_plate(b);
         let spans: &[(f32, f32)] = if b.fine() {
             &[(0.08, 0.4), (0.44, 0.74)]
@@ -307,7 +315,7 @@ impl Shard {
         };
         for &span in spans {
             for e in EDGE {
-                self.plate(b, (e, INNER), span, 0.15, 0.0, thick, 0.0);
+                self.plate(b, (e, INNER), span, 0.15 * self.scale, 0.0, thick, 0.0);
             }
         }
     }

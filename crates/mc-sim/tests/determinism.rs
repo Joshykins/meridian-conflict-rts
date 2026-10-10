@@ -246,6 +246,9 @@ fn setup(w: &mut World) {
                 // its well holds over the south across the snapshot, crushing, slowing and
                 // tearing aircraft down (`gravitic.rs`); a store of energy pays for it.
                 add("regency_t5_gravitic_engine", 1, 1200, 1900);
+                // The Regency gravitic lens: it plants, its front runs out to one of the
+                // south's army and a well holds on it, crushing and slowing (`lens.rs`).
+                add("regency_t3_gravitic_lens", 1, 700, 1250);
             }
         }
     }
@@ -531,6 +534,7 @@ fn reference() -> Vec<u64> {
     let mut platforms = 0;
     let mut dashes = 0;
     let mut bolts = 0;
+    let mut lens_strikes = 0;
     let hashes = (1..TICKS)
         .map(|t| {
             let commands = script(&mut w, t);
@@ -591,6 +595,7 @@ fn reference() -> Vec<u64> {
                     }
                     mc_sim::SimEvent::DashLanded { .. } => dashes += 1,
                     mc_sim::SimEvent::CloudBolt { .. } => bolts += 1,
+                    mc_sim::SimEvent::LensStruck { .. } => lens_strikes += 1,
                     _ => {}
                 }
             }
@@ -609,6 +614,8 @@ fn reference() -> Vec<u64> {
     assert!(bolts > 0, "no storm cloud let a bolt fall");
     // The Seraph dashed into the south's army.
     assert!(dashes > 0, "the Seraph never dashed");
+    // The lens's front struck and its well opened.
+    assert!(lens_strikes > 0, "the gravitic lens never struck");
     // The elevator's first platform brought its queue down after the snapshot.
     assert!(platforms > 0, "no elevator platform docked with units");
     // City blocks took shots, caught fire and came down.

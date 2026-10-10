@@ -15,6 +15,8 @@
 //!
 //! Like the giants' far sounds (`titan.rs`), the big moments carry across the map at once,
 //! without the real lag of sound: the launch and, loudest, the strike.
+//!
+//! The gravitic lens, The Fallen's small cousin, is heard alongside (`lens.rs`).
 
 use super::held::Held;
 use super::Audio;
@@ -114,6 +116,8 @@ pub(crate) struct GraviticSounds {
     engines: HashMap<u32, (u32, u64)>,
     generation: Option<u32>,
     tick: u64,
+    /// Gravitic lenses' fronts, strikes and wells.
+    lens: super::lens::LensSounds,
 }
 
 impl GraviticSounds {
@@ -196,10 +200,14 @@ impl GraviticSounds {
             audio.play_world(sound, gain.min(1.0), pan, 1.0);
         }
 
-        let (held, loops) = wanted(&frame.wells, &mut ids, |at, reach| {
+        let (held, mut loops) = wanted(&frame.wells, &mut ids, |at, reach| {
             far(at, reach.unwrap_or(Far(0.0, 1.0)), 1.0)
         });
         audio.set_held(&held);
+        loops.extend(
+            self.lens
+                .tick(frame, blueprints, (&library, generation), audio, &hear),
+        );
         loops
     }
 }

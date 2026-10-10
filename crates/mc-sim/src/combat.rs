@@ -1341,8 +1341,16 @@ impl World {
         // and a shot after sitting idle, start a real charge below once the tube is on.
         // Skip the tick that just began an idle charge (`!cooling` and cooldown
         // already set would be a second start, not this path).
+        // A lens with its front out or its well held is not charging (`lens.rs`).
+        let lens_out = weapon.lens.is_some()
+            && self
+                .state
+                .lenses
+                .iter()
+                .any(|t| t.source == units.id(row) && t.weapon as usize == w);
         if weapon.charge_ticks > 0
             && cooling
+            && !lens_out
             && units.weapon_cooldown[row][w] == weapon.charge_ticks
             && units.weapon_salvo_left[row][w] == 0
         {
@@ -1897,6 +1905,10 @@ impl World {
         let in_reach = gap
             <= self.reach_onto(row, weapon, t.z + t.height / 2, t.moved.xy().length())
             && gap >= weapon.range_min - t.radius * 2;
+        // A lens holding its link fires nothing more until it lets go (`lens.rs`).
+        if weapon.lens.is_some() && self.lens_holding(row, w) {
+            return Ok(());
+        }
         let units = &mut self.state.units;
         if !(aligned && pitched_on && !hidden) || units.weapon_cooldown[row][w] > 0 {
             return Ok(());
@@ -2072,6 +2084,7 @@ impl World {
             .filter(|p| !weapon.fixed_rack && (w == 0 || weapon.mount || Some(*p) == arm));
 
         let mut wakes = Vec::new();
+        let mut latch = None;
         for i in 0..volley {
             let tube = first_tube + i as usize;
             let (aim, aim_z) = if stroke.is_some() {
@@ -2381,6 +2394,10 @@ impl World {
                 // A cone weapon's shot flies nowhere: its wake rolls out over the fan,
                 // let go once the loop lets go of the unit tables (`wake.rs`).
                 wakes.push((muzzle, facing));
+            } else if weapon.lens.is_some() {
+                // A lens fires no round: its front runs out to the unit it shot at, let
+                // go once the loop lets go of the unit tables (`lens.rs`).
+                latch = t.unit.map(|u| (muzzle, u));
             } else {
                 self.state.projectiles.spawn(
                     muzzle,
@@ -2468,6 +2485,9 @@ impl World {
         }
         for (muzzle, facing) in wakes {
             self.wake(row, w, muzzle, facing);
+        }
+        if let Some((muzzle, target)) = latch {
+            self.launch_lens(row, w, muzzle, target);
         }
         if weapon.split && t.unit.is_some() {
             self.split_target(row, w);

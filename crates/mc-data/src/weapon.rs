@@ -3,7 +3,7 @@
 use mc_core::{Angle, Fx, FxVec3};
 
 use crate::{
-    Bore, CloudSeed, Cluster, Cone, PlasmaGrade, Sabot, Strafe, Trajectory, WeaponColor,
+    Bore, CloudSeed, Cluster, Cone, Lens, PlasmaGrade, Sabot, Strafe, Trajectory, WeaponColor,
     WeaponSounds,
 };
 
@@ -247,6 +247,9 @@ pub struct Weapon {
     /// A cone weapon (`RawWeapon::cone`): each shot strikes everything it may shoot in the
     /// fan ahead of the gun at once (`combat::wake`), and nothing flies.
     pub cone: Option<Cone>,
+    /// A gravitic lens (`RawWeapon::lens`): firing sends a front of gravity out to the
+    /// target that opens a well on it where it strikes (`lens.rs`); no round flies.
+    pub lens: Option<Lens>,
     /// A strafing beam (`RawWeapon::strafe`): fixed in the hull, it rakes a line over the
     /// ground through its mark as the aircraft flies its run (`strafe.rs`).
     pub strafe: Option<Strafe>,

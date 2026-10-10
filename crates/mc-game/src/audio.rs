@@ -29,6 +29,7 @@ pub(crate) mod flight;
 pub(crate) mod gravitic;
 pub(crate) mod held;
 pub(crate) mod intercept;
+mod lens;
 pub(crate) mod listener;
 pub mod music;
 pub(crate) mod rounds;

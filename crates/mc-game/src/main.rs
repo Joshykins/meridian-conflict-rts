@@ -96,6 +96,7 @@ straight into a match instead.
                          its upkeep asks for) | elevator (a space elevator with tanks,
                          gunships and tech 4s queued for its first platform)
                          | dash (a pack of red tanks for a unit that dashes, the Seraph)
+                         | pack (a pack of red tanks for a gravitic lens to hold and crush)
                          | fracture (a gravitic engine turned at once on a red camp 2 km
                          down the range: tanks, power plants and gunships)
                          | fracture-release (the same, then the engine falters for 3 s
@@ -348,7 +349,7 @@ fn run() -> Result<(), String> {
             a if unit_shot::flag(&mut unit_shot, a, &mut value)? => {}
             "--afloat" => opts.afloat = true,
             "--hurt" => opts.hurt = value("--hurt")?.parse::<i16>().ok().filter(|p| (0..100).contains(p)).ok_or("--hurt takes a percentage under 100")? * 10,
-            "--scenario" => opts.scenario = Some(range::Scenario::parse(&value("--scenario")?).ok_or("--scenario takes under-fire, close, targets, build, work, salvage, upgrade, march, turn, destruct, lift, warp, warp-dampened, pause, short, elevator, dash, fracture or fracture-release")?),
+            "--scenario" => opts.scenario = Some(range::Scenario::parse(&value("--scenario")?).ok_or("--scenario takes under-fire, close, targets, build, work, salvage, upgrade, march, turn, destruct, lift, warp, warp-dampened, pause, short, elevator, dash, pack, fracture or fracture-release")?),
             "--players" => opts.players = value("--players")?.parse().map_err(|_| "--players takes a number")?,
             "--teams" => opts.teams = value("--teams")?.parse().map_err(|_| "--teams takes a number")?,
             "--army" => opts.army = value("--army")?.parse().map_err(|_| "--army takes a number")?,

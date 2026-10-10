@@ -523,6 +523,7 @@ impl SoundLibrary {
                     &s.hold,
                     &s.flight,
                     &s.split,
+                    &s.release,
                 ]
                 .into_iter()
                 .flatten()

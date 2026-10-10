@@ -590,6 +590,21 @@ shared! {
         pub const SLIDE_START: f32 = 0.75;
     }
 
+    /// A many-legged walker that braces to fire (`models::Crawl::brace`, crawl.wgsl
+    /// `crawl_brace_foot`, `crawl_brace_sink`), authored braced. Planting, its legs lift
+    /// and step out one after another, left before right and front to back, from where they
+    /// stand packed to their braced feet; then its body settles down between them, the
+    /// legs folding at the knees over their planted feet. Packing runs it the other way.
+    /// Shares are of the deploy (`UnitInstance::deploy`).
+    pub mod crawl_brace as "BRACE_" {
+        /// Its slot in `ModelInfo::crawl`: the last (`CRAWL_SLOTS`).
+        pub const SLOT: u32 = 21;
+        /// How long each leg's step takes; the last step ends as the body starts down.
+        pub const STEP_LEN: f32 = 0.3;
+        pub const SINK_START: f32 = 0.6;
+        pub const SINK_END: f32 = 1.0;
+    }
+
     /// A VTOL's pods standing up and lying down with the hull's lean (`models::vtol_tilt`,
     /// entity.wgsl `vtol_tilt`).
     pub mod vtol as "VTOL_" {
@@ -1391,6 +1406,39 @@ shared! {
         pub const SETTLE: f32 = 0.35;
         /// Seconds the front takes to break up once it has run out, rolling on as it slows.
         pub const BREAK: f32 = 0.6;
+    }
+
+    /// A gravitic lens at work, the Lodestone's (renderer/lens_fx.rs, lens_fx.wgsl): its
+    /// charge, the front it sends out, and the well it holds on its target.
+    pub mod lens_fx as "LENS_FX_" {
+        /// Lenses drawn at once; past it the oldest goes first (`lens_fx`).
+        pub const MAX_LENSES: u32 = 32;
+        /// The well's ground disc: rings out from its middle and segments round it.
+        pub const RINGS: u32 = 28;
+        pub const SEGMENTS: u32 = 72;
+        /// The low dome over the well: rings up from its foot to its crown.
+        pub const DOME_RINGS: u32 = 12;
+        /// The dome stands this share of the well's radius high at its crown.
+        pub const DOME_HEIGHT: f32 = 0.3;
+        /// The ground disc reaches this many well radii, room for the release pulse.
+        pub const DISC_REACH: f32 = 1.5;
+        /// Ribbons a lens draws (the rippled air behind its front, the thread to its
+        /// well) and the quads along each.
+        pub const RIBBONS: u32 = 2;
+        pub const RIBBON_QUADS: u32 = 24;
+        /// Billboards a lens draws (its charge or its front, the strike's core, and the
+        /// snap of bent air as it lets go).
+        pub const BALLS: u32 = 3;
+        /// Grit circling low in a held well, each an eight-faced chip.
+        pub const SHARDS: u32 = 22;
+        /// Seconds: the strike's ring closing in, the dark flash after it, the well
+        /// letting go, and its pressed ring left fading on the ground.
+        pub const IMPLODE: f32 = 0.22;
+        pub const FLASH: f32 = 0.35;
+        pub const RELEASE: f32 = 0.8;
+        pub const PRINT: f32 = 8.0;
+        /// Metres of rippled air left behind a running front at most.
+        pub const CORRIDOR: f32 = 70.0;
     }
 
     /// A twin gun on a walker's arm that kicks on its own shots (`mc_sim::mirror::UNIT_TWIN_*`

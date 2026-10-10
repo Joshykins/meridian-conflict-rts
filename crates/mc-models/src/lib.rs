@@ -512,8 +512,9 @@ pub const MAX_CRAWL_PAIRS: usize = 4;
 /// Most joints a many-legged walker's tail can have (`Crawl::tail_joints`).
 pub const MAX_TAIL_JOINTS: usize = 12;
 /// `ModelInfo::crawl`'s length in vec4s: the header, three per leg pair, two joints of the
-/// tail per vec4, and the pincers' shoulder and jaw hinge.
-pub const CRAWL_SLOTS: usize = 1 + 3 * MAX_CRAWL_PAIRS + MAX_TAIL_JOINTS / 2 + 2;
+/// tail per vec4, the pincers' shoulder and jaw hinge, and the brace (`Crawl::brace`).
+pub const CRAWL_SLOTS: usize = 1 + 3 * MAX_CRAWL_PAIRS + MAX_TAIL_JOINTS / 2 + 2 + 1;
+const _: () = assert!(gpu_consts::crawl_brace::SLOT as usize == CRAWL_SLOTS - 1);
 
 /// A many-legged walker (the Regency commander): each left leg's joints at rest, the right
 /// one its mirror. A leg's bones swing in the vertical plane through its hip and foot, and
@@ -546,6 +547,11 @@ pub struct Crawl {
     /// both halves of it walk in step, at its own phase (a tripod's third leg).
     #[serde(default)]
     pub lone: Option<usize>,
+    /// A walker that braces to fire (`MeshBuilder::set_crawl_brace`, `gpu_consts::crawl_brace`),
+    /// authored braced: packed, how much higher its body rides (metres), and what share of
+    /// the way in from its planted feet to its hips its feet stand. None: it never braces.
+    #[serde(default)]
+    pub brace: Option<[f32; 2]>,
 }
 
 impl Crawl {
@@ -553,7 +559,7 @@ impl Crawl {
     /// tail joint count; then per pair hip (w: phase), knee (w: 1 for a lone leg), ankle (w: stance); then the tail's joints,
     /// two to a vec4 (x, z, x, z); then the pincer's shoulder (w: 1 when there are pincers)
     /// and its jaw hinge (w: the left pincer's weapon slot plus one, and the right's plus
-    /// one times 16; zero for none).
+    /// one times 16; zero for none); last the brace's sink and widen (zero for none).
     pub fn gpu(&self) -> [[f32; 4]; CRAWL_SLOTS] {
         let mut out = [[0.0; 4]; CRAWL_SLOTS];
         out[0] = [
@@ -581,6 +587,9 @@ impl Crawl {
                 .throws
                 .map_or(0.0, |[l, r]| (l as u32 + 1 + 16 * (r as u32 + 1)) as f32);
             out[at + 1] = [hinge[0], hinge[1], hinge[2], throws];
+        }
+        if let Some([sink, widen]) = self.brace {
+            out[CRAWL_SLOTS - 1] = [sink, widen, 0.0, 0.0];
         }
         out
     }

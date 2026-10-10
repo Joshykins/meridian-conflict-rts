@@ -38,6 +38,7 @@ fn every_unit_can_be_the_subject() {
             Scenario::Short,
             Scenario::Elevator,
             Scenario::Dash,
+            Scenario::Pack,
             Scenario::Fracture,
             Scenario::FractureLetGo
         ],
@@ -58,6 +59,7 @@ fn every_unit_can_be_the_subject() {
             Scenario::Short,
             Scenario::Elevator,
             Scenario::Dash,
+            Scenario::Pack,
             Scenario::Fracture,
             Scenario::FractureLetGo
         ],

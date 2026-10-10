@@ -98,6 +98,9 @@ pub struct State {
     /// Cone weapons' wakes rolling out over the ground (`wake.rs`).
     #[serde(default)]
     pub wakes: Vec<crate::wake::Wake>,
+    /// Gravitic lenses' links and the wells they hold on their targets (`lens.rs`).
+    #[serde(default)]
+    pub lenses: Vec<crate::lens::Tether>,
     /// Poured lots under structures. They stay after the building dies.
     #[serde(default)]
     pub pads: Pads,
@@ -431,6 +434,7 @@ impl World {
             sabots: Vec::new(),
             wells: Vec::new(),
             wakes: Vec::new(),
+            lenses: Vec::new(),
             pads: Pads::default(),
             terrain_edits: Vec::new(),
             props_dead: vec![0; map.props.len().div_ceil(64)],
@@ -818,6 +822,10 @@ impl World {
         if !self.state.wakes.is_empty() {
             let _t = mc_core::perf_span!("fn.run_wakes");
             self.run_wakes();
+        }
+        if !self.state.lenses.is_empty() {
+            let _t = mc_core::perf_span!("fn.run_lenses");
+            self.run_lenses();
         }
         phase(&mut self.timings, "weapons");
 

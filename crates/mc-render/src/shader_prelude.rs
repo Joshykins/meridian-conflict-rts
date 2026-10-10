@@ -10,10 +10,10 @@
 //! shader that binds the atmosphere itself and says `//!use regions`); then `shore`, `habitat`, `streets`, `desert`, `rock`, `scars`, `surface`,
 //! `metal`, `regency`, `scenery`, `warp_hull`, `warp_puffs`, `plasma_puffs`, `gravity_puffs` and `storm_puffs` for their own `//!use` lines, in that order,
 //! then `emp` (an EMP stun's look on a model), `wreck` (how a wreck lies and looks) and
-//! `flight` (a winged flier's rig).
+//! `flight` (a winged flier's rig) and `crawl` (a many-legged walker's legs).
 
 /// Files put in front of shaders, never compiled on their own.
-pub(crate) const PRELUDES: [&str; 25] = [
+pub(crate) const PRELUDES: [&str; 26] = [
     "common",
     "bindings",
     "regions",
@@ -39,6 +39,7 @@ pub(crate) const PRELUDES: [&str; 25] = [
     "wreck",
     "nova",
     "flight",
+    "crawl",
 ];
 
 /// The prelude files' text.
@@ -66,6 +67,7 @@ pub(crate) struct Preludes {
     wreck: String,
     nova: String,
     flight: String,
+    crawl: String,
 }
 
 impl Preludes {
@@ -103,6 +105,7 @@ impl Preludes {
             wreck: read("wreck"),
             nova: read("nova"),
             flight: read("flight"),
+            crawl: read("crawl"),
         }
     }
 
@@ -197,6 +200,10 @@ impl Preludes {
         // A winged flier's wings, legs and lean (entity.wgsl; needs common).
         if uses("flight") {
             prelude = format!("{prelude}\n{}", self.flight);
+        }
+        // A many-legged walker's legs and brace (entity.wgsl; needs bindings).
+        if uses("crawl") {
+            prelude = format!("{prelude}\n{}", self.crawl);
         }
         let lines = prelude.lines().count() + 1;
         (format!("{prelude}\n{body}"), lines)

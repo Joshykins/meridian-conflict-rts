@@ -10,8 +10,8 @@ use crate::builder::MeshBuilder;
 
 use super::super::kit::{cable, dark_plate, metal, v3};
 use super::super::machine::{armour, collar, strut, swept, Frame};
+use super::super::shard::Shard;
 use super::footing;
-use super::shard::Shard;
 
 /// A gantry from shard `a` to shard `c`: a plated girder edge to edge at each of `levels`
 /// (heights), a conduit under each, a diagonal from each level up to the next, and a

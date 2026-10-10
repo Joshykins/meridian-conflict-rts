@@ -613,6 +613,19 @@ impl RawCone {
     }
 }
 
+/// A gravitic lens (the Regency's tech 3 lens): its shot is no round but a front of
+/// gravity that runs out to its target at the weapon's `speed`, following it, and opens a
+/// well `radius` metres round it where it strikes. The well sits on the target, wherever
+/// it goes, until the target dies, leaves the gun's range or the gun lets go. Everything
+/// of the enemy's in it (never aircraft) takes the weapon's `damage` a second and keeps
+/// `slow` of its speed, the same anywhere in it and however long it is held.
+#[derive(Deserialize, Clone, Copy)]
+#[serde(deny_unknown_fields)]
+pub struct RawLens {
+    pub radius: f64,
+    pub slow: f64,
+}
+
 /// A strafing beam: held beams fixed in an aircraft's hull, one from each of its
 /// `muzzles` (port and starboard), laid down along the nose so each lands `ahead` metres
 /// in front of the hull, `gap` metres apart, toed out from the muzzles. On a run the beams come on as where they
@@ -1294,6 +1307,9 @@ pub struct RawWeapon {
     /// A cone weapon: every shot strikes all it may shoot in a fan ahead (`RawCone`).
     #[serde(default)]
     pub cone: Option<RawCone>,
+    /// A gravitic lens: holds a gravity well on its target (`RawLens`).
+    #[serde(default)]
+    pub lens: Option<RawLens>,
     /// A strafing beam (`RawStrafe`).
     #[serde(default)]
     pub strafe: Option<RawStrafe>,
@@ -1357,18 +1373,23 @@ pub struct WeaponSounds {
     pub whir: Option<String>,
     /// A rotary gun's barrels coasting down with nothing left to shoot.
     pub spindown: Option<String>,
-    /// A held beam's loop (`beam`), heard while it fires in place of `fire`.
+    /// A held beam's loop (`beam`), heard while it fires in place of `fire`; a gravitic
+    /// lens's (`lens`) well, heard on it while it holds.
     pub hold: Option<String>,
     /// The hit as heard from far across the map, late by the distance: only for the
     /// biggest guns. Near the camera `impact`/`ground` plays instead.
     pub far: Option<String>,
-    /// The shot striking a unit, and striking the ground (`impact` if left out).
+    /// The shot striking a unit, and striking the ground (`impact` if left out); a
+    /// gravitic lens's front striking its target.
     pub impact: Option<String>,
     pub ground: Option<String>,
     /// A spent casing (`sabot`) landing. None: the `ground` sound.
     pub casing: Option<String>,
-    /// A loop heard from each shot while it flies: a cruise missile's motor.
+    /// A loop heard from each shot while it flies: a cruise missile's motor, a gravitic
+    /// lens's front.
     pub flight: Option<String>,
+    /// A gravitic lens's well let go (`LensReleased`), heard where it collapses.
+    pub release: Option<String>,
     /// A cluster shot (`cluster`) breaking into its sub-shots, heard where it splits.
     pub split: Option<String>,
     /// An orb battery (`orbs`) making a batch of orbs, heard at the gun.
@@ -1875,6 +1896,23 @@ impl Unit {
                     "{ctx}: a cone is a hitscan direct shot with no splash, beam or bore"
                 )));
             }
+            if w.lens
+                .is_some_and(|l| l.radius <= 0.0 || !(0.0..=1.0).contains(&l.slow))
+                || w.lens.is_some()
+                    && (w.hitscan
+                        || w.trajectory != Trajectory::Direct
+                        || w.missile
+                        || w.beam
+                        || w.torpedo
+                        || w.bore.is_some()
+                        || w.cone.is_some()
+                        || w.splash > 0.0)
+            {
+                return Err(DataError::Invalid(format!(
+                    "{ctx}: a lens is a direct shot with a speed and no splash, beam, bore or \
+                     cone, a radius over zero and 0 <= slow <= 1"
+                )));
+            }
             if w.dash_only && w.cone.is_none() {
                 return Err(DataError::Invalid(format!(
                     "{ctx}: a dash_only weapon is a cone, let go at the unit's feet as it lands"
@@ -2058,6 +2096,10 @@ impl Unit {
                     edge: fx(c.edge.clamp(0.0, 1.0)),
                     speed: fx(c.speed.clamp(10.0, 2000.0)),
                     stun_ticks: ticks(c.stun.clamp(0.0, 60.0)) as u16,
+                }),
+                lens: w.lens.map(|l| crate::Lens {
+                    radius: fx(l.radius),
+                    slow: fx(l.slow),
                 }),
                 sabot: match &w.sabot {
                     Some(s) => {

@@ -243,6 +243,14 @@ pub struct Cone {
     pub stun_ticks: u16,
 }
 
+/// A gravitic lens's well (`RawLens`): `radius` round its target; what is in it keeps
+/// `slow` of its speed.
+#[derive(Clone, Copy, Debug)]
+pub struct Lens {
+    pub radius: Fx,
+    pub slow: Fx,
+}
+
 /// A strafing beam's stroke (`RawStrafe`): it lands `ahead` of the hull along the nose,
 /// and rakes the ground while its mark is within `half` of where it lands. The beams land
 /// `gap` apart, side by side.
@@ -1822,6 +1830,10 @@ impl Blueprints {
                         h.write_i64(v.0);
                     }
                     h.write_u64(s.casing.0 as u64);
+                }
+                if let Some(l) = w.lens {
+                    h.write_i64(l.radius.0);
+                    h.write_i64(l.slow.0);
                 }
                 if let Some(c) = w.cone {
                     h.write_u64(c.half.0 as u64);
