@@ -921,7 +921,7 @@ impl World {
             };
             let ok = |p: FxVec2| {
                 if motion.passes_over() {
-                    return self.passing_footing(&motion, p);
+                    return self.passing_footing(motion, p);
                 }
                 if self.nav.passable(motion.layer, motion.size_class, p) {
                     return true;
