@@ -57,3 +57,47 @@ fn walks_on_four_shards_and_braces() {
         );
     }
 }
+
+/// Walking (packed), every foot stays where its two bones can put it, all through its
+/// step as crawl.wgsl `crawl_leg` moves it (planted and passing back, then lifted and
+/// swung forward), and never sweeps far round its hip. A foot nearer its hip than the
+/// shin's length less the thigh's folds the leg and throws the shard down flat.
+#[test]
+fn every_step_is_in_reach() {
+    let reach = legs::STANCE * legs::STRIDE;
+    for &(hip, knee, foot, _) in &legs::CRAWL {
+        let (thigh, shin) = ((knee - hip).length(), (foot - knee).length());
+        let lifted = hip + Vec3::Z * legs::SINK;
+        let rest = hip.with_z(0.0) + (foot - hip.with_z(0.0)) * (1.0 - legs::WIDEN);
+        let mut sweep = (f32::MAX, f32::MIN);
+        for i in 0..100 {
+            let phase = i as f32 / 100.0;
+            let step = if phase < legs::STANCE {
+                Vec3::X * reach * (0.5 - phase / legs::STANCE)
+            } else {
+                let u = (phase - legs::STANCE) / (1.0 - legs::STANCE);
+                let advance = reach * (u * u * (3.0 - 2.0 * u) - 0.5)
+                    - legs::STRIDE * (1.0 - legs::STANCE) * (2.0 * u * u * u - 3.0 * u * u + u);
+                Vec3::new(
+                    advance,
+                    0.0,
+                    legs::LIFT * (u * std::f32::consts::PI).sin().powi(2),
+                )
+            };
+            let at = rest + step;
+            let d = (at - lifted).length();
+            assert!(
+                d > shin - thigh + 0.3 && d < shin + thigh - 0.3,
+                "at {phase} of its step a foot is {d} m from its hip; the leg reaches {}..{} m",
+                shin - thigh,
+                shin + thigh
+            );
+            let az = (at.y - hip.y).atan2((at.x - hip.x).abs()).to_degrees();
+            sweep = (sweep.0.min(az), sweep.1.max(az));
+        }
+        assert!(
+            sweep.1 - sweep.0 < 55.0,
+            "a foot sweeps {sweep:?} degrees round its hip"
+        );
+    }
+}

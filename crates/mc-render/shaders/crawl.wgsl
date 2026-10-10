@@ -47,7 +47,7 @@ fn crawl_contact(foot: vec2<f32>, advance: f32, travel: vec2<f32>, turn: f32,
 // and the bones are solved in it. `body` is
 // how far the hips ride off their rest (the body's bob and the ground under it).
 fn crawl_leg(pos: vec3<f32>, normal: vec3<f32>, limb: u32, pair: u32, model: ModelInfo,
-             walk: vec2<f32>, e: Entity, t: f32, body: vec3<f32>) -> array<vec3<f32>, 2> {
+             walk: vec2<f32>, e: Entity, t: f32, body: vec3<f32>, sway: Stance) -> array<vec3<f32>, 2> {
     let left = pos.y > 0.0;
     let flip = vec3<f32>(1.0, select(-1.0, 1.0, left), 1.0);
     let hip0 = model.crawl[1u + 3u * pair].xyz * flip;
@@ -87,7 +87,10 @@ fn crawl_leg(pos: vec3<f32>, normal: vec3<f32>, limb: u32, pair: u32, model: Mod
     let contact = crawl_contact(rest.xy, step.x * walk.x, local_travel, turn, e.gait.y);
     let ground = terrain_height(at + fwd * contact.x + lft * contact.y) - terrain_height(at);
     let foot = vec3<f32>(contact.xy, rest.z + step.y * walk.x + ground);
-    let hip = hip0 + body;
+    // The hip rides the body's roll and nod (`crawl_sway`) as well as its bob.
+    let hips = vec3<f32>(0.0, 0.0, model.leg_hip.z);
+    let hip = rot_x(rot_xz(hip0 - hips, sway.nod), sway.body.x) + hips
+        + vec3<f32>(0.0, sway.body.y, sway.body.z) + body;
 
     // The leg's plane at rest and now, and the bones in it: r out from the hip, z up.
     let az0 = atan2(foot0.y - hip0.y, foot0.x - hip0.x);
@@ -123,6 +126,39 @@ fn crawl_leg(pos: vec3<f32>, normal: vec3<f32>, limb: u32, pair: u32, model: Mod
         m = rot_xz(m, turn);
     }
     return array<vec3<f32>, 2>(rot_z(q, az) + hip, rot_z(m, az));
+}
+
+// A heavy many-legged walker's body with its stride (`Legs::sway`): it shifts and rolls
+// over the side whose feet are down, and as each foot lands it settles onto it and dips
+// toward it, nose for a front foot, tail for a back one. Read by the body as a two-legged
+// walker's `stride_sway` is, and by the hips (`crawl_leg`) so they stay on the legs.
+fn crawl_sway(at_ease: Stance, model: ModelInfo, walk: vec2<f32>) -> Stance {
+    var s = at_ease;
+    let pairs = u32(model.crawl[0].x + 0.5);
+    var mean = 0.0;
+    var land = 0.0;
+    var nod = 0.0;
+    for (var p = 0u; p < pairs; p++) {
+        let offset = model.crawl[1u + 3u * p].w;
+        let stance = model.crawl[3u + 3u * p].w;
+        mean += offset + 0.5 * (1.0 + stance);
+        // Front of the middle or behind it: which way the landing tips the body.
+        let fore = sign(model.crawl[1u + 3u * p].x);
+        for (var side = 0u; side < 2u; side++) {
+            // The weight comes onto the foot over the first eighth of its cycle.
+            let ph = fract(walk.y - offset + 0.5 * f32(side));
+            let pulse = select(0.0, sin(PI * ph / 0.125), ph < 0.125);
+            land += pulse;
+            nod += pulse * fore;
+        }
+    }
+    // +1 with the right feet lifting (the left loaded), -1 with the left.
+    let load = -cos((walk.y - mean / f32(max(pairs, 1u))) * 2.0 * PI);
+    s.body.x += model.leg_sway.x * load * walk.x;
+    s.body.y += model.leg_sway.x * model.leg_hip.z * load * walk.x;
+    s.body.z -= model.leg_sway.z * min(land, 1.0) * walk.x;
+    s.nod -= model.leg_sway.y * nod * walk.x;
+    return s;
 }
 
 // How busy a many-legged walker is, zero at rest to one fighting or building: its tail

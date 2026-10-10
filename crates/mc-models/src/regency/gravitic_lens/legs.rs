@@ -15,21 +15,31 @@ use super::super::kit::{dark_plate, metal};
 use super::super::shard::Shard;
 
 /// The left legs, front and back: hip, knee, the foot's middle on the ground, and where in
-/// the cycle it lifts.
+/// the cycle it lands. A heavy walk, one foot at a time and three always down: back left,
+/// front left, back right, front right, a quarter of a cycle apart (the right legs land
+/// half a cycle after their left).
 pub(super) const CRAWL: [(Vec3, Vec3, Vec3, f32); 2] = [
     (
         Vec3::new(2.0, 2.0, 2.0),
-        Vec3::new(0.8, 0.8, 6.6),
-        Vec3::new(5.4, 5.4, 0.0),
-        0.0,
+        Vec3::new(1.28, 0.62, 6.6),
+        Vec3::new(4.6, 7.0, 0.0),
+        0.125,
     ),
     (
         Vec3::new(-2.0, 2.0, 2.0),
-        Vec3::new(-0.8, 0.8, 6.6),
-        Vec3::new(-5.4, 5.4, 0.0),
-        0.5,
+        Vec3::new(-1.28, 0.62, 6.6),
+        Vec3::new(-4.6, 7.0, 0.0),
+        -0.125,
     ),
 ];
+/// The walk: how far the body goes in one cycle, the share of it each foot stands, and
+/// how high a shard is lifted to step: high enough that each one is seen to step.
+pub(super) const STRIDE: f32 = 7.0;
+pub(super) const STANCE: f32 = 0.75;
+pub(super) const LIFT: f32 = 1.5;
+/// The body's heft (`set_walk_sway`): its roll over the side whose feet are down, its dip
+/// toward each foot as it lands, and how far it settles onto it.
+const SWAY: (f32, f32, f32) = (0.035, 0.03, 0.22);
 /// The shards' size against the Fallen's.
 const SHARD_SCALE: f32 = 0.075;
 /// How far past its knee a shin runs on into its point.
@@ -53,11 +63,12 @@ fn shin(knee: Vec3, foot: Vec3, seed: u32) -> Shard {
 
 /// Packed, how much higher the body rides, and what share nearer its hips the feet stand.
 pub(super) const SINK: f32 = 1.2;
-pub(super) const WIDEN: f32 = 0.2;
+pub(super) const WIDEN: f32 = 0.05;
 
 /// The rig and every leg, at the builder's level of detail.
 pub(super) fn legs(b: &mut MeshBuilder) {
-    b.set_crawl_legs(&CRAWL, 3.0, 0.6, 0.5);
+    b.set_crawl_legs(&CRAWL, STRIDE, STANCE, LIFT);
+    b.set_walk_sway(SWAY.0, SWAY.1, SWAY.2);
     b.set_crawl_brace(SINK, WIDEN);
     b.mirror_y(|b| {
         for (i, &(hip, knee, foot, _)) in CRAWL.iter().enumerate() {

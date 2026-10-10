@@ -1424,9 +1424,13 @@ fn vs_main(in: VsIn) -> VsOut {
         && (e.owner_flags & (KIND_GHOST | FLAG_UNDER_CONSTRUCTION | FLAG_IN_FACTORY)) == 0u {
         stance = idle_stance(e, model, walk, time);
     }
-    if walks && !crawls && any(model.leg_sway.xyz != vec3<f32>(0.0))
+    if walks && any(model.leg_sway.xyz != vec3<f32>(0.0))
         && (e.owner_flags & (KIND_GHOST | FLAG_UNDER_CONSTRUCTION | FLAG_IN_FACTORY)) == 0u {
-        stance = stride_sway(stance, model, walk);
+        if crawls {
+            stance = crawl_sway(stance, model, walk);
+        } else {
+            stance = stride_sway(stance, model, walk);
+        }
     }
     // A winged flier (flight.wgsl): its wings and trailing legs posed from how it moves,
     // its head and lowered arms at ease while it idles.
@@ -2048,7 +2052,7 @@ fn vs_main(in: VsIn) -> VsOut {
             let body = walk_bob(walk, model) + vec3<f32>(0.0, 0.0, footing.ground.z + crawl_set(e, model, t));
             // Clamped to the pairs the model has: `crawl` is a fixed array, never read past it.
             let pair = min((in.rig >> 16u) & 7u, u32(model.crawl[0].x + 0.5) - 1u);
-            let posed = crawl_leg(p, n, limb, min(pair, 3u), model, walk, e, t, body);
+            let posed = crawl_leg(p, n, limb, min(pair, 3u), model, walk, e, t, body, stance);
             p = posed[0];
             n = posed[1];
         } else if in.part == PART_LOCOMOTION && walks && limb != 0u {
