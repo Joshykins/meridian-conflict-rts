@@ -320,6 +320,6 @@ fn a_units_own_income_figure_is_after_its_sides_income_dial() {
     let base = made(&w);
     assert!(base > Fx::ZERO);
     w.state.players[0].income_permille[1] = 3000;
-    w.tick(&[]);
+    w.tick(&[]).unwrap();
     assert_eq!(made(&w), base * 3);
 }
