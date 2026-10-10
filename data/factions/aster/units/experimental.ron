@@ -171,15 +171,16 @@
         motion: (layer: Air, size: 0, speed: 75, accel: 18, turn: 22, altitude: 380, hover: false),
         weapons: [
             (
-                // Eight bolts of 200, each a blast 22 m round, a second apart, from a seed every
-                // second: about 1600 a second while all of them find something under the trail.
+                // Eight bolts of 400, each a blast 26 m round, a second apart, from a seed every
+                // second: 3200 a cloud, about 3200 a second once a run's trail is striking and
+                // every bolt finds something.
                 // The seed leaves from the middle of the dispenser's mouth in the tail.
                 name: "Storm Seeder",
-                damage: 1600, range: 600, reload: 1.0, speed: 100, trajectory: Direct,
+                damage: 3200, range: 600, reload: 1.0, speed: 100, trajectory: Direct,
                 // Nothing turns: the seed always leaves the dispenser's mouth at the tail, so
                 // the mouth is its own pivot, whatever the aim.
                 turret_turn: 720, muzzle: (-46.5, 0, 7.2), pivot: (-46.5, 0, 7.2),
-                cloud: (grow: 7.0, strike: 8.0, bolts: 8, radius: 200, splash: 22),
+                cloud: (grow: 7.0, strike: 8.0, bolts: 8, radius: 200, splash: 26),
                 targets: ["Land", "Naval", "Structure"], color: Blue,
                 flash: 0.0, impact: 2.6, shockwave: 1.6, ion_blast: 26,
                 sounds: (fire: "storm_seed", impact: "storm_bolt", ground: "storm_bolt"),

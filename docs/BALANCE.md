@@ -57,8 +57,9 @@ Off the lines, measured the same way:
   lasers that burn missiles within 680 m (the Argus's). It flies runs like any bomber, and
   while any foe is within 600 m its Storm Seeder lets a cloud go from the tail every second,
   aimed at nothing: a run lays a trail of them. Each hangs about where it was let go, grows
-  for 7 s, then lets eight bolts of 200 (22 m blasts) fall a second apart onto the foes within
-  200 m of it, nearest first. About 1600 dps while every bolt finds something, but late and
+  for 7 s, then lets eight bolts of 400 (26 m blasts) fall a second apart onto the foes within
+  200 m of it, nearest first: 3200 a cloud, about 3200 dps once the trail is striking and
+  every bolt finds something, but late and
   only along its track: what is not under the trail when the clouds are grown is missed (the
   bolts fall on the ground there), and domes take bolts as they take shells. Four small twin
   AA mounts (10 a barrel, both barrels together every 0.5 s, 650 m, past a Sparrow's 480)
