@@ -209,7 +209,7 @@ MERIDIAN_GPU_CRUMBS=1 turns it on for other GPUs whose driver can mark (NVIDIA).
 MERIDIAN_AIM=MODE with --screenshot: an order being aimed at --cursor, with the selection:
 1 a warhead launch, ground a titan's strike, reclaim the Reclaim order, warp a warp jump
 (each ship's exit in formation and the energy card), dash a dash by hand (the wave where
-it would come down).
+it would come down), fracture a gravitic engine's rift (its path and the well at the point).
 
 MERIDIAN_ISSUE_NOTE=TEXT with --screenshot: the F1 report card's note, as if typed.
 
