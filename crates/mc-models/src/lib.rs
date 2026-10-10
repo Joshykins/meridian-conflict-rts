@@ -974,6 +974,7 @@ mod precursor_polar;
 mod precursor_sky;
 mod precursor_tower;
 mod regency;
+pub mod rift_slabs;
 
 #[cfg(test)]
 mod preview;

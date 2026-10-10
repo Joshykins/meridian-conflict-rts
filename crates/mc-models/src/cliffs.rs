@@ -65,12 +65,12 @@ pub(super) const MODELS: &[ModelDef] = &[
 ];
 
 /// A convex solid as its faces, each wound counter-clockwise seen from outside.
-struct Block {
+pub(crate) struct Block {
     faces: Vec<Vec<Vec3>>,
 }
 
 impl Block {
-    fn cuboid(min: Vec3, max: Vec3) -> Self {
+    pub(crate) fn cuboid(min: Vec3, max: Vec3) -> Self {
         let c = |i: u32| {
             Vec3::new(
                 if i & 1 == 0 { min.x } else { max.x },
@@ -93,7 +93,7 @@ impl Block {
 
     /// Cuts away everything on the side of the plane `n·p = d` that `n` points to,
     /// closing the cut with a face of its own.
-    fn cut(&mut self, n: Vec3, d: f32) {
+    pub(crate) fn cut(&mut self, n: Vec3, d: f32) {
         let n = n.normalize();
         let mut cap: Vec<Vec3> = Vec::new();
         let mut kept = Vec::with_capacity(self.faces.len() + 1);
@@ -133,7 +133,7 @@ impl Block {
 
     /// Draws the block's faces; with `buried`, also the back and the underside,
     /// which lie in the wall and are only seen from close by at a rim or a foot.
-    fn emit(&self, b: &mut MeshBuilder, buried: bool) {
+    pub(crate) fn emit(&self, b: &mut MeshBuilder, buried: bool) {
         for face in &self.faces {
             let n = (face[1] - face[0]).cross(face[2] - face[0]);
             if buried || (n.x > -0.5 * n.length() && n.z > -0.5 * n.length()) {
@@ -144,13 +144,13 @@ impl Block {
 }
 
 /// A random number in `lo..hi` from `seed` and a running counter.
-struct Roll {
-    seed: u32,
-    n: u32,
+pub(crate) struct Roll {
+    pub(crate) seed: u32,
+    pub(crate) n: u32,
 }
 
 impl Roll {
-    fn next(&mut self, lo: f32, hi: f32) -> f32 {
+    pub(crate) fn next(&mut self, lo: f32, hi: f32) -> f32 {
         self.n += 1;
         lo + (hi - lo) * hash_unit(self.seed, self.n)
     }
