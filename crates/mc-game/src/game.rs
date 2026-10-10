@@ -379,6 +379,7 @@ pub struct Game {
     stake_sounds: crate::audio::stakes::StakeSounds,
     /// Space elevators' sirens, cable and platform (audio/elevator.rs).
     elevator_sounds: crate::audio::elevator::ElevatorSounds,
+    gravitic_sounds: crate::audio::gravitic::GraviticSounds,
     /// A salvo of strategic missiles heard as one (audio/salvo.rs).
     salvo_sounds: crate::audio::salvo::SalvoAudio,
     /// The score's tension, cues and ending (game_music.rs).
@@ -564,6 +565,7 @@ impl Game {
             giant_sounds: Default::default(),
             stake_sounds: Default::default(),
             elevator_sounds: Default::default(),
+            gravitic_sounds: Default::default(),
             salvo_sounds: Default::default(),
             music: Default::default(),
             music_faction: start
@@ -3732,6 +3734,16 @@ impl Game {
             |p| self.hear(p),
         ));
         self.elevator_sounds = elevators;
+        // Gravitic engines: gatherings, rifts, strikes and wells (audio/gravitic.rs).
+        let mut gravitic = std::mem::take(&mut self.gravitic_sounds);
+        loops.extend(gravitic.tick(
+            &self.view.frame,
+            &self.blueprints,
+            audio,
+            self.camera.focus,
+            |p| self.hear(p),
+        ));
+        self.gravitic_sounds = gravitic;
         // Giant rotary guns' barrels turning (audio/titan.rs).
         loops.extend(self.giant_sounds.loops());
         // Reclaim beams: one loop for all of them, heard from where they bite.
