@@ -5,6 +5,10 @@
 //! and between ticks their light and their plates' heave ease toward that, so nothing
 //! snaps. Let go, a record's light dies over a few seconds and its plates settle, and it
 //! stays as a dark scar until newer breaks push the oldest out.
+//!
+//! A gravitic lens's trail (`rift::TRAIL`, fed by `lens_fx`) shares the records: a narrow
+//! furrow under its front's path, keyed by the lens's unit. Its scar does not stay: let go,
+//! it fades out over `TRAIL_SCAR` seconds and its record is dropped.
 
 use ash::vk;
 use bytemuck::{Pod, Zeroable};
@@ -36,6 +40,8 @@ const LIGHT_DIES: f32 = 2.5;
 const PLATES_SETTLE: f32 = 6.0;
 /// How quickly a fed break's light follows what it is fed (1/s).
 const FOLLOW: f32 = 6.0;
+/// Seconds a lens's trail takes to fade out once it is let go.
+const TRAIL_SCAR: f32 = 14.0;
 
 struct Record {
     /// The engine (unit id) that broke it.
@@ -106,6 +112,21 @@ impl RiftGround {
     }
 
     fn push(&mut self, engine: u32, kind: u32, gpu: GpuRift) {
+        let trails = self.records.iter().filter(|r| r.kind == rift::TRAIL);
+        if kind == rift::TRAIL && trails.count() >= rift::TRAILS as usize {
+            // A deliberate cap (cosmetic): lens trails keep to their share of the records,
+            // so many Lodestones never push an engine's breaks out; the oldest trail let
+            // go goes first, with none let go the oldest trail.
+            let trail = |r: &Record| r.kind == rift::TRAIL;
+            let at = self
+                .records
+                .iter()
+                .position(|r| trail(r) && r.released.is_some())
+                .or_else(|| self.records.iter().position(trail));
+            if let Some(at) = at {
+                self.records.remove(at);
+            }
+        }
         if self.records.len() >= rift::MAX as usize {
             // A deliberate cap (cosmetic): the oldest scar the engines have let go goes
             // first; with none let go, the oldest of all.
@@ -197,6 +218,59 @@ impl RiftGround {
         );
     }
 
+    /// A gravitic lens's trail (`rift::TRAIL`): its front let go from over `from` at
+    /// `began`, running at `speed` m/s toward `to`; `width` the furrow's half width.
+    /// Whatever trail the lens still had is let go.
+    pub(crate) fn trail(
+        &mut self,
+        lens: u32,
+        from: Vec2,
+        to: Vec2,
+        speed: f32,
+        width: f32,
+        began: f32,
+    ) {
+        self.release_kind(lens, rift::TRAIL, began);
+        let seed = self.next_seed();
+        self.push(
+            lens,
+            rift::TRAIL,
+            GpuRift {
+                line: [from.x, from.y, to.x, to.y],
+                shape: [rift::TRAIL as f32, width, 0.0, seed],
+                time: [began, speed, 0.0, 1.0],
+                glow: [0.0; 4],
+            },
+        );
+        if let Some(r) = self.live(lens, rift::TRAIL) {
+            // Its head burns from the first frame, not eased in.
+            r.now = [0.0, 0.0, 0.0, 1.0, 1.0];
+            r.fed = r.now;
+        }
+    }
+
+    /// This tick of a lens's trail: the way it runs (toward `to`, where the target is
+    /// now), how far its front may have got (`run`, metres), and its light fed as for
+    /// `feed`: embers, pulses toward the well, unused, the head, the scar.
+    pub(crate) fn trail_run(&mut self, lens: u32, to: Vec2, run: f32, fed: [f32; 5]) {
+        if let Some(r) = self.live(lens, rift::TRAIL) {
+            r.gpu.line[2] = to.x;
+            r.gpu.line[3] = to.y;
+            r.gpu.time[2] = run;
+            r.fed = fed;
+        }
+    }
+
+    /// Whether the lens has a trail it is still feeding.
+    pub(crate) fn has_trail(&self, lens: u32) -> bool {
+        self.has_live(lens, rift::TRAIL)
+    }
+
+    /// The lens let go (or lost from sight): its trail's light dies and its scar fades.
+    pub(crate) fn release_trail(&mut self, lens: u32, time: f32) {
+        self.release_kind(lens, rift::TRAIL, time);
+    }
+
     /// This tick's feed to the engine's live break of `kind`: glow, pulse, heart, head,
     /// heave (`GpuRift::glow` and `time.w`).
     pub(super) fn feed(&mut self, engine: u32, kind: u32, fed: [f32; 5]) {
@@ -225,6 +299,10 @@ impl RiftGround {
         let dt = (time - self.last).clamp(0.0, 0.25);
         self.last = time;
         let follow = 1.0 - (-FOLLOW * dt).exp();
+        self.records.retain(|r| match r.released {
+            Some(at) if r.kind == rift::TRAIL => time - at < TRAIL_SCAR,
+            _ => true,
+        });
         let mut gpu = [GpuRift::zeroed(); rift::MAX as usize];
         for (slot, r) in gpu.iter_mut().zip(&mut self.records) {
             match r.released {
@@ -240,8 +318,14 @@ impl RiftGround {
                     for k in 0..4 {
                         r.now[k] = r.now[k].min(r.fed[k] * light * light);
                     }
-                    // Settled plates still show a little: the ground stays broken.
-                    r.now[4] = r.now[4].min(r.fed[4] * (0.25 + 0.75 * settle * settle));
+                    if r.kind == rift::TRAIL {
+                        // A trail's scar fades away entirely.
+                        let scar = (1.0 - gone / TRAIL_SCAR).clamp(0.0, 1.0);
+                        r.now[4] = r.now[4].min(r.fed[4] * scar.sqrt());
+                    } else {
+                        // Settled plates still show a little: the ground stays broken.
+                        r.now[4] = r.now[4].min(r.fed[4] * (0.25 + 0.75 * settle * settle));
+                    }
                 }
             }
             r.gpu.glow = [r.now[0], r.now[1], r.now[2], r.now[3]];

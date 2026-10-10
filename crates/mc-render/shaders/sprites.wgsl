@@ -528,6 +528,14 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
             let flicker = 0.65 + 0.35 * sin((globals.camera.w - p.extras.x) * 79.0 + f32(instance) * 1.7);
             out.color = vec3<f32>(0.62, 0.2, 1.0) * 8.0 * envelope * flicker * strike;
             out.shape = vec2<f32>(-distance(head, tail), 3.0);
+        } else if (p.color & 0xFu) == FADE_BEAM_LENS_ARC {
+            // A gravitic lens's arcs (renderer/lens_fx.rs): the engine's violet, held
+            // low so a thin stroke stays violet, crackling as it goes out.
+            let envelope = 1.0 - smoothstep(0.3, 1.0, age);
+            let strike = 1.0 + 0.4 * (1.0 - smoothstep(0.0, 0.15, age));
+            let flicker = 0.65 + 0.35 * sin((globals.camera.w - p.extras.x) * 83.0 + f32(instance) * 1.3);
+            out.color = vec3<f32>(0.55, 0.13, 1.0) * 2.6 * envelope * flicker * strike;
+            out.shape = vec2<f32>(-distance(head, tail), 3.0);
         } else if (p.color & 0xFu) == FADE_BEAM_PLASMA_TRAIL {
             // A Regency plasma shot's trail (renderer/regency_guns_fx.rs): hot where the shot
             // has just passed, cooling to a deep red as it goes out. A fusion round's starts
@@ -606,7 +614,7 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     let p = projectiles[instance];
     // Lightning segments have their own soft caps. The ordinary shot-head sprite
     // would put a bead at every kink, turning dark as the light faded.
-    if (p.color & 0x100u) != 0u || ((p.color & FADE_BEAM) != 0u && ((p.color & 0xFu) == 3u || (p.color & 0xFu) == 4u || (p.color & 0xFu) == 6u || (p.color & 0xFu) == FADE_BEAM_TETHER || (p.color & 0xFu) == FADE_BEAM_RIFT_BOLT || (p.color & 0xFu) == FADE_BEAM_PLASMA_TRAIL || (p.color & 0xFu) == FADE_BEAM_GRAVITY_TETHER)) {
+    if (p.color & 0x100u) != 0u || ((p.color & FADE_BEAM) != 0u && ((p.color & 0xFu) == 3u || (p.color & 0xFu) == 4u || (p.color & 0xFu) == 6u || (p.color & 0xFu) == FADE_BEAM_TETHER || (p.color & 0xFu) == FADE_BEAM_RIFT_BOLT || (p.color & 0xFu) == FADE_BEAM_LENS_ARC || (p.color & 0xFu) == FADE_BEAM_PLASMA_TRAIL || (p.color & 0xFu) == FADE_BEAM_GRAVITY_TETHER)) {
         var hidden: SpriteOut;
         hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
         return hidden;

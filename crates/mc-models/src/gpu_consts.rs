@@ -895,6 +895,9 @@ shared! {
         /// white-violet core, crackling, between its shards, down to the ground, along its
         /// rift and over its well.
         pub const RIFT_BOLT: u32 = 13;
+        /// A gravitic lens's arcs (renderer/lens_fx.rs): the engine's lightning made small
+        /// and kept violet, no white core, so its thin strokes never bloom to white.
+        pub const LENS_ARC: u32 = 14;
     }
 
     /// How a Regency plasma shot is drawn in flight (`mc_sim::mirror::plasma_look`, carried in
@@ -1354,8 +1357,17 @@ shared! {
         pub const LINE: u32 = 1;
         /// The well: the ground broken into plates over its reach, its edge a ring of cracks.
         pub const WELL: u32 = 2;
-        /// Records held at most (`RiftList` in bindings.wgsl).
-        pub const MAX: u32 = 24;
+        /// A gravitic lens's trail (the Lodestone's, renderer/lens_fx.rs): a narrow furrow
+        /// pressed into the ground under its front, violet in its seam behind the head,
+        /// cooling to embers, then a dark scar that fades away.
+        pub const TRAIL: u32 = 3;
+        /// Seconds the trail's seam takes to cool behind the front (to a third).
+        pub const TRAIL_COOL: f32 = 0.6;
+        /// Records held at most (`RiftList` in bindings.wgsl): the engines' breaks and
+        /// up to `TRAILS` lens trails.
+        pub const MAX: u32 = 56;
+        /// Lens trails held at most, of `MAX`: past it the oldest trail goes first.
+        pub const TRAILS: u32 = 32;
     }
 
     /// Heat haze over engine exhausts (renderer/heat_haze.rs, screen.wgsl `haze_bend`).

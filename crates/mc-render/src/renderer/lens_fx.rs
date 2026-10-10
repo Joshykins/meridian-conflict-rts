@@ -1,33 +1,48 @@
 //! A gravitic lens at work, as it is drawn (`Weapon::lens`, the Lodestone; `mc_sim::lens`):
-//! of a piece with the Regency's gravity engines, but its own. Nothing it does glows much,
-//! and nothing is a ball of light: it bends the scene behind it (the copy the water sees
-//! through, lens_fx.wgsl), darkens it, and throws dust.
+//! of a piece with the Regency's gravity engines, a small, quick cousin of the Fallen's.
+//! Its heart is dark: it bends the scene behind it (the copy the water sees through,
+//! lens_fx.wgsl) and darkens it. Round that heart runs the Fallen's violet energy (its
+//! colours, and its lightning made small, `fade_beam::LENS_ARC`), wound round the dark,
+//! never a ball of light; the gains stay moderate, as a bright violet blooms to white.
 //!
-//! - **Charge** (`WeaponCharging`): a black pinpoint swells over the emitter with a thin
-//!   red-violet rim of bent light, rings of bent air close in on it one after another,
-//!   and grit and dust are drawn in to it.
+//! - **Charge** (`WeaponCharging`): a black pinpoint swells over the emitter with violet
+//!   filaments winding round it, rings of bent air close in on it one after another, and
+//!   grit and dust are drawn in to it.
 //! - **Launch** (`LensLaunched`): a deep pressure snap at the emitter; the pinpoint is let
 //!   go as the front.
-//! - **Front**: a dark lens a few metres across running out to its target, black at its
-//!   heart and bending what lies behind it round that heart into a ring. It leaves a
-//!   short corridor of rippled air behind it and kicks a line of dust off the ground under
-//!   its path.
-//! - **Strike** (`LensStruck`): a ring of bent air snaps inward onto the target, a dark
-//!   flash, then dust pushed out across the well and the trees bowed outward.
+//! - **Front**: a dark lens running out to its target, black at its heart and bending what
+//!   lies behind it round that heart, wrapped in swirling violet filaments with a frayed
+//!   violet wake; small arcs crackle off it, back along its way and down to the ground,
+//!   and its light falls on what it passes. Far off it is drawn larger, so it reads at a
+//!   game's zoom. It leaves a short corridor of rippled air and kicks dust off the ground.
+//! - **Trail**: under its path the front presses a narrow furrow into the ground
+//!   (`rift::TRAIL`, drawn by the terrain from the gravitic engines' records,
+//!   `gravitic_engine_fx::ground`): its floor rippled across, lips shoved up either side,
+//!   a violet seam down it burning behind the head and cooling in about a second to
+//!   embers, which pulse in toward the well while it holds. Let go, the light dies and
+//!   the dark furrow fades out over some seconds. Trails keep to their own share of the
+//!   records (`rift::TRAILS`), the oldest going first.
+//! - **Strike** (`LensStruck`): a violet ring of bent air snaps inward onto the target,
+//!   arcs run in from round the well's edge, a dark flash throws off a ragged violet ring
+//!   and a violet light, then dust is pushed out across the well and the trees bowed.
 //! - **Well**, locked on the target and carried with it: the ground under it darkened and
-//!   rippling in toward the middle, its edge pressed into a ring with a faint red-violet
-//!   line, a low dome of bent air over it, grit lifted off the ground and circling slowly
-//!   low down, and a faint thread of rippled air back to the lens that holds it.
+//!   rippling in toward the middle with thin violet arms spiralling in, its edge pressed
+//!   into a ring with violet energy crawling along it and arcs flickering over it, a low
+//!   dome of bent air over it, grit lifted off the ground and circling slowly low down,
+//!   and a thread of rippled air back to the lens that holds it, violet pulses running
+//!   out along it.
 //! - **Release** (`LensReleased`): the well relaxes outward in a soft pulse, the grit
-//!   drops, and the pressed ring is left on the ground, fading.
+//!   drops, the trail goes dark, and the pressed ring is left on the ground, fading.
 //!
 //! Presentation only; the renderer's own clock.
 
 pub(crate) mod pass;
 
 use super::regency_guns_fx::RED;
+use super::stun_fx::Flash;
 use super::{Renderer, PUFF_DUST};
 use crate::gpu::{Gpu, GpuError};
+use crate::gpu_consts::fade_beam::LENS_ARC;
 use crate::gpu_consts::lens_fx::{FLASH, IMPLODE, MAX_LENSES, PRINT, RELEASE};
 use crate::gpu_consts::puff;
 use crate::pipelines::{Layouts, Passes};
@@ -41,8 +56,19 @@ use std::f32::consts::TAU;
 const SPECK: f32 = puff::WARP_SWARM as f32;
 /// How hard the air brakes a speck (warp_puffs.wgsl's drag on all but its glow).
 const SPECK_DRAG: f32 = 1.8;
-/// The Regency's violet, for the faint glint of what a lens draws in.
+/// The Regency's violet, the Fallen's: for the glint of what a lens draws in and the
+/// light its arcs and front throw.
 const VIOLET: Vec3 = Vec3::new(0.55, 0.16, 1.0);
+/// Half the width of the furrow a front presses into the ground, metres.
+const TRAIL_WIDTH: f32 = 3.8;
+/// What a trail is fed (`RiftGround::trail_run`): embers, pulses toward the well, -,
+/// its head, its scar; while the front runs, and while the well holds.
+const TRAIL_RUNNING: [f32; 5] = [0.1, 0.0, 0.0, 1.0, 1.0];
+const TRAIL_HOLDING: [f32; 5] = [0.16, 1.0, 0.0, 1.0, 1.0];
+/// Arcs a front throws off a tick, and a held well round its edge, at most: a deliberate
+/// cosmetic cap, so a crowd of lenses stays within the strokes' budget.
+const FRONT_ARCS: usize = 3;
+const WELL_ARCS: usize = 2;
 /// Seconds a lens lost from sight (fog) takes to fade out.
 const LOST_FADE: f32 = 0.4;
 /// Metres apart the dust under a running front is kicked up, and the height over the
@@ -62,6 +88,8 @@ struct Lens {
     front: (Vec3, Vec3),
     ground: (Vec3, Vec3),
     radius: f32,
+    /// How fast its front runs, m/s.
+    speed: f32,
     /// When its charge began, and how long it takes.
     charge: Option<(f32, f32)>,
     launch: Option<f32>,
@@ -83,6 +111,7 @@ impl Lens {
             front: (at, at),
             ground: (at, at),
             radius: 30.0,
+            speed: 400.0,
             charge: None,
             launch: None,
             strike: None,
@@ -288,6 +317,7 @@ impl Renderer {
                 true
             }
             SimEvent::LensReleased { unit, weapon, .. } => {
+                self.gravitic_engine_fx.ground.release_trail(unit.0, time);
                 let well = self.lens_fx.live(unit.0, weapon).map(|l| {
                     l.release = Some(time);
                     (l.strike.is_some(), l.ground.1, l.radius)
@@ -342,6 +372,14 @@ impl Renderer {
             };
             lens.seen = true;
             lens.radius = v.radius.max(1.0);
+            if let Some(w) = self
+                .blueprints
+                .unit(v.blueprint)
+                .weapons
+                .get(v.weapon as usize)
+            {
+                lens.speed = w.projectile_speed.to_f32().max(1.0);
+            }
             if v.struck && lens.strike.is_none() {
                 // Struck before it was seen: the well is laid standing, without its strike.
                 lens.strike = Some(time - IMPLODE - FLASH - 1.0);
@@ -349,18 +387,154 @@ impl Renderer {
                 lens.ground.0 = lens.ground.1;
             }
         }
+        let ground = &mut self.gravitic_engine_fx.ground;
         for l in &mut fx.lenses {
             if !l.seen && l.launch.is_some() && l.live() {
                 l.lost = Some(time);
+                ground.release_trail(l.unit, time);
             }
         }
         fx.lenses.retain(|l| !l.spent(time));
         let lenses = self.lens_fx.lenses.clone();
         for l in lenses.iter().filter(|l| l.live()) {
+            self.lens_trail(l);
             match (l.launch, l.strike) {
                 (None, _) => self.lens_drawing_in(l, time),
-                (Some(_), None) => self.lens_front_dust(l, time),
-                (Some(_), Some(strike)) => self.lens_well_grit(l, strike, time),
+                (Some(_), None) => {
+                    self.lens_front_dust(l, time);
+                    self.lens_front_arcs(l, time);
+                }
+                (Some(_), Some(strike)) => {
+                    self.lens_well_grit(l, strike, time);
+                    self.lens_well_arcs(l, strike, time);
+                }
+            }
+        }
+    }
+
+    /// The trail a running front presses into the ground under its path
+    /// (`rift::TRAIL`, drawn by the terrain): laid as the front leaves, run out as far as
+    /// the front has got (a tick ahead, as the front is drawn gliding), and its embers
+    /// fed while the well holds.
+    fn lens_trail(&mut self, l: &Lens) {
+        let Some(launch) = l.launch else {
+            return;
+        };
+        let from = l.emitter.1.truncate();
+        let to = l.ground.1.truncate();
+        let length = from.distance(to);
+        let dt = self.tick_seconds.max(0.02);
+        let ground = &mut self.gravitic_engine_fx.ground;
+        if !ground.has_trail(l.unit) {
+            ground.trail(l.unit, from, to, l.speed, TRAIL_WIDTH, launch);
+        }
+        let (run, fed) = match l.strike {
+            None => {
+                let run = l.front.1.truncate().distance(from) + l.speed * dt * 1.2;
+                (run.min(length), TRAIL_RUNNING)
+            }
+            Some(_) => (length, TRAIL_HOLDING),
+        };
+        ground.trail_run(l.unit, to, run, fed);
+    }
+
+    /// A violet arc of a lens's: a short crooked stroke of the Fallen's lightning made
+    /// small and kept violet (`fade_beam::LENS_ARC`).
+    fn lens_arc(&mut self, from: Vec3, to: Vec3, start: f32, life: f32, width: f32) {
+        let side = (to - from).cross(Vec3::Z).normalize_or(Vec3::X);
+        let wander = from.distance(to) * 0.18;
+        self.emp_kinks(
+            from,
+            to,
+            wander,
+            side,
+            Vec3::Z,
+            start,
+            life,
+            width,
+            5,
+            LENS_ARC,
+        );
+    }
+
+    /// Over the coming tick of a running front: violet arcs crackling off it, back along
+    /// its way and down to the ground under it, and its light on what it passes.
+    fn lens_front_arcs(&mut self, l: &Lens, time: f32) {
+        let dt = self.tick_seconds.max(0.02);
+        let (was, now) = l.front;
+        let back = (was - now).normalize_or(-Vec3::X);
+        for _ in 0..FRONT_ARCS {
+            let f = self.scatter.unit();
+            let at = was.lerp(now, f);
+            let born = time + f * dt;
+            let out = Vec3::new(
+                self.scatter.signed(),
+                self.scatter.signed(),
+                self.scatter.signed() * 0.6,
+            )
+            .normalize_or(Vec3::Z);
+            let reach = 3.0 + 5.0 * self.scatter.unit();
+            let to = at + (out + back * 1.2).normalize_or(back) * reach;
+            let life = 0.07 + 0.08 * self.scatter.unit();
+            let width = 0.22 + 0.2 * self.scatter.unit();
+            self.lens_arc(at, to, born, life, width);
+        }
+        // Now and then one down to the ground under it, when it runs low.
+        let ground = self.ground_height(now.truncate());
+        if now.z - ground < 16.0 && self.scatter.unit() < 0.5 {
+            let f = self.scatter.unit();
+            let at = was.lerp(now, f);
+            let foot = at.truncate()
+                + Vec2::from_angle(self.scatter.unit() * TAU) * 2.5 * self.scatter.unit();
+            let to = foot.extend(self.ground_height(foot) + 0.2);
+            self.lens_arc(at, to, time + f * dt, 0.12, 0.3);
+        }
+        // Its violet light on the ground and hulls it passes.
+        self.emp_fx.flashes.push(Flash {
+            pos: was.lerp(now, 0.5),
+            start: time,
+            life: dt * 1.3,
+            color: VIOLET * 260.0,
+            range: 26.0,
+            flicker: 0.5,
+        });
+    }
+
+    /// Over the coming tick of a held well: an arc or two crawling along its edge, and
+    /// now and then one up from the edge onto what it holds.
+    fn lens_well_arcs(&mut self, l: &Lens, strike: f32, time: f32) {
+        if time < strike + IMPLODE {
+            return;
+        }
+        let dt = self.tick_seconds.max(0.02);
+        let foot = l.ground.1;
+        let r = l.radius;
+        let arcs = (self.scatter.unit() * (WELL_ARCS as f32 + 0.6)) as usize;
+        for _ in 0..arcs.min(WELL_ARCS) {
+            let a = self.scatter.unit() * TAU;
+            let b = a + (0.25 + 0.35 * self.scatter.unit()) * self.scatter.signed().signum();
+            let rim = |angle: f32, out: f32| foot.truncate() + Vec2::from_angle(angle) * r * out;
+            let (pa, pb) = (rim(a, 0.97), rim(b, 0.97));
+            let from = pa.extend(self.ground_height(pa) + 0.6);
+            let to = if self.scatter.unit() < 0.3 {
+                // Up onto the target.
+                l.front.1 + Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.5) * 2.0
+            } else {
+                pb.extend(self.ground_height(pb) + 0.6)
+            };
+            let born = time + self.scatter.unit() * dt;
+            let life = 0.1 + 0.1 * self.scatter.unit();
+            let width = 0.3 + 0.2 * self.scatter.unit();
+            self.lens_arc(from, to, born, life, width);
+            if self.scatter.unit() < 0.5 {
+                self.emp_fx.flashes.push(Flash {
+                    pos: to + Vec3::Z * 2.0,
+                    start: born,
+                    life: life * 1.5,
+                    color: VIOLET * 80.0,
+                    range: r * 0.5,
+                    flicker: 0.9,
+                });
             }
         }
     }
@@ -474,6 +648,25 @@ impl Renderer {
     /// a dark flash, then dust pushed out across the well and the trees bowed.
     fn lens_strike(&mut self, foot: Vec3, radius: f32, time: f32) {
         let push = time + IMPLODE + 0.06;
+        // As the ring closes: arcs from out round the well's edge in onto the target, and
+        // a violet flash with the dark one.
+        for k in 0..7 {
+            let angle = (k as f32 + self.scatter.unit()) / 7.0 * TAU;
+            let rim = foot.truncate()
+                + Vec2::from_angle(angle) * radius * (0.7 + 0.3 * self.scatter.unit());
+            let from = rim.extend(self.ground_height(rim) + 0.8);
+            let to = foot + Vec3::Z * (2.0 + 2.0 * self.scatter.unit());
+            let born = time + IMPLODE * (0.3 + 0.6 * self.scatter.unit());
+            self.lens_arc(from, to, born, 0.16, 0.45);
+        }
+        self.emp_fx.flashes.push(Flash {
+            pos: foot + Vec3::Z * 5.0,
+            start: time + IMPLODE,
+            life: FLASH + 0.15,
+            color: VIOLET * 700.0,
+            range: radius * 1.6,
+            flicker: 0.3,
+        });
         self.tree_blasts
             .record(foot, push, radius * 1.3, 0.7, false);
         let water = self.map_info.water_level.to_f32();

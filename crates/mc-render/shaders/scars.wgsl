@@ -341,9 +341,9 @@ fn melt_shade(xy: vec2<f32>, alt: f32, albedo_in: vec3<f32>, rough_in: f32, px: 
 // Three kinds of break, each shaded over whatever ground it lies on: cracks running out
 // round the engine's foot as it gathers (`RIFT_FOOT`), the rift's fissure opening behind
 // its front from the foot to the mark (`RIFT_LINE`), and the well's ground broken into
-// plates (`RIFT_WELL`). The cracks glow violet with white-hot hearts while the engine
-// feeds them (`Rift::glow`, which the CPU eases, dims and flickers), and the plates beside
-// them are tilted up (`time.w`, read through the normal). Once let go the light goes out
+// plates (`RIFT_WELL`); and a gravitic lens's narrow furrow (`RIFT_TRAIL`, lens_fx.rs).
+// The cracks glow violet with white-hot hearts while the engine feeds them (`Rift::glow`,
+// which the CPU eases, dims and flickers), and the plates beside them are tilted up (`time.w`, read through the normal). Once let go the light goes out
 // and the cracks stay as a dark scar, the plates settling flat. Detail under a pixel is
 // swapped for its average (`crater_crack`).
 
@@ -375,7 +375,69 @@ fn rift_one(r: Rift, xy: vec2<f32>, px: f32, s_in: CraterShade) -> CraterShade {
     var light = 0.0;
     var spill = 0.0;
     var broken = 0.0;
-    if kind == RIFT_LINE {
+    if kind == RIFT_TRAIL {
+        // A gravitic lens's trail: a narrow furrow pressed into the ground under its
+        // front's path, its floor rippled across, earth shoved up in lips either side;
+        // a violet seam down it burns behind the head, cools to embers (pulsing toward
+        // the well while it holds), and goes out; the scar fades (`time.w`).
+        let start = r.line.xy;
+        let span = r.line.zw - start;
+        let along = span / max(length(span), 1.0);
+        let side = vec2<f32>(-along.y, along.x);
+        let rel = xy - start;
+        let at = dot(rel, along);
+        let across = dot(rel, side);
+        let front = min(age * r.time.y, r.time.z);
+        if at < 0.0 || at > front + reach || abs(across) > reach * 3.0 {
+            return s;
+        }
+        // It wanders a little off the straight, so it reads torn rather than ruled.
+        let wander = (grad_noise2(vec2<f32>(at, 0.0) + o, 70.0) - 0.5) * reach * 0.9
+            + (grad_noise2(vec2<f32>(at * 1.3, 4.0) - o, 11.0) - 0.5) * reach * 0.25;
+        let t = across - wander;
+        let reached = 1.0 - smoothstep(front - 2.0, front + 1.0, at);
+        // Pinched where it leaves the lens's feet.
+        let foot = smoothstep(3.0, 18.0, at);
+        let width = reach * (0.8 + 0.4 * grad_noise2(vec2<f32>(at, 9.0) + o, 23.0)) * (0.45 + 0.55 * foot);
+        let x = t / width;
+        // Its edges ragged: crumbled in and out a little, more finely than it wanders.
+        let crumble = (grad_noise2(vec2<f32>(at, t) + o * 2.0, 2.5) - 0.5) * 0.35;
+        let ax = abs(x) + crumble;
+        let scar = heave * reached;
+        let furrow = (1.0 - smoothstep(0.75, 1.0 + px / width, ax)) * scar;
+        let lip_x = (ax - 1.2) / 0.3;
+        let lip = exp(-lip_x * lip_x) * scar;
+        // Pressed ripples across its floor a few metres apart, bowed back from the way
+        // it ran; swapped for their average where they are under a pixel.
+        let wave = (at + ax * width * 0.7) / 3.4 * 6.2831853;
+        let fine = 1.0 - smoothstep(0.6, 1.6, px / 3.4 * 6.0);
+        // Its walls and lips through the normal: the floor sunk, the lips raised.
+        s.slope += side * sign(t) * (min(ax, 1.0) * 0.5 * furrow - lip_x * lip * 0.3)
+            + along * cos(wave) * 0.12 * furrow * fine;
+        // Pressed bare and scorched: dark earth, not the colour of what grew there.
+        a = mix(a, a * 0.25 + vec3<f32>(0.03, 0.024, 0.02), furrow * (0.8 + 0.12 * sin(wave) * fine));
+        // The lips: dry earth thrown up, paler than the ground round it.
+        a = mix(a, vec3<f32>(0.1, 0.085, 0.065), lip * 0.6);
+        broken = furrow * 0.8;
+        // The light: hot behind the head, cooling as it falls behind (`RIFT_TRAIL_COOL`),
+        // embers fed while the lens holds, pulsing in toward the well.
+        let passed = age - at / max(r.time.y, 1.0);
+        let hot = select(0.0, exp(-passed / RIFT_TRAIL_COOL), passed >= 0.0) * r.glow.w;
+        let pulse = pow(0.5 + 0.5 * sin((at / 55.0 - now * 1.5) * 6.2831853), 4.0);
+        let ember = glow * (1.0 + r.glow.y * (1.8 * pulse - 0.45));
+        let flick = 0.6 + 0.4 * smoothstep(0.3, 0.7, grad_noise2(vec2<f32>(at, 7.0) + o + vec2<f32>(now * 4.0, 0.0), 13.0));
+        // The embers glow in patches, drifting along it, not as one ruled line.
+        let seep = 0.05 + 0.95 * smoothstep(0.4, 0.75, grad_noise2(vec2<f32>(at - now * 9.0, 2.0) + o, 26.0));
+        let heat = (hot * 0.7 + ember * seep) * flick * reached;
+        // A thin seam down its floor, never under a pixel and a bit: its light spread
+        // thinner instead.
+        let seam_at = (grad_noise2(vec2<f32>(at * 0.8, 3.0) + o, 8.0) - 0.5) * width * 0.5;
+        let seam_w = max(width * 0.16, px * 1.4);
+        let seam = (1.0 - smoothstep(0.0, seam_w, abs(t - seam_at))) * min(width * 0.16 / seam_w * 1.6, 1.0);
+        let in_furrow = 1.0 - smoothstep(0.7, 1.0 + px / width, ax);
+        light = seam * heat + in_furrow * heat * 0.08;
+        spill = heat * 0.14 * exp(-ax / 0.9);
+    } else if kind == RIFT_LINE {
         let start = r.line.xy;
         let span = r.line.zw - start;
         let length_m = max(length(span), 1.0);
