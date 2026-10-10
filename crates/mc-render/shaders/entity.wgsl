@@ -1706,12 +1706,14 @@ fn vs_main(in: VsIn) -> VsOut {
                 if model.crawl[0].w > 1.5 {
                     pitch -= tail_pose(e, model, walk, t, 15u)[5].x;
                 }
-                // A siege gun lies along the deck packed, its rails slid back along the bore;
-                // they slide out first, then the gun pitches.
+                // A siege gun lies along the deck packed, its rails slid back along the bore
+                // and its barrel pulled into the breech; they slide out first, then the gun
+                // pitches.
                 if model.siege[3].z > 0.5 && limb == LIMB_ARM_GUN {
                     let out = siege_deploy(e, t);
                     if (in.rig & (RIG_DEPLOY | (SIEGE_MASK << SIEGE_SHIFT))) == RIG_DEPLOY {
-                        let back = model.siege[2].y * (1.0 - smoothstep(SIEGE_SLIDE_START, 1.0, out));
+                        let reach = select(model.siege[2].y, model.siege[2].z, (in.rig & RIG_RECOIL) != 0u);
+                        let back = reach * (1.0 - smoothstep(SIEGE_SLIDE_START, 1.0, out));
                         p -= normalize(model.recoil.xyz) * back;
                     }
                     pitch = mix(model.siege[2].x, pitch, smoothstep(SIEGE_RAISE_START, SIEGE_RAISE_END, out));

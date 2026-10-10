@@ -651,6 +651,7 @@ impl MeshBuilder {
             hip: at(siege.hip),
             knee: at(siege.knee),
             retract: siege.retract * scale,
+            barrel_retract: siege.barrel_retract * scale,
             ..siege
         });
     }
