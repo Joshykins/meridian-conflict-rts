@@ -29,8 +29,9 @@ fn storm_puff_vertex(p: Puff, corner: vec2<f32>, t: f32, o: PuffOut) -> PuffOut 
     let f = g.x;
     let middle = p.origin + p.vel * g.y;
     let reach = max(p.appearance.z, 1.0);
-    // A seed swells fast and slows as it nears its size.
-    let grown = 0.16 + 0.84 * (1.0 - (1.0 - f) * (1.0 - f));
+    // A seed stays a small knot at first and builds slowly into its size
+    // (storm_cloud_fx.rs `size_at`).
+    let grown = 0.06 + 0.94 * f * f * (3.0 - 2.0 * f);
     // Spent: it spreads and thins, its base sagging as it rains itself out.
     let spent = clamp((t - (p.life - PUFF_STORM_LINGER)) / PUFF_STORM_LINGER, 0.0, 1.0);
     var offset = (p.pos - p.origin) * grown * (1.0 + 0.22 * spent);

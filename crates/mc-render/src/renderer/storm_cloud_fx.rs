@@ -3,12 +3,14 @@
 //! as it drifts to a stop behind the aircraft (a run lays a trail of them), and each
 //! `SimEvent::CloudBolt` a bolt out of its base.
 //!
-//! - **Release** (`ShotFired`): a hard puff of charged vapour out of the dispenser's mouth
-//!   along the throw, a pressure ring, sparks and a few short arcs. No muzzle flash.
+//! - **Release** (`ShotFired`): nothing of its own, not even a muzzle flash: the cloud's
+//!   first knot is the seed being let go.
 //! - **Cloud** (once, when a seed is first seen): its lumps are laid at once
 //!   (storm_puffs.wgsl), lowest first, and carried and grown on the GPU along the seed's
-//!   own eased drift. A small dense knot at first, it swells to a dark thunderhead some
-//!   300 m across, grey-blue on its crown and near black under its base. Lit from inside
+//!   own eased drift. They live in slots of their own at the end of the puff buffer
+//!   (`STORM_PUFF_SLOTS`), written again every tick, so a battle's smoke and sparks going
+//!   round the ring can never overwrite a cloud halfway through its life. A small dense
+//!   knot at first, it builds slowly into a dark thunderhead some 300 m across, grey-blue on its crown and near black under its base. Lit from inside
 //!   by lightning that flickers more often as it grows and all the time while it strikes,
 //!   and twice or so a stroke the sky lights (`Sky::strike`) with its far thunder.
 //! - **Bolt** (`CloudBolt`): a forked blue-white stroke from inside the base down to what
@@ -25,9 +27,9 @@
 use glam::Vec3;
 use std::f32::consts::TAU;
 
-use super::water_fx::PUFF_STEAM;
-use super::{Puff, Renderer, PUFF_BOLT, PUFF_RING};
+use super::{Puff, Renderer, GROUND_FIRE_SLOTS, PUFF_RING};
 use crate::gpu_consts::puff;
+use bytemuck::Zeroable;
 use mc_sim::mirror::CloudView;
 use mc_sim::SimEvent;
 
@@ -42,6 +44,11 @@ const LUMPS: usize = 40;
 /// across. Each cloud is a little bigger or smaller than that (`lay_storm_cloud`).
 const LEAST_REACH: f32 = 140.0;
 const REACH_PER_RADIUS: f32 = 0.75;
+/// Puff slots kept for storm clouds at the end of the puff buffer, after the ring, the
+/// ground fires' and the missile trails' (renderer.rs `MAX_PUFFS`): room for about a
+/// hundred clouds, six or so Nimbus runs at once. A deliberate cosmetic cap: past it the
+/// oldest clouds are let go first.
+pub(super) const STORM_PUFF_SLOTS: usize = 4096;
 /// Strokes the sky lights inside one cloud (each with its thunder) before its bolts: a
 /// deliberate cap, so a wing of them does not take all the sky's flashes or drown the
 /// battle in thunder.
@@ -59,10 +66,12 @@ pub(super) struct StormClouds {
     last_tick: u32,
 }
 
-/// One seed's cloud: what its lumps were laid with, so the lightning finds it where the
-/// GPU draws it.
-#[derive(Clone, Copy)]
+/// One seed's cloud: its lumps, and what they were laid with, so the lightning finds it
+/// where the GPU draws it.
+#[derive(Clone)]
 struct StormCloud {
+    /// Its lumps as laid, written to the storm slots every tick until they are spent.
+    lumps: Vec<Puff>,
     serial: u32,
     /// When it was laid, its middle as drawn then, the drift it had left then, the seconds
     /// it had left to grow (and drift) then, and how far grown it was then (0 a seed, 1
@@ -96,29 +105,23 @@ impl StormCloud {
     }
 }
 
-/// How big a cloud `f` of the way grown is, as a share of grown (storm_puffs.wgsl).
+/// How big a cloud `f` of the way grown is, as a share of grown (storm_puffs.wgsl): a small
+/// knot at first, building slowly into its size.
 fn size_at(f: f32) -> f32 {
-    0.16 + 0.84 * (1.0 - (1.0 - f) * (1.0 - f))
+    0.06 + 0.94 * f * f * (3.0 - 2.0 * f)
 }
 
 impl Renderer {
     /// The storm seeder's part of a sim event: true when it was all of it.
     pub(super) fn storm_cloud_event(&mut self, event: &SimEvent, time: f32) -> bool {
         match event {
+            // Nothing at the tail: the cloud's first knot is the seed let go.
             SimEvent::ShotFired {
-                pos,
-                vel,
-                travel,
-                blueprint,
-                weapon,
-                ..
+                blueprint, weapon, ..
             } if self.blueprints.unit(*blueprint).weapons[*weapon as usize]
                 .cloud
                 .is_some() =>
             {
-                let at = Vec3::from(pos.to_f32()) - Vec3::from(travel.to_f32());
-                let dir = Vec3::from(vel.to_f32()).normalize_or(Vec3::NEG_X);
-                self.with_outbound(|r| r.storm_seed_released(at, dir, time));
                 true
             }
             SimEvent::CloudBolt { from, to, .. } => {
@@ -154,6 +157,11 @@ impl Renderer {
             }
         }
         clouds.retain(|c| c.gone.is_none_or(|gone| time < gone + LINGER));
+        // Oldest first: past the slots kept for them, the oldest clouds go first.
+        let mut held = clouds.iter().map(|c| c.lumps.len()).sum::<usize>();
+        while held > STORM_PUFF_SLOTS && !clouds.is_empty() {
+            held -= clouds.remove(0).lumps.len();
+        }
         for v in views {
             if !clouds.iter().any(|c| c.serial == v.serial) {
                 let cloud = self.lay_storm_cloud(v, time, tick);
@@ -165,6 +173,18 @@ impl Renderer {
                 r.storm_flicker(c, time, tick);
             }
         });
+        let mut slots = vec![Puff::zeroed(); STORM_PUFF_SLOTS];
+        for (slot, lump) in slots
+            .iter_mut()
+            .zip(clouds.iter().flat_map(|c| c.lumps.iter()))
+        {
+            *slot = *lump;
+        }
+        self.puffs.write(
+            ((PUFF_RING + GROUND_FIRE_SLOTS + super::nuke_fx::NUKE_PUFF_SLOTS) * size_of::<Puff>())
+                as u64,
+            bytemuck::cast_slice(&slots),
+        );
         self.storm_clouds.clouds = clouds;
     }
 
@@ -218,8 +238,9 @@ impl Renderer {
             })
             .collect();
         lumps.sort_by(|a, b| a.0.z.total_cmp(&b.0.z));
-        for (offset, size, shows) in lumps {
-            let p = Puff {
+        let lumps = lumps
+            .into_iter()
+            .map(|(offset, size, shows)| Puff {
                 appearance: [grow_seconds, grown_then, reach, shows],
                 origin: drawn.to_array(),
                 opacity: 1.0,
@@ -228,14 +249,10 @@ impl Renderer {
                 vel: drift.to_array(),
                 life: life + self.scatter.unit() * 0.8,
                 params: [size, tone, PUFF_STORM, self.scatter.unit()],
-            };
-            self.puffs.write(
-                (self.puff_cursor * size_of::<Puff>()) as u64,
-                bytemuck::bytes_of(&p),
-            );
-            self.puff_cursor = (self.puff_cursor + 1) % PUFF_RING;
-        }
+            })
+            .collect();
         StormCloud {
+            lumps,
             serial: v.serial,
             laid: time,
             origin: drawn,
@@ -295,52 +312,6 @@ impl Renderer {
         if c.gone.is_none() && f > 0.55 && c.rumbles < MOST_RUMBLES && self.scatter.unit() < 0.05 {
             c.rumbles += 1;
             self.sky.strike(middle, now, 0.3, 1.2, false);
-        }
-    }
-
-    /// A seed let go from the dispenser's mouth at `at`, thrown along `dir`: a hard puff
-    /// of charged vapour, a pressure ring, sparks and a few short arcs at the mouth.
-    fn storm_seed_released(&mut self, at: Vec3, dir: Vec3, time: f32) {
-        self.push_shockwave(at.to_array(), time, 26.0, 0.5, 0.6, 0.0, dir);
-        self.lights
-            .effect(at.to_array(), time, 10.0, 0.25, BLUE_FLASH);
-        for _ in 0..14 {
-            let spread = Vec3::new(
-                self.scatter.signed(),
-                self.scatter.signed(),
-                self.scatter.signed(),
-            ) * 14.0;
-            let vel = dir * (25.0 + self.scatter.unit() * 35.0) + spread;
-            let life = 1.6 + self.scatter.unit();
-            let size = (3.0, 16.0 + self.scatter.unit() * 12.0);
-            self.push_puff(PUFF_STEAM, at, vel, time, life, size);
-        }
-        for _ in 0..10 {
-            let spread = Vec3::new(
-                self.scatter.signed(),
-                self.scatter.signed(),
-                self.scatter.signed(),
-            ) * 25.0;
-            let vel = dir * 40.0 + spread;
-            self.push_puff(PUFF_BOLT, at, vel, time, 0.35, (1.0, 0.3));
-        }
-        for k in 0..3 {
-            let out = Vec3::new(
-                self.scatter.signed(),
-                self.scatter.signed(),
-                self.scatter.signed(),
-            )
-            .normalize_or(Vec3::Z);
-            let reach = 8.0 + self.scatter.unit() * 8.0;
-            self.arc(
-                at,
-                at + out * reach,
-                3,
-                2.0,
-                time + k as f32 * 0.05,
-                0.12,
-                0.8,
-            );
         }
     }
 

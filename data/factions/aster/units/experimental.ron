@@ -179,7 +179,7 @@
                 // Nothing turns: the seed always leaves the dispenser's mouth at the tail, so
                 // the mouth is its own pivot, whatever the aim.
                 turret_turn: 720, muzzle: (-46.5, 0, 7.2), pivot: (-46.5, 0, 7.2),
-                cloud: (grow: 3.5, strike: 1.5, bolts: 4, radius: 200, splash: 26),
+                cloud: (grow: 7.0, strike: 3.0, bolts: 4, radius: 200, splash: 26),
                 targets: ["Land", "Naval", "Structure"], color: Blue,
                 flash: 0.0, impact: 2.6, shockwave: 1.6, ion_blast: 26,
                 sounds: (fire: "storm_seed", impact: "storm_bolt", ground: "storm_bolt"),

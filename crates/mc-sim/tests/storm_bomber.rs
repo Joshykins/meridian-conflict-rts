@@ -88,7 +88,7 @@ fn a_run_lays_a_trail_of_clouds_that_strike_down_onto_what_it_crossed() {
     w.tick(&spawns).unwrap();
     let full = health(&w, TANK);
     let (mut seeded, mut bolts) = (Vec::new(), Vec::new());
-    for tick in 1..=120u32 {
+    for tick in 1..=200u32 {
         w.tick(&[]).unwrap();
         for e in &w.events {
             match *e {

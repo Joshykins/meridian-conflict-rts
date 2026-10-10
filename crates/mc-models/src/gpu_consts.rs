@@ -862,7 +862,7 @@ shared! {
         /// shows. `params.x` its size grown, `params.y` its cloud's shade (1 the usual grey). It thins out over its last `STORM_LINGER`
         /// seconds, its base sinking as it rains out.
         pub const STORM_CLOUD: u32 = 63;
-        pub const STORM_LINGER: f32 = 3.5;
+        pub const STORM_LINGER: f32 = 8.0;
     }
 
     /// Colours of a fading beam (`ProjectileInstance::color` low bits under
