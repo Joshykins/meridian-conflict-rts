@@ -454,3 +454,41 @@ fn outfights_a_pack_of_tier_4s() {
     );
     assert!(w.state.units.row(seraph).is_some(), "the Seraph fell");
 }
+
+/// Its forearm repeaters lob flat: from 300 m at a titan's middle they are still climbing
+/// as they reach its hull, and a climbing shell meets its own mark (`impacts.rs`). They
+/// once passed over everything on the way up and flew on a kilometre past it.
+#[test]
+fn its_repeaters_hit_a_titan_close_in() {
+    let mut w = world(None);
+    let seraph = add(&mut w, SERAPH, 0, 1700, 2000, false);
+    let titan = add(&mut w, "aster_t5_titan", 1, 2000, 2000, true);
+    let order = Command::Attack {
+        units: vec![seraph],
+        target: titan,
+        queue: false,
+    };
+    w.tick(&[command(0, order)]).unwrap();
+    let (mut fired, mut landed) = (0, 0);
+    for _ in 0..100 {
+        w.tick(&[]).unwrap();
+        fired += w
+            .events
+            .iter()
+            .filter(|e| matches!(e, SimEvent::ShotFired { weapon: 0 | 1, .. }))
+            .count();
+        landed += w
+            .events
+            .iter()
+            .filter(|e| {
+                matches!(e, SimEvent::Impact { weapon: 0 | 1, on_unit, on_shield, .. }
+                    if *on_unit || *on_shield)
+            })
+            .count();
+    }
+    assert!(fired >= 30, "the repeaters fired {fired} times");
+    assert!(
+        landed * 10 >= fired * 9,
+        "{landed} of {fired} repeater shots hit"
+    );
+}

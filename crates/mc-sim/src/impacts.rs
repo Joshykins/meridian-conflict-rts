@@ -238,8 +238,10 @@ impl World {
                 });
             }
         }
-        // Lobbed shells pass over things on the way up.
-        if weapon.trajectory == Trajectory::Direct || vel.z < Fx::ZERO {
+        // Lobbed shells pass over things on the way up, but not over their own mark: a
+        // flat shot climbing at a titan's middle meets its hull long before its apex.
+        let rising = weapon.trajectory != Trajectory::Direct && vel.z >= Fx::ZERO;
+        if !rising || p.target[i] != UnitId::NONE {
             let seg = vel.xy();
             let mid = from.xy() + seg * Fx::HALF;
             let reach = seg.length() / 2 + weapon.proximity;
@@ -253,6 +255,7 @@ impl World {
                         || !self.are_enemies(p.owner[i], units.owner[row])
                         || !self.weapon_reaches(row, weapon)
                         || crate::bore::passes_through(weapon, p.target[i], units.id(row))
+                        || (rising && units.id(row) != p.target[i])
                     {
                         return true;
                     }
