@@ -88,6 +88,7 @@ fn regency_none() -> RegencyLook {
 fn regency_pattern(p: u32) -> bool {
     return p == PAT_EMBER || p == NANITE_PATTERN_SLOT
         || p == EMBER_PLATE_SLOT || p == EMBER_PLATE_RIM || p == EMBER_PLATE_MACHINED
+        || p == EMBER_PLATE_DEEP
         || p == NANITE_PATTERN_RIM;
 }
 
@@ -494,7 +495,13 @@ fn regency_look(i: RegencyIn, works: bool) -> RegencyLook {
         out.tone *= 1.0 + grain * 0.025 * resolved;
         return out;
     }
-    return regency_plate(i);
+    var out = regency_plate(i);
+    if i.optic == EMBER_PLATE_DEEP {
+        // The deeper shade: the plate darker, its worn edges dulled with it.
+        out.tone *= EMBER_PLATE_DEEP_TONE;
+        out.lift *= 0.5;
+    }
+    return out;
 }
 
 // The film's colour at `cos_v` (the face's normal against the view).

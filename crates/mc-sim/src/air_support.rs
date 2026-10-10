@@ -387,7 +387,8 @@ impl World {
                     let bp = self.bp(r);
                     let target =
                         self.state.units.pos[r].extend(self.state.units.z[r] + bp.height / 2);
-                    self.blast_blocker(point, target, Some(r)).is_none()
+                    self.blast_blocker(point, target, Some(r), Some(owner))
+                        .is_none()
                         && !(self.shield_blocking(r) && bp.shield.is_some_and(|s| s.is_hull()))
                 })
                 .collect();

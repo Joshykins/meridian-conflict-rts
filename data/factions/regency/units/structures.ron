@@ -549,11 +549,13 @@
     // than the Halberd's), then pinches it out as one glob on a high arc that bursts and
     // sears the ground where it lands.
     //
-    // Balance against the Onager (1900 mass, 2900 HP, 1100 every 16 s at 1900 m, 32 m
-    // splash, 1 degree of spread), bent the Regency way: it hits harder (1300) in a tighter
-    // blast (24 m), laid truer (0.8 degrees). Same reach, past the Trebuchet's 1800 and the
-    // Kiln's 1600, so a tech 3 siege gun has to come into its fire to shell the base, and it
-    // kills either in four hits where the Onager needs five.
+    // Counter-siege and coast defence, as the Onager (1500 mass, 7500 HP, 1400 every 5.5 s
+    // at 1900 m, 36 m splash, 1 degree of spread), bent the Regency way: it hits harder
+    // (1650) in a tighter blast (28 m), laid truer (0.8 degrees). Same reach, past the
+    // Trebuchet's 1800, the Kiln's 1600 and the warships' guns, so a siege gun or a
+    // destroyer has to come into its fire, and it turns onto them (`prefer`) from anything
+    // else. It takes a siege gun's shell and kills either in three hits where the Onager
+    // needs four.
     //
     // Model: `regency_basilisk` (`models::regency::turrets::basilisk`), authored at this
     // size; `muzzle` is the middle of the charge.
@@ -563,16 +565,16 @@
         role: "Artillery Installation", title: "Artillery",
         tech: 2,
         categories: ["Land", "Defense", "Artillery"],
-        health: 3000,
-        cost: (mass: 1950, energy: 13800, time: 1600),
+        health: 7500,
+        cost: (mass: 1550, energy: 10850, time: 1600),
         radius: 10.5, height: 12, footprint: (2, 2),
         vision: 260,
         weapons: [(
             name: "Pinched-plasmeric Howitzer",
-            damage: 1300, splash: 24, range_min: 250, range: 1900, reload: 16.0, speed: 220,
-            trajectory: Ballistic, loft: 3, spread: 0.8,
+            damage: 1650, splash: 28, range_min: 250, range: 1900, reload: 6.5, speed: 400,
+            trajectory: Ballistic, loft: 2, spread: 0.8,
             turret_turn: 12, muzzle: (12.4, 0, 12.6), pivot: (0, 0, 7.6),
-            targets: ["Structure", "Land", "Naval"], color: Orange, red: 1.0,
+            targets: ["Structure", "Land", "Naval"], prefer: ["Artillery", "Naval"], color: Orange, red: 1.0,
             plasma_grade: Some(Pinched),
             flash: 1.3, impact: 2.4, tracer: 1.6,
             sounds: (

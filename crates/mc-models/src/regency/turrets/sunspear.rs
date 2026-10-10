@@ -153,9 +153,9 @@ fn ringed(b: &mut MeshBuilder) {
 /// along its outer face, tied across the bore in bronze. At each rail's tip a plated head
 /// sleeved over it carries two gravity lenses on its inner face. The bore recoils; the
 /// rails part through the charge (`SPREAD`, the ties telescoping), and the heads slide
-/// out along them into the charge (`REACH`). With `slide`, the rails and their heads are a
-/// siege gun's sliding rails (`MeshBuilder::with_siege`), and nothing ties them across
-/// the bore.
+/// out along them into the charge (`REACH`). With `slide`, the rails and their heads, and
+/// the bore, are a siege gun's sliding pieces (`MeshBuilder::with_siege`), and nothing ties
+/// the rails across the bore.
 pub(in crate::regency) fn rails(b: &mut MeshBuilder, len: f32, slide: bool) {
     let fine = b.fine();
     collar(b, Vec3::ZERO, Vec3::Y, 1.6, 10.6);
@@ -186,6 +186,15 @@ pub(in crate::regency) fn rails(b: &mut MeshBuilder, len: f32, slide: bool) {
             );
         }
     }
+    if slide {
+        b.with_siege(0, bore);
+    } else {
+        bore(b);
+    }
+}
+
+/// The bore, recoiling: a bronze tube through plated sleeves, lit at its mouth.
+fn bore(b: &mut MeshBuilder) {
     b.with_recoil(|b| {
         metal(b);
         b.cylinder_between(v3(2.5, 0.0, 0.0), v3(18.5, 0.0, 0.0), 1.1, 1.0, b.sides(10));

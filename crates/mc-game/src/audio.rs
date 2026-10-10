@@ -23,6 +23,7 @@
 
 pub(crate) mod beams;
 pub mod capital;
+mod duck;
 pub(crate) mod elevator;
 pub(crate) mod flight;
 pub(crate) mod gravitic;
@@ -145,6 +146,8 @@ struct Mixer {
     /// Loops whose pitch follows each `set_loops` call instead of staying where it began:
     /// an engine that works harder (capital ships' drives, `capital.rs`).
     gliding: Vec<SoundId>,
+    /// The battle held down under one moment (`Audio::duck_world`).
+    duck: duck::Duck,
 }
 
 struct Shared {
@@ -175,6 +178,7 @@ impl Shared {
                 held: Vec::new(),
                 volumes,
                 gliding: Vec::new(),
+                duck: duck::Duck::default(),
             }),
             bank: RwLock::new(None),
             library: Mutex::new(Arc::new(library)),
@@ -290,10 +294,13 @@ impl Mixer {
             self.volumes.master * self.volumes.effects,
             self.volumes.master * self.volumes.weather,
         );
+        let span = self.duck.advance(frames);
+        let ducking = duck::ducking(span);
         for v in &mut self.voices {
             if v.frames.len() < 2 {
                 continue;
             }
+            let ducked = ducking && v.world && !self.duck.spares(v.key);
             let bus = match (v.world, v.weather) {
                 (false, _) => interface,
                 (true, false) => effects,
@@ -317,10 +324,15 @@ impl Mixer {
                 }
                 let t = (v.at - k as f64) as f32;
                 let (a, b) = (v.frames[k], v.frames[k + 1]);
+                let g = if ducked {
+                    bus * duck::gain(span, i, frames)
+                } else {
+                    bus
+                };
                 write(
                     i,
-                    (a[0] + (b[0] - a[0]) * t) * v.gain[0] * bus,
-                    (a[1] + (b[1] - a[1]) * t) * v.gain[1] * bus,
+                    (a[0] + (b[0] - a[0]) * t) * v.gain[0] * g,
+                    (a[1] + (b[1] - a[1]) * t) * v.gain[1] * g,
                 );
                 v.at += v.rate;
             }
@@ -336,6 +348,7 @@ impl Mixer {
             }
             let n = l.frames.len() as f64;
             let bus = if l.weather { weather } else { effects };
+            let ducked = ducking && !self.duck.spares(sound_key(l.id));
             for i in 0..frames {
                 for c in 0..2 {
                     l.gain[c] += (l.target[c] - l.gain[c]) * 0.0006;
@@ -345,10 +358,15 @@ impl Mixer {
                 let k = l.at as usize % l.frames.len();
                 let (a, b) = (l.frames[k], l.frames[(k + 1) % l.frames.len()]);
                 let t = (l.at - l.at.floor()) as f32;
+                let g = if ducked {
+                    bus * duck::gain(span, i, frames)
+                } else {
+                    bus
+                };
                 write(
                     i,
-                    (a[0] + (b[0] - a[0]) * t) * l.gain[0] * bus,
-                    (a[1] + (b[1] - a[1]) * t) * l.gain[1] * bus,
+                    (a[0] + (b[0] - a[0]) * t) * l.gain[0] * g,
+                    (a[1] + (b[1] - a[1]) * t) * l.gain[1] * g,
                 );
                 l.at = (l.at + l.rate).rem_euclid(n);
             }
@@ -671,6 +689,16 @@ impl Audio {
         for v in m.voices.iter_mut().filter(|v| v.world) {
             v.released = true;
         }
+    }
+
+    /// Holds every world sound and loop down by `depth` (0: not at all, 1: silent) but
+    /// those in `spared`, falling fast and coming back slowly (`duck.rs`): one moment the
+    /// whole battle steps back for. Call it again with 0 to let go.
+    pub fn duck_world(&self, depth: f32, spared: &[SoundId]) {
+        self.shared
+            .mixer()
+            .duck
+            .set(depth, spared.iter().map(|&s| sound_key(s)));
     }
 
     pub fn set_volumes(&self, volumes: Volumes) {

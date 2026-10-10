@@ -1,15 +1,15 @@
-//! The tech 3 mobile anti-spaceship gun: a siege carriage that plants to fire. A long
-//! faceted body rides four armoured tread pods, one at each corner on a short rigid arm
-//! out of a housing in its flank. Packed, the pods run beside the body like a four-tracked
-//! hull, the arms lying nearly flat, and the gun lies along the deck with its rails slid
-//! back down the turret's flanks. Planting (`Model::siege`, `gpu_consts::siege`), each pod
-//! turns in place out into an X, then the arms pivot down about their hips and push the
-//! body up over the pods; the gun rises to the sky and its rails slide out along the bore.
+//! The tech 3 mobile anti-spaceship gun: a siege carriage that plants to fire. Packed it
+//! passes for a heavy tank: a long faceted hull down on four armoured tread pods under
+//! it, the gun lying flat along the deck on a low turntable, its barrel pulled into the
+//! breech and its rails slid back. Planting (`Model::siege`, `gpu_consts::siege`), each
+//! pod swings out from under its corner about a hinge at its end, out into an X, then the
+//! knuckle arms on the hinges stand up and lift the hull; the gun rises to the sky, its
+//! barrel and rails sliding out.
 //!
 //! The gun is the Sunspear's own at [`S`] times its size: two tall rails either side of
 //! a short coiled bore, lens heads at their tips, the rails parting and the heads sliding
-//! out into the charge as it builds. Its fusion is housed in a plated drum across the
-//! turret's back, lit only through slits (no caged core).
+//! out into the charge as it builds. Its fusion is housed in a plated drum on the deck
+//! behind the turntable, lit only through slits (no caged core).
 //!
 //! Authored planted. The unit file's pivot and muzzle are [`LINE`]'s
 //! (`regency_t3_mobile_aa`, `data/factions/regency/units/land_t3.ron`).
@@ -28,7 +28,7 @@ use super::{team_patch, turret_hull, yoke, Line};
 
 /// The blueprint's radius and height.
 pub(in crate::regency) const RADIUS: f32 = 22.0;
-pub(in crate::regency) const HEIGHT: f32 = 42.0;
+pub(in crate::regency) const HEIGHT: f32 = 34.0;
 
 /// The Sunspear's gun at this size.
 const S: f32 = 0.9;
@@ -36,35 +36,42 @@ const S: f32 = 0.9;
 const NOSE: f32 = 15.0;
 const TAIL: f32 = -13.0;
 const HALF: f32 = 7.5;
-const BELLY: f32 = 8.0;
-const DECK: f32 = 12.5;
-/// The turret's roof.
-const ROOF: f32 = DECK + 3.2;
+const BELLY: f32 = 6.2;
+const DECK: f32 = 11.2;
+/// The turret's roof: a low turntable, so the gun lies on the deck packed.
+const ROOF: f32 = DECK + 0.9;
 /// The gun's line: raised 60 degrees at rest, the Sunspear's bore at [`S`].
 pub(super) const LINE: Line = Line {
-    pivot: Vec3::new(1.0, 0.0, DECK + 4.6),
+    pivot: Vec3::new(1.0, 0.0, DECK + 1.9),
     pitch_deg: 60.0,
     len: 26.6 * S,
 };
 /// How far round the charge its projectors stand: none closer than 0.4 of it.
 #[cfg(test)]
 pub(super) const HOLD: f32 = 4.3 * S;
-/// How far back along the bore the rails lie packed, down the turret's flanks.
+/// How far back along the bore the rails lie packed, along the deck, and how far the
+/// barrel pulls back into the breech.
 const RETRACT: f32 = 12.0 * S;
+const BARREL_RETRACT: f32 = 5.0 * S;
 
-/// The front left arm, planted: its hip in the body's flank, its knee on the pod. Packed
-/// it lies [`PACKED_PITCH`] below level, planted 40 degrees.
-const HIP: Vec3 = Vec3::new(9.5, 6.0, 9.8);
-const ARM_LEN: f32 = 6.5;
-const ARM_WAY: Vec2 = Vec2::new(0.55, 0.835);
-const ARM_PITCH: f32 = 0.698;
-const PACKED_PITCH: f32 = 0.14;
-/// How far the front left pod turns out to the left, planted: the X.
-const SPLAY: f32 = 0.6;
-/// A pod: half its length, half its width, its height.
-const POD_SIZE: Vec3 = Vec3::new(6.2, 2.8, 5.0);
+/// The front left knuckle arm, planted: its hip in a housing under the hull, its knee the
+/// hinge on the pod's end. Packed it lies [`PACKED_PITCH`] below level, the hull down on
+/// its pods; planted it stands at 70 degrees, which lifts the hull 2 m.
+const HIP: Vec3 = Vec3::new(8.5, 4.6, 7.42);
+const ARM_LEN: f32 = 3.0;
+const ARM_WAY: Vec2 = Vec2::new(1.0, 0.0);
+const ARM_PITCH: f32 = 1.222;
+const PACKED_PITCH: f32 = 0.262;
+/// Which way the front left pod points from its hinge planted, from straight ahead: out
+/// to the left into the X. Packed it points straight back, under the hull like a tank's
+/// track.
+const POD_OUT: f32 = 0.873;
+/// A pod: half its length, half its width, its height. It runs out from its hinge, which
+/// sits on its top [`POD_BACK`] from its end.
+const POD_SIZE: Vec3 = Vec3::new(5.2, 2.6, 4.4);
+const POD_BACK: f32 = 1.2;
 /// The arm's width and depth.
-const ARM_THICK: Vec2 = Vec2::new(3.0, 2.6);
+const ARM_THICK: Vec2 = Vec2::new(3.2, 2.8);
 
 /// The front left arm's knee, planted.
 fn knee() -> Vec3 {
@@ -72,7 +79,7 @@ fn knee() -> Vec3 {
         - Vec3::Z * ARM_LEN * ARM_PITCH.sin()
 }
 
-/// The front left pod's middle, packed.
+/// The front left pod's hinge, packed.
 fn packed_knee() -> Vec2 {
     HIP.truncate() + ARM_WAY.normalize() * ARM_LEN * PACKED_PITCH.cos()
 }
@@ -84,14 +91,15 @@ pub(super) fn draw(b: &mut MeshBuilder) {
         hip: HIP.to_array(),
         knee: knee.to_array(),
         packed_pitch: PACKED_PITCH,
-        splay: SPLAY,
-        // Level along the deck, a hair down.
-        stow: -LINE.pitch() - 0.03,
+        splay: POD_OUT - std::f32::consts::PI,
+        // Level along the deck.
+        stow: -LINE.pitch(),
         retract: RETRACT,
+        barrel_retract: BARREL_RETRACT,
     });
-    // Packed, its tracks run beside the body.
+    // Packed, its tracks run under the hull, the rear pods back to their hinges.
     let packed = packed_knee();
-    b.set_treads(packed.y, POD_SIZE.y * 2.0, -packed.x - POD_SIZE.x);
+    b.set_treads(packed.y, POD_SIZE.y * 2.0, -packed.x - POD_BACK);
     b.set_dust_line(POD_SIZE.z);
     if b.coarse() {
         coarse(b, knee);
@@ -115,12 +123,13 @@ pub(super) fn draw(b: &mut MeshBuilder) {
             [-1.6, 3.0],
             [ROOF - 0.2, LINE.pivot.z + 1.2],
         );
-        fusion_drum(b, v3(-4.4, 0.0, ROOF + 1.3));
+        fusion_drum(b, v3(-4.4, 0.0, DECK + 1.5));
         b.set_charge_gear(LINE.pivot, S);
         LINE.gun(b, |b| {
             b.with(Affine3A::from_scale(Vec3::splat(S)), |b| {
                 sunspear::rails(b, 25.0, true);
-                sunspear::pinch_coils(b);
+                // The coils ride the barrel back into the breech.
+                b.with_siege(0, |b| b.with_recoil(sunspear::pinch_coils));
             });
         });
     });
@@ -140,9 +149,7 @@ fn coarse(b: &mut MeshBuilder, knee: Vec3) {
     team_patch(b, -3.0, 0.0, 1.0, ROOF + 0.01);
     for (sx, sy) in CORNERS {
         b.with_siege(POD, |b| {
-            let frame = Affine3A::from_translation(v3(knee.x * sx, knee.y * sy, 0.0))
-                * Affine3A::from_rotation_z(SPLAY * sx * sy);
-            b.with(frame, |b| {
+            b.with(pod_frame(knee, sx, sy), |b| {
                 b.with_part(part::LOCOMOTION, |b| {
                     b.paint(TREAD);
                     let Vec3 { x: l, y: w, z: h } = POD_SIZE;
@@ -206,16 +213,27 @@ fn legs(b: &mut MeshBuilder, knee: Vec3) {
             collar(b, hip, Vec3::Y, ARM_THICK.y * 0.55, ARM_THICK.x + 0.4);
         });
         b.with_siege(POD, |b| {
-            let frame = Affine3A::from_translation(v3(knee.x, knee.y, 0.0))
-                * Affine3A::from_rotation_z(SPLAY * sx * sy);
-            b.with(frame, |b| pod(b, knee.z, sy));
+            // The hinge: a plated knuckle on the pod's top round a bronze pin.
+            dark_plate(b);
+            b.with_facets(|b| b.cuboid(knee, v3(ARM_THICK.x + 0.6, ARM_THICK.x + 0.6, 1.6)));
+            collar(b, knee, Vec3::Y, ARM_THICK.y * 0.45, 2.4);
+            b.with(pod_frame(knee / side, sx, sy), |b| pod(b, -sx * sy));
         });
     }
 }
 
+/// A pod's own frame (`pod`'s), for the corner (`sx`, `sy`) of the front left `knee`: it
+/// runs out from its hinge, pointing out into the X.
+fn pod_frame(knee: Vec3, sx: f32, sy: f32) -> Affine3A {
+    let way = (sy * POD_OUT.sin()).atan2(sx * POD_OUT.cos());
+    Affine3A::from_translation(v3(knee.x * sx, knee.y * sy, 0.0))
+        * Affine3A::from_rotation_z(way)
+        * Affine3A::from_translation(v3(POD_SIZE.x - POD_BACK, 0.0, 0.0))
+}
+
 /// A tread pod in its own frame (its middle on the ground at the origin, running along
-/// x), the knee's bracket on top at `knee_z`; `sy` the side of the body it is on.
-fn pod(b: &mut MeshBuilder, knee_z: f32, sy: f32) {
+/// x); `sy` its side that faces out from under the hull packed.
+fn pod(b: &mut MeshBuilder, sy: f32) {
     let Vec3 { x: l, y: w, z: h } = POD_SIZE;
     b.with_part(part::LOCOMOTION, |b| {
         b.paint(TREAD);
@@ -293,18 +311,6 @@ fn pod(b: &mut MeshBuilder, knee_z: f32, sy: f32) {
     } else {
         b.face(&[quad[1], quad[0], quad[3], quad[2]]);
     }
-    // The knee's bracket: two plated cheeks and a bronze pin.
-    let cheek = ARM_THICK.x * 0.5 + 0.25;
-    b.mirror_y(|b| {
-        dark_plate(b);
-        b.beam(
-            v3(0.0, cheek, h - 0.1),
-            v3(0.0, cheek, knee_z + 0.6),
-            Vec2::new(1.8, 0.4),
-            Vec2::new(1.3, 0.4),
-        );
-    });
-    collar(b, v3(0.0, 0.0, knee_z), Vec3::Y, 0.7, cheek * 2.0 + 0.5);
     if b.fine() {
         red_slot(b, v3(l + 0.2, 0.0, 0.8 * h), Vec3::X, Vec3::Y, 1.2, 0.14);
     }
@@ -373,14 +379,14 @@ fn body(b: &mut MeshBuilder) {
             0.16,
         );
     });
-    // A plated housing at each corner that the arm pivots in.
+    // A plated housing under the hull at each corner that the arm pivots in.
     for (sx, sy) in CORNERS {
         let at = HIP * Vec3::new(sx, sy, 1.0);
         dark_plate(b);
         b.with_facets(|b| {
             b.cuboid(
-                at - Vec3::Y * sy * 0.9,
-                Vec3::new(ARM_THICK.x + 1.4, 2.4, ARM_THICK.y + 1.2),
+                v3(at.x, at.y, BELLY - 0.3),
+                Vec3::new(ARM_THICK.x + 1.0, ARM_THICK.x + 0.6, 1.6),
             )
         });
     }
@@ -395,8 +401,8 @@ fn body(b: &mut MeshBuilder) {
     });
 }
 
-/// The fusion drum lying across the turret's back at `c`, short enough for the rails to lie
-/// either side of it packed: a plated cylinder in a cradle of plates, bronze end caps, its
+/// The fusion drum lying across the deck behind the turntable at `c`, short enough for the
+/// rails to lie either side of it packed: a plated cylinder in a cradle of plates, bronze end caps, its
 /// light only through slits along its top.
 fn fusion_drum(b: &mut MeshBuilder, c: Vec3) {
     let sides = b.sides(14);

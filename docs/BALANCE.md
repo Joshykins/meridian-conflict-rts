@@ -84,7 +84,7 @@ Off the lines, measured the same way:
   1.5 s, the air at the mark crackling faintly for its last 0.6 s, and comes down in the middle of everything within 250 m of the one it saw. As it
   lands its Seraphic Nova (a `dash_only` cone weapon, a full-circle wake) rolls out to
   320 m at 260 m/s (15000 at its feet to 3750 at the edge, enemies only, 1.5 s stun on all
-  but experimentals, over hills and walls, stopped only by shield domes), its seekers all
+  but experimentals, over hills and walls, stopped only by enemy shield domes: its own side's let it through), its seekers all
   going up as it lands; then 15 s to recharge. Model 25% bigger since 10-09 (radius 75 m). Not at a move order, hold fire
   or hold position. It lands under a siege gun's `range_min` (the Behemoth's Tempest
   900 m, rockets 600 m), so it is the Behemoth's ground answer; nothing against aircraft, though its forearms reach spacecraft.
@@ -99,8 +99,7 @@ Off the lines, measured the same way:
   ships, and nothing dearer than one payload (the Behemoth).
 - The Regency's Springald (same cost and reach) is bent as the Kiln is from the Trebuchet:
   5600 in 40 m every 10 s (560 dps on paper), a 0.8 degree spread and a 4 s charge. Its
-  shot is drawn as three strands wound round each other but is one shot and strikes once
-  (`Weapon::braid`), so a dome takes it as it takes a Culverin shell.
+  shot is one shell, so a dome takes it as it takes a Culverin shell.
 - The Regency's Carillon (T4 area defence, 6500 mass, 26000 HP, 30 energy/s upkeep) is
   a store of damage, not a rate of it: it makes eight plasma flecks every 4 s and holds
   up to thirty-two (`Weapon::orbs`, `orb_time`), drifting round the spire like fireflies,

@@ -3,7 +3,7 @@
 //! coils. The breech runs forward into a plated fairing that goes from round to three
 //! lobes, and the rails grow out of its lobes, so gun and body are one piece. Its charge
 //! is held at [`LINE`]'s muzzle between three gravity lenses, one on each rail, so the
-//! three knots of its triune shot are gathered where the strands leave from.
+//! three knots of its triune shot are gathered into one where it leaves from.
 
 use std::f32::consts::TAU;
 

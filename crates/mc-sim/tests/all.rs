@@ -95,6 +95,7 @@ mod stranded_ships;
 mod stream;
 mod strider;
 mod survival;
+mod t2_artillery;
 mod thirty_two;
 mod titan;
 mod titan_air;

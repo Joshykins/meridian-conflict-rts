@@ -645,7 +645,7 @@ impl World {
         let domes = blow.domes && !self.scratch.shielded.is_empty();
         let (share, ignite) = (blow.share, blow.ignite);
         for (row, point, dist) in near {
-            if domes && self.blast_blocker(at, point, None).is_some() {
+            if domes && self.blast_blocker(at, point, None, None).is_some() {
                 continue;
             }
             self.damage_structure(row, damage(dist) * share, ignite);

@@ -1199,7 +1199,7 @@ impl World {
                 });
             let damage = if let Some(&(_, _, held)) = screen {
                 damage - held
-            } else if let Some(shield) = self.blast_blocker(origin, target, Some(row)) {
+            } else if let Some(shield) = self.blast_blocker(origin, target, Some(row), None) {
                 let held = if self.state.units.has_flag(shield, flag::INVULNERABLE) {
                     Fx::MAX
                 } else {

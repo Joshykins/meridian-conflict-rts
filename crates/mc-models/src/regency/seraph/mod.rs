@@ -8,9 +8,9 @@
 //! runs the length of each forearm (`arms`), its bore split between two lit rails. On the
 //! back between the wing roots stand two launch decks, eight cells each, open to the sky,
 //! from which the cased seekers climb and fall round it (`deck`). The wings (`wings`) fan
-//! out of a housing on each shoulder blade: seven dark feathers rimmed in red
-//! (`pattern::EMBER_RIM`), each cut differently, the light in the plate, never a lit
-//! piece. Its legs hang staggered, one drawn up; with nothing to shoot its forearms hang
+//! out of a housing on each shoulder blade: seven dark plated feathers, each cut
+//! differently, its lower half in the deep shade and a red line down its trailing edge,
+//! the light in the plate, never a lit piece. Its legs hang staggered, one drawn up; with nothing to shoot its forearms hang
 //! at its sides, the repeaters pointed down (the unit file's `rest_pitch`).
 //!
 //! Finish (docs/STYLE.md "The Regency look"): dark plates, graphite machinery, red light.

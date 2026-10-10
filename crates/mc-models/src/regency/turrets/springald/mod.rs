@@ -1,8 +1,7 @@
 //! The Springald (`regency_t4_artillery`, a 6 x 6 lot, the Culverin's size): the
 //! Regency's map gun, a Triune Pinch-fusion Howitzer. Like the Sunspear it gathers its
 //! charge in front of the bore, here three knots of fusion at once, and lobs them high as
-//! one shot that is drawn as three strands wound round each other (`Weapon::braid`). The
-//! `muzzle` is the middle of the charge.
+//! one shell. The `muzzle` is the middle of the charge.
 //!
 //! It stands on a stepped octagonal plinth ringed by plated pylons. On the plinth a long
 //! turret turns on a bronze race: plated cheeks either side of the trunnion, a short

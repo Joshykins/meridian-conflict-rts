@@ -484,17 +484,22 @@
         role: "Artillery Installation", title: "Artillery",
         tech: 2,
         categories: ["Land", "Defense", "Artillery"],
-        health: 2900,
-        cost: (mass: 1900, energy: 13500, time: 1600),
+        health: 7500,
+        cost: (mass: 1500, energy: 10500, time: 1600),
         radius: 17.85, height: 15.3, footprint: (2, 2),
         vision: 260,
-        // Reaches a little past the Trebuchet's 1800 m, so a mobile siege gun has to come
-        // into its fire to shell it; the commander's Shoulder Howitzer matches it.
+        // Counter-siege and coast defence. It reaches a little past the Trebuchet's 1800 m
+        // and the warships' guns (Marlin 1500), so a siege gun or a destroyer has to come
+        // into its fire to shell the base, and it turns onto them (`prefer`) from anything
+        // else. Armoured to take a Trebuchet's shell and fire back; a shell is in the air
+        // under 7 s at full reach, quick enough to catch a deploying gun or a ship on a
+        // steady course, and it bursts wide enough to deny ground to a standing crowd.
+        // The commander's Shoulder Howitzer matches its reach.
         weapons: [(
             name: "Heavy Howitzer",
-            damage: 1100, splash: 32, range_min: 250, range: 1900, reload: 16.0, speed: 220, trajectory: Ballistic, loft: 3,
+            damage: 1400, splash: 36, range_min: 250, range: 1900, reload: 5.5, speed: 400, trajectory: Ballistic, loft: 2,
             turret_turn: 12, muzzle: (24.7, 0, 16.0), pivot: (-0.5, 0, 9.95), spread: 1.0,
-            targets: ["Structure", "Land", "Naval"], color: Orange, shockwave: 1.0,
+            targets: ["Structure", "Land", "Naval"], prefer: ["Artillery", "Naval"], color: Orange, shockwave: 1.0,
             sounds: (fire: "howitzer", impact: "shell_heavy", ground: "shell_heavy"),
         )],
         mesh: "artillery_static", icon: Artillery,

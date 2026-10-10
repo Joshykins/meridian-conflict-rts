@@ -190,7 +190,9 @@ pub mod pattern {
     /// Standard Regency armour with a violet gasket inside the face perimeter: nanite
     /// gear's `EMBER_RIM`, brighter while the unit builds.
     pub const NANITE_RIM: u32 = crate::gpu_consts::nanite::PATTERN_RIM;
-    pub const LAST: u32 = NANITE_RIM;
+    /// Standard Regency armour in a deeper shade (`gpu_consts::ember_plate::DEEP`).
+    pub const EMBER_DEEP: u32 = crate::gpu_consts::ember_plate::DEEP;
+    pub const LAST: u32 = EMBER_DEEP;
 }
 
 /// Which rigid part of the model a vertex belongs to. The vertex shader
@@ -692,24 +694,27 @@ pub struct Siege {
     /// How far the arm pitches below level packed (radians): less than planted, so the
     /// body comes down as the arm lies flatter, the pod staying on the ground.
     pub packed_pitch: f32,
-    /// How far the front left pod is turned out to the left, planted (radians): the X.
+    /// How far the front left pod turns about its hinge (the knee) from packed to planted
+    /// (radians, positive to the left): from under the hull out into the X.
     pub splay: f32,
     /// The gun's pitch packed against its rest (radians, negative lowers it).
     pub stow: f32,
-    /// How far back along the bore its rails (`rig::DEPLOY` on `ARM_GUN`) lie packed.
+    /// How far back along the bore its rails (`rig::DEPLOY` on `ARM_GUN`) lie packed, and
+    /// its barrel (those that are also `rig::RECOIL`), pulled back into the breech.
     pub retract: f32,
+    pub barrel_retract: f32,
 }
 
 impl Siege {
     /// For `ModelInfo::siege`: hip and the packed pitch, knee and splay, the gun's stow and
-    /// retract, then w 1 in the last.
+    /// its rails' and barrel's retract, then z 1 in the last.
     pub fn gpu(&self) -> [[f32; 4]; 4] {
         let [hx, hy, hz] = self.hip;
         let [kx, ky, kz] = self.knee;
         [
             [hx, hy, hz, self.packed_pitch],
             [kx, ky, kz, self.splay],
-            [self.stow, self.retract, 0.0, 0.0],
+            [self.stow, self.retract, self.barrel_retract, 0.0],
             [0.0, 0.0, 1.0, 0.0],
         ]
     }

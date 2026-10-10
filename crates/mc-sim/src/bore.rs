@@ -113,7 +113,7 @@ impl World {
             .map(|r| {
                 let units = &self.state.units;
                 let middle = units.pos[r].extend(units.z[r] + self.bp(r).height / 2);
-                (r, self.blast_blocker(from, middle, Some(r)))
+                (r, self.blast_blocker(from, middle, Some(r), Some(owner)))
             })
             .collect();
         let mut charged = Vec::new();

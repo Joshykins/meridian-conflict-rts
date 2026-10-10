@@ -1706,12 +1706,14 @@ fn vs_main(in: VsIn) -> VsOut {
                 if model.crawl[0].w > 1.5 {
                     pitch -= tail_pose(e, model, walk, t, 15u)[5].x;
                 }
-                // A siege gun lies along the deck packed, its rails slid back along the bore;
-                // they slide out first, then the gun pitches.
+                // A siege gun lies along the deck packed, its rails slid back along the bore
+                // and its barrel pulled into the breech; they slide out first, then the gun
+                // pitches.
                 if model.siege[3].z > 0.5 && limb == LIMB_ARM_GUN {
                     let out = siege_deploy(e, t);
                     if (in.rig & (RIG_DEPLOY | (SIEGE_MASK << SIEGE_SHIFT))) == RIG_DEPLOY {
-                        let back = model.siege[2].y * (1.0 - smoothstep(SIEGE_SLIDE_START, 1.0, out));
+                        let reach = select(model.siege[2].y, model.siege[2].z, (in.rig & RIG_RECOIL) != 0u);
+                        let back = reach * (1.0 - smoothstep(SIEGE_SLIDE_START, 1.0, out));
                         p -= normalize(model.recoil.xyz) * back;
                     }
                     pitch = mix(model.siege[2].x, pitch, smoothstep(SIEGE_RAISE_START, SIEGE_RAISE_END, out));
@@ -4482,6 +4484,8 @@ fn fs_hull_depth(in: VsOut) {
 
 // How much of a personal field shows when nothing is hitting it.
 const HULL_IDLE: f32 = 0.45;
+// How much of that the lattice itself keeps: its cells only a trace.
+const HULL_LATTICE_IDLE: f32 = 0.35;
 
 // fs_hull behind the clouds where it is past them (bindings.wgsl `past_clouds_at`): a
 // flying hull's field goes into the cloud with it.
@@ -4526,8 +4530,10 @@ fn fs_hull_lit(in: VsOut) -> vec4<f32> {
     let eye_dist = length(in.world - eye);
     let cell_px = select(HULL_HEX, SHIELD_LOOK_HULL_CELL * 0.6, prismatic) * globals.lod.x / max(eye_dist, 1.0);
     let hex_see = smoothstep(0.9, 4.5, cell_px);
-    let seam = pow(saturate((hx.x - 0.66) / 0.22), 1.45) * hex_see;
-    let plate = (1.0 - smoothstep(0.70, 0.90, hx.x)) * hex_see;
+    // At rest the lattice is a trace over the plates, so the unit's own detail reads
+    // through it; a hit (`hull_hits`) lights it at full strength.
+    let seam = pow(saturate((hx.x - 0.66) / 0.22), 1.45) * hex_see * HULL_LATTICE_IDLE;
+    let plate = (1.0 - smoothstep(0.70, 0.90, hx.x)) * hex_see * HULL_LATTICE_IDLE;
     let fres = pow(1.0 - facing, 2.1);
     let live = 0.68 + 0.32 * sin(time * 2.4);
     let dying = select(0.0, 1.0, ((s.packed >> 24u) & 1u) == 1u);

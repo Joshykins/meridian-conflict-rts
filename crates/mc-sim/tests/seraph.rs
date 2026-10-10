@@ -206,14 +206,10 @@ fn the_cooldown_holds_the_next_dash() {
     }
     let (first, _) = until_landed(&mut w, 60).expect("first dash");
     cluster(&mut w, 1000, 3200);
-    let cooldown = w
-        .blueprints
-        .unit_by_key(SERAPH)
-        .unwrap()
-        .dash
-        .unwrap()
-        .cooldown_ticks as u32;
-    let (second, to) = until_landed(&mut w, cooldown + 40).expect("second dash");
+    let dash = w.blueprints.unit_by_key(SERAPH).unwrap().dash.unwrap();
+    let cooldown = dash.cooldown_ticks as u32;
+    let gap = dash.windup_ticks as u32 + dash.transit_ticks as u32;
+    let (second, to) = until_landed(&mut w, cooldown + gap + 20).expect("second dash");
     assert!(
         second - first >= cooldown,
         "dashed again {} ticks after landing, recharge {cooldown}",
@@ -338,6 +334,44 @@ fn the_wave_rolls_out_from_the_landing() {
     if let Some(r) = w.state.units.row(far) {
         assert!(w.state.units.stun[r][0] > 0, "the front never reached it");
     }
+}
+
+/// A bot past the cluster under a dome owned by `dome_owner`, clear of where the
+/// Seraph lands: whether the landing's wave struck it.
+fn wave_under_dome(dome_owner: u8, dome: &str) -> bool {
+    let mut w = world(None);
+    for p in &mut w.state.players {
+        p.free_build = true;
+    }
+    // Beyond its seekers' reach of the dome until it lands.
+    add(&mut w, SERAPH, 0, 300, 2000, false);
+    cluster(&mut w, 1700, 2000);
+    let generator = add(&mut w, dome, dome_owner, 1700, 2380, true);
+    let covered = add(&mut w, BOT, 1, 1700, 2290, true);
+    until_landed(&mut w, 60).expect("it dashed");
+    let r = row(&w, generator);
+    assert!(
+        w.state.units.shield_hp[r] > Fx::ZERO && w.state.units.shield_open[r] == u8::MAX,
+        "the dome is up as it lands"
+    );
+    roll_out(&mut w);
+    let u = &w.state.units;
+    // Struck: stunned (its own hull field may have taken the damage).
+    u.row(covered).is_none_or(|r| u.stun[r][0] > 0)
+}
+
+/// Its own side's dome does not shelter the enemies under it from its wave; an enemy's
+/// dome does.
+#[test]
+fn only_an_enemy_dome_stops_the_wave() {
+    assert!(
+        wave_under_dome(0, "regency_t2_shield"),
+        "its own dome kept the wave off"
+    );
+    assert!(
+        !wave_under_dome(1, "aster_t2_shield"),
+        "an enemy dome let the wave through"
+    );
 }
 
 /// Four heavy tanks the landing does not kill, 150 m about `(x, y)`.
