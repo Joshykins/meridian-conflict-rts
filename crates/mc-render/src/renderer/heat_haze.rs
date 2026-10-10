@@ -35,7 +35,10 @@ pub(crate) struct GpuHeatPlume {
     pub(crate) strength: f32,
     /// Sets each plume's noise apart.
     pub(crate) seed: f32,
-    pub(crate) _pad: [f32; 2],
+    /// `haze::KIND_HEAT`, or `haze::KIND_LENS`: gravity bending the light round the axis
+    /// out to `radius` (renderer/gravitic_engine_fx), `strength` how hard.
+    pub(crate) kind: u32,
+    pub(crate) _pad: f32,
 }
 
 /// Engine load: what a unit standing still burns, and the speed (m/s) at which it runs flat out.
@@ -130,8 +133,15 @@ impl HeatHaze {
         self.load.retain(|id, _| live.contains(id));
     }
 
-    /// Hands the GPU this frame's plumes: those of the running units nearest the eye.
-    pub(super) fn upload(&mut self, time: f32, alpha: f32, camera: &Camera) {
+    /// Hands the GPU this frame's plumes: `lenses` (gravity bending the light, which come
+    /// first), then those of the running units nearest the eye.
+    pub(super) fn upload(
+        &mut self,
+        time: f32,
+        alpha: f32,
+        camera: &Camera,
+        lenses: &[GpuHeatPlume],
+    ) {
         let dt = (time - self.last_time).clamp(0.0, 0.25);
         self.last_time = time;
         let eye = camera.eye();
@@ -170,7 +180,8 @@ impl HeatHaze {
                         height: port.radius * HEIGHT_RADII,
                         strength,
                         seed: (u.id.wrapping_mul(7) + i as u32) as f32 * 0.618,
-                        _pad: [0.0; 2],
+                        kind: crate::gpu_consts::haze::KIND_HEAT,
+                        _pad: 0.0,
                     },
                 ));
             }
@@ -178,8 +189,14 @@ impl HeatHaze {
         // Nearest first; distances can tie, and the stable sort keeps the unit order then.
         self.scratch.sort_by(|a, b| a.0.total_cmp(&b.0));
         // A deliberate cap: past the nearest plumes the rest are too small to see bend.
-        self.scratch.truncate(MAX_PLUMES as usize);
-        let plumes: Vec<GpuHeatPlume> = self.scratch.iter().map(|p| p.1).collect();
+        // The lenses are capped by their maker (`gravitic_engine_fx::MOST_LENSES`).
+        let lenses = &lenses[..lenses.len().min(MAX_PLUMES as usize / 2)];
+        self.scratch.truncate(MAX_PLUMES as usize - lenses.len());
+        let plumes: Vec<GpuHeatPlume> = lenses
+            .iter()
+            .copied()
+            .chain(self.scratch.iter().map(|p| p.1))
+            .collect();
         self.buffer
             .write(0, bytemuck::cast_slice(&[plumes.len() as u32, 0, 0, 0]));
         self.buffer.write(16, bytemuck::cast_slice(&plumes));

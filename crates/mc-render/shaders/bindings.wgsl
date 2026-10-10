@@ -943,6 +943,28 @@ struct CraterList {
 }
 @group(0) @binding(29) var<storage, read> ground_craters: CraterList;
 
+// The ground a gravitic engine breaks (renderer/gravitic_engine_fx/ground.rs), shaded by
+// scars.wgsl `rifts_at`.
+//!rust crate::renderer::gravitic_engine_fx::ground::GpuRift
+struct Rift {
+    // A line's two ends (xy, zw); a disc's middle in xy.
+    line: vec4<f32>,
+    // RIFT_* kind, reach (a disc's radius, a line's half width), a foot's inner radius, seed.
+    shape: vec4<f32>,
+    // When it began (the renderer's clock), how fast its crack front runs (m/s), how far the
+    // front may have got (metres), the share of its plates' heave still showing (0 to 1).
+    time: vec4<f32>,
+    // How bright its cracks glow now, how hard light pulses along it toward the mark, how
+    // much of the light's white heart shows, and how far the head of a line burns.
+    glow: vec4<f32>,
+}
+struct RiftList {
+    // x how many are in use.
+    count: vec4<u32>,
+    items: array<Rift, RIFT_MAX>,
+}
+@group(0) @binding(39) var<storage, read> ground_rifts: RiftList;
+
 // Heat in the ground (renderer/ground_melt.rs): the layout is `MELT_FIELD_*`.
 @group(0) @binding(32) var<storage, read> ground_melt: array<u32>;
 // A city structure's look, one word per map prop (renderer/city_fx.rs,

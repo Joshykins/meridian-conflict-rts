@@ -537,6 +537,8 @@ pub(crate) const SCENE_SET: &[Binding] = &[
     (36, vk::DescriptorType::SAMPLED_IMAGE),
     (37, vk::DescriptorType::SAMPLED_IMAGE),
     (38, vk::DescriptorType::SAMPLED_IMAGE),
+    // The ground a gravitic engine breaks (renderer/gravitic_engine_fx/ground.rs).
+    (39, vk::DescriptorType::STORAGE_BUFFER),
 ];
 
 /// The pass set (group 1 of the scene layout): a pass's own two storage buffers.

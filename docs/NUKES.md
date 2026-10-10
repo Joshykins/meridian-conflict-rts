@@ -104,7 +104,7 @@ under the player's control; and the commander's death a nuke too.
   sea (at the boat's missile size), with a flash, fire hammered down onto the water and a
   ring of steam rolling out over the waves round a column of it. Until then it lays no
   trail and draws no plume.
-- **The crater** (`renderer/craters.rs`, `terrain.wgsl craters_at`): a glassed pool that
+- **The crater** (`renderer/craters.rs`, `scars.wgsl craters_at`): a glassed pool that
   cools from white-yellow through orange plates and glowing cracks to black-green glass over
   about six minutes (a commander's over about four), a bowl and lip in the shading, and
   charcoal streaks feathering out past the damage radius. It stays for the match. The sim

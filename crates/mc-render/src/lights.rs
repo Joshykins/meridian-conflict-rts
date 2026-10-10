@@ -437,6 +437,10 @@ impl Lights {
             crate::gpu_consts::effect::MATERIALS => (MATERIALS, 70.0, 7.0, Envelope::Flash),
             // A rail gun (renderer/rail_fx.rs): white-hot.
             9 => (Vec3::new(1.0, 0.95, 0.88), 90.0, 6.0, Envelope::Flash),
+            // A gravitic engine (renderer/gravitic_engine_fx): white-hot violet.
+            crate::gpu_consts::effect::GRAVITIC => {
+                (Vec3::new(0.72, 0.45, 1.0), 90.0, 7.0, Envelope::Flash)
+            }
             _ => return,
         };
         // Brightness grows with the flash's area, but a big blast is not a sun.

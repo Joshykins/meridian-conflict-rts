@@ -68,6 +68,7 @@ mod footfalls;
 pub(crate) mod foundations;
 mod frame;
 pub(crate) mod grass;
+pub(crate) mod gravitic_engine_fx;
 mod gravitic_fx;
 mod great_gun_fx;
 mod ground_contact;
@@ -150,7 +151,8 @@ pub const MAX_DYNAMIC: usize = MAX_SIM_ENTITIES
     + MAX_BURNING_TREES
     + fallen_trees::MOST_SHOWN
     + wreck_finish::MOST_SHOWN
-    + city_fx::MOST_FALLING;
+    + city_fx::MOST_FALLING
+    + gravitic_engine_fx::MOST_SLABS;
 /// Gun-house poses (`mirror::HousePose`): at most one per unit, so every unit can have one.
 pub const MAX_HOUSES: usize = mc_sim::tables::MAX_UNITS;
 /// Selection rings and status bars: at most one per unit or wreck drawn.
@@ -918,6 +920,9 @@ pub struct Renderer {
     lift_fx: lift_fx::LiftFx,
     /// The light off a winged flier's feathers (renderer/wing_fx.rs).
     wing_fx: wing_fx::WingFx,
+    /// Gravitic engines at work: their light, their rifts and wells, the ground they break
+    /// (renderer/gravitic_engine_fx.rs, scene set 39).
+    gravitic_engine_fx: gravitic_engine_fx::GraviticEngineFx,
     /// Arcs on running reactors, and reactors going up (renderer/reactor_fx.rs).
     reactor_fx: reactor_fx::ReactorFx,
     /// Capital ships' drives, lift jets and lamps (renderer/capital_fx.rs).
@@ -1374,6 +1379,16 @@ impl Renderer {
             drawn_as.push((model_list.len(), icon, 0));
             model_list.push((model, icon));
         }
+        // Then the rock a gravitic engine tears loose (`gravitic_engine_fx`), drawn as props.
+        let rift_slab_base = drawn_as.len() as u32;
+        for key in models::rift_slabs::SLAB_KEYS
+            .iter()
+            .chain(&models::rift_slabs::SHARD_KEYS)
+        {
+            let model = models::build_model(key).unwrap_or_else(|| fallback_model(key, 6.0, 3.0));
+            drawn_as.push((model_list.len(), 13, 0));
+            model_list.push((model, 13));
+        }
         let mut vertices: Vec<MeshVertex> = Vec::new();
         let mut indices: Vec<u32> = Vec::new();
         let mut slots: Vec<DrawSlot> = Vec::new();
@@ -1386,6 +1401,8 @@ impl Renderer {
         let mut lift_models: Vec<Vec<models::Lift>> = Vec::new();
         // Each model slot's flight rig (`wing_fx`).
         let mut flight_models: Vec<Option<models::Flight>> = Vec::new();
+        // Each model slot's held gravity (`gravitic_engine_fx`).
+        let mut gravity_cores: Vec<Option<[f32; 4]>> = Vec::new();
         // Each model slot's held charge (`reactor_fx`).
         let mut discharge_models: Vec<Option<models::Discharge>> = Vec::new();
         // Per blueprint: its ground stakes' scale, if it plants any (`stake_fx`).
@@ -1420,6 +1437,7 @@ impl Renderer {
             exhaust_models.push(model.exhausts.clone());
             lift_models.push(model.lifts.clone());
             flight_models.push(model.flight);
+            gravity_cores.push(model.gravity_core);
             discharge_models.push(model.discharge.clone());
             stake_scales.push(models::stakes::stake_scale(model));
             coil_models.push(model.lods[0].vertices.iter().any(|v| {
@@ -2293,6 +2311,14 @@ impl Renderer {
             vk::DescriptorType::STORAGE_BUFFER,
             &[skins.buffer()],
         );
+        let gravitic_engine_fx =
+            gravitic_engine_fx::GraviticEngineFx::new(&gpu, gravity_cores, rift_slab_base)?;
+        write_buffers(
+            scene_set,
+            39,
+            vk::DescriptorType::STORAGE_BUFFER,
+            &[gravitic_engine_fx.ground.buffer()],
+        );
         let ground_melt = ground_melt::GroundMelt::new(&gpu)?;
         write_buffers(
             scene_set,
@@ -2495,6 +2521,7 @@ impl Renderer {
             lens_flares,
             lift_fx: lift_fx::LiftFx::new(lift_models),
             // With each rig its top speed, as its `ModelInfo` carries it.
+            gravitic_engine_fx,
             wing_fx: wing_fx::WingFx::new(
                 flight_models
                     .into_iter()
@@ -3240,6 +3267,20 @@ impl Renderer {
         let patched = self.titan_charge.patch(units, time);
         let patched = self.capital_fx.swing.patch(&self.blueprints, patched);
         let patched = self.wing_fx.ease(patched);
+        let blueprints = &self.blueprints;
+        let patched = self.gravitic_engine_fx.patch(
+            patched,
+            &frame.wells,
+            |b| {
+                blueprints
+                    .units
+                    .get(b as usize)
+                    .map_or((100.0, 200.0), |bp| {
+                        (bp.radius.to_f32(), bp.height.to_f32())
+                    })
+            },
+            self.tick_seconds,
+        );
         self.dynamic.write(0, bytemuck::cast_slice(&patched));
         self.sim_units = units.len() as u32;
         // One per unit at most (`MAX_HOUSES`): never cut.
@@ -3278,6 +3319,7 @@ impl Renderer {
             self.nuke_fx.clear();
             self.craters.clear();
             self.ground_melt.clear();
+            self.gravitic_engine_fx.clear();
         }
         self.impact_craters.land(time);
         let craters = self.impact_craters.craters();
@@ -3412,6 +3454,7 @@ impl Renderer {
         self.stream_bursts(projectiles, time, camera);
         self.sea_tick(units, projectiles, time, camera);
         self.warp_tick(frame, time, camera);
+        self.gravitic_engine_tick(frame, time, camera);
     }
 
     /// The rounds of a stream gun's shot (`Weapon::rounds`) have no sim impact of their
@@ -3514,6 +3557,7 @@ impl Renderer {
         self.regency_guns_lights(time);
         self.gravitic_lights(time);
         self.star_core_lights(time);
+        self.gravitic_engine_lights();
         self.elevator_lights(time, alpha);
         self.lance_core_lights(time);
         self.heavy_rail_lights(time);
@@ -4714,6 +4758,7 @@ impl Renderer {
         }
         self.giant_event(event, time);
         self.dash_event(event, time);
+        self.gravitic_engine_event(event, time);
         self.titan_charge
             .note(event, self.tick_seconds, &self.blueprints);
         match event {
@@ -5631,6 +5676,7 @@ impl Drop for Renderer {
         self.adjacency_links.destroy(&self.gpu);
         self.shafts.destroy(&self.gpu);
         self.craters.destroy(&self.gpu);
+        self.gravitic_engine_fx.destroy(&self.gpu);
         self.ground_melt.destroy(&self.gpu);
         self.skins.destroy(&self.gpu);
         self.city_fx.destroy(&self.gpu);

@@ -461,8 +461,8 @@ fn grad_noise2(xy: vec2<f32>, cell: f32) -> f32 {
     return clamp(mix(mix(v00, v10, u.x), mix(v01, v11, u.x), u.y) * 0.70710678 * 0.5 + 0.5, 0.0, 1.0);
 }
 
-// ---- Molten rock and cooling cracks: blast craters' glassed pools (terrain.wgsl
-// craters_at), molten ground (terrain.wgsl melt_shade), rock and ice faces. ----
+// ---- Molten rock and cooling cracks: blast craters' glassed pools (scars.wgsl
+// craters_at), molten ground (scars.wgsl melt_shade), rock and ice faces. ----
 
 // Molten rock's glow at `t` (0 cold, 1 white-hot), in HDR: the brightness climbs
 // steeply with the heat, so a red crack is dim beside a yellow pool.

@@ -13,7 +13,7 @@
 //!
 //! Presentation only. The cells live in 32 m tiles made only where something heated
 //! the ground, found through a hash table; both ride in scene set binding 32 (the
-//! layout is `gpu_consts::melt_field`). terrain.wgsl `melt_shade` draws it as part of
+//! layout is `gpu_consts::melt_field`). scars.wgsl `melt_shade` draws it as part of
 //! the ground, so overlapping burns are one surface, and grass_gen.wgsl grows nothing
 //! on glass.
 

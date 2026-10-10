@@ -7,7 +7,7 @@
 //! Presentation only, and general: a crater is a centre, a radius (the blast's damage
 //! radius), a heat (0 to 1) and a style, so other races' and other sizes' blasts can
 //! leave their own. The list rides in scene set binding 29 (`CraterList` in
-//! bindings.wgsl) and terrain.wgsl shades each one analytically, per pixel, only where
+//! bindings.wgsl) and scars.wgsl shades each one analytically, per pixel, only where
 //! the pixel lies inside it. Nothing here is random per frame: every crater's look is
 //! fixed by its seed and its age.
 
@@ -237,7 +237,7 @@ impl Renderer {
             if ground < water {
                 continue;
             }
-            // Follows the cracks' cooling in terrain.wgsl.
+            // Follows the cracks' cooling in scars.wgsl.
             let t = heat * (1.0 - age / cool).clamp(0.0, 1.0).powf(2.2);
             let r = c.at[2];
             let scale = (r / 520.0).powi(2);

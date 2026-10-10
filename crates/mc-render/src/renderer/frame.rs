@@ -182,13 +182,24 @@ impl Renderer {
             bytemuck::cast_slice(falling),
         );
         self.dynamic_count += falling.len() as u32;
+        // Rock a gravitic engine tore loose (gravitic_engine_fx/slabs.rs).
+        let torn = self.gravitic_engine_instances(input.time);
+        let torn = &torn[..torn
+            .len()
+            .min(MAX_DYNAMIC.saturating_sub(self.dynamic_count as usize))];
+        self.dynamic.write(
+            (self.dynamic_count as usize * size_of::<UnitInstance>()) as u64,
+            bytemuck::cast_slice(torn),
+        );
+        self.dynamic_count += torn.len() as u32;
         self.cull.draws.update(
             ghosts
                 .iter()
                 .chain(&trees)
                 .chain(fallen)
                 .chain(going)
-                .chain(falling),
+                .chain(falling)
+                .chain(torn),
         );
 
         let z_range = (
@@ -368,8 +379,13 @@ impl Renderer {
             self.upload_craters(input.time, camera);
             self.ground_melt.step(input.time);
             self.ground_melt.upload();
-            self.heat_haze
-                .upload(input.time, input.alpha.clamp(0.0, 1.0), camera);
+            self.gravitic_engine_frame(input.time, camera);
+            self.heat_haze.upload(
+                input.time,
+                input.alpha.clamp(0.0, 1.0),
+                camera,
+                &self.gravitic_engine_fx.lenses,
+            );
             self.upload_wake_shells(input.time);
             self.lens_flares.upload(input.time, camera);
             self.upload_lights(input.time, input.alpha.clamp(0.0, 1.0), camera);

@@ -32,7 +32,7 @@ struct Effect {
     // x radius, y lifetime seconds, z kind (0 blue, 1 orange, 2 explosion, 3 construction amber,
     // 4 a reactor going up, 5 a blast sitting on the ground, 6 a missile-defense kill,
     // 7 a napalm wave: the impact disc, held and rolled for the burn, 8 a red-tracer gun's flash,
-    // EFFECT_MATERIALS a reclaim flare),
+    // EFFECT_MATERIALS a reclaim flare, EFFECT_GRAVITIC a gravitic engine's flash),
     // w shock ring strength or ground-burst colour
     params: vec4<f32>,
 }
@@ -91,6 +91,10 @@ fn weapon_color(kind: u32) -> vec3<f32> {
     if kind == 9u {
         // An ARC rail gun's flash and strike (renderer/rail_fx.rs): white-hot.
         return vec3<f32>(1.0, 0.96, 0.9);
+    }
+    if kind == EFFECT_GRAVITIC {
+        // A gravitic engine's flash (renderer/gravitic_engine_fx): white-hot violet.
+        return vec3<f32>(0.78, 0.55, 1.0);
     }
     if kind >= 2u {
         // Construction: yellow-orange.
@@ -516,6 +520,14 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
             let flicker = 0.7 + 0.3 * sin((globals.camera.w - p.extras.x) * 71.0 + f32(instance));
             out.color = vec3<f32>(1.0, 0.04, 0.16) * 8.0 * envelope * flicker;
             out.shape = vec2<f32>(-distance(head, tail), 3.0);
+        } else if (p.color & 0xFu) == FADE_BEAM_RIFT_BOLT {
+            // A gravitic engine's lightning (renderer/gravitic_engine_fx): violet, a
+            // white-violet core, struck bright and crackling as it goes out.
+            let envelope = 1.0 - smoothstep(0.3, 1.0, age);
+            let strike = 1.0 + 1.5 * (1.0 - smoothstep(0.0, 0.15, age));
+            let flicker = 0.65 + 0.35 * sin((globals.camera.w - p.extras.x) * 79.0 + f32(instance) * 1.7);
+            out.color = vec3<f32>(0.62, 0.2, 1.0) * 8.0 * envelope * flicker * strike;
+            out.shape = vec2<f32>(-distance(head, tail), 3.0);
         } else if (p.color & 0xFu) == FADE_BEAM_PLASMA_TRAIL {
             // A Regency plasma shot's trail (renderer/regency_guns_fx.rs): hot where the shot
             // has just passed, cooling to a deep red as it goes out. A fusion round's starts
@@ -594,7 +606,7 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     let p = projectiles[instance];
     // Lightning segments have their own soft caps. The ordinary shot-head sprite
     // would put a bead at every kink, turning dark as the light faded.
-    if (p.color & 0x100u) != 0u || ((p.color & FADE_BEAM) != 0u && ((p.color & 0xFu) == 3u || (p.color & 0xFu) == 4u || (p.color & 0xFu) == 6u || (p.color & 0xFu) == FADE_BEAM_TETHER || (p.color & 0xFu) == FADE_BEAM_PLASMA_TRAIL || (p.color & 0xFu) == FADE_BEAM_GRAVITY_TETHER)) {
+    if (p.color & 0x100u) != 0u || ((p.color & FADE_BEAM) != 0u && ((p.color & 0xFu) == 3u || (p.color & 0xFu) == 4u || (p.color & 0xFu) == 6u || (p.color & 0xFu) == FADE_BEAM_TETHER || (p.color & 0xFu) == FADE_BEAM_RIFT_BOLT || (p.color & 0xFu) == FADE_BEAM_PLASMA_TRAIL || (p.color & 0xFu) == FADE_BEAM_GRAVITY_TETHER)) {
         var hidden: SpriteOut;
         hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
         return hidden;

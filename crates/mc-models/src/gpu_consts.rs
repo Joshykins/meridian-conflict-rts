@@ -823,6 +823,13 @@ shared! {
         /// plasma: a violet sheath round a rose-white core, and bright rings of plasma
         /// carried down it from the throat in place of a jet's standing shock diamonds.
         pub const PLASMA_PLUME: u32 = 61;
+        /// A gravitic engine's held energy (renderer/gravitic_engine_fx, gravity_puffs.wgsl):
+        /// not a ball but a column of light standing from `pos` to `pos + vel`, strands of
+        /// violet twisting round a white-hot thread, pinched in the middle and frayed at the
+        /// ends, turned about its own axis to face the eye. `params.x` its half width,
+        /// `appearance.rgb` its brightness, `appearance.w` how hard it is wound (0 a slow
+        /// drift, 1 the strands whipping round). Laid once a tick, two ticks long.
+        pub const GRAVITY_VORTEX: u32 = 62;
     }
 
     /// Colours of a fading beam (`ProjectileInstance::color` low bits under
@@ -852,6 +859,10 @@ shared! {
         /// emitter to the missile, a faint prism shimmer at its edges. Struck and fading
         /// fast, as the laser.
         pub const GRAVITY_TETHER: u32 = 12;
+        /// A gravitic engine's lightning (renderer/gravitic_engine_fx): violet strokes with a
+        /// white-violet core, crackling, between its shards, down to the ground, along its
+        /// rift and over its well.
+        pub const RIFT_BOLT: u32 = 13;
     }
 
     /// How a Regency plasma shot is drawn in flight (`mc_sim::mirror::plasma_look`, carried in
@@ -1298,6 +1309,21 @@ shared! {
     pub mod effect as "EFFECT_" {
         /// The last of a hull going up a reclaim beam: a flare in the Materials red-orange.
         pub const MATERIALS: u32 = 10;
+        /// A gravitic engine's flash (renderer/gravitic_engine_fx): white-hot violet.
+        pub const GRAVITIC: u32 = 11;
+    }
+
+    /// The ground a gravitic engine breaks (renderer/gravitic_engine_fx/ground.rs, scene set
+    /// 39, scars.wgsl `rifts_at`): one record a break, of one of these kinds.
+    pub mod rift as "RIFT_" {
+        /// Cracks running out from round the engine's foot as it gathers.
+        pub const FOOT: u32 = 0;
+        /// The rift: a fissure from the foot to the mark, opening behind its front.
+        pub const LINE: u32 = 1;
+        /// The well: the ground broken into plates over its reach, its edge a ring of cracks.
+        pub const WELL: u32 = 2;
+        /// Records held at most (`RiftList` in bindings.wgsl).
+        pub const MAX: u32 = 24;
     }
 
     /// Heat haze over engine exhausts (renderer/heat_haze.rs, screen.wgsl `haze_bend`).
@@ -1308,6 +1334,13 @@ shared! {
         pub const REACH_M: f32 = 700.0;
         /// The most a plume shifts the scene, output pixels.
         pub const MAX_PX: f32 = 4.0;
+        /// A plume's kind (`GpuHeatPlume::kind`): hot air shimmering, or gravity bending
+        /// the light round a column or a point (renderer/gravitic_engine_fx), which pulls
+        /// what is seen through it in toward the axis and smears it round.
+        pub const KIND_HEAT: u32 = 0;
+        pub const KIND_LENS: u32 = 1;
+        /// The most a gravity lens shifts the scene, output pixels.
+        pub const LENS_MAX_PX: f32 = 28.0;
     }
 
     /// Lens flares on bright points (renderer/lens_flare.rs, screen.wgsl `lens_flare`).

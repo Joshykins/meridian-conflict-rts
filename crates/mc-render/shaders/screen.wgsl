@@ -277,11 +277,13 @@ struct HeatPlume {
     radius: f32,
     axis: vec3<f32>,
     height: f32,
-    // 0 cold, 1 flat out.
+    // 0 cold, 1 flat out (a lens: how hard it bends).
     strength: f32,
     seed: f32,
-    _pad0: f32,
-    _pad1: f32,
+    // HAZE_KIND_HEAT, or HAZE_KIND_LENS: gravity bending the light round the axis
+    // (`port` to `port + axis * height`; a point when `height` is 0) out to `radius`.
+    kind: u32,
+    _pad: f32,
 }
 struct HeatPlumes {
     // x: plumes in use.
@@ -305,6 +307,15 @@ fn haze_bend(uv: vec2<f32>) -> vec3<f32> {
     var nearest = 1.0e9;
     for (var i = 0u; i < count; i++) {
         let p = haze.entries[i];
+        if p.kind == HAZE_KIND_LENS {
+            let lens = lens_bend(uv, rd, eye, p, scene_distance);
+            scene_distance = lens.w;
+            if lens.z > 0.0 {
+                offset += lens.xy;
+                nearest = min(nearest, lens.z);
+            }
+            continue;
+        }
         // Where the view ray passes closest to the column's axis.
         let w = eye - p.port;
         let b = dot(rd, p.axis);
@@ -355,6 +366,61 @@ fn haze_bend(uv: vec2<f32>) -> vec3<f32> {
         return vec3<f32>(0.0);
     }
     return vec3<f32>(offset, nearest);
+}
+
+// Gravity bending the light round a gravitic engine's held energy or over its well
+// (renderer/gravitic_engine_fx): what lies behind the axis is seen pulled out from it, as
+// round a heavy mass, most near the axis and fading smoothly to nothing at `radius`, with a
+// slow twist round it. No rim and no tint, so it reads as the view warping, not a bubble.
+// xy the offset (uv), z the lens's distance (0: no bend), w the scene's distance at `uv`
+// (passed in and out so it is read once; below zero until read).
+fn lens_bend(uv: vec2<f32>, rd: vec3<f32>, eye: vec3<f32>, p: HeatPlume, known: f32) -> vec4<f32> {
+    var scene_distance = known;
+    let w = eye - p.port;
+    let b = dot(rd, p.axis);
+    let d = dot(rd, w);
+    let e = dot(p.axis, w);
+    let den = max(1.0 - b * b, 1e-4);
+    let s = clamp((e - b * d) / den, 0.0, p.height);
+    let on_axis = p.port + p.axis * s;
+    let t = dot(on_axis - eye, rd);
+    if t <= 1.0 {
+        return vec4<f32>(0.0, 0.0, 0.0, scene_distance);
+    }
+    let off = length(on_axis - (eye + rd * t)) / max(p.radius, 1.0);
+    if off >= 1.0 {
+        return vec4<f32>(0.0, 0.0, 0.0, scene_distance);
+    }
+    if scene_distance < 0.0 {
+        scene_distance = scene_distance_at(uv, eye);
+    }
+    if t > scene_distance + p.radius * 0.25 {
+        return vec4<f32>(0.0, 0.0, 0.0, scene_distance);
+    }
+    // The axis point on screen, and this pixel's way out from it.
+    let clip = wave_globals.view_proj * vec4<f32>(on_axis, 1.0);
+    if clip.w < 0.5 {
+        return vec4<f32>(0.0, 0.0, 0.0, scene_distance);
+    }
+    let cuv = vec2<f32>(clip.x / clip.w * 0.5 + 0.5, 0.5 - clip.y / clip.w * 0.5);
+    let away = (uv - cuv) * wave_globals.viewport.xy;
+    let len = length(away);
+    if len < 1e-3 {
+        return vec4<f32>(0.0, 0.0, 0.0, scene_distance);
+    }
+    let out_dir = away / len;
+    let around = vec2<f32>(-out_dir.y, out_dir.x);
+    // About 1/r outside a soft core, closing smoothly to zero at the reach; on the axis
+    // itself nothing moves.
+    let profile = smoothstep(0.0, 0.14, off) * pow(1.0 - off, 2.0) / (off + 0.18);
+    let px_per_m = wave_globals.lod.x / max(t, 1.0);
+    let reach_px = p.radius * px_per_m;
+    let time = wave_globals.camera.w;
+    let shiver = 1.0 + 0.12 * sin(time * 3.1 + p.seed * 17.0 + off * 9.0);
+    let px = min(reach_px * 0.16 * profile * p.strength * shiver, HAZE_LENS_MAX_PX);
+    // Seen through it, what lies behind comes from nearer the axis, and turned a little.
+    let bend = -out_dir * px + around * px * 0.35;
+    return vec4<f32>(bend * wave_globals.viewport.zw, t, scene_distance);
 }
 
 // Lens flares on bright points (renderer/lens_flare.rs): what a small, very bright light
