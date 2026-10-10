@@ -210,8 +210,12 @@ fn observing_your_slot_starts_an_all_ai_match() {
     ai.domain_weights = [50, 150, 75];
     ai.income = 3000;
     let preserved = *ai;
+    // Your own seat may be given an income too, just as an AI's is.
+    state.lineup.roster.seats[0].ai.income = 1500;
     let configured = state.request();
     assert_eq!(configured.config.players[1].ai, preserved);
+    let you = &configured.config.players[0];
+    assert_eq!((you.controller, you.ai.income), (Controller::Human, 1500));
     // Another map keeps the seats' AI set-up.
     let other = (state.lineup.map + 1) % state.catalog.maps.len();
     state

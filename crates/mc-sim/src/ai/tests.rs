@@ -175,12 +175,13 @@ fn doctrine_is_independent_of_player_slot_and_difficulty_has_no_income_bonus() {
 }
 
 #[test]
-fn an_ai_set_up_with_bonus_income_earns_that_much_more_and_a_person_never_does() {
+fn a_seat_set_up_with_bonus_income_earns_that_much_more_ai_or_person() {
     let rich = AiConfig {
         income: 3000,
         ..AiConfig::default()
     };
-    let mut w = world_seated(256, [(Controller::Ai, rich), (Controller::Human, rich)]);
+    let fair = AiConfig::default();
+    let mut w = world_seated(256, [(Controller::Ai, rich), (Controller::Human, fair)]);
     assert_eq!(w.state.players[0].income_permille, [3000, 3000]);
     assert_eq!(w.state.players[1].income_permille, [1000, 1000]);
     for owner in 0..2u8 {
@@ -193,6 +194,32 @@ fn an_ai_set_up_with_bonus_income_earns_that_much_more_and_a_person_never_does()
     assert!(person.energy_income > Fx::ZERO && person.mass_income > Fx::ZERO);
     assert_eq!(ai.energy_income, person.energy_income * 3);
     assert_eq!(ai.mass_income, person.mass_income * 3);
+}
+
+#[test]
+fn a_person_set_up_with_double_income_earns_double() {
+    let rich = AiConfig {
+        income: 2000,
+        ..AiConfig::default()
+    };
+    let mut w = world_seated(
+        256,
+        [
+            (Controller::Human, rich),
+            (Controller::Human, AiConfig::default()),
+        ],
+    );
+    assert_eq!(w.state.players[0].income_permille, [2000, 2000]);
+    for owner in 0..2u8 {
+        let x = 300 + owner as i32 * 1400;
+        spawn(&mut w, "aster_t1_power", owner, x, x);
+        spawn(&mut w, "aster_commander", owner, x + 60, x);
+    }
+    w.tick(&[]).unwrap();
+    let (rich, fair) = (&w.state.players[0], &w.state.players[1]);
+    assert!(fair.energy_income > Fx::ZERO && fair.mass_income > Fx::ZERO);
+    assert_eq!(rich.energy_income, fair.energy_income * 2);
+    assert_eq!(rich.mass_income, fair.mass_income * 2);
 }
 
 #[test]

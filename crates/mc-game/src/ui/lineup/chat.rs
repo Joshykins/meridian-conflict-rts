@@ -183,7 +183,11 @@ impl Facts {
                     Some(r) => format!("the {}", r.name),
                     None => "a random race".to_owned(),
                 },
-                tuning: (s.control == Control::Ai).then(|| super::ai::summary(&s.ai)),
+                tuning: match s.control {
+                    Control::Ai => Some(super::ai::summary(&s.ai)),
+                    Control::Person => Some(super::ai::income_summary(&s.ai)),
+                    Control::Closed => None,
+                },
             })
             .collect();
         Facts {

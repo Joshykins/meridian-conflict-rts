@@ -120,7 +120,7 @@ impl World {
             flow.made[1] += e.energy_income / DT;
             flow.wanted[1] += e.energy_upkeep / DT;
         }
-        // An AI's set-up bonus or the test range can turn a side's income up or down,
+        // A seat's set-up multiplier or the test range can turn a side's income up or down,
         // and the range can give it stores.
         // Mass is turned once the mines are counted, below.
         for (p, pl) in self.state.players.iter().enumerate() {

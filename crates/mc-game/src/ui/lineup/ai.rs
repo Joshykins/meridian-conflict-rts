@@ -1,20 +1,21 @@
-//! An AI commander's settings in the line-up: its doctrine, the forces it
-//! favours and the income it is given. They sit in a line of choices under the AI's row (`seats`), and
-//! are said in short wherever a line will not fit.
+//! A seat's settings in the line-up: an AI commander's doctrine, the forces it
+//! favours and the income it is given, and a person's income. They sit in a line
+//! of choices under the seat's row (`seats`), and are said in short wherever a
+//! line will not fit.
 
 use super::roster::Seat;
 use crate::ui::{id, palette, rgb, type_scale, Rect, Ui};
 use glam::Vec2;
 use mc_sim::Doctrine;
 
-/// The line of an AI's settings under its row.
-pub(super) const AI_LINE: f32 = 36.0;
+/// The line of a seat's settings under its row.
+pub(super) const SEAT_LINE: f32 = 36.0;
 const FORCE_PRESETS: [[u8; 3]; 4] = [[100, 100, 100], [160, 60, 60], [60, 160, 60], [60, 60, 160]];
 const FORCE_LABELS: [&str; 4] = ["Balanced", "Land", "Air", "Naval"];
 
-/// The incomes an AI may be given, in thousandths of a fair share (`AiConfig::income`).
-const INCOMES: [u16; 5] = [1000, 1500, 2000, 3000, 5000];
-const INCOME_LABELS: [&str; 5] = ["1x", "1.5x", "2x", "3x", "5x"];
+/// The incomes a seat may be given, in thousandths of a fair share (`AiConfig::income`).
+const INCOMES: [u16; 7] = [500, 750, 1000, 1500, 2000, 3000, 5000];
+const INCOME_LABELS: [&str; 7] = ["0.5x", "0.75x", "1x", "1.5x", "2x", "3x", "5x"];
 
 const DOCTRINES: [Doctrine; 4] = [
     Doctrine::Adaptive,
@@ -23,9 +24,10 @@ const DOCTRINES: [Doctrine; 4] = [
     Doctrine::Defensive,
 ];
 
-/// An AI's settings as a line of choices in `r`: its doctrine, the forces it
-/// favours and its income. Whoever may plan changes them; everyone else reads them.
-pub(super) fn ai_line(ui: &mut Ui, seat: &mut Seat, r: Rect, host: bool) {
+/// A seat's settings as a line of choices in `r`: an AI's doctrine, the forces
+/// it favours and its income; a person's income alone. Whoever may plan changes
+/// them; everyone else reads them.
+pub(super) fn seat_line(ui: &mut Ui, seat: &mut Seat, r: Rect, host: bool, ai_seat: bool) {
     let key = seat.key as usize;
     let ai = &mut seat.ai;
     let doctrines = DOCTRINES.map(doctrine_label);
@@ -40,7 +42,7 @@ pub(super) fn ai_line(ui: &mut Ui, seat: &mut Seat, r: Rect, host: bool) {
     if income_at.is_none() {
         incomes.push("Custom");
     }
-    let fields: [(&str, &[&str], usize); 3] = [
+    let all: [(&str, &[&str], usize); 3] = [
         (
             "Doctrine",
             &doctrines,
@@ -52,6 +54,9 @@ pub(super) fn ai_line(ui: &mut Ui, seat: &mut Seat, r: Rect, host: bool) {
         ("Forces", &forces, force_at.unwrap_or(FORCE_LABELS.len())),
         ("Income", &incomes, income_at.unwrap_or(INCOMES.len())),
     ];
+    // A person has no doctrine or forces to pick: only the income, as wide as
+    // an AI's income choice would be.
+    let fields = if ai_seat { &all[..] } else { &all[2..] };
     // Each as wide as its label and longest option; the labels go when the
     // line is too narrow for them, and the choices share what is left over.
     let gap = 6.0;
@@ -67,22 +72,23 @@ pub(super) fn ai_line(ui: &mut Ui, seat: &mut Seat, r: Rect, host: bool) {
         };
         label + value + 34.0
     };
-    let room = r.w - gap * (fields.len() - 1) as f32;
+    let room = r.w - gap * (all.len() - 1) as f32;
     let mut labelled = true;
-    let mut widths: Vec<f32> = fields
+    let mut widths: Vec<f32> = all
         .iter()
         .map(|(l, o, _)| natural(ui, l, o, true))
         .collect();
     if widths.iter().sum::<f32>() > room {
         labelled = false;
-        widths = fields
+        widths = all
             .iter()
             .map(|(l, o, _)| natural(ui, l, o, false))
             .collect();
     }
     let k = room / widths.iter().sum::<f32>();
     let mut x = r.x;
-    for (n, ((label, options, at), w)) in fields.iter().zip(widths).enumerate() {
+    let first = all.len() - fields.len();
+    for (n, ((label, options, at), w)) in all.iter().zip(widths).enumerate().skip(first) {
         let w = w * k;
         let cell = Rect::new(x, r.y, w, r.h);
         let label = if labelled { *label } else { "" };
@@ -141,10 +147,20 @@ pub(super) fn summary(ai: &mc_sim::AiConfig) -> String {
         doctrine_label(ai.doctrine),
         force_label(ai.domain_weights)
     );
-    if ai.income != 1000 {
-        s += &format!("  \u{b7}  {} Income", income_label(ai.income));
+    if let Some(income) = income_note(ai) {
+        s += &format!("  \u{b7}  {income}");
     }
     s
+}
+
+/// "2x Income" when a seat's income is not a fair share.
+pub(super) fn income_note(ai: &mc_sim::AiConfig) -> Option<String> {
+    (ai.income != 1000).then(|| format!("{} Income", income_label(ai.income)))
+}
+
+/// "1x Income", "2x Income": a seat's income, said always.
+pub(super) fn income_summary(ai: &mc_sim::AiConfig) -> String {
+    format!("{} Income", income_label(ai.income))
 }
 
 /// "2x", "1.5x", "0.25x": an income in thousandths as a multiple.

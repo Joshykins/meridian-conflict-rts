@@ -146,6 +146,9 @@ pub struct Options {
     /// Watch an all-AI match: no human slot, the camera opens on the whole map.
     pub observe: bool,
     pub ai: mc_sim::AiConfig,
+    /// Your own seat's income, thousandths of a fair share (`AiConfig::income`);
+    /// `ai.income` is the AI seats'.
+    pub income: u16,
     /// The range's subject, a blueprint key, and the scenario it opens with.
     pub subject: String,
     pub scenario: Option<crate::range::Scenario>,
@@ -163,6 +166,20 @@ pub struct Options {
     pub replay: Option<PathBuf>,
 }
 
+impl Options {
+    /// A seat's settings: the AI tuning, and the income the seat's side gets (an
+    /// AI's `ai.income`, a person's `income`).
+    pub(crate) fn seat_ai(&self, controller: Controller) -> mc_sim::AiConfig {
+        match controller {
+            Controller::Ai => self.ai,
+            _ => mc_sim::AiConfig {
+                income: self.income,
+                ..self.ai
+            },
+        }
+    }
+}
+
 impl Default for Options {
     fn default() -> Options {
         Options {
@@ -174,6 +191,7 @@ impl Default for Options {
             fog: true,
             observe: false,
             ai: Default::default(),
+            income: 1000,
             subject: crate::range::DEFAULT_SUBJECT.into(),
             scenario: None,
             hurt: 0,
@@ -354,25 +372,28 @@ pub fn match_config(opts: &Options, map: &MapFile) -> MatchConfig {
         }
     };
     let players = (0..count)
-        .map(|i| PlayerSetup {
-            name: match (opts.scene, opts.observe, i) {
-                (Scene::Range, _, 0) => "Blue".into(),
-                (Scene::Range, _, _) => "Red".into(),
-                (_, true, _) => format!("ARC AI {}", i + 1),
-                (_, _, 0) => "Commander".into(),
-                _ => format!("ARC AI {i}"),
-            },
-            faction: "Aster".into(),
-            ai: opts.ai,
-            team: sides[i],
-            controller: if opts.observe {
+        .map(|i| {
+            let controller = if opts.observe {
                 Controller::Ai
             } else if i == 0 || opts.scene != Scene::Skirmish {
                 Controller::Human
             } else {
                 Controller::Ai
-            },
-            start: i as u8,
+            };
+            PlayerSetup {
+                name: match (opts.scene, opts.observe, i) {
+                    (Scene::Range, _, 0) => "Blue".into(),
+                    (Scene::Range, _, _) => "Red".into(),
+                    (_, true, _) => format!("ARC AI {}", i + 1),
+                    (_, _, 0) => "Commander".into(),
+                    _ => format!("ARC AI {i}"),
+                },
+                faction: "Aster".into(),
+                ai: opts.seat_ai(controller),
+                team: sides[i],
+                controller,
+                start: i as u8,
+            }
         })
         .collect();
     MatchConfig {

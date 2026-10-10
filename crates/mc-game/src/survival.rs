@@ -185,7 +185,11 @@ pub fn scene_match(
         seed: opts.seed,
         fog: opts.fog,
         observe: opts.observe,
-        ai: opts.ai,
+        ai: opts.seat_ai(if opts.observe {
+            Controller::Ai
+        } else {
+            Controller::Human
+        }),
         faction: "Aster".into(),
     }))
 }

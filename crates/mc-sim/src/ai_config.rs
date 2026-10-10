@@ -29,9 +29,10 @@ pub struct AiConfig {
     /// Production preferences for land, air, and naval units (0..=200).
     /// Zero disables combat production in that domain.
     pub domain_weights: [u8; 3],
-    /// What share of a side's normal mass and energy income this AI gets, in
-    /// thousandths: 1000 is a fair match, 2000 doubles it. The set-up's way to
-    /// make an AI harder than its difficulty alone; a person's seat never gets it.
+    /// What share of a side's normal mass and energy income this seat gets, in
+    /// thousandths: 1000 is a fair match, 2000 doubles it. Every seat carries
+    /// one, a person's as well as an AI's: the set-up's way to make an AI harder
+    /// than its difficulty alone, or to give a person a head start or a handicap.
     pub income: u16,
 }
 

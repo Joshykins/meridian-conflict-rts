@@ -937,8 +937,8 @@ pub struct Player {
     pub acts_as: u8,
     /// Test range: building costs this player nothing and never stalls.
     pub free_build: bool,
-    /// What share of their mass and energy income this player gets, thousandths: an
-    /// AI's set-up bonus (`AiConfig::income`), or the test range's dial.
+    /// What share of their mass and energy income this player gets, thousandths: the
+    /// seat's set-up multiplier (`AiConfig::income`), or the test range's dial.
     #[serde(default = "full_income")]
     pub income_permille: [u16; 2],
     /// Test range: mass and energy storage on top of what this player's units hold.

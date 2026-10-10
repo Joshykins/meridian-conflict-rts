@@ -108,6 +108,7 @@ straight into a match instead.
   --ai-doctrine NAME    adaptive | aggressive | economic | defensive
   --ai-domains L,A,N    land, air, naval production preferences, 0-200 each
   --ai-income X         times a fair income the AI gets, 0.25-10 (e.g. 1.5, 2, 3, 5)
+  --income X             times a fair income your own seat gets, 0.25-10 (default 1)
   --army N               units per player in the stress scene (default 500)
   --seed N               match seed
   --no-fog               reveal the map
@@ -311,6 +312,7 @@ fn run() -> Result<(), String> {
                 | "--ai-doctrine"
                 | "--ai-domains"
                 | "--ai-income"
+                | "--income"
         );
         match arg.as_str() {
             "--map" => map_name = Some(value("--map")?),
@@ -336,13 +338,8 @@ fn run() -> Result<(), String> {
                 }
                 opts.ai.domain_weights.copy_from_slice(&weights);
             },
-            "--ai-income" => {
-                let range = mc_sim::INCOME_RANGE;
-                opts.ai.income = value("--ai-income")?.parse::<f64>().ok()
-                    .map(|x| (x * 1000.0).round())
-                    .filter(|p| (*range.start() as f64..=*range.end() as f64).contains(p))
-                    .ok_or("--ai-income takes a multiple from 0.25 to 10")? as u16;
-            },
+            "--ai-income" => opts.ai.income = income_flag("--ai-income", &value("--ai-income")?)?,
+            "--income" => opts.income = income_flag("--income", &value("--income")?)?,
             "--unit" => opts.subject = value("--unit")?,
             "--unit-shot" => unit_shot_key = Some(value("--unit-shot")?),
             "--shot-server" => shot_server = Some(value("--shot-server")?.into()),
@@ -725,4 +722,15 @@ fn loading_times(v: &str) -> Option<Vec<f32>> {
         }
         _ => None,
     }
+}
+
+/// `--income`'s and `--ai-income`'s multiple, as thousandths of a fair share.
+fn income_flag(flag: &str, v: &str) -> Result<u16, String> {
+    let range = mc_sim::INCOME_RANGE;
+    v.parse::<f64>()
+        .ok()
+        .map(|x| (x * 1000.0).round())
+        .filter(|p| (*range.start() as f64..=*range.end() as f64).contains(p))
+        .map(|p| p as u16)
+        .ok_or(format!("{flag} takes a multiple from 0.25 to 10"))
 }

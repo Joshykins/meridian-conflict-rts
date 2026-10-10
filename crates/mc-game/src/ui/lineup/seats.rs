@@ -12,7 +12,7 @@
 //! the plan and each person picks their own race; an open seat shows who sits
 //! there, or a Sit Here for everyone else.
 
-use super::ai::{ai_line, caret, settings_toggle, summary, AI_LINE};
+use super::ai::{caret, income_note, seat_line, settings_toggle, summary, SEAT_LINE};
 use super::roster::{Control, Seat};
 use super::{Ask, Catalog, Lineup, Mode, Occupant, Table};
 use crate::audio::Sfx;
@@ -74,8 +74,8 @@ struct Columns {
     zone: f32,
     zone_w: f32,
     dense: bool,
-    /// Every AI row shows its settings line; when false only the one opened does.
-    ai_lines: bool,
+    /// Every seat's row shows its settings line; when false only the one opened does.
+    lines: bool,
 }
 
 impl Columns {
@@ -140,7 +140,7 @@ impl Columns {
             zone,
             zone_w,
             dense,
-            ai_lines: false,
+            lines: false,
         }
     }
 
@@ -246,21 +246,18 @@ pub fn commanders(
     // the bar beside them, eased, fading at the edges.
     let top = head + 16.0;
     let bottom = area.bottom() - LAYOUTS_H;
-    // Every AI's settings in view when they all fit; otherwise each row opens its own.
-    let ai_rows = lineup
-        .roster
-        .seats
-        .iter()
-        .filter(|s| table.is_ai(s))
-        .count();
+    // Every seat's settings in view when they all fit; otherwise each row opens its own.
+    let line_rows = lineup.roster.seats.iter().filter(|s| s.open()).count();
     let heads = if allied {
         lineup.roster.seated_teams().len()
     } else {
         0
     };
-    let need =
-        n as f32 * cols.pitch() + ai_rows as f32 * AI_LINE + heads as f32 * cols.head_h() + 10.0;
-    cols.ai_lines = !cols.dense && need <= bottom - top;
+    let need = n as f32 * cols.pitch()
+        + line_rows as f32 * SEAT_LINE
+        + heads as f32 * cols.head_h()
+        + 10.0;
+    cols.lines = !cols.dense && need <= bottom - top;
     let shown = ui.ease(id("seat-scroll", 0), lineup.seat_scroll, 16.0);
     // Last frame's height of all the rows says whether any lie past the bottom.
     let before = ui
@@ -379,14 +376,17 @@ fn heading(
     if let Some(observe) = observe {
         watch_switch(ui, observe, area, switch_w);
     }
-    // Open strips follow their row; a row that is no longer an editable AI closes its own.
-    let is_ai_row = |k: u8| {
+    // Open strips follow their row; a row that is no longer an editable seat closes its own.
+    let is_open_row = |k: u8| {
         lineup
             .roster
             .index_of(k)
-            .is_some_and(|i| table.is_ai(&lineup.roster.seats[i]))
+            .is_some_and(|i| lineup.roster.seats[i].open())
     };
-    if lineup.tuning.is_some_and(|k| !is_ai_row(k) || !table.host) {
+    if lineup
+        .tuning
+        .is_some_and(|k| !is_open_row(k) || !table.host)
+    {
         lineup.tuning = None;
     }
     if lineup.coloring.is_some_and(|k| {
@@ -482,9 +482,9 @@ fn seat_rows(
         } else if y + row_h - view.offset > view.bottom {
             below += 1;
         }
-        // An AI's settings line is part of its row.
-        let line = if table.is_ai(&seat) && (cols.ai_lines || lineup.tuning == Some(seat.key)) {
-            AI_LINE
+        // A seat's settings line is part of its row.
+        let line = if seat.open() && (cols.lines || lineup.tuning == Some(seat.key)) {
+            SEAT_LINE
         } else {
             0.0
         };
@@ -629,7 +629,7 @@ fn watch_switch(ui: &mut Ui, observe: &mut bool, area: Rect, switch_w: f32) {
 }
 
 /// One seat's row at `row`: its first line of cells, and under it, when the
-/// row is that tall, the AI's settings line.
+/// row is that tall, the seat's settings line.
 #[expect(clippy::too_many_arguments, reason = "a row reads the whole table")]
 fn seat_row(
     ui: &mut Ui,
@@ -669,7 +669,7 @@ fn seat_row(
         row,
         if placing {
             rgb(palette::ACCENT, 0.75)
-        } else if tuning && !cols.ai_lines {
+        } else if tuning && !cols.lines {
             rgb(palette::ACCENT, 0.5)
         } else {
             rgb(palette::LINE, 0.12 + 0.18 * lit)
@@ -739,10 +739,16 @@ fn seat_row(
             cols.name,
             top.bottom() - 4.0,
             row.right() - 10.0 - cols.name,
-            AI_LINE - 10.0,
+            SEAT_LINE - 10.0,
         );
         if let Some(i) = lineup.roster.index_of(seat.key) {
-            ai_line(ui, &mut lineup.roster.seats[i], line, table.host);
+            seat_line(
+                ui,
+                &mut lineup.roster.seats[i],
+                line,
+                table.host,
+                table.is_ai(&seat),
+            );
         }
     }
     asks
@@ -829,10 +835,12 @@ fn name_cell(
     } else {
         rgb(palette::TEXT, live)
     };
-    // Too many rows for every AI's line: each opens its own from under its name.
-    let toggles = ai && table.host && !cols.ai_lines && !cols.dense;
+    // Too many rows for every seat's line: an AI opens its own from under its
+    // name, a person's (which keeps its line under the name) from the name.
+    let toggles = ai && table.host && !cols.lines && !cols.dense;
+    let name_opens = open && table.host && !cols.lines && (cols.dense || !ai);
     // An AI whose settings line always shows needs nothing under its name.
-    let one_line = cols.dense || !open || (ai && cols.ai_lines);
+    let one_line = cols.dense || !open || (ai && cols.lines);
     let name_y = if one_line { top.mid_y() } else { top.y + 18.0 };
     ui.text_fit_left(x, name_y, name_w, type_scale::BODY, name_tone, &name);
     if toggles {
@@ -841,25 +849,35 @@ fn name_cell(
             lineup.coloring = None;
             ui.audio.play(Sfx::Select);
         }
-    } else if ai && table.host && cols.dense {
-        // One line: the name opens or closes the AI's settings line.
+    } else if name_opens {
+        // The name opens or closes the seat's settings line.
         let tune = Rect::new(x - 4.0, top.y, name_w + 8.0, top.h);
         let res = ui.interact(id("slot-ai-tune", key), tune, true);
         let end = x + ui.text_width(type_scale::BODY, &name).min(name_w) + 10.0;
-        caret(ui, end, top.mid_y(), tuning, res.glow);
+        caret(ui, end, name_y, tuning, res.glow);
         if res.clicked {
             lineup.tuning = if tuning { None } else { Some(seat.key) };
             lineup.coloring = None;
             ui.audio.play(Sfx::Select);
         }
-    } else if !one_line {
-        let (line, tone) = match occupant {
+    }
+    if !toggles && !one_line {
+        let (mut line, tone) = match occupant {
             Some(p) => (p.tags.join("  \u{b7}  "), palette::DIM),
             None if ai => (summary(&seat.ai), palette::DIM),
             None if waiting => ("Waiting for a player".to_owned(), palette::FAINT),
             None if seat.control == Control::Person => ("You Command".to_owned(), palette::ACCENT),
             None => (String::new(), palette::DIM),
         };
+        // A person's income said beside them while their line is shut.
+        if !ai && !cols.lines {
+            if let Some(income) = income_note(&seat.ai) {
+                if !line.is_empty() {
+                    line += "  \u{b7}  ";
+                }
+                line += &income;
+            }
+        }
         ui.text_fit_left(
             x,
             top.y + 38.0,
