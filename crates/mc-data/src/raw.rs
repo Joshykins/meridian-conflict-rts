@@ -1070,6 +1070,8 @@ pub struct RawWeapon {
     #[serde(default)]
     pub trail: bool,
     /// Seconds the wake hangs. Zero (the default) is the usual hang, when the shot has a trail.
+    /// A Regency plasma shot's (`plasma_grade`): seconds its trail glows, up to 30, so a map
+    /// gun's arc hangs across the map; zero, its grade's own.
     #[serde(default)]
     pub wake: f64,
     /// Multiplies a blue plasma sheath around the traveling slug. 0 (the default)
@@ -1221,13 +1223,6 @@ pub struct RawWeapon {
     /// the time to the next shot.
     #[serde(default)]
     pub round_span: f64,
-    /// Strands a lobbed shot is drawn as, wound round its line of flight like the strands
-    /// of a rope: they part off the muzzle, corkscrew round each other all the way up and
-    /// over, and close into one just before it lands. Cosmetic: the sim flies the one
-    /// shot and it strikes once. Zero (the default): drawn as it is. Ballistic plasma guns
-    /// only, two to six.
-    #[serde(default)]
-    pub braid: u8,
     /// An orb battery: the gun holds plasma orbs, one in each of its `muzzles`, made
     /// this many at a time (`orb_time` apart) while it stands idle, and each shot spends
     /// one. A salvo ends when the store is empty. Its shots fly straight and home on their
@@ -1733,16 +1728,6 @@ impl Unit {
                     "{ctx}: fusion_strike is for a Gravitic Seeker"
                 )));
             }
-            if w.braid > 0
-                && (w.trajectory != Trajectory::Ballistic
-                    || w.missile
-                    || w.plasma_grade.is_none()
-                    || !(2..=6).contains(&w.braid))
-            {
-                return Err(DataError::Invalid(format!(
-                    "{ctx}: braid is two to six strands, for a ballistic plasma gun"
-                )));
-            }
             if w.orbs > 0
                 && (w.trajectory != Trajectory::Direct
                     || w.missile
@@ -1942,7 +1927,10 @@ impl Unit {
                 shockwave: w.shockwave.clamp(0.0, 4.0) as f32,
                 tracer: w.tracer.clamp(0.2, 8.0) as f32,
                 trail: w.trail,
-                wake: w.wake.clamp(0.0, 4.0) as f32,
+                wake: w
+                    .wake
+                    .clamp(0.0, if w.plasma_grade.is_some() { 30.0 } else { 4.0 })
+                    as f32,
                 plasma: w.plasma.clamp(0.0, 4.0) as f32,
                 bolts: w.bolts.min(32),
                 discharge: w.discharge.clamp(0.0, 400.0) as f32,
@@ -1980,7 +1968,6 @@ impl Unit {
                 laps: w.laps.clamp(1, 8),
                 rounds: w.rounds.clamp(1, 32),
                 round_span: (w.round_span.clamp(0.0, 10.0) * TICKS_PER_SECOND as f64) as f32,
-                braid: w.braid,
                 orbs: w.orbs,
                 orb_ticks: ticks(w.orb_time).clamp(1, u16::MAX as u32) as u16,
                 casings: w.casings.clamp(0.0, 40.0) as f32,

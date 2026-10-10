@@ -40,9 +40,9 @@
 //!   it lands it goes off as a small supernova (`fusion.rs`).
 //!
 //! Nothing is wound round a middle (no spiral arms, no rings; a fusion strike's streamers
-//! are thrown out in a loose band round its waist, as a supernova's), except a braided
-//! shot's strands (`Weapon::braid`, the Springald's), which the mirror draws as shots of
-//! their own and so leave trails of their own; and nothing hangs as a mist: the plasma is hard-edged and goes out fast (plasma_puffs.wgsl).
+//! are thrown out in a loose band round its waist, as a supernova's), and nothing hangs as
+//! a mist: the plasma is hard-edged and goes out fast (plasma_puffs.wgsl). A map gun's
+//! trail is a thread that hangs over its whole arc (`Weapon::wake`, the Springald's).
 //!
 //! Presentation only; the renderer's own clock. The light is plasma_puffs.wgsl's (the
 //! ball, the bursts, the globs, the thrown clumps), warp_puffs.wgsl's (motes, filaments,
@@ -99,12 +99,16 @@ const MAX_CHARGES: usize = 48;
 /// Sparks a fusion round's trail sheds a tick at most, over every shot in flight. A
 /// deliberate cosmetic cap: past it the trail is laid without them.
 const MAX_TRAIL_SPARKS: usize = 200;
-/// Trail pieces held at most. A deliberate cosmetic cap: the oldest goes first.
-const MAX_TRAILS: usize = 2400;
+/// Trail pieces held at most. A deliberate cosmetic cap: the oldest goes first. A map gun's
+/// shot holds a piece a tick for the whole of its trail (about 300 for one shot).
+const MAX_TRAILS: usize = 6000;
 /// Metres a piece of a shot's trail runs, and the seconds it glows: a Pinched bolt's, then
 /// a Pinch-fusion round's.
 const BOLT_TRAIL: (f32, f32) = (12.0, 0.7);
 const FUSION_TRAIL: (f32, f32) = (10.0, 1.8);
+/// A long-hanging trail's thread across, in the shot's sizes: wider than a short one's, as
+/// it is seen from across the map.
+const HANG_WIDTH: f32 = 0.5;
 /// Metres between the lights a Plasmeric bolt throws down its flight.
 const PLASMERIC_LIGHT_STEP: f32 = 8.0;
 
@@ -412,6 +416,19 @@ impl Renderer {
                 continue;
             }
             let (step, life) = if fusion { FUSION_TRAIL } else { BOLT_TRAIL };
+            // A shot whose trail hangs long (`Weapon::wake`, a map gun's) lays its thread a
+            // tick's stretch at a time: held for its whole arc, it would fill the pieces.
+            let hang = p.wake > life;
+            if hang {
+                self.plasma_fx.guns.trail(Trail {
+                    from,
+                    to,
+                    start: time + tick * span,
+                    life: p.wake,
+                    width: p.size * HANG_WIDTH,
+                    fusion,
+                });
+            }
             // A deliberate cosmetic cap on one shot's stretch: a tick's flight is far
             // under this many pieces.
             let n = ((from.distance(to) / step).ceil() as usize).clamp(1, 16);
@@ -421,14 +438,16 @@ impl Renderer {
                 let when = time + tick * (starts + (span - starts).max(0.0) * f1);
                 let fx = &mut self.plasma_fx.guns;
                 // The thread where it passed, and the sheath round it that goes out sooner.
-                fx.trail(Trail {
-                    from: a,
-                    to: b,
-                    start: when,
-                    life,
-                    width: p.size * if fusion { 0.32 } else { 0.22 },
-                    fusion,
-                });
+                if !hang {
+                    fx.trail(Trail {
+                        from: a,
+                        to: b,
+                        start: when,
+                        life,
+                        width: p.size * if fusion { 0.32 } else { 0.22 },
+                        fusion,
+                    });
+                }
                 fx.trail(Trail {
                     from: a,
                     to: b,

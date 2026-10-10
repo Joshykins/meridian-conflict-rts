@@ -21,7 +21,6 @@ use mc_data::{BlueprintId, Trajectory, WeaponColor};
 use std::collections::HashMap;
 
 mod batch;
-mod braid;
 pub mod city;
 mod dash;
 mod destruct;
@@ -1248,8 +1247,9 @@ pub struct ProjectileInstance {
     pub color: u32,
     pub pos: [f32; 3],
     pub size: f32,
-    /// Seconds the energy wake lasts. Zero: the usual hang, or none. A torpedo's is
-    /// its look instead (`mc_data::TorpedoLook` as a number, `torpedo_look`).
+    /// Seconds the energy wake lasts, or a Regency plasma shot's trail glows. Zero: the
+    /// usual hang, or none. A torpedo's is its look instead (`mc_data::TorpedoLook` as a
+    /// number, `torpedo_look`).
     pub wake: f32,
     /// Metres of blue plasma around the traveling slug. Zero: none.
     pub plasma: f32,
@@ -2071,7 +2071,7 @@ impl World {
                     }
                     | if weapon.rail { PROJECTILE_RAIL } else { 0 },
                 if trail { size * 1.55 } else { size },
-                if trail || smoke || weapon.missile {
+                if trail || smoke || weapon.missile || plasma_look(weapon) > 0 {
                     weapon.wake
                 } else {
                     0.0
@@ -2161,21 +2161,7 @@ impl World {
                     aim_w(weapon, s.projectiles.sub[i] > 0),
                 ),
             };
-            // A braided shot is seen as its strands (`Weapon::braid`); once landed (`spent`
-            // below) they have closed into the one shot.
-            if weapon.braid > 1 && s.projectiles.sub[i] == 0 {
-                braid::strands(
-                    &shot,
-                    weapon.braid,
-                    s.projectiles.age[i],
-                    s.projectiles.ticks_left[i],
-                    s.projectiles.vel[i].to_f32(),
-                    s.projectiles.serial[i],
-                    &mut frame.projectiles,
-                );
-            } else {
-                frame.projectiles.push(shot);
-            }
+            frame.projectiles.push(shot);
         }
         // Shots that landed this tick fly their last stretch, so a shell is seen
         // all the way in, and one fired at point-blank range is seen at all.

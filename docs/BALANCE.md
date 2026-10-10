@@ -99,8 +99,7 @@ Off the lines, measured the same way:
   ships, and nothing dearer than one payload (the Behemoth).
 - The Regency's Springald (same cost and reach) is bent as the Kiln is from the Trebuchet:
   5600 in 40 m every 10 s (560 dps on paper), a 0.8 degree spread and a 4 s charge. Its
-  shot is drawn as three strands wound round each other but is one shot and strikes once
-  (`Weapon::braid`), so a dome takes it as it takes a Culverin shell.
+  shot is one shell, so a dome takes it as it takes a Culverin shell.
 - The Regency's Carillon (T4 area defence, 6500 mass, 26000 HP, 30 energy/s upkeep) is
   a store of damage, not a rate of it: it makes eight plasma flecks every 4 s and holds
   up to thirty-two (`Weapon::orbs`, `orb_time`), drifting round the spire like fireflies,

@@ -115,7 +115,8 @@ pub struct Weapon {
     pub tracer: f32,
     /// A projectile wake: blue energy for Blue shots, white smoke for Orange shots.
     pub trail: bool,
-    /// Seconds the wake hangs. Zero: the usual hang, when the shot has a trail.
+    /// Seconds the wake hangs. Zero: the usual hang, when the shot has a trail. A Regency
+    /// plasma shot's: seconds its trail glows; zero, its grade's own.
     pub wake: f32,
     /// Multiplies a blue plasma sheath around the traveling slug. 0 is none;
     /// 1 is the size the damage implies. Does not change the tracer, flash, or impact.
@@ -195,10 +196,6 @@ pub struct Weapon {
     /// Ticks the rounds are spread over (`RawWeapon::round_span`). Zero: the time to the
     /// next shot. Cosmetic.
     pub round_span: f32,
-    /// Strands a lobbed plasma shot is drawn as, corkscrewing round its line of flight
-    /// and closing into one where it lands (`RawWeapon::braid`). Zero: drawn as it is.
-    /// Cosmetic: not in the content hash.
-    pub braid: u8,
     /// An orb battery (`RawWeapon::orbs`): orbs made each batch. Zero: an ordinary gun.
     /// The most it holds is its muzzles, one orb at each: the places they drift about.
     /// Its shots home on their mark (`mc_sim::orbs`).
