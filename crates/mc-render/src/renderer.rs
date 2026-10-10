@@ -1405,7 +1405,7 @@ impl Renderer {
         let mut indices: Vec<u32> = Vec::new();
         let mut slots: Vec<DrawSlot> = Vec::new();
         let mut infos: Vec<ModelInfo> = Vec::new();
-        // Which model slots carry charge coils (`titan_charge`).
+        // Which model slots carry charge coils or charge gear (`titan_charge`).
         let mut coil_models: Vec<bool> = Vec::new();
         // Each model slot's exhaust ports (`heat_haze`).
         let mut exhaust_models: Vec<Vec<models::Exhaust>> = Vec::new();
@@ -1452,10 +1452,13 @@ impl Renderer {
             gravity_cores.push(model.gravity_core);
             discharge_models.push(model.discharge.clone());
             stake_scales.push(models::stakes::stake_scale(model));
-            coil_models.push(model.lods[0].vertices.iter().any(|v| {
-                (models::pattern::COIL..=models::pattern::COIL_TURN_BACK)
-                    .contains(&(v.surface & 0xFF))
-            }));
+            coil_models.push(
+                model.charge_gear.is_some()
+                    || model.lods[0].vertices.iter().any(|v| {
+                        (models::pattern::COIL..=models::pattern::COIL_TURN_BACK)
+                            .contains(&(v.surface & 0xFF))
+                    }),
+            );
             let icon = &icon;
             let height = model.lods[0]
                 .vertices

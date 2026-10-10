@@ -1140,6 +1140,18 @@ fn glow_of(p: &ProjectileInstance) -> Option<Glow> {
             line: false,
         });
     }
+    // A surge shell (`plasma_look::SURGE_SHELL`): its crimson plume lights what it passes.
+    if p._pad[0] > 2.5
+        && ((p._pad[0] - 1.0) * 0.5).floor() == crate::gpu_consts::plasma_look::SURGE_SHELL as f32
+    {
+        return Some(Glow {
+            from,
+            to,
+            color: Vec3::new(1.0, 0.06, 0.05) * 220.0,
+            range: 30.0,
+            line: false,
+        });
+    }
     // Tracers: small, but a stream of them lights a night battle.
     let color = match flags & 0xF {
         0 => Vec3::new(0.35, 0.66, 1.0),

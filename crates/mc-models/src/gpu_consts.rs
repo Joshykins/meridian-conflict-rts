@@ -516,9 +516,19 @@ shared! {
         /// `SPREAD` and `EXTEND` at once: a projector head riding a parting rail's tip,
         /// sliding out along it into the charge.
         pub const REACH: u32 = 5;
+        /// Parts from the bore's line, up or down off it (by which side of the line through
+        /// `ModelInfo::charge_gear.xyz` along the bore it sits), opening through the charge
+        /// and slamming shut on the shot: a split bore's halves drawing apart to hold it
+        /// (the Saker's).
+        pub const PART: u32 = 6;
         pub const SPREAD_M: f32 = 0.7;
         pub const EXTEND_M: f32 = 1.1;
         pub const VENT_M: f32 = 0.9;
+        pub const PART_M: f32 = 0.55;
+        /// `drive_at.w` on a lit slot (`pattern::EMBER_SLOT`) in a charge gun's gear: the
+        /// slot knows the charge (entity.wgsl), pressure rippling out along it toward the
+        /// muzzle as it fills, blinding at the shot and cooling after.
+        pub const SLOT_TAG: f32 = 6.0;
         /// A `pattern::COIL` stage on a `GLOW_LASER` face (the Regency's red-white plasma
         /// coil): the light that this stage means a vent's heat, lit by the shot and
         /// cooling after it, not climbing through the charge.
@@ -891,6 +901,9 @@ shared! {
         /// A Pinch-fusion round's: starts white and takes the prism's pinks.
         pub const PLASMA_TRAIL_FUSION: f32 = 1.0;
         // retired: 2.0 (a plasma trail's kind)
+        /// A surge shell's (`plasma_look::SURGE_SHELL`): a crimson ember thread that cools
+        /// to violet, beaded where the shell's pressure pulses passed.
+        pub const PLASMA_TRAIL_SURGE: f32 = 3.0;
         /// A gravity crush's tether (renderer/crush_fx.rs), the Regency's missile defence
         /// gripping a missile: a thin hard red core, lensing ripples running out from the
         /// emitter to the missile, a faint prism shimmer at its edges. Struck and fading
@@ -920,6 +933,11 @@ shared! {
         /// Strider's): the same body and smoke, but its charge burns fusion white-pink and
         /// brighter out of the tail, a longer thrust. `mc_sim::mirror::PLASMA_LOOK_FUSION_SEEKER`.
         pub const FUSION_SEEKER: u32 = 7;
+        /// A surge shell (a plasma gun with a `Weapon::surge`, the Saker's Surge Mortar): a
+        /// solid graphite shell, crimson seams in its casing (sprites.wgsl `vs_missile`),
+        /// trailing a crimson heat plume that cools to violet, pressure pulses running back
+        /// down it. `mc_sim::mirror::PLASMA_LOOK_SURGE_SHELL`.
+        pub const SURGE_SHELL: u32 = 8;
     }
 
     /// A strategic launcher (models/aster/strategic.rs, entity.wgsl). The rounds word

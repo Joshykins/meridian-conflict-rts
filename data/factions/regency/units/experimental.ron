@@ -278,7 +278,7 @@
             plasma_grade: Some(PinchFusion),
             flash: 1.6, impact: 2.0, tracer: 2.4,
             sounds: (
-                fire: "regency_sunspear_fire", charge: "regency_sunspear_charge", charge_time: 2.0,
+                fire: "regency_surge_fire", charge: "regency_surge_charge", charge_time: 2.0,
                 charge_volume: 1.6,
                 impact: "regency_surge_hit", ground: "regency_surge_hit",
             ),

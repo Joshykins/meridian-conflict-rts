@@ -458,6 +458,16 @@ fn charge_gear_pose(p0: vec3<f32>, n0: vec3<f32>, gear: u32, rig: vec4<f32>, bor
     if gear == CHARGE_GEAR_VENT {
         p.z += CHARGE_GEAR_VENT_M * rig.w * s.y;
     }
+    if gear == CHARGE_GEAR_PART {
+        // Off the bore's line through the hub, up or down off it by its side of the line:
+        // open through the charge, shut the instant it fires (the charge reads empty).
+        let along = select(vec3<f32>(1.0, 0.0, 0.0), normalize(bore), dot(bore, bore) > 0.25);
+        let off = p - rig.xyz;
+        let up = normalize(cross(along, vec3<f32>(0.0, 1.0, 0.0)));
+        let side = sign(dot(off - along * dot(off, along), up));
+        let open = smoothstep(0.0, 0.9, coil_state(e, time).x);
+        p += up * side * CHARGE_GEAR_PART_M * rig.w * open;
+    }
     if gear == CHARGE_GEAR_SPIN {
         let turn = charge_gear_turn(e, time);
         p = rot_z(p - rig.xyz, turn) + rig.xyz;
@@ -2507,6 +2517,16 @@ fn vs_main(in: VsIn) -> VsOut {
         out.drive = vec4<f32>(c.x, c.y, 0.0, 0.0);
         out.drive_at = vec4<f32>(f32(coil_pat - PAT_COIL), 0.0, 0.0, 3.0);
     }
+    // A lit slot in a charge gun's gear knows the charge and how far down the bore it sits
+    // (`CHARGE_GEAR_SLOT_TAG`).
+    if coil_pat == EMBER_PLATE_SLOT && ((in.rig >> CHARGE_GEAR_SHIFT) & CHARGE_GEAR_MASK) != 0u
+        && model.charge_gear.w > 0.0 && e.mount.w == CHARGE_RECORD {
+        let c = coil_state(e, time);
+        let bore = select(vec3<f32>(1.0, 0.0, 0.0), normalize(model.recoil.xyz), dot(model.recoil.xyz, model.recoil.xyz) > 0.25);
+        let along = abs(dot(in.pos - model.charge_gear.xyz, bore));
+        out.drive = vec4<f32>(c.x, c.y, along, 0.0);
+        out.drive_at = vec4<f32>(0.0, 0.0, 0.0, CHARGE_GEAR_SLOT_TAG);
+    }
     // A fabricator's matter and lamps know its work, its stroke and whether it is paused.
     if (coil_pat == FAB_PATTERN_MATTER || coil_pat == FAB_PATTERN_LAMP) && in.material == MASS_GLOW_MATERIAL {
         let beat = fab_beat(e, time, t);
@@ -3362,6 +3382,19 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             let hot = saturate((in.drive.y - 1.5) / 4.0);
             regency.glow = mix(regency.glow, vec3<f32>(length(regency.glow)) * vec3<f32>(1.0, 0.62, 0.7), hot * 0.6)
                 * in.drive.y;
+        }
+        // A charge gun's slots (`CHARGE_GEAR_SLOT_TAG`): pressure rippling out along the bore
+        // toward the muzzle as it fills, faster and brighter, going hot pink at the crests;
+        // blinding at the shot, then cooling back.
+        if in.drive_at.w == CHARGE_GEAR_SLOT_TAG {
+            let charge = in.drive.x;
+            let since = in.drive.y;
+            let wave = pow(0.5 + 0.5 * sin(in.drive.z * 0.55 - time * (3.0 + 15.0 * charge)), 3.0);
+            let blaze = 1.0 - smoothstep(0.03, 0.4, since);
+            let cool = 1.0 - smoothstep(0.3, 3.5, since);
+            let hot = saturate(charge * wave + blaze);
+            regency.glow = mix(regency.glow, vec3<f32>(length(regency.glow)) * vec3<f32>(1.0, 0.45, 0.5), hot * 0.6)
+                * (1.0 + charge * (1.0 + 6.0 * wave * charge) + blaze * 7.0 + cool * 2.0);
         }
         lights += regency.glow;
         n = normalize(n - reg_to_world(regency.slope, dl1, dl2, dpdx(in.world), dpdy(in.world)));

@@ -138,6 +138,30 @@ impl Renderer {
             .truncate()
             .extend(self.ground_height(pos.truncate()).max(water));
         let linger = surge.linger_ticks as f32 * self.tick_seconds.max(0.02);
+        self.push_surge(
+            at,
+            time + after.to_f32() * self.tick_seconds,
+            surge.radius.to_f32(),
+            surge.speed.to_f32(),
+            linger,
+            w.impact.max(0.3),
+        );
+    }
+
+    /// A wake rolling out over the ground from `at` from `start`: out to `radius` metres at
+    /// `speed` metres a second, burning `linger` seconds after, `power` as bright as a
+    /// shell's `impact`. A surge shell's, and the small one a surge gun drives into the
+    /// ground as it fires (`regency_guns_fx::surge`).
+    pub(super) fn push_surge(
+        &mut self,
+        at: Vec3,
+        start: f32,
+        radius: f32,
+        speed: f32,
+        linger: f32,
+        power: f32,
+    ) {
+        let seed = self.scatter.unit() * 61.0;
         let surges = &mut self.surge_fx.surges;
         // A deliberate cosmetic cap, as many as are drawn: the oldest goes first.
         if surges.len() >= MAX_SURGES as usize {
@@ -145,12 +169,12 @@ impl Renderer {
         }
         surges.push(Surge {
             at,
-            start: time + after.to_f32() * self.tick_seconds,
-            radius: surge.radius.to_f32().max(1.0),
-            speed: surge.speed.to_f32().max(1.0),
+            start,
+            radius: radius.max(1.0),
+            speed: speed.max(1.0),
             linger,
-            power: w.impact.max(0.3),
-            seed: self.scatter.unit() * 61.0,
+            power,
+            seed,
             laid: 0,
         });
     }

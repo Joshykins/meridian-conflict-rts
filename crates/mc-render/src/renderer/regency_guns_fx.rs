@@ -38,6 +38,8 @@
 //!   white-hot core in a broad sheath of the prism, strobing, and behind it a white-hot
 //!   trail that takes the prism and cools to violet, breaking up, shedding sparks. Where
 //!   it lands it goes off as a small supernova (`fusion.rs`).
+//! - **Surge** (a plasma gun with a `Weapon::surge`, the Saker's Surge Mortar): crimson and
+//!   bent violet air, the ground drawn in and driven out, a solid shell (`surge.rs`).
 //!
 //! Nothing is wound round a middle (no spiral arms, no rings; a fusion strike's streamers
 //! are thrown out in a loose band round its waist, as a supernova's), and nothing hangs as
@@ -63,6 +65,7 @@ mod burning;
 mod fusion;
 mod plasmeric;
 mod strike;
+mod surge;
 
 const ORB: f32 = puff::PLASMA_ORB as f32;
 pub(super) const BURST: f32 = puff::PLASMA_BURST as f32;
@@ -106,6 +109,8 @@ const MAX_TRAILS: usize = 6000;
 /// a Pinch-fusion round's.
 const BOLT_TRAIL: (f32, f32) = (12.0, 0.7);
 const FUSION_TRAIL: (f32, f32) = (10.0, 1.8);
+/// A surge shell's (`surge::surge_trail`): it glows longer, cooling to violet.
+const SURGE_TRAIL: (f32, f32) = (10.0, 2.6);
 /// A long-hanging trail's thread across, in the shot's sizes: wider than a short one's, as
 /// it is seen from across the map.
 const HANG_WIDTH: f32 = 0.5;
@@ -121,6 +126,8 @@ pub(super) enum Grade {
     Mortar,
     Pinched,
     Fusion,
+    /// A plasma gun with a ground wake (`Weapon::surge`), whatever its grade (`surge`).
+    Surge,
 }
 
 /// The grade a weapon is drawn as: a plasma gun firing straight, laid flat with its shot
@@ -133,6 +140,9 @@ pub(super) fn grade(w: &Weapon) -> Option<Grade> {
     let lobbed = w.trajectory == Trajectory::Ballistic && !w.flat_fire;
     if w.beam || w.curve.0 > 0 {
         return None;
+    }
+    if w.surge.is_some() && !w.missile {
+        return w.plasma_shot().map(|_| Grade::Surge);
     }
     let grade = match w.plasma_shot()? {
         PlasmaGrade::Plasmeric if lobbed && !w.missile => Grade::Mortar,
@@ -155,7 +165,7 @@ struct Charge {
     unit: u32,
     blueprint: BlueprintId,
     weapon: u8,
-    fusion: bool,
+    grade: Grade,
     start: f32,
     due: f32,
     /// Time laid so far.
@@ -186,7 +196,16 @@ struct Trail {
     start: f32,
     life: f32,
     width: f32,
-    fusion: bool,
+    kind: TrailKind,
+}
+
+/// What a trail piece is drawn as: a Pinched bolt's red, a Pinch-fusion round's prism, or a
+/// surge shell's crimson cooling to violet.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TrailKind {
+    Bolt,
+    Fusion,
+    Surge,
 }
 
 #[derive(Default)]
@@ -218,7 +237,7 @@ impl RegencyGunFx {
             start,
             life,
             width,
-            fusion: true,
+            kind: TrailKind::Fusion,
         });
     }
 
@@ -237,10 +256,10 @@ impl RegencyGunFx {
 
 /// What a trail piece is drawn as (sprites.wgsl, `aim.w`).
 fn trail_kind(t: &Trail) -> f32 {
-    if t.fusion {
-        fade_beam::PLASMA_TRAIL_FUSION
-    } else {
-        0.0
+    match t.kind {
+        TrailKind::Bolt => 0.0,
+        TrailKind::Fusion => fade_beam::PLASMA_TRAIL_FUSION,
+        TrailKind::Surge => fade_beam::PLASMA_TRAIL_SURGE,
     }
 }
 
@@ -297,9 +316,8 @@ impl Renderer {
         time: f32,
     ) -> bool {
         let w = &self.blueprints.unit(blueprint).weapons[weapon as usize];
-        let fusion = match grade(w) {
-            Some(Grade::Pinched) => false,
-            Some(Grade::Fusion) => true,
+        let grade = match grade(w) {
+            Some(g @ (Grade::Pinched | Grade::Fusion | Grade::Surge)) => g,
             _ => return false,
         };
         let due = time + w.charge_ticks as f32 * self.tick_seconds;
@@ -312,7 +330,7 @@ impl Renderer {
                 unit,
                 blueprint,
                 weapon,
-                fusion,
+                grade,
                 start: time,
                 due,
                 laid: time,
@@ -354,16 +372,14 @@ impl Renderer {
                 let (at, dir) = self.regency_muzzle(&u, &w, ((when - time) / tick).clamp(0.0, 1.0));
                 let c = &self.plasma_fx.guns.charges[i];
                 let f = ((when - c.start) / (due - c.start).max(0.01)).clamp(0.0, 1.0);
-                let fusion = c.fusion;
-                self.regency_charge_step(
-                    at,
-                    dir,
-                    &w,
-                    f,
-                    fusion,
-                    when,
-                    (until - from) / steps as f32,
-                );
+                let (grade, span) = (c.grade, (until - from) / steps as f32);
+                if grade == Grade::Surge {
+                    let foot = Vec3::from(u.pos);
+                    self.surge_charge_step(at, dir, &w, f, foot, when, span);
+                } else {
+                    let fusion = grade == Grade::Fusion;
+                    self.regency_charge_step(at, dir, &w, f, fusion, when, span);
+                }
                 self.plasma_fx.guns.charges[i].at = at;
             }
             self.plasma_fx.guns.charges[i].laid = until;
@@ -383,13 +399,14 @@ impl Renderer {
         let mut sparks = 0;
         for p in projectiles {
             let look = drawn_look(p);
-            let (fusion, plasmeric) = match look {
-                1 => (false, false),
-                2 => (true, false),
-                3 => (false, false),
-                4 => (false, true),
+            let (kind, plasmeric) = match look {
+                1 | 3 => (TrailKind::Bolt, false),
+                2 => (TrailKind::Fusion, false),
+                4 => (TrailKind::Bolt, true),
+                plasma_look::SURGE_SHELL => (TrailKind::Surge, false),
                 _ => continue,
             };
+            let fusion = kind == TrailKind::Fusion;
             // A round of a jet that leaves the muzzle part of the way through the tick
             // (`PROJECTILE_STARTS_SHIFT`) has `prev_pos` behind the gun: its trail starts
             // where it leaves, as sprites.wgsl `shot_muzzle` draws it.
@@ -415,7 +432,11 @@ impl Renderer {
                 }
                 continue;
             }
-            let (step, life) = if fusion { FUSION_TRAIL } else { BOLT_TRAIL };
+            let (step, life) = match kind {
+                TrailKind::Bolt => BOLT_TRAIL,
+                TrailKind::Fusion => FUSION_TRAIL,
+                TrailKind::Surge => SURGE_TRAIL,
+            };
             // A shot whose trail hangs long (`Weapon::wake`, a map gun's) lays its thread a
             // tick's stretch at a time: held for its whole arc, it would fill the pieces.
             let hang = p.wake > life;
@@ -426,12 +447,16 @@ impl Renderer {
                     start: time + tick * span,
                     life: p.wake,
                     width: p.size * HANG_WIDTH,
-                    fusion,
+                    kind,
                 });
             }
             // A deliberate cosmetic cap on one shot's stretch: a tick's flight is far
             // under this many pieces.
             let n = ((from.distance(to) / step).ceil() as usize).clamp(1, 16);
+            if kind == TrailKind::Surge {
+                self.surge_trail(from, to, p.size, (starts, span), time);
+                continue;
+            }
             for k in 0..n {
                 let (f0, f1) = (k as f32 / n as f32, (k + 1) as f32 / n as f32);
                 let (a, b) = (from.lerp(to, f0), from.lerp(to, f1));
@@ -445,7 +470,7 @@ impl Renderer {
                         start: when,
                         life,
                         width: p.size * if fusion { 0.32 } else { 0.22 },
-                        fusion,
+                        kind,
                     });
                 }
                 fx.trail(Trail {
@@ -454,7 +479,7 @@ impl Renderer {
                     start: when,
                     life: life * 0.35,
                     width: p.size * if fusion { 0.9 } else { 0.5 },
-                    fusion,
+                    kind,
                 });
                 // A fusion round sheds sparks that fall away from its trail. A deliberate
                 // cosmetic cap on them a tick.
@@ -710,6 +735,11 @@ impl Renderer {
         match grade {
             Grade::Bolt | Grade::Flak => self.bolt_fired(at, dir, rounds, flash, round_gap, time),
             Grade::Mortar => self.mortar_fired(at, dir, flash, time),
+            Grade::Surge => {
+                let w = w.clone();
+                self.charge_spent(blueprint, weapon, at, 0.15, time);
+                self.surge_fired(&w, at, dir, reach, time);
+            }
             Grade::Pinched => {
                 // The ball pinches its plasma out as one jet (`Weapon::round_span`): a hard
                 // red flash where it hangs, a pulse at the mouth as each round of the jet
@@ -925,10 +955,16 @@ impl Renderer {
         if c.left > 0 {
             return;
         }
-        let (fusion, at) = (c.fusion, c.at);
+        let (grade, at) = (c.grade, c.at);
         fx.charges.swap_remove(i);
         let w = &self.blueprints.unit(blueprint).weapons[weapon as usize];
+        let fusion = grade == Grade::Fusion;
         let size = ball(w) * if fusion { 1.5 } else { 1.0 };
+        if grade == Grade::Surge {
+            let w = w.clone();
+            self.surge_spent(at, &w, life, time);
+            return;
+        }
         if fusion {
             // The star let go: a white flash where it hung.
             self.push_lit(

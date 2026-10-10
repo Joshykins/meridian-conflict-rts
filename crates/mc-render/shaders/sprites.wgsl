@@ -145,6 +145,12 @@ fn fusion_seeker(p: Projectile) -> bool {
     return cased_seeker(p) && u32(floor((p.extras.z - 1.0) * 0.5)) == PLASMA_LOOK_FUSION_SEEKER;
 }
 
+// A surge shell (`PLASMA_LOOK_SURGE_SHELL`): no missile, but a solid shell all the same,
+// drawn by `vs_missile` as a stubby faceted body with no fins, its plume by `vs_projectile`.
+fn surge_shell(p: Projectile) -> bool {
+    return plasma_look(p) == PLASMA_LOOK_SURGE_SHELL;
+}
+
 // A cased seeker's charge and line work, as the strategic warhead's (nova.wgsl `NOVA_VIOLET`).
 const SEEKER_RED: vec3<f32> = vec3<f32>(1.0, 0.035, 0.012);
 
@@ -316,6 +322,9 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         trace = length(stride) * 0.85;
     } else if look == 4u {
         trace = min(length(stride) * 0.65, max(p.size, 0.5) * 10.0);
+    } else if look == PLASMA_LOOK_SURGE_SHELL {
+        // A surge shell's plume, a tick and a bit behind its body.
+        trace = min(length(stride) * 0.6, max(p.size, 1.0) * 1.1);
     }
     if (p.color & 0x200u) != 0u {
         trace = min(trace, distance(head, shot_muzzle(p)));
@@ -373,7 +382,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     // Pinched: tight; fusion: a broad prism sheath round its core; a thrown charge: its
     // containment is wider than the core it holds.
     width_px *= select(1.0, 0.8, look == 1u) * select(1.0, 1.35, look == 3u) * select(1.0, 2.6, look == 4u)
-        * select(1.0, 1.9, look == 2u);
+        * select(1.0, 1.9, look == 2u) * select(1.0, 0.45, look == PLASMA_LOOK_SURGE_SHELL);
     let plasma_m = p.extras.y;
     var core_frac = 0.0;
     if plasma_m > 0.0 && !beam && !fade_beam {
@@ -467,7 +476,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         // 1.25: a tracer with an orange-hot core; 1.4: a red round, red-hot right through.
         out.shape.y = select(1.25, 1.4, red > 0.5);
         if look > 0u {
-            // 7.6, 8.6, 9.6, 10.6: the Regency plasma shots (`fs_sprite`).
+            // 7.6, 8.6, 9.6, 10.6, 14.6 (a surge shell): the Regency plasma shots (`fs_sprite`).
             out.color = vec3<f32>(1.0);
             out.shape.y = 6.6 + f32(look);
         }
@@ -544,15 +553,20 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
             // breaking up.
             let heat = max(1.0 - age, 0.0);
             let fusion = abs(p.aim.w - FADE_BEAM_PLASMA_TRAIL_FUSION) < 0.5;
+            // A surge shell's: crimson ember cooling to the Regency's violet, no prism.
+            let surge = abs(p.aim.w - FADE_BEAM_PLASMA_TRAIL_SURGE) < 0.5;
             var red = mix(vec3<f32>(0.45, 0.012, 0.008), vec3<f32>(1.0, 0.06, 0.035), smoothstep(0.0, 0.45, heat));
             if fusion {
                 red = mix(vec3<f32>(0.22, 0.1, 0.5), vec3<f32>(0.6, 0.4, 1.0), smoothstep(0.0, 0.45, heat));
             }
+            if surge {
+                red = mix(vec3<f32>(0.2, 0.05, 0.45), vec3<f32>(0.9, 0.03, 0.06), smoothstep(0.1, 0.6, heat));
+            }
             let hue = prism(f32(instance) * 0.137 + globals.camera.w * PRISM_RATE * 3.0);
-            let pink = vec3<f32>(1.0, 0.45, 0.42);
+            let pink = select(vec3<f32>(1.0, 0.45, 0.42), vec3<f32>(1.0, 0.08, 0.1), surge);
             var warm = mix(red, mix(pink, hue, select(0.0, 0.8, fusion)), smoothstep(0.45, 0.8, heat));
-            warm = mix(warm, vec3<f32>(1.0, 0.9, 0.92), smoothstep(select(0.88, 0.8, fusion), 1.0, heat));
-            out.color = warm * select(7.0, 9.0, fusion) * pow(heat, 0.8);
+            warm = mix(warm, vec3<f32>(1.0, 0.9, 0.92), smoothstep(select(0.88, 0.8, fusion), 1.0, heat) * select(1.0, 0.0, surge));
+            out.color = warm * select(select(7.0, 9.0, fusion), 3.2, surge) * pow(heat, 0.8);
             out.shape = vec2<f32>(-distance(head, tail), 6.6 + 0.4 * clamp(age, 0.0, 1.0));
         } else if (p.color & 0xFu) == 6u {
             // A capital rail's ionised channel (renderer/heavy_rail_fx.rs): white-hot,
@@ -615,6 +629,12 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     // Lightning segments have their own soft caps. The ordinary shot-head sprite
     // would put a bead at every kink, turning dark as the light faded.
     if (p.color & 0x100u) != 0u || ((p.color & FADE_BEAM) != 0u && ((p.color & 0xFu) == 3u || (p.color & 0xFu) == 4u || (p.color & 0xFu) == 6u || (p.color & 0xFu) == FADE_BEAM_TETHER || (p.color & 0xFu) == FADE_BEAM_RIFT_BOLT || (p.color & 0xFu) == FADE_BEAM_LENS_ARC || (p.color & 0xFu) == FADE_BEAM_PLASMA_TRAIL || (p.color & 0xFu) == FADE_BEAM_GRAVITY_TETHER)) {
+        var hidden: SpriteOut;
+        hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
+        return hidden;
+    }
+    // A surge shell's head is its solid body (`vs_missile`), not a glowing bead.
+    if surge_shell(p) {
         var hidden: SpriteOut;
         hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
         return hidden;
@@ -760,6 +780,9 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     } else if look == 4u {
         // A Plasmeric bolt's heart: white-hot going red.
         out.color = vec3<f32>(1.3, 0.26, 0.22);
+    } else if look == PLASMA_LOOK_SURGE_SHELL {
+        // A surge shell's plume seen from afar: crimson.
+        out.color = vec3<f32>(1.3, 0.1, 0.12);
     }
     if (p.color & 0x100u) != 0u {
         out.color = SHOT_YELLOW;
@@ -951,6 +974,30 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
             let time = globals.camera.w;
             let red = vec3<f32>(1.0, 0.045, 0.02);
             let white = vec3<f32>(1.0, 0.86, 0.8);
+            if in.shape.y > 14.1 {
+                // A surge shell's plume (`PLASMA_LOOK_SURGE_SHELL`; its solid body is
+                // `vs_missile`'s): hot just behind the shell, crimson, its rim going to the
+                // Regency's violet and the whole of it cooling to violet toward the tail.
+                // Pressure pulses run back down it, each swelling it and flaring its rim.
+                // Hard-edged, never a haze.
+                let pulse = exp(-pow(fract(u * 3.0 + time * 5.0) - 0.5, 2.0) * 60.0);
+                let prof = (0.35 + 0.65 * smoothstep(0.0, 0.85, u)) * (0.8 + 0.2 * pulse)
+                    * (1.0 - smoothstep(0.93, 1.0, u));
+                let y = abs(in.uv.y) / max(prof, 0.01);
+                if y >= 1.0 {
+                    discard;
+                }
+                let violet = vec3<f32>(0.55, 0.16, 1.0);
+                let crimson = vec3<f32>(1.0, 0.03, 0.04);
+                let body = pow(1.0 - y, 1.2);
+                let rim = smoothstep(0.45, 0.85, y) * (1.0 - smoothstep(0.85, 1.0, y));
+                let core = pow(max(1.0 - y * 2.6, 0.0), 2.0) * smoothstep(0.55, 0.9, u);
+                let hue = mix(violet, crimson, smoothstep(0.15, 0.7, u));
+                let rgb = hue * body * (1.1 + 1.8 * pulse) * (0.2 + 0.8 * u)
+                    + violet * rim * (0.5 + 1.6 * pulse)
+                    + mix(crimson, white, 0.15) * core * 1.6;
+                return vec4<f32>(rgb * smoothstep(0.0, 0.25, u) * in.color.r, 1.0);
+            }
             if in.shape.y > 10.1 {
                 // A Plasmeric bolt: a fat bolt of red plasma, a round head and a short tail
                 // that narrows behind it, round a white-hot heart. Its skin boils, ragged in
@@ -1279,16 +1326,24 @@ fn vs_missile(@builtin(vertex_index) vertex: u32, @builtin(instance_index) insta
     let p = projectiles[instance];
     var out: MissileOut;
     let at = shot_head(p);
-    if (p.color & 0x100u) == 0u || at.w < 0.0 {
+    let shell = surge_shell(p);
+    // A shell has no fins or wings.
+    if ((p.color & 0x100u) == 0u && !shell) || at.w < 0.0 || (shell && vertex >= 96u) {
         out.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
         out.normal = vec3<f32>(0.0, 0.0, 1.0);
         return out;
     }
-    let half_length = missile_half_length(p);
-    let radius = half_length * 0.14;
+    var half_length = missile_half_length(p);
+    var radius = half_length * 0.14;
+    if shell {
+        // Stubby: a fifth of its plume across, a third as thick as it is long.
+        half_length = clamp(p.size * 0.22, 1.2, 4.0);
+        radius = half_length * 0.34;
+    }
     let cased = cased_seeker(p);
-    // Where the body meets the prow: a cased seeker's faceted prow is longer.
-    let prow = select(0.55, 0.4, cased);
+    // Where the body meets the prow: a cased seeker's faceted prow is longer, a shell's
+    // longer still.
+    let prow = select(select(0.55, 0.4, cased), 0.25, shell);
     var local = vec3<f32>(0.0);
     var normal = vec3<f32>(0.0);
     var surface = vec3<f32>(0.0);
@@ -1362,7 +1417,7 @@ fn vs_missile(@builtin(vertex_index) vertex: u32, @builtin(instance_index) insta
     out.clip = globals.view_proj * vec4<f32>(at.xyz + axis * local.x + side * local.y + up * local.z, 1.0);
     out.normal = axis * normal.x + side * normal.y + up * normal.z;
     out.surface = surface;
-    out.cased = select(0u, 1u, cased);
+    out.cased = select(select(0u, 1u, cased), 2u, shell);
     return out;
 }
 fn fs_missile_lit(in: MissileOut) -> vec4<f32> {
@@ -1370,7 +1425,10 @@ fn fs_missile_lit(in: MissileOut) -> vec4<f32> {
     if in.cased == 0u {
         return vec4<f32>(vec3<f32>(0.024, 0.028, 0.033) * light, 1.0);
     }
-    let look = cased_seeker_color(in.surface);
+    var look = cased_seeker_color(in.surface);
+    if in.cased == 2u {
+        look = surge_shell_color(in.surface);
+    }
     return vec4<f32>(look[0] * light + look[1], 1.0);
 }
 
@@ -1412,6 +1470,38 @@ fn cased_seeker_color(s: vec3<f32>) -> array<vec3<f32>, 2> {
         line = max(line, step(0.46, d) * step(0.05, s.x) * step(s.x, 0.34) * select(0.0, 1.0, edge));
     }
     return array<vec3<f32>, 2>(base, SEEKER_RED * line * 4.0 * pulse);
+}
+
+// A surge shell's surface at `s` (`MissileOut::surface`), its base colour and light: graphite
+// in steel courses, a crimson driving band near its base and a ring at the prow's foot, seams
+// of crimson down every other edge between them, and its base burning with the charge it
+// carries. The light beats with the pressure pulses running back down its plume.
+fn surge_shell_color(s: vec3<f32>) -> array<vec3<f32>, 2> {
+    let graphite = vec3<f32>(0.03, 0.03, 0.034);
+    let steel = vec3<f32>(0.2, 0.205, 0.225);
+    let crimson = vec3<f32>(1.0, 0.03, 0.04);
+    let beat = 0.75 + 0.25 * sin(globals.camera.w * 31.4);
+    let piece = u32(s.z + 0.5);
+    if piece == 2u {
+        return array<vec3<f32>, 2>(graphite, crimson * 7.0 * beat);
+    }
+    var base = graphite;
+    if piece == 1u && s.x > 0.85 {
+        // Its point, bright steel.
+        base = steel;
+    }
+    if s.x < -0.92 || (s.x > 0.15 && s.x < 0.22) {
+        base = steel;
+    }
+    let d = abs(fract(s.y * 8.0 + 1e-3) - 0.5);
+    var line = 0.0;
+    if piece == 0u {
+        line = max(line, 1.0 - step(0.05, abs(s.x + 0.66)));
+        line = max(line, 1.0 - step(0.025, abs(s.x - 0.24)));
+        let edge = (u32(floor(s.y * 8.0 + 0.5)) & 1u) == 0u;
+        line = max(line, step(0.46, d) * step(-0.6, s.x) * step(s.x, 0.22) * select(0.0, 1.0, edge));
+    }
+    return array<vec3<f32>, 2>(base, crimson * line * 5.0 * beat);
 }
 
 // How much of a shot or effect shows past the clouds (bindings.wgsl `past_clouds_at`):

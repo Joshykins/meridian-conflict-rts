@@ -408,8 +408,18 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     - **Pinch-fusion Beam:** a grade up, with fusion bursts strobing along
       it. The **Orbital Pinch-fusion Beam** is the campaign's glassing beam.
   - **Indirect fire:** **Plasmeric Mortar**, **Plasmeric Howitzer**. The
-    **Surge Mortar** (the T4 Saker, `Weapon::surge`) lands as a Pinch-fusion
-    shell does, then lets go a wake through the ground that is nothing like the
+    **Surge Mortar** (the T4 Saker, `Weapon::surge`) is crimson and bent violet
+    air from charge to landing, never a fusion star's white
+    (renderer/regency_guns_fx/surge.rs). Through its 2 s charge the split bore's
+    halves draw apart, the slots in their flanks rippling out toward the muzzle,
+    crimson motes stream down the gap into a tight dark-hearted knot between the
+    tips with short red arcs across it, and motes skim in over the ground to its
+    feet. On the shot the halves slam shut, the bore kicks back, the knot lets go
+    in a crimson bloom and the gun drives a small wake into the ground under its
+    legs. The shell is solid: a stubby graphite casing with crimson seams and a
+    burning base, a short violet-rimmed crimson plume with pressure pulses
+    running back down it, and a crimson thread behind that beads and breaks up.
+    It lands as a Pinch-fusion shell does, then lets go a wake through the ground that is nothing like the
     Wake's wall of plasma: a low swell, a pale rose crest no taller than a man
     over bent violet air, rolling out all round the crater, and behind it the
     ground left in patches of wandering crimson cracks that pulse slowly, with

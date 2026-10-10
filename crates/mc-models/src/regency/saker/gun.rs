@@ -4,11 +4,15 @@
 //! plate; swept plates lie in a course down each half's back and graphite bands clamp
 //! both.
 //!
+//! Through the charge the halves draw apart off the gap (`charge_gear::PART`), the slots
+//! in their flanks rippling with it; they slam shut on the shot and the bore kicks back.
+//!
 //! Drawn in the gun's frame: the origin at the trunnion, +x down the bore, +z up off it.
 
 use glam::{Vec2, Vec3};
 
 use crate::builder::MeshBuilder;
+use crate::gpu_consts::charge_gear::PART;
 use crate::{pattern, rig};
 
 use super::super::kit::{dark_plate, metal, slab, v3};
@@ -37,11 +41,12 @@ impl Line {
     }
 
     /// Records the turret's yaw axis (over the unit's middle at `deck`), the gun's
-    /// trunnion and its recoil.
+    /// trunnion, its recoil and the halves' parting off the bore's line.
     pub(super) fn rig(&self, b: &mut MeshBuilder, deck: f32) {
         b.set_turret_pivot(v3(0.0, 0.0, deck));
         b.set_arm_pivot(self.pivot);
-        b.set_recoil(self.pivot, self.muzzle(), 1.6);
+        b.set_recoil(self.pivot, self.muzzle(), 2.6);
+        b.set_charge_gear(self.pivot, 1.0);
     }
 }
 
@@ -210,18 +215,24 @@ fn coarse(b: &mut MeshBuilder, g: &Gun) {
 
 /// The bore: the two halves either side of the gap, a graphite rod down the gap that
 /// stops short of the charge, the bands, red slots in the flanks and a
-/// course of plates down each half's back.
+/// course of plates down each half's back. All but the rod part through the charge (the
+/// bands stretch to keep their grip).
 fn bore(b: &mut MeshBuilder, g: &Gun) {
-    let len = g.len();
-    let fine = b.fine();
     metal(b);
     b.cylinder_between(
         v3(1.6, 0.0, 0.0),
-        v3(len - 3.6, 0.0, 0.0),
+        v3(g.len() - 3.6, 0.0, 0.0),
         g.gap * 0.7,
         g.gap * 0.6,
         b.sides(8),
     );
+    b.with_charge_gear(PART, |b| halves(b, g));
+}
+
+/// The bore's halves, their bands, slots and plates.
+fn halves(b: &mut MeshBuilder, g: &Gun) {
+    let len = g.len();
+    let fine = b.fine();
     for &x in g.bands {
         let s = g.at(x) * 1.07;
         metal(b);

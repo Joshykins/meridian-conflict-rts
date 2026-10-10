@@ -1173,6 +1173,9 @@ pub const PLASMA_LOOK_GRAVITIC_SEEKER: u32 = 5;
 /// `plasma_look` of a seeker carrying pinch fusion (`Weapon::fusion_strike`): drawn as any
 /// seeker, its thrust fusion-hot. `mc_models::gpu_consts::plasma_look::FUSION_SEEKER`.
 pub const PLASMA_LOOK_FUSION_SEEKER: u32 = 7;
+/// `plasma_look` of a surge shell (a plasma gun with a `Weapon::surge`, the Saker's): a
+/// solid shell trailing a crimson plume. `mc_models::gpu_consts::plasma_look::SURGE_SHELL`.
+pub const PLASMA_LOOK_SURGE_SHELL: u32 = 8;
 /// Set in `ProjectileInstance::color` for a torpedo running under the water: no
 /// tracer, flame or casing in the air; a dark body, bubbles and a wake instead.
 pub const PROJECTILE_TORPEDO: u32 = 1 << 4;
@@ -1352,7 +1355,8 @@ const _: () = assert!(std::mem::size_of::<ProjectileInstance>() == 80);
 /// bursts, 3 a gravitic charge thrown curving onto its mark (`Weapon::curve`), 4 a
 /// Plasmeric bolt (a fat glowing teardrop, as a plasma repeater throws), 5 a seeker, any
 /// plasma `missile` (`Weapon::seeker`, `PLASMA_LOOK_GRAVITIC_SEEKER`; 7 one carrying pinch
-/// fusion, `PLASMA_LOOK_FUSION_SEEKER`), beside
+/// fusion, `PLASMA_LOOK_FUSION_SEEKER`), 8 a surge shell (any plasma gun with a
+/// `Weapon::surge`, `PLASMA_LOOK_SURGE_SHELL`), 5 and 7 beside
 /// `PROJECTILE_MISSILE`: its faceted body is drawn in the Regency's look, violet at the
 /// tail, so every Regency missile reads as one a missile defence can take. Zero for
 /// anything else.
@@ -1362,6 +1366,7 @@ pub fn plasma_look(weapon: &mc_data::Weapon) -> u32 {
         _ if weapon.seeker() && weapon.fusion_strike => PLASMA_LOOK_FUSION_SEEKER,
         _ if weapon.seeker() => PLASMA_LOOK_GRAVITIC_SEEKER,
         Some(_) if weapon.curve.0 > 0 => 3,
+        Some(_) if weapon.surge.is_some() => PLASMA_LOOK_SURGE_SHELL,
         Some(PlasmaGrade::Pinched) => 1,
         Some(PlasmaGrade::PinchFusion) => 2,
         Some(PlasmaGrade::Plasmeric) => 4,

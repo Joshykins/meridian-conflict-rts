@@ -574,6 +574,70 @@
                 Roll(at: 0.1, from: 300, to: 50, glide: 2.0, attack: 0.1, decay: 1.1, gain: 0.3, swell: 3, depth: 0.5, seed: 52),
             ],
         ),
+        // The Saker's Surge Mortar, heard 2 s before its shot: its split bore unlocking and
+        // its halves grinding apart, then pressure building in the ground and the gun, not a
+        // star. A heavy lock clunk; the halves grinding open; a deep rough groan of the
+        // ground pressing up into the gun that swells to the end and leans down rather than
+        // climbing; air pulled in down the bore, its band falling; a few heavy thuds of the
+        // charge settling, uneven, and a crimson sizzle crackling up over the last second.
+        // Nothing climbs to a whine. It stops dead for the shot (`regency_surge_fire`).
+        "regency_surge_charge": (
+            length: 2.2, peak: 0.5, room: 0.35,
+            layers: [
+                // The lock letting go: a deep clunk and a metal clank.
+                Burst(low: 45, high: 380, attack: 0.001, decay: 0.04, gain: 4),
+                Fm(from: 310, to: 240, glide: 0.08, ratio: 3.5, index: 1.4, fade: 0.05, attack: 0.001, decay: 0.07, gain: 0.35),
+                // The halves grinding apart.
+                Roll(at: 0.04, from: 520, to: 360, glide: 0.5, attack: 0.08, decay: 0.3, gain: 0.55, swell: 22, depth: 0.8, seed: 8201),
+                Fm(at: 0.05, from: 92, to: 80, glide: 0.4, ratio: 0.5, index: 2.2, fade: 0.4, attack: 0.08, decay: 0.25, gain: 0.3),
+                // The ground pressing up into the gun: a deep rough groan, then its mid body,
+                // both leaning down as they fill.
+                Fm(at: 0.1, from: 52, to: 44, glide: 1.9, ratio: 0.5, index: 2.8, fade: 6.0, attack: 1.88, decay: 0.035, gain: 0.6),
+                Fm(at: 0.55, from: 150, to: 128, glide: 1.4, ratio: 0.5, index: 2.0, fade: 6.0, attack: 1.43, decay: 0.035, gain: 0.85),
+                Drive(1.5),
+                // Air drawn in down the bore, its band falling.
+                Sweep(at: 0.2, from: 2200, to: 420, glide: 1.6, q: 0.9, attack: 1.0, decay: 0.45, gain: 0.5, seed: 8202),
+                // The ground's pressure: a slow rough throb that grows.
+                Roll(at: 0.2, from: 300, to: 220, glide: 1.8, attack: 1.78, decay: 0.035, gain: 0.8, swell: 4, depth: 0.9, seed: 8203),
+                // The charge settling: a few heavy uneven thuds.
+                Burst(at: 0.62, low: 35, high: 220, attack: 0.006, decay: 0.09, gain: 2.0, seed: 8204),
+                Burst(at: 1.14, low: 35, high: 230, attack: 0.006, decay: 0.09, gain: 2.4, pan: -0.2, seed: 8205),
+                Burst(at: 1.49, low: 40, high: 240, attack: 0.006, decay: 0.08, gain: 2.6, pan: 0.2, seed: 8206),
+                Burst(at: 1.83, low: 40, high: 260, attack: 0.005, decay: 0.07, gain: 3.0, seed: 8207),
+                // The crimson sizzle crackling up between the tips.
+                Roll(at: 1.0, from: 1400, to: 1100, glide: 0.95, attack: 0.93, decay: 0.035, gain: 0.35, swell: 100, depth: 1.0, pan: -0.25, seed: 8208),
+                Roll(at: 1.05, from: 1300, to: 1000, glide: 0.9, attack: 0.88, decay: 0.035, gain: 0.35, swell: 110, depth: 1.0, pan: 0.25, seed: 8209),
+            ],
+        ),
+        // The Saker letting its shell go: the halves slamming shut on the charge and the bore
+        // kicking back, a pressure blast rather than a crack, a deep compressive whump that
+        // holds, the gun's own surge going down through its legs into the ground as a short
+        // rolling shudder, and the plasma's roar falling away after the shell, low.
+        "regency_surge_fire": (
+            length: 2.8, peak: 0.85, room: 0.5,
+            layers: [
+                // The halves slamming shut: a hard metal clack.
+                Burst(low: 900, high: 3200, attack: 0.0002, decay: 0.005, gain: 4),
+                Fm(from: 420, to: 300, glide: 0.06, ratio: 3.5, index: 1.6, fade: 0.04, attack: 0.0005, decay: 0.05, gain: 0.3),
+                // The pressure blast and the compressive whump.
+                Burst(at: 0.004, low: 70, high: 650, attack: 0.001, decay: 0.07, gain: 16),
+                Burst(at: 0.006, low: 25, high: 180, attack: 0.004, decay: 0.35, gain: 14),
+                Tone(at: 0.004, from: 84, to: 34, glide: 0.25, attack: 0.002, decay: 0.4, gain: 1.4),
+                Tone(at: 0.006, from: 46, to: 26, glide: 0.8, attack: 0.006, decay: 0.6, gain: 0.55),
+                // The charge's growl, rough and held.
+                Fm(at: 0.004, from: 150, to: 96, glide: 0.5, ratio: 0.5, index: 2.4, fade: 0.4, attack: 0.003, decay: 0.6, gain: 0.8),
+                Drive(1.6),
+                // The plasma roaring off after the shell, a rough band falling.
+                Roll(at: 0.01, from: 1100, to: 260, glide: 1.4, attack: 0.02, decay: 0.75, gain: 0.7, swell: 10, depth: 0.6, seed: 8211),
+                // The gun's surge through its legs: the ground shuddering out from under it,
+                // widening to either side.
+                Fm(at: 0.08, from: 60, to: 44, glide: 1.0, ratio: 0.5, index: 2.2, fade: 0.8, attack: 0.15, decay: 0.55, gain: 0.35),
+                Roll(at: 0.08, from: 520, to: 220, glide: 1.0, attack: 0.15, decay: 0.6, gain: 0.6, swell: 6, depth: 0.7, pan: -0.45, seed: 8212),
+                Roll(at: 0.12, from: 500, to: 210, glide: 1.0, attack: 0.15, decay: 0.6, gain: 0.6, swell: 6, depth: 0.7, pan: 0.45, seed: 8213),
+                // The bore running back out on its slide, a low knock.
+                Burst(at: 0.9, low: 60, high: 600, attack: 0.004, decay: 0.05, gain: 1.4, seed: 8214),
+            ],
+        ),
         // A Surge Mortar shell landing (the Saker): the Sunspear's strike, heavier. A
         // crack and a great whump, a deep boom and growl; then the wake rolling out all
         // round through the ground, a low groaning rumble that swells for a second and
