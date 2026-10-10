@@ -377,8 +377,11 @@ impl Renderer {
         {
             let _t = mc_core::perf_span!("cpu.craters_lights");
             self.upload_craters(input.time, camera);
-            self.ground_melt.step(input.time);
-            self.ground_melt.upload();
+            {
+                let _t = mc_core::perf_span!("cpu.ground_melt");
+                self.ground_melt.step(input.time);
+                self.ground_melt.upload();
+            }
             self.gravitic_engine_frame(input.time, camera);
             self.heat_haze.upload(
                 input.time,

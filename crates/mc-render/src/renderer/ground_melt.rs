@@ -11,6 +11,10 @@
 //! gets there; only the few sources that burn white-hot by themselves (`Burn::peak` at
 //! 1, a star's beam) do.
 //!
+//! A wave rolling over the ground (a cone weapon's wake) sears it with `Sweep`s, bands
+//! of an arc laid one behind another, each cell heated once, rather than discs laid
+//! thick enough to cover the arc.
+//!
 //! Presentation only. The cells live in 32 m tiles made only where something heated
 //! the ground, found through a hash table; both ride in scene set binding 32 (the
 //! layout is `gpu_consts::melt_field`). scars.wgsl `melt_shade` draws it as part of
@@ -22,6 +26,7 @@ use crate::gpu_consts::melt_field as mf;
 use ash::vk;
 use glam::Vec2;
 use std::collections::HashMap;
+use std::f32::consts::PI;
 
 const TILE: usize = mf::TILE as usize;
 const CELLS: usize = TILE * TILE;
@@ -39,6 +44,10 @@ const REACH: f32 = 1.9;
 const RAGGED: f32 = 0.25;
 /// Share of its heating time a slow source shows nothing (the ground only warming).
 const LATENT: f32 = 0.4;
+/// How deep inside its own edge a sweep's band counts every cell, in radii (a disc's
+/// middle is 0): its heat wanders a little under its peak across the band, as a field
+/// of overlapping discs' does.
+const SWEEP_CORE: f32 = 0.5;
 /// Longest step the field cools in one go: a hitch must not cool it at once.
 const MOST_STEP: f32 = 0.25;
 
@@ -53,6 +62,86 @@ pub(super) struct Burn {
     pub(super) start: f32,
     pub(super) rise: f32,
     pub(super) cool: f32,
+}
+
+/// A band of an arc swept over the ground at once (a wake's front as it passes): every
+/// cell more than `inner` and at most `outer` metres from `apex`, within `half` radians
+/// either side of `ahead`, heated to `peak`. It falls off over `edge` metres (a burn's
+/// radius) past the arc's sides, and past `outer` too when it is `open` (the last band,
+/// where the wave ran out; otherwise the next band takes over there). Its heat drains
+/// over `cool` seconds from `start`.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Sweep {
+    pub(super) apex: Vec2,
+    pub(super) ahead: Vec2,
+    pub(super) half: f32,
+    pub(super) inner: f32,
+    pub(super) outer: f32,
+    pub(super) open: bool,
+    pub(super) edge: f32,
+    pub(super) peak: f32,
+    pub(super) start: f32,
+    pub(super) cool: f32,
+}
+
+impl Sweep {
+    /// Metres past its sides (and past `outer`, open) it reaches: its scorch's reach, its
+    /// edge wandering out.
+    fn reach(&self) -> f32 {
+        self.edge * REACH / (1.0 - RAGGED)
+    }
+
+    /// Metres out from the apex the furthest cell it heats stands.
+    fn furthest(&self) -> f32 {
+        if self.open {
+            self.outer + self.reach()
+        } else {
+            self.outer
+        }
+    }
+
+    /// The corners of the box round the band and what it reaches past its sides.
+    fn bounds(&self) -> (Vec2, Vec2) {
+        let outer = self.furthest();
+        let wide = (self.half + self.reach() / self.inner.max(1.0)).min(PI);
+        if wide >= PI {
+            return (self.apex - outer, self.apex + outer);
+        }
+        let mut lo = Vec2::splat(f32::MAX);
+        let mut hi = Vec2::splat(f32::MIN);
+        let mut take = |p: Vec2| {
+            lo = lo.min(p);
+            hi = hi.max(p);
+        };
+        for side in [-wide, wide] {
+            let out = Vec2::from_angle(side).rotate(self.ahead);
+            take(self.apex + out * self.inner);
+            take(self.apex + out * outer);
+        }
+        // The arc bulges furthest out where it crosses an axis.
+        for axis in [Vec2::X, Vec2::Y, -Vec2::X, -Vec2::Y] {
+            if axis.angle_to(self.ahead).abs() <= wide {
+                take(self.apex + axis * outer);
+            }
+        }
+        (lo, hi)
+    }
+
+    /// Metres outside the band a point `d` from the apex stands: past the arc's side
+    /// (`side`, its direction in the frame along `ahead`) while that is nearest, else from
+    /// the apex (behind it), and past `outer`, open.
+    fn outside(&self, d: Vec2, dist: f32, side: Vec2) -> f32 {
+        // In the frame along `ahead`, folded onto one side.
+        let p = Vec2::new(d.dot(self.ahead), d.perp_dot(self.ahead).abs());
+        let past = side.x * p.y - side.y * p.x;
+        let across = if past <= 0.0 || p.dot(side) >= 0.0 {
+            past
+        } else {
+            dist
+        };
+        let beyond = if self.open { dist - self.outer } else { 0.0 };
+        Vec2::new(across.max(0.0), beyond.max(0.0)).length()
+    }
 }
 
 #[derive(Clone, Copy, Default)]
@@ -123,6 +212,8 @@ pub(super) struct GroundMelt {
     index: HashMap<(i32, i32), usize>,
     /// Burns still to come or still heating, each with its seed.
     burns: Vec<(Burn, u32)>,
+    /// Sweeps still to come, each with its seed.
+    sweeps: Vec<(Sweep, u32)>,
     table_dirty: bool,
     clock: Option<f32>,
     seed: u32,
@@ -146,6 +237,7 @@ impl GroundMelt {
             tiles: Vec::new(),
             index: HashMap::new(),
             burns: Vec::new(),
+            sweeps: Vec::new(),
             table_dirty: false,
             clock: None,
             seed: 0x1234_5677,
@@ -168,6 +260,7 @@ impl GroundMelt {
         self.tiles.clear();
         self.index.clear();
         self.burns.clear();
+        self.sweeps.clear();
         self.table_dirty = true;
         self.clock = None;
     }
@@ -176,6 +269,12 @@ impl GroundMelt {
     pub(super) fn burn(&mut self, burn: Burn) {
         self.seed = self.seed.wrapping_mul(1_103_515_245).wrapping_add(12_345);
         self.burns.push((burn, self.seed >> 8));
+    }
+
+    /// Sears the ground with `sweep` when its time comes.
+    pub(super) fn sweep(&mut self, sweep: Sweep) {
+        self.seed = self.seed.wrapping_mul(1_103_515_245).wrapping_add(12_345);
+        self.sweeps.push((sweep, self.seed >> 8));
     }
 
     /// A pool of ground heated at once to `peak` (1 white-hot): `radius` metres at `pos`,
@@ -204,7 +303,9 @@ impl GroundMelt {
         };
         self.clock = Some(time);
         if dt > 0.0 {
+            let _t = mc_core::perf_span!("melt.cool");
             for tile in self.tiles.iter_mut().filter(|t| t.hot) {
+                mc_core::perf_count!("melt.hot_tiles");
                 let mut hot = false;
                 for c in tile.cells.iter_mut().filter(|c| c.heat > 0.0) {
                     c.heat = (c.heat - dt / c.cool.max(0.5)).max(0.0);
@@ -214,6 +315,7 @@ impl GroundMelt {
                 tile.dirty = true;
             }
         }
+        let burns = mc_core::perf_span!("melt.burns");
         let mut i = 0;
         while i < self.burns.len() {
             let (burn, seed) = self.burns[i];
@@ -239,6 +341,116 @@ impl GroundMelt {
                 i += 1;
             }
         }
+        drop(burns);
+        let _t = mc_core::perf_span!("melt.sweeps");
+        let mut i = 0;
+        while i < self.sweeps.len() {
+            let (sweep, seed) = self.sweeps[i];
+            if sweep.start <= time {
+                self.heat_sweep(&sweep, seed, time);
+                self.sweeps.swap_remove(i);
+            } else {
+                i += 1;
+            }
+        }
+    }
+
+    /// Sears the cells of `sweep`'s band, each once: row by row, only the cells of the
+    /// ring it lies in.
+    fn heat_sweep(&mut self, sweep: &Sweep, seed: u32, time: f32) {
+        let r = sweep.edge.max(mf::CELL);
+        let reach = sweep.reach();
+        let sear = (sweep.peak * 1.6).min(1.0);
+        let (inner, outer) = (sweep.inner.max(0.0), sweep.furthest());
+        let (lo, hi) = sweep.bounds();
+        let side = Vec2::from_angle(sweep.half.min(PI));
+        // The cells whose middles lie from `a` to `b` metres.
+        let first = |a: f32| (a / mf::CELL - 0.5).ceil() as i32;
+        let after = |b: f32| (b / mf::CELL - 0.5).floor() as i32;
+        let mut last: Option<((i32, i32), usize)> = None;
+        for cy in first(lo.y)..=after(hi.y) {
+            let y = (cy as f32 + 0.5) * mf::CELL - sweep.apex.y;
+            if y.abs() > outer {
+                continue;
+            }
+            // The row crosses the ring in one run, or in two either side of its hole.
+            let xo = (outer * outer - y * y).sqrt();
+            let xi = (inner * inner - y * y).max(0.0).sqrt();
+            let runs = if xi > 0.0 {
+                [(-xo, -xi), (xi, xo)]
+            } else {
+                [(-xo, xo), (1.0, 0.0)]
+            };
+            for (a, b) in runs {
+                let from = first((sweep.apex.x + a).max(lo.x));
+                let to = after((sweep.apex.x + b).min(hi.x));
+                for cx in from..=to {
+                    let at = (Vec2::new(cx as f32, cy as f32) + 0.5) * mf::CELL;
+                    let d = at - sweep.apex;
+                    let dist = d.length();
+                    if dist <= inner || dist > outer {
+                        continue;
+                    }
+                    let outside = sweep.outside(d, dist, side);
+                    if outside >= reach {
+                        continue;
+                    }
+                    let wander = noise(at, r * 0.6, seed) * 0.7 + noise(at, 2.5, seed ^ 0x55) * 0.3;
+                    let d = (SWEEP_CORE + outside / r) * (1.0 - RAGGED + 2.0 * RAGGED * wander);
+                    if d >= REACH {
+                        continue;
+                    }
+                    let target = sweep.peak * (1.0 - smoothstep(0.4, 1.0, d));
+                    let scorch = sear * (1.0 - smoothstep(0.6, REACH, d));
+                    if target < 0.002 && scorch < 0.004 {
+                        continue;
+                    }
+                    let t = (cx.div_euclid(TILE as i32), cy.div_euclid(TILE as i32));
+                    let slot = match last {
+                        Some((at, slot)) if at == t && self.tiles[slot].at == t => slot,
+                        _ => self.tile(t, time),
+                    };
+                    last = Some((t, slot));
+                    let i = cy.rem_euclid(TILE as i32) as usize * TILE
+                        + cx.rem_euclid(TILE as i32) as usize;
+                    self.warm(slot, i, target, scorch, STACK, sweep.cool, time);
+                }
+            }
+        }
+    }
+
+    /// Raises cell `i` of the tile in `slot` towards `target` heat, adding `stack` of the
+    /// heat it already had (less the nearer it is to white heat), and its scorch to
+    /// `scorch`.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "one cell's share of a burn or sweep"
+    )]
+    fn warm(
+        &mut self,
+        slot: usize,
+        i: usize,
+        target: f32,
+        scorch: f32,
+        stack: f32,
+        cool: f32,
+        time: f32,
+    ) {
+        let tile = &mut self.tiles[slot];
+        let c = &mut tile.cells[i];
+        let headroom = (1.0 - c.heat).max(0.0);
+        let heat = (c.heat.max(target) + stack * c.heat.min(target) * headroom).min(mf::HEAT_MAX);
+        if heat > c.heat {
+            c.cool = if c.heat > 0.0 { c.cool.max(cool) } else { cool };
+            c.heat = heat;
+            tile.hot = true;
+        }
+        // How far it melted: barely fused crust just past the melt point, smooth glass
+        // where it ran white-hot.
+        c.glass = c.glass.max(smoothstep(mf::MELT, 1.0, c.heat));
+        c.scorch = c.scorch.max(scorch);
+        tile.dirty = true;
+        tile.touched = time;
     }
 
     /// Raises the cells under `burn` to `share` of its heat, adding `stack` of the heat a
@@ -273,27 +485,8 @@ impl GroundMelt {
                             continue;
                         }
                         let s = *slot.get_or_insert_with(|| self.tile((tx, ty), time));
-                        let tile = &mut self.tiles[s];
-                        let c =
-                            &mut tile.cells[(cy - base.1) as usize * TILE + (cx - base.0) as usize];
-                        let headroom = (1.0 - c.heat).max(0.0);
-                        let heat = (c.heat.max(target) + stack * c.heat.min(target) * headroom)
-                            .min(mf::HEAT_MAX);
-                        if heat > c.heat {
-                            c.cool = if c.heat > 0.0 {
-                                c.cool.max(burn.cool)
-                            } else {
-                                burn.cool
-                            };
-                            c.heat = heat;
-                            tile.hot = true;
-                        }
-                        // How far it melted: barely fused crust just past the melt point,
-                        // smooth glass where it ran white-hot.
-                        c.glass = c.glass.max(smoothstep(mf::MELT, 1.0, c.heat));
-                        c.scorch = c.scorch.max(scorch);
-                        tile.dirty = true;
-                        tile.touched = time;
+                        let i = (cy - base.1) as usize * TILE + (cx - base.0) as usize;
+                        self.warm(s, i, target, scorch, stack, burn.cool, time);
                     }
                 }
             }
@@ -355,6 +548,7 @@ impl GroundMelt {
 
     /// Writes what changed this frame.
     pub(super) fn upload(&mut self) {
+        let _t = mc_core::perf_span!("melt.upload");
         if self.table_dirty {
             let header = [self.tiles.len() as u32, 0, 0, 0];
             self.buffer.write(0, bytemuck::cast_slice(&header));
@@ -367,6 +561,7 @@ impl GroundMelt {
             if !tile.dirty {
                 continue;
             }
+            mc_core::perf_count!("melt.uploaded_tiles");
             for (w, c) in words.iter_mut().zip(tile.cells.iter()) {
                 *w = c.packed();
             }
@@ -488,5 +683,67 @@ mod tests {
             });
             assert!(found, "tile {:?} not found", tile.at);
         }
+    }
+    fn band(apex: Vec2, half: f32, r: f32, open: bool) -> Sweep {
+        Sweep {
+            apex,
+            ahead: Vec2::new(0.6, 0.8),
+            half,
+            inner: r - 3.0,
+            outer: r + 3.0,
+            open,
+            edge: 7.0,
+            peak: 0.16,
+            start: 0.0,
+            cool: 1.5,
+        }
+    }
+
+    /// Bands laid one behind another sear the whole arc between them, seamless, under
+    /// the peak and never melting it; past the arc's sides and past the last band the
+    /// scorch fades out, and behind the apex nothing happens.
+    #[test]
+    fn sweeps_sear_their_arc_once_and_fade_past_its_edges() {
+        let mut m = GroundMelt::empty();
+        let apex = Vec2::new(-200.3, 1000.7);
+        let half = 0.25;
+        let mut r = 4.0;
+        while r < 300.0 {
+            m.sweep(band(apex, half, r, r + 6.0 >= 300.0));
+            r += 6.0;
+        }
+        m.step(0.0);
+        let ahead = Vec2::new(0.6, 0.8);
+        let at = |a: f32, out: f32| apex + Vec2::from_angle(a).rotate(ahead) * out;
+        for out in (10..=295).step_by(5) {
+            for a in [-0.8, -0.4, 0.0, 0.4, 0.8] {
+                let c = cell(&m, at(half * a, out as f32));
+                assert!(c.heat > 0.09 && c.heat <= 0.16, "{out} {a}: {}", c.heat);
+                assert!(c.scorch > 0.2, "{out} {a}: {}", c.scorch);
+                assert_eq!(c.glass, 0.0);
+            }
+        }
+        // Past a side the heat goes first, then the scorch.
+        let side = |past: f32| cell(&m, at(half + past / 200.0, 200.0));
+        assert!(side(5.0).heat < 0.02 && side(5.0).scorch > 0.0);
+        assert_eq!(side(20.0).scorch, 0.0);
+        // Past the last band, as past a side.
+        assert!(cell(&m, at(0.0, 308.0)).heat < 0.02);
+        assert_eq!(cell(&m, at(0.0, 325.0)).scorch, 0.0);
+        assert_eq!(cell(&m, at(PI, 20.0)).scorch, 0.0);
+    }
+
+    /// A band right round the apex (a ring) sears all round, nothing inside it.
+    #[test]
+    fn a_full_turn_sweep_sears_a_ring() {
+        let mut m = GroundMelt::empty();
+        m.sweep(band(Vec2::new(40.0, 40.0), PI, 100.0, false));
+        m.step(0.0);
+        for k in 0..16 {
+            let p = Vec2::new(40.0, 40.0) + Vec2::from_angle(k as f32 * PI / 8.0) * 100.0;
+            assert!(cell(&m, p).heat > 0.1, "{k}");
+        }
+        assert_eq!(cell(&m, Vec2::new(40.0, 40.0)).scorch, 0.0);
+        assert_eq!(cell(&m, Vec2::new(40.0, 120.0)).scorch, 0.0);
     }
 }

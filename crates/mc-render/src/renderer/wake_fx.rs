@@ -21,7 +21,7 @@
 //! from `regency_trails`); the front and trail themselves are drawn where the front stands
 //! each frame (`upload_wake_shells`). Presentation only; the renderer's own clock.
 
-use super::ground_melt::Burn;
+use super::ground_melt::Sweep;
 use super::regency_guns_fx::{BURST, GLOW, HOT, MOTE, RED, WAKE, WHITE};
 use super::wake_shell::GpuWakeShell;
 use super::{Renderer, PUFF_CLOD, PUFF_DUST};
@@ -34,9 +34,10 @@ use std::f32::consts::{FRAC_PI_2, PI};
 const RING: f32 = 6.0;
 /// The front's light: hotter than the trail, a blue-white (wake_shell.wgsl `ICE`).
 const ICE: Vec3 = Vec3::new(0.72, 0.86, 1.0);
-/// Metres apart along the arc the ground is scorched as the front passes, and how far
-/// each scorch reaches; how hot it gets (under the melt: it scorches and glows, never
-/// melts) and seconds its glow takes to die.
+/// Metres apart along the arc the ground is tried for water as the front passes (it
+/// scorches only dry ground), and metres the scorch fades over past the arc's sides;
+/// how hot it gets (under the melt: it scorches and glows, never melts) and seconds its
+/// glow takes to die.
 const SCORCH_STEP: f32 = 14.0;
 const SCORCH_RADIUS: f32 = 7.0;
 const SCORCH_HEAT: f32 = 0.16;
@@ -241,21 +242,37 @@ impl Renderer {
         let water = self.map_info.water_level.to_f32();
         let width = reach.half_width(r);
         let kicks = ((r * reach.arc / 6.0).ceil() as usize).clamp(2, 24);
-        // The ground it rolls over scorched all along the arc, glowing a moment. A
-        // deliberate cosmetic cap on how many a stretch lays.
-        let scorches = ((2.0 * r * reach.arc / SCORCH_STEP).ceil() as usize).clamp(1, 64);
-        for n in 0..scorches {
-            let across = 2.0 * (n as f32 + self.scatter.unit()) / scorches as f32 - 1.0;
-            let (p, _) = self.front_foot(wake, reach, r, across);
-            if p.z > water + 0.05 {
-                self.ground_melt.burn(Burn {
-                    pos: p.truncate(),
-                    radius: SCORCH_RADIUS * (0.8 + 0.4 * self.scatter.unit()),
-                    peak: SCORCH_HEAT,
-                    start: when,
-                    rise: 0.0,
-                    cool: SCORCH_COOL,
-                });
+        // The ground it rolls over scorched all along the arc, glowing a moment: the
+        // stretch's band swept at once, in pieces between the water. A deliberate
+        // cosmetic cap on how finely the water is found.
+        let tries = ((2.0 * r * reach.arc / SCORCH_STEP).ceil() as usize).clamp(1, 64);
+        let mut dry_from = None;
+        for n in 0..=tries {
+            let dry = n < tries && {
+                let across = 2.0 * (n as f32 + 0.5) / tries as f32 - 1.0;
+                self.front_foot(wake, reach, r, across).0.z > water + 0.05
+            };
+            match (dry, dry_from) {
+                (true, None) => dry_from = Some(n),
+                (false, Some(from)) => {
+                    // From `from` to `n` of the way across, in `tries`.
+                    let (a, b) = (from as f32 / tries as f32, n as f32 / tries as f32);
+                    let middle = (a + b - 1.0) * reach.arc;
+                    self.ground_melt.sweep(Sweep {
+                        apex: wake.at.truncate(),
+                        ahead: Vec2::from_angle(middle).rotate(wake.ahead),
+                        half: (b - a) * reach.arc,
+                        inner: r - RING / 2.0,
+                        outer: r + RING / 2.0,
+                        open: ring_at(k + 1) > reach.range,
+                        edge: SCORCH_RADIUS,
+                        peak: SCORCH_HEAT,
+                        start: when,
+                        cool: SCORCH_COOL,
+                    });
+                    dry_from = None;
+                }
+                _ => {}
             }
         }
         for _ in 0..kicks {

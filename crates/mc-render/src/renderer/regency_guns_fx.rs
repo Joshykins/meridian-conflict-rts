@@ -482,6 +482,7 @@ impl Renderer {
                 }
             }
         }
+        let _t = mc_core::perf_span!("cpu.wake_fx");
         self.roll_wakes(time);
     }
 
