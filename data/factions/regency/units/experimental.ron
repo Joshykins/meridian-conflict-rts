@@ -371,15 +371,16 @@
         radius: 125, height: 240, footprint: (22, 22), hull: (19, 19),
         vision: 600,
         // Given a point anywhere, it gathers for 15 s (its great rings spinning up inside
-        // the crown, the ground round it breaking and shaking), then the rift runs through the ground
-        // at 900 m/s (a 10 km map's width in about 11 s) and shatters a well 300 m across
-        // the point: 18000 struck at its heart as it lands, then 2400 a second for as long
-        // as it holds, a third of that at its edge. Whatever of the enemy's is in it keeps
-        // 35% of its speed; tech 1-3 aircraft are torn out of the sky. A shield dome over
+        // the crown, the ground round it breaking and shaking), then the rift runs through
+        // the ground at 900 m/s (a 10 km map's width in about 11 s) and shatters a well
+        // 300 m round the point. It strikes no blow: from then on everything of the enemy's
+        // anywhere in the well takes 2400 a second, the same at its edge as at its heart,
+        // for as long as it holds, and keeps 35% of its speed; tech 1-3 aircraft are torn
+        // out of the sky. A shield dome over
         // the well takes the crush for what is under it. 8000 energy a second while it is
         // at work, nothing while it stands idle.
         gravitic: (
-            gather: 15, speed: 900, radius: 300, impact: 18000, damage: 2400, edge: 0.33,
+            gather: 15, speed: 900, radius: 300, damage: 2400,
             slow: 0.35, downs: 3, upkeep: 8000, core: (0, 0, 120),
             sounds: (
                 gather: "regency_fallen_gather", launch: "regency_fallen_launch",
@@ -388,7 +389,7 @@
                 release: "regency_fallen_release", downed: "regency_fallen_downed",
             ),
         ),
-        mesh: "regency_gravitic_engine", icon: Titan,
+        mesh: "regency_gravitic_engine", icon: GraviticEngine,
         sounds: (death: "blast_colossal"),
     ),
 ]

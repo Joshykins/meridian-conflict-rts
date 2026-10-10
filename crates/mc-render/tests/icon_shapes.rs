@@ -47,6 +47,7 @@ fn every_kind() -> Vec<IconKind> {
         WingedTitan,
         SiegeWalker,
         AssaultWalker,
+        GraviticEngine,
     ];
     for kind in &all {
         match kind {
@@ -54,7 +55,7 @@ fn every_kind() -> Vec<IconKind> {
             | Extractor | Power | Storage | Defense | Intel | Wall | Shield | Fighter | Bomber
             | Ship | Submarine | Gunship | Transport | Silo | AntiNuke | Warship | Titan
             | Salvage | SalvageCarrier | SalvageDrone | TorpedoBomber | SensorShip | Damper
-            | Elevator | WingedTitan | SiegeWalker | AssaultWalker => {}
+            | Elevator | WingedTitan | SiegeWalker | AssaultWalker | GraviticEngine => {}
         }
     }
     all
@@ -114,4 +115,5 @@ fn the_named_shapes_are_their_icon_kinds() {
     assert_eq!(IconKind::WingedTitan as u32, icon::WINGED_TITAN);
     assert_eq!(IconKind::SiegeWalker as u32, icon::SIEGE_WALKER);
     assert_eq!(IconKind::AssaultWalker as u32, icon::ASSAULT_WALKER);
+    assert_eq!(IconKind::GraviticEngine as u32, icon::GRAVITIC_ENGINE);
 }

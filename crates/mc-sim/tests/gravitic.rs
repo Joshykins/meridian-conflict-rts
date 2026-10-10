@@ -137,8 +137,8 @@ fn gathers_then_the_rift_runs_to_the_point_and_strikes() {
     assert!(matches!(w.state.wells[0].phase, WellPhase::Holding { .. }));
 }
 
-/// The strike and the well crush the enemy's units in it, less at the edge; friends and
-/// whatever is outside are untouched.
+/// The well crushes the enemy's units in it, as hard at its edge as at its heart, a tick at
+/// a time with no blow as it strikes; friends and whatever is outside are untouched.
 #[test]
 fn the_well_crushes_the_enemy_and_spares_friends() {
     let mut w = world();
@@ -147,7 +147,7 @@ fn the_well_crushes_the_enemy_and_spares_friends() {
     let rim = add(&mut w, TANK, 1, MARK.0 + 260, MARK.1);
     let outside = add(&mut w, TANK, 1, MARK.0, MARK.1 + 500);
     let friend = add(&mut w, TANK, 0, MARK.0 - 60, MARK.1);
-    // Tough enough to live through the strike, to measure it.
+    // Tough enough to live through it, to measure it.
     for u in [heart, rim, outside, friend] {
         let r = row(&w, u);
         w.state.units.health[r] = Fx::from_int(100_000);
@@ -155,13 +155,23 @@ fn the_well_crushes_the_enemy_and_spares_friends() {
     let full = health(&w, heart);
     aim(&mut w, engine, MARK);
     assert!(struck(&mut w));
-    let (h, r) = (health(&w, heart), health(&w, rim));
-    assert!(h < full && r < full, "struck: heart {h}, rim {r}");
-    assert!(r > h, "the rim takes less than the heart");
+    // One tick's crush as it strikes: 2400 a second, no blow on top.
+    let tick = Fx::from_int(240);
+    assert_eq!(health(&w, heart), full - tick, "no blow as it strikes");
+    assert_eq!(
+        health(&w, rim),
+        full - tick,
+        "the rim takes what the heart does"
+    );
     for _ in 0..10 {
         run(&mut w, &[]);
     }
-    assert!(health(&w, rim) < r, "the well goes on crushing");
+    assert_eq!(
+        health(&w, heart),
+        full - tick * 11,
+        "the well goes on crushing"
+    );
+    assert_eq!(health(&w, rim), health(&w, heart));
     assert_eq!(health(&w, outside), full);
     assert_eq!(health(&w, friend), full);
 }

@@ -396,13 +396,18 @@ fn icon_shape(shape: u32, p: vec2<f32>) -> f32 {
         // A reverse-kneed assault walker in profile: hunched hull, launcher hump, low
         // pointed head, the gun arm out in front (`hud/icons.rs` draws the same).
         case 40u: { return sd_assault_walker(p); }
+        // A gravitic engine from the front: a crown of shards leaning in to a point over
+        // its well, on a broken ground line (`hud/icons.rs` draws the same; `fs_icon`
+        // frames it as a tier 5).
+        case 41u: { return sd_gravitic_engine(p); }
         default: { return sd_box(p, vec2<f32>(0.6)); }
     }
 }
 
 // The tier 5s' shapes: drawn big and framed.
 fn is_tier5(shape: u32) -> bool {
-    return shape == ICON_TITAN || shape == ICON_WINGED_TITAN || shape == ICON_ELEVATOR;
+    return shape == ICON_TITAN || shape == ICON_WINGED_TITAN || shape == ICON_ELEVATOR
+        || shape == ICON_GRAVITIC_ENGINE;
 }
 // `IconKind::SalvageDrone`: drawn small, one of a carrier's swarm.
 const ICON_SALVAGE_DRONE: u32 = 33u;
@@ -487,6 +492,19 @@ fn sd_winged_titan(p: vec2<f32>) -> f32 {
     // Legs trailing to points, one lower than the other: it hovers.
     d = min(d, sd_taper(p, vec2<f32>(-0.08, -0.14), vec2<f32>(-0.15, -0.88), 0.08, 0.025));
     d = min(d, sd_taper(p, vec2<f32>(0.08, -0.14), vec2<f32>(0.16, -0.66), 0.08, 0.025));
+    return d;
+}
+
+fn sd_gravitic_engine(p: vec2<f32>) -> f32 {
+    let q = vec2<f32>(abs(p.x), p.y);
+    // The ground line, broken in the middle under the well.
+    var d = sd_box(q - vec2<f32>(0.5, -0.66), vec2<f32>(0.36, 0.07));
+    // The crown: a tall middle shard and two pairs leaning in to it, gaps between.
+    d = min(d, sd_taper(p, vec2<f32>(0.0, -0.36), vec2<f32>(0.0, 0.98), 0.1, 0.02));
+    d = min(d, sd_taper(q, vec2<f32>(0.34, -0.58), vec2<f32>(0.1, 0.8), 0.1, 0.02));
+    d = min(d, sd_taper(q, vec2<f32>(0.68, -0.58), vec2<f32>(0.24, 0.5), 0.09, 0.02));
+    // The held gravity: a small core low between the shards.
+    d = min(d, length(p - vec2<f32>(0.0, -0.5)) - 0.1);
     return d;
 }
 

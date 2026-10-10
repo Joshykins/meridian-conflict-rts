@@ -2,8 +2,8 @@
 //! structure that, given a point anywhere on the map, gathers, then tears the ground open
 //! in a rift that runs out to the point, and where the rift strikes the ground shatters
 //! into a gravity well. The well holds until the engine is given another point, is
-//! stopped or dies: everything of the enemy's inside it is crushed (less toward its
-//! edge) and slowed, and an aircraft that is not an experimental is torn out of the sky.
+//! stopped or dies: everything of the enemy's inside it is crushed (the same
+//! anywhere in it) and slowed, and an aircraft that is not an experimental is torn out of the sky.
 //! A shield dome over it takes the crush instead of what is under it, and its own hit
 //! points go as a unit's would. mc-sim `gravitic.rs`.
 
@@ -21,12 +21,8 @@ pub struct RawGravitic {
     pub speed: f64,
     /// Metres: the well's reach round the point.
     pub radius: f64,
-    /// Struck once over the well as the rift arrives, at its heart.
-    pub impact: f64,
-    /// A second, at the well's heart, while it holds.
+    /// A second, the same anywhere in the well, while it holds.
     pub damage: f64,
-    /// The share of the heart's damage (struck and held) left at the well's edge.
-    pub edge: f64,
     /// The share of its speed a unit in the well keeps.
     pub slow: f64,
     /// Aircraft of this tech and under are torn out of the sky in it; above, they are
@@ -69,10 +65,8 @@ pub struct Gravitic {
     /// Metres a tick.
     pub step: Fx,
     pub radius: Fx,
-    pub impact: Fx,
     /// A second.
     pub damage: Fx,
-    pub edge: Fx,
     pub slow: Fx,
     pub downs: u8,
     /// A second.
@@ -95,17 +89,15 @@ impl RawGravitic {
                 self.gather,
                 self.speed,
                 self.radius,
-                self.impact,
                 self.damage,
                 self.upkeep,
             ]
             .into_iter()
             .all(ok)
-            || !share(self.edge)
             || !share(self.slow)
         {
             return Err(DataError::Invalid(format!(
-                "{key}: a gravitic engine needs a gather, a speed and a radius, none of its numbers negative, and its edge and slow shares from 0 to 1"
+                "{key}: a gravitic engine needs a gather, a speed and a radius, none of its numbers negative, and its slow share from 0 to 1"
             )));
         }
         let (x, y, z) = self.core;
@@ -115,9 +107,7 @@ impl RawGravitic {
                 .clamp(1.0, 6000.0) as u16,
             step: fx(self.speed / ticks_per_second as f64),
             radius: fx(self.radius),
-            impact: fx(self.impact),
             damage: fx(self.damage),
-            edge: fx(self.edge),
             slow: fx(self.slow),
             downs: self.downs,
             upkeep: fx(self.upkeep),
@@ -132,9 +122,7 @@ impl Gravitic {
         for v in [
             self.step,
             self.radius,
-            self.impact,
             self.damage,
-            self.edge,
             self.slow,
             self.upkeep,
             self.core.x,
