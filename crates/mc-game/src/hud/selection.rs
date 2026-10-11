@@ -1159,7 +1159,7 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
             && !s.bp(u).is_mobile()
     });
     if structures && work.len() < 4 {
-        work.push(Order { glyph: Glyph::Prefab, label: "Save Prefab", key: "", hint: "Save Prefab (Ctrl+S): keep the layout of the selected structures, to put it all down again with an engineer from its build panel's Prefabs tab (B, then P). Engineers selected with structures planned save those plans too.", action: HudAction::OfferPrefab, lit: false });
+        work.push(Order { glyph: Glyph::Prefab, label: "Save Prefab", key: "", hint: "Save Prefab: keep the layout of the selected structures, to put it all down again with an engineer from its build panel's Prefabs tab (B, then P). Engineers selected with structures planned save those plans too.", action: HudAction::OfferPrefab, lit: false });
     }
     out.push((
         if builders || reclaimers {

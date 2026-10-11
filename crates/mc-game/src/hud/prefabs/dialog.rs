@@ -180,7 +180,7 @@ pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene) {
         )
     } else if draft.editing {
         (
-            "Its structures stay as saved  \u{b7}  Ctrl+S a new layout to change them".to_owned(),
+            "Its structures stay as saved  \u{b7}  save a new layout to change them".to_owned(),
             palette::FAINT,
         )
     } else if full {

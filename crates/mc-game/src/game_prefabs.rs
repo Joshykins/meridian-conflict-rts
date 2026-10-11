@@ -1,4 +1,4 @@
-//! Prefabs in a match (`crate::prefabs`): Ctrl+S (or the Save Prefab order) keeps the
+//! Prefabs in a match (`crate::prefabs`): the Save Prefab order keeps the
 //! selected structures' layout, and the construction panel's Prefabs tab puts one
 //! down with the selected builders, turned with R and mirrored with F.
 //!
@@ -186,7 +186,7 @@ impl Game {
         self.place_from = None;
     }
 
-    /// Ctrl+S, or the Save Prefab order: the selected structures (and the structures
+    /// The Save Prefab order: the selected structures (and the structures
     /// the selected builders have planned) as a prefab, offered for naming.
     pub(super) fn offer_prefab(&mut self, audio: &Audio) {
         if self.view.observing {

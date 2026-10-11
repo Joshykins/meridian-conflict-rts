@@ -2830,7 +2830,7 @@ impl Game {
             return;
         }
         // A structure or prefab in hand turns on R, a prefab mirrors on F (`game_place.rs`),
-        // unless the construction keys have the letters; Ctrl+S keeps the selection as one.
+        // unless the construction keys have the letters.
         if code == KeyCode::KeyR && !self.hud.build_keys && self.turn_in_hand(audio) {
             return;
         }
@@ -2839,10 +2839,6 @@ impl Game {
             && matches!(self.view.mode, Mode::Prefab(_))
         {
             self.mirror_prefab(audio);
-            return;
-        }
-        if code == KeyCode::KeyS && self.ctrl {
-            self.offer_prefab(audio);
             return;
         }
         if self.hud.free.on && self.free_camera_key(code, r, audio) {
