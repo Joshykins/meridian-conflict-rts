@@ -2750,8 +2750,17 @@ fn site_waves(local: vec3<f32>, weld: vec4<f32>, time: f32, seed: f32) -> vec2<f
 const TREE_STILL_PX: f32 = 6.0;
 
 fn blast_sway(index: u32) -> vec3<f32> {
+    return tree_sway[sway_row(index)].xyz;
+}
+
+// How much a prop grows in a thinned-out forest (cull.wgsl `thin_scale`).
+fn thin_grow(index: u32) -> f32 {
+    return tree_sway[sway_row(index)].w;
+}
+
+fn sway_row(index: u32) -> u32 {
     let dynamic = (index & DYNAMIC_BIT) != 0u;
-    return tree_sway[select(index, globals.counts.y + (index & ~DYNAMIC_BIT), dynamic)].xyz;
+    return select(index, globals.counts.y + (index & ~DYNAMIC_BIT), dynamic);
 }
 
 // shield_shelter, ground_air and gust_at are in habitat.wgsl.

@@ -68,7 +68,8 @@ struct CullPush {
 @group(0) @binding(9) var<storage, read> props_dead: array<u32>;
 @group(0) @binding(10) var<storage, read> effect_barriers: EffectBarriers;
 // Per entity (indexed as `vis`): the blasts' push on a standing tree, xy the lean of
-// its top in metres, z the stir of its leaves. entity.wgsl `tree_air` adds the wind.
+// its top in metres, z the stir of its leaves (entity.wgsl `tree_air` adds the wind);
+// w, for every prop, how much it grows in a thinned-out forest (`thin_scale`).
 @group(0) @binding(11) var<storage, read_write> tree_sway: array<vec4<f32>>;
 // Per list and slot, as `commands`: the draw the props make of it (`PulledDraw`).
 @group(0) @binding(12) var<storage, read_write> pulled: array<PulledDraw>;
@@ -99,7 +100,40 @@ fn icon_too(flags: u32, slot: u32) -> bool {
     return slot != NOT_VISIBLE && slot != globals.counts.z - 1u && has_icon(flags);
 }
 
+// A far forest keeps its cover with fewer trees (models with `ICON_TREE`): under
+// THIN_PX of radius on screen a share of the trees is left out, more the smaller they
+// are, down to keeping THIN_KEEP of them, and the rest grow to cover the ground they
+// leave. Which go is fixed by the tree (`thin_rank`), so the same ones go every
+// frame, and one near its turn shrinks away over a band instead of popping. Trees a
+// few pixels across were most of a low view's vertices and shadow casters.
+const THIN_PX: f32 = 20.0;
+const THIN_KEEP: f32 = 0.25;
+const THIN_FADE: f32 = 0.15;
+
+// How much the entity `classify` just kept grows (`thin_scale`): 1 but for a tree in
+// a thinned-out forest.
+var<private> thin_grow: f32 = 1.0;
+
+// A tree's place in the thinning order, 0 to 1, the same every frame.
+fn thin_rank(index: u32) -> f32 {
+    return f32(ihash21(i32(index), 911) >> 8u) / 16777216.0;
+}
+
+// How much tree `index`, `px` pixels in radius on screen, grows: 0 when it is left out.
+fn thin_scale(index: u32, px: f32) -> f32 {
+    let keep = clamp(px / THIN_PX, THIN_KEEP, 1.0);
+    let rank = thin_rank(index);
+    if rank >= keep {
+        return 0.0;
+    }
+    // The band it shrinks away over narrows to nothing as the forest comes back whole.
+    let band = THIN_FADE * keep * (1.0 - keep) / (1.0 - THIN_KEEP);
+    let fade = select(1.0, clamp((keep - rank) / band, 0.0, 1.0), band > 1e-4);
+    return inverseSqrt(keep) * fade;
+}
+
 fn classify(e: Entity, index: u32, dynamic: bool) -> u32 {
+    thin_grow = 1.0;
     let flags = e.owner_flags;
     if !dynamic && (props_dead[index >> 5u] & (1u << (index & 31u))) != 0u {
         return NOT_VISIBLE;
@@ -140,7 +174,7 @@ fn classify(e: Entity, index: u32, dynamic: bool) -> u32 {
         }
     }
     let dist = max(distance(center, globals.camera.xyz), 1.0);
-    let px = radius * globals.lod.x / dist;
+    var px = radius * globals.lod.x / dist;
     if (flags & KIND_GHOST) != 0u {
         return model.slot;
     }
@@ -158,6 +192,14 @@ fn classify(e: Entity, index: u32, dynamic: bool) -> u32 {
     } else if px < select(1.2, globals.detail.x, (flags & KIND_PROP) != 0u) {
         return NOT_VISIBLE;
     }
+    if !dynamic && (flags & KIND_PROP) != 0u && (model.icon & ICON_TREE) != 0u {
+        thin_grow = thin_scale(index, px);
+        if thin_grow <= 0.0 {
+            return NOT_VISIBLE;
+        }
+    }
+    // Its level of detail by the size it is drawn at.
+    px *= thin_grow;
     var detail_bias = select(1.0, 0.55, (model.icon & 0x200000u) != 0u);
     if (flags & KIND_PROP) != 0u {
         detail_bias *= globals.detail.y;
@@ -322,12 +364,17 @@ fn cs_cull(@builtin(global_invocation_id) id: vec3<u32>) {
     }
     let lists = other_lists(e);
     vis[out_index] = slot | (lists << LISTS_SHIFT);
-    // A standing prop (a trampled tree is past caring): what the blasts do to it.
-    if (e.owner_flags & KIND_PROP) != 0u && e.arm_pitch.x == 0.0 {
-        let scale = select(1.0, f32(e.packed) * 0.001, e.packed != 0u);
-        let stretch = select(1.0, e.arm_pitch.w, e.arm_pitch.w > 0.0);
-        let tall = max(models[e.blueprint].height * scale * stretch, 1.0);
-        tree_sway[out_index] = vec4<f32>(tree_blast(e.pos, tall), 0.0);
+    // A prop: how much it grows, and for a standing one (a trampled tree is past
+    // caring) what the blasts do to it.
+    if (e.owner_flags & KIND_PROP) != 0u {
+        var blast = vec3<f32>(0.0);
+        if e.arm_pitch.x == 0.0 {
+            let scale = select(1.0, f32(e.packed) * 0.001, e.packed != 0u) * thin_grow;
+            let stretch = select(1.0, e.arm_pitch.w, e.arm_pitch.w > 0.0);
+            let tall = max(models[e.blueprint].height * scale * stretch, 1.0);
+            blast = tree_blast(e.pos, tall);
+        }
+        tree_sway[out_index] = vec4<f32>(blast, thin_grow);
     }
     atomicAdd(&counters[slot], 1u);
     for (var l = 1u; l < CULL_LIST_COUNT; l++) {

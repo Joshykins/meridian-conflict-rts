@@ -202,6 +202,9 @@ shared! {
         /// of pieces, and the terrain under them casts the wall's shadow already: a piece
         /// casts only into the nearest cascade, where its ledges' shadows show.
         pub const CLIFF: u32 = 0x2000_0000;
+        /// `ModelInfo::icon` bit: a tree (a prop kind). A far forest is drawn with fewer,
+        /// bigger trees (cull.wgsl `thin_scale`).
+        pub const TREE: u32 = 0x4000_0000;
     }
 
     /// How a settled wreck lies (`mc_sim::mirror::WRECK_*`, which a test holds equal;

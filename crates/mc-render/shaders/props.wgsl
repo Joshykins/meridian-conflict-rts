@@ -58,7 +58,7 @@ fn prop_place(in: VsIn) -> PropPlaced {
     let model = models[e.blueprint];
     let t = globals.sun.w;
     let time = globals.camera.w;
-    let scale = select(1.0, f32(e.packed) * 0.001, e.packed != 0u);
+    let scale = select(1.0, f32(e.packed) * 0.001, e.packed != 0u) * thin_grow(entity_index);
     let stretch = select(1.0, e.arm_pitch.w, e.arm_pitch.w > 0.0);
     var p = in.pos;
     var n = in.normal;
@@ -147,7 +147,7 @@ fn vs_prop(in: VsIn) -> PropOut {
     let e = load_entity(visible[in.instance]);
     let model = models[e.blueprint];
     let placed = prop_place(in);
-    let scale = select(1.0, f32(e.packed) * 0.001, e.packed != 0u);
+    let scale = select(1.0, f32(e.packed) * 0.001, e.packed != 0u) * thin_grow(visible[in.instance]);
     var out: PropOut;
     out.clip = globals.view_proj * vec4<f32>(placed.world, 1.0);
     out.world = placed.world;

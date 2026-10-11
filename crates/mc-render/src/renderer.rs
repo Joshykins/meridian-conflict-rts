@@ -1374,8 +1374,14 @@ impl Renderer {
         for kind in PropKind::ALL {
             let key = models::prop_model_key(kind.raw());
             let model = models::build_model(key).unwrap_or_else(|| fallback_model(key, 4.0, 8.0));
-            drawn_as.push((model_list.len(), 13, 0));
-            model_list.push((model, 13));
+            let icon = 13
+                | if kind.is_tree() {
+                    crate::gpu_consts::icon::TREE
+                } else {
+                    0
+                };
+            drawn_as.push((model_list.len(), icon, 0));
+            model_list.push((model, icon));
         }
         // Trees and rocks lead the prop kinds; their slots get a vertex stage of their
         // own (entity.wgsl `vs_prop`).
