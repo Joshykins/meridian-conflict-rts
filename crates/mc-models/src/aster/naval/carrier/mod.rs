@@ -5,8 +5,8 @@
 //! middle from a landing mouth in the stern to a launch mouth in the bow face, glimpsed
 //! from above through skylights, a long slit and gratings between the deck blocks that
 //! roof it. Its floor carries the lit lane and its walls ribs and lit slots.
-//! The command plateau over the bow quarter is edged in bronze and zig-zags in steps down
-//! both sides; on it stands a terraced citadel with the fleet radar. Twelve SAM cells
+//! The command plateau over the stern quarter is edged in bronze and zig-zags in steps down
+//! both sides; on it stands a terraced citadel with the fleet radar, the bridge aft. Twelve SAM cells
 //! lie flush in the deck either side of the tunnel, and four interceptor lasers stand on
 //! the citadel and the deck.
 //!
@@ -68,8 +68,8 @@ const FLOOR: f32 = 1.5;
 const CEILING: f32 = 7.2;
 const TUNNEL: f32 = 5.5;
 const FLARE: f32 = 1.4;
-/// The command plateau's aft end and its deck.
-const PLATEAU_AFT: f32 = 14.0;
+/// The command plateau's fore end and its deck.
+const PLATEAU_FORE: f32 = -14.0;
 const PLATEAU: f32 = 10.8;
 
 /// The flight deck: touchdown a few lengths inside the stern mouth, launch out of the bow.
@@ -98,14 +98,14 @@ const HULL: [Station; 9] = [
 ];
 
 /// Weapon 0's two blocks of cells, flush in the deck either side of the tunnel.
-const CELLS: [Vec2; 2] = [Vec2::new(-14.0, 11.5), Vec2::new(-14.0, -11.5)];
-/// The interceptor lasers (`anti_missile_mounts`): the citadel's, the plateau's aft
-/// corners, and the port landing ramp.
+const CELLS: [Vec2; 2] = [Vec2::new(14.0, 11.5), Vec2::new(14.0, -11.5)];
+/// The interceptor lasers (`anti_missile_mounts`): the citadel's, the plateau's fore
+/// corners, and the starboard ramp.
 const LASERS: [Vec3; 4] = [
-    Vec3::new(45.6, 0.0, 19.5),
-    Vec3::new(36.0, 14.4, 11.7),
-    Vec3::new(36.0, -14.4, 11.7),
-    Vec3::new(-40.0, 13.6, 11.5),
+    Vec3::new(-45.6, 0.0, 19.5),
+    Vec3::new(-36.0, -14.4, 11.7),
+    Vec3::new(-36.0, 14.4, 11.7),
+    Vec3::new(40.0, -13.6, 11.5),
 ];
 
 pub(in crate::aster::naval) fn build(b: &mut MeshBuilder) {
@@ -149,21 +149,21 @@ fn coarse(b: &mut MeshBuilder) {
         v3(FORE - AFT - 6.0, 31.0, DECK - FOOT),
     );
     b.cuboid_open(
-        v3((PLATEAU_AFT + FORE) * 0.5, 0.0, (DECK + PLATEAU) * 0.5),
-        v3(FORE - PLATEAU_AFT - 6.0, 28.0, PLATEAU - DECK),
+        v3((AFT + PLATEAU_FORE) * 0.5, 0.0, (DECK + PLATEAU) * 0.5),
+        v3(PLATEAU_FORE - AFT - 6.0, 28.0, PLATEAU - DECK),
     );
     // The citadel and its mast, drawn in to the radar's height.
     b.frustum_open(
-        v3(40.0, 0.0, 11.0),
+        v3(-40.0, 0.0, 11.0),
         v2(20.0, 14.0),
         v2(6.0, 4.0),
         10.5,
-        v2(-2.0, 0.0),
+        v2(2.0, 0.0),
     );
     for c in CELLS {
         kit::cell_battery(b, c, DECK);
     }
-    team_panel(b, v3(-40.0, 0.0, DECK), v2(4.0, 20.0));
+    team_panel(b, v3(40.0, 0.0, DECK), v2(4.0, 20.0));
 }
 
 /// The tunnel wall's half width at `x`: flared out at both mouths.
@@ -352,16 +352,18 @@ fn portal(b: &mut MeshBuilder, x: f32, out: f32) {
 /// between them through which the lane shows: skylights open to the tunnel, gratings of
 /// bars across a gap, and a long slit down the middle of one block.
 fn roof(b: &mut MeshBuilder) {
-    let w = TUNNEL + 0.6;
+    // Out to where the body's deck starts at the top of its chamfer, and no further: the
+    // two tops would lie in one plane and fight.
+    let w = TUNNEL + 0.3;
     // (x0, x1, how the block is cut): 0 whole, 1 split down the middle by a slit, 2 split
-    // by a slit off to port.
+    // by a slit off to starboard.
     let blocks = [
-        (AFT + 1.0, -52.0, 0),
-        (STERN_STEP, -38.0, 0),
-        (-34.0, -20.0, 1),
-        (-15.0, -5.0, 0),
-        (-1.0, 10.5, 2),
-        (BOW_STEP, FORE - 0.5, 0),
+        (AFT + 0.5, STERN_STEP - 6.0, 0),
+        (-10.5, 1.0, 2),
+        (5.0, 15.0, 0),
+        (20.0, 34.0, 1),
+        (38.0, 46.0, 0),
+        (BOW_STEP, FORE - 1.0, 0),
     ];
     b.paint(PLATING).pattern(pattern::HULL_PLATE);
     for &(x0, x1, cut) in &blocks {
@@ -369,7 +371,7 @@ fn roof(b: &mut MeshBuilder) {
         // The slit's sides, if any.
         let (s0, s1) = match cut {
             1 => (-1.0, 1.0),
-            2 => (2.0, 3.4),
+            2 => (-3.4, -2.0),
             _ => (w, w),
         };
         b.block(v3(x0, -w, CEILING), v3(x1, s0, top));
@@ -378,16 +380,16 @@ fn roof(b: &mut MeshBuilder) {
         }
     }
     // Two openings are only part of the roof's width: plates fill the rest.
-    for (x0, x1, y0, y1) in [(-20.0, -15.0, -w, -1.5), (10.5, PLATEAU_AFT, 2.5, w)] {
+    for (x0, x1, y0, y1) in [(15.0, 20.0, 1.5, w), (PLATEAU_FORE, -10.5, -w, -2.5)] {
         b.block(v3(x0, y0, CEILING), v3(x1, y1, deck_z((x0 + x1) * 0.5)));
     }
-    // The gaps between the blocks: the stern ones open skylights, the others gratings.
+    // The gaps between the blocks: open skylights, and gratings of bars.
     let gaps = [
-        (-52.0, STERN_STEP, false),
-        (-38.0, -34.0, true),
-        (-20.0, -15.0, false),
-        (-5.0, -1.0, true),
-        (10.5, PLATEAU_AFT, false),
+        (PLATEAU_FORE, -10.5, false),
+        (1.0, 5.0, true),
+        (15.0, 20.0, false),
+        (34.0, 38.0, true),
+        (46.0, BOW_STEP, false),
     ];
     if !b.fine() {
         return;

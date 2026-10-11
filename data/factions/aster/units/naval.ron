@@ -573,7 +573,7 @@
         // Four interceptor lasers: the citadel's, the plateau's aft corners, and the port
         // ramp aft.
         anti_missile: 350,
-        anti_missile_mounts: [(45.6, 0.0, 19.5), (36.0, 14.4, 11.7), (36.0, -14.4, 11.7), (-40.0, 13.6, 11.5)],
+        anti_missile_mounts: [(-45.6, 0.0, 19.5), (-36.0, -14.4, 11.7), (-36.0, 14.4, 11.7), (40.0, -13.6, 11.5)],
         economy: (energy_upkeep: 120),
         motion: (layer: Naval, size: 5, speed: 33, accel: 7, turn: 18),
         // The fleet's long arm against air: a Skyguard's reach afloat (a little short of the
@@ -584,12 +584,12 @@
             (
                 name: "Long Range SAM",
                 damage: 1400, range: 2800, reload: 15, speed: 520, trajectory: Direct,
-                turret_turn: 0, arc: 360, muzzle: (-16.8, 10.1, 5.7),
+                turret_turn: 0, arc: 360, muzzle: (11.2, 10.1, 5.7),
                 muzzles: [
-                    (-16.8, 10.1, 5.7), (-11.2, 12.9, 5.7), (-14.0, 10.1, 5.7),
-                    (-16.8, 12.9, 5.7), (-11.2, 10.1, 5.7), (-14.0, 12.9, 5.7),
-                    (-16.8, -12.9, 5.7), (-11.2, -10.1, 5.7), (-14.0, -12.9, 5.7),
-                    (-16.8, -10.1, 5.7), (-11.2, -12.9, 5.7), (-14.0, -10.1, 5.7),
+                    (11.2, 10.1, 5.7), (16.8, 12.9, 5.7), (14.0, 10.1, 5.7),
+                    (11.2, 12.9, 5.7), (16.8, 10.1, 5.7), (14.0, 12.9, 5.7),
+                    (11.2, -12.9, 5.7), (16.8, -10.1, 5.7), (14.0, -12.9, 5.7),
+                    (11.2, -10.1, 5.7), (16.8, -12.9, 5.7), (14.0, -10.1, 5.7),
                 ],
                 salvo: 12, salvo_delay: 0.3, split: true, hatch: 0.6, caliber: 0.9,
                 targets: ["Air"], color: Orange, missile: true, guided: true, vertical_launch: true,
