@@ -163,23 +163,23 @@ fn queued_units_come_down_free_up_to_the_payload_and_seats_in_order() {
     let mut w = world();
     let id = elevator(&mut w);
     let e = spec(&w);
-    // Breachers first, then tanks behind them. Each fills a crate, so three ride and the
-    // fourth does not fit: nothing behind it comes down on this fall.
-    let breacher = w.blueprints.id_of("aster_t4_breacher").unwrap();
+    // Assault bots first, then tanks behind them. As many bots ride as the payload and the
+    // seats take, and the next does not fit: nothing behind it comes down on this fall.
+    let bot = w.blueprints.id_of("aster_t3_assault_bot").unwrap();
     let (cost, radius) = {
-        let bp = w.blueprints.unit(breacher);
+        let bp = w.blueprints.unit(bot);
         (bp.cost_materials, bp.radius)
     };
     let (fits, materials) =
-        mc_sim::mirror::crate_load(std::iter::repeat_n((radius, cost), 6), e.payload);
-    assert_eq!(fits, 3, "a Breacher to a crate");
+        mc_sim::mirror::crate_load(std::iter::repeat_n((radius, cost), 200), e.payload);
+    assert!(fits > 1 && fits < 200, "the payload stops the bots: {fits}");
     let cmds = [
-        produce(&w, id, "aster_t4_breacher", fits as u8 + 1),
+        produce(&w, id, "aster_t3_assault_bot", fits as u8 + 1),
         produce(&w, id, "aster_t1_tank", 4),
     ];
     let n = first_dock(&w);
     let events = run(&mut w, n, &cmds);
-    assert_eq!(count_of(&w, "aster_t4_breacher"), fits as usize);
+    assert_eq!(count_of(&w, "aster_t3_assault_bot"), fits as usize);
     assert_eq!(
         count_of(&w, "aster_t1_tank"),
         0,
@@ -196,9 +196,9 @@ fn queued_units_come_down_free_up_to_the_payload_and_seats_in_order() {
         .unwrap();
     assert_eq!(paid.0, fits);
     assert_eq!(paid.1, e.payload - materials);
-    // The next fall takes the last Breacher and the tanks.
+    // The next fall takes the last bot and the tanks.
     run(&mut w, e.period_ticks, &[]);
-    assert_eq!(count_of(&w, "aster_t4_breacher"), fits as usize + 1);
+    assert_eq!(count_of(&w, "aster_t3_assault_bot"), fits as usize + 1);
     assert_eq!(count_of(&w, "aster_t1_tank"), 4);
 }
 
@@ -258,12 +258,12 @@ fn a_repeated_queue_comes_down_on_every_fall() {
             repeat: true,
         },
     };
-    let order = produce(&w, id, "aster_t4_assault_tank", 2);
+    let order = produce(&w, id, "aster_t3_assault_bot", 2);
     w.tick(&[repeat, order]).unwrap();
     let n = first_dock(&w) - 1 + 2 * e.period_ticks;
     run(&mut w, n, &[]);
     assert_eq!(
-        count_of(&w, "aster_t4_assault_tank"),
+        count_of(&w, "aster_t3_assault_bot"),
         6,
         "two a fall, three falls"
     );

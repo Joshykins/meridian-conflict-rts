@@ -34,7 +34,8 @@ come down: they land, open, let their units drive out and sink into the ground.
   are put out at once. **Batch overrides this**: with the elevator in a batch (Shift+L),
   each unit goes to the batch's muster as it comes out instead.
 - What it can bring down is its `builder.builds` list: every unit ARC's land and air
-  factories make, and the T4 land experimentals. Ships, anything dearer than one payload
+  factories make. No T4: since they were priced as experimentals (2026-10-11) each costs
+  more than a payload. Ships, anything dearer than one payload
   and anything too wide for a crate (`mc_core::elevator_bay::seats`) are refused by the
   data check (`Blueprints::load`).
 - The interface: the elevator's panel stands between its order card and its build menu,

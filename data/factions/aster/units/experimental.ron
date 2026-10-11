@@ -344,8 +344,8 @@
         // 20 000 materials every 30 s: about 670 materials a second once it is running, so it
         // pays for itself in four minutes if nothing touches it.
         elevator: (period: 30, payload: 20000, tether: 24, descent: 7, dock: 18, sink: 4),
-        // What it brings down: everything ARC's land and air factories make, and the
-        // tech 4 land experimentals; nothing that floats.
+        // What it brings down: everything ARC's land and air factories make; nothing that
+        // floats, and no tech 4, which costs more than a payload.
         builder: (power: 0, range: 0, builds: [
             "aster_t1_engineer", "aster_t1_mobile_reclaimer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t1_mobile_aa",
             "aster_t2_engineer", "aster_t2_mobile_reclaimer", "aster_t2_tank", "aster_t2_hover", "aster_t2_missile", "aster_t2_mobile_shield", "aster_t2_mobile_aa",
@@ -353,7 +353,6 @@
             "aster_t1_interceptor", "aster_t1_bomber", "aster_t1_air_scout", "aster_t1_rotor_gunship",
             "aster_t2_gunship", "aster_t2_fire_bomber", "aster_t2_torpedo_bomber", "aster_t2_interceptor",
             "aster_t3_air_superiority", "aster_t3_support", "aster_t3_strategic_bomber", "aster_t3_assault_aircraft",
-            "aster_t4_assault_tank", "aster_t4_breacher",
         ]),
         mesh: "space_elevator", icon: Elevator,
         sounds: (death: "blast_large"),
