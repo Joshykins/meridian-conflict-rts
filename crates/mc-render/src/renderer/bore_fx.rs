@@ -31,8 +31,11 @@ const SHELL_MELT_COOL: f32 = 10.0;
 /// through (`heat_up`), and the longest it takes.
 const HEAT_RATE: f32 = 120.0;
 const MOST_HEAT_UP: f32 = 8.0;
-/// Bolt strokes kept, at most.
+/// Bolt strokes kept, at most: a deliberate cap, the oldest go first. Trimmed only once
+/// it is overrun by `STROKE_SLACK`, in one go, so a storm of strokes (a wing of Nimbus
+/// at 8x speed) does not shift the whole list for each one it adds.
 const MAX_STROKES: usize = 12288;
+const STROKE_SLACK: usize = MAX_STROKES / 4;
 /// Overlapping return strokes keep the channel alive while its branching shape changes.
 /// (delay, lifetime, relative width), in seconds from the strike.
 const DISCHARGE_STROKES: [(f32, f32, f32); 5] = [
@@ -95,6 +98,7 @@ impl BoreFx {
             width,
             color: PLASMA_COLUMN,
         });
+        self.trim();
     }
 
     /// Drops the strokes still to come within `radius` of `at` (a storm that died early).
@@ -126,8 +130,14 @@ impl BoreFx {
             width,
             color,
         });
-        if self.strokes.len() > MAX_STROKES {
-            self.strokes.remove(0);
+        self.trim();
+    }
+
+    /// Drops the oldest strokes once they overrun the cap by `STROKE_SLACK`.
+    fn trim(&mut self) {
+        if self.strokes.len() > MAX_STROKES + STROKE_SLACK {
+            let extra = self.strokes.len() - MAX_STROKES;
+            self.strokes.drain(..extra);
         }
     }
 }

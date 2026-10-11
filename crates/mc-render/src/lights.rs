@@ -29,6 +29,8 @@ const FAR: f32 = 40_000.0;
 pub const MAX_LIGHTS: usize = 2048;
 /// Cluster entries at most (the grid buffer holds CLUSTERS words before them).
 pub const MAX_INDICES: usize = 1 << 18;
+/// Weapon and blast flashes kept at most (`push_flash`).
+const MOST_FLASHES: usize = 4096;
 /// Lights one cluster lists at most: past this the weakest are left out.
 const PER_CLUSTER: u32 = 64;
 /// A light whose reach covers fewer pixels than this is not drawn.
@@ -415,8 +417,10 @@ impl Lights {
                 return;
             }
         }
-        if self.flashes.len() >= 4096 {
-            self.flashes.remove(0);
+        // A deliberate cap, the oldest go first, trimmed in one go once overrun by a
+        // quarter so a storm of flashes does not shift the list for each one it adds.
+        if self.flashes.len() >= MOST_FLASHES + MOST_FLASHES / 4 {
+            self.flashes.drain(..self.flashes.len() - MOST_FLASHES);
         }
         self.flashes.push(flash);
     }
