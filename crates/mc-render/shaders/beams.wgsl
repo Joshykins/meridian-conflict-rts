@@ -733,10 +733,8 @@ fn replicator_fragment(in: BeamOut, n: f32) -> vec4<f32> {
 // nanites hangs round the part of the hull still to come, thickest just over the build
 // front and thinning out above it, circling slowly and drifting in and down into the
 // front, where it condenses into plate; a few of its motes catch a violet glint. Through
-// it, splashes in slow motion with no gravity: a thin violet ring appears round the hull
-// (most at the front), its rim lifts into a crown and the light drains from the ring into
-// the crown's peaks. Colours: the violet of Regency construction, red where it has cooled
-// toward plate.
+// it, broken violet arcs hug the hull at the front, turning slowly round it. Colours: the
+// violet of Regency construction, red where it has cooled toward plate.
 
 const NANITE_VIOLET: vec3<f32> = vec3<f32>(0.66, 0.12, 1.0);
 const NANITE_RED: vec3<f32> = vec3<f32>(1.0, 0.06, 0.08);
@@ -761,7 +759,7 @@ fn nanite_tint(kind: f32) -> NaniteTint {
 const SHAPE_STRAND: f32 = 9.0;
 const SHAPE_NANITE_GLOW: f32 = 10.0;
 const SHAPE_NANITE_MOTE: f32 = 11.0;
-const SHAPE_CROWN: f32 = 12.0;
+const SHAPE_ARC: f32 = 12.0;
 const SHAPE_LEAD: f32 = 14.0;
 const SHAPE_SWARM: f32 = 15.0;
 
@@ -781,15 +779,15 @@ const STRAND_STAGGER: f32 = 0.06;
 const STREAM_LEAD: u32 = 2u;
 // How fast the lead snaps across, metres a second.
 const LEAD_SPEED: f32 = 140.0;
-// Round a site: splashes, each a ring in segments (every other corner a crown peak),
-// then the swarm's puffs in the slots after them.
-const SPLASHES: u32 = 4u;
-const CROWN_SEGS: u32 = 10u;
-const SPLASH_PERIOD_MIN: f32 = 4.5;
-const SPLASH_PERIOD_MAX: f32 = 6.5;
+// Round a site: rings, each in segments with some left out (broken arcs), then the
+// swarm's puffs in the slots after them.
+const ARCS: u32 = 4u;
+const ARC_SEGS: u32 = 10u;
+const ARC_PERIOD_MIN: f32 = 4.5;
+const ARC_PERIOD_MAX: f32 = 6.5;
 const SWARM_PUFFS: u32 = 24u;
 // Metres the swarm stands over the front at most (half the hull's height on a short one).
-const SWARM_BAND: f32 = 6.0;
+const SWARM_BAND: f32 = 12.0;
 // Seconds a puff of the swarm lasts, before another takes its slot.
 const SWARM_LIFE_MIN: f32 = 3.0;
 const SWARM_LIFE_MAX: f32 = 5.0;
@@ -938,30 +936,21 @@ fn nanite_vertex(b: Beam, slot: u32, corner: vec2<f32>) -> BeamOut {
     return out;
 }
 
-// One splash round a site: a ring, centred `centre`, in the plane of `e1`/`e2`, of
-// `radius`, its peaks lifted `lift` along `n`; `k` its seed.
-struct Splash {
+// One ring of arcs round a site: centred `centre`, flat, of `radius`, turned `spin`
+// radians about its axis; `k` its seed.
+struct ArcRing {
     centre: vec3<f32>,
-    e1: vec3<f32>,
-    e2: vec3<f32>,
-    n: vec3<f32>,
     radius: f32,
-    lift: f32,
+    spin: f32,
     k: f32,
 }
 
-// Corner `v` of a splash's ring (`v` and `v + CROWN_SEGS` are the same corner). Even
-// corners are crown peaks: lifted and flared out; odd ones sag a little between them.
-fn crown_corner(sp: Splash, v: u32) -> vec3<f32> {
-    let c = v % CROWN_SEGS;
-    let fc = f32(c);
-    let peak = c % 2u == 0u;
-    let jit = (hash(sp.k + 11.0 + fc * 1.3) - 0.5) * 0.5;
-    let a = (fc + jit) * 6.2832 / f32(CROWN_SEGS) + hash(sp.k + 9.0) * 6.2832;
-    let radial = sp.e1 * cos(a) + sp.e2 * sin(a);
-    let up = select(-0.15, 0.6 + 0.8 * hash(sp.k + 20.0 + fc), peak) * sp.lift;
-    let flare = select(0.0, 0.18 * up, peak);
-    return sp.centre + radial * (sp.radius + flare) + sp.n * up;
+// Corner `v` of a ring (`v` and `v + ARC_SEGS` are the same corner), a little uneven.
+fn arc_corner(ring: ArcRing, v: u32) -> vec3<f32> {
+    let fc = f32(v % ARC_SEGS);
+    let jit = (hash(ring.k + 11.0 + fc * 1.3) - 0.5) * 0.5;
+    let a = (fc + jit) * 6.2832 / f32(ARC_SEGS) + hash(ring.k + 9.0) * 6.2832 + ring.spin;
+    return ring.centre + vec3<f32>(cos(a), sin(a), 0.0) * ring.radius;
 }
 
 // Round a Regency site at work (`BEAM_NANITE_SITE`): `emitter` is the site's foot, `to`
@@ -973,60 +962,47 @@ fn nanite_site_vertex(b: Beam, slot: u32, corner: vec2<f32>) -> BeamOut {
     let r = max(b.radius, 1.0);
     let front = clamp(mix(b.to_prev, b.to, globals.sun.w).z - foot.z, 0.0, h);
     let site = hash(foot.x * 0.37 + foot.y * 0.73);
-    if slot >= SPLASHES * CROWN_SEGS {
-        return nanite_swarm_vertex(b, slot - SPLASHES * CROWN_SEGS, corner, front, site);
+    if slot >= ARCS * ARC_SEGS {
+        return nanite_swarm_vertex(b, slot - ARCS * ARC_SEGS, corner, front, site);
     }
-    // Each slot shows one splash after another. The first starts with the work and the
+    // Each slot shows one ring after another. The first starts with the work and the
     // others follow a share of a period apart; one born before the work stopped is let
     // run its course, the lot thinning out over the seconds after.
-    let i = f32(slot / CROWN_SEGS);
-    let part = slot % CROWN_SEGS;
-    let period = mix(SPLASH_PERIOD_MIN, SPLASH_PERIOD_MAX, hash(i * 3.7 + site));
-    let t = (time - b.start) / period + i / f32(SPLASHES);
+    let i = f32(slot / ARC_SEGS);
+    let part = slot % ARC_SEGS;
+    let period = mix(ARC_PERIOD_MIN, ARC_PERIOD_MAX, hash(i * 3.7 + site));
+    let t = (time - b.start) / period + i / f32(ARCS);
     let ph = fract(t);
     let born = time - ph * period;
     if born < b.start || (b.end >= 0.0 && born > b.end) {
+        return hidden();
+    }
+    let k = floor(t) * 7.13 + i * 1.7 + site * 31.0;
+    // A third of the ring left out, in breaks of its own.
+    if (part + u32(hash(k + 12.0) * 3.0)) % 3u == 0u {
         return hidden();
     }
     var level = 1.0;
     if b.end >= 0.0 {
         level = 1.0 - smoothstep(2.0, 7.5, time - b.end);
     }
-    let k = floor(t) * 7.13 + i * 1.7 + site * 31.0;
-    // Most of them at the build front, in the swarm; the rest anywhere up the hull.
-    var z = hash(k + 2.0) * h * 0.95;
-    if hash(k + 1.0) < 0.65 {
-        z = front + (hash(k + 2.0) - 0.5) * 0.3 * h;
-    }
-    z = clamp(z, 0.2, h);
-    // Round the hull, the odd one reaching a little past it; spreading slowly.
-    let pick = hash(k + 3.0);
-    var sp: Splash;
-    sp.radius = r * (0.55 + 0.55 * pick * pick) * (1.0 + 0.12 * ph);
-    // Laid nearly flat, a little askew.
-    sp.n = normalize(vec3<f32>((hash(k + 5.0) - 0.5) * 0.2, (hash(k + 6.0) - 0.5) * 0.2, 1.0));
-    sp.e1 = normalize(cross(vec3<f32>(0.0, 1.0, 0.0), sp.n));
-    sp.e2 = cross(sp.n, sp.e1);
-    sp.centre = foot + vec3<f32>(0.0, 0.0, z);
-    // The crown rises, then holds while the light drains into its peaks.
-    sp.lift = clamp(sp.radius * 0.45, 0.8, h * 0.6) * smoothstep(0.06, 0.5, ph);
-    sp.k = k;
-    // A stretch of ring from a sag to a peak (so the fragment knows which end is which).
-    let peak_first = part % 2u == 0u;
-    let pa = crown_corner(sp, select(part, part + 1u, peak_first));
-    let pb = crown_corner(sp, select(part + 1u, part, peak_first));
-    let life = smoothstep(0.0, 0.1, ph) * (1.0 - smoothstep(0.4, 0.78, ph));
+    let life = smoothstep(0.0, 0.15, ph) * (1.0 - smoothstep(0.7, 1.0, ph));
     if life <= 0.002 {
         return hidden();
     }
-    // The ring bows out between its corners, and dips toward the trough so the crown's
-    // troughs are round and its peaks pointed: how far, across the drawn ribbon, in metres.
+    // Hugging the hull at the front, turning slowly one way or the other.
+    var ring: ArcRing;
+    ring.centre = foot + vec3<f32>(0.0, 0.0, clamp(front + (hash(k + 2.0) - 0.5) * 2.0, 0.2, h));
+    ring.radius = r * (0.75 + 0.25 * hash(k + 3.0));
+    ring.spin = (time - born) * select(-0.5, 0.5, hash(k + 8.0) > 0.5);
+    ring.k = k;
+    let pa = arc_corner(ring, part);
+    let pb = arc_corner(ring, part + 1u);
+    // The ring bows out between its corners: how far, across the drawn ribbon, in metres.
     let chord = distance(pa, pb);
     let mid = (pa + pb) * 0.5;
-    var rad = mid - sp.centre;
-    rad = normalize(rad - sp.n * dot(rad, sp.n) + vec3<f32>(1e-4, 0.0, 0.0));
-    let bulge = rad * sp.radius * (1.0 - cos(3.14159 / f32(CROWN_SEGS)))
-        - sp.n * 0.25 * max(dot(pb - pa, sp.n), 0.0);
+    let rad = normalize(vec3<f32>((mid - ring.centre).xy, 0.0) + vec3<f32>(1e-4, 0.0, 0.0));
+    let bulge = rad * ring.radius * (1.0 - cos(3.14159 / f32(ARC_SEGS)));
     let ca = globals.view_proj * vec4<f32>(pa, 1.0);
     let cb = globals.view_proj * vec4<f32>(pb, 1.0);
     let cm = globals.view_proj * vec4<f32>(mid, 1.0);
@@ -1038,15 +1014,14 @@ fn nanite_site_vertex(b: Beam, slot: u32, corner: vec2<f32>) -> BeamOut {
         let d = (co.xy / co.w - cm.xy / cm.w) * globals.viewport.xy;
         bow = dot(d, vec2<f32>(-dir.y, dir.x)) * cm.w / globals.lod.x;
     }
-    let amp = clamp(sp.radius * 0.012, 0.06, 0.2);
+    let amp = clamp(ring.radius * 0.012, 0.06, 0.2);
     var o = strand_ribbon(
-        pa, pb, pa, corner, amp + abs(bow), SHAPE_CROWN,
+        pa, pb, pa, corner, amp + abs(bow), SHAPE_ARC,
         vec4<f32>(chord, 0.0, chord, hash(k + 30.0 + f32(part)))
     );
     o.extra.x = amp + STRAND_PAD;
-    // z how far it bows out mid-way, w how much of its light has drained to the peak.
+    // z how far it bows out mid-way.
     o.extra.z = bow;
-    o.extra.w = smoothstep(0.22, 0.6, ph);
     o.kind = f32(BEAM_NANITE_SITE);
     o.level = level * life;
     return o;
@@ -1130,8 +1105,8 @@ fn nanite_fragment(in: BeamOut, n: f32) -> vec4<f32> {
         return swarm_fragment(in);
     }
     if shape < 9.5 || shape > 11.5 {
-        // A strand of the stream, its lead, or a stretch of a splash's ring.
-        let crown = shape > 11.5 && shape < 12.5;
+        // A strand of the stream, its lead, or a stretch of a site's arcs.
+        let arc = shape > 11.5 && shape < 12.5;
         let lead = shape > 13.5;
         let m = in.state.y;
         let head = in.strand.x;
@@ -1140,7 +1115,7 @@ fn nanite_fragment(in: BeamOut, n: f32) -> vec4<f32> {
         let s = clamp(m / total, 0.0, 1.0);
         // A ring has no ends.
         var ends = smoothstep(tail, tail + 0.5, m) * (1.0 - smoothstep(head - 0.25, head + 0.05, m));
-        if crown {
+        if arc {
             ends = 1.0;
         }
         if ends <= 0.001 {
@@ -1149,12 +1124,12 @@ fn nanite_fragment(in: BeamOut, n: f32) -> vec4<f32> {
         let y = in.uv.y * in.state.z;
         let px = in.extra.y;
         // A stream is tight at both ends; a ring is even.
-        let env = select(0.25 + 0.75 * sin(3.14159 * s), 1.0, crown);
+        let env = select(0.25 + 0.75 * sin(3.14159 * s), 1.0, arc);
         let amp = max(in.extra.x - STRAND_PAD, 0.05) * env;
         // A ring bows out between its corners.
-        let bow = select(0.0, in.extra.z * 4.0 * s * (1.0 - s), crown);
+        let bow = select(0.0, in.extra.z * 4.0 * s * (1.0 - s), arc);
         var flow = STRAND_FLOW;
-        if crown {
+        if arc {
             flow = 1.2;
         } else if lead {
             flow = 30.0;
@@ -1167,7 +1142,7 @@ fn nanite_fragment(in: BeamOut, n: f32) -> vec4<f32> {
         var bright = 0.0;
         var hot = 0.0;
         var threads = 3;
-        if crown {
+        if arc {
             threads = 2;
         } else if lead {
             threads = 1;
@@ -1181,14 +1156,11 @@ fn nanite_fragment(in: BeamOut, n: f32) -> vec4<f32> {
             bright += t.x * weight;
             hot += t.y * weight;
         }
-        if crown {
-            // The light drains out of the ring into its peaks (s = 1), which run hot.
-            let drain = in.extra.w;
-            let gather = mix(1.0, pow(s, 3.0) * 1.6, drain);
+        if arc {
             // Kept deep: a bright violet line blooms out to near white.
-            let ring = mix(NANITE_VIOLET, NANITE_RED, 0.15 + 0.5 * drain * s);
-            let color = ring * bright * 0.9 * gather + NANITE_HOT * (hot * 0.5 + bright * drain * pow(s, 6.0) * 0.6);
-            return vec4<f32>(color * in.level, clamp(bright * 0.2 * gather, 0.0, 0.35) * in.level);
+            let ring = mix(NANITE_VIOLET, NANITE_RED, 0.15);
+            let color = ring * bright * 0.9 + NANITE_HOT * hot * 0.5;
+            return vec4<f32>(color * in.level, clamp(bright * 0.2, 0.0, 0.35) * in.level);
         }
         // The head glows as it creeps on (the lead's as it snaps across).
         let tip = exp(-pow((head - m) / 0.5, 2.0)) * (0.5 + 0.5 * n);

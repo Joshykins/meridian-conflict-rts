@@ -256,7 +256,7 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 - **Construction is violet,** the Regency's counterpart to ARC's amber: it marks
   what can build.
 - **Nanites build.** A structure forms out of violet light that cools to red
-  and then to plate, in a dark swarm with thin violet rings through it (user
+  and then to plate, in a dark swarm with violet arcs through it (user
   direction, 2026-09-26; on 2026-10-04 the swarm came back round the site, in
   place of the red filaments).
   - The builder shoots **strands of particles** from its violet emitter, not one
@@ -267,21 +267,26 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
     tails drain into the site when it stops (`beams.wgsl` `BEAM_NANITE`). A
     Regency factory shoots them from each of its fabricator heads.
   - The hull **forms from the ground up.** What has just formed glows violet,
-    then slowly turns red, then becomes the finished plate. The band is a few
-    metres deep on any hull. A thin hot line runs along the front with a haze
-    Black motes of the swarm settle on the hull's shape just above the front,
-    packed close there and thinning out, a few glinting violet. Nothing shows
-    above that (`entity.wgsl` `nanite_site`).
+    then slowly turns red, then becomes the finished plate. The band is tall:
+    two fifths of a short hull, at most 8 m on a tall one (user, 2026-10-11:
+    "much taller"). A hot line runs along the front, bright enough to bloom,
+    and now and then glints in the camera's glass on the side facing the eye
+    (`renderer/nanite_site_fx.rs`). Black motes of the swarm settle on the
+    hull's shape over the front, up to 7 m, packed close there and thinning
+    out, a few glinting violet. Nothing shows above that. Below the band the
+    plate is not finished while the site works: it is a little darker and the
+    seams of the cells it condensed in glow as a red net pulsing up toward the
+    front (`entity.wgsl` `nanite_site`, `nanite_veins`).
   - Round the site while it is fed (`BEAM_NANITE_SITE`, one per site), a **dark
     swarm** hangs round the part of the hull still to come: a smoky haze of
     black motes, thickest just over the front and thinning above it, circling
     slowly and drifting in and down into the front. A few motes glint violet.
     It darkens what is behind it and is never a solid blob.
-  - Through the swarm, **violet rings** of many sizes come and go up the hull,
-    most of them at the front. Each lifts into a crown, its light drawn into the
-    peaks, and turns red as it fades. They stay mostly inside the hull and never
-    reach far past it. Nothing is thrown up out of the site: the red filaments
-    were removed on 2026-10-04 ("a little insane" in a busy base).
+  - Through the swarm, **broken violet arcs** hug the hull at the front, flat,
+    turning slowly round it one way or the other, and fade (2026-10-11; they
+    replaced rings that lifted into crowns). Nothing is thrown up out of the
+    site: the red filaments were removed on 2026-10-04 ("a little insane" in a
+    busy base).
   - The site's work light is still a tenth of ARC's amber. A work lamp's worth
     of violet floods a hull purple.
   - It sounds **deep and heavy**, a great machine felt more than heard. The

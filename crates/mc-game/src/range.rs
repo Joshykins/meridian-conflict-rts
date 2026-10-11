@@ -997,7 +997,9 @@ fn stage(
                 .units
                 .iter()
                 .filter(builds)
-                .min_by_key(|b| b.tech)
+                // A mobile builder before a structure of its tier: an engineering station
+                // would stand on the very spot it is to build.
+                .min_by_key(|b| (b.tech, b.is_structure()))
                 .ok_or("Nothing Builds This")?;
             let north = pad + FxVec2::from_ints(0, 160);
             let order = if bp.built_on_site() {

@@ -534,7 +534,7 @@ impl Lights {
         }
         for b in &frame.beams {
             if b.kind == mc_sim::reclaim::BEAM_NANITE_SITE {
-                // Round a Regency site: the red of the filaments rising out of it, low down.
+                // Round a Regency site: the red of its cooling band, low down.
                 // Its violet work light is the site's own (`push_site`).
                 self.glows.push(Glow {
                     from: Vec3::from(b.from) + Vec3::Z * (b.height * 0.3 + 1.0),

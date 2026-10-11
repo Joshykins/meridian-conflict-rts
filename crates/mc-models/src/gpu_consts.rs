@@ -1230,7 +1230,7 @@ shared! {
     pub mod beam as "BEAM_" {
         /// A Regency builder's nanite stream, emitter to weld (`reclaim::BEAM_NANITE`).
         pub const NANITE: u32 = 1;
-        /// A Regency site being fed: its rings and rising filaments (`reclaim::BEAM_NANITE_SITE`).
+        /// A Regency site being fed: its swarm and turning arcs (`reclaim::BEAM_NANITE_SITE`).
         pub const NANITE_SITE: u32 = 6;
         // retired: 7 (a scavenger tower's dim sweep beam)
         /// A nanite faction's reclaim: their stream reaching out to what it takes apart,

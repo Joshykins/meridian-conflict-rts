@@ -12,8 +12,8 @@ use std::collections::HashMap;
 pub(super) const MAX_BEAMS: usize = 1024;
 /// A beam that has shut off is kept this long, so what was already on its way up it arrives.
 const LINGER: f32 = 3.0;
-/// The same for a Regency site's splashes: one born just before the work stopped rises
-/// and thins out for up to `SPLASH_PERIOD_MAX` (beams.wgsl) more.
+/// The same for a Regency site's arcs: a ring born just before the work stopped turns
+/// and thins out for up to `ARC_PERIOD_MAX` (beams.wgsl) more.
 const NANITE_SITE_LINGER: f32 = 8.0;
 /// A beam whose far end jumps farther than this (plus the target's size) between ticks is on something new.
 const JUMP: f32 = 6.0;

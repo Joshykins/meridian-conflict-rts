@@ -88,6 +88,7 @@ mod lift_fx;
 mod map_look;
 mod mine_fx;
 mod nanite_repair_fx;
+mod nanite_site_fx;
 mod nuke_fx;
 mod nuke_volume;
 mod orb_fx;
@@ -3423,6 +3424,7 @@ impl Renderer {
         drop(part);
         let part = mc_core::perf_span!("cpu.upload.events");
         self.construction(frame, time, camera);
+        self.nanite_site_glints(frame, time, camera.eye());
         // A blast is known before the trees it kills are looked at (`nuke_fx::tree_fate`).
         for event in &frame.events {
             if matches!(event, SimEvent::NuclearDetonation { .. }) {

@@ -2625,9 +2625,11 @@ const UNIT_NANITE: u32 = 2u;
 const CLASS_NANITE: u32 = 0x4000u;
 const NANITE_VIOLET: vec3<f32> = vec3<f32>(0.66, 0.12, 1.0);
 const NANITE_RED: vec3<f32> = vec3<f32>(1.0, 0.06, 0.1);
-// Metres the swarm lies on the hull over the front at most (a quarter of a short hull).
-const NANITE_SWARM_SKIN: f32 = 2.5;
-
+// Metres the swarm lies on the hull over the front at most (two fifths of a short hull).
+const NANITE_SWARM_SKIN: f32 = 7.0;
+// Metres behind the front the fresh band runs, violet then red, before it is plate (two
+// fifths of a short hull).
+const NANITE_BAND: f32 = 8.0;
 // How far the swarm has condensed into plate at `build`: over the first four fifths of the
 // work, then the site settles and its light goes.
 fn nanite_grow(build: f32) -> f32 {
@@ -2641,46 +2643,63 @@ fn nanite_order(local: vec3<f32>, height: f32, seed: f32) -> f32 {
     return clamp(local.z / max(height, 1.0) + waver * 0.05, 0.0, 1.0);
 }
 
+// The plate under the band while the site is at work, `live` 1 then going to 0 as it
+// settles: not finished yet. The seams between the cells it condensed in still glow, a red
+// net that pulses up toward the front and fades with depth below it.
+fn nanite_veins(color: vec3<f32>, local: vec3<f32>, age: f32, seed: f32, time: f32, live: f32) -> vec3<f32> {
+    let p = local.xy * 0.55 + vec2<f32>(local.z * 0.4, seed * 9.0);
+    let g = vec2<f32>(value_noise2(p, 1.0), value_noise2(p + vec2<f32>(5.2, 1.3), 1.0));
+    let seam = 1.0 - smoothstep(0.0, 0.06, abs(g.x - g.y));
+    let pulse = 0.55 + 0.45 * sin(local.z * 0.9 - time * 2.2 + g.x * 4.0);
+    let fade = (1.0 - smoothstep(0.0, 18.0, age)) * live;
+    return color * (1.0 - 0.3 * live) + NANITE_RED * seam * pulse * fade * 1.4;
+}
+
 // A Regency site's colour, and 0 in w where there is nothing there yet. It forms from the
 // ground up: what has just condensed is glowing violet, which slowly cools through red
-// into the finished plate; a thin hot line runs along the front and black motes of the
-// swarm settle just above it. Above that there is nothing yet (the swarm and rings round
-// the site, beams.wgsl, show where it will stand). The glowing band is a share of
-// the height, so it takes the same share of the work on any hull.
+// into the finished plate; a hot line runs along the front and black motes of the swarm
+// settle just above it. Above that there is nothing yet (the swarm round the site,
+// beams.wgsl, shows where it will stand). The band is a share of a short hull's height and
+// at most `NANITE_BAND` metres on a tall one.
 fn nanite_site(color: vec3<f32>, local: vec3<f32>, build: f32, height: f32, seed: f32, time: f32) -> vec4<f32> {
     let grow = nanite_grow(build);
     let order = nanite_order(local, height, seed);
     let settle = smoothstep(0.8, 1.0, build);
+    let h = max(height, 1.0);
     if order > grow {
-        // The swarm settling onto the hull's shape just over the front (the rest of it
-        // hangs round the site, beams.wgsl `nanite_swarm_vertex`): black motes drifting
-        // down onto the front, packed close there and thinning out above, a few glinting
-        // violet.
-        let above = (order - grow) * max(height, 1.0);
-        let band = min(height * 0.25, NANITE_SWARM_SKIN);
+        // The swarm settling onto the hull's shape over the front (the rest of it hangs
+        // round the site, beams.wgsl `nanite_swarm_vertex`): black motes drifting down onto
+        // the front, packed close there and thinning out above, a few glinting violet.
+        let above = (order - grow) * h;
+        let band = min(h * 0.4, NANITE_SWARM_SKIN);
         let thin = above / max(band, 0.5);
-        let cell = floor(local * 6.0 + vec3<f32>(0.0, 0.0, time * 1.5));
-        let h = hash21(cell.xy + vec2<f32>(cell.z * 1.7, seed * 13.0));
-        if thin > 1.0 || h < 0.5 + 0.5 * thin {
+        let cell = floor(local * 5.0 + vec3<f32>(0.0, 0.0, time * 1.5));
+        let n = hash21(cell.xy + vec2<f32>(cell.z * 1.7, seed * 13.0));
+        if thin > 1.0 || n < 0.45 + 0.55 * thin {
             return vec4<f32>(0.0);
         }
-        let glint = step(0.993, h) * (0.5 + 0.5 * sin(time * 7.0 + h * 40.0));
+        let glint = step(0.993, n) * (0.5 + 0.5 * sin(time * 7.0 + n * 40.0));
         return vec4<f32>(color * 0.08 + NANITE_VIOLET * glint * 1.5 * (1.0 - settle), 1.0);
     }
-    // Metres behind the front: the band is the same depth on any hull, so on a tall one
-    // it is a band and not the whole of what is up.
-    let age = (grow - order) * max(height, 1.0);
+    // Metres behind the front, in shares of the band: the band is the same depth on any
+    // hull taller than twice it, so on a tall one it is a band and not the whole of what is up.
+    let age = (grow - order) * h;
+    let band = min(h * 0.4, NANITE_BAND);
+    let u = age / band;
     // Liquid light: brightness flowing up through the fresh material.
-    let flow = value_noise2(local.xy * 0.8 + vec2<f32>(local.z * 0.6 - time * 0.9, seed * 5.0), 1.0);
-    let violet = 1.0 - smoothstep(0.15, 0.7, age);
-    let red = smoothstep(0.15, 0.7, age) * (1.0 - smoothstep(0.9, 2.2, age));
+    let flow = value_noise2(local.xy * 0.5 + vec2<f32>(local.z * 0.35 - time * 0.9, seed * 5.0), 1.0);
+    let violet = 1.0 - smoothstep(0.1, 0.4, u);
+    let red = smoothstep(0.1, 0.4, u) * (1.0 - smoothstep(0.55, 1.0, u));
     let hot = violet + red;
-    let glow = NANITE_VIOLET * violet * (0.8 + 0.7 * flow) + NANITE_RED * red * (0.35 + 0.45 * flow);
+    let glow = NANITE_VIOLET * violet * (0.5 + 0.5 * flow) + NANITE_RED * red * (0.35 + 0.45 * flow);
+    let live = 1.0 - settle;
+    let plate = nanite_veins(color, local, age, seed, time, live);
     // The fresh band is the glow over dark; the plate shows through as it cools.
-    var c = mix(color, color * 0.25, hot) + glow * (1.0 - settle * 0.85);
-    // The front itself: a thin, hot line.
-    let edge = exp(-pow(age / 0.12, 2.0));
-    c += mix(NANITE_VIOLET, vec3<f32>(1.0, 0.75, 1.0), 0.4) * edge * 2.0 * (1.0 - settle);
+    var c = mix(plate, color * 0.25, hot) + glow * (1.0 - settle * 0.85);
+    // The front itself: a hot line, bright enough to bloom, with a softer glow under it.
+    let edge = exp(-pow(age / 0.3, 2.0));
+    let under = exp(-age / max(band * 0.12, 0.4));
+    c += mix(NANITE_VIOLET, vec3<f32>(1.0, 0.75, 1.0), 0.4) * (edge * 6.0 + under * 0.3) * live;
     return vec4<f32>(c, 1.0);
 }
 
