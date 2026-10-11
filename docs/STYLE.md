@@ -434,12 +434,14 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     the plane they are fired at. Tech 2 is the **Twin Pinched-plasmeric
     Airburst Repeater**: pinched bolts on flak's timed fuse (`airburst`).
     It must not look or sound like the point defences beside it (user call
-    2026-10-10): no charge, no red bloom or jet, each bead leaving with a
-    dry pneumatic thoomp and gas vented sideways; in flight a small
-    white-hot pearl ticking on its fuse, shedding sparks; bursting as a
-    star of straight needles with pops crackling out on its shell and a
-    crack-and-crackle report (`regency_guns_fx/airburst.rs`,
-    `regency_gorget_fire`/`_burst`). Tech 3 is a silo of
+    2026-10-10): both barrels fire together, each kicking back, a heavy
+    twin-cannon report and gas vented sideways, no charge, no red bloom or
+    jet; in flight a small white-hot pearl ticking on its fuse, shedding
+    sparks; bursting as a hard ball, a red-hot core in a ragged shell of
+    red lumps, a few shrapnel lines, sparks falling, gone in half a second
+    (never a star of needles), heard as a flak crump rolling across the
+    sky (`regency_guns_fx/airburst.rs`, `regency_gorget_fire`/`_burst`).
+    Tech 3 is a silo of
     **Gravitic Seekers**. A warship's sky mount is the same plain repeater,
     named **Plasmeric AA Repeater** to tell it from the surface gun beside it.
   - **Air-dropped:** **Plasmeric Bomb**.

@@ -16,9 +16,8 @@
 //! - **Airburst** (a gun with `Weapon::airburst`, the Gorget's): nothing like the point
 //!   defences beside it (`airburst`). No charge; each bead leaves with a hard white snap and
 //!   gas vented out sideways, no red bloom or jet. In flight a small white-hot pearl ticking
-//!   on its fuse, shedding sparks. It bursts as a star: a pin-point flash, a shell of straight
-//!   white-hot needles thrown out every way, crackling pops out on that shell a moment later,
-//!   embers drifting down.
+//!   on its fuse, shedding sparks. It bursts as a hard ball: a red-hot core in a ragged shell
+//!   of red lumps, a few shrapnel lines, sparks falling.
 //! - **Pinched-plasmeric** (the Halberd's): over its charge (`SimEvent::WeaponCharging`) a
 //!   ball of red plasma gathers in front of the bore, motes and filaments drawn in to it
 //!   and red lightning snapping into it from round it, its light growing. It pinches its

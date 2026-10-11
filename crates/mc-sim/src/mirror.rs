@@ -830,17 +830,21 @@ impl UnitInstance {
     }
 }
 
-/// Instant kick when the tube fires, then a cubic ease back home in about
-/// a second and a half. Spawn stagger sits on half a reload, well past this.
-fn barrel_recoil(cooldown: u16, reload: u16) -> f32 {
-    if reload == 0 || cooldown == 0 {
+/// Ticks a barrel takes to ease home after a shot that ends its salvo.
+const RECOIL_TICKS: u16 = 16;
+
+/// Instant kick when the tube fires, then a cubic ease back home in `window` ticks
+/// (`RECOIL_TICKS`, about a second and a half, after a salvo's last shot). Spawn stagger
+/// sits on half a reload, well past this.
+fn barrel_recoil_over(cooldown: u16, reload: u16, window: u16) -> f32 {
+    if reload == 0 || cooldown == 0 || window == 0 {
         return 0.0;
     }
     let since = reload.saturating_sub(cooldown);
-    if since >= 16 {
+    if since >= window {
         return 0.0;
     }
-    let t = since as f32 / 16.0;
+    let t = since as f32 / window as f32;
     let u = 1.0 - t;
     u * u * u
 }
@@ -887,13 +891,41 @@ fn lying_casing(
 /// this tick starts from rest (`prev` 0) even though cooldown just jumped
 /// to `reload`.
 fn barrel_recoil_pair(cooldown: u16, reload: u16) -> (f32, f32) {
-    let now = barrel_recoil(cooldown, reload);
+    barrel_recoil_pair_over(cooldown, reload, RECOIL_TICKS)
+}
+
+/// `barrel_recoil_pair`, home in `window` ticks.
+fn barrel_recoil_pair_over(cooldown: u16, reload: u16, window: u16) -> (f32, f32) {
+    let now = barrel_recoil_over(cooldown, reload, window);
     let prev = if cooldown == reload || cooldown == 0 {
         0.0
     } else {
-        barrel_recoil(cooldown + 1, reload)
+        barrel_recoil_over(cooldown + 1, reload, window)
     };
     (now, prev)
+}
+
+/// A gun's kick this tick and last, every shot of a salvo kicking on its own. Mid-salvo the
+/// countdown is the gap to the next shot, not the reload, and the barrel is home again by
+/// then (a kick still easing when the next comes reads as one long slide); the shot that
+/// ends the salvo eases home over `RECOIL_TICKS`.
+fn salvo_recoil_pair(cooldown: u16, weapon: &mc_data::Weapon, salvo_left: u8) -> (f32, f32) {
+    salvo_kick(
+        cooldown,
+        weapon.reload_ticks,
+        weapon.salvo_delay_ticks,
+        salvo_left,
+    )
+}
+
+/// `salvo_recoil_pair` on the weapon's reload and salvo gap, in ticks.
+fn salvo_kick(cooldown: u16, reload: u16, gap: u8, salvo_left: u8) -> (f32, f32) {
+    if salvo_left > 0 {
+        let gap = gap.max(1) as u16;
+        barrel_recoil_pair_over(cooldown, gap, gap.min(RECOIL_TICKS))
+    } else {
+        barrel_recoil_pair(cooldown, reload)
+    }
 }
 
 /// A held beam's brace (`Weapon::beam`), this tick and last, in place of a kick: how far
@@ -3407,7 +3439,9 @@ pub struct PlannedLaunch {
 
 #[cfg(test)]
 mod recoil_tests {
-    use super::barrel_recoil;
+    fn barrel_recoil(cooldown: u16, reload: u16) -> f32 {
+        super::barrel_recoil_over(cooldown, reload, super::RECOIL_TICKS)
+    }
 
     #[test]
     fn kick_is_instant_and_ignores_spawn_stagger() {
@@ -3421,6 +3455,14 @@ mod recoil_tests {
         assert_eq!((now, prev), (1.0, 0.0));
         let (now, prev) = super::barrel_recoil_pair(159, 160);
         assert!(prev > now && prev > 0.8, "{prev} -> {now}");
+    }
+
+    /// Every shot of a salvo kicks, not only the last, and is home before the next.
+    #[test]
+    fn each_shot_of_a_salvo_kicks() {
+        assert_eq!(super::salvo_kick(5, 16, 5, 2), (1.0, 0.0));
+        assert!(super::salvo_kick(1, 16, 5, 2).0 < 0.05);
+        assert_eq!(super::salvo_kick(16, 16, 5, 0), (1.0, 0.0));
     }
 }
 

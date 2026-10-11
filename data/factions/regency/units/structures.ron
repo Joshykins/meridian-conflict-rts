@@ -631,10 +631,11 @@
         vision: 450, radar: 650, water_build: true,
         weapons: [(
             name: "Twin Pinched-plasmeric Airburst Repeater",
-            // 4 bolts of 150 every 1.6 s, the barrels in turn: 375 a second.
+            // 4 bolts of 150 every 1.6 s, both barrels together twice, 0.5 s apart: 375 a
+            // second.
             damage: 150, splash: 30, proximity: 8, airburst: true,
             range: 560, reload: 1.6, speed: 420, trajectory: Direct,
-            salvo: 4, salvo_delay: 0.15,
+            salvo: 4, salvo_batch: 2, salvo_delay: 0.5,
             turret_turn: 160, muzzle: (8.0, 0, 7.0), pivot: (0, 0, 7.0),
             muzzles: [(8.0, 0, 7.6), (8.0, 0, 6.4)],
             targets: ["Air"], color: Orange, red: 1.0,

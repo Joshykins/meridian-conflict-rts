@@ -134,7 +134,7 @@ fn house_weapon_of(model: ModelInfo, slot: u32) -> f32 {
     return model.house_weapon_high[slot - 4u];
 }
 // How far open a breech door stands (0 shut, 1 open) from the gun's recoil kick this tick
-// and last (`mirror::barrel_recoil`: one the tick it fires, easing home as (1 - s)^3 over
+// and last (`mirror::barrel_recoil_over`: one the tick it fires, easing home as (1 - s)^3 over
 // its run, s the share of the run gone). It snaps open as the gun kicks, stands open
 // while the spent cartridge is thrown, and shuts before the tube is home. The tick the
 // gun fires starts from s = 0, not from last tick's rest.

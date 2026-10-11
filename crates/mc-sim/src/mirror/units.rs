@@ -180,10 +180,12 @@ impl World {
                 s.units.spin[row][w.rotary as usize],
                 s.units.weapon_cooldown[row][main],
             ),
-            w => barrel_recoil_pair(
+            Some(w) => salvo_recoil_pair(
                 s.units.weapon_cooldown[row][main],
-                w.map(|w| w.reload_ticks).unwrap_or(0),
+                w,
+                s.units.weapon_salvo_left[row][main],
             ),
+            None => (0.0, 0.0),
         };
         let twin = twin_arm_gun(&bp.weapons, main);
         let mounted = bp.weapons.iter().position(|w| w.mount);
