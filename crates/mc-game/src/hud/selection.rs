@@ -236,10 +236,18 @@ pub fn info(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
         }
     }
     types.sort_by_key(|(bp, ids)| (std::cmp::Reverse(ids.len()), *bp));
+    // Structures of the player's own (or builders' plans) can be kept as a prefab: the
+    // button closes the heading.
+    let mut right = x + cw;
+    if super::prefabs::can_save(s, units) {
+        let w = super::prefabs::SAVE_W;
+        super::prefabs::save_button(hud, ui, Rect::new(right - w, r.y + 9.0, w, 22.0), true);
+        right -= w + 12.0;
+    }
     ui.section(
         x,
         r.y + 20.0,
-        cw,
+        right - x,
         &format!("{} Units Selected", units.len()),
     );
     // Its record, right of the heading, only once there is one: kills, then what its
@@ -250,7 +258,6 @@ pub fn info(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
         .filter(|u| s.bp(u).sends_reclaimers())
         .filter_map(|u| s.queue_of(u).map(|q| q.reclaimed))
         .sum();
-    let mut right = x + cw;
     if kills > 0 {
         let kills = format!("{kills} kill{}", if kills == 1 { "" } else { "s" });
         ui.text_right(
@@ -632,7 +639,15 @@ fn body(r: Rect) -> Rect {
 fn single(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect, strip: bool) {
     let bp = s.bp(u);
     let details = Rect::new(r.right() - 16.0 - 26.0, r.y + 14.0, 26.0, 24.0);
-    title(hud, ui, s, u, r, details.x - 8.0);
+    // A builder with structures planned can keep them as a prefab: a button beside
+    // the details one. (One structure alone is not a layout.)
+    let mut title_end = details.x - 8.0;
+    if s.view.status.plans.iter().any(|p| p.unit_id == u.unit_id) {
+        let save = Rect::new(title_end - 26.0, details.y, 26.0, details.h);
+        super::prefabs::save_button(hud, ui, save, false);
+        title_end = save.x - 8.0;
+    }
+    title(hud, ui, s, u, r, title_end);
     // Details (I) opens lore, figures and every weapon in a card of their own.
     let t = hud.tile(ui, id("unit-details", 0), details, hud.details_open, true);
     let c = Vec2::new(details.x + details.w * 0.5, details.mid_y());
@@ -1151,15 +1166,6 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
     work.extend(pause_order::pause_order(s, units));
     work.push(Order { glyph: Glyph::Stop, label: "Stop", key: "X",
  hint: "Drop every order. A factory clears its queue and forgets the orders it hands its units.", action: HudAction::Stop, lit: false });
-    // Structures of the player's own can be kept as a prefab, where the column has room.
-    let structures = units.iter().any(|u| {
-        (u.owner_flags & 0xFF) as u8 == s.view.local
-            && s.bp(u).built_on_site()
-            && !s.bp(u).is_mobile()
-    });
-    if structures && work.len() < 4 {
-        work.push(Order { glyph: Glyph::Prefab, label: "Save Prefab", key: "", hint: "Save Prefab: keep the layout of the selected structures, to put it all down again with an engineer from its build panel's Prefabs tab (B, then P). Engineers selected with structures planned save those plans too.", action: HudAction::OfferPrefab, lit: false });
-    }
     out.push((
         if builders || reclaimers {
             Family::Engineering

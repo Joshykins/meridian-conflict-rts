@@ -11,7 +11,9 @@ use glam::Vec2;
 use mc_data::{BlueprintId, Blueprints, FactionId};
 
 mod dialog;
+mod save;
 mod tab;
+pub(super) use save::{can_save, save_button, WIDE as SAVE_W};
 pub(super) use tab::{hover_card, mode_frame, tab, toggle_button};
 
 /// The prefabs' share of the HUD: whether the construction panel shows prefabs, the

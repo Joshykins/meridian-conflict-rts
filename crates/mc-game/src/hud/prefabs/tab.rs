@@ -443,7 +443,7 @@ fn empty(ui: &mut Ui, grid: Rect, others: usize) {
     );
     let lines = [
         "Lay out a group of structures, built or just planned. Select them (or the",
-        "engineers that planned them) and press Save Prefab on the order card.",
+        "engineers that planned them) and press Save Prefab on the selection card.",
         "Name it, and it waits here (P), on its tier and shelf, in every match.",
     ];
     for (i, line) in lines.iter().enumerate() {
