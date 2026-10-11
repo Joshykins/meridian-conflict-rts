@@ -243,7 +243,7 @@
         // Air is its counter: its guns outrange anything on the ground and its feet crush
         // what gets under them, but it has no anti-air at all; it wants escorts.
         health: 1300000,
-        cost: (materials: 120000, energy: 1200000, time: 400000),
+        cost: (materials: 240000, energy: 2400000, time: 800000),
         radius: 160, height: 480,
         footprint: (32, 32),
         vision: 2400, radar: 4200,

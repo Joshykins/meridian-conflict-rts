@@ -17,8 +17,14 @@ Galactic Colossus 27,500 for 100,000), with energy and build time raised by the 
 as the materials (2026-10-09). Their damage was set under the old price and is now under the
 per-mass rule; it gets raised next. The Harrow keeps its price until then, since with
 9,200 health it is not an experimental yet. The tier 4s that came after the rule are priced by
-it too: the Colossus 28,000, the Nimbus 20,000, the Saker 9,000 (26,000 health) and the
-Scourge 48,000 (beside the Dominion it peers). Tier 5 is several experimentals in one.
+it too: the Colossus 28,000, the Nimbus 20,000, the Saker 16,000 (a support gun: under the front-line tier 4s, though it
+has only 26,000 health) and the Scourge 48,000 (beside the Dominion it peers).
+
+Tier 5 is several experimentals in one, priced by a best guess at what each does, not by
+health (2026-10-11): the Seraph 120,000 (it kills four Striders, 104,000, and lives), the
+Behemoth 240,000 (twice the Seraph), the Fallen 150,000 (a strategic weapon, not a fighter)
+and the Skyhook 160,000 (priced by how fast it pays itself back). Unmeasured against the
+tier 4s at their new prices.
 
 Lines: tank (Warden -> Bulwark and Skimmer -> Paladin), artillery, mobile AA,
 fighters, bombers, gunships, point defence, static AA. Aircraft and anti-air follow the
@@ -89,14 +95,14 @@ Off the lines, measured the same way:
   area only about one shell in ten lands on the building it was aimed at, the rest on
   what stands round it. A dome is the answer: a T2 dome (9000, 90/s) goes down in about 20 s of hits, a T3
   dome (36000, 360/s) holds one gun off for nearly 3 minutes and two for under one.
-- The Behemoth (ARC T5 walker, 120000 materials) is countered by air (2026-10-06): 1.3 M
-  health and a 200000 hull field (600/s), about 12 health per materials, half a T4's. Rank
+- The Behemoth (ARC T5 walker, 240000 materials) is countered by air (2026-10-06): 1.3 M
+  health and a 200000 hull field (600/s). Rank
   adds up to half again and 1600/s of mending, and a Behemoth in a fight ranks fast. Its
   guns outrange the ground and its feet crush what gets under it, but it has no anti-air
   at all: it needs escorts. Measured (aircraft attacking it from one side, unopposed):
   40 Thunderheads kill it in 85 s, 25 in 140 s, 15 in 240 s; 40 Eclipses in 125 s; 100
   Kestrels in 120 s.
-- The Seraph (Regency T5 strike titan, 60000 materials, half a Behemoth; first pass 2026-10-09,
+- The Seraph (Regency T5 strike titan, 120000 materials, half a Behemoth; first pass 2026-10-09,
   unplayed): 220000 health under a 260000 hull field (1200/s; 10-09: most of its weight
   moved into the field), 2000 energy/s upkeep, hovering at 70 m/s. Two Rapid Fusion
   Repeaters (1500 with 18 m splash every 0.5 s each, 1000 m, also at spacecraft, each
@@ -116,8 +122,8 @@ Off the lines, measured the same way:
   670 materials a second, more than a whole late-game economy (about 250 a second at 20
   minutes), so it pays for itself in four minutes if left alone. It is the reason to
   reach tier 5 and the first thing an enemy should want dead: 1.5 M health, no shield,
-  no guns. It brings down land and air units and the T4 land walkers and tanks, never
-  ships, and nothing dearer than one payload (the Behemoth).
+  no guns. It brings down land and air units, never ships, and nothing dearer than one
+  payload (no tier 4 or 5).
 - The Regency's Springald (same cost and reach) is bent as the Kiln is from the Trebuchet:
   5600 in 40 m every 10 s (560 dps on paper), a 0.8 degree spread and a 4 s charge. Its
   shot is one shell, so a dome takes it as it takes a Culverin shell.
