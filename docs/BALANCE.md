@@ -292,7 +292,7 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   drawn as its supernova). The interface shows each link: a conduit on the ground, the unit panel's
   Adjacency band, tags on the selection's links, and the placing site's would-be links.
 - Fed reloads (`reload_energy`, mc-sim `fed_reload.rs`): the artillery installations
-  (Onager, Basilisk) draw 300 energy a second while they reload, the map guns (Culverin,
+  (Onager, Basilisk) draw 100 energy a second while they reload, the map guns (Culverin,
   Springald) 2500, more than a Reactor III makes. A reload runs only as fast as it is paid,
   with the rest of the energy-only spending (upkeep), so an unpowered gun stops reloading.
   Power plants against it save their share of the draw and speed the reload by as much:

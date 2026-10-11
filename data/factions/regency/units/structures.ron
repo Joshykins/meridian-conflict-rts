@@ -575,8 +575,8 @@
             name: "Pinched-plasmeric Howitzer",
             damage: 1650, splash: 28, range_min: 250, range: 1900, reload: 6.5, speed: 400,
             trajectory: Ballistic, loft: 2, spread: 0.8,
-            // Each reload draws 300 energy a second off the grid, as the Onager's does.
-            reload_energy: 300,
+            // Each reload draws 100 energy a second off the grid, as the Onager's does.
+            reload_energy: 100,
             turret_turn: 12, muzzle: (12.4, 0, 12.6), pivot: (0, 0, 7.6),
             targets: ["Structure", "Land", "Naval"], prefer: ["Artillery", "Naval"], color: Orange, red: 1.0,
             plasma_grade: Some(Pinched),

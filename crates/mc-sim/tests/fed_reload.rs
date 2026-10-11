@@ -44,7 +44,7 @@ fn a_paid_reload_takes_its_time_and_draws_its_power() {
     let (ticks, drew) = time_it(&mut w, gun, 200);
     // A 5.5 s reload; its last tick is counted with the economy's.
     assert_eq!(ticks, 54);
-    assert!((drew - 300.0).abs() < 1.0, "draws {drew} a second");
+    assert!((drew - 100.0).abs() < 1.0, "draws {drew} a second");
     // Done: it draws nothing more.
     w.tick(&[]).unwrap();
     assert_eq!(w.flows[row(&w, gun)].wanted[1], Fx::ZERO);
@@ -79,7 +79,7 @@ fn power_plants_against_it_speed_the_reload_and_cut_its_draw() {
     let (ticks, drew) = time_it(&mut w, gun, 200);
     // 54 ticks at 1.6 times the pace.
     assert_eq!(ticks, 34, "ringed reload");
-    assert!((drew - 120.0).abs() < 1.0, "draws {drew} a second");
+    assert!((drew - 40.0).abs() < 1.0, "draws {drew} a second");
 }
 
 #[test]

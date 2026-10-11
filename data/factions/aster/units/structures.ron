@@ -560,9 +560,9 @@
         weapons: [(
             name: "Heavy Howitzer",
             damage: 1400, splash: 36, range_min: 250, range: 1900, reload: 5.5, speed: 400, trajectory: Ballistic, loft: 2,
-            // Each reload draws 300 energy a second off the grid and runs only as fast as
+            // Each reload draws 100 energy a second off the grid and runs only as fast as
             // it is paid; power plants built against it cut the draw and speed it up.
-            reload_energy: 300,
+            reload_energy: 100,
             turret_turn: 12, muzzle: (24.7, 0, 16.0), pivot: (-0.5, 0, 9.95), spread: 1.0,
             targets: ["Structure", "Land", "Naval"], prefer: ["Artillery", "Naval"], color: Orange, shockwave: 1.0,
             sounds: (fire: "howitzer", impact: "shell_heavy", ground: "shell_heavy"),
