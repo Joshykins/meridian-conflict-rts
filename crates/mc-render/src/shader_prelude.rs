@@ -13,7 +13,7 @@
 //! `flight` (a winged flier's rig) and `crawl` (a many-legged walker's legs).
 
 /// Files put in front of shaders, never compiled on their own.
-pub(crate) const PRELUDES: [&str; 25] = [
+pub(crate) const PRELUDES: [&str; 26] = [
     "common",
     "bindings",
     "regions",
@@ -39,6 +39,7 @@ pub(crate) const PRELUDES: [&str; 25] = [
     "nova",
     "flight",
     "crawl",
+    "props",
 ];
 
 /// The prelude files' text.
@@ -66,6 +67,7 @@ pub(crate) struct Preludes {
     nova: String,
     flight: String,
     crawl: String,
+    props: String,
 }
 
 impl Preludes {
@@ -103,6 +105,7 @@ impl Preludes {
             nova: read("nova"),
             flight: read("flight"),
             crawl: read("crawl"),
+            props: read("props"),
         }
     }
 
@@ -197,6 +200,10 @@ impl Preludes {
         // A many-legged walker's legs and brace (entity.wgsl; needs bindings).
         if uses("crawl") {
             prelude = format!("{prelude}\n{}", self.crawl);
+        }
+        // Trees' and rocks' vertex stages (entity.wgsl; needs bindings).
+        if uses("props") {
+            prelude = format!("{prelude}\n{}", self.props);
         }
         let lines = prelude.lines().count() + 1;
         (format!("{prelude}\n{body}"), lines)

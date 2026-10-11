@@ -39,6 +39,16 @@ struct DrawCommand {
     first_instance: u32,
 }
 
+// A slot's draw as one run of vertices (`VkDrawIndirectCommand`): every instance's
+// indices one after another, which entity.wgsl `prop_vertex` turns back into a mesh
+// vertex and an instance. `first_instance` is the slot's `DrawCommand`, for that.
+struct PulledDraw {
+    vertex_count: u32,
+    instance_count: u32,
+    first_vertex: u32,
+    first_instance: u32,
+}
+
 struct CullPush {
     // First entity of this dispatch within its buffer, and how many.
     count: u32,
@@ -60,6 +70,8 @@ struct CullPush {
 // Per entity (indexed as `vis`): the blasts' push on a standing tree, xy the lean of
 // its top in metres, z the stir of its leaves. entity.wgsl `tree_air` adds the wind.
 @group(0) @binding(11) var<storage, read_write> tree_sway: array<vec4<f32>>;
+// Per list and slot, as `commands`: the draw the props make of it (`PulledDraw`).
+@group(0) @binding(12) var<storage, read_write> pulled: array<PulledDraw>;
 
 var<immediate> push: CullPush;
 
@@ -348,6 +360,7 @@ fn cs_prefix(@builtin(local_invocation_index) list: u32) {
         commands[base + s].first_index = slots[s].first_index;
         commands[base + s].vertex_offset = slots[s].vertex_offset;
         commands[base + s].first_instance = first;
+        pulled[base + s] = PulledDraw(count * slots[s].index_count, 1u, 0u, base + s);
         atomicStore(&counters[base + s], first);
         first += count;
     }

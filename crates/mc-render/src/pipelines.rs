@@ -539,6 +539,11 @@ pub(crate) const SCENE_SET: &[Binding] = &[
     (38, vk::DescriptorType::SAMPLED_IMAGE),
     // The ground a gravitic engine breaks (renderer/gravitic_engine_fx/ground.rs).
     (39, vk::DescriptorType::STORAGE_BUFFER),
+    // The cull's draws and the model meshes, for the props' pulled vertices (entity.wgsl
+    // `prop_vertex`).
+    (40, vk::DescriptorType::STORAGE_BUFFER),
+    (41, vk::DescriptorType::STORAGE_BUFFER),
+    (42, vk::DescriptorType::STORAGE_BUFFER),
 ];
 
 /// The pass set (group 1 of the scene layout): a pass's own two storage buffers.
@@ -575,6 +580,7 @@ pub(crate) const CULL_SET: &[Binding] = &[
     (9, vk::DescriptorType::STORAGE_BUFFER),
     (10, vk::DescriptorType::STORAGE_BUFFER),
     (11, vk::DescriptorType::STORAGE_BUFFER),
+    (12, vk::DescriptorType::STORAGE_BUFFER),
 ];
 
 impl Layouts {
@@ -895,7 +901,7 @@ impl Pipelines {
             )
         };
         // The camera's depth with the scene's own test and culling (`shadow`'s pass is depth-only).
-        let prepass = |module, vs, fs, vertex| {
+        let prepass_culled = |module, vs, fs, vertex, cull| {
             graphics_pipeline(
                 gpu,
                 &PipelineDesc {
@@ -907,10 +913,11 @@ impl Pipelines {
                     vertex,
                     blend: Blend::NoColor,
                     depth: Depth::TestWrite,
-                    cull: back,
+                    cull,
                 },
             )
         };
+        let prepass = |module, vs, fs, vertex| prepass_culled(module, vs, fs, vertex, back);
         let present = |vs, fs, vertex, blend| {
             graphics_pipeline(
                 gpu,
@@ -1004,27 +1011,41 @@ impl Pipelines {
                 back,
             )?,
             entity_shadow: shadow(entity, c"vs_main", c"fs_shadow", VertexKind::Mesh)?,
+            // Unculled: a leaf card is one face, seen from both sides (`leaf_card`). The
+            // depth passes have no vertex input: they pull their vertices from the meshes
+            // (entity.wgsl `prop_vertex`).
             prop: [
                 scene(
                     entity,
                     c"vs_prop",
-                    c"fs_main",
+                    c"fs_prop",
                     VertexKind::Mesh,
                     Blend::Opaque,
                     Depth::TestWrite,
-                    back,
+                    none,
                 )?,
                 scene(
                     entity,
                     c"vs_prop",
-                    c"fs_main",
+                    c"fs_prop",
                     VertexKind::Mesh,
                     Blend::Opaque,
                     Depth::Test,
-                    back,
+                    none,
                 )?,
-                shadow(entity, c"vs_prop", c"fs_shadow", VertexKind::Mesh)?,
-                prepass(entity, c"vs_prop", c"fs_prepass", VertexKind::Mesh)?,
+                shadow(
+                    entity,
+                    c"vs_prop_depth",
+                    c"fs_prop_shadow",
+                    VertexKind::None,
+                )?,
+                prepass_culled(
+                    entity,
+                    c"vs_prop_depth",
+                    c"fs_prop_prepass",
+                    VertexKind::None,
+                    none,
+                )?,
             ],
             terrain_prepass: prepass(terrain, c"vs_main", c"fs_shadow", VertexKind::Vec2)?,
             entity_prepass: prepass(entity, c"vs_main", c"fs_prepass", VertexKind::Mesh)?,

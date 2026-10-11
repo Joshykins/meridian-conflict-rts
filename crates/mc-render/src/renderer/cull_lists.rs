@@ -5,11 +5,13 @@
 use ash::vk;
 
 use crate::gpu::{Buffer, Gpu, GpuError};
-use crate::gpu_consts::cull_list;
+use crate::gpu_consts::{cull_list, pass};
 use crate::pipelines::Pipelines;
 
 /// Bytes of one `DrawCommand` (cull.wgsl), a `VkDrawIndexedIndirectCommand`.
 const COMMAND_BYTES: u64 = 20;
+/// Bytes of one `PulledDraw` (cull.wgsl), a `VkDrawIndirectCommand`.
+const PULLED_BYTES: u64 = 16;
 
 pub(super) struct CullLists {
     pub(super) draws: super::active_draws::ActiveDraws,
@@ -24,6 +26,9 @@ pub(super) struct CullLists {
     /// Per entity: the blasts' push on a standing tree (cull.wgsl `tree_blast`; set 0
     /// binding 31 of the scene).
     pub(super) sway: Buffer,
+    /// Per list and slot: the same draw as one run of vertices, which the props draw
+    /// with (cull.wgsl `PulledDraw`, entity.wgsl `prop_vertex`; cull set binding 12).
+    pub(super) pulled: Buffer,
     slot_count: u32,
 }
 
@@ -49,6 +54,10 @@ impl CullLists {
             )?,
             visible: gpu.device_buffer((entities + units + (lists - 1) * entities) * 4, storage)?,
             sway: gpu.device_buffer(entities * 16, storage)?,
+            pulled: gpu.device_buffer(
+                slot_count as u64 * lists * PULLED_BYTES,
+                storage | vk::BufferUsageFlags::INDIRECT_BUFFER,
+            )?,
             slot_count,
         })
     }
@@ -61,6 +70,11 @@ impl CullLists {
     /// Where in `commands` the draws of `list` (a `cull_list` number) start.
     pub(super) fn first_command(&self, list: u32) -> u64 {
         (list * self.slot_count) as u64 * COMMAND_BYTES
+    }
+
+    /// Where in `pulled` the draws of `list` (a `cull_list` number) start.
+    fn first_pulled(&self, list: u32) -> u64 {
+        (list * self.slot_count) as u64 * PULLED_BYTES
     }
 
     /// Records the cull: clear, classify, prefix sums, scatter, then a barrier so the
@@ -154,6 +168,7 @@ impl CullLists {
             &mut self.commands,
             &mut self.visible,
             &mut self.sway,
+            &mut self.pulled,
         ] {
             gpu.destroy_buffer(std::mem::replace(b, Buffer::null()));
         }
@@ -174,6 +189,10 @@ impl super::Renderer {
 
     /// The models of cull list `list`, inside a render pass with set 0 bound:
     /// `pipelines` are units and the rest, then trees and rocks (entity.wgsl `vs_prop`).
+    /// In the depth passes the props draw their slots as runs of pulled vertices
+    /// (`pulled`); the colour pass draws everything as indexed instances, which keep
+    /// the GPU's reuse of a vertex shared by two triangles (a pulled vertex runs once
+    /// per index, and the colour pass's vertex hands on twenty outputs).
     pub(super) fn draw_entities(
         &self,
         cmd: vk::CommandBuffer,
@@ -184,12 +203,14 @@ impl super::Renderer {
         let device = &self.gpu.device;
         let gfx = vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT;
         let first = self.cull.first_command(list);
+        let first_pulled = self.cull.first_pulled(list);
         let draws = &self.cull.draws;
         // SAFETY: called only inside a render pass of `render` while `cmd` is recording, after
         // set 0 is bound; `shields_set` is a pass set, the 8 pushed bytes fit the layout's
-        // 16-byte push range; `commands` has INDIRECT_BUFFER usage and holds `slot_count`
-        // 20-byte commands for each of the `cull_list::COUNT` lists, `list` is below it and
-        // each occupied range is bounded by the model slots, so all command reads lie inside it.
+        // 16-byte push range; `commands` and `pulled` have INDIRECT_BUFFER usage and hold
+        // `slot_count` commands (20 and 16 bytes) for each of the `cull_list::COUNT` lists,
+        // `list` is below it and each occupied range is bounded by the model slots, so all
+        // command reads lie inside them.
         unsafe {
             device.cmd_bind_descriptor_sets(
                 cmd,
@@ -203,33 +224,40 @@ impl super::Renderer {
             device.cmd_push_constants(cmd, self.layouts.scene, gfx, 0, bytemuck::bytes_of(&pushed));
             device.cmd_bind_vertex_buffers(cmd, 0, &[self.mesh_vb.buffer], &[0]);
             device.cmd_bind_index_buffer(cmd, self.mesh_ib.buffer, 0, vk::IndexType::UINT32);
-            for (pipeline, ranges) in pipelines
-                .into_iter()
-                .zip([&draws.ranges, &draws.prop_ranges])
-            {
+            for (pipeline, ranges, pulled) in [
+                (pipelines[0], &draws.ranges, false),
+                (pipelines[1], &draws.prop_ranges, pass_kind != pass::MAIN),
+            ] {
                 device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, pipeline);
+                let draw = |slots: std::ops::Range<u32>| {
+                    if pulled {
+                        device.cmd_draw_indirect(
+                            cmd,
+                            self.cull.pulled.buffer,
+                            first_pulled + slots.start as u64 * PULLED_BYTES,
+                            slots.end - slots.start,
+                            PULLED_BYTES as u32,
+                        );
+                    } else {
+                        device.cmd_draw_indexed_indirect(
+                            cmd,
+                            self.cull.commands.buffer,
+                            first + slots.start as u64 * COMMAND_BYTES,
+                            slots.end - slots.start,
+                            COMMAND_BYTES as u32,
+                        );
+                    }
+                };
                 for range in ranges {
                     if self.timers.fine() {
                         // One slot at a time, each named, to find a draw that hangs the GPU.
                         for slot in range.clone() {
                             self.timers.crumb(cmd, || self.slot_label(slot));
-                            device.cmd_draw_indexed_indirect(
-                                cmd,
-                                self.cull.commands.buffer,
-                                first + slot as u64 * COMMAND_BYTES,
-                                1,
-                                COMMAND_BYTES as u32,
-                            );
+                            draw(slot..slot + 1);
                         }
                         continue;
                     }
-                    device.cmd_draw_indexed_indirect(
-                        cmd,
-                        self.cull.commands.buffer,
-                        first + range.start as u64 * COMMAND_BYTES,
-                        range.end - range.start,
-                        COMMAND_BYTES as u32,
-                    );
+                    draw(range.clone());
                 }
             }
         }

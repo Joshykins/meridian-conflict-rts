@@ -12,6 +12,7 @@
 //!use wreck
 //!use flight
 //!use crawl
+//!use props
 // Units, structures, wrecks and props. One multi-draw-indirect call renders
 // every visible model; per-instance data comes from the visible list the cull
 // pass built, so `instance_index` (which includes firstInstance) indexes it.
@@ -2615,126 +2616,6 @@ fn vs_main(in: VsIn) -> VsOut {
     return out;
 }
 
-// Trees and rocks (the leading prop kinds, renderer `ActiveDraws::props`): `vs_main`
-// for what a prop can be. Standing on the ground, scaled and stretched, a tree's
-// leaves fluttering and its stem bent by the wind and blasts, a trampled one tipped
-// over its foot; nothing a unit, wreck or ship needs. A forest is hundreds of
-// thousands of these, and `vs_main`'s every other branch and its registers made
-// the entity pass vertex-bound. Drawn by this in every pass, so its depth agrees
-// with itself between the pre-pass and the colour pass.
-@vertex
-fn vs_prop(in: VsIn) -> VsOut {
-    let entity_index = visible[in.instance];
-    let e = load_entity(entity_index);
-    let model = models[e.blueprint];
-    let t = globals.sun.w;
-    let time = globals.camera.w;
-    let scale = select(1.0, f32(e.packed) * 0.001, e.packed != 0u);
-    let stretch = select(1.0, e.arm_pitch.w, e.arm_pitch.w > 0.0);
-    var p = in.pos;
-    var n = in.normal;
-    // A trampled tree tips over from its foot (renderer/fallen_trees.rs).
-    let toppled = e.arm_pitch.x != 0.0;
-    var tree = vec3<f32>(0.0);
-    let is_tree = !toppled && (in.material == MAT_FOLIAGE || in.material == MAT_BARK);
-    let tall = max(model.height * scale * stretch, 1.0);
-    if is_tree {
-        // As `vs_main`: no wind on a tree a few pixels tall.
-        if tall * globals.lod.x < TREE_STILL_PX * distance(e.pos, globals.camera.xyz) {
-            tree = blast_sway(entity_index);
-        } else {
-            tree = tree_air(e.pos, tall, e.unit_id, blast_sway(entity_index));
-        }
-    }
-    if in.material == MAT_FOLIAGE {
-        n = select(normalize(vec3<f32>(in.pos.xy * 0.18, 0.7)), in.face.xyz, dot(in.face.xyz, in.face.xyz) > 0.25);
-        let flex = clamp(in.pos.z / max(model.height, 1.0), 0.0, 1.0);
-        let card = f32((in.surface >> 8u) & 0x7Fu);
-        let phase = time * 1.5 + (in.pos.x + in.pos.y * 0.7) * 0.35 + card * 0.37 + f32(e.unit_id % 31u);
-        let shiver = time * 6.3 + card * 1.71 + in.pos.z * 0.3;
-        p += (vec3<f32>(sin(phase), cos(phase * 0.83), 0.0) * 0.04
-            + vec3<f32>(sin(shiver), cos(shiver * 1.13), sin(shiver * 0.71) * 0.5) * 0.07 * tree.z) * flex;
-    }
-    let heading = lerp_angle(e.prev_heading, e.heading, t);
-    var origin = mix(e.prev_pos, e.pos, t);
-    // Props carry an approximate height; stand them on the real surface.
-    origin.z = terrain_height(origin.xy) - e.arm_pitch.z;
-    let local = vec3<f32>(p.xy, p.z * stretch) * scale;
-    if stretch != 1.0 {
-        n = normalize(vec3<f32>(n.xy, n.z / stretch));
-    }
-    var up = vec3<f32>(0.0, 0.0, 1.0);
-    let fwd0 = vec3<f32>(cos(heading), sin(heading), 0.0);
-    var left = normalize(cross(up, fwd0));
-    var fwd = cross(left, up);
-    if toppled {
-        let pitch = mix(e.arm_pitch.x, e.arm_pitch.y, t);
-        let pitch_fwd = fwd * cos(pitch) + up * sin(pitch);
-        up = up * cos(pitch) - fwd * sin(pitch);
-        fwd = pitch_fwd;
-    }
-    let bank = mix(e._pad2.x, e._pad2.y, t);
-    let bank_left = left * cos(bank) + up * sin(bank);
-    up = up * cos(bank) - left * sin(bank);
-    left = bank_left;
-    var world = origin + fwd * local.x + left * local.y + up * local.z;
-    var world_n = normalize(fwd * n.x + left * n.y + up * n.z);
-    // The stem bends as a pole over its foot (`vs_main`).
-    let reach = length(tree.xy);
-    if is_tree && reach > 0.001 {
-        let dir = tree.xy / reach;
-        let bend = min(asin(min(reach / tall, 0.8)) * 1.5, 0.95);
-        let h = world.z - origin.z;
-        let r = max(h, 0.0) / tall;
-        let f = select(1.0, r * (2.0 - r), r < 1.0);
-        let mean = select((r - 1.0 / 3.0) / max(r, 0.001), r - r * r / 3.0, r < 1.0);
-        let a = bend * mean;
-        let turn = bend * f;
-        let rel = world.xy - origin.xy;
-        let along = dot(rel, dir);
-        let stem_h = max(h, 0.0);
-        world = vec3<f32>(
-            origin.xy + rel + dir * (stem_h * sin(a) + along * (cos(turn) - 1.0)),
-            origin.z + h + stem_h * (cos(a) - 1.0) - along * sin(turn),
-        );
-        let n_along = dot(world_n.xy, dir);
-        world_n = normalize(vec3<f32>(
-            world_n.xy + dir * (n_along * (cos(turn) - 1.0) + world_n.z * sin(turn)),
-            world_n.z * cos(turn) - n_along * sin(turn),
-        ));
-    }
-    var out: VsOut;
-    if (push.pass_kind & PASS_KIND_MASK) == PASS_SHADOW {
-        out.clip = globals.shadow_cascades[push.pass_kind >> PASS_CASCADE_SHIFT] * vec4<f32>(world, 1.0);
-    } else {
-        out.clip = globals.view_proj * vec4<f32>(world, 1.0);
-    }
-    out.world = world;
-    out.normal = world_n;
-    // What `vs_main` hands on for a prop: no warp, wreck, drive, crackle or refit.
-    let warp_reach = max(model.bounds_radius * scale, 1.0);
-    out.warp = vec4<f32>(0.0, 0.0, 0.0, clamp(0.5 + 0.5 * local.x / warp_reach, 0.0, 1.0));
-    out.uv = in.uv;
-    out.material = in.material;
-    out.owner_flags = e.owner_flags;
-    out.state = vec4<f32>(e.build, e.health, in.pos.z / max(model.height, 0.1), hash11(f32(e.unit_id & 0xFFFFu)));
-    out.local = in.pos;
-    out.wreck = vec4<f32>(-1e6, 1e6, 0.0, 0.0);
-    out.model_class = ((model.icon >> 8u) & 0xFFu) | ((in.surface & 0xFFFFu) << 16u);
-    out.face = in.face;
-    out.unit_id = e.unit_id;
-    out.skin = model.skin;
-    out.marks = model.marks;
-    out.drive = vec4<f32>(-1.0, 0.0, 0.0, 0.0);
-    out.drive_at = vec4<f32>(0.0);
-    out.dust = select(0.62, model.surface.y / max(model.height, 0.1), model.surface.y > 0.0);
-    out.crackle = vec2<f32>(0.0);
-    out.refit = vec3<f32>(0.0, 0.0, e.upgrade);
-    let body = max(select(model.bounds_radius, model.surface.x, model.surface.x > 0.0), 1.0);
-    out.weld = vec4<f32>(f32(e.weld_first), f32(e.weld_count), body, max(model.height, 1.0));
-    return out;
-}
-
 // `ModelInfo::icon` bit: the spinner looks about (renderer `Model::spinner_scans`).
 const ICON_SPINNER_SCANS: u32 = 0x8000000u;
 
@@ -2932,21 +2813,32 @@ fn leaf_tag(in: VsOut) -> u32 {
 }
 
 fn foliage_sample(in: VsOut) -> vec4<f32> {
-    var layer = FOLIAGE_BASE + select(FOLIAGE_BROADLEAF, FOLIAGE_CONIFER, (leaf_tag(in) & LEAF_CONIFER) != 0u);
-    let atlas = (in.model_class >> 16u) & 0xFFu;
+    return foliage_texel(in.model_class, in.uv);
+}
+
+// The leaf atlas texel at `uv` for a card of a model of class `model_class` (`VsOut`).
+fn foliage_texel(model_class: u32, uv: vec2<f32>) -> vec4<f32> {
+    var layer = FOLIAGE_BASE + select(FOLIAGE_BROADLEAF, FOLIAGE_CONIFER, (((model_class >> 24u) & 0xFFu) & LEAF_CONIFER) != 0u);
+    let atlas = (model_class >> 16u) & 0xFFu;
     if atlas == LEAF_TROPICAL {
         layer = FOLIAGE_BASE + FOLIAGE_TROPICAL;
     } else if atlas == SCENERY_LEAF_DESERT {
         layer = FOLIAGE_BASE + SCENERY_FOLIAGE_DESERT;
     }
-    return textureSample(terrain_materials, clamp_sampler, in.uv, layer);
+    return textureSample(terrain_materials, clamp_sampler, uv, layer);
 }
 
 fn foliage_missing(in: VsOut, leaf: vec4<f32>) -> bool {
-    let charred = 1.0 - clamp(in.state.y, 0.0, 1.0);
+    return leaf_cut(in.uv, in.local, in.state.y, leaf);
+}
+
+// A leaf card's texel `leaf` at `uv` (model point `local`) left out: past the
+// leaves' outline, or burnt away on a tree at `health`.
+fn leaf_cut(uv: vec2<f32>, local: vec3<f32>, health: f32, leaf: vec4<f32>) -> bool {
+    let charred = 1.0 - clamp(health, 0.0, 1.0);
     // Burn away small leaf groups to expose twigs, rather than turning a
     // solid green polyhedron into a solid black polyhedron.
-    let group = hash21(floor(in.uv * 17.0) + floor(in.local.xy * 2.0));
+    let group = hash21(floor(uv * 17.0) + floor(local.xy * 2.0));
     return leaf.a < 0.38 || group < charred * 0.90;
 }
 
@@ -2955,13 +2847,19 @@ fn foliage_missing(in: VsOut, leaf: vec4<f32>) -> bool {
 // last: above zero this chunk is gone, just under zero it is glowing. Far
 // below zero for everything else.
 fn vapor_edge(in: VsOut) -> f32 {
-    if (in.owner_flags & KIND_PROP) == 0u || in.state.y <= 1.0 {
+    return vapor_at(in.owner_flags, in.state.y, in.state.z, in.local);
+}
+
+// `vapor_edge` from the parts of `VsOut` it reads: `health`, and `rise` the point's
+// share of the model's height.
+fn vapor_at(flags: u32, health: f32, rise: f32, local: vec3<f32>) -> f32 {
+    if (flags & KIND_PROP) == 0u || health <= 1.0 {
         return -9.0;
     }
-    let v = clamp(in.state.y - 1.0, 0.0, 1.0);
-    let cell = floor(in.local * 1.7);
+    let v = clamp(health - 1.0, 0.0, 1.0);
+    let cell = floor(local * 1.7);
     let r = fract(sin(dot(cell, vec3<f32>(12.9898, 78.233, 37.719))) * 43758.547);
-    let order = r * 0.5 + (1.0 - clamp(in.state.z, 0.0, 1.0)) * 0.5;
+    let order = r * 0.5 + (1.0 - clamp(rise, 0.0, 1.0)) * 0.5;
     return v * 1.15 - order;
 }
 
@@ -3108,8 +3006,13 @@ fn material_of(id: u32, owner: u32, skin: u32) -> Pbr {
 // so with nothing selected, and in the free camera, the architecture stands whole.
 // Shadows stay whole.
 fn precursor_cutaway(in: VsOut) -> bool {
+    return precursor_cut(in.owner_flags, in.world, in.clip.xy);
+}
+
+// `precursor_cutaway` from the parts of `VsOut` it reads.
+fn precursor_cut(flags: u32, world: vec3<f32>, pixel: vec2<f32>) -> bool {
     let cut = globals.scene.w;
-    if (in.owner_flags & KIND_PROP) == 0u || globals.tree_wind.w <= 0.0 || cut <= 0.0 {
+    if (flags & KIND_PROP) == 0u || globals.tree_wind.w <= 0.0 || cut <= 0.0 {
         return false;
     }
     let eye = globals.camera.xyz;
@@ -3117,21 +3020,21 @@ fn precursor_cutaway(in: VsOut) -> bool {
     let ground = terrain_height(focus);
     let rise = eye.z - ground;
     let above = ground + 0.2 * rise;
-    if rise <= 1.0 || in.world.z < above {
+    if rise <= 1.0 || world.z < above {
         return false;
     }
     // Across from the line between the focus and the point under the eye.
     let ab = eye.xy - focus;
-    let t = clamp(dot(in.world.xy - focus, ab) / max(dot(ab, ab), 1.0), -0.25, 1.0);
-    let d = length(in.world.xy - (focus + ab * t));
+    let t = clamp(dot(world.xy - focus, ab) / max(dot(ab, ab), 1.0), -0.25, 1.0);
+    let d = length(world.xy - (focus + ab * t));
     let r = 0.6 * rise;
     // Gone outright inside, dissolving only over a narrow fringe.
-    let fade = cut * (1.0 - smoothstep(0.85 * r, r, d)) * smoothstep(above, above + 0.03 * rise, in.world.z);
+    let fade = cut * (1.0 - smoothstep(0.85 * r, r, d)) * smoothstep(above, above + 0.03 * rise, world.z);
     if fade >= 0.999 {
         return true;
     }
 
-    let p = floor(in.clip.xy);
+    let p = floor(pixel);
     let door = fract(52.9829189 * fract(dot(p, vec2<f32>(0.06711056, 0.00583715))));
     return door < fade * 0.97;
 }
@@ -3191,6 +3094,11 @@ fn tread_link(link: f32, q: f32, flank: bool, shade: f32) -> TreadLink {
 
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
+    return shade_entity(in);
+}
+
+// The colour of an entity's fragment (`fs_main`, `fs_prop`).
+fn shade_entity(in: VsOut) -> vec4<f32> {
     if warp_swarm_missing(in.local, in.warp, in.state.w) { discard; }
     if precursor_cutaway(in) { discard; }
     let flags = in.owner_flags;

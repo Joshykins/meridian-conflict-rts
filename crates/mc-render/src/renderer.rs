@@ -1807,8 +1807,15 @@ impl Renderer {
             (MAX_OVERLAY_VERTICES * size_of::<OverlayVertex>()) as u64,
             U::VERTEX_BUFFER,
         )?;
-        let mesh_vb = gpu.buffer_with_data(bytemuck::cast_slice(&vertices), U::VERTEX_BUFFER)?;
-        let mesh_ib = gpu.buffer_with_data(bytemuck::cast_slice(&indices), U::INDEX_BUFFER)?;
+        // Storage too: the props pull their vertices from them (entity.wgsl `prop_vertex`).
+        let mesh_vb = gpu.buffer_with_data(
+            bytemuck::cast_slice(&vertices),
+            U::VERTEX_BUFFER | U::STORAGE_BUFFER,
+        )?;
+        let mesh_ib = gpu.buffer_with_data(
+            bytemuck::cast_slice(&indices),
+            U::INDEX_BUFFER | U::STORAGE_BUFFER,
+        )?;
         let quad: [[f32; 2]; 4] = [[-1.0, -1.0], [1.0, -1.0], [1.0, 1.0], [-1.0, 1.0]];
         let quad_vb = gpu.buffer_with_data(bytemuck::cast_slice(&quad), U::VERTEX_BUFFER)?;
         let quad_ib = gpu.buffer_with_data(
@@ -2182,6 +2189,12 @@ impl Renderer {
             vk::DescriptorType::STORAGE_BUFFER,
             &[&cull.sway],
         );
+        write_buffers(
+            scene_set,
+            40,
+            vk::DescriptorType::STORAGE_BUFFER,
+            &[&cull.commands, &mesh_vb, &mesh_ib],
+        );
         write_buffers(scene_set, 15, vk::DescriptorType::STORAGE_BUFFER, &[&welds]);
         for (binding, image) in [
             (5, &overview),
@@ -2236,7 +2249,7 @@ impl Renderer {
             &[&dynamic, &statics, &model_table, &slot_table]
                 .into_iter()
                 .chain(cull.bindings())
-                .chain([&props_dead, &effect_barriers, &cull.sway])
+                .chain([&props_dead, &effect_barriers, &cull.sway, &cull.pulled])
                 .collect::<Vec<_>>(),
         );
         write_buffers(

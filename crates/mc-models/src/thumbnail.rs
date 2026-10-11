@@ -333,7 +333,9 @@ pub(super) fn rasterise(mesh: &MeshLod, size: usize, shot: &Shot) -> Samples {
             continue;
         }
         let p = [at(a), at(b), at(c)];
-        if (p[1] - p[0]).cross(p[2] - p[0]).dot(to_camera) <= 0.0 {
+        // Leaf cards are one face, seen from both sides (`MeshBuilder::leaf_card`).
+        if a.material != material::FOLIAGE && (p[1] - p[0]).cross(p[2] - p[0]).dot(to_camera) <= 0.0
+        {
             continue;
         }
         let normals = [a, b, c].map(|v| Vec3::from(v.normal));

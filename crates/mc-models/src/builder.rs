@@ -1557,7 +1557,7 @@ impl MeshBuilder {
         self.emit_face(&world, None);
     }
 
-    /// A two-sided cutout foliage card showing `region` (`[u0, v0, u1, v1]`, v
+    /// A cutout foliage card showing `region` (`[u0, v0, u1, v1]`, v
     /// down as the atlas is stored: the region's top edge is at `center + up`) of
     /// the leaf atlas that `tag` picks. Geometric normals stay for winding checks;
     /// the foliage shader lights the leaves from the crown instead:
@@ -1593,27 +1593,25 @@ impl MeshBuilder {
         let normal = (points[1] - points[0])
             .cross(points[2] - points[0])
             .normalize();
-        for back in [false, true] {
-            let base = self.mesh.vertices.len() as u32;
-            for i in 0..4 {
-                self.mesh.vertices.push(MeshVertex {
-                    pos: points[i].to_array(),
-                    normal: (if back { -normal } else { normal }).to_array(),
-                    uv: uv[i],
-                    material: material::FOLIAGE,
-                    part: self.part,
-                    rig: self.rig,
-                    face: shade[i],
-                    surface: self.leaf_atlas | (tag & 0xFF) << 8,
-                });
-            }
-            let order = if back {
-                [0, 2, 1, 0, 3, 2]
-            } else {
-                [0, 1, 2, 0, 2, 3]
-            };
-            self.mesh.indices.extend(order.map(|i| base + i));
+        // One face: the props' pipelines draw without culling, and the leaves are lit
+        // by `face` (the crown), the same from either side. A back face of its own
+        // doubled every forest's vertices.
+        let base = self.mesh.vertices.len() as u32;
+        for i in 0..4 {
+            self.mesh.vertices.push(MeshVertex {
+                pos: points[i].to_array(),
+                normal: normal.to_array(),
+                uv: uv[i],
+                material: material::FOLIAGE,
+                part: self.part,
+                rig: self.rig,
+                face: shade[i],
+                surface: self.leaf_atlas | (tag & 0xFF) << 8,
+            });
         }
+        self.mesh
+            .indices
+            .extend([0, 1, 2, 0, 2, 3].map(|i| base + i));
     }
 
     /// Which leaf atlas the leaf cards that follow show: `pattern::NONE` (the

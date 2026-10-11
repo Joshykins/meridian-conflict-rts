@@ -17,7 +17,8 @@
 //! (canyon-country desert ground) after habitat for `//!use desert`;
 //! `shaders/warp_hull.wgsl` and `shaders/warp_puffs.wgsl` (a capital ship's warp)
 //! for `//!use warp_hull` and `//!use warp_puffs`; `shaders/plasma_puffs.wgsl` (the
-//! Regency's squeezed plasma) for `//!use plasma_puffs`; `shaders/gravity_puffs.wgsl` (a
+//! Regency's squeezed plasma) for `//!use plasma_puffs`; `shaders/props.wgsl` (trees'
+//! and rocks' vertex stages) for `//!use props`; `shaders/gravity_puffs.wgsl` (a
 //! gravitic engine's held energy) for `//!use gravity_puffs`; `shaders/scars.wgsl`
 //! (craters, melt and rifts in the ground) for `//!use scars`; `shaders/emp.wgsl` and
 //! `shaders/wreck.wgsl` (how a wreck lies and burns out) and `shaders/nova.wgsl` (a
