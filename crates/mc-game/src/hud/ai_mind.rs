@@ -31,7 +31,7 @@ const FRONTS: usize = 4;
 /// Lines the card needs, to size it before drawing.
 fn lines(m: &AiMind) -> (usize, usize) {
     let plans = m.plans.iter().filter(|p| p.level > 0).count() + UNHELD;
-    let ops = m.ops.len().max(1) + m.fronts.len().min(FRONTS).max(1) + 2;
+    let ops = m.ops.len().max(1) + m.fronts.len().clamp(1, FRONTS) + 2;
     (plans, ops)
 }
 
