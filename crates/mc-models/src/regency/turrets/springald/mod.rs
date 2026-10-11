@@ -3,7 +3,7 @@
 //! charge in front of the bore, here three knots of fusion at once, one at each rail's
 //! lens, and lobs them high as one shell. The `muzzle` is the middle of the charge.
 //!
-//! A long turret turns on a toothed race (`house`) over its base (`base`): plated cheeks
+//! A long turret turns on a toothed race (`house`) over its drum and outriggers (`base`): plated cheeks
 //! either side of the trunnion, the fusion plant that feeds the gun on its back, three
 //! capacitor cells (`back`), and the gun (`rails`) laid 45 degrees up at rest, as a map gun
 //! stands, and never lower: it lobs higher still (`keeps_aim` holds it where it last
@@ -43,22 +43,8 @@ const ROOF: f32 = 13.0;
 /// The cheeks' inner faces, off the bore.
 const CHEEK: f32 = 6.4;
 
-/// The Springald on its plinth (`base::plinth`).
+/// The Springald, its gun laid 45 degrees up.
 pub(in crate::regency) fn springald(b: &mut MeshBuilder, _tech: u8) {
-    draw(b, base::plinth);
-}
-
-/// The Springald on four outriggers (`base::outriggers`).
-pub(in crate::regency) fn springald_outriggers(b: &mut MeshBuilder, _tech: u8) {
-    draw(b, base::outriggers);
-}
-
-/// The Springald on a scaled drum (`base::bastion`).
-pub(in crate::regency) fn springald_bastion(b: &mut MeshBuilder, _tech: u8) {
-    draw(b, base::bastion);
-}
-
-fn draw(b: &mut MeshBuilder, base: fn(&mut MeshBuilder)) {
     b.set_turret_pivot(Vec3::Z * DECK);
     b.set_arm_pivot(LINE.pivot);
     b.set_recoil(LINE.pivot, LINE.muzzle, 4.0);
@@ -84,7 +70,7 @@ fn draw(b: &mut MeshBuilder, base: fn(&mut MeshBuilder)) {
     // The blades flare off the bore's line through the trunnion; gear travels are drawn
     // at twice their metres: the blades draw back 1 m, the lids lift 1.8 m.
     b.set_charge_gear(LINE.pivot, 2.0);
-    base(b);
+    base::draw(b);
     b.with_part(part::TURRET, |b| {
         house::draw(b);
         back::draw(b);
@@ -103,20 +89,14 @@ mod tests {
 
     #[test]
     fn springald_holds_its_charge() {
-        for key in [
+        super::super::super::check_charge(
             "regency_springald",
-            "regency_springald~outriggers",
-            "regency_springald~bastion",
-        ] {
-            super::super::super::check_charge(
-                key,
-                RADIUS,
-                HEIGHT,
-                Some(6),
-                &[LINE.muzzle.to_array()],
-                HOLD,
-            );
-        }
+            RADIUS,
+            HEIGHT,
+            Some(6),
+            &[LINE.muzzle.to_array()],
+            HOLD,
+        );
     }
 
     /// The unit file's pivot and muzzle are the model's own.

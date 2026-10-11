@@ -37,10 +37,7 @@ pub(super) use canopy::canopy;
 pub(super) use gorget::gorget;
 pub(super) use halberd::halberd;
 pub(super) use picket::picket;
-pub(super) use springald::{
-    springald, springald_bastion, springald_outriggers, HEIGHT as SPRINGALD_HEIGHT,
-    RADIUS as SPRINGALD_RADIUS,
-};
+pub(super) use springald::{springald, HEIGHT as SPRINGALD_HEIGHT, RADIUS as SPRINGALD_RADIUS};
 pub(super) use sunspear::sunspear;
 
 use glam::{Vec2, Vec3};
