@@ -635,11 +635,11 @@ impl Warp {
 }
 
 /// A nanite repair field (`mc_sim::repair_field`): every finished friendly unit within
-/// `radius` of it, not itself, heals `rate` of its full health a second.
+/// `radius` of it, not itself, heals `heal` health a second, whatever its size.
 #[derive(Clone, Copy, Debug)]
 pub struct RepairField {
     pub radius: Fx,
-    pub rate: Fx,
+    pub heal: Fx,
 }
 
 /// An aircraft's tank (`mc_sim::staging`): it burns while the aircraft is up and fills
@@ -759,10 +759,12 @@ pub struct Shield {
     pub radius: Fx,
     /// Hit points the bubble can take.
     pub health: Fx,
-    /// Hit points recovered per second while the bubble is up, and while it
-    /// fills after a break. Engineers can raise the live rate; a shattered
-    /// dome fills at this rate only, and stays down until it is full.
+    /// Hit points recovered per second while the bubble is up. Engineers can
+    /// raise it.
     pub regen: Fx,
+    /// Hit points recovered per second while a shattered bubble fills. It stays
+    /// down until it is full, and engineers cannot hurry it.
+    pub recharge: Fx,
 }
 
 impl Shield {
@@ -883,8 +885,8 @@ pub struct UnitBlueprint {
     pub health: Fx,
     /// Health per second.
     pub regen: Fx,
-    /// Its regen is nanites at work: it keeps mending while it is hit (`run_regen`), and
-    /// the renderer draws the nanites while it mends.
+    /// Its regen is nanites at work: the renderer draws the nanites while it mends. Every
+    /// unit's regen runs under fire (`run_regen`); this changes only the look.
     pub nanite_regen: bool,
     pub cost_materials: Fx,
     pub cost_energy: Fx,
@@ -1820,7 +1822,7 @@ impl Blueprints {
             match &u.repair_field {
                 Some(f) => {
                     h.write_i64(f.radius.0);
-                    h.write_i64(f.rate.0);
+                    h.write_i64(f.heal.0);
                 }
                 None => h.write_u64(u64::MAX),
             }
@@ -1865,6 +1867,7 @@ impl Blueprints {
                     h.write_i64(s.radius.0);
                     h.write_i64(s.health.0);
                     h.write_i64(s.regen.0);
+                    h.write_i64(s.recharge.0);
                 }
                 None => h.write_u64(u64::MAX),
             }

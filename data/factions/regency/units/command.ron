@@ -103,19 +103,21 @@
                 modules: [
                     (
                         key: "nano_repair", icon: Engineer, name: "Nanite Repair",
-                        summary: "Plates of nanites down the spine: heavier plating, and they mend the Exarch's hull fast, even under fire.",
+                        summary: "Nanite feeds down the spine thicken and mend the Exarch's own hull, far faster than it heals bare.",
                         cost: (materials: 900, energy: 10800, time: 1100),
-                        // Nanites keep at it under fire: this regen does not wait out hits.
-                        health: 3000, regen: 140, nanite_regen: true,
+                        // Less hull than ARC's Personal Shield, more regen than it.
+                        health: 4000, regen: 100, nanite_regen: true,
                     ),
                     (
                         key: "nano_field", icon: Engineer, name: "Nanite Repair Field", after: "nano_repair",
-                        summary: "The nanites go out in a cloud: every unit and structure of its side near the Exarch mends, and the Exarch mends faster still, under heavier plating.",
-                        cost: (materials: 2200, energy: 26400, time: 2600),
-                        // It takes Nanite Repair's place, so it carries its plating and regen too.
-                        health: 6000, regen: 240, nanite_regen: true,
-                        // A fiftieth of each friend's full health a second, within 150 m.
-                        repair_field: (radius: 150, rate: 0.02),
+                        summary: "The nanites go out in a cloud: every unit and structure of its side near the Exarch mends, and the Exarch's own hull grows far heavier.",
+                        cost: (materials: 3000, energy: 36000, time: 3500),
+                        // It takes Nanite Repair's place, so these are the totals, not more on top.
+                        // With Suite III's hull, about two thirds of a tech 4.
+                        health: 28000, regen: 220, nanite_regen: true,
+                        // 40 health a second to every friend within 180 m, whatever its size:
+                        // much for a tech 1 unit, little for a big one.
+                        repair_field: (radius: 180, heal: 40),
                     ),
                     (
                         key: "mfe", icon: Power, name: "Material Formation Engine",

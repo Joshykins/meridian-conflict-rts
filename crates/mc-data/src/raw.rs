@@ -358,8 +358,8 @@ pub(crate) struct Unit {
     pub health: f64,
     #[serde(default)]
     pub regen: f64,
-    /// Its regen is nanites at work: it does not wait out hits, and the nanites are drawn
-    /// crawling over the hull while it mends.
+    /// Its regen is nanites at work: the nanites are drawn crawling over the hull while it
+    /// mends.
     #[serde(default)]
     pub nanite_regen: bool,
     pub cost: Cost,
@@ -899,7 +899,8 @@ pub(crate) struct RawWarp {
 #[serde(deny_unknown_fields)]
 pub struct RawRepairField {
     pub radius: f64,
-    pub rate: f64,
+    /// Health a second each friend in reach gets back, the same for every unit.
+    pub heal: f64,
 }
 
 /// An aircraft's tank: `range` kilometres of flight at full speed.
@@ -981,8 +982,11 @@ pub struct RawShield {
     #[serde(default)]
     pub radius: f64,
     pub health: f64,
-    /// Hit points per second while the bubble is up, and while it fills after a break.
+    /// Hit points per second while the bubble is up.
     pub regen: f64,
+    /// Hit points per second while it fills after a break. Unset: twice `regen`.
+    #[serde(default)]
+    pub recharge: Option<f64>,
 }
 
 /// A giant walker's footfall (`stride` walkers): each time it has covered `pace` metres a
@@ -2595,14 +2599,14 @@ impl Unit {
                 None => None,
             },
             repair_field: match self.repair_field {
-                Some(f) if f.radius <= 0.0 || !(f.rate > 0.0 && f.rate <= 1.0) => {
+                Some(f) if f.radius <= 0.0 || f.heal <= 0.0 => {
                     return Err(DataError::Invalid(format!(
-                        "{key}: a repair field needs a radius and a rate above 0, at most 1"
+                        "{key}: a repair field needs a radius and a heal above 0"
                     )));
                 }
                 Some(f) => Some(crate::RepairField {
                     radius: fx(f.radius),
-                    rate: fx(f.rate),
+                    heal: fx(f.heal),
                 }),
                 None => None,
             },
@@ -2671,6 +2675,7 @@ impl Unit {
                     radius,
                     health: fx(s.health),
                     regen: fx(s.regen),
+                    recharge: fx(s.recharge.unwrap_or(s.regen * 2.0)),
                 }
             }),
             upgrades_to: match &self.upgrades_to {

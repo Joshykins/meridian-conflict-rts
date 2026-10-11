@@ -1,8 +1,8 @@
 //! Nanite repair fields (`UnitBlueprint::repair_field`): a unit that carries one mends
 //! every finished friendly unit within its radius, ground or air, structure or mobile,
-//! a share of that unit's full health a second. It costs nothing to run and takes no
-//! orders; two fields over the same unit both mend it. The unit carrying it is left to
-//! its own regen.
+//! the same health a second whatever the unit's size, so it does most for small units.
+//! It heals under fire, costs nothing to run and takes no orders; two fields over the
+//! same unit both mend it. The unit carrying it is left to its own regen.
 
 use crate::spatial::kind;
 use crate::World;
@@ -32,9 +32,8 @@ impl World {
                     {
                         return true;
                     }
-                    let max = self.unit_max_health(t);
-                    if units.health[t] < max {
-                        mend.push((t, max * field.rate / TICKS_PER_SECOND as i32));
+                    if units.health[t] < self.unit_max_health(t) {
+                        mend.push((t, field.heal / TICKS_PER_SECOND as i32));
                     }
                     true
                 });

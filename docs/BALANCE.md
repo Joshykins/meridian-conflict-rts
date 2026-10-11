@@ -11,6 +11,15 @@ Tier 1 is the anchor: its combat stats set the scale. Each tier costs about 4x t
 5x a tier 1 unit, and a tier 3 about 25x. Health and damage are raised together (never lowered)
 to reach the target; range specialists (SAM, strategic bomber) are capped at 3x.
 
+Tier 4 combat units are the exception: they are priced as Forged Alliance's experimentals,
+about 1 material for every 3 health (the Monkeylord is 20,000 mass for 45,000 health, the
+Galactic Colossus 27,500 for 100,000), with energy and build time raised by the same factor
+as the materials (2026-10-09). Their damage was set under the old price and is now under the
+per-mass rule; it gets raised next. The Harrow keeps its price until then, since with
+9,200 health it is not an experimental yet. The tier 4s that came after the rule are priced by
+it too: the Colossus 28,000, the Nimbus 20,000, the Saker 9,000 (26,000 health) and the
+Scourge 48,000 (beside the Dominion it peers). Tier 5 is several experimentals in one.
+
 Lines: tank (Warden -> Bulwark and Skimmer -> Paladin), artillery, mobile AA,
 fighters, bombers, gunships, point defence, static AA. Aircraft and anti-air follow the
 rules in "Air and anti-air" below instead: they are measured by what one pass or one shot
@@ -21,12 +30,12 @@ Off the lines, measured the same way:
 - Arbalest (T3 lightning sniper, 560 materials): about 1.7 per unit of materials against the
   Paladin's 2.7. It is a range specialist (520 m against the Paladin's 280) and cannot
   defend itself up close, so it sits under the rule on purpose.
-- Fulgur (T4 super-heavy tank, 3400 materials, about 4x a Paladin): 60000 health plus an
-  18000 hull field, about 1067 direct dps from the AEB-2 and two bolt rifles, so about 2.6 per
-  unit of materials, near the Paladin's. What puts it over is the AEB-2's channel: 2000 damage to
+- Fulgur (T4 super-heavy tank, 22000 materials): 60000 health plus an
+  18000 hull field, about 1067 direct dps from the AEB-2 and two bolt rifles, so about 0.4 per
+  unit of materials, far under the Paladin's 2.7. What puts it over is the AEB-2's channel: 2000 damage to
   everything within 7 m of it, which a column or a clump pays for many times. Raised on a
-  lot by Mason IIIs (build power 150: one takes about 135 s); it has no factory.
-- Strider (Regency T4 assault tripod, 3400 materials, the Fulgur's price): 60000 health and no
+  lot by Mason IIIs (build power 150: one takes about 860 s); it has no factory.
+- Strider (Regency T4 assault tripod, 26000 materials, the Breacher's price): 60000 health and no
   shield, about 1830 direct dps from two Pinch-fusion Cannons (4200 a shot with 24 m of
   splash, taking turns half a reload apart) out to 1250 m, and about 420 more from eight
   Gravitic Seekers thrown up and spread over the ground targets within 1250 m, each going
@@ -35,7 +44,7 @@ Off the lines, measured the same way:
   and caught inside the gatlings' 750 m it loses, either way badly hurt
   (mc-sim `tests/strider.rs`). Shorter reach than the Fulgur's AEB-2 and nothing against
   aircraft. Raised on a lot by Artificer IIIs or the Exarch's Engineering Suite III.
-- Colossus (Regency T4 four-legged siege walker, 4200 materials, the Strider's and the
+- Colossus (Regency T4 four-legged siege walker, 28000 materials, the Strider's and the
   Breacher's peer; made a T4 in full 2026-10-08 at the user's word): 75000 health plus an
   18000 hull field. Its Heavy Pinched Lance, a tight red stream, charges 3 s and then burns 5 s (50 ticks
   of 1200 with 40 m of splash, every 40 s): about 12000 dps through the burn, 1500 averaged
@@ -46,14 +55,14 @@ Off the lines, measured the same way:
   stomp), has nothing for the air, and is raised on a lot by Artificer IIIs or the Exarch's
   Engineering Suite III. Unplayed: the numbers are a first pass (mc-sim
   `tests/colossus.rs`).
-- Breacher (T4 assault walker, 3800 materials): 72000 health plus a 16000 hull field, about 2000
+- Breacher (T4 assault walker, 26000 materials): 72000 health plus a 16000 hull field, about 2000
   dps from its two gatling-breach cannons at full spin (300 a shot, 0.3 s) and 430 from the
-  thermobaric launchers (32 rockets of 240 every 18 s), so about 3.9 per unit of materials, a little
-  over the 1.3x a tier 3 rule: it has to close to 600 m (the Fulgur stands off at 1500).
+  thermobaric launchers (32 rockets of 240 every 18 s), so about 0.6 per unit of materials: it
+  has to close to 600 m (the Fulgur stands off at 1500).
   Each rocket also leaves 16 s of burning ground (40 a second to each enemy in it), which a
   clump standing in the field pays for many times. Raised on a lot by Mason IIIs like the
   Fulgur; it carries nothing for the air.
-- Nimbus (ARC T4 storm bomber, 4000 materials): 52000 health plus an 18000 hull field, and two
+- Nimbus (ARC T4 storm bomber, 20000 materials): 52000 health plus an 18000 hull field, and two
   lasers that burn missiles within 680 m (the Argus's). It flies runs like any bomber, and
   while any foe is within 600 m its Storm Seeder lets a cloud go from the tail every second,
   aimed at nothing: a run lays a trail of them. Each hangs about where it was let go, grows
@@ -383,7 +392,8 @@ Warships (the Valiant, Resolute and Dominion) fly in the air layer with everythi
 no separate space layer, and any anti-air weapon can hit them.
 
 - Every spaceship sits a tier above the land and air units of its cost band, and pays 1.75x what
-  it did as a tier lower (2026-10-02); only the Dominion kept its tier and price:
+  it did as a tier lower (2026-10-02). The tier 4 ships were raised again to experimental
+  prices with the rest of tier 4 (2026-10-09):
 
   | Ship | Tier | Materials | Energy | Build time |
   | --- | --- | --- | --- | --- |
@@ -392,8 +402,8 @@ no separate space layer, and any anti-air weapon can hit them.
   | Vigil (sensor ship) | 2 | 490 | 7,350 | 2,450 |
   | Valiant (rail corvette) | 3 | 1,925 | 31,500 | 11,550 |
   | Bastion (assault transport) | 3 | 4,200 | 63,000 | 25,200 |
-  | Resolute (heavy frigate) | 4 | 8,750 | 105,000 | 35,000 |
-  | Dominion (dreadnought) | 4 | 16,000 | 220,000 | 70,000 |
+  | Resolute (heavy frigate) | 4 | 18,000 | 216,000 | 72,000 |
+  | Dominion (dreadnought) | 4 | 45,000 | 619,000 | 197,000 |
 
   Tech 2 ships are raised by the Mason II and III and the commander's Engineering Suite II and
   III (the Regency's Artificer II and III and the Exarch's suites); tech 3 and 4 ships by the
@@ -403,10 +413,10 @@ no separate space layer, and any anti-air weapon can hit them.
   - anti-space guns;
   - other warships;
   - fighters, against most hulls, when the ship has no anti-air cover.
-- A ground anti-space gun outranges the warship it answers and beats it for fewer materials:
-  - one Zenith (T4, 11,200 materials, 3,200 m) reliably kills one Dominion (16,000 materials, 2,500 m) at
+- A ground anti-space gun outranges the warship it answers and beats it for less materials:
+  - one Zenith (T4, 31,500 materials, 3,200 m) reliably kills one Dominion (45,000 materials, 2,500 m) at
     about 70% of its materials;
-  - the Narwhal (T3, 3,800 materials, 3,000 m) does the same to a Resolute (T4, 8,750 materials) at
-    under half its materials, but on its own it loses to a Dominion.
+  - the Narwhal (T3, 3,800 materials, 3,000 m) does the same to a Resolute (T4, 18,000 materials) at
+    about a fifth of its materials, but on its own it loses to a Dominion.
 - `tests/dreadnought.rs` and `tests/narwhal.rs` fight each of these duels three ways: parked
   close, parked at the ship's own reach, and with the ship ordered in from out of range.

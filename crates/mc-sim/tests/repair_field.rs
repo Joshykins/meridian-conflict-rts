@@ -1,5 +1,5 @@
-//! The Exarch's Nanite Repair Field: friends within its reach heal slowly; units out of
-//! reach and the enemy's do not.
+//! The Exarch's Nanite Repair Field: friends within its reach heal a flat amount a second;
+//! units out of reach and the enemy's do not.
 
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
@@ -60,7 +60,7 @@ fn exarch(w: &mut World, keys: &[&str], x: i32, y: i32) -> usize {
 }
 
 #[test]
-fn the_field_mends_friends_in_reach_slowly_and_no_one_else() {
+fn the_field_mends_friends_in_reach_and_no_one_else() {
     let mut w = world();
     let acu = exarch(&mut w, &["nano_repair", "nano_field"], 900, 900);
     let field = w
@@ -89,15 +89,14 @@ fn the_field_mends_friends_in_reach_slowly_and_no_one_else() {
     for _ in 0..50 {
         w.tick(&[]).unwrap();
     }
-    let max = w.unit_max_health(near);
     let healed = w.state.units.health[near] - Fx::from_int(50);
-    // Five seconds of the field: its share a second, give or take a tick's worth.
-    let expect = max * field.rate * 5;
+    // Five seconds of the field: its flat heal a second, give or take a tick's worth.
+    let expect = field.heal * 5;
+    assert!(expect + Fx::from_int(50) < w.unit_max_health(near));
     assert!(
         healed >= expect * 9 / 10 && healed <= expect * 11 / 10,
         "healed {healed:?} in five seconds, expected about {expect:?}"
     );
-    assert!(healed < max / 4, "slowly: {healed:?} of {max:?}");
     assert_eq!(w.state.units.health[far], Fx::from_int(50));
     assert_eq!(w.state.units.health[foe], Fx::from_int(50));
 }
@@ -144,7 +143,7 @@ fn the_mirror_shows_the_nanites_at_work() {
 }
 
 #[test]
-fn nanite_repair_mends_under_fire_where_bare_regen_waits() {
+fn nanite_repair_mends_faster_under_fire_than_bare_regen() {
     // An enemy tank shooting at each Exarch, half dead, its own fire held.
     let under_fire = |keys: &[&str]| {
         let mut w = world();
@@ -165,9 +164,6 @@ fn nanite_repair_mends_under_fire_where_bare_regen_waits() {
     };
     let bare = under_fire(&[]);
     let nanite = under_fire(&["nano_repair"]);
-    assert!(bare < Fx::ZERO, "bare regen waits out the hits: {bare:?}");
-    assert!(
-        nanite > Fx::ZERO,
-        "nanites outmend a light tank: {nanite:?}"
-    );
+    // Regen runs under fire either way; the nanites' is the stronger.
+    assert!(nanite > bare, "nanites {nanite:?}, bare {bare:?}");
 }
