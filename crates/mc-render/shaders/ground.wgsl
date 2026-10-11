@@ -338,6 +338,7 @@ fn fs_pad(in: PadOut) -> @location(0) vec4<f32> {
     let owner = in.packed & OWNER_MASK;
     let build = f32((in.packed >> PAD_BUILD_SHIFT) & PAD_BUILD_MASK) / 255.0;
     let blueprint = in.packed >> PAD_BLUEPRINT_SHIFT;
+    let pad_plan = in.packed >> PAD_TURN_SHIFT;
     let ghost = select(0u, 1u, (in.packed & PAD_GHOST) != 0u);
     let team = globals.team_colors[owner].rgb;
 
@@ -353,14 +354,14 @@ fn fs_pad(in: PadOut) -> @location(0) vec4<f32> {
     // reaches the lot it runs a hand's breadth past, so two lots side by side overlap
     // rather than meet at half cover each.
     let ragged = textureSample(noise_map, repeat_sampler, wp / 5.0).b;
-    let plan = pad_mesh_sd(in.uv, blueprint);
+    let plan = pad_mesh_sd(in.uv, pad_plan);
     let sd = plan.x;
     var edge_in = -plan.y;
     // Out of the apron, across the kerb: the apron's gradient, from one texel over each way.
     let step_uv = 2.0 * PAD_FOOTPRINT_REACH / f32(textureDimensions(pad_footprints).x);
     let grad = vec2<f32>(
-        pad_mesh_sd(in.uv + vec2<f32>(step_uv, 0.0), blueprint).y - plan.y,
-        pad_mesh_sd(in.uv + vec2<f32>(0.0, step_uv), blueprint).y - plan.y,
+        pad_mesh_sd(in.uv + vec2<f32>(step_uv, 0.0), pad_plan).y - plan.y,
+        pad_mesh_sd(in.uv + vec2<f32>(0.0, step_uv), pad_plan).y - plan.y,
     );
     let outward = select(sign(local) * step(abs(local.yx), abs(local.xy)), normalize(grad), dot(grad, grad) > 1e-8);
     // A Regency lot is no square slab: a black hub under the building, smaller discs spread out

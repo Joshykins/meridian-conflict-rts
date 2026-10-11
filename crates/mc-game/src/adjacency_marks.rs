@@ -12,7 +12,7 @@ use crate::nuke_marks::{project, surface, tag};
 use crate::orders::Field;
 use crate::ui::{palette, rgb, type_scale, Rect, Ui};
 use glam::Vec2;
-use mc_core::{Fx, FxVec2};
+use mc_core::{Angle, Fx, FxVec2};
 use mc_data::BlueprintId;
 
 /// Selected buildings whose links are tagged: past this many the tags would bury the
@@ -25,7 +25,7 @@ pub fn draw(
     field: &Field,
     hover: Option<u32>,
     lit: Option<u32>,
-    placing: Option<(BlueprintId, Vec2)>,
+    placing: Option<(BlueprintId, Vec2, Angle)>,
 ) {
     let _t = mc_core::perf_span!("ui.adjacency_marks");
     let view = field.view;
@@ -59,8 +59,8 @@ pub fn draw(
             );
         }
     }
-    if let Some((bp, site)) = placing {
-        placing_marks(ui, field, bp, site);
+    if let Some((bp, site, heading)) = placing {
+        placing_marks(ui, field, bp, site, heading);
     }
 }
 
@@ -117,15 +117,23 @@ fn seam(
     tag(ui, pm - Vec2::new(0.0, 16.0), text, tone);
 }
 
-/// The links a building placed at `site` would make, and the card that sums them up.
-fn placing_marks(ui: &mut Ui, field: &Field, bp: BlueprintId, site: Vec2) {
+/// The links a building placed at `site`, facing `heading`, would make, and the card
+/// that sums them up.
+fn placing_marks(ui: &mut Ui, field: &Field, bp: BlueprintId, site: Vec2, heading: Angle) {
     let view = field.view;
     let bp = field.blueprints.unit(bp);
     if !bp.is_structure() {
         return;
     }
     let at = FxVec2::new(Fx::from_f32(site.x), Fx::from_f32(site.y));
-    let ties = adj::prospective(field.blueprints, &view.frame.units, view.local, bp, at);
+    let ties = adj::prospective(
+        field.blueprints,
+        &view.frame.units,
+        view.local,
+        bp,
+        at,
+        heading,
+    );
     for t in &ties {
         let [a, b] = t.edge.map(Vec2::from);
         let partner = view

@@ -3474,9 +3474,16 @@ fn owner_and_pad_bits_match_the_sim() {
     assert_eq!(owner::MASK, mc_sim::PAD_OWNER_MASK);
     assert_eq!(pad::GHOST, mc_sim::PAD_GHOST);
     assert_eq!(pad::NANITE, mc_sim::PAD_NANITE);
-    let p = mc_sim::pack_structure_pad(owner::MASK as u8, 200, 42, true);
+    assert_eq!(pad::TURN_SHIFT, mc_sim::world::PAD_TURN_SHIFT);
+    assert_eq!(pad::BLUEPRINT_SHIFT, mc_sim::world::PAD_BLUEPRINT_SHIFT);
+    let p = mc_sim::pack_structure_pad(owner::MASK as u8, 200, 42, 3, true);
     assert_eq!(p & owner::MASK, owner::MASK);
     assert_ne!(p & pad::GHOST, 0);
     assert_eq!((p >> pad::BUILD_SHIFT) & pad::BUILD_MASK, 200);
+    assert_eq!((p >> pad::TURN_SHIFT) & pad::TURN_MASK, 3);
     assert_eq!(p >> pad::BLUEPRINT_SHIFT, 42);
+    // Every blueprint's index fits above the turn.
+    let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let bps = mc_data::Blueprints::load(&data).unwrap();
+    assert!(bps.units.len() < 1 << (32 - pad::BLUEPRINT_SHIFT));
 }

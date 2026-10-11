@@ -6,7 +6,7 @@ use super::Shot;
 use crate::game::{Mode, View};
 use crate::hud::Hud;
 use crate::orders::Field;
-use crate::prefabs::{Library, PrefabSite};
+use crate::prefabs::{Library, PrefabSite, Turn};
 use crate::ui::Ui;
 use glam::Vec2;
 use mc_data::Blueprints;
@@ -14,6 +14,8 @@ use mc_sim::mirror::UnitInstance;
 
 pub(super) struct PrefabShot {
     library: Option<Library>,
+    /// How the prefab in hand is turned and mirrored (`--place-turn`).
+    turn: Turn,
 }
 
 impl PrefabShot {
@@ -44,7 +46,10 @@ impl PrefabShot {
                 .map_err(|why| format!("--save-prefab: {}", why.label()))?;
             hud.prefabs.offer(draft);
         }
-        Ok(PrefabShot { library })
+        Ok(PrefabShot {
+            library,
+            turn: shot.turn,
+        })
     }
 
     pub(super) fn library(&self) -> &Library {
@@ -68,12 +73,13 @@ impl PrefabShot {
             return Vec::new();
         };
         let builds = crate::hud::prefabs::selection_builds(field.view, field.blueprints);
-        let sites = crate::orders::prefab_sites(field, prefab, ground, 0, &builds);
+        let sites = crate::orders::prefab_sites(field, prefab, ground, self.turn, &builds);
         for s in &sites {
             ghosts.push(crate::orders::placement_ghost(
                 field,
                 s.blueprint,
                 s.at,
+                s.heading,
                 s.goes_down(),
             ));
         }
@@ -84,7 +90,7 @@ impl PrefabShot {
     pub(super) fn hint(&self, ui: &mut Ui, view: &View, sites: &[PrefabSite]) {
         if let Mode::Prefab(id) = view.mode {
             if let Some(prefab) = self.library().get(id) {
-                crate::hud::prefabs::cursor_hint(ui, prefab, sites, 0);
+                crate::hud::prefabs::cursor_hint(ui, prefab, sites, self.turn);
             }
         }
     }

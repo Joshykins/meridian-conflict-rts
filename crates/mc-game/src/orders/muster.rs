@@ -6,7 +6,7 @@
 //! group nearest where it goes. With a factory selected, a mark shows where its next unit
 //! will stand.
 
-use super::{half_footprint, Field, Filling, Group};
+use super::{lots::half_lot, Field, Filling, Group};
 use crate::ui::{self, type_scale, Ui};
 use glam::{Vec2, Vec3};
 use mc_data::BlueprintId;
@@ -153,7 +153,7 @@ pub(super) fn links(ui: &mut Ui, field: &Field) {
             .map(|&i| &view.frame.units[i])
             .take(MAX_LINKED)
             .map(|u| {
-                let half = half_footprint(field.blueprints, BlueprintId(u.blueprint as u16));
+                let half = half_lot(field.blueprints, BlueprintId(u.blueprint as u16), u.heading);
                 (Vec2::new(u.pos[0], u.pos[1]), half)
             })
             .collect();

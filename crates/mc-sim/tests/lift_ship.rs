@@ -87,7 +87,7 @@ fn engineers_raise_it_on_a_lot_and_it_stays_down_with_the_ramp_open() {
         units: vec![id],
         blueprint: bp,
         pos: FxVec2::from_ints(1100, 1000),
-        heading: Angle::from_degrees(270),
+        heading: w.blueprints.unit(bp).build_heading(),
         queue: false,
     })])
     .unwrap();
@@ -108,7 +108,7 @@ fn engineers_raise_it_on_a_lot_and_it_stays_down_with_the_ramp_open() {
         .unwrap();
     assert!(w.state.units.has_flag(ship, flag::UNDER_CONSTRUCTION));
     assert_eq!(height(&w, ship), 0, "the site stands on the ground");
-    // Whatever heading the order carried, the hull lies along its 28 x 13 lot.
+    // Unturned, the hull lies along its 28 x 13 lot.
     assert_eq!(
         w.state.units.heading[ship],
         Angle::ZERO,

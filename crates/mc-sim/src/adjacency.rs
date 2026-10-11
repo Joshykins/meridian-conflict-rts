@@ -25,7 +25,7 @@
 
 use crate::tables::{flag, UnitId};
 use crate::World;
-use mc_core::{Fx, FxVec2};
+use mc_core::{Angle, Fx, FxVec2};
 use mc_data::UnitBlueprint;
 
 /// What a provider saves its neighbour.
@@ -68,10 +68,11 @@ impl Links {
 /// A lot as metres: `(x0, y0, x1, y1)`.
 type Lot = (i32, i32, i32, i32);
 
-/// The lot a building of `bp` at `pos` stands on, in metres.
-pub fn lot(bp: &UnitBlueprint, pos: FxVec2) -> Lot {
-    let half_w = bp.footprint.0 as i32 * mc_map::BUILD_CELL_M / 2;
-    let half_h = bp.footprint.1 as i32 * mc_map::BUILD_CELL_M / 2;
+/// The lot a building of `bp` at `pos`, facing `heading`, stands on, in metres.
+pub fn lot(bp: &UnitBlueprint, pos: FxVec2, heading: Angle) -> Lot {
+    let footprint = bp.footprint_at(heading);
+    let half_w = footprint.0 as i32 * mc_map::BUILD_CELL_M / 2;
+    let half_h = footprint.1 as i32 * mc_map::BUILD_CELL_M / 2;
     let (cx, cy) = (pos.x.round_int(), pos.y.round_int());
     (cx - half_w, cy - half_h, cx + half_w, cy + half_h)
 }
@@ -158,7 +159,11 @@ impl World {
             {
                 continue;
             }
-            lots.push((units.owner[row], row, lot(bp, units.pos[row])));
+            lots.push((
+                units.owner[row],
+                row,
+                lot(bp, units.pos[row], units.heading[row]),
+            ));
         }
         lots.sort_by_key(|&(owner, row, _)| (owner, row));
         let links = &mut self.adjacency;

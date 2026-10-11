@@ -216,7 +216,11 @@ fn lot_extent(s: &Scene, prefab: &Prefab) -> ([f32; 2], [f32; 2]) {
     let (members, _) = prefab.resolve(s.blueprints);
     let sites: Vec<_> = members
         .iter()
-        .map(|m| (m.blueprint, mc_core::FxVec2::from_ints(m.x, m.y)))
+        .map(|m| prefabs::Laid {
+            blueprint: m.blueprint,
+            at: mc_core::FxVec2::from_ints(m.x, m.y),
+            heading: m.heading(s.blueprints),
+        })
         .collect();
     prefabs::bounds(s.blueprints, &sites).unwrap_or(([0.0; 2], [0.0; 2]))
 }

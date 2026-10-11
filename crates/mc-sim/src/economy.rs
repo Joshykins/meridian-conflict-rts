@@ -576,11 +576,10 @@ impl World {
             .blueprints
             .unit(self.state.units.blueprint[row])
             .clone();
-        let pos = self.state.units.pos[row];
-        self.remember_structure_pad(&bp, pos, owner)?;
+        let (pos, heading) = (self.state.units.pos[row], self.state.units.heading[row]);
+        self.remember_structure_pad(&bp, pos, heading, owner)?;
         // An experimental raised on a lot drives off it: the lot is free again.
         if bp.is_site_built_unit() {
-            let heading = self.state.units.heading[row];
             self.release_lot(row, &bp, pos, heading);
         }
         if self.state.units.has_flag(row, flag::UPGRADE) {

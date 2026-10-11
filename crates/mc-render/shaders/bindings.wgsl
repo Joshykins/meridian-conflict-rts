@@ -1148,11 +1148,17 @@ fn under_sea_seen(color: vec4<f32>, clip: vec4<f32>) -> vec4<f32> {
 
 // The structure's ground plan from the mesh-baked SDF atlas (`models::bake_pad_footprint`),
 // metres, positive outside: x the pour under the building, y the paved apron round it.
-// Layer is the unit blueprint index.
-fn pad_mesh_sd(uv: vec2<f32>, layer: u32) -> vec2<f32> {
+// `plan` is the pad word from its turn up (`packed >> PAD_TURN_SHIFT`): the blueprint
+// index, whose layer it reads, and the quarter turns its building stands turned by.
+fn pad_mesh_sd(uv: vec2<f32>, plan: u32) -> vec2<f32> {
     let n = textureNumLayers(pad_footprints);
-    let i = i32(min(layer, n - 1u));
-    let tex = uv / PAD_FOOTPRINT_REACH * 0.5 + 0.5;
+    let i = i32(min(plan >> (PAD_BLUEPRINT_SHIFT - PAD_TURN_SHIFT), n - 1u));
+    // Back into the unturned building's frame: a quarter clockwise per turn.
+    var local = uv;
+    for (var t = 0u; t < (plan & PAD_TURN_MASK); t += 1u) {
+        local = vec2<f32>(local.y, -local.x);
+    }
+    let tex = local / PAD_FOOTPRINT_REACH * 0.5 + 0.5;
     let raw = textureSampleLevel(pad_footprints, clamp_sampler, tex, i, 0.0).rg;
     return (0.5 - raw) * 2.0 * PAD_SDF_RANGE;
 }

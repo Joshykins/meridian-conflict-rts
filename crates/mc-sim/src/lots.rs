@@ -4,11 +4,143 @@
 
 use crate::nav::Nav;
 use crate::tables::*;
-use crate::world::{hull_cells, place_cells_of};
 use crate::World;
 use mc_core::{Angle, Fx, FxVec2, FxVec3};
-use mc_data::{BlueprintId, UnitBlueprint};
+use mc_data::{cat, BlueprintId, UnitBlueprint};
 use mc_map::Prop;
+
+/// Snaps a structure centre to the build grid, facing `build_heading`: odd
+/// footprints centre on a cell, even footprints on a cell corner.
+pub fn snap_to_build_grid(bp: &UnitBlueprint, pos: FxVec2) -> FxVec2 {
+    snap_turned_to_build_grid(bp, pos, bp.build_heading())
+}
+
+/// `snap_to_build_grid` for a site turned to `heading` (`UnitBlueprint::footprint_at`).
+pub fn snap_turned_to_build_grid(bp: &UnitBlueprint, pos: FxVec2, heading: Angle) -> FxVec2 {
+    let footprint = bp.footprint_at(heading);
+    let cell = Fx::from_int(mc_map::BUILD_CELL_M);
+    let snap = |v: Fx, cells: u8| {
+        if cells % 2 == 1 {
+            Fx::from_int((v / cell).floor_int()) * cell + cell / 2
+        } else {
+            Fx::from_int((v / cell).round_int()) * cell
+        }
+    };
+    FxVec2::new(snap(pos.x, footprint.0), snap(pos.y, footprint.1))
+}
+
+fn lot_extents(footprint: (u8, u8), pos: FxVec2) -> (i32, i32, i32, i32) {
+    let half_w = footprint.0 as i32 * mc_map::BUILD_CELL_M / 2;
+    let half_h = footprint.1 as i32 * mc_map::BUILD_CELL_M / 2;
+    let cx = pos.x.round_int();
+    let cy = pos.y.round_int();
+    (cx - half_w, cy - half_h, cx + half_w, cy + half_h)
+}
+
+/// Inclusive lot rectangle: a deposit on the edge still counts as covered.
+pub fn lot_covers_point(footprint: (u8, u8), pos: FxVec2, point: FxVec2) -> bool {
+    let (x0, y0, x1, y1) = lot_extents(footprint, pos);
+    let px = point.x.round_int();
+    let py = point.y.round_int();
+    px >= x0 && px <= x1 && py >= y0 && py <= y1
+}
+
+/// Metres of a path cell, across, a hull may cover and still leave the cell
+/// walkable. Units brush past a building's walls; a lane between two lots
+/// stays open once each hull stands this far back from the lot edge.
+const HULL_GRACE_M: i32 = 3;
+
+/// Inclusive path-cell rectangles a structure's hull keeps units off: the lot
+/// interior cells the hull (turned to `heading`) covers by more than
+/// [`HULL_GRACE_M`] across. The rest of the lot is apron units walk on.
+/// Walls fill their lot.
+pub fn hull_cells(
+    bp: &UnitBlueprint,
+    pos: FxVec2,
+    heading: Angle,
+) -> Vec<((u32, u32), (u32, u32))> {
+    let (min, max) = place_cells_of(bp.footprint_at(heading), pos);
+    if bp.has(cat::WALL) {
+        return vec![(min, max)];
+    }
+    // A seabed installation stands deep under the keels: ships sail over it.
+    if bp.seabed {
+        return Vec::new();
+    }
+    let cell = mc_map::CELL_SIZE_M;
+    let grow = Fx::from_int(cell / 2 - HULL_GRACE_M);
+    let (hx, hy) = (bp.hull.0 + grow, bp.hull.1 + grow);
+    let inside = |x: u32, y: u32| {
+        let c = FxVec2::from_ints(x as i32 * cell + cell / 2, y as i32 * cell + cell / 2);
+        let local = (c - pos).rotate(-heading);
+        local.x.abs() < hx && local.y.abs() < hy
+    };
+    let mut out: Vec<((u32, u32), (u32, u32))> = Vec::new();
+    for y in min.1..=max.1 {
+        let mut x = min.0;
+        while x <= max.0 {
+            if !inside(x, y) {
+                x += 1;
+                continue;
+            }
+            let x0 = x;
+            while x < max.0 && inside(x + 1, y) {
+                x += 1;
+            }
+            // Grow the rectangle from the row below when it spans the same cells.
+            match out
+                .iter_mut()
+                .find(|r| r.0 .0 == x0 && r.1 .0 == x && r.1 .1 + 1 == y)
+            {
+                Some(r) => r.1 .1 = y,
+                None => out.push(((x0, y), (x, y))),
+            }
+            x += 1;
+        }
+    }
+    if out.is_empty() {
+        // A hull too small to cover any cell still stands on the one under its middle.
+        let c = (
+            (pos.x.floor_int() / cell).max(0) as u32,
+            (pos.y.floor_int() / cell).max(0) as u32,
+        );
+        out.push((c, c));
+    }
+    out
+}
+
+/// Path cells the lot overlaps when rounded out to 8 m. Flattening and the
+/// terrain check use this so a 12 m pad still sits on ground that covers it.
+pub(crate) fn path_cells_of(footprint: (u8, u8), pos: FxVec2) -> ((u32, u32), (u32, u32)) {
+    let cell = mc_map::CELL_SIZE_M;
+    let (x0, y0, x1, y1) = lot_extents(footprint, pos);
+    let to_cell = |lo: i32, hi: i32| {
+        let a = lo.max(0) / cell;
+        let b = ((hi + cell - 1) / cell - 1).max(a);
+        (a as u32, b as u32)
+    };
+    let (xa, xb) = to_cell(x0, x1);
+    let (ya, yb) = to_cell(y0, y1);
+    ((xa, ya), (xb, yb))
+}
+
+/// Path cells whose centres lie strictly inside the lot. Neighbouring 12 m
+/// lots share the 8 m cells their edges round into; those stay walkable and
+/// must not block placement.
+pub(crate) fn place_cells_of(footprint: (u8, u8), pos: FxVec2) -> ((u32, u32), (u32, u32)) {
+    let cell = mc_map::CELL_SIZE_M;
+    let (x0, y0, x1, y1) = lot_extents(footprint, pos);
+    let to_cell = |lo: i32, hi: i32| {
+        let first = (lo - cell / 2).div_euclid(cell) + 1;
+        let last = (hi - cell / 2 - 1).div_euclid(cell);
+        let a = first.max(0);
+        let b = last.max(a);
+        (a as u32, b as u32)
+    };
+    let (xa, xb) = to_cell(x0, x1);
+    let (ya, yb) = to_cell(y0, y1);
+    ((xa, ya), (xb, yb))
+}
 
 /// City buildings and precursor artifacts are solid. Their cells are blocked,
 /// once, before the match starts.
@@ -78,7 +210,7 @@ impl World {
         for &(min, max) in &released {
             self.nav.unblock_cells(min, max);
         }
-        let lot = place_cells_of(bp.footprint, pos);
+        let lot = place_cells_of(bp.footprint_at(heading), pos);
         self.nav.set_lot(lot.0, lot.1, false);
         let restore = {
             let units = &self.state.units;
@@ -93,7 +225,7 @@ impl World {
                 {
                     continue;
                 }
-                let other_lot = place_cells_of(bp.footprint, units.pos[row]);
+                let other_lot = place_cells_of(bp.footprint_at(units.heading[row]), units.pos[row]);
                 if !cells_overlap(lot, other_lot) {
                     continue;
                 }
@@ -175,7 +307,7 @@ impl World {
             self.nav.block_cells(min, max);
             self.nav.reseal(min, max);
         }
-        let lot = place_cells_of(bp.footprint, pos);
+        let lot = place_cells_of(bp.footprint_at(heading), pos);
         self.nav.set_lot(lot.0, lot.1, true);
     }
 
@@ -199,11 +331,11 @@ impl World {
             .slots
             .iter()
             .filter_map(|row| {
-                let bp = self.blueprints.unit(self.state.units.blueprint[row]);
-                let site = bp.is_site_built_unit()
-                    && self.state.units.has_flag(row, flag::UNDER_CONSTRUCTION);
+                let units = &self.state.units;
+                let bp = self.blueprints.unit(units.blueprint[row]);
+                let site = bp.is_site_built_unit() && units.has_flag(row, flag::UNDER_CONSTRUCTION);
                 (bp.is_structure() || site)
-                    .then(|| place_cells_of(bp.footprint, self.state.units.pos[row]))
+                    .then(|| place_cells_of(bp.footprint_at(units.heading[row]), units.pos[row]))
             })
             .collect();
         for (min, max) in lots {

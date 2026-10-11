@@ -24,7 +24,6 @@ use mc_sim::command::{MAX_GUARD_RADIUS, MIN_GUARD_RADIUS};
 use mc_sim::mirror::{
     ShieldInstance, UnitInstance, UnitOrders, WingView, KIND_GHOST, KIND_WRECK, STATE_UNIDENTIFIED,
 };
-use mc_sim::placement::Unfit;
 use mc_sim::tables::{flag, OrderKind};
 use mc_sim::{Command, FireState, Handle, RenderFrame};
 use std::collections::{HashMap, HashSet};
@@ -52,6 +51,8 @@ mod mine_placing;
 mod music_notes;
 #[path = "game_orbit.rs"]
 mod orbit_input;
+#[path = "game_place.rs"]
+mod place_turn;
 #[path = "game_prefabs.rs"]
 mod prefab_desk;
 #[path = "game_reclaim.rs"]
@@ -1300,7 +1301,7 @@ impl Game {
                     audio.play(Sfx::Order);
                     self.warn_of_planned_mines(blueprint, &valid);
                     let units = self.selected_ids();
-                    let heading = self.blueprints.unit(blueprint).build_heading();
+                    let heading = self.place_heading(blueprint);
                     for (i, pos) in valid.into_iter().enumerate() {
                         self.send(Command::Build {
                             units: units.clone(),
@@ -2831,9 +2832,16 @@ impl Game {
         if self.hud.net.typing() {
             return;
         }
-        // A prefab in hand turns on R; Ctrl+S keeps the selection as one.
-        if code == KeyCode::KeyR && matches!(self.view.mode, Mode::Prefab(_)) {
-            self.turn_prefab(audio);
+        // A structure or prefab in hand turns on R, a prefab mirrors on F (`game_place.rs`),
+        // unless the construction keys have the letters; Ctrl+S keeps the selection as one.
+        if code == KeyCode::KeyR && !self.hud.build_keys && self.turn_in_hand(audio) {
+            return;
+        }
+        if code == KeyCode::KeyF
+            && !self.hud.build_keys
+            && matches!(self.view.mode, Mode::Prefab(_))
+        {
+            self.mirror_prefab(audio);
             return;
         }
         if code == KeyCode::KeyS && self.ctrl {
@@ -3086,53 +3094,6 @@ impl Game {
                     }
                 }
             }
-        }
-    }
-
-    /// Where the structure being placed would go, and whether it looks buildable.
-    /// The sim has the final say; this only drives the preview colour.
-    fn placement(&self, blueprint: BlueprintId, r: &Renderer) -> Option<(FxVec2, bool)> {
-        let field = Field {
-            view: &self.view,
-            blueprints: &self.blueprints,
-            map: &self.map,
-            camera: &self.camera,
-            renderer: r,
-        };
-        orders::site(
-            &field,
-            blueprint,
-            orders::surface_under(&field, self.cursor)?,
-            None,
-        )
-    }
-
-    /// Sites a click or a place-drag would put down. `drag` is the pointer having
-    /// moved a footprint's worth; without it the ghost stays under the cursor.
-    fn placing_sites(
-        &self,
-        blueprint: BlueprintId,
-        drag: bool,
-        r: &Renderer,
-    ) -> Vec<(FxVec2, Result<(), Unfit>)> {
-        let field = Field {
-            view: &self.view,
-            blueprints: &self.blueprints,
-            map: &self.map,
-            camera: &self.camera,
-            renderer: r,
-        };
-        let Some(ground) = orders::surface_under(&field, self.cursor) else {
-            return Vec::new();
-        };
-        let Some((to, _)) = orders::site(&field, blueprint, ground, None) else {
-            return Vec::new();
-        };
-        match (drag, self.place_from) {
-            (true, Some(from)) => orders::drag_sites(&field, blueprint, from, to),
-            _ => orders::site_verdict(&field, blueprint, ground, None, &[])
-                .into_iter()
-                .collect(),
         }
     }
 
@@ -4306,8 +4267,15 @@ impl Game {
                 camera: &self.camera,
                 renderer,
             };
+            let heading = self.place_heading(blueprint);
             for &(pos, fit) in &sites {
-                ghosts.push(orders::placement_ghost(&field, blueprint, pos, fit.is_ok()));
+                ghosts.push(orders::placement_ghost(
+                    &field,
+                    blueprint,
+                    pos,
+                    heading,
+                    fit.is_ok(),
+                ));
             }
         }
         let prefab_sites = match self.view.mode {
@@ -4537,7 +4505,7 @@ impl Game {
                 &field,
                 hover_unit.map(|i| self.view.frame.units[i].unit_id),
                 self.hud.adjacency.partner,
-                placing,
+                placing.map(|(bp, at)| (bp, at, self.place_heading(bp))),
             );
             work::draw_tags(&mut ui, &field, alpha, |o| !self.is_enemy(o));
             crate::titan_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));
@@ -4602,12 +4570,7 @@ impl Game {
             hud::cursor_hint(&mut ui, &self.view, &self.blueprints, &sites);
             if let Mode::Prefab(id) = self.view.mode {
                 if let Some(prefab) = self.prefabs.library.get(id) {
-                    hud::prefabs::cursor_hint(
-                        &mut ui,
-                        prefab,
-                        &prefab_sites,
-                        self.prefabs.quarters,
-                    );
+                    hud::prefabs::cursor_hint(&mut ui, prefab, &prefab_sites, self.prefabs.turn);
                 }
             }
             let field = Field {
@@ -4690,6 +4653,7 @@ impl Game {
                 self.view.local,
                 self.blueprints.unit(bp),
                 site.0,
+                self.place_heading(bp),
             ),
             _ => Vec::new(),
         };

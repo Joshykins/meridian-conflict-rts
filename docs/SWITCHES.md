@@ -61,6 +61,7 @@ match that long is run with the built exe directly.
 |---|---|---|
 | `--prefabs FILE` | a `prefabs.ron` | The player's prefabs read from FILE instead of beside the settings, the selected builder's construction panel open on its Prefabs tab (`hud/prefabs`). |
 | `--place @NAME` | a prefab's name | With `--prefabs`: that prefab in hand at `--cursor`, its holograms and the card by the pointer (`--place KEY` places one structure). |
+| `--place-turn Q[m]` | `0`..`3`, then `m` to mirror | With `--place`: what is in hand turned Q quarter turns anticlockwise (as R turns it, clockwise, in the game), and with `m` (a prefab) mirrored first, as F does. |
 | `--save-prefab` | | The Save Prefab box open on the selection: its structures, and with `--plans` the commander's planned ones. |
 
 ## Crash reports

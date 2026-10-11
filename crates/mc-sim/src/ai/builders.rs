@@ -229,11 +229,8 @@ impl World {
                         } else if bp.has(cat::SHIELD) || bp.has(cat::ARTILLERY) {
                             planned.guards.push(site);
                         }
-                        let heading = if bp.is_structure() {
-                            AI_BUILD_HEADING
-                        } else {
-                            job.heading
-                        };
+                        // Every lot faces the way `can_place` judged it: unturned.
+                        let heading = bp.build_heading();
                         ordered.push((job.blueprint, site, heading));
                         out.push(Command::Build {
                             units: vec![self.state.units.id(row)],
@@ -481,7 +478,7 @@ impl World {
         // An expander claims mines, unless the power is out: then it helps that first.
         let urgent_power = directives.power == super::commander::economy::Power::Urgent;
         if self.is_expander(row) && !urgent_power {
-            if let Some(job) = self.expander_job(row, start, facing, claimed, intel) {
+            if let Some(job) = self.expander_job(row, start, claimed, intel) {
                 return Some(job);
             }
         }
@@ -528,7 +525,7 @@ impl World {
             if far {
                 return None;
             }
-            self.job_structure(row, cat::POWER, ptech, start, facing, Fx::ZERO, true)
+            self.job_structure(row, cat::POWER, ptech, start, Fx::ZERO, true)
                 .map(|job| Job {
                     place: Place::Adjacent,
                     ..job
@@ -571,7 +568,7 @@ impl World {
                 return None;
             }
             self.pick_factory(row, factory_tech, want_air, None)
-                .map(|blueprint| self.factory_at(blueprint, near, start, facing))
+                .map(|blueprint| self.factory_at(blueprint, near, start))
         };
 
         if planned.engineer_factories == 0 {
@@ -586,7 +583,6 @@ impl World {
                     return Some(Job {
                         blueprint,
                         near,
-                        heading: facing,
                         min_r: Fx::from_int(8),
                         keep_off_deposits: true,
                         place: Place::Around,
@@ -612,15 +608,7 @@ impl World {
             let least = Some(Fx::ratio(skill.bare_mine_efficiency as i64, 100));
             if let Some(spot) = self.free_deposit(start, claimed, range, intel, least) {
                 if allow(spot) {
-                    return self.job_structure(
-                        row,
-                        cat::EXTRACTOR,
-                        1,
-                        spot,
-                        facing,
-                        Fx::ZERO,
-                        false,
-                    );
+                    return self.job_structure(row, cat::EXTRACTOR, 1, spot, Fx::ZERO, false);
                 }
             }
         }
@@ -638,15 +626,7 @@ impl World {
         // Claim the mexes around the start before stacking reactors.
         if let Some(deposit) = self.free_deposit(start, claimed, Fx::from_int(480), intel, None) {
             if allow(deposit) {
-                return self.job_structure(
-                    row,
-                    cat::EXTRACTOR,
-                    1,
-                    deposit,
-                    facing,
-                    Fx::ZERO,
-                    false,
-                );
+                return self.job_structure(row, cat::EXTRACTOR, 1, deposit, Fx::ZERO, false);
             }
         }
         // The Commander's answers to a threat it is under now (`plans.rs`).
@@ -668,7 +648,7 @@ impl World {
         {
             if let Some(job) = self
                 .pick_factory(row, factory_tech, false, Some(2))
-                .map(|blueprint| self.factory_at(blueprint, start, start, facing))
+                .map(|blueprint| self.factory_at(blueprint, start, start))
                 .filter(|job| allow(job.near))
             {
                 return Some(job);
@@ -683,15 +663,7 @@ impl World {
             let near = offset_toward(start, front, Fx::from_int(140))
                 + FxVec2::from_angle(facing + Angle::QUARTER_TURN) * Fx::from_int(72);
             if allow(near) {
-                return self.job_structure(
-                    row,
-                    cat::INTEL,
-                    1,
-                    near,
-                    facing,
-                    Fx::from_int(20),
-                    true,
-                );
+                return self.job_structure(row, cat::INTEL, 1, near, Fx::from_int(20), true);
             }
         }
         // Ahead of the stall, not in it: power for what every factory and
@@ -731,7 +703,6 @@ impl World {
                 cat::DEFENSE | cat::ANTI_AIR,
                 tech.min(2),
                 near,
-                facing,
                 Fx::from_int(16),
                 true,
             ) {
@@ -772,15 +743,7 @@ impl World {
         let bare = (!energy_short).then(|| Fx::ratio(skill.bare_mine_efficiency as i64, 100));
         if let Some(deposit) = self.free_deposit(start, claimed, mex_range, intel, bare) {
             if allow(deposit) {
-                return self.job_structure(
-                    row,
-                    cat::EXTRACTOR,
-                    1,
-                    deposit,
-                    facing,
-                    Fx::ZERO,
-                    false,
-                );
+                return self.job_structure(row, cat::EXTRACTOR, 1, deposit, Fx::ZERO, false);
             }
         }
         if let Some(mex) = self.unguarded_mex(census, planned, intel, stance, materials_income) {
@@ -806,7 +769,6 @@ impl World {
                     cat::DEFENSE | cat::DIRECT_FIRE,
                     pd_tech,
                     near,
-                    (toward - mex).angle(),
                     Fx::from_int(18),
                     false,
                 );
@@ -842,7 +804,6 @@ impl World {
                         cat::DEFENSE | cat::DIRECT_FIRE,
                         tech.clamp(1, 2),
                         near,
-                        (enemy - at).angle(),
                         Fx::from_int(20),
                         false,
                     );
@@ -870,7 +831,6 @@ impl World {
                     return Some(Job {
                         blueprint,
                         near: site,
-                        heading: facing,
                         min_r: Fx::ZERO,
                         keep_off_deposits: true,
                         place: Place::Packed(0),
@@ -887,7 +847,6 @@ impl World {
                     return Some(Job {
                         blueprint,
                         near,
-                        heading: facing + Angle::HALF_TURN,
                         min_r: Fx::from_int(16),
                         keep_off_deposits: true,
                         place: Place::Farm,
@@ -908,7 +867,6 @@ impl World {
                         cat::INTEL,
                         1,
                         offset_toward(mex, front, Fx::from_int(60)),
-                        facing,
                         Fx::from_int(16),
                         true,
                     );
@@ -929,7 +887,6 @@ impl World {
                     cat::DEFENSE | cat::DIRECT_FIRE,
                     tech,
                     near,
-                    facing,
                     Fx::from_int(28),
                     true,
                 );
@@ -939,13 +896,7 @@ impl World {
     }
 
     /// A factory job near `near`; a shipyard goes on the water nearest `start`.
-    fn factory_at(
-        &self,
-        blueprint: BlueprintId,
-        near: FxVec2,
-        start: FxVec2,
-        facing: Angle,
-    ) -> Job {
+    fn factory_at(&self, blueprint: BlueprintId, near: FxVec2, start: FxVec2) -> Job {
         let bp = self.blueprints.unit(blueprint);
         let shipyard = (adaptive::domain(bp) == 2)
             .then(|| self.shipyard_anchor(bp, start))
@@ -953,7 +904,6 @@ impl World {
         Job {
             blueprint,
             near: shipyard.unwrap_or(near),
-            heading: facing,
             min_r: if shipyard.is_some() {
                 Fx::ZERO
             } else {
@@ -990,7 +940,6 @@ impl World {
                 cat::DEFENSE | cat::DIRECT_FIRE,
                 tech.clamp(1, 2),
                 near,
-                facing,
                 Fx::from_int(16),
                 false,
             );
@@ -1003,7 +952,6 @@ impl World {
                     cat::POWER,
                     1,
                     spot + FxVec2::from_angle(facing + Angle::HALF_TURN) * Fx::from_int(70),
-                    facing + Angle::HALF_TURN,
                     Fx::ZERO,
                     true,
                 )
@@ -1018,7 +966,6 @@ impl World {
                 cat::INTEL,
                 1,
                 offset_toward(spot, front, Fx::from_int(40)),
-                facing,
                 Fx::from_int(16),
                 true,
             );
@@ -1029,7 +976,6 @@ impl World {
                 cat::DEFENSE | cat::ARTILLERY,
                 2,
                 spot + FxVec2::from_angle(facing + Angle::HALF_TURN) * Fx::from_int(90),
-                facing,
                 Fx::from_int(24),
                 true,
             );
@@ -1039,7 +985,6 @@ impl World {
                 return Some(Job {
                     blueprint,
                     near: spot,
-                    heading: facing,
                     min_r: Fx::from_int(20),
                     keep_off_deposits: true,
                     place: Place::Around,
@@ -1083,7 +1028,6 @@ impl World {
                 cat::DEFENSE | cat::DIRECT_FIRE,
                 tech.clamp(1, 2),
                 near,
-                (mex - near).angle(),
                 Fx::from_int(16),
                 false,
             );
@@ -1097,7 +1041,6 @@ impl World {
         categories: u32,
         max_tech: u8,
         near: FxVec2,
-        heading: Angle,
         min_r: Fx,
         keep_off_deposits: bool,
     ) -> Option<Job> {
@@ -1105,7 +1048,6 @@ impl World {
             .map(|blueprint| Job {
                 blueprint,
                 near,
-                heading,
                 min_r,
                 keep_off_deposits,
                 place: Place::Around,

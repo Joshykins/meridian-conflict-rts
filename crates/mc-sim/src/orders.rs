@@ -12,7 +12,7 @@ use crate::mirror::{Refusal, SimEvent};
 use crate::nav::Route;
 use crate::spatial::kind;
 use crate::tables::*;
-use crate::world::snap_to_build_grid;
+use crate::world::snap_turned_to_build_grid;
 use crate::{SimError, World};
 use mc_core::{Angle, Fx, FxVec2, TICKS_PER_SECOND};
 use mc_data::{cat, BlueprintId, MoveLayer};
@@ -177,7 +177,9 @@ impl World {
                 if !bp.built_on_site() {
                     return Ok(());
                 }
-                let site = snap_to_build_grid(bp, *pos);
+                // Lots stay on the build grid: the site faces one of four ways.
+                let heading = bp.lot_heading(*heading);
+                let site = snap_turned_to_build_grid(bp, *pos, heading);
                 // Against what it will be by then: a queued refit (an engineering suite) opens
                 // its tiers, as a factory's queued upgrade does. Only those can start it; the
                 // other builders in the selection go too and help once it stands (`run_build`).
@@ -207,7 +209,7 @@ impl World {
                     }
                 }
                 // Plans these builders are about to drop are not in the way.
-                if self.plan_blocks(player, *blueprint, site, |row, _| {
+                if self.plan_blocks(player, *blueprint, site, heading, |row, _| {
                     !*queue && rows.contains(&row)
                 }) {
                     self.events.push(SimEvent::BuildRejected { player });
@@ -221,7 +223,7 @@ impl World {
                     if !held {
                         let mut o = order(OrderKind::Build, site, Handle::NONE);
                         o.blueprint = *blueprint;
-                        o.heading = *heading;
+                        o.heading = heading;
                         self.give(row, o, *queue)?;
                     }
                 }
@@ -607,27 +609,27 @@ impl World {
             })
     }
 
-    /// Whether `blueprint` at `site` would overlap a structure `player` has planned.
-    /// The very same plan in another queue is not in the way: whoever gets there
-    /// second joins in. `skip` names plans that do not count.
+    /// Whether `blueprint` at `site`, turned to `heading`, would overlap a structure
+    /// `player` has planned. The very same plan in another queue is not in the way:
+    /// whoever gets there second joins in. `skip` names plans that do not count.
     fn plan_blocks(
         &self,
         player: u8,
         blueprint: BlueprintId,
         site: FxVec2,
+        heading: Angle,
         skip: impl Fn(usize, &Order) -> bool,
     ) -> bool {
-        let bp = self.blueprints.unit(blueprint);
+        let lot = self.blueprints.unit(blueprint).footprint_at(heading);
         self.planned_sites(player).any(|(row, o)| {
             if skip(row, o) || (o.pos == site && o.blueprint == blueprint) {
                 return false;
             }
-            let other = self.blueprints.unit(o.blueprint);
+            let other = self.blueprints.unit(o.blueprint).footprint_at(o.heading);
             let reach =
                 |a: u8, b: u8| Fx::from_int((a as i32 + b as i32) * mc_map::BUILD_CELL_M) / 2;
             let d = o.pos - site;
-            d.x.abs() < reach(bp.footprint.0, other.footprint.0)
-                && d.y.abs() < reach(bp.footprint.1, other.footprint.1)
+            d.x.abs() < reach(lot.0, other.0) && d.y.abs() < reach(lot.1, other.1)
         })
     }
 
@@ -680,16 +682,20 @@ impl World {
             return Ok(());
         };
         let to = if kind == OrderKind::Build {
-            let blueprint = self.state.orders.order[first].blueprint;
+            let (blueprint, heading) = {
+                let o = &self.state.orders.order[first];
+                (o.blueprint, o.heading)
+            };
             nodes.retain(|&(_, node, _)| self.state.orders.order[node].blueprint == blueprint);
-            let site = snap_to_build_grid(self.blueprints.unit(blueprint), to);
+            let bp = self.blueprints.unit(blueprint);
+            let site = snap_turned_to_build_grid(bp, to, heading);
             // The plans being moved are not in their own way; the same plan in a queue left alone is.
             let moved = |row: usize, o: &Order| {
                 o.pos == from && o.blueprint == blueprint && nodes.iter().any(|&(r, ..)| r == row)
             };
             let fits = site == from
-                || (self.can_place(self.blueprints.unit(blueprint), site)
-                    && !self.plan_blocks(player, blueprint, site, moved));
+                || (self.can_place_turned(bp, site, heading)
+                    && !self.plan_blocks(player, blueprint, site, heading, moved));
             if !fits {
                 self.reject_site(player, blueprint, site);
                 return Ok(());
@@ -2631,7 +2637,9 @@ impl World {
             }
             return Ok(());
         }
-        if !self.can_place(&bp, o.pos) {
+        // Snapped again: a restored order's heading is only as good as the snapshot.
+        let heading = bp.lot_heading(o.heading);
+        if !self.can_place_turned(&bp, o.pos, heading) {
             // Same-tick start: the lot is blocked but the site is not in the
             // index yet. Join that, rather than bounce and drop the order.
             if let Some(existing) = self.unindexed_joinable_site(row, o.blueprint, o.pos) {
@@ -2642,10 +2650,11 @@ impl World {
             self.finish_order(row);
             return Ok(());
         }
-        if self.mobile_units_in_footprint(&bp, o.pos, row, o.blueprint) {
+        let lot = bp.footprint_at(heading);
+        if self.mobile_units_in_footprint(lot, o.pos, row, o.blueprint) {
             // Friendly units standing on the site get a moment to clear off; the
             // builder's own side's are sent off it (`site_clearing.rs`).
-            self.send_off_site(&bp, o.pos, row, o.blueprint)?;
+            self.send_off_site(lot, o.pos, row, o.blueprint)?;
             if self.state.units.stuck_ticks[row] < 50 {
                 self.state.units.stuck_ticks[row] += 1;
                 return Ok(());
@@ -2657,16 +2666,10 @@ impl World {
             return Ok(());
         }
         // Trees on the lot go first: no materials in them, so it is quick.
-        if !self.clear_lot(row, bp.footprint, o.pos) {
+        if !self.clear_lot(row, lot, o.pos) {
             return Ok(());
         }
         let owner = self.state.units.owner[row];
-        // A unit raised on a lot lies along it, whatever the order said.
-        let heading = if bp.is_site_built_unit() {
-            bp.build_heading()
-        } else {
-            o.heading
-        };
         let site = self.spawn_unit(o.blueprint, owner, o.pos, heading, false)?;
         self.take_site(row, site);
         Ok(())
@@ -2739,17 +2742,19 @@ impl World {
             .find(|&r| r != builder && self.site_is_joinable(builder, r, blueprint, pos))
     }
 
+    /// Whether a mobile unit other than `except` stands on a `lot` (turned, in build
+    /// cells) at `pos`.
     fn mobile_units_in_footprint(
         &self,
-        bp: &mc_data::UnitBlueprint,
+        lot: (u8, u8),
         pos: FxVec2,
         except: usize,
         blueprint: BlueprintId,
     ) -> bool {
         // The lot is a rectangle: a unit beside a long, narrow lot is not on it.
         let half = FxVec2::from_ints(
-            bp.footprint.0 as i32 * mc_map::BUILD_CELL_M / 2,
-            bp.footprint.1 as i32 * mc_map::BUILD_CELL_M / 2,
+            lot.0 as i32 * mc_map::BUILD_CELL_M / 2,
+            lot.1 as i32 * mc_map::BUILD_CELL_M / 2,
         );
         let mut found = false;
         self.index.query(pos, half.x.max(half.y), kind::UNIT, |e| {

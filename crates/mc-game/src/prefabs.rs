@@ -6,7 +6,7 @@
 //! (`prefabs.ron`), and nothing of it reaches the simulation: placing one sends the
 //! same `Command::Build` orders as placing its structures one by one would.
 
-use mc_core::{Fx, FxVec2};
+use mc_core::{Angle, Fx, FxVec2};
 use mc_data::{BlueprintId, Blueprints, FactionId};
 use mc_sim::placement::Unfit;
 use serde::{Deserialize, Serialize};
@@ -24,13 +24,21 @@ const MAX_FILE_BYTES: u64 = 1 << 20;
 /// cannot throw a structure across the map.
 const MAX_OFFSET: i32 = 2048;
 
-/// One structure of a prefab: its blueprint, and where it stands from the
-/// prefab's middle, metres east (`x`) and north (`y`).
+/// One structure of a prefab: its blueprint, where it stands from the prefab's
+/// middle, metres east (`x`) and north (`y`), and how it was turned: quarter turns
+/// anticlockwise from its build heading (`UnitBlueprint::lot_turn`; files saved before
+/// structures could be turned have none).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Member {
     pub key: String,
     pub x: i32,
     pub y: i32,
+    #[serde(default, skip_serializing_if = "is_unturned")]
+    pub turn: u8,
+}
+
+fn is_unturned(turn: &u8) -> bool {
+    *turn == 0
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -52,6 +60,15 @@ pub struct Resolved {
     pub blueprint: BlueprintId,
     pub x: i32,
     pub y: i32,
+    /// Quarter turns anticlockwise from its build heading, 0..4.
+    pub turn: u8,
+}
+
+impl Resolved {
+    /// Which way it faces in the prefab as saved.
+    pub fn heading(&self, blueprints: &Blueprints) -> Angle {
+        blueprints.unit(self.blueprint).build_heading() + quarter_turns(self.turn)
+    }
 }
 
 impl Prefab {
@@ -66,6 +83,7 @@ impl Prefab {
                         blueprint,
                         x: m.x,
                         y: m.y,
+                        turn: m.turn % 4,
                     });
                 }
                 _ => {}
@@ -124,6 +142,55 @@ pub fn rotate(x: i32, y: i32, quarters: u8) -> (i32, i32) {
     }
 }
 
+/// How what is in hand is put down: turned (R, Shift+R), and for a prefab mirrored
+/// (F). Placing a single structure only turns it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Turn {
+    /// Quarter turns anticlockwise, seen from above.
+    pub quarters: u8,
+    /// Mirrored left to right across the prefab's middle, before it is turned.
+    pub mirrored: bool,
+}
+
+impl Turn {
+    /// `Q` or `Qm`: Q quarter turns anticlockwise (0..3), m mirrored (`--place-turn`).
+    pub fn parse(text: &str) -> Option<Turn> {
+        let (q, mirrored) = match text.strip_suffix('m') {
+            Some(q) => (q, true),
+            None => (text, false),
+        };
+        let quarters: u8 = q.parse().ok().filter(|&q| q < 4)?;
+        Some(Turn { quarters, mirrored })
+    }
+
+    /// A quarter turn clockwise, or with `back` anticlockwise.
+    pub fn step(&mut self, back: bool) {
+        self.quarters = (self.quarters + if back { 1 } else { 3 }) % 4;
+    }
+
+    /// The heading a structure of `bp` placed alone is ordered with.
+    pub fn heading(self, bp: &mc_data::UnitBlueprint) -> Angle {
+        bp.lot_heading(bp.build_heading() + quarter_turns(self.quarters))
+    }
+
+    /// Where a member at `(x, y)` from the middle, facing `heading`, goes, and which way
+    /// it then faces: mirrored across the north-south line through the middle (a
+    /// heading `h` becomes a half turn less `h`), then turned.
+    fn place(self, x: i32, y: i32, heading: Angle) -> (i32, i32, Angle) {
+        let (x, heading) = if self.mirrored {
+            (-x, Angle::HALF_TURN - heading)
+        } else {
+            (x, heading)
+        };
+        let (x, y) = rotate(x, y, self.quarters);
+        (x, y, heading + quarter_turns(self.quarters))
+    }
+}
+
+fn quarter_turns(n: u8) -> Angle {
+    Angle(Angle::QUARTER_TURN.0.wrapping_mul(n as u16 % 4))
+}
+
 /// The ground a prefab's middle snaps to: build-cell corners, so every member keeps
 /// its place on the grid relative to the others.
 pub fn snap_anchor(at: FxVec2) -> FxVec2 {
@@ -132,39 +199,50 @@ pub fn snap_anchor(at: FxVec2) -> FxVec2 {
     FxVec2::new(snap(at.x), snap(at.y))
 }
 
-/// Where each member goes with the prefab's middle at `anchor`, turned `quarters`
-/// quarter turns, snapped to the build grid as the sim will snap it.
+/// A member of a laid-out prefab: what, where, and which way it faces.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Laid {
+    pub blueprint: BlueprintId,
+    pub at: FxVec2,
+    pub heading: Angle,
+}
+
+/// Where each member goes with the prefab's middle at `anchor`, mirrored and turned
+/// by `turn`, each member turned with it, snapped to the build grid and to a quarter
+/// turn as the sim will snap them.
 pub fn layout(
     blueprints: &Blueprints,
     members: &[Resolved],
     anchor: FxVec2,
-    quarters: u8,
-) -> Vec<(BlueprintId, FxVec2)> {
+    turn: Turn,
+) -> Vec<Laid> {
     let anchor = snap_anchor(anchor);
     members
         .iter()
         .map(|m| {
-            let (x, y) = rotate(m.x, m.y, quarters);
-            let at = FxVec2::new(anchor.x + Fx::from_int(x), anchor.y + Fx::from_int(y));
             let bp = blueprints.unit(m.blueprint);
-            (m.blueprint, mc_sim::world::snap_to_build_grid(bp, at))
+            let (x, y, heading) = turn.place(m.x, m.y, m.heading(blueprints));
+            let heading = bp.lot_heading(heading);
+            let at = FxVec2::new(anchor.x + Fx::from_int(x), anchor.y + Fx::from_int(y));
+            Laid {
+                blueprint: m.blueprint,
+                at: mc_sim::world::snap_turned_to_build_grid(bp, at, heading),
+                heading,
+            }
         })
         .collect()
 }
 
 /// The lots a layout covers, as `(lo, hi)` corners in metres, for drawing.
-pub fn bounds(
-    blueprints: &Blueprints,
-    sites: &[(BlueprintId, FxVec2)],
-) -> Option<([f32; 2], [f32; 2])> {
-    let half = |b: BlueprintId| {
-        let f = blueprints.unit(b).footprint;
+pub fn bounds(blueprints: &Blueprints, sites: &[Laid]) -> Option<([f32; 2], [f32; 2])> {
+    let half = |s: &Laid| {
+        let f = blueprints.unit(s.blueprint).footprint_at(s.heading);
         let cell = mc_map::BUILD_CELL_M as f32 * 0.5;
         [f.0 as f32 * cell, f.1 as f32 * cell]
     };
-    sites.iter().fold(None, |acc, &(b, at)| {
-        let [x, y] = at.to_f32();
-        let h = half(b);
+    sites.iter().fold(None, |acc, s| {
+        let [x, y] = s.at.to_f32();
+        let h = half(s);
         let (lo, hi) = ([x - h[0], y - h[1]], [x + h[0], y + h[1]]);
         Some(match acc {
             None => (lo, hi),
@@ -199,22 +277,28 @@ impl Uncaptured {
     }
 }
 
-/// A prefab of these structures (`(blueprint, centre)`, standing or planned), with
-/// its middle on the build-cell corner nearest the middle of their lots, and a name
-/// made from what is in it. Repeats of the same structure on the same lot count once.
-pub fn capture(
-    blueprints: &Blueprints,
-    structures: &[(BlueprintId, FxVec2)],
-) -> Result<Prefab, Uncaptured> {
-    let mut sites: Vec<(BlueprintId, FxVec2)> = Vec::new();
-    for &(b, at) in structures {
-        let bp = blueprints.unit(b);
+/// A prefab of these structures (standing or planned, each where it stands and the
+/// way it faces), with its middle on the build-cell corner nearest the middle of their
+/// lots, and a name made from what is in it. Repeats of the same structure on the same
+/// lot count once.
+pub fn capture(blueprints: &Blueprints, structures: &[Laid]) -> Result<Prefab, Uncaptured> {
+    let mut sites: Vec<Laid> = Vec::new();
+    for s in structures {
+        let bp = blueprints.unit(s.blueprint);
         if !bp.built_on_site() || bp.is_mobile() {
             continue;
         }
-        let at = mc_sim::world::snap_to_build_grid(bp, at);
-        if !sites.contains(&(b, at)) {
-            sites.push((b, at));
+        let heading = bp.lot_heading(s.heading);
+        let at = mc_sim::world::snap_turned_to_build_grid(bp, s.at, heading);
+        if !sites
+            .iter()
+            .any(|o| o.blueprint == s.blueprint && o.at == at)
+        {
+            sites.push(Laid {
+                blueprint: s.blueprint,
+                at,
+                heading,
+            });
         }
     }
     if sites.is_empty() {
@@ -231,13 +315,17 @@ pub fn capture(
     let anchor = snap_anchor(middle);
     // Rows from the north-west, as a page is read: the order it is built in when the
     // builders stand nowhere in particular, and the order of its census.
-    sites.sort_by_key(|(_, at)| (std::cmp::Reverse(at.y), at.x));
+    sites.sort_by_key(|s| (std::cmp::Reverse(s.at.y), s.at.x));
     let members = sites
         .iter()
-        .map(|&(b, at)| Member {
-            key: blueprints.unit(b).key.clone(),
-            x: (at.x - anchor.x).round_int(),
-            y: (at.y - anchor.y).round_int(),
+        .map(|s| {
+            let bp = blueprints.unit(s.blueprint);
+            Member {
+                key: bp.key.clone(),
+                x: (s.at.x - anchor.x).round_int(),
+                y: (s.at.y - anchor.y).round_int(),
+                turn: bp.lot_turn(s.heading),
+            }
         })
         .collect();
     let mut prefab = Prefab {
@@ -513,6 +601,7 @@ fn read_file(path: &std::path::Path) -> Result<Option<Vec<Prefab>>, String> {
 pub struct PrefabSite {
     pub blueprint: BlueprintId,
     pub at: FxVec2,
+    pub heading: Angle,
     /// Whether the ground and the lot will take it.
     pub fit: Result<(), Unfit>,
     /// Whether a selected builder can raise it.

@@ -3,13 +3,17 @@
 use crate::ai::AiState;
 use crate::command::PlayerCommand;
 use crate::fog::Fog;
+pub use crate::lots::{
+    hull_cells, lot_covers_point, snap_to_build_grid, snap_turned_to_build_grid,
+};
+pub(crate) use crate::lots::{path_cells_of, place_cells_of};
 use crate::mirror::SimEvent;
 use crate::nav::Nav;
 use crate::spatial::{kind, SpatialIndex, NO_OWNER};
 use crate::tables::*;
 use crate::{SimError, Table};
 use mc_core::{player_bit, Angle, Fx, FxVec2, PlayerMask, Rng, MAX_PLAYERS};
-use mc_data::{cat, BlueprintId, Blueprints, MoveLayer, UnitBlueprint};
+use mc_data::{BlueprintId, Blueprints, MoveLayer, UnitBlueprint};
 use mc_jobs::Pool;
 use mc_map::{Heightfield, MapFile, Prop};
 use serde::{Deserialize, Serialize};
@@ -546,7 +550,7 @@ impl World {
             let afloat = (bp.water_build || bp.seabed)
                 && self.terrain.height_at(pos) < self.terrain.water_level();
             if !afloat {
-                let lot = path_cells_of(bp.footprint, pos);
+                let lot = path_cells_of(bp.footprint_at(heading), pos);
                 let record = self.terrain.flatten_rect(lot.0, lot.1, None);
                 if self.state.terrain_edits.len() >= MAX_FLATTENS {
                     return Err(SimError::TableFull(Table::Flattens));
@@ -615,7 +619,7 @@ impl World {
             }
         }
         if complete {
-            self.remember_structure_pad(&bp, pos, owner)?;
+            self.remember_structure_pad(&bp, pos, heading, owner)?;
             self.arm_shield(row, true);
         }
         Ok(row)
@@ -628,6 +632,7 @@ impl World {
         &mut self,
         bp: &UnitBlueprint,
         pos: FxVec2,
+        heading: Angle,
         owner: u8,
     ) -> Result<(), SimError> {
         if !bp.poured_lot() {
@@ -640,8 +645,8 @@ impl World {
             .factions
             .get(bp.faction.0 as usize)
             .is_some_and(|f| f.construction == mc_data::Construction::Nanite);
-        let packed =
-            pack_structure_pad(owner, 255, bp.id.0, false) | if nanite { PAD_NANITE } else { 0 };
+        let packed = pack_structure_pad(owner, 255, bp.id.0, bp.lot_turn(heading), false)
+            | if nanite { PAD_NANITE } else { 0 };
         self.state.pads.upsert(pos, radius, packed)?;
         Ok(())
     }
@@ -1168,149 +1173,22 @@ pub const PAD_NANITE: u32 = 1 << 7;
 
 const _: () = assert!(MAX_PLAYERS <= PAD_OWNER_MASK as usize + 1);
 
+/// Pad `packed`: quarter turns of its building from `build_heading`, bits 16..18
+/// (`UnitBlueprint::lot_turn`), so the slab turns with the hull.
+pub const PAD_TURN_SHIFT: u32 = 16;
+/// Pad `packed`: the blueprint index, bits 18..32.
+pub const PAD_BLUEPRINT_SHIFT: u32 = 18;
+
 /// Packing the pad shader reads (`mc_models::gpu_consts::pad`; a test holds the
 /// two equal): owner in 0..5, ghost at bit 6, nanite at bit 7, build in 8..16,
-/// blueprint index in 16..32. The slab is the mesh plan for that blueprint,
-/// not a hashed lot.
-pub fn pack_structure_pad(owner: u8, build: u8, blueprint: u16, ghost: bool) -> u32 {
+/// turn in 16..18, blueprint index in 18..32. The slab is the mesh plan for that
+/// blueprint, turned, not a hashed lot.
+pub fn pack_structure_pad(owner: u8, build: u8, blueprint: u16, turn: u8, ghost: bool) -> u32 {
     (owner as u32 & PAD_OWNER_MASK)
         | if ghost { PAD_GHOST } else { 0 }
         | (build as u32) << 8
-        | (blueprint as u32) << 16
-}
-
-/// Snaps a structure centre to the build grid: odd footprints centre on a
-/// cell, even footprints on a cell corner.
-pub fn snap_to_build_grid(bp: &UnitBlueprint, pos: FxVec2) -> FxVec2 {
-    let cell = Fx::from_int(mc_map::BUILD_CELL_M);
-    let snap = |v: Fx, cells: u8| {
-        if cells % 2 == 1 {
-            Fx::from_int((v / cell).floor_int()) * cell + cell / 2
-        } else {
-            Fx::from_int((v / cell).round_int()) * cell
-        }
-    };
-    FxVec2::new(snap(pos.x, bp.footprint.0), snap(pos.y, bp.footprint.1))
-}
-
-fn lot_extents(footprint: (u8, u8), pos: FxVec2) -> (i32, i32, i32, i32) {
-    let half_w = footprint.0 as i32 * mc_map::BUILD_CELL_M / 2;
-    let half_h = footprint.1 as i32 * mc_map::BUILD_CELL_M / 2;
-    let cx = pos.x.round_int();
-    let cy = pos.y.round_int();
-    (cx - half_w, cy - half_h, cx + half_w, cy + half_h)
-}
-
-/// Inclusive lot rectangle: a deposit on the edge still counts as covered.
-pub fn lot_covers_point(footprint: (u8, u8), pos: FxVec2, point: FxVec2) -> bool {
-    let (x0, y0, x1, y1) = lot_extents(footprint, pos);
-    let px = point.x.round_int();
-    let py = point.y.round_int();
-    px >= x0 && px <= x1 && py >= y0 && py <= y1
-}
-
-/// Inclusive path-cell rectangle a structure blocks. Hulls sit inside the
-/// build-grid lot, so only cells whose centres lie inside the lot are
-/// impassable — units can squeeze along the pad edge.
-pub fn footprint_cells(bp: &UnitBlueprint, pos: FxVec2) -> ((u32, u32), (u32, u32)) {
-    place_cells_of(bp.footprint, pos)
-}
-
-/// Metres of a path cell, across, a hull may cover and still leave the cell
-/// walkable. Units brush past a building's walls; a lane between two lots
-/// stays open once each hull stands this far back from the lot edge.
-const HULL_GRACE_M: i32 = 3;
-
-/// Inclusive path-cell rectangles a structure's hull keeps units off: the lot
-/// interior cells the hull (turned to `heading`) covers by more than
-/// [`HULL_GRACE_M`] across. The rest of the lot is apron units walk on.
-/// Walls fill their lot.
-pub fn hull_cells(
-    bp: &UnitBlueprint,
-    pos: FxVec2,
-    heading: Angle,
-) -> Vec<((u32, u32), (u32, u32))> {
-    let (min, max) = place_cells_of(bp.footprint, pos);
-    if bp.has(cat::WALL) {
-        return vec![(min, max)];
-    }
-    // A seabed installation stands deep under the keels: ships sail over it.
-    if bp.seabed {
-        return Vec::new();
-    }
-    let cell = mc_map::CELL_SIZE_M;
-    let grow = Fx::from_int(cell / 2 - HULL_GRACE_M);
-    let (hx, hy) = (bp.hull.0 + grow, bp.hull.1 + grow);
-    let inside = |x: u32, y: u32| {
-        let c = FxVec2::from_ints(x as i32 * cell + cell / 2, y as i32 * cell + cell / 2);
-        let local = (c - pos).rotate(-heading);
-        local.x.abs() < hx && local.y.abs() < hy
-    };
-    let mut out: Vec<((u32, u32), (u32, u32))> = Vec::new();
-    for y in min.1..=max.1 {
-        let mut x = min.0;
-        while x <= max.0 {
-            if !inside(x, y) {
-                x += 1;
-                continue;
-            }
-            let x0 = x;
-            while x < max.0 && inside(x + 1, y) {
-                x += 1;
-            }
-            // Grow the rectangle from the row below when it spans the same cells.
-            match out
-                .iter_mut()
-                .find(|r| r.0 .0 == x0 && r.1 .0 == x && r.1 .1 + 1 == y)
-            {
-                Some(r) => r.1 .1 = y,
-                None => out.push(((x0, y), (x, y))),
-            }
-            x += 1;
-        }
-    }
-    if out.is_empty() {
-        // A hull too small to cover any cell still stands on the one under its middle.
-        let c = (
-            (pos.x.floor_int() / cell).max(0) as u32,
-            (pos.y.floor_int() / cell).max(0) as u32,
-        );
-        out.push((c, c));
-    }
-    out
-}
-
-/// Path cells the lot overlaps when rounded out to 8 m. Flattening and the
-/// terrain check use this so a 12 m pad still sits on ground that covers it.
-pub(crate) fn path_cells_of(footprint: (u8, u8), pos: FxVec2) -> ((u32, u32), (u32, u32)) {
-    let cell = mc_map::CELL_SIZE_M;
-    let (x0, y0, x1, y1) = lot_extents(footprint, pos);
-    let to_cell = |lo: i32, hi: i32| {
-        let a = lo.max(0) / cell;
-        let b = ((hi + cell - 1) / cell - 1).max(a);
-        (a as u32, b as u32)
-    };
-    let (xa, xb) = to_cell(x0, x1);
-    let (ya, yb) = to_cell(y0, y1);
-    ((xa, ya), (xb, yb))
-}
-
-/// Path cells whose centres lie strictly inside the lot. Neighbouring 12 m
-/// lots share the 8 m cells their edges round into; those stay walkable and
-/// must not block placement.
-pub(crate) fn place_cells_of(footprint: (u8, u8), pos: FxVec2) -> ((u32, u32), (u32, u32)) {
-    let cell = mc_map::CELL_SIZE_M;
-    let (x0, y0, x1, y1) = lot_extents(footprint, pos);
-    let to_cell = |lo: i32, hi: i32| {
-        let first = (lo - cell / 2).div_euclid(cell) + 1;
-        let last = (hi - cell / 2 - 1).div_euclid(cell);
-        let a = first.max(0);
-        let b = last.max(a);
-        (a as u32, b as u32)
-    };
-    let (xa, xb) = to_cell(x0, x1);
-    let (ya, yb) = to_cell(y0, y1);
-    ((xa, ya), (xb, yb))
+        | (turn as u32 & 3) << PAD_TURN_SHIFT
+        | (blueprint as u32) << PAD_BLUEPRINT_SHIFT
 }
 
 impl World {
@@ -1318,18 +1196,24 @@ impl World {
     /// allows, not overlapping another structure. A core mine also keeps out
     /// of every other mine's reach, anyone's, finished or begun (`mine_in_the_way`).
     pub fn can_place(&self, bp: &UnitBlueprint, pos: FxVec2) -> bool {
-        self.lot_fits(bp, pos)
+        self.can_place_turned(bp, pos, bp.build_heading())
+    }
+
+    /// `can_place` for a site turned to `heading` (`UnitBlueprint::footprint_at`).
+    pub fn can_place_turned(&self, bp: &UnitBlueprint, pos: FxVec2, heading: Angle) -> bool {
+        self.lot_fits(bp, pos, heading)
             && bp
                 .mine
                 .is_none_or(|m| self.mine_in_the_way(pos, m.reach, None).is_none())
     }
 
-    /// `can_place` without the mines' reach: the lot alone.
-    pub(crate) fn lot_fits(&self, bp: &UnitBlueprint, pos: FxVec2) -> bool {
+    /// `can_place_turned` without the mines' reach: the lot alone.
+    pub(crate) fn lot_fits(&self, bp: &UnitBlueprint, pos: FxVec2, heading: Angle) -> bool {
         let size = self.terrain.size_metres();
+        let footprint = bp.footprint_at(heading);
         let half = FxVec2::from_ints(
-            bp.footprint.0 as i32 * mc_map::BUILD_CELL_M / 2,
-            bp.footprint.1 as i32 * mc_map::BUILD_CELL_M / 2,
+            footprint.0 as i32 * mc_map::BUILD_CELL_M / 2,
+            footprint.1 as i32 * mc_map::BUILD_CELL_M / 2,
         );
         if pos.x - half.x < Fx::ZERO
             || pos.y - half.y < Fx::ZERO
@@ -1341,7 +1225,7 @@ impl World {
         // Terrain on the rounded-out path rect; occupancy on the lot interior.
         // Neighbouring 2x2s share the overhang cells, and those stay walkable
         // so units can squeeze through without forbidding the next building.
-        let path = path_cells_of(bp.footprint, pos);
+        let path = path_cells_of(footprint, pos);
         let water = self.terrain.water_level();
         if bp.seabed
             && !(path.0 .1..=path.1 .1).all(|y| {
@@ -1359,7 +1243,7 @@ impl World {
         } {
             return false;
         }
-        let place = place_cells_of(bp.footprint, pos);
+        let place = place_cells_of(footprint, pos);
         self.nav.no_blockers(place.0, place.1) && self.nav.lots_free(place.0, place.1)
     }
 
@@ -1373,7 +1257,8 @@ impl World {
             }
             let bp = self.bp(row);
             if bp.is_structure() && bp.has(categories) {
-                let (min, max) = path_cells_of(bp.footprint, e.pos);
+                let lot = bp.footprint_at(self.state.units.heading[row]);
+                let (min, max) = path_cells_of(lot, e.pos);
                 let cx = (pos.x.floor_int() / mc_map::CELL_SIZE_M) as u32;
                 let cy = (pos.y.floor_int() / mc_map::CELL_SIZE_M) as u32;
                 if cx >= min.0 && cx <= max.0 && cy >= min.1 && cy <= max.1 {
@@ -1481,11 +1366,12 @@ mod tests {
 
     #[test]
     fn pad_packing_names_the_blueprint() {
-        let p = pack_structure_pad(31, 200, 42, true);
+        let p = pack_structure_pad(31, 200, 42, 3, true);
         assert_eq!(p & PAD_OWNER_MASK, 31);
         assert_ne!(p & PAD_GHOST, 0, "ghost");
         assert_eq!(p & PAD_NANITE, 0);
         assert_eq!((p >> 8) & 0xFF, 200);
-        assert_eq!(p >> 16, 42);
+        assert_eq!((p >> PAD_TURN_SHIFT) & 3, 3);
+        assert_eq!(p >> PAD_BLUEPRINT_SHIFT, 42);
     }
 }

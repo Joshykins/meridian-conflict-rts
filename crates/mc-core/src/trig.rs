@@ -143,6 +143,12 @@ impl Angle {
     pub fn to_radians_f32(self) -> f32 {
         self.0 as f32 * (core::f32::consts::TAU / 65536.0)
     }
+
+    /// The angle nearest `radians`. Presentation only: a mirrored heading read back.
+    #[inline]
+    pub fn from_radians_f32(radians: f32) -> Angle {
+        Angle((radians * (65536.0 / core::f32::consts::TAU)).round() as i64 as u16)
+    }
 }
 
 impl core::ops::Add for Angle {

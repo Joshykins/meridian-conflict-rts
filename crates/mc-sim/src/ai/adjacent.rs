@@ -140,17 +140,17 @@ impl World {
             .slots
             .iter()
             .filter(|&r| units.owner[r] == player && near(units.pos[r]))
-            .map(|r| (self.bp(r), units.pos[r]));
+            .map(|r| (self.bp(r), units.pos[r], units.heading[r]));
         let planned = self
             .planned_sites(player)
             .filter(|(_, o)| near(o.pos))
-            .map(|(_, o)| (self.blueprints.unit(o.blueprint), o.pos));
+            .map(|(_, o)| (self.blueprints.unit(o.blueprint), o.pos, o.heading));
         let mut out: Vec<Neighbour> = standing
             .chain(planned)
-            .filter(|(n, _)| n.is_structure() && (feeds(bp, n) || ruinous(bp, n)))
-            .map(|(n, pos)| Neighbour {
+            .filter(|(n, ..)| n.is_structure() && (feeds(bp, n) || ruinous(bp, n)))
+            .map(|(n, pos, heading)| Neighbour {
                 bp: n,
-                lot: adjacency::lot(n, pos),
+                lot: adjacency::lot(n, pos, heading),
             })
             .collect();
         // The same plan in two builders' queues is one building.
@@ -190,7 +190,7 @@ impl World {
             }
             for (x, y) in corners {
                 let site = FxVec2::from_ints(x + w / 2, y + h / 2);
-                let lot = adjacency::lot(bp, site);
+                let lot = adjacency::lot(bp, site, AI_BUILD_HEADING);
                 if let Some(worth) = self
                     .adjacency_worth(bp, lot, &neighbours)
                     .filter(|&v| v > Fx::ZERO)
@@ -310,7 +310,6 @@ impl World {
         Some(Job {
             blueprint,
             near: start,
-            heading: AI_BUILD_HEADING,
             min_r: Fx::ZERO,
             keep_off_deposits: true,
             place: Place::Adjacent,
@@ -345,13 +344,16 @@ impl World {
                     gain,
                     next.economy.energy_upkeep - bp.economy.energy_upkeep,
                 );
-                let lot = adjacency::lot(next, units.pos[row]);
+                let lot = adjacency::lot(next, units.pos[row], units.heading[row]);
                 let ruins = units.slots.iter().any(|r| {
                     units.owner[r] == player
                         && self.bp(r).is_structure()
                         && ruinous(next, self.bp(r))
-                        && adjacency::shared_edge(lot, adjacency::lot(self.bp(r), units.pos[r]))
-                            .is_some()
+                        && adjacency::shared_edge(
+                            lot,
+                            adjacency::lot(self.bp(r), units.pos[r], units.heading[r]),
+                        )
+                        .is_some()
                 });
                 (payback <= horizon && !ruins).then_some((row, payback))
             })

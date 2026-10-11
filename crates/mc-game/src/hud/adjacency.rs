@@ -13,7 +13,7 @@ use super::selection::wrap_text;
 use super::{Scene, ENERGY, MATERIALS};
 use crate::ui::{id, palette, rgb, type_scale, Rect, Ui};
 use glam::Vec2;
-use mc_core::{Fx, FxVec2};
+use mc_core::{Angle, Fx, FxVec2};
 use mc_data::{BlueprintId, Blueprints, UnitBlueprint};
 use mc_sim::adjacency::{self, Resource};
 use mc_sim::fed_reload;
@@ -99,8 +99,9 @@ pub fn prospective(
     local: u8,
     bp: &UnitBlueprint,
     at: FxVec2,
+    heading: Angle,
 ) -> Vec<Tie> {
-    let own = adjacency::lot(bp, at);
+    let own = adjacency::lot(bp, at, heading);
     let mut out = Vec::new();
     for u in units {
         if u.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST) != 0
@@ -114,7 +115,7 @@ pub fn prospective(
             continue;
         }
         let pos = FxVec2::new(Fx::from_f32(u.pos[0]), Fx::from_f32(u.pos[1]));
-        let theirs = adjacency::lot(other, pos);
+        let theirs = adjacency::lot(other, pos, Angle::from_radians_f32(u.heading));
         let Some(shared) = adjacency::shared_edge(own, theirs) else {
             continue;
         };
@@ -146,9 +147,10 @@ pub fn planned_links(
     local: u8,
     bp: &UnitBlueprint,
     at: FxVec2,
+    heading: Angle,
 ) -> Vec<LinkView> {
     let site = at.to_f32();
-    prospective(blueprints, units, local, bp, at)
+    prospective(blueprints, units, local, bp, at, heading)
         .into_iter()
         .map(|t| {
             let partner = units
@@ -206,7 +208,8 @@ pub fn ringed(bp: &UnitBlueprint, ties: &[Tie]) -> f32 {
         .collect();
     partners.sort_by_key(|p| p.0);
     partners.dedup_by_key(|p| p.0);
-    let around = adjacency::perimeter(adjacency::lot(bp, FxVec2::ZERO)) as f32;
+    // Turning a lot does not change how far round it is.
+    let around = adjacency::perimeter(adjacency::lot(bp, FxVec2::ZERO, Angle::ZERO)) as f32;
     (partners.iter().map(|p| p.1).sum::<f32>() / around).min(1.0)
 }
 
@@ -527,7 +530,14 @@ mod tests {
             unit(&b, "aster_t3_air_factory", 2, 732.0, 792.0),
         ];
         let fab = b.unit(b.id_of("aster_t3_fabricator").unwrap());
-        let ties = prospective(&b, &units, 0, fab, FxVec2::from_ints(792, 792));
+        let ties = prospective(
+            &b,
+            &units,
+            0,
+            fab,
+            FxVec2::from_ints(792, 792),
+            fab.build_heading(),
+        );
         // The reactor covers the site's east side: a quarter of a full ring's 60%.
         let gets = totals(&ties);
         assert!((gets[Resource::Energy as usize] - 0.15).abs() < 1e-3);

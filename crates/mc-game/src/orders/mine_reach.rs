@@ -137,7 +137,10 @@ pub(crate) fn open_instead(field: &Field, blueprint: BlueprintId, at: Vec2) -> O
 /// mine's reach in sight, and on a lot the placement check passes. Searched round
 /// the rims of the nearest mines' reaches, a little outside each.
 fn nearest_open(field: &Field, blueprint: BlueprintId, at: Vec2) -> Option<Vec2> {
-    let reach = field.blueprints.unit(blueprint).mine?.reach.to_f32();
+    let bp = field.blueprints.unit(blueprint);
+    let reach = bp.mine?.reach.to_f32();
+    // A mine is never turned (`UnitBlueprint::turnable`).
+    let heading = bp.build_heading();
     let mut mines: Vec<(Vec2, f32)> = standing_mines(field.view, field.blueprints)
         .map(|(p, r, ..)| (p, reach.max(r)))
         .filter(|(p, keep)| p.distance(at) < keep * 3.0)
@@ -161,8 +164,14 @@ fn nearest_open(field: &Field, blueprint: BlueprintId, at: Vec2) -> Option<Vec2>
         .into_iter()
         .filter(|q| q.x > 0.0 && q.y > 0.0 && q.x < size.x && q.y < size.y)
         .find_map(|q| {
-            let (pos, fit) =
-                super::site_verdict(field, blueprint, Vec3::new(q.x, q.y, 0.0), None, &[])?;
+            let (pos, fit) = super::site_verdict(
+                field,
+                blueprint,
+                Vec3::new(q.x, q.y, 0.0),
+                heading,
+                None,
+                &[],
+            )?;
             fit.is_ok().then(|| Vec2::from(pos.to_f32()))
         })
 }

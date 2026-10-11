@@ -122,8 +122,8 @@ pub use tables::{FireState, UnitId, WreckId};
 pub use validate::{decode_untrusted, MAX_SNAPSHOT_BYTES};
 pub use veterancy::{veterancy_health, veterancy_need, VETERANCY_MAX};
 pub use world::{
-    footprint_cells, lot_covers_point, pack_structure_pad, snap_to_build_grid, MatchConfig,
-    PlayerSetup, State, TickTimings, World, PAD_GHOST, PAD_NANITE, PAD_OWNER_MASK,
+    lot_covers_point, pack_structure_pad, snap_to_build_grid, snap_turned_to_build_grid,
+    MatchConfig, PlayerSetup, State, TickTimings, World, PAD_GHOST, PAD_NANITE, PAD_OWNER_MASK,
 };
 
 use std::fmt;

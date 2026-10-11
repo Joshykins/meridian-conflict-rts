@@ -239,7 +239,6 @@ struct Planned {
 struct Job {
     blueprint: BlueprintId,
     near: FxVec2,
-    heading: Angle,
     min_r: Fx,
     keep_off_deposits: bool,
     place: Place,
@@ -353,7 +352,7 @@ impl World {
             .planned_sites(player)
             .map(|(_, o)| {
                 let bp = self.blueprints.unit(o.blueprint);
-                let fp = bp.footprint;
+                let fp = bp.footprint_at(o.heading);
                 Claim {
                     pos: o.pos,
                     foot: fp.0.max(fp.1) as i32,

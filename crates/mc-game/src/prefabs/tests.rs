@@ -8,15 +8,31 @@ fn at(x: i32, y: i32) -> FxVec2 {
     FxVec2::from_ints(x, y)
 }
 
+/// A structure of `key` at `p`, unturned.
+fn laid(b: &Blueprints, key: &str, p: FxVec2) -> Laid {
+    let blueprint = b.id_of(key).unwrap();
+    Laid {
+        blueprint,
+        at: p,
+        heading: b.unit(blueprint).build_heading(),
+    }
+}
+
 /// A factory (8x8) with two generators (2x2) and a storage (3x3) beside it.
-fn base(b: &Blueprints) -> Vec<(BlueprintId, FxVec2)> {
-    let id = |k: &str| b.id_of(k).unwrap();
+fn base(b: &Blueprints) -> Vec<Laid> {
     vec![
-        (id("aster_t1_land_factory"), at(600, 600)),
-        (id("aster_t1_power"), at(660, 600)),
-        (id("aster_t1_power"), at(660, 624)),
-        (id("aster_materials_storage"), at(666, 570)),
+        laid(b, "aster_t1_land_factory", at(600, 600)),
+        laid(b, "aster_t1_power", at(660, 600)),
+        laid(b, "aster_t1_power", at(660, 624)),
+        laid(b, "aster_materials_storage", at(666, 570)),
     ]
+}
+
+/// Where the laid-out members stand, sorted, without which way they face.
+fn spots(sites: &[Laid]) -> Vec<(BlueprintId, FxVec2)> {
+    let mut out: Vec<_> = sites.iter().map(|s| (s.blueprint, s.at)).collect();
+    out.sort_by_key(|(id, p)| (id.0, p.x, p.y));
+    out
 }
 
 #[test]
@@ -33,14 +49,15 @@ fn capture_then_layout_puts_everything_back() {
         Fx::from_f32((lo[0] + hi[0]) * 0.5),
         Fx::from_f32((lo[1] + hi[1]) * 0.5),
     );
-    let mut placed = layout(&b, &members, middle, 0);
-    let mut want: Vec<_> = sites
+    let placed = layout(&b, &members, middle, Turn::default());
+    let want: Vec<_> = sites
         .iter()
-        .map(|&(id, p)| (id, mc_sim::world::snap_to_build_grid(b.unit(id), p)))
+        .map(|s| Laid {
+            at: mc_sim::world::snap_to_build_grid(b.unit(s.blueprint), s.at),
+            ..*s
+        })
         .collect();
-    placed.sort_by_key(|(id, p)| (id.0, p.x, p.y));
-    want.sort_by_key(|(id, p)| (id.0, p.x, p.y));
-    assert_eq!(placed, want);
+    assert_eq!(spots(&placed), spots(&want));
 }
 
 #[test]
@@ -48,13 +65,13 @@ fn moved_anywhere_it_keeps_its_shape() {
     let b = blueprints();
     let p = capture(&b, &base(&b)).unwrap();
     let (members, _) = p.resolve(&b);
-    let here = layout(&b, &members, at(1000, 1000), 0);
+    let here = layout(&b, &members, at(1000, 1000), Turn::default());
     // Any point snaps to a cell corner first, so the shape never shifts by a cell.
     for q in [at(2003, 517), at(1210, 1195), at(15, 4000)] {
-        let there = layout(&b, &members, q, 0);
-        let d = there[0].1 - here[0].1;
+        let there = layout(&b, &members, q, Turn::default());
+        let d = there[0].at - here[0].at;
         for (a, b) in here.iter().zip(&there) {
-            assert_eq!(b.1 - a.1, d, "member moved apart from the others");
+            assert_eq!(b.at - a.at, d, "member moved apart from the others");
         }
     }
 }
@@ -74,16 +91,19 @@ fn a_turned_layout_of_square_lots_does_not_overlap_itself() {
     let b = blueprints();
     let p = capture(&b, &base(&b)).unwrap();
     let (members, _) = p.resolve(&b);
-    for q in 0..4 {
+    for (quarters, mirrored) in (0..4).flat_map(|q| [(q, false), (q, true)]) {
+        let q = Turn { quarters, mirrored };
         let sites = layout(&b, &members, at(1200, 1200), q);
-        for (i, &(ba, pa)) in sites.iter().enumerate() {
-            for &(bb, pb) in &sites[i + 1..] {
-                let (fa, fb) = (b.unit(ba).footprint, b.unit(bb).footprint);
+        for (i, sa) in sites.iter().enumerate() {
+            for sb in &sites[i + 1..] {
+                let fa = b.unit(sa.blueprint).footprint_at(sa.heading);
+                let fb = b.unit(sb.blueprint).footprint_at(sb.heading);
+                let (pa, pb) = (sa.at, sb.at);
                 let reach = |x: u8, y: u8| (x as i32 + y as i32) * mc_map::BUILD_CELL_M / 2;
                 let d = pa - pb;
                 let apart = d.x.abs().round_int() >= reach(fa.0, fb.0)
                     || d.y.abs().round_int() >= reach(fa.1, fb.1);
-                assert!(apart, "turn {q}: lots overlap");
+                assert!(apart, "{q:?}: lots overlap");
             }
         }
     }
@@ -94,20 +114,27 @@ fn capture_refuses_nothing_and_too_much() {
     let b = blueprints();
     assert_eq!(capture(&b, &[]), Err(Uncaptured::Nothing));
     let commander = b.factions[0].commander;
+    let key = |id: BlueprintId| b.unit(id).key.clone();
     assert_eq!(
-        capture(&b, &[(commander, at(100, 100))]),
+        capture(&b, &[laid(&b, &key(commander), at(100, 100))]),
         Err(Uncaptured::Nothing)
     );
-    let power = b.id_of("aster_t1_power").unwrap();
     let many: Vec<_> = (0..MAX_MEMBERS as i32 + 1)
-        .map(|i| (power, at(100 + 24 * (i % 10), 100 + 24 * (i / 10))))
+        .map(|i| {
+            laid(
+                &b,
+                "aster_t1_power",
+                at(100 + 24 * (i % 10), 100 + 24 * (i / 10)),
+            )
+        })
         .collect();
     assert_eq!(
         capture(&b, &many),
         Err(Uncaptured::TooMany(MAX_MEMBERS + 1))
     );
     // The same structure on the same lot twice (built and planned) counts once.
-    let twice = [(power, at(100, 100)), (power, at(100, 100))];
+    let power = laid(&b, "aster_t1_power", at(100, 100));
+    let twice = [power, power];
     assert_eq!(capture(&b, &twice).unwrap().members.len(), 1);
 }
 
@@ -193,6 +220,7 @@ fn the_file_reads_back_what_was_written_and_survives_a_bad_one() {
             key: "aster_t1_power".into(),
             x: MAX_OFFSET + 1,
             y: 0,
+            turn: 0,
         }],
         id: PrefabId::default(),
     };
@@ -219,6 +247,7 @@ fn the_reason_left_out_is_the_commonest_counted() {
     let site = |fit, buildable| PrefabSite {
         blueprint: power,
         at: at(0, 0),
+        heading: Angle::ZERO,
         fit,
         buildable,
     };
@@ -232,4 +261,103 @@ fn the_reason_left_out_is_the_commonest_counted() {
     assert_eq!(left_out_reason(&sites), "Lot taken (2), 2 more");
     assert_eq!(left_out_reason(&sites[..1]), "");
     assert_eq!(left_out_reason(&sites[4..]), "Not built by this selection");
+}
+
+/// A layout with an odd-sized lot (the storage, 3x3) off the middle, a power plant
+/// turned a quarter, and a factory unturned.
+fn turned_base(b: &Blueprints) -> Vec<Resolved> {
+    let mut sites = base(b);
+    sites[1].heading = sites[1].heading + Angle::QUARTER_TURN;
+    let (members, _) = capture(b, &sites).unwrap().resolve(b);
+    members
+}
+
+#[test]
+fn mirrored_and_turned_lots_land_on_the_grid_and_face_their_mirrored_way() {
+    let b = blueprints();
+    let members = turned_base(&b);
+    assert!(members.iter().any(|m| m.turn == 1), "the turn is kept");
+    let anchor = at(1200, 1200);
+    let plain = layout(&b, &members, anchor, Turn::default());
+    for quarters in 0..4 {
+        let turn = Turn {
+            quarters,
+            mirrored: true,
+        };
+        let sites = layout(&b, &members, anchor, turn);
+        for (m, (s, p)) in members.iter().zip(sites.iter().zip(&plain)) {
+            let bp = b.unit(m.blueprint);
+            // On the grid as the sim snaps it, and facing a quarter turn of its build heading.
+            assert_eq!(
+                mc_sim::world::snap_turned_to_build_grid(bp, s.at, s.heading),
+                s.at,
+                "{}",
+                bp.key
+            );
+            assert_eq!(bp.lot_heading(s.heading), s.heading);
+            // The mirror of the unturned layout, then turned: x flipped about the
+            // middle, a heading h now a half turn less h.
+            let snapped = snap_anchor(anchor);
+            let (dx, dy) = (
+                (p.at.x - snapped.x).round_int(),
+                (p.at.y - snapped.y).round_int(),
+            );
+            let (x, y) = rotate(-dx, dy, quarters);
+            assert_eq!(
+                s.at,
+                FxVec2::new(snapped.x + Fx::from_int(x), snapped.y + Fx::from_int(y)),
+                "{}",
+                bp.key
+            );
+            let want =
+                Angle::HALF_TURN - p.heading + Angle(Angle::QUARTER_TURN.0 * quarters as u16);
+            assert_eq!(s.heading, bp.lot_heading(want), "{}", bp.key);
+        }
+    }
+}
+
+#[test]
+fn mirroring_twice_gives_the_layout_back() {
+    let b = blueprints();
+    let members = turned_base(&b);
+    for quarters in 0..4 {
+        let plain = Turn {
+            quarters,
+            mirrored: false,
+        };
+        let mut twice = plain;
+        twice.mirrored = !twice.mirrored;
+        twice.mirrored = !twice.mirrored;
+        assert_eq!(twice, plain);
+        // And mirrored about the middle, a mirrored layout mirrored again is the original:
+        // a member's offset and heading both come back.
+        for m in &members {
+            let h = m.heading(&b);
+            let once = Turn {
+                quarters: 0,
+                mirrored: true,
+            }
+            .place(m.x, m.y, h);
+            let back = Turn {
+                quarters: 0,
+                mirrored: true,
+            }
+            .place(once.0, once.1, once.2);
+            assert_eq!(back, (m.x, m.y, h));
+        }
+    }
+}
+
+#[test]
+fn place_turn_reads_quarters_and_a_mirror() {
+    assert_eq!(Turn::parse("0"), Some(Turn::default()));
+    assert_eq!(
+        Turn::parse("3m"),
+        Some(Turn {
+            quarters: 3,
+            mirrored: true
+        })
+    );
+    assert_eq!(Turn::parse("4"), None);
+    assert_eq!(Turn::parse("m"), None);
 }

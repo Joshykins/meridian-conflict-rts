@@ -1076,6 +1076,9 @@ pub fn cursor_hint(
     };
     let hint = match view.mode {
         Mode::Place(_) if placing > 1 => "Shift Queues  \u{b7}  RMB Cancels",
+        Mode::Place(b) if blueprints.unit(b).turnable() => {
+            "Click or drag  \u{b7}  R turns, Shift+R back  \u{b7}  Shift keeps placing  \u{b7}  RMB cancels"
+        }
         Mode::Place(_) | Mode::Spawn | Mode::SpawnSubject => {
             "Click or drag  \u{b7}  Shift keeps placing  \u{b7}  RMB cancels"
         }

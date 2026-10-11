@@ -48,6 +48,8 @@ pub struct Shot {
     /// Match screenshots: placing the structure with this blueprint key, at `cursor`;
     /// `@NAME`, with `prefabs`, the prefab of that name.
     pub place: Option<String>,
+    /// With `place`: how what is in hand is turned (and a prefab mirrored), as R and F set it.
+    pub turn: crate::prefabs::Turn,
     /// Match screenshots: the player's prefabs from this file, the construction panel
     /// open on its Prefabs tab.
     pub prefabs: Option<String>,
@@ -951,12 +953,19 @@ pub fn screenshot(
         }
         ghosts.clear();
         // The structure being placed, under the pointer, as the game shows it.
+        let heading = |bp: mc_data::BlueprintId| shot.turn.heading(world.blueprints.unit(bp));
         if let Some((at, fit)) = place.and_then(|bp| {
             let ground = crate::orders::surface_under(&field, input.cursor)?;
-            crate::orders::site_verdict(&field, bp, ground, None, &[])
+            crate::orders::site_verdict(&field, bp, ground, heading(bp), None, &[])
         }) {
             let bp = place.expect("a site comes from a blueprint");
-            ghosts.push(crate::orders::placement_ghost(&field, bp, at, fit.is_ok()));
+            ghosts.push(crate::orders::placement_ghost(
+                &field,
+                bp,
+                at,
+                heading(bp),
+                fit.is_ok(),
+            ));
         }
         let prefab_sites = prefab_shot.ghosts(&field, input.cursor, &mut ghosts);
         let outlined = order_map.ghosts(&field, &mut ghosts);
@@ -964,7 +973,7 @@ pub fn screenshot(
         crate::game::work::draw_tags(&mut ui, &field, 1.0, |o| o == 0);
         let pointer = crate::orders::surface_under(&field, input.cursor);
         let site = place.and_then(|bp| {
-            let (at, _) = crate::orders::site(&field, bp, pointer?, None)?;
+            let (at, _) = crate::orders::site(&field, bp, pointer?, heading(bp), None)?;
             Some((bp, glam::Vec2::from(at.to_f32())))
         });
         crate::nuke_marks::draw(&mut ui, &field, 1.0, pointer, site);
@@ -1009,7 +1018,7 @@ pub fn screenshot(
             .flatten();
         let placing = place.and_then(|bp| {
             let ground = crate::orders::surface_under(&field, input.cursor)?;
-            crate::orders::site(&field, bp, ground, None).map(|(at, _)| at)
+            crate::orders::site(&field, bp, ground, heading(bp), None).map(|(at, _)| at)
         });
         // The staged news arrives once, with the first frame.
         let news = if i == 0 { net_notices.as_slice() } else { &[] };

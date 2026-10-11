@@ -11,7 +11,7 @@
 use crate::lots::prop_cells;
 use crate::nav::cell_class;
 use crate::world::{path_cells_of, place_cells_of};
-use mc_core::{Fx, FxVec2};
+use mc_core::{Angle, Fx, FxVec2};
 use mc_data::UnitBlueprint;
 use mc_map::{Heightfield, MapFile, Prop};
 use mc_path::terrain;
@@ -131,12 +131,13 @@ impl SiteMap {
         }
     }
 
-    /// Whether `bp` could stand at `pos` (already snapped to the build grid),
-    /// leaving other structures out of it.
-    pub fn check(&self, bp: &UnitBlueprint, pos: FxVec2) -> Result<(), Unfit> {
+    /// Whether `bp` could stand at `pos` (already snapped to the build grid) turned to
+    /// `heading`, leaving other structures out of it.
+    pub fn check(&self, bp: &UnitBlueprint, pos: FxVec2, heading: Angle) -> Result<(), Unfit> {
+        let footprint = bp.footprint_at(heading);
         let half = FxVec2::from_ints(
-            bp.footprint.0 as i32 * mc_map::BUILD_CELL_M / 2,
-            bp.footprint.1 as i32 * mc_map::BUILD_CELL_M / 2,
+            footprint.0 as i32 * mc_map::BUILD_CELL_M / 2,
+            footprint.1 as i32 * mc_map::BUILD_CELL_M / 2,
         );
         if pos.x - half.x < Fx::ZERO
             || pos.y - half.y < Fx::ZERO
@@ -145,7 +146,7 @@ impl SiteMap {
         {
             return Err(Unfit::OffMap);
         }
-        let (min, max) = path_cells_of(bp.footprint, pos);
+        let (min, max) = path_cells_of(footprint, pos);
         for y in min.1..=max.1 {
             for x in min.0..=max.0 {
                 let class = self.cell(x, y);
@@ -169,7 +170,7 @@ impl SiteMap {
                 }
             }
         }
-        let (min, max) = place_cells_of(bp.footprint, pos);
+        let (min, max) = place_cells_of(footprint, pos);
         for y in min.1..=max.1 {
             for x in min.0..=max.0 {
                 if self.cell(x, y) & CITY != 0 {

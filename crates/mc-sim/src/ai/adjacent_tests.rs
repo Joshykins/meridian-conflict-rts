@@ -64,8 +64,8 @@ fn bp(w: &World, key: &str) -> UnitBlueprint {
 fn touches(w: &World, row: usize, bp: &UnitBlueprint, site: FxVec2) -> bool {
     let units = &w.state.units;
     crate::adjacency::shared_edge(
-        crate::adjacency::lot(w.bp(row), units.pos[row]),
-        crate::adjacency::lot(bp, site),
+        crate::adjacency::lot(w.bp(row), units.pos[row], units.heading[row]),
+        crate::adjacency::lot(bp, site, AI_BUILD_HEADING),
     )
     .is_some()
 }

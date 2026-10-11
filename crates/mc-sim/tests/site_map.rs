@@ -65,7 +65,7 @@ fn agree_on(params: &BakeParams) -> usize {
             for x in (-20..sx + 20).step_by(41) {
                 let pos = mc_sim::world::snap_to_build_grid(bp, FxVec2::from_ints(x, y));
                 let sim = w.can_place(bp, pos);
-                let preview = sites.check(bp, pos);
+                let preview = sites.check(bp, pos, bp.build_heading());
                 assert_eq!(
                     sim,
                     preview.is_ok(),

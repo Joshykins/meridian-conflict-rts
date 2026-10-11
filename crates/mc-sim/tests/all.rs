@@ -69,6 +69,7 @@ mod patrol;
 mod pause;
 mod pinned_hulls;
 mod place;
+mod placement_turn;
 mod player_orders;
 mod priority;
 mod radar;

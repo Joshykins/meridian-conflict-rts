@@ -76,6 +76,7 @@ impl Renderer {
                     (u.owner_flags & crate::gpu_consts::owner::MASK) as u8,
                     build as u8,
                     u.blueprint as u16,
+                    bp.lot_turn(mc_core::Angle::from_radians_f32(u.heading)),
                     ghost,
                 ) | if nanite { mc_sim::PAD_NANITE } else { 0 },
             });

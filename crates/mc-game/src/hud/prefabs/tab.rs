@@ -402,6 +402,6 @@ pub(in crate::hud) fn hover_card(
         r.bottom() - 16.0,
         type_scale::MICRO,
         rgb(palette::FAINT, 1.0),
-        "Click to place  \u{b7}  R turns it  \u{b7}  Right-click twice to delete",
+        "Click to place  \u{b7}  R turns it, F mirrors it  \u{b7}  Right-click twice to delete",
     );
 }

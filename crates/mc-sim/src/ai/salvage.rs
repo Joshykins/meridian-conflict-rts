@@ -136,7 +136,6 @@ impl World {
         Some(Job {
             blueprint,
             near,
-            heading: super::AI_BUILD_HEADING,
             min_r: Fx::from_int(24),
             keep_off_deposits: true,
             place: Place::Around,

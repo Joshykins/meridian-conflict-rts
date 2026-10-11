@@ -106,11 +106,10 @@ impl World {
             if !other.is_structure() {
                 return true;
             }
-            let of = (other.footprint.0 as i32, other.footprint.1 as i32);
-            let pos = self.state.units.pos[row];
-            let other_apron = other
-                .has(cat::FACTORY)
-                .then(|| apron(of, pos, self.state.units.heading[row]));
+            let (pos, heading) = (self.state.units.pos[row], self.state.units.heading[row]);
+            let of = other.footprint_at(heading);
+            let of = (of.0 as i32, of.1 as i32);
+            let other_apron = other.has(cat::FACTORY).then(|| apron(of, pos, heading));
             let ring = other.adjacency.is_some() && size.max(of.0.max(of.1)) <= RING_FOOT;
             let feeds = bp.adjacency.is_some() && (ring || adjacent::feeds(bp, other));
             ok = clear(lot(of, pos), of.0.max(of.1), other_apron, feeds);

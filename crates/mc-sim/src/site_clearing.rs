@@ -13,18 +13,18 @@ use mc_data::BlueprintId;
 const STEP_CLEAR: i32 = 3;
 
 impl World {
-    /// Sends `builder`'s side's units standing on the lot of a `bp` at `pos` off it.
-    /// Units already on their way somewhere are left to go.
+    /// Sends `builder`'s side's units standing on a `lot` (turned, in build cells) at
+    /// `pos` off it. Units already on their way somewhere are left to go.
     pub(crate) fn send_off_site(
         &mut self,
-        bp: &mc_data::UnitBlueprint,
+        lot: (u8, u8),
         pos: FxVec2,
         builder: usize,
         blueprint: BlueprintId,
     ) -> Result<(), SimError> {
         let half = FxVec2::from_ints(
-            bp.footprint.0 as i32 * mc_map::BUILD_CELL_M / 2,
-            bp.footprint.1 as i32 * mc_map::BUILD_CELL_M / 2,
+            lot.0 as i32 * mc_map::BUILD_CELL_M / 2,
+            lot.1 as i32 * mc_map::BUILD_CELL_M / 2,
         );
         let owner = self.state.units.owner[builder];
         let mut off = Vec::new();

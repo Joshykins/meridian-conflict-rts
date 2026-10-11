@@ -162,6 +162,8 @@ straight into a match instead.
                          the selected builder's construction panel open on its Prefabs tab
   --place @NAME          with --prefabs: that prefab in hand at --cursor (KEY, not @NAME:
                          that structure being placed)
+  --place-turn Q[m]      with --place: what is in hand turned Q quarter turns anticlockwise
+                         (as R turns it clockwise), and with m (a prefab) mirrored first
   --save-prefab          match screenshot: the Save Prefab box open on the selection (its
                          structures, and with --plans the commander's planned ones)
   --follow N             match screenshot: play N more ticks through the renderer first,
@@ -285,6 +287,7 @@ fn run() -> Result<(), String> {
     let mut report = None;
     let mut range_tab: Option<String> = None;
     let mut place: Option<String> = None;
+    let mut turn = prefabs::Turn::default();
     let mut prefabs: Option<String> = None;
     let mut save_prefab = false;
     let (mut plans, mut drag): (bool, Option<[f32; 2]>) = (false, None);
@@ -385,7 +388,7 @@ fn run() -> Result<(), String> {
             "--bench" => bench = Some(value("--bench")?.parse().map_err(|_| "--bench takes a tick count")?),
             "--ticks" => ticks = value("--ticks")?.parse().map_err(|_| "--ticks takes a number")?,
             "--at" => at = Some(value("--at")?),
-            "--screenshot" => shot = Some(headless::Shot { path: value("--screenshot")?, camera: None, focus_z: None, width: 0, height: 0, select: None, cursor: None, paused: false, net: None, unit_picker: false, range_maps: false, refit_tab: false, details: false, report: None, range_tab: None, place: None, prefabs: None, save_prefab: false, plans: false, drag: None, follow: 0, alpha: 1.0, build_grid: false, quality: None }),
+            "--screenshot" => shot = Some(headless::Shot { path: value("--screenshot")?, camera: None, focus_z: None, width: 0, height: 0, select: None, cursor: None, paused: false, net: None, unit_picker: false, range_maps: false, refit_tab: false, details: false, report: None, range_tab: None, place: None, turn: Default::default(), prefabs: None, save_prefab: false, plans: false, drag: None, follow: 0, alpha: 1.0, build_grid: false, quality: None }),
             "--camera" => {
                 let v: Vec<f32> = value("--camera")?.split(',').filter_map(|p| p.trim().parse().ok()).collect();
                 if v.len() < 3 {
@@ -418,6 +421,7 @@ fn run() -> Result<(), String> {
             "--report" => report = Some(value("--report")?),
             "--range-tab" => range_tab = Some(value("--range-tab")?),
             "--place" => place = Some(value("--place")?),
+            "--place-turn" => turn = prefabs::Turn::parse(&value("--place-turn")?).ok_or("--place-turn takes quarter turns 0..3, then m to mirror (a prefab): 1, 2m")?,
             "--prefabs" => prefabs = Some(value("--prefabs")?),
             "--save-prefab" => save_prefab = true,
             "--plans" => plans = true,
@@ -603,7 +607,7 @@ fn run() -> Result<(), String> {
         shot.details = details;
         shot.report = report;
         shot.range_tab = range_tab;
-        shot.place = place;
+        (shot.place, shot.turn) = (place, turn);
         (shot.prefabs, shot.save_prefab) = (prefabs, save_prefab);
         (shot.width, shot.height) = size;
         (shot.select, shot.cursor, shot.paused) = (select, cursor, paused);

@@ -570,7 +570,6 @@ impl World {
             return Some(Job {
                 blueprint: id,
                 near,
-                heading: bp.build_heading(),
                 min_r: Fx::from_int(24),
                 keep_off_deposits: true,
                 place: Place::Around,

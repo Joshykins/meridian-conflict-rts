@@ -5,7 +5,7 @@
 use super::style::Role;
 use super::{Hud, Scene};
 use crate::game::View;
-use crate::prefabs::{Prefab, PrefabId, PrefabSite};
+use crate::prefabs::{Prefab, PrefabId, PrefabSite, Turn};
 use crate::ui::{palette, rgb, type_scale, Rect, Ui};
 use glam::Vec2;
 use mc_data::{BlueprintId, Blueprints};
@@ -76,11 +76,12 @@ pub fn selection_builds(view: &View, blueprints: &Blueprints) -> Vec<BlueprintId
 
 /// What the selection would save as a prefab: the local player's selected units (the
 /// structures among them count, `prefabs::capture`) and the structures the selected
-/// builders have planned, as `(blueprint, centre)`.
-pub fn selection_structures(view: &View) -> Vec<(BlueprintId, mc_core::FxVec2)> {
-    use mc_core::{Fx, FxVec2};
+/// builders have planned, each where it stands and the way it faces.
+pub fn selection_structures(view: &View) -> Vec<crate::prefabs::Laid> {
+    use crate::prefabs::Laid;
+    use mc_core::{Angle, Fx, FxVec2};
     use mc_sim::mirror::{KIND_GHOST, KIND_PROP, KIND_WRECK};
-    let mut out: Vec<(BlueprintId, FxVec2)> = view
+    let mut out: Vec<Laid> = view
         .selection
         .iter()
         .filter_map(|id| view.index_of.get(id))
@@ -89,11 +90,10 @@ pub fn selection_structures(view: &View) -> Vec<(BlueprintId, mc_core::FxVec2)> 
             (u.owner_flags & 0xFF) as u8 == view.local
                 && u.owner_flags & (KIND_WRECK | KIND_GHOST | KIND_PROP) == 0
         })
-        .map(|u| {
-            (
-                BlueprintId(u.blueprint as u16),
-                FxVec2::new(Fx::from_f32(u.pos[0]), Fx::from_f32(u.pos[1])),
-            )
+        .map(|u| Laid {
+            blueprint: BlueprintId(u.blueprint as u16),
+            at: FxVec2::new(Fx::from_f32(u.pos[0]), Fx::from_f32(u.pos[1])),
+            heading: Angle::from_radians_f32(u.heading),
         })
         .collect();
     out.extend(
@@ -101,7 +101,11 @@ pub fn selection_structures(view: &View) -> Vec<(BlueprintId, mc_core::FxVec2)> 
             .plans
             .iter()
             .filter(|p| view.selection.contains(&p.unit_id))
-            .map(|p| (p.blueprint, p.at)),
+            .map(|p| Laid {
+                blueprint: p.blueprint,
+                at: p.at,
+                heading: Angle::from_radians_f32(p.heading),
+            }),
     );
     out
 }
@@ -121,7 +125,9 @@ pub(super) fn plan(
     let lots: Vec<(BlueprintId, [f32; 4])> = members
         .iter()
         .map(|m| {
-            let f = blueprints.unit(m.blueprint).footprint;
+            let f = blueprints
+                .unit(m.blueprint)
+                .footprint_at(m.heading(blueprints));
             let (hw, hh) = (f.0 as f32 * cell * 0.5, f.1 as f32 * cell * 0.5);
             let (x, y) = (m.x as f32, m.y as f32);
             (m.blueprint, [x - hw, y - hh, x + hw, y + hh])
@@ -177,7 +183,7 @@ pub(super) fn plan(
 
 /// The card by the pointer with a prefab in hand: its name, how much of it will go
 /// down and why the rest will not, and the keys.
-pub fn cursor_hint(ui: &mut Ui, prefab: &Prefab, sites: &[PrefabSite], quarters: u8) {
+pub fn cursor_hint(ui: &mut Ui, prefab: &Prefab, sites: &[PrefabSite], turn: Turn) {
     let total = sites.len();
     let going = sites.iter().filter(|s| s.goes_down()).count();
     let (text, tone) = if total == 0 {
@@ -209,14 +215,19 @@ pub fn cursor_hint(ui: &mut Ui, prefab: &Prefab, sites: &[PrefabSite], quarters:
             palette::TEXT,
         )
     };
-    let turned = match quarters % 4 {
+    let turned = match turn.quarters % 4 {
         0 => "",
         1 => "  \u{b7}  Turned 90\u{b0} left",
         2 => "  \u{b7}  Turned 180\u{b0}",
         _ => "  \u{b7}  Turned 90\u{b0} right",
     };
+    let mirrored = if turn.mirrored {
+        "  \u{b7}  Mirrored"
+    } else {
+        ""
+    };
     let hint = format!(
-        "Click to place  \u{b7}  R turns, Shift+R back  \u{b7}  Shift keeps placing  \u{b7}  RMB cancels{turned}"
+        "Click to place  \u{b7}  R turns, Shift+R back  \u{b7}  F mirrors  \u{b7}  Shift keeps placing  \u{b7}  RMB cancels{turned}{mirrored}"
     );
     let p = ui.cursor + Vec2::new(20.0, 22.0);
     let w = ui

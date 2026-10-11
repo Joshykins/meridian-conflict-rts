@@ -5,7 +5,7 @@
 
 use crate::command::{Command, PlayerCommand};
 use crate::tables::*;
-use crate::world::snap_to_build_grid;
+use crate::world::snap_turned_to_build_grid;
 use crate::{SimError, World};
 use mc_core::{Fx, FxVec2};
 
@@ -50,10 +50,10 @@ impl World {
                 let bp = self.blueprints.unit(*blueprint).clone();
                 let mut rows = Vec::new();
                 if bp.is_structure() {
-                    let site = snap_to_build_grid(&bp, *pos);
+                    let site = snap_turned_to_build_grid(&bp, *pos, *heading);
                     // A cheat: mines may be put down in each other's reach (the
                     // showcase's row of every structure, the range's copies).
-                    if self.lot_fits(&bp, site) {
+                    if self.lot_fits(&bp, site, *heading) {
                         rows.push(self.spawn_unit(*blueprint, *owner, site, *heading, true)?);
                     }
                 } else {

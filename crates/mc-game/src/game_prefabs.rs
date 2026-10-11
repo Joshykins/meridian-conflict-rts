@@ -1,6 +1,6 @@
 //! Prefabs in a match (`crate::prefabs`): Ctrl+S (or the Save Prefab order) keeps the
 //! selected structures' layout, and the construction panel's Prefabs tab puts one
-//! down with the selected builders, turned with R.
+//! down with the selected builders, turned with R and mirrored with F.
 //!
 //! Placing one sends a `Command::Build` for each structure that can go down, nearest
 //! the builders first, exactly as placing them one by one would.
@@ -9,28 +9,29 @@ use super::{Game, Mode};
 use crate::audio::{Audio, Sfx};
 use crate::hud::{self, HudAction};
 use crate::orders::{self, Field};
-use crate::prefabs::{self, Kept, Library, Prefab, PrefabId, PrefabSite};
+use crate::prefabs::{self, Kept, Library, Prefab, PrefabId, PrefabSite, Turn};
 use crate::ui::palette;
 use glam::Vec2;
-use mc_core::{Fx, FxVec2};
+use mc_core::{Angle, Fx, FxVec2};
 use mc_data::BlueprintId;
 use mc_render::Renderer;
 use mc_sim::mirror::UnitInstance;
 use mc_sim::Command;
 
-/// The library, and how the prefab in hand is turned.
+/// The library, and how what is in hand (a prefab, or a structure being placed) is
+/// turned. The turn stays as it was set, for the next prefab or structure picked up
+/// too, until it is turned again: the hologram always shows it.
 #[derive(Default)]
 pub struct Prefabs {
     pub library: Library,
-    /// Quarter turns anticlockwise, seen from above.
-    pub quarters: u8,
+    pub turn: Turn,
 }
 
 impl Prefabs {
     pub fn load() -> Prefabs {
         Prefabs {
             library: Library::load(),
-            quarters: 0,
+            turn: Turn::default(),
         }
     }
 }
@@ -58,7 +59,7 @@ impl Game {
             return Vec::new();
         };
         let builds = self.prefab_builds();
-        orders::prefab_sites(&field, prefab, ground, self.prefabs.quarters, &builds)
+        orders::prefab_sites(&field, prefab, ground, self.prefabs.turn, &builds)
     }
 
     /// The prefab in hand's holograms, and their lots outlined.
@@ -80,6 +81,7 @@ impl Game {
                 &field,
                 s.blueprint,
                 s.at,
+                s.heading,
                 s.goes_down(),
             ));
         }
@@ -90,10 +92,10 @@ impl Game {
     /// have, and keeps the prefab in hand.
     pub(super) fn place_prefab(&mut self, id: PrefabId, r: &Renderer, audio: &Audio) {
         let sites = self.prefab_sites(id, r);
-        let mut going: Vec<(BlueprintId, FxVec2)> = sites
+        let mut going: Vec<(BlueprintId, FxVec2, Angle)> = sites
             .iter()
             .filter(|s| s.goes_down())
-            .map(|s| (s.blueprint, s.at))
+            .map(|s| (s.blueprint, s.at, s.heading))
             .collect();
         if going.is_empty() {
             audio.play(Sfx::Deny);
@@ -108,7 +110,7 @@ impl Game {
             let (i, _) = going
                 .iter()
                 .enumerate()
-                .min_by_key(|(_, (_, at))| (*at - from).length_sq())
+                .min_by_key(|(_, (_, at, _))| (*at - from).length_sq())
                 .expect("not empty");
             let next = going.remove(i);
             from = next.1;
@@ -117,18 +119,19 @@ impl Game {
         let mines: Vec<(BlueprintId, FxVec2)> = ordered
             .iter()
             .copied()
-            .filter(|(b, _)| self.blueprints.unit(*b).mine.is_some())
+            .filter(|(b, ..)| self.blueprints.unit(*b).mine.is_some())
+            .map(|(b, at, _)| (b, at))
             .collect();
         for (b, at) in mines {
             self.warn_of_planned_mines(b, &[at]);
         }
         let units = self.selected_ids();
-        for (i, (blueprint, pos)) in ordered.iter().enumerate() {
+        for (i, &(blueprint, pos, heading)) in ordered.iter().enumerate() {
             self.send(Command::Build {
                 units: units.clone(),
-                blueprint: *blueprint,
-                pos: *pos,
-                heading: self.blueprints.unit(*blueprint).build_heading(),
+                blueprint,
+                pos,
+                heading,
                 queue: self.shift || i > 0,
             });
         }
@@ -166,10 +169,9 @@ impl Game {
         FxVec2::new(Fx::from_f32(m.x), Fx::from_f32(m.y))
     }
 
-    /// R with a prefab in hand: a quarter turn clockwise (Shift: anticlockwise).
-    pub(super) fn turn_prefab(&mut self, audio: &Audio) {
-        let step = if self.shift { 1 } else { 3 };
-        self.prefabs.quarters = (self.prefabs.quarters + step) % 4;
+    /// F with a prefab in hand: mirrored left to right (again: back as it was).
+    pub(super) fn mirror_prefab(&mut self, audio: &Audio) {
+        self.prefabs.turn.mirrored = !self.prefabs.turn.mirrored;
         audio.play(Sfx::Tick);
     }
 

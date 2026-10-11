@@ -22,8 +22,9 @@ struct Press {
     a: vec2<f32>,
     b: vec2<f32>,
     // Mover: half length, half width. Track: half gauge, one track's width.
-    // Scorch: radius, strength. Lot: half size, its blueprint plus one when the lot is
-    // paved only on its apron (`pad_mesh_sd`), zero for the whole square.
+    // Scorch: radius, strength. Lot: half size, its pad plan (blueprint and turn,
+    // `pad_mesh_sd`) plus one when the lot is paved only on its apron, zero for the
+    // whole square.
     r: vec2<f32>,
     // Mover: travel direction (cos/sin packed as f16), weight. Track: how fresh.
     s: f32,
@@ -191,7 +192,7 @@ fn cs_gather_stains(@builtin(global_invocation_id) id: vec3<u32>) {
             return;
         }
         let apron = (s.strength_seed & PAD_NANITE) == 0u;
-        p.r = vec2<f32>(s.radius, select(0.0, f32((s.strength_seed >> PAD_BLUEPRINT_SHIFT) + 1u), apron));
+        p.r = vec2<f32>(s.radius, select(0.0, f32((s.strength_seed >> PAD_TURN_SHIFT) + 1u), apron));
         p.kind = PRESS_LOT;
     }
     p.s = 0.0;

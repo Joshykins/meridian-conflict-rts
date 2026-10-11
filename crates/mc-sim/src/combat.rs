@@ -3010,7 +3010,7 @@ impl World {
                 }
                 // The lot was poured; death does not take it up. The scorch
                 // stain sits on top of it.
-                self.remember_structure_pad(&bp, pos, owner)?;
+                self.remember_structure_pad(&bp, pos, heading, owner)?;
             } else if reclaimed {
                 // Unbuilt, not destroyed: the pour goes with the building.
                 self.state.pads.remove_at(pos);

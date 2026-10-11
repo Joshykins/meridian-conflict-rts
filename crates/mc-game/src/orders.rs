@@ -17,18 +17,21 @@ use mc_map::MapFile;
 use mc_render::{Camera, Renderer};
 use mc_sim::command::{MAX_COMMAND_UNITS, MAX_GUARD_RADIUS, MIN_GUARD_RADIUS};
 use mc_sim::mirror::{UnitInstance, KIND_GHOST, KIND_PROP, KIND_WRECK, STATE_RADAR};
-use mc_sim::placement::Unfit;
 use mc_sim::tables::OrderKind;
 use mc_sim::{Command, Handle};
 use std::collections::{HashMap, HashSet};
 
 mod guard_rings;
+mod lots;
 pub(crate) mod mine_reach;
 mod muster;
 mod reclaim_rings;
 mod sites;
 mod wall_line;
 
+pub use lots::{build_grid_focus, drag_sites, ghost_footprints};
+#[cfg(test)]
+use lots::{footprints_overlap, line_centres, snap_footprint};
 pub(crate) use reclaim_rings::reclaim_radius;
 pub use sites::{placement_ghost, prefab_sites, site, site_verdict};
 
@@ -134,48 +137,6 @@ impl Key {
 /// Patrol routes: the order card's movement colour.
 const PATROL: u32 = 0x7FD0FF;
 
-/// A structure's lot on the ground: its build cells, and a firmer line round the edge.
-fn footprint_grid(
-    ui: &mut Ui,
-    project: &dyn Fn(Vec2) -> Option<Vec2>,
-    c: Vec2,
-    half: Vec2,
-    tone: u32,
-) {
-    let cell = mc_map::BUILD_CELL_M as f32;
-    let cells = (half * 2.0 / cell).round().max(Vec2::ONE);
-    let (nx, ny) = (cells.x as usize, cells.y as usize);
-    let corner = c - half;
-    let at = |i: usize, j: usize| project(corner + Vec2::new(i as f32, j as f32) * cell);
-    // Each line goes a cell at a time, so it follows the ground.
-    for i in 0..=nx {
-        let edge = i == 0 || i == nx;
-        for j in 0..ny {
-            if let (Some(a), Some(b)) = (at(i, j), at(i, j + 1)) {
-                ui.stroke(
-                    a,
-                    b,
-                    if edge { 2.0 } else { 1.0 },
-                    ui::rgb(tone, if edge { 0.95 } else { 0.45 }),
-                );
-            }
-        }
-    }
-    for j in 0..=ny {
-        let edge = j == 0 || j == ny;
-        for i in 0..nx {
-            if let (Some(a), Some(b)) = (at(i, j), at(i + 1, j)) {
-                ui.stroke(
-                    a,
-                    b,
-                    if edge { 2.0 } else { 1.0 },
-                    ui::rgb(tone, if edge { 0.95 } else { 0.45 }),
-                );
-            }
-        }
-    }
-}
-
 /// A ring on the ground around `c`, `radius` metres, dashed.
 fn ground_ring(ui: &mut Ui, field: &Field, c: Vec2, radius: f32, color: [f32; 4]) {
     const SEGMENTS: usize = 48;
@@ -212,11 +173,6 @@ pub(crate) fn bombard_radius<'a>(
     drag.clamp(BOMBARD_MIN, widest)
 }
 
-fn half_footprint(blueprints: &Blueprints, blueprint: BlueprintId) -> Vec2 {
-    let bp = blueprints.unit(blueprint);
-    Vec2::new(bp.footprint.0 as f32, bp.footprint.1 as f32) * (mc_map::BUILD_CELL_M as f32 * 0.5)
-}
-
 /// Where a structure at `xy` stands: the ground, or the water's surface over the sea.
 pub fn surface_height(field: &Field, xy: Vec2) -> f32 {
     field.renderer.surface_height(xy)
@@ -229,213 +185,15 @@ pub fn surface_under(field: &Field, cursor: Vec2) -> Option<Vec3> {
     field.renderer.pick_surface(origin, dir)
 }
 
-/// Where the build grid is drawn while a structure is placed or a plan is in hand:
-/// around the pointer, reaching further as the camera pulls back, with the lots
-/// already taken near it (structures standing or begun, and plans), nearest first.
-pub fn build_grid_focus(
-    field: &Field,
-    cursor: Vec2,
-    in_hand: Option<(FxVec2, BlueprintId)>,
-) -> Option<(Vec2, f32, Vec<[f32; 4]>)> {
-    let centre = surface_under(field, cursor)?.truncate();
-    let radius = (field.camera.distance * 0.3).clamp(60.0, 480.0);
-    let mut lots: Vec<(f32, [f32; 4])> = Vec::new();
-    let mut lot = |c: Vec2, blueprint: BlueprintId| {
-        let half = half_footprint(field.blueprints, blueprint);
-        let gap = ((c - centre).abs() - half).max(Vec2::ZERO).length();
-        if gap < radius {
-            let (lo, hi) = (c - half, c + half);
-            lots.push((gap, [lo.x, lo.y, hi.x, hi.y]));
-        }
-    };
-    for u in &field.view.frame.units {
-        let blueprint = BlueprintId(u.blueprint as u16);
-        if u.owner_flags & (KIND_WRECK | KIND_GHOST | KIND_PROP) == 0
-            && field.blueprints.unit(blueprint).is_structure()
-        {
-            lot(Vec2::new(u.pos[0], u.pos[1]), blueprint);
-        }
-    }
-    for plan in &field.view.status.plans {
-        if in_hand != Some((plan.at, plan.blueprint)) {
-            lot(Vec2::from(plan.pos), plan.blueprint);
-        }
-    }
-    lots.sort_by(|a, b| a.0.total_cmp(&b.0));
-    Some((centre, radius, lots.into_iter().map(|(_, r)| r).collect()))
-}
-
-/// The lot outline on every structure preview: orange where it can go, red where it cannot.
-pub fn ghost_footprints(ui: &mut Ui, field: &Field, ghosts: &[UnitInstance]) {
-    let scale = ui.s;
-    let project = |q: Vec2| {
-        field
-            .camera
-            .project(q.extend(surface_height(field, q) + 1.0))
-            .filter(|p| p.abs().max_element() < 20_000.0)
-            .map(|p| p / scale)
-    };
-    for g in ghosts.iter().take(MAX_GHOSTS) {
-        let blueprint = BlueprintId(g.blueprint as u16);
-        if g.owner_flags & KIND_GHOST == 0 || !field.blueprints.unit(blueprint).built_on_site() {
-            continue;
-        }
-        let tone = if g.health > 0.0 {
-            palette::WARN
-        } else {
-            palette::BAD
-        };
-        let half = half_footprint(field.blueprints, blueprint);
-        let c = Vec2::new(g.pos[0], g.pos[1]);
-        if !lot_marker(ui, &project, c, half, g.health > 0.0, tone) {
-            footprint_grid(ui, &project, c, half, tone);
-        }
-    }
-}
-
-/// Seen from far off a lot is a few pixels across, and its grid says nothing:
-/// there it gets a mark of a readable size, with a cross where it cannot go.
-/// True when the mark stands in for the grid.
-fn lot_marker(
-    ui: &mut Ui,
-    project: &dyn Fn(Vec2) -> Option<Vec2>,
-    c: Vec2,
-    half: Vec2,
-    fits: bool,
-    tone: u32,
-) -> bool {
-    const LEGIBLE: f32 = 26.0;
-    let Some(centre) = project(c) else {
-        return false;
-    };
-    let across = [
-        Vec2::new(-1.0, -1.0),
-        Vec2::new(1.0, -1.0),
-        Vec2::new(1.0, 1.0),
-        Vec2::new(-1.0, 1.0),
-    ]
-    .iter()
-    .filter_map(|&k| project(c + half * k))
-    .map(|p| (p - centre).abs().max_element() * 2.0)
-    .fold(0.0, f32::max);
-    // Fades in as the lot itself shrinks past legible.
-    let k = ((LEGIBLE - across) / (LEGIBLE * 0.5)).clamp(0.0, 1.0);
-    if k <= 0.0 {
-        return false;
-    }
-    let side = LEGIBLE.max(across);
-    let r = ui::Rect::new(centre.x - side * 0.5, centre.y - side * 0.5, side, side);
-    ui.fill(r, ui::rgb(tone, 0.18 * k));
-    if fits {
-        ui.brackets(r, side * 0.32, ui::rgb(tone, 0.95 * k));
-    } else {
-        ui.frame(r, ui::rgb(tone, 0.95 * k));
-        let inset = side * 0.28;
-        let (a, b) = (
-            Vec2::new(r.x + inset, r.y + inset),
-            Vec2::new(r.right() - inset, r.bottom() - inset),
-        );
-        ui.stroke(a, b, 2.0, ui::rgb(tone, k));
-        ui.stroke(
-            Vec2::new(a.x, b.y),
-            Vec2::new(b.x, a.y),
-            2.0,
-            ui::rgb(tone, k),
-        );
-    }
-    k >= 1.0
-}
-
-/// Centres a drag from `from` to `to` would occupy, spaced a footprint apart so
-/// they sit edge to edge. One centre when the pointer has not moved a footprint,
-/// and one for a structure that is never laid in a line (a core mine).
-pub fn line_centres(footprint: (u8, u8), single: bool, from: FxVec2, to: FxVec2) -> Vec<FxVec2> {
-    let from = snap_footprint(footprint, from);
-    let to = snap_footprint(footprint, to);
-    if single || from == to {
-        return vec![if single { to } else { from }];
-    }
-    let step_x = (footprint.0 as i32).max(1) * mc_map::BUILD_CELL_M;
-    let step_y = (footprint.1 as i32).max(1) * mc_map::BUILD_CELL_M;
-    let dx = (to.x - from.x).round_int();
-    let dy = (to.y - from.y).round_int();
-    let steps = (dx.abs() / step_x)
-        .max(dy.abs() / step_y)
-        .clamp(1, MAX_DRAG_SITES as i32 - 1);
-    let mut out = Vec::with_capacity((steps + 1) as usize);
-    out.push(from);
-    for i in 1..=steps {
-        let snapped = snap_footprint(
-            footprint,
-            FxVec2::from_ints(
-                from.x.round_int() + dx * i / steps,
-                from.y.round_int() + dy * i / steps,
-            ),
-        );
-        if out.last() != Some(&snapped)
-            && !out
-                .iter()
-                .any(|&p| footprints_overlap(footprint, p, snapped))
-        {
-            out.push(snapped);
-        }
-    }
-    out
-}
-
-/// Sites a place-drag from `from` to `to` would put down, and whether each looks free.
-pub fn drag_sites(
-    field: &Field,
-    blueprint: BlueprintId,
-    from: FxVec2,
-    to: FxVec2,
-) -> Vec<(FxVec2, Result<(), Unfit>)> {
-    let bp = field.blueprints.unit(blueprint);
-    let mut out = Vec::new();
-    let mut taken = Vec::new();
-    let centres = if bp.has(mc_data::cat::WALL) && bp.footprint == (1, 1) {
-        wall_line::wall_line(from, to)
-    } else {
-        line_centres(bp.footprint, bp.mine.is_some(), from, to)
-    };
-    for centre in centres {
-        let xy = Vec2::from(centre.to_f32());
-        let Some((pos, fit)) = site_verdict(
-            field,
-            blueprint,
-            xy.extend(surface_height(field, xy)),
-            None,
-            &taken,
-        ) else {
-            continue;
-        };
-        if out.iter().any(|(p, _)| *p == pos) {
-            continue;
-        }
-        out.push((pos, fit));
-        if fit.is_ok() {
-            taken.push((pos, blueprint));
-        }
-    }
-    out
-}
-
-fn snap_footprint(footprint: (u8, u8), pos: FxVec2) -> FxVec2 {
-    let cell = Fx::from_int(mc_map::BUILD_CELL_M);
-    let snap = |v: Fx, cells: u8| {
-        if cells % 2 == 1 {
-            Fx::from_int((v / cell).floor_int()) * cell + cell / 2
-        } else {
-            Fx::from_int((v / cell).round_int()) * cell
-        }
-    };
-    FxVec2::new(snap(pos.x, footprint.0), snap(pos.y, footprint.1))
-}
-
-fn footprints_overlap(footprint: (u8, u8), a: FxVec2, b: FxVec2) -> bool {
-    let reach = |n: u8| n as i32 * mc_map::BUILD_CELL_M;
-    let d = a - b;
-    d.x.abs().round_int() < reach(footprint.0) && d.y.abs().round_int() < reach(footprint.1)
+/// Which way the plan of `blueprint` at `at` faces: the way it moves with when dragged.
+fn plan_heading(view: &View, at: FxVec2, blueprint: BlueprintId) -> mc_core::Angle {
+    view.status
+        .plans
+        .iter()
+        .find(|p| p.at == at && p.blueprint == blueprint)
+        .map_or(mc_core::Angle::ZERO, |p| {
+            mc_core::Angle::from_radians_f32(p.heading)
+        })
 }
 
 /// Where a patrol given now would loop back to: the middle of the selection, or, with
@@ -838,7 +596,7 @@ impl OrderMap {
                 let at = self.shown(key, plan.pos);
                 let (d, half) = (
                     (at - ground).abs(),
-                    half_footprint(field.blueprints, plan.blueprint),
+                    lots::half_lot(field.blueprints, plan.blueprint, plan.heading),
                 );
                 if d.x < half.x && d.y < half.y && best.is_none_or(|(bd, ..)| d.length() < bd) {
                     best = Some((d.length(), key, at));
@@ -952,8 +710,16 @@ impl OrderMap {
         self.hover = None;
         if let Some(grip) = &self.drag {
             self.aim = match grip.key.kind {
-                OrderKind::Build => surface_under(field, cursor)
-                    .and_then(|ground| site(field, grip.key.blueprint, ground, Some(grip.key.at))),
+                OrderKind::Build => surface_under(field, cursor).and_then(|ground| {
+                    let heading = plan_heading(field.view, grip.key.at, grip.key.blueprint);
+                    site(
+                        field,
+                        grip.key.blueprint,
+                        ground,
+                        heading,
+                        Some(grip.key.at),
+                    )
+                }),
                 _ => {
                     Self::ground_under(field, cursor).map(|ground| (to_fx(ground.truncate()), true))
                 }

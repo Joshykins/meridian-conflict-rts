@@ -22,7 +22,7 @@ use crate::command::Command;
 use crate::tables::UnitId;
 use crate::tables::WreckId;
 use crate::World;
-use mc_core::{Angle, Fx, FxVec2, StateHasher};
+use mc_core::{Fx, FxVec2, StateHasher};
 use mc_data::{cat, BlueprintId};
 use serde::{Deserialize, Serialize};
 
@@ -444,7 +444,6 @@ impl World {
         &self,
         row: usize,
         start: FxVec2,
-        facing: Angle,
         claimed: &[Claim],
         intel: &Intel,
     ) -> Option<Job> {
@@ -458,7 +457,7 @@ impl World {
             .into_iter()
             .min_by_key(|d| (d.distance_sq(pos), d.x, d.y))
             .or_else(|| self.free_deposit(start, claimed, reach, intel, Some(bare)))?;
-        self.job_structure(row, cat::EXTRACTOR, 1, spot, facing, Fx::ZERO, false)
+        self.job_structure(row, cat::EXTRACTOR, 1, spot, Fx::ZERO, false)
     }
 
     /// For a commander out roaming with nothing to build: the nearest wreck of the

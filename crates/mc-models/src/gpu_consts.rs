@@ -111,7 +111,10 @@ shared! {
         pub const NANITE: u32 = 0x80;
         pub const BUILD_SHIFT: u32 = 8;
         pub const BUILD_MASK: u32 = 0xFF;
-        pub const BLUEPRINT_SHIFT: u32 = 16;
+        /// Quarter turns of its building from its build heading: the slab turns too.
+        pub const TURN_SHIFT: u32 = 16;
+        pub const TURN_MASK: u32 = 0x3;
+        pub const BLUEPRINT_SHIFT: u32 = 18;
     }
 
     /// What a draw is for, in the low byte of the entity and terrain push constant

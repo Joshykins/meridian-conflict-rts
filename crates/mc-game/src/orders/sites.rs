@@ -2,23 +2,27 @@
 //! the map's ground by the sim's own rules, the structures standing and planned,
 //! and for a core mine the reach of the mines in sight (`mine_reach`).
 
-use super::{half_footprint, mine_reach, to_fx, Field};
+use super::{lots::half_lot, mine_reach, to_fx, Field};
+use crate::prefabs::Laid;
 use glam::{Vec2, Vec3};
-use mc_core::FxVec2;
+use mc_core::{Angle, FxVec2};
 use mc_data::BlueprintId;
 use mc_sim::mirror::{UnitInstance, KIND_GHOST, KIND_WRECK};
 use mc_sim::placement::Unfit;
 
-/// Where `blueprint` would stand with the pointer on `ground`, and whether it looks
-/// buildable there. `moving` is the site of the plan being dragged, when it is one.
-/// The sim has the final say; this only drives the preview colour.
+/// Where `blueprint` would stand with the pointer on `ground`, turned to `heading`
+/// (snapped to a quarter turn, as the sim will), and whether it looks buildable there.
+/// `moving` is the site of the plan being dragged, when it is one. The sim has the
+/// final say; this only drives the preview colour.
 pub fn site(
     field: &Field,
     blueprint: BlueprintId,
     ground: Vec3,
+    heading: Angle,
     moving: Option<FxVec2>,
 ) -> Option<(FxVec2, bool)> {
-    site_verdict(field, blueprint, ground, moving, &[]).map(|(pos, fit)| (pos, fit.is_ok()))
+    site_verdict(field, blueprint, ground, heading, moving, &[])
+        .map(|(pos, fit)| (pos, fit.is_ok()))
 }
 
 /// `site`, with why it will not do when it will not.
@@ -26,14 +30,16 @@ pub fn site_verdict(
     field: &Field,
     blueprint: BlueprintId,
     ground: Vec3,
+    heading: Angle,
     moving: Option<FxVec2>,
-    taken: &[(FxVec2, BlueprintId)],
+    taken: &[Laid],
 ) -> Option<(FxVec2, Result<(), Unfit>)> {
     let bp = field.blueprints.unit(blueprint);
-    let pos = mc_sim::world::snap_to_build_grid(bp, to_fx(ground.truncate()));
+    let heading = bp.lot_heading(heading);
+    let pos = mc_sim::world::snap_turned_to_build_grid(bp, to_fx(ground.truncate()), heading);
     // The ground and the map's cities first, by the sim's own rules.
     if let Some(sites) = field.view.sites.get() {
-        if let Err(why) = sites.check(bp, pos) {
+        if let Err(why) = sites.check(bp, pos, heading) {
             return Some((pos, Err(why)));
         }
     }
@@ -47,7 +53,7 @@ pub fn site_verdict(
             return Some((pos, Err(Unfit::MineReach)));
         }
     }
-    let (pos, valid) = site_among(field, blueprint, ground, moving, taken)?;
+    let (pos, valid) = site_among(field, blueprint, ground, heading, moving, taken)?;
     let why = if field.view.sites.get().is_some() {
         Unfit::Taken
     } else {
@@ -63,8 +69,9 @@ fn site_among(
     field: &Field,
     blueprint: BlueprintId,
     ground: Vec3,
+    heading: Angle,
     moving: Option<FxVec2>,
-    taken: &[(FxVec2, BlueprintId)],
+    taken: &[Laid],
 ) -> Option<(FxVec2, bool)> {
     let Field {
         view,
@@ -74,23 +81,24 @@ fn site_among(
     } = field;
     let bp = blueprints.unit(blueprint);
     let mut valid = true;
-    let pos = mc_sim::world::snap_to_build_grid(bp, to_fx(ground.truncate()));
+    let pos = mc_sim::world::snap_turned_to_build_grid(bp, to_fx(ground.truncate()), heading);
     // The plan in hand put back where it was.
     if moving == Some(pos) {
         return Some((pos, true));
     }
-    let half = half_footprint(blueprints, blueprint);
+    let half = half_lot(blueprints, blueprint, heading.to_radians_f32());
     let p = Vec2::from(pos.to_f32());
-    let overlaps = |centre: Vec2, other: BlueprintId| {
+    // `other_heading` in radians, as the frame and the plans carry it.
+    let overlaps = |centre: Vec2, other: BlueprintId, other_heading: f32| {
         let d = (centre - p).abs();
-        let reach = half + half_footprint(blueprints, other);
+        let reach = half + half_lot(blueprints, other, other_heading);
         d.x < reach.x && d.y < reach.y
     };
     for u in &view.frame.units {
         let other = BlueprintId(u.blueprint as u16);
         if u.owner_flags & KIND_WRECK == 0
             && blueprints.unit(other).is_structure()
-            && overlaps(Vec2::new(u.pos[0], u.pos[1]), other)
+            && overlaps(Vec2::new(u.pos[0], u.pos[1]), other, u.heading)
         {
             valid = false;
         }
@@ -104,12 +112,16 @@ fn site_among(
             // An order that is not queued replaces the selection's plans; the same plan elsewhere can be joined.
             None => (selected && !view.shift) || (same && !selected),
         };
-        if !out_of_the_way && overlaps(Vec2::from(plan.pos), plan.blueprint) {
+        if !out_of_the_way && overlaps(Vec2::from(plan.pos), plan.blueprint, plan.heading) {
             valid = false;
         }
     }
-    for &(centre, other) in taken {
-        if overlaps(Vec2::from(centre.to_f32()), other) {
+    for t in taken {
+        if overlaps(
+            Vec2::from(t.at.to_f32()),
+            t.blueprint,
+            t.heading.to_radians_f32(),
+        ) {
             valid = false;
         }
     }
@@ -121,8 +133,7 @@ fn site_among(
     }
     // A naval yard wants open water under its whole lot: the middle and the corners.
     if bp.water_only() && view.sites.get().is_none() {
-        let half = Vec2::new(bp.footprint.0 as f32, bp.footprint.1 as f32)
-            * (mc_map::BUILD_CELL_M as f32 * 0.5);
+        let half = half_lot(blueprints, blueprint, heading.to_radians_f32());
         let at = Vec2::from(pos.to_f32());
         for corner in [
             Vec2::ZERO,
@@ -140,16 +151,17 @@ fn site_among(
 }
 
 /// The hologram of `blueprint` on its lot at `at`, for a placement preview: whole,
-/// facing as it will be built, and lit as buildable there or not (`health`, which
-/// `ghost_footprints` reads too).
+/// facing `heading` as it will be built, and lit as buildable there or not (`health`,
+/// which `ghost_footprints` reads too).
 pub fn placement_ghost(
     field: &Field,
     blueprint: BlueprintId,
     at: FxVec2,
+    heading: Angle,
     valid: bool,
 ) -> UnitInstance {
     let bp = field.blueprints.unit(blueprint);
-    let heading = bp.build_heading().to_radians_f32();
+    let heading = bp.lot_heading(heading).to_radians_f32();
     let xy = at.to_f32();
     let p = [xy[0], xy[1], field.renderer.surface_height(Vec2::from(xy))];
     UnitInstance {
@@ -167,32 +179,33 @@ pub fn placement_ghost(
     }
 }
 
-/// Where each structure of `prefab` would go with its middle on `ground`, turned
-/// `quarters` quarter turns, and whether it can: the ground and the lots (each also
+/// Where each structure of `prefab` would go with its middle on `ground`, mirrored
+/// and turned by `turn`, and whether it can: the ground and the lots (each also
 /// against the prefab's own structures before it), and whether `builds` holds it.
 pub fn prefab_sites(
     field: &Field,
     prefab: &crate::prefabs::Prefab,
     ground: Vec3,
-    quarters: u8,
+    turn: crate::prefabs::Turn,
     builds: &[BlueprintId],
 ) -> Vec<crate::prefabs::PrefabSite> {
     let (members, _) = prefab.resolve(field.blueprints);
     let anchor = to_fx(ground.truncate());
-    let mut taken: Vec<(FxVec2, BlueprintId)> = Vec::new();
+    let mut taken: Vec<Laid> = Vec::new();
     let mut out = Vec::with_capacity(members.len());
-    for (blueprint, at) in crate::prefabs::layout(field.blueprints, &members, anchor, quarters) {
-        let xy = Vec2::from(at.to_f32());
+    for laid in crate::prefabs::layout(field.blueprints, &members, anchor, turn) {
+        let xy = Vec2::from(laid.at.to_f32());
         let ground = xy.extend(super::surface_height(field, xy));
-        let fit = site_verdict(field, blueprint, ground, None, &taken)
+        let fit = site_verdict(field, laid.blueprint, ground, laid.heading, None, &taken)
             .map_or(Err(Unfit::OffMap), |(_, fit)| fit);
-        let buildable = builds.contains(&blueprint);
+        let buildable = builds.contains(&laid.blueprint);
         if fit.is_ok() && buildable {
-            taken.push((at, blueprint));
+            taken.push(laid);
         }
         out.push(crate::prefabs::PrefabSite {
-            blueprint,
-            at,
+            blueprint: laid.blueprint,
+            at: laid.at,
+            heading: laid.heading,
             fit,
             buildable,
         });

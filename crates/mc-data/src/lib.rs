@@ -10,6 +10,7 @@
 pub mod dash;
 pub mod elevator;
 pub mod gravitic;
+mod lot;
 mod raw;
 pub mod refit;
 pub mod regions;
@@ -1062,19 +1063,6 @@ impl UnitBlueprint {
     /// turrets cover every side, so it never wheels its hull about a target.
     pub fn is_capital_ship(&self) -> bool {
         self.has(cat::SPACE) || self.transport.is_some()
-    }
-
-    /// Which way it faces when raised on its lot. Structures face south. A unit
-    /// built on a lot (a lift ship) lies along the lot's long side, nose east
-    /// when the lot is wider than deep, so its hull and the lot agree.
-    pub fn build_heading(&self) -> Angle {
-        if !self.is_site_built_unit() {
-            Angle::from_degrees(270)
-        } else if self.footprint.0 >= self.footprint.1 {
-            Angle::ZERO
-        } else {
-            Angle::from_degrees(90)
-        }
     }
 
     /// Room in a transport: a commander takes eight slots; other land units take their size class plus one.
