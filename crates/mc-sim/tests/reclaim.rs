@@ -194,6 +194,49 @@ fn own_structures_can_be_reclaimed_and_allies_cannot() {
 }
 
 #[test]
+fn a_site_reclaimed_comes_down_the_way_it_went_up() {
+    let mut w = world();
+    let power = cmd(Command::DebugSpawn {
+        owner: 0,
+        blueprint: w.blueprints.id_of("aster_t1_power").unwrap(),
+        pos: FxVec2::from_ints(548, 512),
+        heading: Angle::ZERO,
+        count: 1,
+        flags: 0,
+        build: 500,
+    });
+    w.tick(&[spawn(&w, 0, ENGINEER, 500, 0), power]).unwrap();
+    let site = ids(&w, 0, "aster_t1_power")[0];
+    let row = w.state.units.row(site).unwrap();
+    assert!(w.state.units.has_flag(row, flag::UNDER_CONSTRUCTION));
+    let (time, full, cost) = (w.bp(row).build_time, w.bp(row).health, w.bp(row).cost_mass);
+    let start = w.state.units.build_progress[row];
+    w.tick(&[cmd(Command::ReclaimUnit {
+        units: ids(&w, 0, ENGINEER),
+        target: site,
+        queue: false,
+    })])
+    .unwrap();
+    run_until(&mut w, 2000, |w| {
+        w.state.units.build_progress[w.state.units.row(site).unwrap()] < start * Fx::ratio(3, 4)
+    });
+    // Health stays where building would have put it for that progress.
+    let (progress, health) = (w.state.units.build_progress[row], w.state.units.health[row]);
+    let expected = full / 10 + full * Fx::ratio(9, 10) * progress / time;
+    assert!(
+        (health - expected).abs() < full / 100,
+        "health {health:?} follows progress (expected {expected:?})"
+    );
+    run_until(&mut w, 4000, |w| w.state.units.row(site).is_none());
+    let got = w.state.players[0].reclaimed_mass;
+    let put_in = cost * start / time;
+    assert!(
+        got > put_in * Fx::ratio(19, 100) && got <= put_in * Fx::ratio(1, 5),
+        "a fifth of what was put in came back: {got:?} of {put_in:?}"
+    );
+}
+
+#[test]
 fn an_engineer_sent_to_reclaim_a_far_wreck_takes_what_it_passes_on_the_way() {
     let mut w = world();
     w.tick(&[

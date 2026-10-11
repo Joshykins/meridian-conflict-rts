@@ -2,7 +2,8 @@
 //!
 //! A wreck gives up its mass at the reclaimer's power. A live unit is unbuilt
 //! at the same power it would take to build: it loses health as it goes, and
-//! when the last of it is taken it is simply gone (`flag::RECLAIMED`). Reclaimers
+//! when the last of it is taken it is simply gone (`flag::RECLAIMED`). A site
+//! still going up loses its build progress too, as fast as it was built. Reclaimers
 //! with nothing to do clear the wrecks within their reach; a live unit is only
 //! ever reclaimed on an order.
 
@@ -277,15 +278,35 @@ impl World {
             self.state.units.id(row),
         );
         let enemies = self.are_enemies(by, of);
-        let taken = (full * (power / DT) / time)
-            .max(Fx::EPSILON)
-            .min(self.state.units.health[t]);
-        self.state.units.health[t] -= taken;
-        self.state.units.flags[t] |= flag::HURT;
-        // A site is worth what has been put into it: a fresh one gives nothing back.
-        let built = self.state.units.build_progress[t] / time;
-        let mass = cost * taken / full * built * UNIT_YIELD;
-        let gone = self.state.units.health[t] <= Fx::ZERO;
+        let units = &mut self.state.units;
+        let (taken, mass, gone) = if units.has_flag(t, flag::UNDER_CONSTRUCTION) {
+            // A site is unbuilt the way it went up: its progress falls at the power that
+            // would raise it, its health with it, and it is gone once nothing is left built.
+            // What comes back is a share of what had been put in.
+            let progress = units.build_progress[t];
+            let step = (power / DT).max(Fx::EPSILON).min(progress);
+            // The last step takes the tenth a fresh site starts with as well.
+            let taken = if step >= progress {
+                units.health[t]
+            } else {
+                (full * step / time * Fx::ratio(9, 10)).min(units.health[t])
+            };
+            units.build_progress[t] -= step;
+            units.health[t] -= taken;
+            let gone = units.health[t] <= Fx::ZERO;
+            (taken, cost * step / time * UNIT_YIELD, gone)
+        } else {
+            let taken = (full * (power / DT) / time)
+                .max(Fx::EPSILON)
+                .min(units.health[t]);
+            units.health[t] -= taken;
+            (
+                taken,
+                cost * taken / full * UNIT_YIELD,
+                units.health[t] <= Fx::ZERO,
+            )
+        };
+        units.flags[t] |= flag::HURT;
         if enemies {
             self.record_damage(t, source, taken);
         }
