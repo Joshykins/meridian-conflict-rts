@@ -18,7 +18,9 @@ mod arrival;
 mod builders;
 mod commander;
 pub use commander::mind::{AiMind, MindEconomy, MindNote, MindOp, MindPlan};
-pub use commander::mind_zones::{MindHolding, MindZone, ZoneMapView, ZoneShape, NO_ZONE};
+pub use commander::mind_zones::{
+    MindFront, MindHolding, MindZone, ZoneMapView, ZoneShape, NO_ZONE,
+};
 mod danger;
 mod energy;
 mod groups;

@@ -25,11 +25,13 @@ const HEAD: f32 = 22.0;
 /// Plans shown that it does not hold: the next best few.
 const UNHELD: usize = 3;
 const NOTES: usize = 5;
+/// Fronts listed, those with most at stake first.
+const FRONTS: usize = 4;
 
 /// Lines the card needs, to size it before drawing.
 fn lines(m: &AiMind) -> (usize, usize) {
     let plans = m.plans.iter().filter(|p| p.level > 0).count() + UNHELD;
-    let ops = m.ops.len().max(1);
+    let ops = m.ops.len().max(1) + m.fronts.len().min(FRONTS).max(1) + 2;
     (plans, ops)
 }
 
@@ -292,6 +294,10 @@ impl Hud {
             y += LINE;
         }
         y += 6.0;
+        if !fits(y) {
+            return;
+        }
+        y = self.mind_fronts(ui, s, m, x, x2, y, r.bottom() - 6.0);
 
         // What it knows and what hurts it, a line each.
         if fits(y) {
@@ -346,5 +352,83 @@ impl Hud {
             );
             y += LINE;
         }
+    }
+}
+
+impl Hud {
+    /// The card's fronts: against whom, what stands near each side of it, and what is
+    /// at stake behind it. Returns the line below.
+    #[expect(clippy::too_many_arguments, reason = "the card's layout, passed down")]
+    fn mind_fronts(
+        &self,
+        ui: &mut Ui,
+        s: &Scene,
+        m: &AiMind,
+        x: f32,
+        x2: f32,
+        mut y: f32,
+        bottom: f32,
+    ) -> f32 {
+        let fits = |y: f32| y + LINE * 0.5 <= bottom;
+        let dim = rgb(palette::DIM, 1.0);
+        let faint = rgb(palette::FAINT, 1.0);
+        let text = rgb(palette::TEXT, 1.0);
+        ui.text(
+            x,
+            y,
+            type_scale::MICRO,
+            dim,
+            "FRONTS  \u{b7}  NEAR: OURS / THEIRS  \u{b7}  AT STAKE",
+        );
+        y += HEAD - 4.0;
+        if m.fronts.is_empty() && fits(y) {
+            ui.text(x, y, type_scale::CAPTION, faint, "None yet");
+            y += LINE;
+        }
+        let mut fronts: Vec<_> = m.fronts.iter().collect();
+        fronts.sort_by_key(|f| (std::cmp::Reverse(f.stake_us + f.stake_them), f.id));
+        for f in fronts.into_iter().take(FRONTS) {
+            if !fits(y) {
+                break;
+            }
+            let who = s
+                .view
+                .status
+                .players
+                .get(f.enemy as usize)
+                .map_or("?", |p| p.name.as_str());
+            let end = ui.text(x, y, type_scale::CAPTION, text, &format!("#{}", f.id));
+            ui.text(
+                end + 6.0,
+                y,
+                type_scale::MICRO,
+                s.team_color(f.enemy),
+                &format!("{}{who}", if f.water { "sea \u{b7} " } else { "" }),
+            );
+            let ahead = f.ours * 10 >= f.theirs * 13;
+            let behind = f.ours * 13 < f.theirs * 10;
+            ui.text(
+                x + 158.0,
+                y,
+                type_scale::MICRO,
+                if ahead {
+                    text
+                } else if behind {
+                    rgb(palette::BAD, 1.0)
+                } else {
+                    dim
+                },
+                &format!("{} / {}", kilo(f.ours), kilo(f.theirs)),
+            );
+            ui.text_right(
+                x2,
+                y,
+                type_scale::MICRO,
+                dim,
+                &format!("{} / {}", kilo(f.stake_us), kilo(f.stake_them)),
+            );
+            y += LINE;
+        }
+        y + 6.0
     }
 }

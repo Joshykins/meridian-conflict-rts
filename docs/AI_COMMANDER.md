@@ -164,6 +164,35 @@ old is kept; out of view, the old stands. Something on radar is never less than
 what was known. When read, structures are sure for ten minutes and fade to 40% at
 thirty; an army is sure for twenty seconds and is forgotten at three minutes.
 
+### 3d. Fronts (`fronts.rs`)
+
+Where the side's ground meets an enemy's, found each think, one set per enemy
+player, on land and at sea:
+
+- **Claims**: our structure mass in each zone, and half our armed mobile mass; the
+  enemy's from knowledge, structures by how sure they still are and the army
+  believed there now. An enemy start never seen is still claimed (1000). At sea, a
+  water zone also takes half the claim of the land on its coast.
+- **Reach**: each claim of 250 or more spreads over the zone graph by walk (or sail)
+  distance between zone middles, starting ahead by a tenth of its mass in metres
+  (1.5 km at most): a strong base pushes the border away from it.
+- **Border**: a zone both sides reach within 250 m of each other, or one touching the
+  other side's ground. A connected run of border zones is cut into sectors of four
+  hops from one of its ends, so a border across the map is several fronts; a cliff
+  or a strait breaks a run of itself.
+- Each front reads: its zones, their zones beside it (`entries`), what is at stake
+  behind it within two hops on each side (structures and ore), armed mass near it on
+  each side (one hop), and how many zones lie from it to their most valuable ground.
+  A front of two zones or fewer with less than 600 at stake on both sides is dropped;
+  at most 48 are kept, those with most at stake.
+- **Identity**: a front keeps its id from think to think by the zones it shares with
+  a front of the last think against the same enemy on the same ground: the biggest
+  pick first, so a front that splits keeps its id on its larger part and two that
+  merge keep the older one (`CommanderState::fronts`).
+
+On the overlay, fronts are outlined orange with their id and the armed mass near
+each side; the AI Mind card lists the four with most at stake.
+
 ### 4. Beliefs (`beliefs.rs`)
 
 What the side thinks of the enemy, each a guess from what it has seen, where it has

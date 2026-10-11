@@ -94,6 +94,27 @@ pub struct MindZone {
     pub held: Vec<MindHolding>,
 }
 
+/// One of the side's fronts: where its ground meets an enemy's (`fronts.rs`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct MindFront {
+    pub id: u32,
+    pub enemy: u8,
+    pub water: bool,
+    /// Its zones, and their zones beside it: the way through to them.
+    pub zones: Vec<u16>,
+    pub entries: Vec<u16>,
+    /// Mass at stake behind it, ours and theirs.
+    pub stake_us: i32,
+    pub stake_them: i32,
+    /// Armed mass near it: ours, and theirs as believed.
+    pub ours: i32,
+    pub theirs: i32,
+    /// Zones from it to their most valuable ground.
+    pub depth: u16,
+    /// Seconds since it was first found.
+    pub age: u32,
+}
+
 /// Mass of guns, anti-air, artillery and shields at which a zone without factories
 /// is a firebase.
 const FIREBASE: i32 = 1500;
@@ -151,6 +172,33 @@ impl World {
             .zone_view
             .get_or_init(|| Arc::new(ZoneMapView::of(&self.zones())))
             .clone()
+    }
+
+    /// `player`'s fronts at its last think, with what it read of each.
+    pub(in crate::ai) fn mind_fronts(&self, player: u8) -> Vec<MindFront> {
+        let c = &self.state.ai[player as usize].commander;
+        let tick = self.state.tick;
+        c.scratch
+            .fronts
+            .iter()
+            .map(|f| MindFront {
+                id: f.id,
+                enemy: f.enemy,
+                water: f.water,
+                zones: f.zones.clone(),
+                entries: f.entries.clone(),
+                stake_us: f.stake_us,
+                stake_them: f.stake_them,
+                ours: f.ours,
+                theirs: f.theirs,
+                depth: f.depth,
+                age: c
+                    .fronts
+                    .iter()
+                    .find(|r| r.id == f.id)
+                    .map_or(0, |r| tick.saturating_sub(r.since) / 10),
+            })
+            .collect()
     }
 
     /// What `player`'s AI believes of each zone it knows anything of.

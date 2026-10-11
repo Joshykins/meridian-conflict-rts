@@ -15,7 +15,7 @@ use crate::nuke_marks::{project, surface, tag};
 use crate::orders::Field;
 use crate::ui::{ink, palette, rgb, type_scale, Color, Rect, Ui};
 use glam::{Vec2, Vec3};
-use mc_sim::ai::{MindHolding, MindZone, ZoneMapView, NO_ZONE};
+use mc_sim::ai::{MindFront, MindHolding, MindZone, ZoneMapView, NO_ZONE};
 
 /// What the map shows.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -181,6 +181,26 @@ pub fn draw(
         }
     };
     let ink_line = rgb(palette::TEXT, 0.22);
+    // Which front each zone is on: its own map's fronts, those with most at stake
+    // drawn over the rest.
+    let fronts: &[MindFront] = status
+        .players
+        .get(who as usize)
+        .and_then(|p| p.mind.as_ref())
+        .map_or(&[], |m| m.fronts.as_slice());
+    let mut front_of = vec![usize::MAX; map.zones.len()];
+    let mut by_stake: Vec<usize> = (0..fronts.len()).collect();
+    by_stake.sort_by_key(|&i| fronts[i].stake_us + fronts[i].stake_them);
+    for i in by_stake {
+        for &z in &fronts[i].zones {
+            if let Some(f) = front_of.get_mut(z as usize) {
+                *f = i;
+            }
+        }
+    }
+    let front = |z: u16| front_of.get(z as usize).copied().unwrap_or(usize::MAX);
+    let front_line = rgb(palette::ACCENT, 0.9);
+    let front_fill = rgb(palette::ACCENT, 0.10);
     for y in 0..h {
         let below: Vec<Option<Vec2>> = (0..=w).map(|x| corner(ui, x, y + 1)).collect();
         // Each zone's fill, a run of nodes at a time.
@@ -197,6 +217,10 @@ pub fn draw(
                 if on_screen(a) || on_screen(c) || on_screen(b) || on_screen(d) {
                     ui.triangle(a, b, c, t);
                     ui.triangle(a, c, d, t);
+                    if front(z) != usize::MAX {
+                        ui.triangle(a, b, c, front_fill);
+                        ui.triangle(a, c, d, front_fill);
+                    }
                 }
             }
             x = end;
@@ -211,14 +235,41 @@ pub fn draw(
                 continue;
             }
             let line = |n: u16| n != z && (z != NO_ZONE || n != NO_ZONE);
-            if x + 1 < w && line(at(x + 1, y)) {
-                ui.stroke(b, c, 1.2, ink_line);
+            // A front's outline is drawn bold where it parts from the zones round it.
+            let edge = |n: u16, p: Vec2, q: Vec2, ui: &mut Ui| {
+                if front(n) != front(z) {
+                    ui.stroke(p, q, 2.6, front_line);
+                } else if line(n) {
+                    ui.stroke(p, q, 1.2, ink_line);
+                }
+            };
+            if x + 1 < w {
+                edge(at(x + 1, y), b, c, ui);
             }
-            if y + 1 < h && line(at(x, y + 1)) {
-                ui.stroke(d, c, 1.2, ink_line);
+            if y + 1 < h {
+                edge(at(x, y + 1), d, c, ui);
             }
         }
         above = below;
+    }
+    // Each front's name and balance, over its middle.
+    for f in fronts {
+        let n = f.zones.len().max(1) as f32;
+        let mid = f
+            .zones
+            .iter()
+            .filter_map(|&z| map.zones.get(z as usize))
+            .fold(Vec2::ZERO, |a, z| {
+                a + Vec2::new(z.centre.0 as f32, z.centre.1 as f32)
+            })
+            / n;
+        let Some(p) = project(ui, field, mid.extend(surface(field, mid) + LIFT)) else {
+            continue;
+        };
+        if on_screen(p) {
+            let text = format!("FRONT #{}  {} / {}", f.id, kilo(f.ours), kilo(f.theirs));
+            tag(ui, p - Vec2::new(0.0, 22.0), &text, palette::ACCENT);
+        }
     }
     // Over each zone: what it is, and an army believed there.
     for (z, s) in shown.iter().enumerate() {
@@ -313,6 +364,27 @@ pub fn card(ui: &mut Ui, field: &Field, mode: MapMode, who: u8, z: u16, at: Vec2
         String::new()
     };
     lines.push((text, format!("Zone {z}  \u{b7}  {ground}{ore}"), true));
+    let fronts = status
+        .players
+        .get(who as usize)
+        .and_then(|p| p.mind.as_ref())
+        .map_or(&[][..], |m| m.fronts.as_slice());
+    for f in fronts.iter().filter(|f| f.zones.contains(&z)) {
+        let name = names.get(f.enemy as usize).copied().unwrap_or("?");
+        lines.push((
+            rgb(palette::ACCENT, 1.0),
+            format!(
+                "Front #{} against {name}: near {} / {}, at stake {} / {}, {} zones to their best ground",
+                f.id,
+                kilo(f.ours),
+                kilo(f.theirs),
+                kilo(f.stake_us),
+                kilo(f.stake_them),
+                f.depth
+            ),
+            false,
+        ));
+    }
     let holder = |lines: &mut Vec<(Color, String, bool)>, h: &MindHolding, belief: bool| {
         let name = names.get(h.player as usize).copied().unwrap_or("?");
         lines.push((

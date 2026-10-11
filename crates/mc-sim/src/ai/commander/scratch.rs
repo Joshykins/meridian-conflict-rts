@@ -10,6 +10,8 @@ pub(in crate::ai) struct Scratch {
     /// Work units the last think spent (world-model cells and contacts walked):
     /// a count the tests can budget, unlike time.
     pub work: u32,
+    /// Its fronts at the last think, as read then: for the overlay.
+    pub fronts: Vec<super::fronts::Front>,
 }
 
 // Derived data is never part of what two states compare.

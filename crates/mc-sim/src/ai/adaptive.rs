@@ -90,7 +90,9 @@ impl World {
             });
         }
         // The long memory takes everything seen; the contacts below keep the freshest.
+        let span = mc_core::perf_span!("ai.knowledge");
         self.learn_zones(player, &seen, &blips);
+        drop(span);
         let mut contacts = std::mem::take(&mut self.state.ai[player as usize].contacts);
         contacts.retain(|c| {
             tick.saturating_sub(c.seen) <= config.memory_ticks()

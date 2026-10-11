@@ -6,6 +6,7 @@
 //! operation's orders as far as the side's attention goes.
 mod beliefs;
 pub(in crate::ai) mod economy;
+pub(in crate::ai) mod fronts;
 mod king;
 pub(in crate::ai) mod knowledge;
 mod matchup;
@@ -172,6 +173,9 @@ impl World {
         let wm = self.world_model(player, &profiles);
         let zv = self.zone_view(player, &zones, &wm);
         let beliefs = self.beliefs(player, &profiles);
+        let span = mc_core::perf_span!("ai.fronts");
+        self.find_fronts(player, &zones, &zv, &profiles);
+        drop(span);
         // Behind, for spending on the next tier: what it fields against the army it
         // believes in, and never less than two minutes of their income. Under fog
         // it believed in a 1.2k army that stood at 4.3k.

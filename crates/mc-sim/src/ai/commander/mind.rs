@@ -96,6 +96,8 @@ pub struct AiMind {
     pub need: [i32; 3],
     /// What it believes of every zone it knows anything of (`knowledge.rs`).
     pub known: Vec<super::mind_zones::MindZone>,
+    /// Its fronts (`fronts.rs`).
+    pub fronts: Vec<super::mind_zones::MindFront>,
 }
 
 const HURT_NAMES: [&str; 6] = ["land", "artillery", "air", "space", "sea", "turrets"];
@@ -230,6 +232,7 @@ impl World {
             work: c.scratch.work,
             need: c.role_need.map(i32::from),
             known: self.mind_zones(&c.knowledge),
+            fronts: self.mind_fronts(player),
         })
     }
 }
