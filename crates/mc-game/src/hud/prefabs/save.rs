@@ -1,5 +1,4 @@
-//! The Save Prefab button on the selection card: in the heading of a selection of
-//! many, and beside the details button of one builder with structures planned. It
+//! The Save Prefab button in the heading of the card of a selection of many. It
 //! offers the selection's structures (and its builders' plans) for naming.
 
 use crate::hud::build::tip;
@@ -9,7 +8,7 @@ use crate::ui::{id, palette, rgb, type_scale, Rect, Ui};
 use glam::Vec2;
 use mc_sim::mirror::UnitInstance;
 
-/// The heading button's width, with its label.
+/// The button's width.
 pub(in crate::hud) const WIDE: f32 = 122.0;
 const TIP: &str = "Save Prefab  \u{b7}  keep this layout, to lay it again with B, then P";
 
@@ -29,27 +28,29 @@ pub(in crate::hud) fn can_save(s: &Scene, units: &[&UnitInstance]) -> bool {
             .any(|p| units.iter().any(|u| u.unit_id == p.unit_id))
 }
 
-/// The button in `r`, filled with the accent so it stands out from the card: the
-/// prefab glyph, and with `label` its name.
-pub(in crate::hud) fn save_button(hud: &mut Hud, ui: &mut Ui, r: Rect, label: bool) {
+/// The button in `r`, filled with the accent so it stands out from the card.
+pub(in crate::hud) fn save_button(hud: &mut Hud, ui: &mut Ui, r: Rect) {
     let t = hud.tile(ui, id("save-prefab", 0), r, false, true);
     ui.fill_cut(r, 5.0, rgb(palette::ACCENT_DEEP, 0.7 + 0.2 * t.glow));
     ui.fill_cut(r, 5.0, rgb(palette::ACCENT, 0.15 + 0.2 * t.glow));
     let edge = rgb(palette::ACCENT, 0.8 + 0.2 * t.glow);
     ui.outline_cut(r, 5.0, edge, edge);
     let tone = rgb(0xFFFFFF, 1.0);
-    let glyph_x = if label { r.x + 14.0 } else { r.x + r.w * 0.5 };
-    icons::glyph(ui, Glyph::Prefab, Vec2::new(glyph_x, r.mid_y()), 6.0, tone);
-    if label {
-        ui.text_fit_left(
-            r.x + 26.0,
-            r.mid_y(),
-            r.w - 30.0,
-            type_scale::BUTTON,
-            tone,
-            "Save Prefab",
-        );
-    }
+    icons::glyph(
+        ui,
+        Glyph::Prefab,
+        Vec2::new(r.x + 14.0, r.mid_y()),
+        6.0,
+        tone,
+    );
+    ui.text_fit_left(
+        r.x + 26.0,
+        r.mid_y(),
+        r.w - 30.0,
+        type_scale::BUTTON,
+        tone,
+        "Save Prefab",
+    );
     if t.hovered {
         let w = ui.text_width(type_scale::MICRO, TIP) + 24.0;
         tip(ui, r.right() - w, r.y - 32.0, TIP);

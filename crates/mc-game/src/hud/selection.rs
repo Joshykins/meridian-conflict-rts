@@ -241,7 +241,7 @@ pub fn info(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
     let mut right = x + cw;
     if super::prefabs::can_save(s, units) {
         let w = super::prefabs::SAVE_W;
-        super::prefabs::save_button(hud, ui, Rect::new(right - w, r.y + 9.0, w, 22.0), true);
+        super::prefabs::save_button(hud, ui, Rect::new(right - w, r.y + 9.0, w, 22.0));
         right -= w + 12.0;
     }
     ui.section(
@@ -639,15 +639,7 @@ fn body(r: Rect) -> Rect {
 fn single(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect, strip: bool) {
     let bp = s.bp(u);
     let details = Rect::new(r.right() - 16.0 - 26.0, r.y + 14.0, 26.0, 24.0);
-    // A builder with structures planned can keep them as a prefab: a button beside
-    // the details one. (One structure alone is not a layout.)
-    let mut title_end = details.x - 8.0;
-    if s.view.status.plans.iter().any(|p| p.unit_id == u.unit_id) {
-        let save = Rect::new(title_end - 26.0, details.y, 26.0, details.h);
-        super::prefabs::save_button(hud, ui, save, false);
-        title_end = save.x - 8.0;
-    }
-    title(hud, ui, s, u, r, title_end);
+    title(hud, ui, s, u, r, details.x - 8.0);
     // Details (I) opens lore, figures and every weapon in a card of their own.
     let t = hud.tile(ui, id("unit-details", 0), details, hud.details_open, true);
     let c = Vec2::new(details.x + details.w * 0.5, details.mid_y());
