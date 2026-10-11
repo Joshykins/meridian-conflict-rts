@@ -700,10 +700,55 @@
 
         // The Brazier's Plasmeric Repeater: the Canopy's launch from a smaller organ.
         "regency_brazier_fire": (like: "regency_canopy_fire", size: 0.85, peak: 0.24),
-        // The Gorget's airburst repeater: a Halberd's pinch from a smaller bore, and a burst
-        // like the Canopy's old one, bigger.
-        "regency_gorget_fire": (like: "regency_halberd_fire", size: 0.55, peak: 0.42),
-        "regency_gorget_burst": (like: "regency_canopy_burst", size: 1.35, peak: 0.5),
+        // The Gorget's airburst repeater, one bead leaving: nothing like the point defences'
+        // (the Picket's pulse, the Halberd's growling jet). A hard pneumatic thoomp, short and
+        // dry: a deep punch with a tight crack on it, the fork's breech clacking shut, gas
+        // venting out either side in a quick hiss, and a short report. Four in 0.45 s, so
+        // each is done in about a third of a second. No growl, no falling tone.
+        "regency_gorget_fire": (
+            length: 0.45, peak: 0.4, room: 0.2,
+            layers: [
+                // The punch and its crack.
+                Burst(low: 50, high: 320, attack: 0.001, decay: 0.035, gain: 12, seed: 401),
+                Burst(low: 800, high: 3000, attack: 0.0002, decay: 0.005, gain: 8, seed: 402),
+                Tone(from: 95, to: 62, glide: 0.04, attack: 0.001, decay: 0.06, gain: 0.8),
+                // The breech clacking shut.
+                Fm(at: 0.012, from: 820, to: 760, glide: 0.02, ratio: 3.5, index: 1.8, fade: 0.02, attack: 0.0005, decay: 0.025, gain: 0.35),
+                Drive(1.3),
+                // Gas venting out either side of the fork.
+                Sweep(at: 0.004, from: 1900, to: 900, glide: 0.08, q: 1.1, attack: 0.002, decay: 0.06, gain: 0.8, pan: -0.35, seed: 403),
+                Sweep(at: 0.008, from: 1800, to: 850, glide: 0.08, q: 1.1, attack: 0.002, decay: 0.06, gain: 0.8, pan: 0.35, seed: 404),
+                // A short report.
+                Roll(at: 0.01, from: 520, to: 160, glide: 0.3, attack: 0.01, decay: 0.12, gain: 0.3, swell: 9, depth: 0.5, seed: 405),
+            ],
+        ),
+        // A Gorget bead going off among aircraft, heard from the ground: a star, not a boom.
+        // A sharp high crack and a soft hollow whumpf under it, then the shell crackling: a
+        // run of small pops spread across the sky over a quarter of a second, and the report
+        // rolling away high and wide. No held noise up high, no pitched layer left ringing.
+        "regency_gorget_burst": (
+            length: 1.3, peak: 0.5, room: 0.45,
+            layers: [
+                // The bead going off.
+                Burst(low: 900, high: 3800, attack: 0.0002, decay: 0.003, gain: 9, seed: 411),
+                Burst(low: 50, high: 300, attack: 0.002, decay: 0.06, gain: 6, seed: 412),
+                Tone(from: 115, to: 62, glide: 0.06, attack: 0.002, decay: 0.09, gain: 0.5),
+                Drive(1.3),
+                // The shell crackling out.
+                Burst(at: 0.05, low: 700, high: 2600, attack: 0.0003, decay: 0.004, gain: 4.68, pan: -0.5, seed: 413),
+                Burst(at: 0.08, low: 600, high: 2400, attack: 0.0003, decay: 0.004, gain: 4.14, pan: 0.45, seed: 414),
+                Burst(at: 0.11, low: 750, high: 2700, attack: 0.0003, decay: 0.004, gain: 4.32, pan: -0.15, seed: 415),
+                Burst(at: 0.135, low: 650, high: 2500, attack: 0.0003, decay: 0.004, gain: 3.6, pan: 0.6, seed: 416),
+                Burst(at: 0.17, low: 700, high: 2600, attack: 0.0003, decay: 0.004, gain: 3.42, pan: -0.6, seed: 417),
+                Burst(at: 0.2, low: 600, high: 2300, attack: 0.0003, decay: 0.004, gain: 2.88, pan: 0.2, seed: 418),
+                Burst(at: 0.24, low: 650, high: 2400, attack: 0.0003, decay: 0.004, gain: 2.34, pan: -0.3, seed: 419),
+                Burst(at: 0.28, low: 600, high: 2200, attack: 0.0003, decay: 0.005, gain: 1.8, pan: 0.4, seed: 420),
+                // The report rolling away overhead.
+                Roll(at: 0.01, from: 900, to: 220, glide: 0.8, attack: 0.02, decay: 0.35, gain: 0.35, swell: 10, depth: 0.55, pan: -0.25, seed: 421),
+                Roll(at: 0.05, from: 850, to: 200, glide: 0.8, attack: 0.03, decay: 0.35, gain: 0.35, swell: 11, depth: 0.55, pan: 0.25, seed: 422),
+                Roll(at: 0.1, from: 300, to: 90, glide: 1.0, attack: 0.08, decay: 0.45, gain: 0.25, swell: 4, depth: 0.5, seed: 423),
+            ],
+        ),
 
         // ---- movement ------------------------------------------------------------------
         // The Outrider walking: a small six-legged crawler scuttling on alternate tripods,

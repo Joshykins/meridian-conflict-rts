@@ -938,6 +938,11 @@ shared! {
         /// trailing a crimson heat plume that cools to violet, pressure pulses running back
         /// down it. `mc_sim::mirror::PLASMA_LOOK_SURGE_SHELL`.
         pub const SURGE_SHELL: u32 = 8;
+        /// An airburst round (`Weapon::airburst`, the Gorget's): a small hard bead of
+        /// squeezed plasma on a timed fuse, not a stream. A white-hot pearl in a thin ruby
+        /// shell, ticking bright and dim as its fuse runs, shedding a short broken line of
+        /// sparks behind it. `mc_sim::mirror::PLASMA_LOOK_AIRBURST`.
+        pub const AIRBURST: u32 = 9;
     }
 
     /// A strategic launcher (models/aster/strategic.rs, entity.wgsl). The rounds word

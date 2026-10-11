@@ -13,6 +13,12 @@
 //! - **Plasmeric AA repeater** (the Canopy's, a proximity-fused bolt): the same bolt; it
 //!   bursts as a wide red bloom that throws sparkles and streaks of plasma out through the
 //!   air.
+//! - **Airburst** (a gun with `Weapon::airburst`, the Gorget's): nothing like the point
+//!   defences beside it (`airburst`). No charge; each bead leaves with a hard white snap and
+//!   gas vented out sideways, no red bloom or jet. In flight a small white-hot pearl ticking
+//!   on its fuse, shedding sparks. It bursts as a star: a pin-point flash, a shell of straight
+//!   white-hot needles thrown out every way, crackling pops out on that shell a moment later,
+//!   embers drifting down.
 //! - **Pinched-plasmeric** (the Halberd's): over its charge (`SimEvent::WeaponCharging`) a
 //!   ball of red plasma gathers in front of the bore, motes and filaments drawn in to it
 //!   and red lightning snapping into it from round it, its light growing. It pinches its
@@ -61,6 +67,7 @@ use mc_sim::mirror::{
 };
 use std::mem::size_of;
 
+mod airburst;
 mod burning;
 mod fusion;
 mod plasmeric;
@@ -128,6 +135,8 @@ pub(super) enum Grade {
     Fusion,
     /// A plasma gun with a ground wake (`Weapon::surge`), whatever its grade (`surge`).
     Surge,
+    /// A plasma gun on a timed fuse (`Weapon::airburst`), whatever its grade (`airburst`).
+    Airburst,
 }
 
 /// The grade a weapon is drawn as: a plasma gun firing straight, laid flat with its shot
@@ -143,6 +152,9 @@ pub(super) fn grade(w: &Weapon) -> Option<Grade> {
     }
     if w.surge.is_some() && !w.missile {
         return w.plasma_shot().map(|_| Grade::Surge);
+    }
+    if w.airburst && !w.missile {
+        return w.plasma_shot().map(|_| Grade::Airburst);
     }
     let grade = match w.plasma_shot()? {
         PlasmaGrade::Plasmeric if lobbed && !w.missile => Grade::Mortar,
@@ -399,14 +411,6 @@ impl Renderer {
         let mut sparks = 0;
         for p in projectiles {
             let look = drawn_look(p);
-            let (kind, plasmeric) = match look {
-                1 | 3 => (TrailKind::Bolt, false),
-                2 => (TrailKind::Fusion, false),
-                4 => (TrailKind::Bolt, true),
-                plasma_look::SURGE_SHELL => (TrailKind::Surge, false),
-                _ => continue,
-            };
-            let fusion = kind == TrailKind::Fusion;
             // A round of a jet that leaves the muzzle part of the way through the tick
             // (`PROJECTILE_STARTS_SHIFT`) has `prev_pos` behind the gun: its trail starts
             // where it leaves, as sprites.wgsl `shot_muzzle` draws it.
@@ -415,6 +419,19 @@ impl Renderer {
             let starts = (p.color >> PROJECTILE_STARTS_SHIFT) as f32 / 255.0;
             let to = Vec3::from(p.pos);
             let from = Vec3::from(p.prev_pos).lerp(to, (starts / span).min(1.0));
+            let (kind, plasmeric) = match look {
+                1 | 3 => (TrailKind::Bolt, false),
+                2 => (TrailKind::Fusion, false),
+                4 => (TrailKind::Bolt, true),
+                plasma_look::SURGE_SHELL => (TrailKind::Surge, false),
+                plasma_look::AIRBURST => {
+                    // No trail: the sparks it sheds.
+                    self.airburst_flight(from, to, p.size, time, &mut sparks);
+                    continue;
+                }
+                _ => continue,
+            };
+            let fusion = kind == TrailKind::Fusion;
             if plasmeric {
                 // A deliberate cosmetic cap on one bolt's lights a tick: a tick's flight
                 // is far under this many.
@@ -735,6 +752,7 @@ impl Renderer {
         match grade {
             Grade::Bolt | Grade::Flak => self.bolt_fired(at, dir, rounds, flash, round_gap, time),
             Grade::Mortar => self.mortar_fired(at, dir, flash, time),
+            Grade::Airburst => self.airburst_fired(at, dir, flash, time),
             Grade::Surge => {
                 let w = w.clone();
                 self.charge_spent(blueprint, weapon, at, 0.15, time);

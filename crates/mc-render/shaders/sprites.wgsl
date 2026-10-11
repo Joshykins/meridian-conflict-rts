@@ -325,6 +325,9 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     } else if look == PLASMA_LOOK_SURGE_SHELL {
         // A surge shell's plume, a tick and a bit behind its body.
         trace = min(length(stride) * 0.6, max(p.size, 1.0) * 1.1);
+    } else if look == PLASMA_LOOK_AIRBURST {
+        // An airburst round: a short bead and the few sparks it sheds, never a stream.
+        trace = min(length(stride) * 0.5, max(p.size, 0.5) * 9.0);
     }
     if (p.color & 0x200u) != 0u {
         trace = min(trace, distance(head, shot_muzzle(p)));
@@ -382,7 +385,8 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     // Pinched: tight; fusion: a broad prism sheath round its core; a thrown charge: its
     // containment is wider than the core it holds.
     width_px *= select(1.0, 0.8, look == 1u) * select(1.0, 1.35, look == 3u) * select(1.0, 2.6, look == 4u)
-        * select(1.0, 1.9, look == 2u) * select(1.0, 0.45, look == PLASMA_LOOK_SURGE_SHELL);
+        * select(1.0, 1.9, look == 2u) * select(1.0, 0.45, look == PLASMA_LOOK_SURGE_SHELL)
+        * select(1.0, 1.6, look == PLASMA_LOOK_AIRBURST);
     let plasma_m = p.extras.y;
     var core_frac = 0.0;
     if plasma_m > 0.0 && !beam && !fade_beam {
@@ -476,7 +480,8 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         // 1.25: a tracer with an orange-hot core; 1.4: a red round, red-hot right through.
         out.shape.y = select(1.25, 1.4, red > 0.5);
         if look > 0u {
-            // 7.6, 8.6, 9.6, 10.6, 14.6 (a surge shell): the Regency plasma shots (`fs_sprite`).
+            // 7.6, 8.6, 9.6, 10.6, 14.6 (a surge shell), 15.6 (an airburst round): the Regency
+            // plasma shots (`fs_sprite`).
             out.color = vec3<f32>(1.0);
             out.shape.y = 6.6 + f32(look);
         }
@@ -783,6 +788,9 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     } else if look == PLASMA_LOOK_SURGE_SHELL {
         // A surge shell's plume seen from afar: crimson.
         out.color = vec3<f32>(1.3, 0.1, 0.12);
+    } else if look == PLASMA_LOOK_AIRBURST {
+        // An airburst round's pearl: white-hot, rose.
+        out.color = vec3<f32>(1.35, 0.62, 0.66);
     }
     if (p.color & 0x100u) != 0u {
         out.color = SHOT_YELLOW;
@@ -974,6 +982,27 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
             let time = globals.camera.w;
             let red = vec3<f32>(1.0, 0.045, 0.02);
             let white = vec3<f32>(1.0, 0.86, 0.8);
+            if in.shape.y > 15.1 {
+                // An airburst round (`PLASMA_LOOK_AIRBURST`, the Gorget's): a small hard bead
+                // of squeezed plasma on a timed fuse, nothing like a repeater's boiling bolt or
+                // a Pinched stream. A white-hot pearl in a thin ruby shell at the head, ticking
+                // bright and dim as the fuse runs; behind it a short broken line of sparks it
+                // sheds, dot after dot, staying where they were shed and cooling from rose to
+                // red. Hard-edged.
+                let head = 0.78;
+                let tick = 0.55 + 0.45 * step(0.5, fract(time * 13.0));
+                let d = length(vec2<f32>((u - head) / (1.0 - head), in.uv.y));
+                let pearl = pow(max(1.0 - d * 1.8, 0.0), 1.5);
+                let shell = 1.0 - smoothstep(0.7, 1.0, d);
+                let cell = u * 7.0 + time * 40.0;
+                let lit = step(0.3, hash11(floor(cell) + 3.7));
+                let dot = max(1.0 - length(vec2<f32>((fract(cell) - 0.5) * 2.4, in.uv.y / 0.3)), 0.0);
+                let sparks = dot * lit * pow(smoothstep(0.0, head, u), 1.5) * (1.0 - shell);
+                let rose = vec3<f32>(1.0, 0.42, 0.45);
+                let rgb = red * shell * 3.0 + white * pearl * 12.0 * tick
+                    + mix(red, rose, u / head) * sparks * 5.0;
+                return vec4<f32>(rgb * in.color.r, 1.0);
+            }
             if in.shape.y > 14.1 {
                 // A surge shell's plume (`PLASMA_LOOK_SURGE_SHELL`; its solid body is
                 // `vs_missile`'s): hot just behind the shell, crimson, its rim going to the

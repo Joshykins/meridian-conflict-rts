@@ -34,6 +34,7 @@ impl Renderer {
             Grade::Mortar => self.mortar_burst(at, impact, splash, ground, start),
             Grade::Flak => self.plasma_flak_burst(at, impact, splash, ground, start),
             Grade::Pinched => self.pinched_burst(at, impact, size, under, start),
+            Grade::Airburst => self.airburst_burst(at, impact, splash, ground, start),
             // A surge shell lands as a Pinch-fusion one does; its wake is `surge_fx`'s.
             Grade::Fusion | Grade::Surge => {
                 self.fusion_nova(at, impact, size * 1.5, splash, under, start)
