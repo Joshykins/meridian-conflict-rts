@@ -1171,9 +1171,10 @@ pub struct MineView {
     /// `full` are turned by it already; a preview made from another blueprint is turned
     /// by it too.
     pub dial: f32,
-    /// Seconds it has been digging.
+    /// Seconds its tier has grown for (since it was built or last upgraded): an
+    /// upgrade digs and spreads out again.
     pub age: f32,
-    /// Metres out from it the land it works reaches by now.
+    /// Metres out from it the land its tier works reaches by now.
     pub spread: f32,
 }
 
@@ -3073,7 +3074,10 @@ impl World {
                 ore: v.ore.to_f32(),
                 rate: (v.ore * (spec.per_hectare - spec.ground).max(Fx::ZERO)).to_f32() * dial,
                 dig: v.reached_at as f32 / tps,
-                eta: v.reached_at.saturating_sub(m.age) as f32 / tps,
+                eta: (Fx::from_int(v.reached_at as i32) - m.grown)
+                    .max(Fx::ZERO)
+                    .to_f32()
+                    / tps,
             })
             .collect()
     }
@@ -3095,10 +3099,10 @@ impl World {
         Some(MineView {
             land: m.land,
             share: m.land.efficiency(&spec).to_f32(),
-            rate: m.rate(&spec).to_f32() * dial,
+            rate: self.mine_rate_now(row)?.to_f32() * dial,
             full: m.full_rate(&spec).to_f32() * dial,
             dial,
-            age: m.age as f32 / TICKS_PER_SECOND as f32,
+            age: m.grown.to_f32() / TICKS_PER_SECOND as f32,
             spread: m.spread().to_f32(),
         })
     }

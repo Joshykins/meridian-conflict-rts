@@ -37,7 +37,7 @@ impl World {
                 continue;
             }
             let bp = self.bp(row);
-            need += bp.economy.energy_upkeep;
+            need += bp.economy.energy_upkeep + self.mine_grow_upkeep(row);
             if let Some(next) = bp.upgrades_to.filter(|_| self.upgrading(row)) {
                 need += self.upgrade_draw(row, self.blueprints.unit(next)) * paid;
             }
@@ -94,16 +94,18 @@ impl World {
         }
     }
 
-    /// Energy a second an upgrade of `row` into `next` draws while it runs.
+    /// Energy a second an upgrade of `row` into `next` draws while it runs, or a
+    /// mine's while it grows out after, whichever is more.
     pub(super) fn upgrade_draw(&self, row: usize, next: &UnitBlueprint) -> Fx {
         let power =
             self.blueprints
                 .upgrade_power(self.bp(row), next, crate::orders::SELF_UPGRADE_POWER);
-        if next.build_time > Fx::ZERO {
+        let build = if next.build_time > Fx::ZERO {
             power * self.blueprints.upgrade_cost(next).1 / next.build_time
         } else {
             Fx::ZERO
-        }
+        };
+        build.max(next.mine.map_or(Fx::ZERO, |m| m.grow_upkeep))
     }
 
     /// Whether the side has the energy to spare for an upgrade drawing `draw`

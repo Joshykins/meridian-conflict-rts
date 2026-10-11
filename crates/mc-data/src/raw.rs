@@ -740,6 +740,9 @@ pub(crate) struct RawMine {
     pub per_hectare: f64,
     #[serde(default)]
     pub base: f64,
+    /// Energy a second drawn while it grows; see [`crate::Mine::grow_upkeep`].
+    #[serde(default)]
+    pub grow_upkeep: f64,
     /// It drives a pile hammer, blow by blow (the ARC core mine). False: it draws its
     /// mass up without striking (the Regency Taproot), so there is no beat to show or hear.
     #[serde(default = "yes")]
@@ -2438,6 +2441,7 @@ impl Unit {
                 ground: fx(m.ground),
                 per_hectare: fx(m.per_hectare),
                 base: fx(m.base),
+                grow_upkeep: fx(m.grow_upkeep),
                 hammer: m.hammer,
             }),
             fabricator: self

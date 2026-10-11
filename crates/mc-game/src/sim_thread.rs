@@ -343,7 +343,8 @@ fn mine_growth_of(world: &World, players: &mut [PlayerStatus]) {
         };
         // The income dial (the seat's set-up multiplier, the test range's) turns the mines' output too.
         let dial = pl.income_permille[0] as f32 / 1000.0;
-        p.mine_growth += (m.full_rate(&bp) - m.rate(&bp)).max(Fx::ZERO).to_f32() * dial;
+        let now = world.mine_rate_now(row).unwrap_or(Fx::ZERO);
+        p.mine_growth += (m.full_rate(&bp) - now).max(Fx::ZERO).to_f32() * dial;
     }
 }
 

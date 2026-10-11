@@ -97,15 +97,14 @@ fn spec(w: &World) -> mc_data::Mine {
 }
 
 fn made(w: &World, id: UnitId) -> Fx {
-    let m = w.state.mines.by_unit[&id].clone();
-    let row = w.state.units.row(id).unwrap();
-    m.rate(&w.bp(row).mine.unwrap())
+    w.mine_rate_now(w.state.units.row(id).unwrap()).unwrap()
 }
 
-/// Every mine done digging, as if long finished.
+/// Every mine done growing, as if long finished.
 fn dig_out(w: &mut World) {
     for m in w.state.mines.by_unit.values_mut() {
-        m.age = 1_000_000;
+        m.grown = Fx::from_int(1_000_000);
+        m.before = None;
     }
 }
 
@@ -242,7 +241,15 @@ fn an_upgraded_mine_keeps_its_reach_but_yields_more_and_climbs_one_tier_past_the
     assert_eq!(spec2.reach, t1.reach);
     assert_eq!(s.land, before.land, "the same territory");
     assert!(s.full_rate(&spec2) > before.full_rate(&t1) * 2);
-    assert!(s.age > before.age, "digging carries on through the upgrade");
+    assert!(
+        s.age > before.age,
+        "the hammer beats on through the upgrade"
+    );
+    assert!(s.grown < before.grown, "the new tier grows out again");
+    assert!(
+        made(&w, id) >= before.rate(&t1, None),
+        "the old tier keeps paying"
+    );
 }
 
 #[test]
@@ -290,18 +297,18 @@ fn ore_pays_only_once_the_drift_reaches_it() {
     let depth = region.depth().to_f64();
     assert!((140.0..=400.0).contains(&depth), "{depth} m down");
     // At first it works next to nothing but its shaft: its land spreads out from it.
-    let land = m.rate(&spec) - spec.base;
+    let land = m.rate(&spec, None) - spec.base;
     assert!(land < (m.full_rate(&spec) - spec.base) / 100, "{land:?}");
-    while w.state.mines.by_unit[&id].age < vein.reached_at {
+    while w.state.mines.by_unit[&id].grown < Fx::from_int(vein.reached_at as i32) {
         w.tick(&[]).unwrap();
     }
     let m = w.state.mines.by_unit[&id].clone();
     // Now the ore counts, on top of the land it has spread over so far.
     assert_eq!(
-        m.rate(&spec),
+        m.rate(&spec, None),
         mc_sim::mines::mine_rate(&spec, Fx::ONE, m.worked_ground(), vein.ore)
     );
-    assert!(m.rate(&spec) > spec.ground * m.worked_ground());
+    assert!(m.rate(&spec, None) > spec.ground * m.worked_ground());
 }
 
 #[test]
@@ -324,10 +331,10 @@ fn a_new_mine_spreads_over_its_land_from_nothing() {
         (worked - circle).abs() < circle * 0.15,
         "{worked} ha vs {circle}"
     );
-    assert!(m.rate(&spec) > start.rate(&spec));
+    assert!(m.rate(&spec, None) > start.rate(&spec, None));
     // In the end, all of it.
     let mut m = m;
-    m.age = 1_000_000;
+    m.grown = Fx::from_int(1_000_000);
     assert_eq!(m.worked_ground(), m.land.ground);
 }
 
@@ -436,4 +443,74 @@ fn a_mason_iii_builds_a_deep_core_outright() {
         w.state.mines.by_unit.contains_key(&u.id(row)),
         "and digs as a mine"
     );
+}
+
+/// Tier 2 put on the grown tier 1 mine `id` as an upgrade finishing would.
+fn upgrade_to_t2(w: &mut World, id: UnitId) -> mc_data::Mine {
+    let t2 = w.blueprints.id_of("aster_core_mine_t2").unwrap();
+    let row = w.state.units.row(id).unwrap();
+    w.state.units.blueprint[row] = t2;
+    w.blueprints.unit(t2).mine.unwrap()
+}
+
+#[test]
+fn an_upgrade_grows_out_from_the_shaft_while_the_old_tier_keeps_paying() {
+    let mut w = world(vec![square(5600, 5000, 80)]);
+    let id = mine(&mut w, 0, 5002, 5002);
+    dig_out(&mut w);
+    w.tick(&[]).unwrap();
+    let t1 = spec(&w);
+    let old = made(&w, id);
+    let row = w.state.units.row(id).unwrap();
+    let upkeep = |w: &World| w.state.players[0].energy_demand;
+    assert_eq!(
+        upkeep(&w),
+        w.bp(row).economy.energy_upkeep,
+        "grown: upkeep only"
+    );
+
+    let t2 = upgrade_to_t2(&mut w, id);
+    w.state.players[0].energy = Fx::from_int(1_000_000);
+    w.tick(&[]).unwrap();
+    let m = w.state.mines.by_unit[&id].clone();
+    assert!(m.growing() && m.before.is_some());
+    // The new shaft pays at once; its land and ore wait for it to grow out.
+    let now = made(&w, id);
+    let shaft = t2.base - t1.base;
+    assert!(now > old && now < old + shaft * 2, "{now:?} from {old:?}");
+    assert!(now < m.full_rate(&t2) / 2);
+    let tier2 = w.bp(row).economy.energy_upkeep;
+    assert_eq!(upkeep(&w), tier2 + t2.grow_upkeep, "growing draws more");
+
+    let ticks = m.full_growth().ceil_int() + 2;
+    for _ in 0..ticks {
+        w.state.players[0].energy = Fx::from_int(1_000_000);
+        w.tick(&[]).unwrap();
+    }
+    let m = w.state.mines.by_unit[&id].clone();
+    assert!(!m.growing() && m.before.is_none());
+    assert_eq!(made(&w, id), m.full_rate(&t2), "grown out: all of tier 2");
+    assert_eq!(upkeep(&w), tier2, "grown: the extra draw stops");
+}
+
+#[test]
+fn a_mine_grows_only_as_its_energy_is_paid() {
+    let mut w = world(vec![square(5600, 5000, 80)]);
+    let id = mine(&mut w, 0, 5002, 5002);
+    dig_out(&mut w);
+    w.tick(&[]).unwrap();
+    upgrade_to_t2(&mut w, id);
+    w.tick(&[]).unwrap();
+    let grown = w.state.mines.by_unit[&id].grown;
+    for _ in 0..50 {
+        w.state.players[0].energy = Fx::ZERO;
+        w.tick(&[]).unwrap();
+    }
+    assert_eq!(
+        w.state.mines.by_unit[&id].grown, grown,
+        "no energy, no growth"
+    );
+    w.state.players[0].energy = Fx::from_int(1_000_000);
+    w.tick(&[]).unwrap();
+    assert_eq!(w.state.mines.by_unit[&id].grown, grown + Fx::ONE);
 }

@@ -371,6 +371,9 @@ pub struct Mine {
     /// Materials per second from the shaft itself, from the moment it is finished,
     /// whatever its territory: a new mine pays at once while its land spreads out.
     pub base: Fx,
+    /// Energy per second it draws on top of its upkeep while it grows: while its land
+    /// spreads out and its drifts are dug, after it is built and again after each upgrade.
+    pub grow_upkeep: Fx,
     /// Strikes a pile hammer in a beat (`RawMine::hammer`). Presentation only.
     pub hammer: bool,
 }

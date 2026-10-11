@@ -204,7 +204,9 @@ impl World {
         if self.powered_down(row) {
             return Fx::ZERO;
         }
-        let full = self.bp(row).economy.energy_upkeep + self.gravitic_upkeep(row);
+        let full = self.bp(row).economy.energy_upkeep
+            + self.gravitic_upkeep(row)
+            + self.mine_grow_upkeep(row);
         full - full * self.adjacency.saving(row, Resource::Energy)
     }
 

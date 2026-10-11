@@ -956,7 +956,7 @@ fn mines_and_radar_report_their_flows() {
     w.state.players[0].energy = Fx::from_int(50_000);
     w.tick(&[]).unwrap();
     let m = w.bp(row(&w, mex)).mine.unwrap();
-    let income = w.state.mines.by_unit[&mex].rate(&m).to_f32();
+    let income = w.state.mines.by_unit[&mex].rate(&m, None).to_f32();
     let m = economy_of(&w, mex);
     assert!(income > 0.0);
     assert!((m.mass_made - income).abs() < 1e-3, "{m:?}");

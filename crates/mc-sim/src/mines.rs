@@ -19,10 +19,18 @@
 //! mine at [`SPREAD_SPEED`] too, so a new mine starts with only its shaft's
 //! `base` and grows into its territory. Mines stand on land only: the sea in
 //! a mine's circle is worth nothing, though it counts in its shaft's share.
+//!
+//! An upgrade grows out the same way: the new tier's shaft pays at once, but
+//! what it adds over the old tier on the land and the ore comes in only as its
+//! land spreads out again and its drifts are dug again, while the old tier
+//! keeps paying everywhere. A mine grows only as fast as its side pays its
+//! energy, and draws its tier's `grow_upkeep` on top of its upkeep while it
+//! grows (`MineState::grown`).
 
 use crate::tables::UnitId;
 use crate::World;
 use mc_core::{player_bit, Fx, FxVec2, PlayerMask, StateHasher, TICKS_PER_SECOND};
+use mc_data::BlueprintId;
 use mc_map::OreRegion;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -55,8 +63,17 @@ pub struct MineState {
     /// Hectares of its land by distance from it, one entry per
     /// [`GROUND_CELL_M`] ring, so the land it has spread over can be summed.
     pub rings: Vec<Fx>,
-    /// Ticks since it was finished. Kept through an upgrade.
+    /// Ticks since it was finished. Kept through an upgrade. Only the hammer's beat
+    /// keeps this: growth goes by [`Self::grown`].
     pub age: u32,
+    /// Ticks its tier has grown for since it was finished or last upgraded: each
+    /// tick adds the share of its side's energy that is paid, so a stall slows it.
+    pub grown: Fx,
+    /// While an upgrade grows out: the tier it was before, and how far that tier
+    /// had grown. That tier still pays where the new one has not reached.
+    pub before: Option<(BlueprintId, Fx)>,
+    /// Its blueprint when last counted, to notice an upgrade.
+    pub tier: BlueprintId,
 }
 
 /// An ore field a mine draws on.
@@ -86,36 +103,92 @@ pub struct Share {
 }
 
 impl MineState {
-    /// Materials per second now: the land it has spread over, and the ore it
-    /// has dug out to.
-    pub fn rate(&self, m: &mc_data::Mine) -> Fx {
+    fn new(tier: BlueprintId) -> Self {
+        MineState {
+            tier,
+            ..Default::default()
+        }
+    }
+
+    /// Materials per second now: what its tier pays on the land it has spread
+    /// over and the ore it has dug out to, and while an upgrade grows out, the
+    /// tier `before` it everywhere the new one has not reached yet.
+    pub fn rate(&self, m: &mc_data::Mine, before: Option<&mc_data::Mine>) -> Fx {
+        let now = self.rate_at(m, self.grown);
+        match (before, self.before) {
+            (Some(b), Some((_, was))) => self.rate_at(b, was) + now - self.rate_at(b, self.grown),
+            _ => now,
+        }
+    }
+
+    /// Materials per second a mine of `m` makes once grown for `grown` ticks.
+    fn rate_at(&self, m: &mc_data::Mine, grown: Fx) -> Fx {
         let reached = self
             .veins
             .iter()
-            .filter(|v| self.age >= v.reached_at)
+            .filter(|v| Fx::from_int(v.reached_at as i32) <= grown)
             .fold(Fx::ZERO, |a, v| a + v.ore);
-        mine_rate(m, self.land.rock_part(), self.worked_ground(), reached)
+        mine_rate(
+            m,
+            self.land.rock_part(),
+            worked(&self.rings, spread(grown)),
+            reached,
+        )
     }
 
-    /// Metres out from the mine the land it works reaches by now.
+    /// Metres out from the mine the land its tier works reaches by now.
     pub fn spread(&self) -> Fx {
-        Fx::from_int(SPREAD_SPEED) * self.age as i32 / TICKS_PER_SECOND as i32
+        spread(self.grown)
     }
 
     /// Hectares of its land within [`Self::spread`].
     pub fn worked_ground(&self) -> Fx {
-        let spread = self.spread();
-        self.rings
-            .iter()
-            .enumerate()
-            .take_while(|&(i, _)| Fx::from_int(i as i32 * GROUND_CELL_M) <= spread)
-            .fold(Fx::ZERO, |a, (_, v)| a + *v)
+        worked(&self.rings, self.spread())
+    }
+
+    /// Ticks of growth it takes to spread over all its land and dig every drift.
+    pub fn full_growth(&self) -> Fx {
+        let last_ring = Fx::from_int(self.rings.len().saturating_sub(1) as i32 * GROUND_CELL_M);
+        let land = last_ring * DT / SPREAD_SPEED;
+        let dug = self.veins.iter().map(|v| v.reached_at).max().unwrap_or(0);
+        land.max(Fx::from_int(dug as i32))
+    }
+
+    /// Still spreading out or digging: drawing its tier's `grow_upkeep`.
+    pub fn growing(&self) -> bool {
+        self.grown < self.full_growth()
+    }
+
+    /// One tick of growth at `powered`, the share of its side's energy paid. Once
+    /// grown, the tier before an upgrade is forgotten.
+    fn grow(&mut self, powered: Fx) {
+        let full = self.full_growth();
+        if self.grown < full {
+            self.grown = (self.grown + powered.clamp(Fx::ZERO, Fx::ONE)).min(full);
+        }
+        if self.grown >= full {
+            self.before = None;
+        }
     }
 
     /// Materials per second once every drift is dug.
     pub fn full_rate(&self, m: &mc_data::Mine) -> Fx {
         self.land.rate(m)
     }
+}
+
+/// Metres out from a mine its land reaches after `grown` ticks of growth.
+fn spread(grown: Fx) -> Fx {
+    Fx::from_int(SPREAD_SPEED) * grown / DT
+}
+
+/// Hectares of land in `rings` within `spread` metres.
+fn worked(rings: &[Fx], spread: Fx) -> Fx {
+    rings
+        .iter()
+        .enumerate()
+        .take_while(|&(i, _)| Fx::from_int(i as i32 * GROUND_CELL_M) <= spread)
+        .fold(Fx::ZERO, |a, (_, v)| a + *v)
 }
 
 /// Ticks a mine at `mine` takes to dig out to a field at `centre`, `depth` down.
@@ -166,6 +239,10 @@ impl Mines {
         h.write_u64(self.by_unit.len() as u64);
         for (id, m) in &self.by_unit {
             h.write_u64(id.0 as u64 | (m.age as u64) << 32);
+            h.write_i64(m.grown.0);
+            let (before, was) = m.before.map_or((u16::MAX, Fx::ZERO), |(b, g)| (b.0, g));
+            h.write_u64(m.tier.0 as u64 | (before as u64) << 16);
+            h.write_i64(was.0);
             let l = &m.land;
             for v in [
                 l.ground,
@@ -484,8 +561,18 @@ impl World {
             m.age = m.age.saturating_add(1);
         }
         for row in units.slots.iter() {
-            if units.is_active(row) && self.blueprints.unit(units.blueprint[row]).mine.is_some() {
-                mines.entry(units.id(row)).or_default();
+            let tier = units.blueprint[row];
+            if !units.is_active(row) || self.blueprints.unit(tier).mine.is_none() {
+                continue;
+            }
+            let m = mines
+                .entry(units.id(row))
+                .or_insert_with(|| MineState::new(tier));
+            // Upgraded in place: the new tier grows out from the shaft again.
+            if m.tier != tier {
+                m.before = Some((m.tier, m.grown));
+                m.grown = Fx::ZERO;
+                m.tier = tier;
             }
         }
         let placed = self.mine_sites(None);
@@ -522,6 +609,25 @@ impl World {
                 m.veins = veins;
                 m.rings = rings;
             }
+        }
+    }
+
+    /// Materials per second the mine in `row` makes now, before its side's energy share.
+    pub fn mine_rate_now(&self, row: usize) -> Option<Fx> {
+        let spec = self.bp(row).mine?;
+        let m = self.state.mines.by_unit.get(&self.state.units.id(row))?;
+        let before = m.before.and_then(|(b, _)| self.blueprints.unit(b).mine);
+        Some(m.rate(&spec, before.as_ref()))
+    }
+
+    /// Energy a second the mine in `row` draws to grow, on top of its upkeep.
+    pub(crate) fn mine_grow_upkeep(&self, row: usize) -> Fx {
+        let Some(spec) = self.bp(row).mine else {
+            return Fx::ZERO;
+        };
+        match self.state.mines.by_unit.get(&self.state.units.id(row)) {
+            Some(m) if m.growing() => spec.grow_upkeep,
+            _ => Fx::ZERO,
         }
     }
 
@@ -564,7 +670,7 @@ impl World {
     /// mass per tick each side's mines fell short of their full output by.
     pub(crate) fn mine_income(&mut self, income: &mut [(Fx, Fx)], powered: &[Fx]) -> Vec<Fx> {
         let mut lost = vec![Fx::ZERO; income.len()];
-        for (&id, m) in &self.state.mines.by_unit {
+        for (&id, m) in &mut self.state.mines.by_unit {
             let Some(row) = self.state.units.row(id) else {
                 continue;
             };
@@ -572,7 +678,9 @@ impl World {
                 continue;
             };
             let p = self.state.units.owner[row] as usize;
-            let full = m.rate(&bp) / DT;
+            m.grow(powered[p]);
+            let before = m.before.and_then(|(b, _)| self.blueprints.unit(b).mine);
+            let full = m.rate(&bp, before.as_ref()) / DT;
             let made = full * mine_power(powered[p]);
             income[p].0 += made;
             lost[p] += full - made;

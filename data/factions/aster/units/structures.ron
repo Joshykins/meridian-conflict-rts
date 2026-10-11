@@ -230,6 +230,9 @@
     // (`Blueprints::upgrade_needs`), so the economy grows before the army tiers.
     // The hammer runs on energy: a side that cannot pay its upkeep gets a
     // quarter of its mines' output at worst (mc-sim mines.rs `UNPOWERED`).
+    // An upgrade grows out from the shaft like a new mine, drawing `grow_upkeep`
+    // while it does; the mine upgrades itself at `upgrade_power` (tier 2 in
+    // about 73 s, tier 3 150 s, the Deep Core 250 s).
     (
         key: "aster_core_mine",
         name: "Core Mine",
@@ -237,14 +240,15 @@
         tech: 1,
         categories: ["Land", "Economy", "Extractor"],
         health: 600,
-        cost: (mass: 45, energy: 270, time: 72),
+        cost: (mass: 45, energy: 270, time: 60),
         radius: 12.8, height: 12.6, footprint: (3, 3),
         vision: 300,
         economy: (mass_storage: 100, energy_upkeep: 2),
         mine: (
             reach: 1000,
-            ground: 0.00054, per_hectare: 0.9, base: 0.3,
+            ground: 0.00162, per_hectare: 0.9, base: 0.3, grow_upkeep: 4,
         ),
+        upgrade_power: 15,
         upgrades_to: "aster_core_mine_t2",
         adjacency: Mass,
         mesh: "core_mine", icon: Extractor,
@@ -263,8 +267,9 @@
         economy: (mass_storage: 200, energy_upkeep: 8),
         mine: (
             reach: 1000,
-            ground: 0.00162, per_hectare: 2.7, base: 0.9,
+            ground: 0.00486, per_hectare: 2.7, base: 0.9, grow_upkeep: 40,
         ),
+        upgrade_power: 40,
         upgrades_to: "aster_core_mine_t3",
         adjacency: Mass,
         mesh: "core_mine", icon: Extractor,
@@ -283,8 +288,9 @@
         economy: (mass_storage: 400, energy_upkeep: 30),
         mine: (
             reach: 1000,
-            ground: 0.00378, per_hectare: 6.3, base: 2.1,
+            ground: 0.01134, per_hectare: 6.3, base: 2.1, grow_upkeep: 150,
         ),
+        upgrade_power: 60,
         upgrades_to: "aster_core_mine_t4",
         adjacency: Mass,
         mesh: "core_mine", icon: Extractor,
@@ -308,7 +314,7 @@
         economy: (mass_storage: 800, energy_upkeep: 60),
         mine: (
             reach: 1000,
-            ground: 0.00648, per_hectare: 10.8, base: 3.6,
+            ground: 0.01944, per_hectare: 10.8, base: 3.6, grow_upkeep: 300,
         ),
         adjacency: Mass,
         mesh: "core_mine", icon: Extractor,
@@ -364,11 +370,10 @@
     ),
     // The Material Fabricator turns energy into material, as far as its upkeep is paid
     // (mc-sim mines.rs `fabricator_income`). One 2x2 building from tech 2, upgraded in
-    // place to tech 3. Small and many: two eat a Reactor II, four a Reactor III, so a
-    // player adds them a few at a time rather than saving up for one. Still worth it
-    // after the mine upgrades (2 / 5 / 7 min): T2 1.5/s pays back in ~13 min, T3 5/s
-    // in ~10, with their share of a reactor. Adjacency (mc-sim adjacency.rs): a reactor
-    // against it cuts its upkeep, and it cuts the materials of what a factory against it builds.
+    // place to tech 3. Dear in energy, as in FAF: one eats a Reactor II, two a Reactor
+    // III. They come after the mine upgrades (2 / 4 / 7 min): T2 1.5/s pays back in
+    // ~18 min, T3 5/s in ~13, with their share of a reactor. Adjacency (mc-sim
+    // adjacency.rs): a reactor against it cuts its upkeep, and it cuts the materials of what a factory against it builds.
     // Volatile, and that is the price of standing close: its blast is sized to destroy a
     // power plant of its tier against it (any side of the lot), not a factory of its
     // tier; a reactor's blast takes the fabricators against it in turn.
@@ -379,10 +384,10 @@
         tech: 2,
         categories: ["Land", "Economy"],
         health: 1200,
-        cost: (mass: 825, energy: 4950, time: 1300),
+        cost: (mass: 900, energy: 5400, time: 1300),
         radius: 11, height: 16, footprint: (2, 2), hull: (7.0, 7.0),
         vision: 120,
-        economy: (energy_upkeep: 175),
+        economy: (energy_upkeep: 350),
         fabricator: (mass: 1.5),
         adjacency: Mass,
         death_blast: (radius: 50, damage: 3500),
@@ -397,10 +402,10 @@
         tech: 3,
         categories: ["Land", "Economy"],
         health: 3000,
-        cost: (mass: 2250, energy: 13500, time: 3600),
+        cost: (mass: 2500, energy: 15000, time: 3600),
         radius: 11, height: 22, footprint: (2, 2), hull: (7.0, 7.0),
         vision: 140,
-        economy: (energy_upkeep: 500),
+        economy: (energy_upkeep: 1000),
         fabricator: (mass: 5),
         adjacency: Mass,
         death_blast: (radius: 80, damage: 12500),

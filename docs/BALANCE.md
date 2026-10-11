@@ -198,14 +198,26 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   sat on 3-7 a second for its first seven minutes; the first numbers, 2026-10-02, left a tier 1
   side on 5 a second for twenty minutes against unit prices set at Forged Alliance's): reach
   1000 m. Ore is what a mine is for: a hectare of ore pays `per_hectare` 0.9 a second at tier 1,
-  a hectare of bare land `ground` 0.00054 (a whole circle of it about 0.15), and the shaft
+  a hectare of bare land `ground` 0.00162 (a whole circle of it about 0.5; tripled 2026-10-10,
+  the user: "a little more per land"), and the shaft
   `base` 0.3 from the moment the mine is finished. Each tier multiplies all three: 3x, 7x, 12x a tier 1, so
   each step up gains less than the one before. `zz_mine_yield_probe` puts a median 3-4 ha of
   ore in a lone mine's reach on the duel maps (Serac Divide 2.9, about 13 on the 80 km maps),
   so a tier 1 mine on a duel field makes about 3 a second (half again FAF's tier 1 mine), one
-  on bare land about 0.45. Land spreads out at 10 m/s (full in about 100 s); shafts sink at
+  on bare land about 0.8. Land spreads out at 10 m/s (full in about 100 s); shafts sink at
   8 m/s and drifts run at 24 m/s, so the ore pays within a minute or so. Each mine stores 100 / 200 /
   400 / 800.
+- **An upgrade grows out too** (the user, 2026-10-10: "like growing a mine right after
+  placing"). The new tier's shaft pays at once; what it adds on the land and the ore comes in
+  as its land spreads out again and its drifts are dug again, while the old tier keeps paying
+  everywhere (`MineState::before`). A growing mine draws `grow_upkeep` 4 / 40 / 150 / 300
+  energy a second on top of its upkeep (about 100 s on a lone mine), and grows only as fast as
+  its side pays its energy: a stall slows the growth, as it slows an upgrade in FAF. The
+  Regency Excavators draw it too, though they have no upkeep once grown.
+- **Mines build fast** (2026-10-10): a tier 1 mine is 60 build time (12 s for a tier 1
+  engineer), and a mine upgrades itself at `upgrade_power` 15 / 40 / 60, so tier 2 takes
+  about 73 s, tier 3 150 s and the Deep Core 250 s (110 / 600 / 1,500 s before). Engineers
+  assisting add their power.
 - Prices (mass / energy): 45 / 270, 750 / 4,500, 4,000 / 24,000, Deep Core 11,000 / 66,000.
   A new mine on a field pays back in under a minute; an upgrade pays only the difference
   between the tiers, about 2, 5 and 7 minutes on a duel field. The Regency Excavators dig
@@ -251,13 +263,14 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   21 s (180 s and 107 s at its own power before). It still waits for the side's tech.
 - **Material fabricators** (`fabricator: (mass)`) turn energy into material, as far as their
   upkeep is paid (nothing in a full stall, nothing while paused), and go up like reactors.
-  One 2x2 building from tech 2 (the user, 2026-10-03), upgraded in place to tech 3. Each eats
-  a whole power plant of its tier, and tech 3 is the better buy:
+  One 2x2 building from tech 2 (the user, 2026-10-03), upgraded in place to tech 3. Dear in
+  energy, as in FAF (the user, 2026-10-10: "more expensive, especially on energy"): a T2
+  eats a whole Reactor II, a T3 half a Reactor III, and tech 3 is the better buy:
 
-  | Tier | Makes | Draws | Mass | Payback, own-tier power |
+  | Tier | Makes | Draws | Mass | Payback with its power plant |
   | --- | --- | --- | --- | --- |
-  | T2 (2x2) | 3/s | 350 E/s (one T2 reactor) | 1,650 | ~13 min |
-  | T3 (2x2, upgrade 7,350) | 20/s | 2,000 E/s (one T3 reactor) | 9,000 | ~10 min |
+  | T2 (2x2) | 1.5/s | 350 E/s (233 a material) | 900 | ~18 min |
+  | T3 (2x2, upgrade 1,600) | 5/s | 1,000 E/s (200 a material) | 2,500 | ~13 min |
 
   All pay back slower than the mine upgrades, so they come after the mines; they need no
   ground, so a side whose mines are done grows on them. They share the Mines priority
