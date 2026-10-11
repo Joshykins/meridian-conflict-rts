@@ -22,7 +22,7 @@ use mc_render::gpu_consts::mark;
 use mc_render::{Camera, FrameInput, Mark, Overlay, Renderer};
 use mc_sim::command::{MAX_GUARD_RADIUS, MIN_GUARD_RADIUS};
 use mc_sim::mirror::{
-    ShieldInstance, UnitInstance, UnitOrders, KIND_GHOST, KIND_WRECK, STATE_UNIDENTIFIED,
+    ShieldInstance, UnitInstance, UnitOrders, WingView, KIND_GHOST, KIND_WRECK, STATE_UNIDENTIFIED,
 };
 use mc_sim::placement::Unfit;
 use mc_sim::tables::{flag, OrderKind};
@@ -1045,7 +1045,7 @@ impl Game {
             {
                 -1.0
             } else {
-                unit_bar_work(u, &self.view.status.queues)
+                unit_bar_work(u, &self.view.status.queues, &self.view.frame.wings)
             },
             shield: if unknown {
                 -1.0
@@ -4715,7 +4715,7 @@ fn mark_kind(hover: bool, enemy: bool) -> u32 {
 }
 
 /// Construction fill for the unit bar, or a negative if the unit is not building.
-pub(crate) fn unit_bar_work(u: &UnitInstance, queues: &[UnitOrders]) -> f32 {
+pub(crate) fn unit_bar_work(u: &UnitInstance, queues: &[UnitOrders], wings: &[WingView]) -> f32 {
     const UNDER: u32 = (flag::UNDER_CONSTRUCTION as u32) << 8;
     if u.owner_flags & KIND_WRECK != 0 {
         return -1.0;
@@ -4730,6 +4730,13 @@ pub(crate) fn unit_bar_work(u: &UnitInstance, queues: &[UnitOrders]) -> f32 {
     // round on the line.
     if let Some(l) = crate::hud::silo::Launcher::of(u) {
         return if l.assembling() { l.progress } else { -1.0 };
+    }
+    // A carrier builds its air wings apart from its orders, sailing or not.
+    if let Some(w) = wings
+        .iter()
+        .find(|w| w.unit_id == u.unit_id && !w.queue.is_empty())
+    {
+        return w.progress.clamp(0.0, 1.0);
     }
     let Some(q) = sim_thread::queue_of(queues, u.unit_id) else {
         return -1.0;
@@ -4841,10 +4848,10 @@ mod tests {
     fn unit_bar_work_follows_construction() {
         let mut site = dummy(1, 1, 0, [0.0; 3], (flag::UNDER_CONSTRUCTION as u32) << 8);
         site.build = 0.4;
-        assert!((unit_bar_work(&site, &[]) - 0.4).abs() < 1e-6);
+        assert!((unit_bar_work(&site, &[], &[]) - 0.4).abs() < 1e-6);
 
         let idle = dummy(2, 1, 0, [0.0; 3], 0);
-        assert!(unit_bar_work(&idle, &[]) < 0.0);
+        assert!(unit_bar_work(&idle, &[], &[]) < 0.0);
 
         let factory = dummy(3, 1, 0, [0.0; 3], 0);
         let queues = [UnitOrders {
@@ -4863,23 +4870,35 @@ mod tests {
             progress: 0.55,
             ..Default::default()
         }];
-        assert!((unit_bar_work(&factory, &queues) - 0.55).abs() < 1e-6);
+        assert!((unit_bar_work(&factory, &queues, &[]) - 0.55).abs() < 1e-6);
 
         let mut refit = dummy(4, 1, 0, [0.0; 3], 0);
         refit.upgrade = 0.2;
-        assert!((unit_bar_work(&refit, &[]) - 0.2).abs() < 1e-6);
+        assert!((unit_bar_work(&refit, &[], &[]) - 0.2).abs() < 1e-6);
 
         let wreck = dummy(5, 1, 0, [0.0; 3], KIND_WRECK);
-        assert!(unit_bar_work(&wreck, &[]) < 0.0);
+        assert!(unit_bar_work(&wreck, &[], &[]) < 0.0);
 
         // A launcher assembling its second round shows it; a full one shows nothing.
         use mc_sim::nukes::{LAUNCHER_CAPACITY_SHIFT, LAUNCHER_MARK, LAUNCHER_PROGRESS_SHIFT};
         let mut silo = dummy(6, 1, 0, [0.0; 3], 0);
         silo.status[2] =
             LAUNCHER_MARK | 1 | 2 << LAUNCHER_CAPACITY_SHIFT | 128 << LAUNCHER_PROGRESS_SHIFT;
-        assert!((unit_bar_work(&silo, &[]) - 128.0 / 255.0).abs() < 1e-6);
+        assert!((unit_bar_work(&silo, &[], &[]) - 128.0 / 255.0).abs() < 1e-6);
         silo.status[2] = LAUNCHER_MARK | 2 | 2 << LAUNCHER_CAPACITY_SHIFT;
-        assert!(unit_bar_work(&silo, &[]) < 0.0);
+        assert!(unit_bar_work(&silo, &[], &[]) < 0.0);
+
+        // A carrier shows the wing going up aboard, and nothing once its queue is empty.
+        let carrier = dummy(7, 1, 0, [0.0; 3], 0);
+        let mut wings = [WingView {
+            unit_id: 7,
+            queue: vec![0],
+            progress: 0.3,
+            launching: 0,
+        }];
+        assert!((unit_bar_work(&carrier, &[], &wings) - 0.3).abs() < 1e-6);
+        wings[0].queue.clear();
+        assert!(unit_bar_work(&carrier, &[], &wings) < 0.0);
     }
 
     #[test]

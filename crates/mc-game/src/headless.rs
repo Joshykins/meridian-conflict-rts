@@ -764,7 +764,7 @@ pub fn screenshot(
             mc_render::Mark {
                 unit_index: i as u32,
                 kind: 0,
-                work: crate::game::unit_bar_work(u, &view.status.queues),
+                work: crate::game::unit_bar_work(u, &view.status.queues, &frame.wings),
                 shield: crate::game::unit_bar_shield(u.unit_id, &frame.shields),
                 fuel: crate::game::unit_bar_fuel(u.unit_id, &frame.fuel),
             }

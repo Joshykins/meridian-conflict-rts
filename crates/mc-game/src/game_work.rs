@@ -1,7 +1,7 @@
 //! Work under way shows without a selection. Whatever a side builds carries its
 //! progress bar (bars only, no ring): a site going up, a structure upgrading, a
-//! factory's product, an engineer's build or assist. A site or an upgrade also
-//! carries its percentage, and the time it has left while its work moves
+//! factory's product, a carrier's air wing, an engineer's build or assist. A site or
+//! an upgrade also carries its percentage, and the time it has left while its work moves
 //! (`mirror::WorkLeft`), on a tab hanging from its construction bar; the engineers
 //! round it do not, so a crowd of them does not repeat the figure.
 
@@ -48,7 +48,7 @@ pub(crate) fn bar_marks(view: &View, friend: impl Fn(u8) -> bool, marks: &mut Ve
     // Sites, upgrades and launchers read their progress off the unit itself.
     for (i, u) in units.iter().enumerate() {
         if shown(u, &friend) {
-            push(i, unit_bar_work(u, &[]), marks);
+            push(i, unit_bar_work(u, &[], &[]), marks);
         }
     }
     // Factories and engineers, off their queue.
@@ -67,6 +67,18 @@ pub(crate) fn bar_marks(view: &View, friend: impl Fn(u8) -> bool, marks: &mut Ve
         };
         if shown(&units[i], &friend) {
             push(i, q.progress.clamp(0.0, 1.0), marks);
+        }
+    }
+    // Carriers, off their wing bays: a factory's bar while a wing goes up aboard.
+    for w in &view.frame.wings {
+        if w.queue.is_empty() || w.progress <= 0.0 {
+            continue;
+        }
+        let Some(&i) = view.index_of.get(&w.unit_id) else {
+            continue;
+        };
+        if shown(&units[i], &friend) {
+            push(i, w.progress.clamp(0.0, 1.0), marks);
         }
     }
 }
