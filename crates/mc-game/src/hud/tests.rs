@@ -237,7 +237,8 @@ fn first_on_shelves(rig: &Rig, key: &str, tech: u8) -> BlueprintId {
         .map(|b| rig.blueprints.unit(*b))
         .filter(|b| b.tech == tech)
         .collect();
-    items.sort_by_key(|b| style::Purpose::of(b, structures));
+    // As the shelf sorts them (`build.rs`): by purpose, then like beside like.
+    items.sort_by_key(|b| (style::Purpose::of(b, structures), style::Role::of(b)));
     items[0].id
 }
 
