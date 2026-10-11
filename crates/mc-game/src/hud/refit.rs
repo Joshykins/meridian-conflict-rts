@@ -598,7 +598,13 @@ fn card(
         " m",
         palette::TEXT,
     );
-    let power = |b: &UnitBlueprint| b.builder.as_ref().map_or(0.0, |x| x.power.to_f32());
+    // Build power as the unit's side works it (its build dial).
+    let build_dial = s.build_dial((u.owner_flags & 0xFF) as u8);
+    let power = |b: &UnitBlueprint| {
+        b.builder
+            .as_ref()
+            .map_or(0.0, |x| x.power.to_f32() * build_dial)
+    };
     diff("Build Power", power(from), power(to), "", palette::TEXT);
     let (ea, eb) = (&from.economy, &to.economy);
     // Income as the unit's side is paid it.

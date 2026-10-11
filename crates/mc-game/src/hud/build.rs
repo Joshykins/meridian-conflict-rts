@@ -1187,7 +1187,9 @@ fn upgrade_card(
             " m",
         ));
     }
-    let power = |bp: &UnitBlueprint| bp.builder.as_ref().map_or(0.0, |b| b.power.to_f32());
+    // Build power as the unit's side works it (its build dial).
+    let dial = s.build_dial((u.owner_flags & 0xFF) as u8);
+    let power = |bp: &UnitBlueprint| bp.builder.as_ref().map_or(0.0, |b| b.power.to_f32() * dial);
     if power(from) + power(next) > 0.0 {
         rows.push(("Build Power", power(from), power(next), ""));
     }

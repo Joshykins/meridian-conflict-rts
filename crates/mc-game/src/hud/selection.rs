@@ -662,7 +662,7 @@ fn single(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect, stri
         ui.fade *= k;
         ui.shift.y += (1.0 - k) * 20.0;
         ui.interactive &= hud.details_open;
-        details_card(ui, hud, bp, r);
+        details_card(ui, hud, bp, s.build_dial((u.owner_flags & 0xFF) as u8), r);
         (ui.fade, ui.shift, ui.interactive) = (fade, shift, live);
     } else {
         hud.details_focus = 0;

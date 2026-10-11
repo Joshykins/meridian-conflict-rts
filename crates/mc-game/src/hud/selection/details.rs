@@ -4,7 +4,14 @@
 use super::*;
 
 /// Lore, figures and every weapon, over the unit panel: opened by its i button (or I).
-pub(super) fn details_card(ui: &mut Ui, hud: &mut Hud, bp: &UnitBlueprint, anchor: Rect) {
+/// `build_dial` is the unit's side's build rate, a factor its build power is shown at.
+pub(super) fn details_card(
+    ui: &mut Ui,
+    hud: &mut Hud,
+    bp: &UnitBlueprint,
+    build_dial: f32,
+    anchor: Rect,
+) {
     let w = 560.0;
     let (pad, cw) = (18.0, w - 36.0);
     let lore = wrap_text(ui, type_scale::BODY, &bp.lore, cw);
@@ -22,7 +29,7 @@ pub(super) fn details_card(ui: &mut Ui, hud: &mut Hud, bp: &UnitBlueprint, ancho
             .fold(0.0, f32::max);
         rows_h += h + 10.0;
     }
-    let figures = figures(bp);
+    let figures = figures(bp, build_dial);
     let h = 64.0
         + lore.len() as f32 * 20.0
         + figures_h(&figures)
@@ -144,7 +151,7 @@ pub(super) fn details_card(ui: &mut Ui, hud: &mut Hud, bp: &UnitBlueprint, ancho
 }
 
 /// The unit's headline figures, each in its colour with a bar against the roster's usual spread.
-fn figures(bp: &UnitBlueprint) -> Vec<(&'static str, String, f32, u32)> {
+fn figures(bp: &UnitBlueprint, build_dial: f32) -> Vec<(&'static str, String, f32, u32)> {
     let mut out = Vec::new();
     if !bp.weapons.is_empty() {
         out.push((
@@ -173,7 +180,7 @@ fn figures(bp: &UnitBlueprint) -> Vec<(&'static str, String, f32, u32)> {
         ));
     }
     if let Some(b) = &bp.builder {
-        let p = b.power.to_f32();
+        let p = b.power.to_f32() * build_dial;
         out.push((
             "Build Power",
             format!("{:.0}", p),

@@ -112,7 +112,8 @@ pub(in crate::hud) fn data_card(
     if let Some(b) = &item.builder {
         rows.push((
             "Build Power".into(),
-            format!("{:.0}", b.power.to_f32()),
+            // As the local side works it (its build dial).
+            format!("{:.0}", b.power.to_f32() * s.build_dial(s.view.local)),
             palette::TEXT,
         ));
     }
