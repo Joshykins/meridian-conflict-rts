@@ -433,6 +433,9 @@ pub(in crate::ai) struct CommanderState {
     /// (`commander.rs`). Zero reads as one.
     #[serde(default)]
     pub think_scale: u8,
+    /// What it knows of each zone, by zone id (`knowledge.rs`).
+    #[serde(default)]
+    pub knowledge: Vec<super::knowledge::ZoneKnowledge>,
     /// Derived from the data and the map, never saved (`scratch.rs`).
     #[serde(skip)]
     pub scratch: super::scratch::Scratch,
@@ -536,6 +539,10 @@ impl CommanderState {
         }
         for x in &self.hurt {
             h.write_i64(x.0);
+        }
+        h.write_u64(self.knowledge.len() as u64);
+        for k in &self.knowledge {
+            k.hash(h);
         }
         for n in &self.notes {
             h.write_u64(

@@ -111,12 +111,22 @@ is on the overlay card and in the `ai.world_model_work` perf counter.
 
 ### 3b. Zones (`zones.rs`)
 
-The ground the land army can walk (`reach.rs`), split once around every start and ore
-field into zones (seeds within 400 m join, at most 250) that know their neighbours.
-The graph depends on the map alone, so it is rebuilt after a restore rather than saved.
-Each think a `ZoneView` reads what changes from the world model and contacts: land
-fire, enemy mass, and the mass of our own structures in each zone.
+The whole map, land and water, split once into zones that know their neighbours.
+There is one zone map for the match, shared by every side and the observer
+(`ai::Shared`), so a zone id is the same place to all of them. It is built from the
+pathing grid's terrain classes, which never take the terrain's later edits, so it is
+the same on every machine and is rebuilt after a restore rather than saved.
 
+- **Seeds**: every start, then every ore field (seeds within 400 m of a zone on the
+  same ground join it), then a lattice every 1.5 km over ground no seed claims
+  (open sea, bare land), skipped within 1 km of another seed. Zones grow over their
+  own ground a ring at a time; a cliff between two nodes stops them. Ground no seed
+  reached (an island with no ore, a lake) gets a zone of its own when it holds 4
+  nodes or more. At most 1024 zones.
+- **Links**: `adj` joins zones on the same ground a unit can cross between; `coast`
+  joins land to the water it touches.
+- Each think a `ZoneView` reads what changes from the world model and contacts: land
+  fire, enemy mass, and the mass of our own structures in each zone.
 - **Value**: 250 mass per ore field plus the enemy mass remembered in the zone;
   incursions are answered most valuable first. Target choice (`land_objective`) keeps
   the old "mass within 600 m" value and subtracts the worst fire on the zones between
@@ -132,6 +142,27 @@ fire, enemy mass, and the mass of our own structures in each zone.
   raises Boom for the first 12 minutes.
 - A structure the plans' wants found no lot for is skipped at that place for three
   minutes (`eco.blocked_wants`), as a deposit is.
+
+### 3c. Knowledge (`knowledge.rs`)
+
+The side's long memory of the map, by zone, saved with the match. Contacts are its
+short memory of single units (the freshest 256, forgotten in seconds to minutes);
+knowledge keeps, for every zone, what each enemy player was seen to hold there:
+
+- structure mass and count by kind (`Built`: economy, factories, airfields,
+  shipyards, guns, anti-air, artillery, launchers, interceptors, shields, sensors,
+  other), and when they were last refreshed;
+- armed mobile mass by domain, builders, and when they were last refreshed;
+- when their commander was last seen there;
+- per zone: when it was last mostly in view, how much of it is in view now, and the
+  enemy radar blips there it cannot name.
+
+Each think (`learn_zones`, from everything the side detects, before the contacts are
+cut to 256) a zone is refreshed by the share of it in view, sampled every other node:
+wholly in view, what is seen now replaces what was known; half in view, half of the
+old is kept; out of view, the old stands. Something on radar is never less than
+what was known. When read, structures are sure for ten minutes and fade to 40% at
+thirty; an army is sure for twenty seconds and is forgotten at three minutes.
 
 ### 4. Beliefs (`beliefs.rs`)
 
@@ -381,6 +412,21 @@ shows
   nukes; a dash for never) and `HURT BY`: what has been killing it lately;
 - its last decisions: minute, plan, new stake and why ("looks good", "working",
   "losing trades", "answered", "hedge", "stale", "less appealing").
+
+The card's **Map** switch draws the side's zones on the ground (`mind_map.rs`):
+
+- **Mind**: what it believes. Its own zones are tinted its colour, each enemy zone its
+  holder's colour, fading as what it knows of the zone ages; ground it has never had
+  eyes on is dark. A dashed ring at a zone's middle is an army it believes in, fading
+  with how sure it is. Each held zone is tagged: main base, forward base, firebase,
+  expansion, army, builders or outpost.
+- **Truth**: what every player really holds there, counted the same way.
+- The zone under the pointer gets a card: everything known of it (structures by kind,
+  how long ago and how sure, the army seen and believed now, builders, their
+  commander), and in Mind, what is really there beside it.
+
+The zones and their truth are published only while the switch is on
+(`Watch::zones`, `World::ai_zone_map`, `World::ai_zone_truth`).
 
 The data comes from `World::ai_mind` (`mind.rs`), sent to the HUD with each side's
 status. Headless: `MERIDIAN_VISION=N scripts/shot.sh run --map crosswater --players 2

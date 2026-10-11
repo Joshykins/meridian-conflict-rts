@@ -3,9 +3,22 @@
 //! plans and stakes, each operation with its phase, size and trade, what it has
 //! seen and what has hurt it, and its last decisions with why.
 
-use super::{Hud, Scene};
-use crate::ui::{palette, rgb, type_scale, Rect, Ui};
+use super::{segmented, Hud, Scene};
+use crate::mind_map::MapMode;
+use crate::ui::{id, palette, rgb, type_scale, Rect, Ui};
 use mc_sim::ai::AiMind;
+
+/// What an observer has the AI's map show, set from the card's switch.
+#[derive(Default)]
+pub struct MindView {
+    pub map: MapMode,
+}
+
+const MODES: [(MapMode, &str); 3] = [
+    (MapMode::Off, "Off"),
+    (MapMode::Mind, "Mind"),
+    (MapMode::Truth, "Truth"),
+];
 
 const LINE: f32 = 17.0;
 const HEAD: f32 = 22.0;
@@ -45,7 +58,7 @@ impl Hud {
         let w = 340.0;
         let (plans, ops) = lines(m);
         let want =
-            HEAD * 5.0 + LINE * (plans + ops + 6 + NOTES.min(m.notes.len().max(1))) as f32 + 22.0;
+            HEAD * 6.0 + LINE * (plans + ops + 6 + NOTES.min(m.notes.len().max(1))) as f32 + 22.0;
         let h = want.min(bottom - top);
         if h < HEAD * 3.0 {
             return;
@@ -67,6 +80,36 @@ impl Hud {
 
         ui.text(x, y, type_scale::OVERLINE, text, "AI MIND");
         ui.text_right(x2, y, type_scale::CAPTION, s.team_color(who), &p.name);
+        y += HEAD + 2.0;
+
+        // The map switch: the AI's zones on the ground, as it believes them or as
+        // they are (`mind_map.rs`).
+        ui.text(x, y, type_scale::MICRO, dim, "MAP");
+        let sw = Rect::new(x + 44.0, y - 10.0, x2 - x - 44.0, 20.0);
+        let key = "ai-mind-map";
+        let res: [_; 3] =
+            std::array::from_fn(|n| ui.interact(id(key, n), segmented::segment(sw, n, 3), true));
+        segmented::body(ui, sw, res.iter().fold(0.0, |a, r| r.glow.max(a)));
+        let chosen = MODES
+            .iter()
+            .position(|(m, _)| *m == self.mind_view.map)
+            .unwrap_or(0);
+        let at = ui.ease(id(key, 9), chosen as f32, 16.0);
+        segmented::pill(ui, sw, at, 3, rgb(palette::ACCENT, 1.0), 1.0);
+        for (n, &(mode, label)) in MODES.iter().enumerate() {
+            let seg = segmented::segment(sw, n, 3);
+            segmented::hover(ui, sw, n, 3, res[n].glow);
+            segmented::divider(ui, sw, n, 3, Some(at));
+            let c = if n == chosen {
+                rgb(0xFFFFFF, 1.0)
+            } else {
+                rgb(palette::FAINT, 0.85 + 0.15 * res[n].glow)
+            };
+            ui.text_centred(seg.x + seg.w * 0.5, y, type_scale::MICRO, c, label);
+            if res[n].clicked {
+                self.mind_view.map = mode;
+            }
+        }
         y += HEAD + 2.0;
 
         // Plans: what it holds, with a four-step stake bar, then what came next.

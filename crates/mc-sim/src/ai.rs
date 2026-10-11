@@ -18,6 +18,7 @@ mod arrival;
 mod builders;
 mod commander;
 pub use commander::mind::{AiMind, MindEconomy, MindNote, MindOp, MindPlan};
+pub use commander::mind_zones::{MindHolding, MindZone, ZoneMapView, ZoneShape, NO_ZONE};
 mod danger;
 mod energy;
 mod groups;
@@ -80,6 +81,16 @@ enum Personality {
     Aggressive,
     Expander,
     Turtle,
+}
+
+/// What every AI side derives from the map alike and shares: built once, never
+/// saved or hashed, and rebuilt the same after a snapshot is restored.
+#[derive(Default)]
+pub(crate) struct Shared {
+    profiles: std::sync::OnceLock<std::sync::Arc<commander::profile::Profiles>>,
+    zones: std::sync::OnceLock<std::sync::Arc<commander::zones::Zones>>,
+    /// The zones as the observer draws them.
+    zone_view: std::sync::OnceLock<std::sync::Arc<commander::mind_zones::ZoneMapView>>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]

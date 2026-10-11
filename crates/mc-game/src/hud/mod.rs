@@ -365,6 +365,8 @@ pub struct Hud {
     survey: mine_coast::Survey,
     /// Observing: every commander's income and army over the last minutes.
     observed: observer::History,
+    /// Observing a Commander: its map of the zones on the ground (`mind_map.rs`).
+    pub mind_view: ai_mind::MindView,
     /// Launch warnings and what came of them (`silo::alerts`).
     nuke_alerts: silo::Alerts,
     /// Titan calls and strike cards (`titan::alerts`).

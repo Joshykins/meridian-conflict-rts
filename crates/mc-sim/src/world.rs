@@ -199,6 +199,8 @@ pub struct World {
     /// Index of the first terrain edit the renderer has not seen yet is tracked
     /// by the renderer; this is the count at the end of the last tick.
     pub(crate) scratch: Scratch,
+    /// What the AI sides derive from the map and share (`ai.rs`). Not state.
+    pub(crate) ai_shared: crate::ai::Shared,
 }
 
 /// Reusable per-tick buffers. Contents never survive a tick.
@@ -480,6 +482,7 @@ impl World {
             perf: mc_core::perf::Frame::default(),
             perf_nav: mc_path::NavStats::default(),
             scratch: Scratch::default(),
+            ai_shared: Default::default(),
         };
 
         if config.spawn_commanders {

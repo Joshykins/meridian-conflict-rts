@@ -1,13 +1,15 @@
-//! Zones (`docs/AI_COMMANDER.md`, "Zones"): the ground the land army can walk,
-//! split once around the side's start and every ore field into regions that know
-//! their neighbours. Operations pick targets and gauge danger by zone, so one idea
-//! of "what this ground is worth" serves raids, defence and scouts alike.
+//! Zones (`docs/AI_COMMANDER.md`, "Zones"): the whole map, land and water, split
+//! once into regions that know their neighbours. Every side and the observer share
+//! one zone map, so zone 12 is the same place to all of them. Operations pick
+//! targets and gauge danger by zone, and what a side knows of the map is kept by
+//! zone (`knowledge.rs`).
 //!
-//! The graph depends on the map alone, so it is rebuilt after a snapshot is
-//! restored instead of being kept in the state. What changes (fire, enemy mass,
-//! what we hold) is read from the world model each think (`ZoneView`).
+//! The map depends on the terrain classes alone (the pathing grid never takes the
+//! terrain's later edits), so it is the same on every machine and is rebuilt after a
+//! snapshot is restored rather than saved. What changes (fire, enemy mass, what we
+//! hold) is read each think (`ZoneView`).
 use super::profile::Target;
-use super::reach::{Reach, NODE};
+use super::reach::NODE;
 use super::world_model::WorldModel;
 use crate::World;
 use mc_core::{Fx, FxVec2};
@@ -15,113 +17,277 @@ use std::collections::VecDeque;
 
 /// No zone.
 pub(in crate::ai) const NONE: u16 = u16::MAX;
-/// Seeds nearer than this to a zone already made join it: neighbouring ore fields
-/// are one zone.
+/// Seeds nearer than this to a zone already made on the same ground join it:
+/// neighbouring ore fields are one zone.
 const MERGE: i32 = 400;
-/// Zones a map gets at most (a deliberate cap: a map with more ore fields than this
-/// leaves the rest to the zone nearest them).
-const MOST_ZONES: usize = 250;
+/// Metres between the seeds laid over ground no start or ore field claims, so open
+/// sea and bare land are split into zones of a few kilometres too.
+const LATTICE: i32 = 1536;
+/// A lattice seed is laid only this far from every other seed on its ground.
+const LATTICE_CLEAR: i32 = 1000;
+/// Ground left over without a seed (an island with no ore) gets a zone of its own
+/// when it holds at least this many nodes; a smaller pocket belongs to no zone.
+const MIN_POCKET: usize = 4;
+/// Zones a map gets at most (a deliberate cap: on a map that would make more, the
+/// last seeds are dropped and their ground goes to the zones nearest it).
+const MOST_ZONES: usize = 1024;
 /// Mass a mine point is worth to whoever holds the zone.
 pub(in crate::ai) const ORE_VALUE: i32 = 250;
+/// Nodes looked at to judge how much of a zone is in view: every other one each way.
+pub(in crate::ai) const SAMPLE: i32 = 2;
+
+/// What a zone's ground is: land units walk it, ships sail it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(u8)]
+pub(in crate::ai) enum Ground {
+    #[default]
+    Land = 0,
+    Water = 1,
+}
 
 #[derive(Clone, Debug, Default)]
 pub(in crate::ai) struct Zone {
     pub centre: FxVec2,
+    pub ground: Ground,
     /// Ore fields in it.
     pub ore: u16,
-    /// Neighbouring zones, by id.
+    /// Nodes in it, and of those the ones sampled for how much is in view.
+    pub nodes: u32,
+    pub samples: u32,
+    /// Zones on the same ground a unit can cross into, by id.
     pub adj: Vec<u16>,
+    /// Zones on the other ground it touches: the coast between land and water.
+    pub coast: Vec<u16>,
 }
 
 #[derive(Clone, Debug, Default)]
 pub(in crate::ai) struct Zones {
     w: i32,
     h: i32,
-    /// The zone of each `reach::NODE` square, `NONE` off the walkable ground.
+    /// The zone of each `reach::NODE` square, `NONE` on cliffs and pockets.
     id: Vec<u16>,
     pub zones: Vec<Zone>,
+    /// The zone of each player's start, by player.
+    pub starts: Vec<u16>,
+}
+
+/// The ground of every node, and whether a unit crosses from one node to the next.
+pub(in crate::ai) struct Grid<'a> {
+    pub w: i32,
+    pub h: i32,
+    pub ground: &'a [Option<Ground>],
+    /// Whether the edge between nodes `a` and `b` (neighbours on the same ground)
+    /// can be crossed.
+    pub crosses: &'a dyn Fn(usize, usize) -> bool,
+}
+
+impl Grid<'_> {
+    fn centre(&self, i: usize) -> FxVec2 {
+        let (x, y) = (i as i32 % self.w, i as i32 / self.w);
+        FxVec2::from_ints(x * NODE + NODE / 2, y * NODE + NODE / 2)
+    }
+
+    /// The node of ground `g` nearest `p`, within `within` metres along either axis.
+    fn near(&self, p: FxVec2, g: Ground, within: i32) -> Option<usize> {
+        let (px, py) = (p.x.floor_int(), p.y.floor_int());
+        let span = within / NODE + 1;
+        let (cx, cy) = (px / NODE, py / NODE);
+        (cy - span..=cy + span)
+            .flat_map(|y| (cx - span..=cx + span).map(move |x| (x, y)))
+            .filter(|&(x, y)| x >= 0 && y >= 0 && x < self.w && y < self.h)
+            .map(|(x, y)| (y * self.w + x) as usize)
+            .filter(|&i| self.ground[i] == Some(g))
+            .map(|i| {
+                let c = self.centre(i);
+                let (dx, dy) = (
+                    i64::from(c.x.floor_int() - px),
+                    i64::from(c.y.floor_int() - py),
+                );
+                (dx * dx + dy * dy, i)
+            })
+            .filter(|&(d, _)| d <= i64::from(within) * i64::from(within) * 2)
+            .min()
+            .map(|(_, i)| i)
+    }
 }
 
 impl Zones {
-    /// Zones seeded at `starts` then `ores` (in that order, so ids are the same on
-    /// every machine), grown over the walkable nodes of `reach` a ring at a time.
-    pub(in crate::ai) fn build(reach: &Reach, starts: &[FxVec2], ores: &[FxVec2]) -> Zones {
-        let (w, h) = reach.dims();
+    /// Zones seeded at `starts`, then `ores`, then a lattice over the ground those
+    /// leave (in that order, so ids are the same on every machine), grown over the
+    /// nodes of their own ground a ring at a time.
+    pub(in crate::ai) fn build(grid: &Grid, starts: &[FxVec2], ores: &[FxVec2]) -> Zones {
+        let (w, h) = (grid.w, grid.h);
         let n = (w * h).max(0) as usize;
         let mut id = vec![NONE; n];
         let mut zones: Vec<Zone> = Vec::new();
         let mut queue = VecDeque::new();
-        for seed in starts.iter().chain(ores) {
-            let Some(at) = reach.walkable_near(*seed, 2 * NODE) else {
-                continue;
+        let mut seed = |at: usize, id: &mut Vec<u16>, zones: &mut Vec<Zone>| -> bool {
+            let Some(g) = grid.ground[at] else {
+                return false;
             };
-            let node = ((at.y.floor_int() / NODE) * w + at.x.floor_int() / NODE) as usize;
-            if id[node] != NONE
+            let c = grid.centre(at);
+            if id[at] != NONE
+                || zones.len() >= MOST_ZONES
                 || zones
                     .iter()
-                    .any(|z| z.centre.distance(at) < Fx::from_int(MERGE))
+                    .any(|z| z.ground == g && z.centre.distance(c) < Fx::from_int(MERGE))
             {
-                continue;
+                return false;
             }
-            if zones.len() >= MOST_ZONES {
-                break;
-            }
-            id[node] = zones.len() as u16;
+            id[at] = zones.len() as u16;
             zones.push(Zone {
-                centre: at,
+                centre: c,
+                ground: g,
                 ..Zone::default()
             });
-            queue.push_back(node);
+            queue.push_back(at);
+            true
+        };
+        for p in starts.iter().chain(ores) {
+            if let Some(at) = grid.near(*p, Ground::Land, 2 * NODE) {
+                seed(at, &mut id, &mut zones);
+            }
         }
-        while let Some(i) = queue.pop_front() {
-            let (x, y) = (i as i32 % w, i as i32 / w);
-            for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
-                let (nx, ny) = (x + dx, y + dy);
-                if !reach.walkable_node(nx, ny) {
-                    continue;
+        let mut y = LATTICE / 2;
+        while y < h * NODE {
+            let mut x = LATTICE / 2;
+            while x < w * NODE {
+                let p = FxVec2::from_ints(x, y);
+                for g in [Ground::Land, Ground::Water] {
+                    let Some(at) = grid.near(p, g, LATTICE / 4) else {
+                        continue;
+                    };
+                    let c = grid.centre(at);
+                    if !zones.iter().any(|z| {
+                        z.ground == g && z.centre.distance(c) < Fx::from_int(LATTICE_CLEAR)
+                    }) {
+                        seed(at, &mut id, &mut zones);
+                    }
                 }
-                let j = (ny * w + nx) as usize;
-                if id[j] == NONE {
-                    id[j] = id[i];
-                    queue.push_back(j);
+                x += LATTICE;
+            }
+            y += LATTICE;
+        }
+        let grow = |queue: &mut VecDeque<usize>, id: &mut Vec<u16>| {
+            while let Some(i) = queue.pop_front() {
+                let (x, y) = (i as i32 % w, i as i32 / w);
+                for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+                    let (nx, ny) = (x + dx, y + dy);
+                    if nx < 0 || ny < 0 || nx >= w || ny >= h {
+                        continue;
+                    }
+                    let j = (ny * w + nx) as usize;
+                    if id[j] == NONE && grid.ground[j] == grid.ground[i] && (grid.crosses)(i, j) {
+                        id[j] = id[i];
+                        queue.push_back(j);
+                    }
                 }
+            }
+        };
+        grow(&mut queue, &mut id);
+        // Ground no seed reached: an island with no ore, a lake. Each piece big
+        // enough is a zone of its own.
+        for i in 0..n {
+            if id[i] != NONE || grid.ground[i].is_none() || zones.len() >= MOST_ZONES {
+                continue;
+            }
+            let mark = zones.len() as u16;
+            id[i] = mark;
+            let mut piece = vec![i];
+            let mut k = 0;
+            while k < piece.len() {
+                let j = piece[k];
+                k += 1;
+                let (x, y) = (j as i32 % w, j as i32 / w);
+                for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+                    let (nx, ny) = (x + dx, y + dy);
+                    if nx < 0 || ny < 0 || nx >= w || ny >= h {
+                        continue;
+                    }
+                    let m = (ny * w + nx) as usize;
+                    if id[m] == NONE && grid.ground[m] == grid.ground[j] && (grid.crosses)(j, m) {
+                        id[m] = mark;
+                        piece.push(m);
+                    }
+                }
+            }
+            if piece.len() >= MIN_POCKET {
+                zones.push(Zone {
+                    centre: grid.centre(piece[piece.len() / 2]),
+                    ground: grid.ground[i].unwrap_or_default(),
+                    ..Zone::default()
+                });
+            } else {
+                // Too small to matter; `NONE + 1` marks it looked at, cleared below.
+                for &j in &piece {
+                    id[j] = NONE - 1;
+                }
+            }
+        }
+        for v in &mut id {
+            if *v == NONE - 1 {
+                *v = NONE;
             }
         }
         for i in 0..n {
-            let (x, y) = (i as i32 % w, i as i32 / w);
             let a = id[i];
             if a == NONE {
                 continue;
+            }
+            let (x, y) = (i as i32 % w, i as i32 / w);
+            let z = &mut zones[a as usize];
+            z.nodes += 1;
+            if x % SAMPLE == 0 && y % SAMPLE == 0 {
+                z.samples += 1;
             }
             for (dx, dy) in [(1, 0), (0, 1)] {
                 let (nx, ny) = (x + dx, y + dy);
                 if nx >= w || ny >= h {
                     continue;
                 }
-                let b = id[(ny * w + nx) as usize];
-                if b != NONE && b != a {
-                    for (p, q) in [(a, b), (b, a)] {
-                        let adj = &mut zones[p as usize].adj;
-                        if !adj.contains(&q) {
-                            adj.push(q);
-                        }
+                let j = (ny * w + nx) as usize;
+                let b = id[j];
+                if b == NONE || b == a {
+                    continue;
+                }
+                let same = grid.ground[i] == grid.ground[j];
+                if same && !(grid.crosses)(i, j) {
+                    continue;
+                }
+                for (p, q) in [(a, b), (b, a)] {
+                    let list = if same {
+                        &mut zones[p as usize].adj
+                    } else {
+                        &mut zones[p as usize].coast
+                    };
+                    if !list.contains(&q) {
+                        list.push(q);
                     }
                 }
             }
         }
         for z in &mut zones {
             z.adj.sort_unstable();
+            z.coast.sort_unstable();
         }
-        let mut zs = Zones { w, h, id, zones };
+        let mut zs = Zones {
+            w,
+            h,
+            id,
+            zones,
+            starts: Vec::new(),
+        };
         for o in ores {
             if let Some(z) = zs.of(*o) {
                 zs.zones[z as usize].ore += 1;
             }
         }
+        zs.starts = starts.iter().map(|s| zs.of(*s).unwrap_or(NONE)).collect();
         zs
     }
 
-    /// The zone `p` stands in, or the one beside it when it is on a cliff or shore.
+    /// The zone `p` stands in, or the one beside it when it is on a cliff or a
+    /// pocket too small for a zone.
     pub(in crate::ai) fn of(&self, p: FxVec2) -> Option<u16> {
         let (x, y) = (p.x.floor_int() / NODE, p.y.floor_int() / NODE);
         (-1..=1)
@@ -135,6 +301,11 @@ impl Zones {
             })
             .min()
             .map(|(.., z)| z)
+    }
+
+    /// Nodes across and down, and the zone of each (`NONE` for none).
+    pub(in crate::ai) fn grid(&self) -> (i32, i32, &[u16]) {
+        (self.w, self.h, &self.id)
     }
 }
 
@@ -180,6 +351,63 @@ impl ZoneView {
 }
 
 impl World {
+    /// The match's zones, shared by every side: built from the terrain classes on
+    /// first use.
+    pub(in crate::ai) fn zones(&self) -> std::sync::Arc<Zones> {
+        self.ai_shared
+            .zones
+            .get_or_init(|| std::sync::Arc::new(self.build_zones()))
+            .clone()
+    }
+
+    fn build_zones(&self) -> Zones {
+        let size = self.terrain.size_metres();
+        let (w, h) = (size.x.floor_int() / NODE, size.y.floor_int() / NODE);
+        let n = (w * h).max(0) as usize;
+        let cell = |p: FxVec2| {
+            let c = mc_path::Cell::from_pos(p);
+            (c.x >= 0 && c.y >= 0).then_some((c.x as u32, c.y as u32))
+        };
+        let land = |p: FxVec2| cell(p).is_some_and(|c| self.nav.passable_terrain(c, c));
+        let water = |p: FxVec2| cell(p).is_some_and(|c| self.nav.passable_naval_terrain(c, c));
+        let centre = |i: usize| {
+            FxVec2::from_ints(
+                (i as i32 % w) * NODE + NODE / 2,
+                (i as i32 / w) * NODE + NODE / 2,
+            )
+        };
+        let ground: Vec<Option<Ground>> = (0..n)
+            .map(|i| {
+                let c = centre(i);
+                if land(c) {
+                    Some(Ground::Land)
+                } else if water(c) {
+                    Some(Ground::Water)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        // A unit crosses to the next node when the ground halfway is its own too: a
+        // cliff between two plateaus splits them.
+        let crosses = |a: usize, b: usize| {
+            let mid = centre(a).lerp(centre(b), Fx::HALF);
+            match ground[a] {
+                Some(Ground::Land) => land(mid),
+                Some(Ground::Water) => water(mid),
+                None => false,
+            }
+        };
+        let grid = Grid {
+            w,
+            h,
+            ground: &ground,
+            crosses: &crosses,
+        };
+        let starts: Vec<FxVec2> = self.state.players.iter().map(|p| p.start).collect();
+        Zones::build(&grid, &starts, &self.ore_centres())
+    }
+
     /// The zone view for `player` from its world model and what it remembers.
     pub(in crate::ai) fn zone_view(&self, player: u8, zones: &Zones, wm: &WorldModel) -> ZoneView {
         let n = zones.zones.len();
@@ -217,77 +445,4 @@ impl World {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn at(x: i32, y: i32) -> FxVec2 {
-        FxVec2::from_ints(x * NODE + NODE / 2, y * NODE + NODE / 2)
-    }
-
-    /// Two rooms joined by a corridor, a wall room cut off on the right.
-    fn map() -> Reach {
-        Reach::from_rows(&[
-            "###########.##",
-            "###########.##",
-            "##.########.##",
-            "###########.##",
-            "###########.##",
-        ])
-    }
-
-    #[test]
-    fn zones_split_the_ground_between_their_seeds_and_know_their_neighbours() {
-        let zs = Zones::build(&map(), &[at(0, 0)], &[at(10, 4)]);
-        assert_eq!(zs.zones.len(), 2);
-        assert_eq!(zs.of(at(1, 1)), Some(0));
-        assert_eq!(zs.of(at(9, 3)), Some(1));
-        assert_eq!(zs.zones[0].adj, vec![1]);
-        assert_eq!(zs.zones[1].adj, vec![0]);
-        // The strip past the wall is cut off from home: no zone.
-        assert_eq!(zs.of(at(13, 2)), None);
-    }
-
-    #[test]
-    fn seeds_close_together_make_one_zone_that_counts_both_ore_fields() {
-        let zs = Zones::build(&map(), &[at(0, 0)], &[at(1, 1), at(2, 1)]);
-        assert_eq!(zs.zones.len(), 1);
-        assert_eq!(zs.zones[0].ore, 2);
-    }
-}
-
-#[cfg(test)]
-mod view_tests {
-    use super::*;
-
-    #[test]
-    fn fire_along_carries_the_worst_zone_on_the_way() {
-        // 0 - 1 - 2, fire on the middle one only.
-        let zones = Zones {
-            zones: vec![
-                Zone {
-                    adj: vec![1],
-                    ..Zone::default()
-                },
-                Zone {
-                    adj: vec![0, 2],
-                    ..Zone::default()
-                },
-                Zone {
-                    adj: vec![1],
-                    ..Zone::default()
-                },
-            ],
-            ..Zones::default()
-        };
-        let view = ZoneView {
-            threat: vec![Fx::ZERO, Fx::from_int(7), Fx::ZERO],
-            enemy: vec![Fx::ZERO; 3],
-            held: vec![Fx::ZERO; 3],
-        };
-        assert_eq!(
-            view.fire_along(&zones, 0),
-            vec![Fx::ZERO, Fx::from_int(7), Fx::from_int(7)]
-        );
-        assert_eq!(view.fire_along(&zones, 1)[0], Fx::from_int(7));
-    }
-}
+mod tests;

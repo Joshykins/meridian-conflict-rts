@@ -94,6 +94,8 @@ pub struct AiMind {
     pub work: u32,
     /// What its defences found missing, per mille: anti-air, artillery, raiders.
     pub need: [i32; 3],
+    /// What it believes of every zone it knows anything of (`knowledge.rs`).
+    pub known: Vec<super::mind_zones::MindZone>,
 }
 
 const HURT_NAMES: [&str; 6] = ["land", "artillery", "air", "space", "sea", "turrets"];
@@ -216,9 +218,18 @@ impl World {
             hurt,
             seen,
             rally: c.rally.map(xy),
-            zones: c.scratch.zone_counts(),
+            zones: {
+                let z = self.ai_shared.zones.get();
+                z.map_or((0, 0), |z| {
+                    (
+                        z.zones.len() as u32,
+                        z.zones.iter().filter(|z| z.ore > 0).count() as u32,
+                    )
+                })
+            },
             work: c.scratch.work,
             need: c.role_need.map(i32::from),
+            known: self.mind_zones(&c.knowledge),
         })
     }
 }

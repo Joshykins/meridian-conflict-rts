@@ -109,6 +109,10 @@ pub struct SimStatus {
     pub survival: Option<mc_sim::SurvivalStatus>,
     /// A replay being watched: its length, and the tick a seek is running to.
     pub replay: Option<ReplayStatus>,
+    /// The match's zones and what each player really holds in each, while an observer
+    /// draws the AI's map (`Watch::zones`; `mind_map.rs`).
+    pub zone_map: Option<Arc<mc_sim::ai::ZoneMapView>>,
+    pub zone_truth: Vec<Vec<mc_sim::ai::MindHolding>>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -145,6 +149,9 @@ pub struct Watch {
     /// An observer looking through one side's eyes: its fog and what it can see.
     /// `None` sees everything. Ignored on a machine that plays.
     pub perspective: Option<u8>,
+    /// An observer is drawing an AI's map of the zones: the zones and their truth are
+    /// published (`SimStatus::zone_map`).
+    pub zones: bool,
 }
 
 pub struct SimHandle {
@@ -308,6 +315,8 @@ pub fn status_of(world: &World, worst: u64) -> SimStatus {
         error: None,
         survival: world.survival_status(),
         replay: None,
+        zone_map: None,
+        zone_truth: Vec::new(),
     };
     forces_of(world, &mut status.players);
     mine_growth_of(world, &mut status.players);
@@ -377,6 +386,13 @@ fn write_watched(world: &World, local: Option<u8>, watch: &Watch, status: &mut S
         world.write_plans(side, &mut status.plans);
     }
     write_ally_mine_plans(world, local.and(side), &mut status.ally_mine_plans);
+    if local.is_none() && watch.zones {
+        status.zone_map = Some(world.ai_zone_map());
+        status.zone_truth = world.ai_zone_truth();
+    } else {
+        status.zone_map = None;
+        status.zone_truth.clear();
+    }
 }
 
 /// The core mines `side`'s allies have planned, for the warning when the side places one

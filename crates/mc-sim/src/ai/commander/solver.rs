@@ -124,9 +124,7 @@ impl World {
         let c = &self.state.ai[player as usize].commander;
         let p = |k: PlanKind| points(c.plan(k));
         let land_route = self.land_route_to_enemy(player);
-        let outranging = self
-            .outranging_air(player, &self.profiles(player))
-            .floor_int() as i64;
+        let outranging = self.outranging_air(player, &self.profiles()).floor_int() as i64;
         let shares = [
             p(PlanKind::Pressure)
                 + p(PlanKind::Raid)
@@ -167,7 +165,7 @@ impl World {
         counts: &BTreeMap<BlueprintId, usize>,
         serial: u32,
     ) -> Option<BlueprintId> {
-        let profiles = self.profiles(player);
+        let profiles = self.profiles();
         let c = &self.state.ai[player as usize].commander;
         let land_route = self.land_route_to_enemy(player);
         let stake = |k: PlanKind| s(c.plan(k));

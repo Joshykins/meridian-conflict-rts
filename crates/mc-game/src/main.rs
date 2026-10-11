@@ -29,6 +29,7 @@ mod issues;
 mod line_of_fire;
 mod loading;
 mod match_options;
+mod mind_map;
 mod net_bot;
 mod netplay;
 mod nuke_marks;

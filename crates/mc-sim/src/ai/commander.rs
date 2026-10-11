@@ -7,20 +7,22 @@
 mod beliefs;
 pub(in crate::ai) mod economy;
 mod king;
+pub(in crate::ai) mod knowledge;
 mod matchup;
 pub(in crate::ai) mod mind;
+pub(in crate::ai) mod mind_zones;
 mod ops;
 mod ops_air_sea;
 mod ops_ground;
 mod ops_space;
 mod plans;
-mod profile;
+pub(in crate::ai) mod profile;
 mod reach;
 mod scratch;
 mod solver;
 pub(super) mod state;
 mod world_model;
-mod zones;
+pub(in crate::ai) mod zones;
 
 use super::{offset_toward, Census, Intel};
 use crate::command::Command;
@@ -152,9 +154,9 @@ impl World {
         intel: &Intel,
         out: &mut Vec<Command>,
     ) {
-        let profiles = self.profiles(player);
+        let profiles = self.profiles();
         let reach = self.home_reach(player);
-        let zones = self.zones(player, &reach);
+        let zones = self.zones();
         // Past a few hundred units a side thinks less often (a deliberate cap on its
         // cost, kept in the state so a restored match thinks on the same ticks).
         let owned = {

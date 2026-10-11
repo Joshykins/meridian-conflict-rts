@@ -44,6 +44,8 @@ mod game_nuke_sounds;
 pub(crate) mod groups;
 #[path = "game_menu.rs"]
 mod menu_screens;
+#[path = "game_mind_map.rs"]
+mod mind_map_view;
 #[path = "game_mines.rs"]
 mod mine_placing;
 #[path = "game_music.rs"]
@@ -4245,12 +4247,14 @@ impl Game {
             || self.watched.side != self.view.local
             || self.watched.everyone != everyone
             || self.watched.perspective != self.view.perspective
+            || self.watched.zones != self.mind_map_on()
         {
             self.watched = Watch {
                 units: watch.collect(),
                 side: self.view.local,
                 everyone,
                 perspective: self.view.perspective,
+                zones: self.mind_map_on(),
             };
             self.sim.watch.lock().unwrap().clone_from(&self.watched);
         }
@@ -4532,6 +4536,7 @@ impl Game {
             crate::gravitic_marks::draw(&mut ui, &field, self.ground_under_cursor(renderer));
             crate::warp_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));
             crate::destruct_marks::draw(&mut ui, &field, alpha);
+            self.draw_mind_map(&mut ui, &field, renderer);
             if self.pointer == Pointer::Attack {
                 if let Some(target) = self.unit_at(self.cursor) {
                     crate::line_of_fire::draw_hover(&mut ui, &field, target);

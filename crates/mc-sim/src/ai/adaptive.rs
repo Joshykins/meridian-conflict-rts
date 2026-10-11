@@ -68,6 +68,7 @@ impl World {
         let mask = self.team_mask(player);
         let config = self.state.ai[player as usize].config;
         let mut seen = Vec::new();
+        let mut blips = Vec::new();
         for row in self.state.units.slots.iter() {
             if !self.are_enemies(player, self.state.units.owner[row])
                 || self.state.units.has_flag(row, flag::IN_FACTORY)
@@ -78,6 +79,7 @@ impl World {
             let id = self.state.units.id(row);
             // A radar blip that has never been identified is not a unit blueprint.
             if self.state.fog_enabled && !self.fog.is_identified(row, id.generation(), mask) {
+                blips.push(self.state.units.pos[row]);
                 continue;
             }
             seen.push(Contact {
@@ -87,6 +89,8 @@ impl World {
                 seen: tick,
             });
         }
+        // The long memory takes everything seen; the contacts below keep the freshest.
+        self.learn_zones(player, &seen, &blips);
         let mut contacts = std::mem::take(&mut self.state.ai[player as usize].contacts);
         contacts.retain(|c| {
             tick.saturating_sub(c.seen) <= config.memory_ticks()
