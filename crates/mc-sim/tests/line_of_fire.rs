@@ -6,7 +6,7 @@ use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
 use mc_jobs::Pool;
 use mc_map::Heightfield;
-use mc_sim::tables::{flag, Controller, FireState};
+use mc_sim::tables::{flag, Controller};
 use mc_sim::world::MapData;
 use mc_sim::{Command, MatchConfig, PlayerCommand, PlayerSetup, SimEvent, World};
 use std::path::Path;
@@ -103,11 +103,6 @@ fn a_gun_holds_fire_while_a_hill_hides_its_target() {
     .unwrap();
     let shooter = rows_of(&w, 0)[0];
     let target = rows_of(&w, 1)[0];
-    w.tick(&[cmd(Command::SetFireState {
-        units: vec![w.state.units.id(shooter)],
-        state: FireState::HoldPosition,
-    })])
-    .unwrap();
     let start = w.state.units.pos[shooter];
     for _ in 0..80 {
         w.tick(&[]).unwrap();
@@ -121,7 +116,7 @@ fn a_gun_holds_fire_while_a_hill_hides_its_target() {
     assert_ne!(w.state.units.shot_blocked[shooter] & 1, 0);
     assert!(
         start.distance(w.state.units.pos[shooter]) < Fx::ONE,
-        "holding position, it should not move"
+        "a land unit holds its spot: it should not move"
     );
 }
 
@@ -135,14 +130,8 @@ fn a_gun_turns_to_a_target_it_can_see() {
     ])
     .unwrap();
     let shooter = rows_of(&w, 0)[0];
-    w.tick(&[
-        spawn(&w, 1, "aster_t1_tank", 500, 687, DUMMY),
-        cmd(Command::SetFireState {
-            units: vec![w.state.units.id(shooter)],
-            state: FireState::HoldPosition,
-        }),
-    ])
-    .unwrap();
+    w.tick(&[spawn(&w, 1, "aster_t1_tank", 500, 687, DUMMY)])
+        .unwrap();
     let open = rows_of(&w, 1)
         .into_iter()
         .find(|&r| w.state.units.pos[r].y > Fx::from_int(600))
@@ -209,11 +198,6 @@ fn artillery_lobs_over_the_hill() {
     ])
     .unwrap();
     let shooter = rows_of(&w, 0)[0];
-    w.tick(&[cmd(Command::SetFireState {
-        units: vec![w.state.units.id(shooter)],
-        state: FireState::HoldPosition,
-    })])
-    .unwrap();
     let mut shot = false;
     for _ in 0..200 {
         w.tick(&[]).unwrap();
@@ -236,11 +220,6 @@ fn tank_by_a_wall(w: &mut World) -> (usize, usize) {
     .unwrap();
     let shooter = rows_of(w, 0)[0];
     let wall = rows_of(w, 1)[0];
-    w.tick(&[cmd(Command::SetFireState {
-        units: vec![w.state.units.id(shooter)],
-        state: FireState::HoldPosition,
-    })])
-    .unwrap();
     (shooter, wall)
 }
 

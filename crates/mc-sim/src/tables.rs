@@ -35,21 +35,21 @@ pub const MAX_FLATTENS: usize = 32_768;
 pub const NO_ORDER: u32 = u32::MAX;
 pub const NO_FIELD: u32 = u32::MAX;
 
-/// A unit's stance: whether its weapons pick targets of their own, and whether
-/// it leaves its spot to go after them. An explicit `Attack`, `AttackGround` or
-/// `Bombard` order fires (and moves) whatever the stance.
+/// A unit's stance: whether its weapons pick targets of their own. An explicit
+/// `Attack`, `AttackGround` or `Bombard` order fires (and moves) whatever the stance.
+///
+/// Land and naval units never leave their spot, or their route, to go after a
+/// target no order names: they shoot what comes in range. Only armed aircraft
+/// go after what they see (`World::chases`).
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum FireState {
-    /// Engages anything it can reach. An idle land or naval unit goes after an
-    /// enemy it sees just out of range, on a leash, then walks back; idle
-    /// aircraft launch at anything they see.
+    /// Shoots anything it can reach; idle aircraft launch at anything they see.
     #[default]
     FireAtWill,
     /// Never picks a target by itself.
     HoldFire,
-    /// Shoots anything in range but never leaves its spot, or its route, to chase.
-    HoldPosition,
+    // retired: 2 (HoldPosition, now how every land and naval unit behaves)
 }
 
 impl FireState {
@@ -57,7 +57,6 @@ impl FireState {
     pub fn from_bits(bits: u32) -> FireState {
         match bits & 3 {
             1 => FireState::HoldFire,
-            2 => FireState::HoldPosition,
             _ => FireState::FireAtWill,
         }
     }

@@ -2570,30 +2570,29 @@ impl Game {
         }
     }
 
-    /// H (hold position) and Y (hold fire): puts the armed selection in that
-    /// stance, or back to engaging if most of it is in it already.
-    fn toggle_stance(&mut self, stance: FireState) {
-        let (mut in_it, mut armed) = (0, 0);
+    /// Y: puts the armed selection on hold fire, or back to firing if most of it
+    /// holds fire already.
+    fn toggle_hold_fire(&mut self) {
+        let (mut held, mut armed) = (0, 0);
         for u in self.selected_units() {
             if self.takes_stance(u) {
                 armed += 1;
-                in_it += usize::from(u.fire_state() == stance);
+                held += usize::from(u.fire_state() == FireState::HoldFire);
             }
         }
         if armed == 0 {
             return;
         }
-        let next = if in_it * 2 > armed {
+        let next = if held * 2 > armed {
             FireState::FireAtWill
         } else {
-            stance
+            FireState::HoldFire
         };
         self.set_fire_state(next);
         self.hud.toast(
             match next {
-                FireState::HoldPosition => "Hold Position",
                 FireState::HoldFire => "Hold Fire",
-                FireState::FireAtWill => "Engage",
+                FireState::FireAtWill => "Fire",
             },
             hud::style::Family::Stance.tone(),
         );
@@ -2910,7 +2909,6 @@ impl Game {
                 | KeyCode::KeyR
                 | KeyCode::KeyP
                 | KeyCode::KeyK
-                | KeyCode::KeyH
                 | KeyCode::KeyY
                 | KeyCode::KeyV
                 | KeyCode::KeyO
@@ -2989,8 +2987,7 @@ impl Game {
             KeyCode::KeyR => self.arm(Targeting::Reclaim),
             KeyCode::KeyP => self.arm(Targeting::Patrol),
             KeyCode::KeyK => self.arm(Targeting::Bombard),
-            KeyCode::KeyH => self.toggle_stance(FireState::HoldPosition),
-            KeyCode::KeyY => self.toggle_stance(FireState::HoldFire),
+            KeyCode::KeyY => self.toggle_hold_fire(),
             KeyCode::KeyV => self.toggle_dive(),
             KeyCode::KeyO => self.arm(Targeting::Warp),
             // A titan's ability: a dasher's dash, or a giant's strike (`hud/titan.rs`).

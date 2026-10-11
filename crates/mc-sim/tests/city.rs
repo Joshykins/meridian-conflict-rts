@@ -8,7 +8,7 @@ use mc_data::Blueprints;
 use mc_jobs::Pool;
 use mc_map::{Heightfield, Prop, PropKind};
 use mc_sim::city::{BURNING, DOWN, GUTTED};
-use mc_sim::tables::{flag, Controller, FireState};
+use mc_sim::tables::{flag, Controller};
 use mc_sim::world::MapData;
 use mc_sim::{Command, MatchConfig, PlayerCommand, PlayerSetup, SimEvent, UnitId, World};
 use std::path::Path;
@@ -304,11 +304,6 @@ fn a_gun_holds_fire_while_a_house_stands_between_it_and_its_target() {
             flag::PASSIVE | flag::INVULNERABLE,
         ),
     ])
-    .unwrap();
-    w.tick(&[cmd(Command::SetFireState {
-        units: ids_of(&w, 0),
-        state: FireState::HoldPosition,
-    })])
     .unwrap();
     for _ in 0..80 {
         w.tick(&[]).unwrap();

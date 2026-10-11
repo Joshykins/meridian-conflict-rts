@@ -98,8 +98,7 @@ Off the lines, measured the same way:
   lands its Seraphic Nova (a `dash_only` cone weapon, a full-circle wake) rolls out to
   320 m at 260 m/s (15000 at its feet to 3750 at the edge, enemies only, 1.5 s stun on all
   but experimentals, over hills and walls, stopped only by enemy shield domes: its own side's let it through), its seekers all
-  going up as it lands; then 15 s to recharge. Model 25% bigger since 10-09 (radius 75 m). Not at a move order, hold fire
-  or hold position. It lands under a siege gun's `range_min` (the Behemoth's Tempest
+  going up as it lands; then 15 s to recharge. Model 25% bigger since 10-09 (radius 75 m). Not at a move order or hold fire. It lands under a siege gun's `range_min` (the Behemoth's Tempest
   900 m, rockets 600 m), so it is the Behemoth's ground answer; nothing against aircraft, though its forearms reach spacecraft.
   Measured (mc-sim `tests/seraph.rs`): it kills four Striders and lives.
 - The Skyhook space elevator (ARC T5, 160000 materials / 1.6 M energy, `docs/ELEVATOR.md`):

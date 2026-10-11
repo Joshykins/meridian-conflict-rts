@@ -657,9 +657,11 @@ impl World {
         self.state.units.fire_state[row] != FireState::HoldFire
     }
 
-    /// Whether `row` may leave its spot, or its route, to go after a target no order names.
+    /// Whether `row` may leave its spot, or its route, to go after a target no order
+    /// names: only an aircraft at fire at will. Land and naval units hold where the
+    /// player put them and shoot what comes in range.
     pub(crate) fn chases(&self, row: usize) -> bool {
-        self.state.units.fire_state[row] == FireState::FireAtWill
+        self.fires_at_will(row) && self.is_air(row)
     }
 
     /// The point (and scatter) `row`'s orders tell its ground weapons to shell, if any.

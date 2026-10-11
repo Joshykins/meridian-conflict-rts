@@ -19,8 +19,9 @@
 //! friends and reclaims wrecks there, and takes up work that appears later
 //! (`area_work.rs`).
 //!
-//! Only a unit free to engage (`FireState::FireAtWill`) leaves its spot. Held
-//! position, it stays and shoots what comes into range; on hold fire, it only stands.
+//! The guard area is the one place a land or naval unit goes after an enemy no
+//! order names (`World::chases`: elsewhere only aircraft do). On hold fire, it
+//! only stands.
 
 use crate::spatial::kind;
 use crate::tables::*;
@@ -188,7 +189,7 @@ impl World {
         let units = &self.state.units;
         if !look
             || bp.weapons.is_empty()
-            || !self.chases(row)
+            || !self.fires_at_will(row)
             || units.has_flag(row, flag::PASSIVE)
             || (!self.is_air(row) && self.has_clear_target(row))
         {

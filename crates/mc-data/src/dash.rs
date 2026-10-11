@@ -6,7 +6,7 @@
 //!
 //! It dashes on its own while it is free to pick its fights: idle, on an attack-move or a
 //! patrol, or under an attack order (whose mark picks the cluster), and only at fire at
-//! will. A move order, hold fire or hold position keeps it where the player put it.
+//! will. A move order or hold fire keeps it where the player put it.
 
 use mc_core::{Fx, StateHasher};
 use serde::Deserialize;

@@ -809,9 +809,7 @@ pub enum Glyph {
     Formation,
     GroundAttack,
     Bombard,
-    FireAtWill,
     HoldFire,
-    HoldPosition,
     Dive,
     Surface,
     Guard,
@@ -1026,10 +1024,6 @@ pub fn glyph(ui: &mut Ui, glyph: Glyph, c: Vec2, r: f32, color: Color) {
                 ui.disc(c + Vec2::new(dx * r, dy * r), t * 1.3, color);
             }
         }
-        Glyph::FireAtWill => {
-            reticle(ui, c, r);
-            ui.disc(c, t * 1.4, color);
-        }
         Glyph::HoldFire => {
             ui.arc(c, r * 0.6, 0.0, TAU, t, color);
             ui.stroke(
@@ -1066,20 +1060,6 @@ pub fn glyph(ui: &mut Ui, glyph: Glyph, c: Vec2, r: f32, color: Color) {
             let tip = Vec2::new(c.x + r * 0.7, from + dir.y * r * 0.55);
             ui.stroke(Vec2::new(c.x + r * 0.7, from), tip, t, color);
             arrow_head(ui, tip, dir, r * 0.25, t, color);
-        }
-        Glyph::HoldPosition => {
-            // A spot staked out: a square with a pin at its middle.
-            let k = r * 0.75;
-            let corners = [
-                Vec2::new(-k, -k),
-                Vec2::new(k, -k),
-                Vec2::new(k, k),
-                Vec2::new(-k, k),
-            ];
-            for i in 0..4 {
-                ui.stroke(c + corners[i], c + corners[(i + 1) % 4], t, color);
-            }
-            ui.disc(c, t * 1.6, color);
         }
         Glyph::Guard => {
             // The area watched: a ring with four ticks pointing in, the spot held at its middle.

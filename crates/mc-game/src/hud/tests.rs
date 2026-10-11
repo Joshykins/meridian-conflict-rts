@@ -1002,17 +1002,14 @@ fn the_order_card_offers_what_the_selection_can_do_by_family() {
         rig.click(order_slot(1, 1)),
         vec![HudAction::Target(Targeting::Bombard)]
     );
+    // The one stance: hold fire (a tank holds its spot anyway), then guard.
     assert_eq!(
         rig.click(order_slot(2, 0)),
-        vec![HudAction::FireState(mc_sim::FireState::FireAtWill)]
+        vec![HudAction::FireState(mc_sim::FireState::HoldFire)]
     );
     assert_eq!(
         rig.click(order_slot(2, 1)),
-        vec![HudAction::FireState(mc_sim::FireState::HoldPosition)]
-    );
-    assert_eq!(
-        rig.click(order_slot(2, 2)),
-        vec![HudAction::FireState(mc_sim::FireState::HoldFire)]
+        vec![HudAction::Target(Targeting::Guard)]
     );
     assert_eq!(rig.click(order_slot(3, 0)), vec![HudAction::Stop]);
     // One tank has no formation, and a tank cannot reclaim: nothing more on the card.

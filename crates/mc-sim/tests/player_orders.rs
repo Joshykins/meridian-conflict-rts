@@ -153,86 +153,12 @@ fn tank_reach(w: &World) -> i32 {
     (bp.max_weapon_range() + bp.radius).to_f32() as i32
 }
 
+/// Land units hold where they are put: an enemy just out of range is left alone, one
+/// in range is shot from where the unit stands.
 #[test]
-fn an_idle_unit_chases_an_enemy_just_out_of_range_then_walks_back() {
+fn an_idle_unit_shoots_what_is_in_range_but_never_chases() {
     let mut w = world();
     let tank = add(&mut w, "aster_t1_tank", 0, 500, 500);
-    let x = 500 + tank_reach(&w) + 12;
-    let enemy = add(&mut w, "aster_t1_tank", 1, x, 500);
-    let r = row(&w, enemy);
-    w.state.units.flags[r] |= flag::PASSIVE;
-    assert!(
-        shots(&mut w, tank, 200) > 0,
-        "it never went after the enemy"
-    );
-    assert!(strayed(&w, tank, 500, 500) > 4.0, "it shot without moving");
-    for _ in 0..3000 {
-        w.tick(&[]).unwrap();
-        if w.state.units.row(enemy).is_none() && queue(&w, tank).is_empty() {
-            break;
-        }
-    }
-    assert!(
-        w.state.units.row(enemy).is_none(),
-        "the chase never finished the enemy"
-    );
-    assert!(
-        queue(&w, tank).is_empty(),
-        "still busy: {:?}",
-        queue(&w, tank)
-    );
-    assert!(
-        strayed(&w, tank, 500, 500) < 6.0,
-        "it did not come back: {} m off",
-        strayed(&w, tank, 500, 500)
-    );
-}
-
-#[test]
-fn a_chase_gives_up_at_the_end_of_its_leash() {
-    let mut w = world();
-    let tank = add(&mut w, "aster_t1_tank", 0, 500, 500);
-    let x = 500 + tank_reach(&w) + 12;
-    let enemy = dummy(&mut w, "aster_t1_tank", x, 500);
-    let mut far = 0.0f32;
-    let mut gave_up = false;
-    for _ in 0..1500 {
-        // The enemy backs off as fast as the tank follows, and slips away
-        // once the tank turns for home.
-        let r = row(&w, enemy);
-        let t = w.state.units.pos[row(&w, tank)];
-        gave_up |= queue(&w, tank)
-            .first()
-            .is_some_and(|o| o.0 == OrderKind::AttackMove);
-        let ex = if gave_up {
-            1500
-        } else {
-            x.max(t.x.to_f32() as i32 + tank_reach(&w) + 12)
-        };
-        w.state.units.pos[r] = FxVec2::from_ints(ex, 500);
-        w.tick(&[]).unwrap();
-        far = far.max(strayed(&w, tank, 500, 500));
-        if gave_up && queue(&w, tank).is_empty() {
-            break;
-        }
-    }
-    assert!(gave_up, "it never turned back");
-    let leash = tank_reach(&w) as f32;
-    assert!(far > 4.0, "it never set off");
-    // Braking from full speed carries it a little past the end.
-    assert!(far < leash * 1.2, "it ran {far} m on a {leash} m leash");
-    assert!(strayed(&w, tank, 500, 500) < 6.0, "it did not come back");
-}
-
-#[test]
-fn holding_position_shoots_what_is_in_range_but_never_chases() {
-    let mut w = world();
-    let tank = add(&mut w, "aster_t1_tank", 0, 500, 500);
-    w.tick(&order(Command::SetFireState {
-        units: vec![tank],
-        state: FireState::HoldPosition,
-    }))
-    .unwrap();
     let reach = tank_reach(&w);
     let enemy = dummy(&mut w, "aster_t1_tank", 500 + reach + 12, 500);
     assert_eq!(
@@ -249,60 +175,6 @@ fn holding_position_shoots_what_is_in_range_but_never_chases() {
         "it did not fire on an enemy in range"
     );
     assert!(strayed(&w, tank, 500, 500) < 1.0, "it left its spot");
-}
-
-#[test]
-fn holding_position_stops_a_unit_where_it_stands_and_later_moves_keep_it() {
-    let mut w = world();
-    let tank = add(&mut w, "aster_t1_tank", 0, 500, 500);
-    w.tick(&order(Command::Move {
-        units: vec![tank],
-        target: FxVec2::from_ints(1200, 500),
-        queue: false,
-    }))
-    .unwrap();
-    for _ in 0..40 {
-        w.tick(&[]).unwrap();
-    }
-    w.tick(&order(Command::SetFireState {
-        units: vec![tank],
-        state: FireState::HoldPosition,
-    }))
-    .unwrap();
-    assert!(
-        queue(&w, tank).is_empty(),
-        "the move was kept: {:?}",
-        queue(&w, tank)
-    );
-    let stop = w.state.units.pos[row(&w, tank)];
-    for _ in 0..60 {
-        w.tick(&[]).unwrap();
-    }
-    let rolled = w.state.units.pos[row(&w, tank)].distance(stop).to_f32();
-    assert!(
-        rolled < 20.0,
-        "it kept rolling for {rolled} m, speed {}",
-        w.state.units.speed[row(&w, tank)].to_f32()
-    );
-
-    // Sent on, it goes, and holds there.
-    w.tick(&order(Command::Move {
-        units: vec![tank],
-        target: FxVec2::from_ints(700, 500),
-        queue: false,
-    }))
-    .unwrap();
-    for _ in 0..400 {
-        w.tick(&[]).unwrap();
-    }
-    assert!(
-        strayed(&w, tank, 700, 500) < 6.0,
-        "the move after holding was not obeyed"
-    );
-    assert_eq!(
-        w.state.units.fire_state[row(&w, tank)],
-        FireState::HoldPosition
-    );
 }
 
 #[test]

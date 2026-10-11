@@ -7,14 +7,15 @@
 //!   ready, then it charges for the point itself, as far toward it as it reaches, on the
 //!   nearest ground it can stand on: no cluster is gathered. A point nearer than
 //!   `Dash::min` is refused (`Refusal::DashTooClose`). It is the player's order, so it
-//!   goes at hold fire and hold position too. The order is done as it goes.
+//!   goes at hold fire too. The order is done as it goes.
 //! - **When**: its dash is ready (`Dash::cooldown_ticks` after its last landing), it is
-//!   free to pick its fights (idle, chasing on its own, on an attack-move or patrol, or
+//!   free to pick its fights (idle, chasing inside a guard area, on an attack-move or patrol, or
 //!   under an attack order; fire at will; not stunned), and an enemy it sees on the ground
 //!   or the water lies between `Dash::min` and `Dash::range` of it. Idle, the enemy is
 //!   the nearest one it sees, and none may be nearer than `min`: one at its feet means it
-//!   is in the fight already. Under an attack order it is the order's mark. A move order,
-//!   hold fire or hold position never dash: the player keeps the unit where it was put.
+//!   is in the fight already. Under an attack order it is the order's mark. A move order
+//!   or hold fire never dash: the player keeps the unit where it was put. It is the one
+//!   land unit that goes after enemies on its own; `World::chases` keeps the rest in place.
 //!   Looked at twice a second.
 //! - **Where**: the middle of the enemies within `Dash::gather` of the one it dashes at,
 //!   each counted once whatever its size (so it comes down among them, not on the one
@@ -152,7 +153,7 @@ impl World {
             return Some(Leave::Free { chase: false });
         };
         match o.kind {
-            // A chase it began itself (`idle_chase`) carries its leash in `radius`.
+            // A chase a guard began (`guard.rs`) carries its leash in `radius`.
             OrderKind::Attack if o.radius > Fx::ZERO => Some(Leave::Free { chase: true }),
             OrderKind::Attack => units.row(o.target).map(Leave::On),
             OrderKind::AttackMove | OrderKind::Patrol => Some(Leave::Free { chase: false }),

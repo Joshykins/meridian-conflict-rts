@@ -976,22 +976,16 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
         }
         Order { glyph: Glyph::Guard, label: "Guard", key: "", hint: "Guard (Ctrl+G): press on a spot, or on a friendly unit to go with it, and drag out the ring. These units are stationed there: they hold it and go after enemies that come in. Aircraft circle it halfway out, a group in formation. Shift queues; shift-drag the centre to move it. Any other order takes a unit off.", action: HudAction::Target(Targeting::Guard), lit: targeting(Targeting::Guard) }
     };
-    // The stance most of the armed selection is in.
-    let stance = {
-        let mut n = [0usize; 3];
+    // Whether most of the armed selection holds its fire.
+    let holding_fire = {
+        let (mut held, mut n) = (0usize, 0usize);
         for u in units {
             if ordered_as(s.blueprints, s.bp(u)).any(|b| !b.weapons.is_empty()) {
-                n[u.fire_state() as usize] += 1;
+                n += 1;
+                held += usize::from(u.fire_state() == FireState::HoldFire);
             }
         }
-        [
-            FireState::FireAtWill,
-            FireState::HoldPosition,
-            FireState::HoldFire,
-        ]
-        .into_iter()
-        .max_by_key(|s| n[*s as usize])
-        .unwrap_or_default()
+        held * 2 > n
     };
 
     let mut out = Vec::new();
@@ -1054,14 +1048,19 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
         out.push((Family::Combat, combat));
     }
 
-    // How the selection behaves between orders. The lit one is the current stance.
+    // How the selection behaves between orders. Land and naval units always hold
+    // where they are put and shoot what comes in range; aircraft go after what they
+    // see. Hold fire, lit while most of the selection holds, is the one stance.
     if armed {
+        let fire = if holding_fire {
+            FireState::FireAtWill
+        } else {
+            FireState::HoldFire
+        };
         out.push((
             Family::Stance,
             vec![
-                Order { glyph: Glyph::FireAtWill, label: "Engage", key: "", hint: "Engage: shoot anything in range and go after enemies seen close by, then come back. The default.", action: HudAction::FireState(FireState::FireAtWill), lit: stance == FireState::FireAtWill },
-                Order { glyph: Glyph::HoldPosition, label: "Hold Pos", key: "H", hint: "Hold position: stop here and shoot anything in range, but never chase. Later moves keep it. H again to engage.", action: HudAction::FireState(FireState::HoldPosition), lit: stance == FireState::HoldPosition },
-                Order { glyph: Glyph::HoldFire, label: "Hold Fire", key: "Y", hint: "Hold fire: never shoot unless given an attack order. Y again to engage.", action: HudAction::FireState(FireState::HoldFire), lit: stance == FireState::HoldFire },
+                Order { glyph: Glyph::HoldFire, label: "Hold Fire", key: "Y", hint: "Hold fire: never shoot unless given an attack order. Y again to fire at what comes in range.", action: HudAction::FireState(fire), lit: holding_fire },
             ],
         ));
         if mobile {

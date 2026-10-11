@@ -29,8 +29,6 @@ pub(crate) const MAX_FACTORY_QUEUE: usize = 1000;
 const ORDER_RESERVE: usize = 16_384;
 /// Chasing units re-path once their quarry has moved this far from the field's goal.
 pub(crate) const CHASE_REPATH_DISTANCE: Fx = Fx::from_int(96);
-/// Shortest leash, metres, for a unit that goes after an enemy on its own.
-const CHASE_LEASH_MIN: i32 = 24;
 /// Build power of structures that upgrade themselves but are not builders.
 pub(crate) const SELF_UPGRADE_POWER: Fx = Fx::from_int(10);
 /// A build arm works once it points within this of its target (~4 degrees).
@@ -464,24 +462,6 @@ impl World {
             Command::SetFireState { units, state } => {
                 for row in self.owned_or_rising(player, units) {
                     self.state.units.fire_state[row] = *state;
-                    // Hold position stops a unit where it stands. Work in hand
-                    // (building, reclaiming, a refit) carries on.
-                    let travelling =
-                        self.state
-                            .orders
-                            .front(&self.state.units, row)
-                            .is_some_and(|o| {
-                                matches!(
-                                    o.kind,
-                                    OrderKind::Move
-                                        | OrderKind::AttackMove
-                                        | OrderKind::Patrol
-                                        | OrderKind::Attack
-                                )
-                            });
-                    if *state == FireState::HoldPosition && self.bp(row).is_mobile() && travelling {
-                        self.clear_orders(row)?;
-                    }
                 }
                 Ok(())
             }
@@ -1415,8 +1395,7 @@ impl World {
                 continue;
             }
             let Some(o) = self.state.orders.front(&self.state.units, row).copied() else {
-                // Looked at a few times a second, spread over the rows, like
-                // `idle_chase`: a sky full of fighters seeing an army at once
+                // Looked at a few times a second, spread over the rows: a sky full of fighters seeing an army at once
                 // would otherwise all search on one tick.
                 if self.is_air(row)
                     && !self.bp(row).weapons.is_empty()
@@ -1472,7 +1451,7 @@ impl World {
                     self.stop_moving(row);
                 }
                 let _span = mc_core::perf_span!("orders.idle");
-                if self.idle_chase(row)? || self.idle_air_land(row)? {
+                if self.idle_air_land(row)? {
                     continue;
                 }
                 if !self.idle_repair(row)? {
@@ -2301,11 +2280,10 @@ impl World {
             self.finish_order(row);
             return Ok(());
         };
-        // A chase the unit started itself (`idle_chase`) ends at the end of its
-        // leash, when it gets stuck, or when its stance stops allowing it. The
-        // walk home queued behind it comes next.
+        // A chase a guard started (`guard.rs`) ends at the end of its leash, when
+        // it gets stuck, or at hold fire. The guard behind it comes next.
         if o.radius > Fx::ZERO
-            && (!self.chases(row)
+            && (!self.fires_at_will(row)
                 || units.pos[row].distance(o.pos) > o.radius
                 || units.stuck_ticks[row] == u16::MAX)
         {
@@ -2390,57 +2368,6 @@ impl World {
             return Ok(());
         }
         self.ensure_moving(row, o.pos, o.pos)
-    }
-
-    /// An idle armed land or naval unit that sees an enemy just out of range goes
-    /// after it, then walks back. The chase is an `Attack` whose `pos` is home
-    /// and whose `radius` is the leash (`run_attack` ends it there), followed by
-    /// an attack-move home. Builders keep to their work, a unit already
-    /// shooting something stays put, and a wall is never chased. True if it set off.
-    fn idle_chase(&mut self, row: usize) -> Result<bool, SimError> {
-        // Looked at a few times a second, spread over the rows.
-        if !(self.state.tick as usize + row).is_multiple_of(4) {
-            return Ok(false);
-        }
-        let bp = self.bp(row);
-        if bp.weapons.is_empty()
-            || !bp.is_mobile()
-            || bp.builder.is_some()
-            || bp.drone.is_some()
-            || self.is_air(row)
-            || !self.chases(row)
-            || self.state.units.has_flag(row, flag::PASSIVE)
-            || self.has_clear_target(row)
-        {
-            return Ok(false);
-        }
-        let range = bp.max_weapon_range();
-        let leash = range.max(Fx::from_int(CHASE_LEASH_MIN));
-        let reach = (range + leash / 2).min(bp.vision);
-        let units = &self.state.units;
-        let (home, owner) = (units.pos[row], units.owner[row]);
-        let Some(t) = self
-            .index
-            .nearest_foe(home, reach, kind::UNIT, self.team_mask(owner), |e| {
-                let t = e.row as usize;
-                self.unit_entry_is_current(e)
-                    && self.are_enemies(owner, units.owner[t])
-                    && !units.has_flag(t, flag::IN_FACTORY)
-                    && !self.is_wall(t)
-                    && self.can_strike(row, t)
-                    && self.detects(owner, t)
-            })
-            .map(|e| e.row as usize)
-        else {
-            return Ok(false);
-        };
-        let mut chase = order(OrderKind::Attack, home, self.state.units.id(t));
-        chase.radius = leash;
-        let mut back = order(OrderKind::AttackMove, home, Handle::NONE);
-        back.heading = self.state.units.heading[row];
-        self.give(row, chase, false)?;
-        self.give(row, back, true)?;
-        Ok(true)
     }
 
     /// Attack-move to the waypoint; there, send the order to the back of the queue.

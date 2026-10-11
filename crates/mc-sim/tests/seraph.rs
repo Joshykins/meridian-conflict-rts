@@ -218,10 +218,10 @@ fn the_cooldown_holds_the_next_dash() {
     assert!(to.distance(FxVec2::from_ints(1000, 3200)) <= Fx::from_int(90));
 }
 
-/// A move order, hold fire and hold position keep it where the player put it.
+/// A move order and hold fire keep it where the player put it.
 #[test]
 fn no_dash_unless_free_to_pick_its_fight() {
-    for how in ["move", "hold fire", "hold position"] {
+    for how in ["move", "hold fire"] {
         let mut w = world(None);
         let seraph = add(&mut w, SERAPH, 0, 500, 2000, false);
         cluster(&mut w, 1700, 2000);
@@ -231,13 +231,9 @@ fn no_dash_unless_free_to_pick_its_fight() {
                 target: FxVec2::from_ints(500, 3800),
                 queue: false,
             },
-            "hold fire" => Command::SetFireState {
-                units: vec![seraph],
-                state: FireState::HoldFire,
-            },
             _ => Command::SetFireState {
                 units: vec![seraph],
-                state: FireState::HoldPosition,
+                state: FireState::HoldFire,
             },
         };
         w.tick(&[command(0, order)]).unwrap();
@@ -550,14 +546,17 @@ fn its_repeaters_hit_a_titan_close_in() {
     );
 }
 
-/// The Seraph held where it stands (hold position: no dash), its guns free.
+/// The Seraph held where it stands (guarding its own spot: no dash), its guns free.
 fn held_seraph(w: &mut World, x: i32, y: i32) -> UnitId {
     let seraph = add(w, SERAPH, 0, x, y, false);
     w.tick(&[command(
         0,
-        Command::SetFireState {
+        Command::Guard {
             units: vec![seraph],
-            state: FireState::HoldPosition,
+            pos: FxVec2::from_ints(x, y),
+            target: mc_sim::Handle::NONE,
+            radius: Fx::ONE,
+            queue: false,
         },
     )])
     .unwrap();
@@ -626,7 +625,7 @@ fn dash_to(w: &mut World, seraph: UnitId, x: i32, y: i32) {
     .unwrap();
 }
 
-/// By hand, with nothing in sight and at hold position, it dashes to the point given.
+/// By hand, with nothing in sight and held on guard, it dashes to the point given.
 #[test]
 fn a_dash_by_hand_goes_where_it_is_sent() {
     let mut w = world(None);
