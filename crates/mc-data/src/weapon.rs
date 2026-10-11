@@ -259,6 +259,9 @@ pub struct Weapon {
     /// Knots a Pinch-fusion gun gathers its charge as (`RawWeapon::knots`), two to six;
     /// zero for one ball. Cosmetic: not in the content hash.
     pub knots: u8,
+    /// A twin-rail Pinch-fusion gun (`RawWeapon::rails`): each bore's charge is held
+    /// between rails. Cosmetic: not in the content hash.
+    pub rails: bool,
     /// A strafing beam (`RawWeapon::strafe`): fixed in the hull, it rakes a line over the
     /// ground through its mark as the aircraft flies its run (`strafe.rs`).
     pub strafe: Option<Strafe>,

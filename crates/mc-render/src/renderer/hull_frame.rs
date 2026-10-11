@@ -201,19 +201,19 @@ mod tests {
         };
         let near = |a: Vec3, b: Vec3| a.distance(b) < 0.05;
         let m = mouths(&pose, 0);
-        assert!(near(m[0].0, Vec3::new(153.0, 48.4, 8.4)), "{:?}", m);
-        assert!(near(m[1].0, Vec3::new(153.0, 51.6, 8.4)), "{:?}", m);
+        assert!(near(m[0].0, Vec3::new(150.0, 49.0, 8.4)), "{:?}", m);
+        assert!(near(m[1].0, Vec3::new(150.0, 51.0, 8.4)), "{:?}", m);
         // Turned a quarter to port, the house's muzzles stand out to port of its pivot.
         pose.pose[0] = [std::f32::consts::FRAC_PI_2; 4];
         pose.pose[0][2] = 0.0;
         pose.pose[0][3] = 0.0;
         let m = mouths(&pose, 0);
-        assert!(near(m[0].0, Vec3::new(139.6, 65.0, 8.4)), "{:?}", m);
+        assert!(near(m[0].0, Vec3::new(139.0, 62.0, 8.4)), "{:?}", m);
         // The aft house rests turned round: its muzzles are aft of its pivot.
         pose.pose[2] = [std::f32::consts::PI, std::f32::consts::PI, 0.0, 0.0];
         let m = mouths(&pose, 2);
         assert!(
-            near(m[0].0 * Vec3::new(1.0, 0.0, 1.0), Vec3::new(49.0, 0.0, 8.4)),
+            near(m[0].0 * Vec3::new(1.0, 0.0, 1.0), Vec3::new(52.0, 0.0, 8.4)),
             "{:?}",
             m
         );

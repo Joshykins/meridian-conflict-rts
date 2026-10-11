@@ -44,7 +44,7 @@ fn it_fits() {
     assert_eq!(houses, want, "{key}: houses");
     let tris = |lod: usize| model.lods[lod].indices.len() / 3;
     let (full, mid, coarse) = (tris(0), tris(1), tris(2));
-    assert!((2000..=14000).contains(&full), "{key}: {full} triangles");
+    assert!((2000..=26000).contains(&full), "{key}: {full} triangles");
     assert!(
         mid as f32 <= full as f32 * 0.45 + 20.0,
         "{key}: reduced {mid} of {full}"

@@ -429,6 +429,22 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     broken violet ripples running out through them, embers rising, until it
     dies down (renderer/surge_fx.rs, surge_fx.wgsl). Never an even web of
     cracks over the whole disc, never a solid plate of light.
+    The Flamberge's **twin-rail Pinch-fusion Cannons** (`Weapon::rails`) are a rail
+    gun's electricity, not a star (renderer/regency_guns_fx/railed.rs). Each bore holds
+    its charge between its rails (the gap between them is the gap between the bores):
+    over the 2.2 s charge white-violet lightning jumps across the rails, walking up them
+    from the breech to the charge, faster and brighter as it fills, and at the charge a
+    hard white-hot knot is squeezed flat between the lens heads (plasma_puffs.wgsl
+    `pinch_knot`), small at first, strobing faster toward the shot, motes drawn in
+    along the rails. The two knots stay two points, their light small. On the shot a
+    short hard white flash at each mouth, a discharge cracked down both rails, plasma
+    blown out sideways between them and a heavy kick of hot gas off the house's back;
+    the rounds are long white-hot lances in a thin prism sheath (`plasma_look`
+    `RAILED_LANCE`) leaving a hard white thread that goes out through rose and lavender
+    within a second. Where one lands, a flat white pinch over the point, then a hard
+    flash, a thin pillar of light straight up and a burst of white-hot streamers taking
+    the prism thrown out low every way, sparks, lightning into the ground, a molten pool
+    and heat rising; the pair land a beat apart. No ball, shell or ring.
     The **Triune Pinch-fusion Howitzer** (the T4 Springald, `Weapon::knots`) charges in
     cold white and lilac with bent indigo air, and what it lets go is red
     (renderer/regency_guns_fx/knotted.rs). Through its 4 s charge the gun's three

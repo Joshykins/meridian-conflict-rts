@@ -163,7 +163,7 @@ Gravitic`), a plasma charge steered in gravity containment.
 | Falchion | 1 | Frigate | Heavy plasmeric repeater, plasmeric AA repeater, radar. |
 | Claymore | 2 | Heavy destroyer | Hull shield; gravitic torpedoes and interceptors; pinched-plasmeric cannon and light AA repeater; radar, sonar. |
 | Pavise | 2 | Cruiser | Gravitic seeker battery (AA, 1,800 m), two gravity-lens missile defence mounts (600 m), a light repeater, radar; a heavy gravitic seeker at structures to 2,600 m. |
-| Flamberge | 3 | Battleship | Three twin Pinch-fusion Cannon houses, four twin heavy repeaters on the beams, light flak, gravity-lens missile defence, bow gravitic torpedoes. No sonar, no torpedo defence. |
+| Flamberge | 3 | Battleship | A stepped dreadnought: a ziggurat keep with a horned bridge, three twin-rail Pinch-fusion Cannon houses (rails part and bores run out through the charge), four twin heavy repeaters on the beams, light flak, gravity-lens missile defence, bow gravitic torpedoes. No sonar, no torpedo defence. |
 | Mantlet | 3 | Air-defence carrier | Twelve heavy gravitic seeker cells (2,700 m), flak on both beams, gravity-lens missile defence, interceptor tubes, radar 3,800 m. No gun. |
 | Rapier | 3 | Assault submarine | The fastest hull under the sea; six-tube gravitic torpedo launcher and interceptors dived; surfaced, two twin repeaters, flak and a gravitic seeker pod. |
 

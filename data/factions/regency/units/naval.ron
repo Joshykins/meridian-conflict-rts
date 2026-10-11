@@ -255,7 +255,7 @@
         categories: ["Naval", "DirectFire"],
         health: 54000,
         cost: (materials: 4600, energy: 41400, time: 27600),
-        radius: 64, height: 16,
+        radius: 64, height: 20,
         vision: 1400,
         anti_missile: 300,
         anti_missile_mounts: [(-1.0, 5.0, 13.0), (-1.0, -5.0, 13.0), (-20.0, 5.0, 10.5), (-20.0, -5.0, 10.5)],
@@ -266,9 +266,10 @@
                 damage: 2000, splash: 10, range_min: 150, range: 2400, reload: 18, salvo: 2, salvo_delay: 0,
                 speed: 1100, trajectory: Ballistic, loft: 0.6, flat_fire: true,
                 turret_turn: 22, arc: 300, mount: true,
-                pivot: (38.0, 0, 8.0), muzzle: (53.0, 0, 8.4), muzzles: [(53.0, -1.6, 8.4), (53.0, 1.6, 8.4)],
+                pivot: (38.0, 0, 8.0), muzzle: (50.0, 0, 8.4), muzzles: [(50.0, -1.0, 8.4), (50.0, 1.0, 8.4)],
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
-                plasma_grade: Some(PinchFusion),
+                // Twin-rail: each bore's charge held between its rails (`rails`).
+                plasma_grade: Some(PinchFusion), rails: true,
                 flash: 0.9, impact: 2.6, tracer: 2.4,
                 sounds: (
                     fire: "regency_flamberge_fire", charge: "regency_flamberge_charge", charge_time: 2.2,
@@ -280,9 +281,9 @@
                 damage: 2000, splash: 10, range_min: 150, range: 2400, reload: 18, salvo: 2, salvo_delay: 0,
                 speed: 1100, trajectory: Ballistic, loft: 0.6, flat_fire: true,
                 turret_turn: 22, arc: 300, mount: true,
-                pivot: (20.0, 0, 11.0), muzzle: (35.0, 0, 11.4), muzzles: [(35.0, -1.6, 11.4), (35.0, 1.6, 11.4)],
+                pivot: (20.0, 0, 11.0), muzzle: (32.0, 0, 11.4), muzzles: [(32.0, -1.0, 11.4), (32.0, 1.0, 11.4)],
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
-                plasma_grade: Some(PinchFusion),
+                plasma_grade: Some(PinchFusion), rails: true,
                 flash: 0.9, impact: 2.6, tracer: 2.4,
                 sounds: (
                     fire: "regency_flamberge_fire", charge: "regency_flamberge_charge", charge_time: 2.2,
@@ -295,9 +296,9 @@
                 speed: 1100, trajectory: Ballistic, loft: 0.6, flat_fire: true,
                 turret_turn: 22, arc: 300, rear: true, mount: true,
                 // An aft house's muzzles are given as if it faced forward, mirrored.
-                pivot: (-36.0, 0, 8.0), muzzle: (21.0, 0, 8.4), muzzles: [(21.0, 1.6, 8.4), (21.0, -1.6, 8.4)],
+                pivot: (-36.0, 0, 8.0), muzzle: (24.0, 0, 8.4), muzzles: [(24.0, 1.0, 8.4), (24.0, -1.0, 8.4)],
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
-                plasma_grade: Some(PinchFusion),
+                plasma_grade: Some(PinchFusion), rails: true,
                 flash: 0.9, impact: 2.6, tracer: 2.4,
                 sounds: (
                     fire: "regency_flamberge_fire", charge: "regency_flamberge_charge", charge_time: 2.2,

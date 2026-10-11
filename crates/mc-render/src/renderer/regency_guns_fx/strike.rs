@@ -43,6 +43,7 @@ impl Renderer {
                 let w = w.clone();
                 self.knotted_strike(at, &w, impact, splash, under, start)
             }
+            Grade::Railed => self.railed_strike(at, impact, splash, under, start),
         }
         true
     }

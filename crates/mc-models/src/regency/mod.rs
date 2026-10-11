@@ -326,7 +326,10 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_frigate" => 4500,
         "regency_destroyer" | "regency_cruiser" => 7000,
         // Tech 3: the capital ships, and a big submarine.
-        "regency_battleship" | "regency_carrier" => 14000,
+        "regency_carrier" => 14000,
+        // Plated as the tech 4s are: belt and strake courses, sponsons, a ziggurat keep,
+        // and three main houses with working rails, jackets, coils and radiators.
+        "regency_battleship" => 26000,
         // The tech 3 jets: hull, blade, wings and the plates lapped over them.
         "regency_partisan" | "regency_augur" => 4000,
         "regency_maul" => 6000,

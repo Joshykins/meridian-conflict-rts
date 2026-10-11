@@ -26,7 +26,7 @@ fn nova_light(c: vec3<f32>, a: vec3<f32>) -> vec3<f32> {
 fn is_plasma_puff(kind: u32) -> bool {
     return kind == PUFF_PLASMA_ORB || kind == PUFF_PLASMA_BURST || kind == PUFF_PLASMA_GLOB
         || kind == PUFF_PLASMA_WAKE || kind == PUFF_STAR_CORE || kind == PUFF_SUPERNOVA
-        || kind == PUFF_NOVA_WISP || kind == PUFF_CRUSH_LENS;
+        || kind == PUFF_NOVA_WISP || kind == PUFF_CRUSH_LENS || kind == PUFF_PINCH_KNOT;
 }
 
 // Turned to the eye, where it was born; a burst is drawn a little toward the eye so the
@@ -58,6 +58,9 @@ fn plasma_puff_vertex(p: Puff, corner: vec2<f32>, life_age: f32, o: PuffOut) -> 
     out.uv = corner;
     if kind == PUFF_SUPERNOVA {
         return supernova_vertex(p, corner, size, out);
+    }
+    if kind == PUFF_PINCH_KNOT {
+        return pinch_knot_vertex(p, corner, out);
     }
     let to_eye = normalize(globals.camera.xyz - p.pos);
     var pos = p.pos + to_eye * select(0.0, size * 0.35, kind == PUFF_PLASMA_BURST);
@@ -125,6 +128,9 @@ fn plasma_puff_color(in: PuffOut, d: f32) -> vec4<f32> {
     }
     if u32(in.state.y) == PUFF_CRUSH_LENS {
         return crush_lens(in, d);
+    }
+    if u32(in.state.y) == PUFF_PINCH_KNOT {
+        return pinch_knot(in, d);
     }
     return plasma_burst(in, d);
 }
@@ -518,4 +524,73 @@ fn nova_wisp(in: PuffOut, d: f32) -> vec4<f32> {
     let heart = pow(field, 4.0) * (1.0 - smoothstep(0.0, 0.25, age));
     let fade = pow(1.0 - age, 1.7) * smoothstep(0.0, 0.04, age);
     return vec4<f32>(nova_light(c * body + white * heart, in.appearance.rgb) * fade, 0.0);
+}
+
+// A knot of fusion squeezed flat between a railed gun's lens heads (renderer
+// regency_guns_fx/railed.rs): an oblate lump, `params.x` across, `params.y` of that thick
+// along the squeeze axis `vel`. Its outline on screen is the spheroid's: full across the
+// squeeze, and along it as thick as it looks from where the eye stands (thin edge-on, round
+// face-on). `uv` runs over that ellipse, so `d` is 1 at its edge. Stood at its near face.
+fn pinch_knot_vertex(p: Puff, corner: vec2<f32>, o: PuffOut) -> PuffOut {
+    var out = o;
+    let r = p.params.x;
+    let thin = r * clamp(p.params.y, 0.05, 1.0);
+    let to_eye = normalize(globals.camera.xyz - p.pos);
+    var axis = p.vel / max(length(p.vel), 1e-4);
+    if length(p.vel) < 1e-4 {
+        axis = vec3<f32>(0.0, 0.0, 1.0);
+    }
+    // The squeeze axis as the eye sees it, and the way across it.
+    let c = dot(axis, to_eye);
+    var minor = axis - to_eye * c;
+    if dot(minor, minor) < 1e-6 {
+        minor = cross(to_eye, vec3<f32>(0.0, 0.0, 1.0));
+        if dot(minor, minor) < 1e-6 {
+            minor = vec3<f32>(1.0, 0.0, 0.0);
+        }
+    }
+    minor = normalize(minor);
+    let major = normalize(cross(to_eye, minor));
+    let s2 = max(1.0 - c * c, 0.0);
+    let half_minor = sqrt(thin * thin * s2 + r * r * c * c);
+    // Never under a couple of pixels, so a far knot still reads as a point.
+    let center = globals.view_proj * vec4<f32>(p.pos, 1.0);
+    let floor_m = 1.5 * max(center.w, 1.0) / max(globals.lod.x, 1.0);
+    // The quad holds a thin glow past the face: 1.6 times the knot.
+    let world = p.pos + (major * corner.x * max(r, floor_m) + minor * corner.y * max(half_minor, floor_m)) * 1.6;
+    out.clip = globals.view_proj * vec4<f32>(world, 1.0);
+    out.clip.z = front_depth(p.pos, r) * out.clip.w;
+    out.world = world;
+    out.uv = corner;
+    return out;
+}
+
+fn pinch_knot(in: PuffOut, d_quad: f32) -> vec4<f32> {
+    let now = globals.camera.w;
+    let seed = in.state.z;
+    let tent = 1.0 - abs(in.state.x * 2.0 - 1.0);
+    // In the knot's own measure: 1 at its face, 1.6 at the quad's edge.
+    let q = in.uv * 1.6;
+    let d = d_quad * 1.6;
+    let angle = atan2(q.y, q.x);
+    let round = vec2<f32>(cos(angle), sin(angle));
+    // A hard edge that boils a little: never a soft ball.
+    let boil = star_fbm3(vec3<f32>(round * 2.6, now * 3.2 + seed * 7.0));
+    let edge = 0.92 + 0.16 * (boil - 0.5);
+    let body = 1.0 - smoothstep(edge - 0.06, edge + 0.02, d);
+    // White-hot through; cells churning hotter and cooler across it.
+    let cells = value_noise2(q * 4.5 + vec2<f32>(now * 6.0, -now * 4.0) + seed * 13.0, 1.0);
+    let heart = exp(-d * d / 0.18);
+    // A thin rim of the prism, and a thin corona out past it that goes out fast.
+    let hue = prism(seed + now * PRISM_RATE * 2.0 + round.x * 0.3 + round.y * 0.2 + cells * 0.4);
+    let rim = exp(-pow((d - edge) / 0.07, 2.0));
+    let corona = exp(-max(d - edge, 0.0) * 9.0) * (1.0 - body) * (1.0 - smoothstep(1.3, 1.6, d));
+    let white = vec3<f32>(1.0, 0.96, 0.98);
+    let light = white * body * (0.8 + 0.5 * cells + 1.6 * heart)
+        + mix(white, hue, 0.7) * rim * 0.9
+        + mix(white, hue, 0.8) * corona * 0.35;
+    // It strobes faster as it fills (`appearance.w` a second), never quite out.
+    let rate = in.appearance.w;
+    let strobe = select(1.0, 0.7 + 0.3 * step(0.5, fract(now * rate + seed)), rate > 0.0);
+    return vec4<f32>(light * in.appearance.rgb * tent * strobe, 0.0);
 }

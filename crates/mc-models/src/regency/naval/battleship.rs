@@ -1,11 +1,13 @@
 //! The Flamberge, the Regency's tech 3 battleship (`regency_t3_battleship`): the
-//! Leviathan's place. A capital ship drawn low and long, its
-//! superstructure swept back, dark plate lapped over bronze workings (docs/STYLE.md "The
-//! Regency look", "The navy").
+//! Leviathan's place. A stepped dreadnought, faceted and alien: dark plate lapped over
+//! graphite workings (docs/STYLE.md "The Regency look", "The navy").
 //!
-//! The origin is the waterline; the keel is drawn below it. The hull is a whaleback arrowhead under one long swept fin
-//! ([`body`]); the main houses carry the Sunspear's rails made twin ([`guns`]). It draws
-//! the unit file's weapon points:
+//! The origin is the waterline; the keel is drawn below it. The hull is faceted, its
+//! sheer climbing to a raised, flared forecastle and a raked stem, tumbling home, drawing
+//! in aft to a narrow transom, dressed in armour courses ([`body`]); a stepped ziggurat
+//! amidships with a horned bridge ([`keep`]); the main houses are twin-rail Pinch-fusion
+//! Cannon, working with each house's own charge ([`house`]). It draws the unit file's
+//! weapon points:
 //!
 //! - Houses 0, 1, 2: three twin Pinch-fusion Cannon ([`MAIN`]): fore, a second raised over
 //!   it, and aft (`rear`, authored facing forward like every house). Each gathers two
@@ -22,7 +24,9 @@ use crate::library::ModelDef;
 
 mod body;
 mod guns;
+mod house;
 mod hull;
+mod keep;
 #[cfg(test)]
 mod tests;
 
@@ -34,7 +38,7 @@ pub(crate) const MODELS: &[ModelDef] = &[ModelDef::new(
 )];
 
 const RADIUS: f32 = 64.0;
-const HEIGHT: f32 = 16.0;
+const HEIGHT: f32 = 20.0;
 
 /// The three main houses' pivots (weapons 0, 1, 2): fore, second (raised) and aft.
 const MAIN: [Vec3; 3] = [
@@ -44,9 +48,9 @@ const MAIN: [Vec3; 3] = [
 ];
 /// How far ahead of its pivot, and over it, a main gun holds its charges, and how far
 /// either side of the house's middle each one is.
-const REACH: f32 = 15.0;
+const REACH: f32 = 12.0;
 const RISE: f32 = 0.4;
-const TWIN: f32 = 1.6;
+const TWIN: f32 = 1.0;
 
 /// The middle of main gun `i`'s pair of charges (the unit file's `muzzle`).
 fn charge(i: usize) -> Vec3 {

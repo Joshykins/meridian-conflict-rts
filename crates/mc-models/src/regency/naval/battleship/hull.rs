@@ -88,8 +88,9 @@ pub(super) fn hull(b: &mut MeshBuilder, stations: &[Station], coarse: &[usize]) 
     } else {
         stations.iter().map(|s| ring(b, s)).collect()
     };
+    // Faceted, flat-shaded: a dreadnought's plates, not a submarine's skin.
     dark_plate(b);
-    b.loft(&rings, true, true);
+    b.with_facets(|b| b.loft(&rings, true, true));
 }
 
 /// The station at `x`, between the two either side of it.
@@ -185,15 +186,6 @@ pub(super) const CHAMFERED: [[f32; 2]; 8] = [
     [-0.6, 1.0],
     [0.6, 1.0],
     [1.0, 0.6],
-];
-
-/// A ridge: flat sides, a peaked top.
-pub(super) const RIDGE: [[f32; 2]; 5] = [
-    [1.0, -1.0],
-    [0.55, 0.6],
-    [0.0, 1.0],
-    [-0.55, 0.6],
-    [-1.0, -1.0],
 ];
 
 /// A box's section, for a chamfered one past full detail.

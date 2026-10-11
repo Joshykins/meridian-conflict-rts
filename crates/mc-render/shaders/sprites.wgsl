@@ -337,6 +337,9 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     } else if look == PLASMA_LOOK_KNOTTED_SHELL {
         // A knotted shell's plume: short and hard behind its long body.
         trace = min(length(stride) * 0.6, max(p.size, 1.0) * 1.6);
+    } else if look == PLASMA_LOOK_RAILED_LANCE {
+        // A railed lance: long, longer than the Sunspear's slug.
+        trace = length(stride) * 1.8;
     }
     if (p.color & 0x200u) != 0u {
         trace = min(trace, distance(head, shot_muzzle(p)));
@@ -396,7 +399,8 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     width_px *= select(1.0, 0.8, look == 1u) * select(1.0, 1.35, look == 3u) * select(1.0, 2.6, look == 4u)
         * select(1.0, 1.9, look == 2u) * select(1.0, 0.45, look == PLASMA_LOOK_SURGE_SHELL)
         * select(1.0, 1.6, look == PLASMA_LOOK_AIRBURST)
-        * select(1.0, 0.4, look == PLASMA_LOOK_KNOTTED_SHELL);
+        * select(1.0, 0.4, look == PLASMA_LOOK_KNOTTED_SHELL)
+        * select(1.0, 0.75, look == PLASMA_LOOK_RAILED_LANCE);
     let plasma_m = p.extras.y;
     var core_frac = 0.0;
     if plasma_m > 0.0 && !beam && !fade_beam {
@@ -491,7 +495,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         out.shape.y = select(1.25, 1.4, red > 0.5);
         if look > 0u {
             // 7.6, 8.6, 9.6, 10.6, 14.6 (a surge shell), 15.6 (an airburst round), 16.6 (a
-            // knotted shell): the Regency plasma shots (`fs_sprite`).
+            // knotted shell), 17.6 (a railed lance): the Regency plasma shots (`fs_sprite`).
             out.color = vec3<f32>(1.0);
             out.shape.y = 6.6 + f32(look);
         }
@@ -585,6 +589,14 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
             var warm = mix(red, mix(pink, hue, select(0.0, 0.8, fusion)), smoothstep(0.45, 0.8, heat));
             warm = mix(warm, vec3<f32>(1.0, 0.9, 0.92), smoothstep(select(0.88, 0.8, fusion), 1.0, heat) * select(1.0, 0.0, surge));
             out.color = warm * select(select(7.0, 9.0, fusion), 3.2, surge) * pow(heat, 0.8);
+            let railed = abs(p.aim.w - FADE_BEAM_PLASMA_TRAIL_RAILED) < 0.5;
+            if railed {
+                // A railed lance's: a hard white thread that flashes through rose and
+                // lavender and goes out to a dim violet, never red.
+                let white = smoothstep(0.6, 1.0, heat);
+                let cool = mix(vec3<f32>(0.3, 0.16, 0.6), mix(vec3<f32>(1.0, 0.55, 0.78), hue, 0.5), smoothstep(0.1, 0.6, heat));
+                out.color = mix(cool, vec3<f32>(1.0, 0.95, 0.98), white) * 5.0 * pow(heat, 1.3);
+            }
             if knotted {
                 // White-hot for an instant behind the shell, then red, going out to a dark
                 // red as it dies.
@@ -814,6 +826,9 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     } else if look == PLASMA_LOOK_KNOTTED_SHELL {
         // A knotted shell's plume seen from afar: red.
         out.color = vec3<f32>(1.4, 0.12, 0.08);
+    } else if look == PLASMA_LOOK_RAILED_LANCE {
+        // A railed lance's head: white-hot, the faintest rose.
+        out.color = vec3<f32>(1.35, 1.24, 1.28);
     }
     if (p.color & 0x100u) != 0u {
         out.color = SHOT_YELLOW;
@@ -1005,6 +1020,27 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
             let time = globals.camera.w;
             let red = vec3<f32>(1.0, 0.045, 0.02);
             let white = vec3<f32>(1.0, 0.86, 0.8);
+            if in.shape.y > 17.1 {
+                // A railed lance (`PLASMA_LOOK_RAILED_LANCE`, the Flamberge's): long and thin,
+                // a hard white-hot core running its whole length, brightest and widest at the
+                // head, in a narrow sheath of the prism (white, a little rose and lavender)
+                // with a fine shimmer running back down it. No bursts strobing in it (the
+                // Sunspear's slug), no puffy edge: it ends hard.
+                let prof = (0.3 + 0.7 * smoothstep(0.0, 0.85, u)) * (1.0 - smoothstep(0.97, 1.0, u));
+                let y = abs(in.uv.y) / max(prof, 0.01);
+                if y >= 1.0 {
+                    discard;
+                }
+                let shimmer = 0.75 + 0.25 * sin(u * 60.0 + time * 90.0);
+                let hue = prism(u * 0.8 - time * PRISM_RATE * 6.0);
+                let sheath = mix(vec3<f32>(1.0, 0.9, 0.96), hue, 0.55) * pow(1.0 - y, 2.0)
+                    * 1.6 * shimmer * (0.25 + 0.75 * u);
+                let core = pow(max(1.0 - y * 2.6, 0.0), 2.4);
+                let tip = smoothstep(0.8, 0.98, u);
+                let rgb = sheath + white * core * (6.0 + 8.0 * tip)
+                    + vec3<f32>(1.0) * pow(max(1.0 - y * 1.6, 0.0), 6.0) * 8.0 * tip;
+                return vec4<f32>(rgb * smoothstep(0.0, 0.35, u) * in.color.r, 1.0);
+            }
             if in.shape.y > 16.1 {
                 // A knotted shell's plume (`PLASMA_LOOK_KNOTTED_SHELL`; its solid body is
                 // `vs_missile`'s): a short hard white-hot core right behind the base in a

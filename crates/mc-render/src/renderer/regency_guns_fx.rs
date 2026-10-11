@@ -50,6 +50,10 @@
 //!   Howitzer): a white knot at each projector pinched into one point, cold white and lilac
 //!   with bent indigo air, a solid shell, a thread hanging over its arc, and a pinch before
 //!   its supernova (`knotted.rs`).
+//! - **Railed** (a Pinch-fusion gun with `Weapon::rails`, the Flamberge's main battery):
+//!   each bore's charge held between rails, white-violet lightning walking up them and a
+//!   white-hot knot squeezed flat between the lens heads; a discharge cracked down the rails
+//!   as it fires, a long white-hot lance in flight, and a strike of its own (`railed.rs`).
 //!
 //! Nothing is wound round a middle (no spiral arms, no rings; a fusion strike's streamers
 //! are thrown out in a loose band round its waist, as a supernova's), and nothing hangs as
@@ -77,6 +81,7 @@ mod burning;
 mod fusion;
 mod knotted;
 mod plasmeric;
+mod railed;
 mod strike;
 mod surge;
 
@@ -150,6 +155,9 @@ pub(super) enum Grade {
     Airburst,
     /// A Pinch-fusion gun that gathers its charge as knots (`Weapon::knots`, `knotted`).
     Knotted,
+    /// A twin-rail Pinch-fusion gun, each bore's charge held between rails
+    /// (`Weapon::rails`, `railed`).
+    Railed,
 }
 
 /// The grade a weapon is drawn as: a plasma gun firing straight, laid flat with its shot
@@ -171,6 +179,9 @@ pub(super) fn grade(w: &Weapon) -> Option<Grade> {
     }
     if w.knots > 1 && !w.missile && w.plasma_shot() == Some(PlasmaGrade::PinchFusion) {
         return Some(Grade::Knotted);
+    }
+    if w.rails && !w.missile && w.plasma_shot() == Some(PlasmaGrade::PinchFusion) {
+        return Some(Grade::Railed);
     }
     let grade = match w.plasma_shot()? {
         PlasmaGrade::Plasmeric if lobbed && !w.missile => Grade::Mortar,
@@ -243,13 +254,15 @@ struct Trail {
 }
 
 /// What a trail piece is drawn as: a Pinched bolt's red, a Pinch-fusion round's prism, a
-/// surge shell's crimson cooling to violet, or a knotted shell's white cooling to indigo.
+/// surge shell's crimson cooling to violet, a knotted shell's white cooling to indigo, or a
+/// railed lance's white thread flashing through the prism to violet.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum TrailKind {
     Bolt,
     Fusion,
     Surge,
     Knotted,
+    Railed,
 }
 
 #[derive(Default)]
@@ -307,6 +320,7 @@ fn trail_kind(t: &Trail) -> f32 {
         TrailKind::Fusion => fade_beam::PLASMA_TRAIL_FUSION,
         TrailKind::Surge => fade_beam::PLASMA_TRAIL_SURGE,
         TrailKind::Knotted => fade_beam::PLASMA_TRAIL_KNOTTED,
+        TrailKind::Railed => fade_beam::PLASMA_TRAIL_RAILED,
     }
 }
 
@@ -347,7 +361,10 @@ impl Renderer {
     ) -> bool {
         let w = &self.blueprints.unit(blueprint).weapons[weapon as usize];
         let grade = match grade(w) {
-            Some(g @ (Grade::Pinched | Grade::Fusion | Grade::Surge | Grade::Knotted)) => g,
+            Some(
+                g
+                @ (Grade::Pinched | Grade::Fusion | Grade::Surge | Grade::Knotted | Grade::Railed),
+            ) => g,
             _ => return false,
         };
         let due = time + w.charge_ticks as f32 * self.tick_seconds;
@@ -426,6 +443,8 @@ impl Renderer {
                         self.surge_charge_step(at, dir, &w, f, foot, when, span);
                     } else if grade == Grade::Knotted {
                         self.knotted_charge_step(at, dir, &w, f, when, span);
+                    } else if grade == Grade::Railed {
+                        self.railed_charge_step(at, dir, &w, f, when, span);
                     } else {
                         let fusion = grade == Grade::Fusion;
                         // A pair of stars, each smaller: together as bright as one.
@@ -474,6 +493,10 @@ impl Renderer {
                 4 => (TrailKind::Bolt, true),
                 plasma_look::SURGE_SHELL => (TrailKind::Surge, false),
                 plasma_look::KNOTTED_SHELL => (TrailKind::Knotted, false),
+                plasma_look::RAILED_LANCE => {
+                    self.railed_trail(from, to, p.size, (starts, span), &mut sparks, time);
+                    continue;
+                }
                 plasma_look::AIRBURST => {
                     // No trail: the sparks it sheds.
                     self.airburst_flight(from, to, p.size, time, &mut sparks);
@@ -504,6 +527,7 @@ impl Renderer {
                 TrailKind::Fusion => FUSION_TRAIL,
                 TrailKind::Surge => SURGE_TRAIL,
                 TrailKind::Knotted => KNOTTED_TRAIL,
+                TrailKind::Railed => railed::RAILED_TRAIL,
             };
             // A shot whose trail hangs long (`Weapon::wake`, a map gun's) lays its thread a
             // tick's stretch at a time: held for its whole arc, it would fill the pieces.
@@ -811,9 +835,7 @@ impl Renderer {
         };
         let (rounds, flash, size) = (w.rounds.max(1), w.flash.max(0.3), ball(w));
         // The gun's length from its trunnion to its muzzle.
-        let reach = (Vec3::from(w.muzzle.to_f32())
-            - w.pivot.map_or(Vec3::ZERO, |p| Vec3::from(p.to_f32())))
-        .length();
+        let reach = railed::gun_reach(w);
         match grade {
             Grade::Bolt | Grade::Flak => self.bolt_fired(at, dir, rounds, flash, round_gap, time),
             Grade::Mortar => self.mortar_fired(at, dir, flash, time),
@@ -827,6 +849,11 @@ impl Renderer {
                 let w = w.clone();
                 self.charge_spent(blueprint, weapon, at, 0.12, time);
                 self.knotted_fired(&w, at, dir, reach, time);
+            }
+            Grade::Railed => {
+                let w = w.clone();
+                self.charge_spent(blueprint, weapon, at, 0.08, time);
+                self.railed_fired(&w, at, dir, reach, time);
             }
             Grade::Pinched => {
                 // The ball pinches its plasma out as one jet (`Weapon::round_span`): a hard
@@ -1068,6 +1095,11 @@ impl Renderer {
         if grade == Grade::Knotted {
             let w = w.clone();
             self.knotted_spent(at, &w, life, time);
+            return;
+        }
+        if grade == Grade::Railed {
+            let w = w.clone();
+            self.railed_spent(at, &w, life, time);
             return;
         }
         if fusion {

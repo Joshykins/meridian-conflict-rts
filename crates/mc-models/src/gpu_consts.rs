@@ -887,6 +887,15 @@ shared! {
         /// drift, 1 the strands whipping round). Laid once a tick, two ticks long.
         pub const GRAVITY_VORTEX: u32 = 62;
         // retired: 63 (a storm seed's cloud lump; the sky draws those clouds now)
+        /// A knot of fusion squeezed flat between a railed gun's lens heads
+        /// (renderer/regency_guns_fx/railed.rs, plasma_puffs.wgsl `pinch_knot`): an oblate
+        /// white-hot lump, flattened along `vel` (the squeeze axis, its length unused), so
+        /// it reads as a tight lens edge-on and a small disc face-on. Hard-edged, boiling a
+        /// little, a thin prism rim (white, rose, lavender). `params.x` its radius across the
+        /// squeeze, `params.y` how flat it is (its thickness over its radius), `appearance.rgb`
+        /// its brightness, `appearance.w` its strobe rate a second (0 steady). Laid once a
+        /// step, two steps long: its light a tent over its life.
+        pub const PINCH_KNOT: u32 = 64;
     }
 
     /// Colours of a fading beam (`ProjectileInstance::color` low bits under
@@ -917,6 +926,10 @@ shared! {
         /// A knotted shell's (`plasma_look::KNOTTED_SHELL`, the Springald's): a red-hot
         /// thread going out to dark red as the shell's smoke takes over.
         pub const PLASMA_TRAIL_KNOTTED: f32 = 4.0;
+        /// A railed lance's (`plasma_look::RAILED_LANCE`, the Flamberge's): a hard white
+        /// thread that flashes through rose and lavender and goes out within a second or
+        /// so, breaking up; never red.
+        pub const PLASMA_TRAIL_RAILED: f32 = 5.0;
         /// A gravity crush's tether (renderer/crush_fx.rs), the Regency's missile defence
         /// gripping a missile: a thin hard red core, lensing ripples running out from the
         /// emitter to the missile, a faint prism shimmer at its edges. Struck and fading
@@ -961,6 +974,12 @@ shared! {
         /// (sprites.wgsl `vs_missile`), a short red plume round a white-hot core.
         /// `mc_sim::mirror::PLASMA_LOOK_KNOTTED_SHELL`.
         pub const KNOTTED_SHELL: u32 = 10;
+        /// A twin-rail Pinch-fusion gun's round (`Weapon::rails`, the Flamberge's main
+        /// battery): a long, thin white-hot lance, hard-edged, in a narrow sheath of the
+        /// prism (white, a little rose and lavender) that runs back off it in a fine
+        /// shimmer, its head the brightest; no bursts strobing down it (that is the
+        /// Sunspear's slug). `mc_sim::mirror::PLASMA_LOOK_RAILED_LANCE`.
+        pub const RAILED_LANCE: u32 = 11;
     }
 
     /// A strategic launcher (models/aster/strategic.rs, entity.wgsl). The rounds word

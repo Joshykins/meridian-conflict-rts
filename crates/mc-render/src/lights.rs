@@ -1164,6 +1164,19 @@ fn glow_of(p: &ProjectileInstance) -> Option<Glow> {
             line: false,
         });
     }
+    // A railed lance (`plasma_look::RAILED_LANCE`): white-hot, it lights what it passes
+    // white with a little rose.
+    if p._pad[0] > 2.5
+        && ((p._pad[0] - 1.0) * 0.5).floor() == crate::gpu_consts::plasma_look::RAILED_LANCE as f32
+    {
+        return Some(Glow {
+            from,
+            to,
+            color: Vec3::new(1.0, 0.85, 0.92) * 240.0,
+            range: 36.0,
+            line: false,
+        });
+    }
     // Tracers: small, but a stream of them lights a night battle.
     let color = match flags & 0xF {
         0 => Vec3::new(0.35, 0.66, 1.0),

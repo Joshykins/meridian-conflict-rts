@@ -1402,6 +1402,15 @@ pub struct RawWeapon {
     /// Cosmetic.
     #[serde(default)]
     pub knots: u8,
+    /// A twin-rail Pinch-fusion gun: two or more bores side by side, plated rails either
+    /// side of each and between them, each bore's charge held between its rails and pinched
+    /// flat by the lens heads at their tips. The gap between the rails is the gap between
+    /// the bores (`muzzles`). It is drawn as a railed gun throughout: lightning walking up
+    /// the rails as it charges, a discharge down them as it fires, a long white-hot lance
+    /// in flight, and its own strike (renderer `regency_guns_fx::railed`, the Flamberge's
+    /// main battery). Cosmetic.
+    #[serde(default)]
+    pub rails: bool,
     /// A strafing beam (`RawStrafe`).
     #[serde(default)]
     pub strafe: Option<RawStrafe>,
@@ -2037,6 +2046,20 @@ impl Unit {
                     "{ctx}: knots are two to six, on a Pinch-fusion gun firing a shell"
                 )));
             }
+            if w.rails
+                && (w.muzzles.len() < 2
+                    || w.missile
+                    || w.knots > 0
+                    || w.surge.is_some()
+                    || w.airburst
+                    || w.beam
+                    || w.plasma_grade != Some(PlasmaGrade::PinchFusion))
+            {
+                return Err(DataError::Invalid(format!(
+                    "{ctx}: rails are on a Pinch-fusion gun of two or more bores firing a \
+                     shell: no missile, beam, knots, surge or airburst"
+                )));
+            }
             if w.dash_only && w.cone.is_none() {
                 return Err(DataError::Invalid(format!(
                     "{ctx}: a dash_only weapon is a cone, let go at the unit's feet as it lands"
@@ -2227,6 +2250,7 @@ impl Unit {
                     slow: fx(l.slow),
                 }),
                 knots: w.knots,
+                rails: w.rails,
                 surge: match &w.surge {
                     Some(s) => Some(s.compile(key, fx, TICKS_PER_SECOND)?),
                     None => None,
