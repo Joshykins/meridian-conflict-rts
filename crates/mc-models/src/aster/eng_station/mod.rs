@@ -1,5 +1,5 @@
 //! The ARC engineering station, the Foreman (`eng_station`, tech 1 to 3 on one upgrade
-//! chain, a 3x3 lot): a static engineer that builds and assists far across the base
+//! chain, a 2x2 lot): a static engineer that builds and assists far across the base
 //! (300 / 500 / 800 m) with one build arm on a slewing head.
 //!
 //! A braced armoured foot on a two-step foundation, a slim octagonal mast fed by amber
@@ -37,13 +37,15 @@ mod head;
 mod marks;
 mod works;
 
-/// Collision radius at every tier: a 3x3 lot of 12 m cells.
+/// Authored radius at every tier. The station was drawn for a 3x3 lot; its blueprints
+/// stand it on a 2x2 lot, so it is shown at two thirds of this size.
 pub(super) const RADIUS: f32 = 16.9;
 /// Authored height, the same at every tier.
 pub(super) const HEIGHT: f32 = 30.0;
-/// The forearm's elbow: the blueprints' `builder.arm.pivot`.
+/// The forearm's elbow: the blueprints' `builder.arm.pivot`, scaled with the model.
 const ELBOW: Vec3 = Vec3::new(2.0, 0.0, 25.8);
-/// The projector's tip, level ahead of the elbow: the blueprints' `builder.arm.emitter`.
+/// The projector's tip, level ahead of the elbow: the blueprints' `builder.arm.emitter`,
+/// scaled with the model.
 const EMITTER: Vec3 = Vec3::new(13.6, 0.0, 25.8);
 /// Full-detail triangle budget, the reclaim tower's.
 #[cfg(test)]
@@ -308,7 +310,8 @@ mod tests {
         assert!(over.is_empty(), "over the triangle budgets: {over:?}");
     }
 
-    /// The blueprints' build arm is the model's, at every tier.
+    /// The blueprints' build arm is the model's, at every tier, scaled as the blueprint
+    /// scales the model, and the scale is the same across as up.
     #[test]
     fn blueprints_carry_the_arm() {
         let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
@@ -316,15 +319,22 @@ mod tests {
         for tech in 1..=3 {
             let key = format!("aster_t{tech}_eng_station");
             let unit = bps.units.iter().find(|u| u.key == key).expect("blueprint");
+            let across = unit.radius.to_f32() / RADIUS;
+            let up = unit.height.to_f32() / HEIGHT;
+            assert!((across / up - 1.0).abs() < 0.01, "{key}: stretched");
+            let scale = Vec3::new(across, across, up);
             let arm = unit.builder.as_ref().and_then(|b| b.arm).expect("an arm");
             let v = |p: mc_core::FxVec3| Vec3::from(p.to_f32());
             assert!(
-                (v(arm.emitter) - EMITTER).length() < 0.01,
+                (v(arm.emitter) - EMITTER * scale).length() < 0.01,
                 "{key}: emitter {}",
                 v(arm.emitter)
             );
             let pivot = v(arm.pivot.expect("an elbow"));
-            assert!((pivot - ELBOW).length() < 0.01, "{key}: pivot {pivot}");
+            assert!(
+                (pivot - ELBOW * scale).length() < 0.01,
+                "{key}: pivot {pivot}"
+            );
             assert!(arm.shoulder.is_none(), "{key}: one bone");
         }
     }

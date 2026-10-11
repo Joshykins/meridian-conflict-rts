@@ -197,7 +197,7 @@ pub(super) const MODELS: &[ModelDef] = &[
     ),
     // The reclaim tower (a 3x3 lot), its head on the rig `reclaim_tower::PIVOT_Z`, `EMIT_X`.
     ModelDef::tiered("reclaim_tower", RECLAIM_TOWER, reclaim_tower::tower),
-    // The engineering station (a 3x3 lot), its arm on the rig `eng_station::ELBOW`,
+    // The engineering station (a 2x2 lot), its arm on the rig `eng_station::ELBOW`,
     // `EMITTER`.
     ModelDef::tiered("eng_station", ENG_STATION, eng_station::station),
     ModelDef::tiered(

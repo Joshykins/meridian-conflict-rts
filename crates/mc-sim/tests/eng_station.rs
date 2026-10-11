@@ -261,3 +261,23 @@ fn a_station_upgrades_in_place() {
         "the station is now its tech 2 self, under the same id"
     );
 }
+
+/// A reactor or fabricator against a station saves it nothing: the station builds out in
+/// the field at full price, so it is no consumer and draws no links. A factory is one.
+#[test]
+fn a_station_takes_no_adjacency_saving() {
+    use mc_sim::adjacency::{offers, uses, Resource};
+    let bps = Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+    let bp = |key: &str| bps.unit(bps.id_of(key).unwrap());
+    for key in ["aster_t2_eng_station", "regency_t3_eng_station"] {
+        assert!(!uses(bp(key), Resource::Materials), "{key}");
+        assert!(!uses(bp(key), Resource::Energy), "{key}");
+        assert!(
+            offers(bp("aster_t3_power"), bp(key))
+                .iter()
+                .all(Option::is_none),
+            "{key}"
+        );
+    }
+    assert!(uses(bp("aster_t2_land_factory"), Resource::Materials));
+}

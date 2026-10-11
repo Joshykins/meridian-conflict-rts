@@ -11,6 +11,8 @@
 //!   also runs faster by twice the share;
 //! - materials: the materials a factory spends on what it builds.
 //!
+//! An engineering station builds out in the field, not in a bay, so it takes no saving.
+//!
 //! A provider's `mc_data::Adjacency` figure is what it saves a building it rings all the
 //! way round, and it scales with what the provider makes. A neighbour gets that in
 //! proportion to how much of its perimeter the two share (`edge_share`), and the savings
@@ -113,9 +115,10 @@ pub fn edge_share(full: Fx, edge: (FxVec2, FxVec2), consumer: Lot) -> Fx {
 }
 
 /// Whether a building of `bp` spends `resource` in a way a neighbour can save:
-/// energy upkeep, a factory's building, or a gun's fed reload.
+/// energy upkeep, a factory's building, or a gun's fed reload. An engineering station
+/// is not a factory here: what it builds stands out in the field, at full price.
 pub fn uses(bp: &UnitBlueprint, resource: Resource) -> bool {
-    let factory = bp.is_structure() && bp.builder.is_some();
+    let factory = bp.is_structure() && bp.builder.is_some() && !bp.is_station();
     match resource {
         Resource::Materials => factory,
         Resource::Energy => {

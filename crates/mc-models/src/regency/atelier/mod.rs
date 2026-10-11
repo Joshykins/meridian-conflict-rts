@@ -1,5 +1,5 @@
 //! The Atelier, the Regency engineering station (`regency_t{1,2,3}_eng_station`, tech 1 to 3
-//! on one upgrade chain, a 3 x 3 lot): a static engineer, a tower whose crown streams
+//! on one upgrade chain, a 2 x 2 lot): a static engineer, a tower whose crown streams
 //! nanites onto sites hundreds of metres off. Nothing on it aims: the stream leaves the
 //! crown's middle, at the top of the tower ([`EMITTER`]: the sim's beam origin for a
 //! builder with no arm is the unit's position at its blueprint `height`).
@@ -28,13 +28,14 @@ use super::kit::{dark_plate, frame, metal, nanite_plate, slab, v3};
 use super::machine::{Course, Frame};
 use super::parts::face_out;
 
-/// Collision radius at every tier: a 3 x 3 lot of 12 m cells.
+/// Authored radius at every tier. The tower was drawn for a 3 x 3 lot; its blueprints
+/// stand it on a 2 x 2 lot, so it is shown at two thirds of this size.
 pub(super) const RADIUS: f32 = 16.9;
 /// Authored height, the same at every tier: upgrades build round the tower, not up it.
 pub(super) const HEIGHT: f32 = 46.0;
 /// Where the stream leaves: the crown's middle, at the top.
 pub(super) const EMITTER: Vec3 = Vec3::new(0.0, 0.0, HEIGHT);
-/// The models, every tier at the blueprint's size.
+/// The models' authored size, every tier the same.
 pub(super) const SIZES: [(f32, f32); 3] = [(RADIUS, HEIGHT); 3];
 /// Full-detail triangle budget: a 3 x 3 tower, plated in courses up its height, its
 /// crown and its tech 3 kit.
@@ -264,8 +265,10 @@ mod tests {
             let key = format!("regency_t{tech}_eng_station");
             let bp = blueprints.unit(blueprints.id_of(&key).unwrap());
             assert_eq!(bp.visual.mesh, "regency_atelier", "{key}");
-            assert!((bp.radius.to_f32() - RADIUS).abs() < 1e-3, "{key}");
-            assert!((bp.height.to_f32() - EMITTER.z).abs() < 1e-3, "{key}");
+            // The blueprint scales the tower evenly, so its height is still the crown's.
+            let across = bp.radius.to_f32() / RADIUS;
+            let up = bp.height.to_f32() / EMITTER.z;
+            assert!((across / up - 1.0).abs() < 0.01, "{key}: stretched");
             let builder = bp.builder.as_ref().expect("it builds");
             assert!(builder.arm.is_none(), "{key}: a tower has no arm");
             assert!(

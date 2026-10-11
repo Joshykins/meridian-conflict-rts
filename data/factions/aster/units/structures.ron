@@ -722,10 +722,10 @@
         tech: 1,
         categories: ["Land"],
         health: 1500,
-        cost: (materials: 220, energy: 1800, time: 400),
-        radius: 16.9, height: 30, footprint: (3, 3),
+        cost: (materials: 110, energy: 900, time: 200),
+        radius: 11.3, height: 20, footprint: (2, 2),
         vision: 400,
-        builder: (power: 25, range: 300, arm: (turn: 120, emitter: (13.6, 0, 25.8), pivot: (2, 0, 25.8)), builds: [
+        builder: (power: 13, range: 300, arm: (turn: 120, emitter: (9.09, 0, 17.2), pivot: (1.34, 0, 17.2)), builds: [
             "aster_t1_land_factory", "aster_t1_air_factory", "aster_t1_airbase", "aster_t1_naval_factory", "aster_core_mine", "aster_t1_power", "aster_materials_storage", "aster_energy_storage", "aster_t1_point_defense", "aster_t1_radar", "aster_t1_sonar", "aster_t1_torpedo_defense", "aster_wall", "aster_t1_aa", "aster_t1_reclaimer", "aster_t1_eng_station",
         ]),
         upgrades_to: "aster_t2_eng_station",
@@ -739,10 +739,10 @@
         tech: 2,
         categories: ["Land"],
         health: 4200,
-        cost: (materials: 1000, energy: 8000, time: 1600),
-        radius: 16.9, height: 30, footprint: (3, 3),
+        cost: (materials: 400, energy: 3200, time: 650),
+        radius: 11.3, height: 20, footprint: (2, 2),
         vision: 550,
-        builder: (power: 180, range: 500, arm: (turn: 120, emitter: (13.6, 0, 25.8), pivot: (2, 0, 25.8)), builds: [
+        builder: (power: 72, range: 500, arm: (turn: 120, emitter: (9.09, 0, 17.2), pivot: (1.34, 0, 17.2)), builds: [
             "aster_t2_lift_ship", "aster_t2_sensor_ship", "aster_t1_land_factory", "aster_t1_air_factory", "aster_t1_airbase", "aster_t1_naval_factory", "aster_core_mine", "aster_t1_power", "aster_materials_storage", "aster_energy_storage", "aster_t1_point_defense", "aster_t1_radar", "aster_t1_sonar", "aster_t1_torpedo_defense", "aster_wall", "aster_t1_reclaimer", "aster_t1_eng_station", "aster_t2_land_factory", "aster_t2_air_factory", "aster_t2_airbase", "aster_t2_naval_factory", "aster_core_mine_t2", "aster_t2_power", "aster_t2_point_defense", "aster_t2_artillery", "aster_t2_reclaimer", "aster_t2_eng_station", "aster_t2_radar", "aster_materials_storage_t2", "aster_energy_storage_t2", "aster_t2_sonar", "aster_t2_torpedo_defense", "aster_t2_shield", "aster_t2_warp_damper", "aster_t1_aa", "aster_t2_aa", "aster_t2_missile_defense", "aster_t2_fabricator",
         ]),
         upgrades_to: "aster_t3_eng_station",
@@ -756,10 +756,10 @@
         tech: 3,
         categories: ["Land"],
         health: 11000,
-        cost: (materials: 3600, energy: 28000, time: 4000),
-        radius: 16.9, height: 30, footprint: (3, 3),
+        cost: (materials: 1600, energy: 12800, time: 1800),
+        radius: 11.3, height: 20, footprint: (2, 2),
         vision: 700,
-        builder: (power: 900, range: 800, arm: (turn: 120, emitter: (13.6, 0, 25.8), pivot: (2, 0, 25.8)), builds: [
+        builder: (power: 360, range: 800, arm: (turn: 120, emitter: (9.09, 0, 17.2), pivot: (1.34, 0, 17.2)), builds: [
             "aster_t2_lift_ship", "aster_t2_sensor_ship", "aster_t1_land_factory", "aster_t1_air_factory", "aster_t1_airbase", "aster_t1_naval_factory", "aster_core_mine", "aster_t1_power", "aster_materials_storage", "aster_energy_storage", "aster_t1_point_defense", "aster_t1_radar", "aster_t1_sonar", "aster_t1_torpedo_defense", "aster_wall", "aster_t1_reclaimer", "aster_t1_eng_station", "aster_t2_land_factory", "aster_t2_air_factory", "aster_t2_airbase", "aster_t2_naval_factory", "aster_core_mine_t2", "aster_t2_power", "aster_t2_point_defense", "aster_t2_artillery", "aster_t2_reclaimer", "aster_t2_eng_station", "aster_t2_radar", "aster_materials_storage_t2", "aster_energy_storage_t2", "aster_t2_sonar", "aster_t2_torpedo_defense", "aster_t2_shield", "aster_t2_warp_damper", "aster_t3_land_factory", "aster_t3_air_factory", "aster_t3_airbase", "aster_t3_naval_factory", "aster_core_mine_t3", "aster_core_mine_t4", "aster_t3_power", "aster_t3_reclaimer", "aster_t3_eng_station", "aster_t3_radar", "aster_materials_storage_t3", "aster_energy_storage_t3", "aster_t3_sonar", "aster_t3_torpedo_defense", "aster_t3_shield", "aster_t1_aa", "aster_t2_aa", "aster_t2_missile_defense", "aster_t3_missile_defense", "aster_t3_sam", "aster_t3_point_defense", "aster_t3_lift_ship", "aster_t3_corvette", "aster_t4_frigate", "aster_t4_dreadnought", "aster_t4_assault_tank", "aster_t4_breacher", "aster_t4_storm_bomber", "aster_t5_titan", "aster_t5_space_elevator", "aster_t4_anti_ship", "aster_t3_nuke_defense", "aster_t4_nuke_silo", "aster_t4_submarine", "aster_t4_artillery", "aster_t2_fabricator", "aster_t3_fabricator",
         ]),
         mesh: "eng_station", icon: Engineer,
