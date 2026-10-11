@@ -45,6 +45,19 @@ fn land() -> World {
     world(Heightfield::flat(512, 512, Fx::from_int(20)))
 }
 
+/// Open sea: 20 m of water over a flat bed, for a carrier to steam about on.
+fn sea() -> World {
+    let samples = vec![0u16; 513 * 513];
+    world(Heightfield::from_samples(
+        512,
+        512,
+        samples,
+        Fx::ZERO,
+        Fx::ONE,
+        Fx::from_int(20),
+    ))
+}
+
 fn spawn(w: &mut World, key: &str, x: i32, y: i32) -> usize {
     let bp = w.blueprints.id_of(key).unwrap();
     w.spawn_unit(bp, 0, FxVec2::from_ints(x, y), Angle::ZERO, true)
@@ -230,9 +243,38 @@ fn what_is_aboard_a_base_dies_with_it() {
     );
 }
 
+/// Runs `fighter` down onto `carrier` (`hangar` set), and returns how it was flying the
+/// tick before: its height over the deck, how far it was from the landing point, and
+/// whether it had come round astern first (x < the carrier's, along its heading).
+fn land_on(w: &mut World, carrier: usize, fighter: usize) -> (Fx, Fx, bool) {
+    let staging = w
+        .blueprints
+        .unit(w.state.units.blueprint[carrier])
+        .staging
+        .unwrap();
+    let carrier_id = w.state.units.id(carrier);
+    let mut astern = false;
+    let mut last = (Fx::ZERO, Fx::ZERO);
+    for _ in 0..2400 {
+        let u = &w.state.units;
+        let local = (u.pos[fighter] - u.pos[carrier]).rotate(-u.heading[carrier]);
+        astern |= local.x < Fx::from_int(-300);
+        let land = u.pos[carrier] + staging.land.xy().rotate(u.heading[carrier]);
+        last = (
+            u.z[fighter] - u.z[carrier] - staging.land.z,
+            u.pos[fighter].distance(land),
+        );
+        w.tick(&[]).unwrap();
+        if w.state.units.hangar[fighter] == carrier_id {
+            return (last.0, last.1, astern);
+        }
+    }
+    panic!("never went aboard: last {last:?}");
+}
+
 #[test]
 fn a_carrier_takes_aircraft_in_over_the_stern_and_launches_them_off_the_bow() {
-    let mut w = world(Heightfield::flat(512, 512, Fx::from_int(-40)));
+    let mut w = sea();
     let carrier = spawn(&mut w, "aster_t3_carrier", 2000, 2000);
     let fighter = spawn(&mut w, "aster_t1_interceptor", 2600, 2000);
     let staging = w
@@ -241,19 +283,15 @@ fn a_carrier_takes_aircraft_in_over_the_stern_and_launches_them_off_the_bow() {
         .staging
         .unwrap();
     w.state.units.fuel[fighter] = range_of(&w, fighter) / 5;
-    let carrier_id = w.state.units.id(carrier);
-    // It comes round astern (x < the carrier's) before it goes down.
-    let mut astern = false;
-    for _ in 0..2400 {
-        w.tick(&[]).unwrap();
-        let x = w.state.units.pos[fighter].x - w.state.units.pos[carrier].x;
-        astern |= x < Fx::from_int(-300);
-        if w.state.units.hangar[fighter] == carrier_id {
-            break;
-        }
-    }
+    // Flown in, not dropped in: down on the deck and up to the landing point when taken
+    // aboard, having come round astern.
+    let (height, off, astern) = land_on(&mut w, carrier, fighter);
     assert!(astern, "came in from astern");
-    assert_eq!(w.state.units.hangar[fighter], carrier_id, "went aboard");
+    assert!(height <= Fx::from_int(2), "{height:?} over the deck");
+    assert!(
+        off <= Fx::from_int(10),
+        "{off:?} short of the landing point"
+    );
     for _ in 0..2400 {
         w.tick(&[]).unwrap();
         if w.state.units.hangar[fighter] == Handle::NONE {
@@ -266,6 +304,40 @@ fn a_carrier_takes_aircraft_in_over_the_stern_and_launches_them_off_the_bow() {
         (off.x - staging.launch[0].0.x).abs() < Fx::from_int(40),
         "off the bow: {off:?}"
     );
+}
+
+#[test]
+fn a_carrier_under_way_is_caught_up_and_landed_on() {
+    for aircraft in ["aster_t2_interceptor", "aster_t2_fire_bomber"] {
+        let mut w = sea();
+        let carrier = spawn(&mut w, "aster_t3_carrier", 1500, 1500);
+        let id = w.state.units.id(carrier);
+        order(
+            &mut w,
+            Command::Move {
+                units: vec![id],
+                target: FxVec2::from_ints(3800, 3200),
+                queue: false,
+            },
+        );
+        step(&mut w, 100);
+        // Spawned ahead of it: it must go round, not over.
+        let ahead = w.state.units.pos[carrier]
+            + FxVec2::from_angle(w.state.units.heading[carrier]) * Fx::from_int(500);
+        let fighter = spawn(&mut w, aircraft, ahead.x.floor_int(), ahead.y.floor_int());
+        w.state.units.fuel[fighter] = range_of(&w, fighter) / 5;
+        let (height, off, astern) = land_on(&mut w, carrier, fighter);
+        assert!(
+            w.state.units.speed[carrier] > Fx::from_int(10),
+            "still under way"
+        );
+        assert!(astern, "{aircraft} came in from astern");
+        assert!(
+            height <= Fx::from_int(2),
+            "{aircraft} {height:?} over the deck"
+        );
+        assert!(off <= Fx::from_int(10), "{aircraft} {off:?} short");
+    }
 }
 
 #[test]

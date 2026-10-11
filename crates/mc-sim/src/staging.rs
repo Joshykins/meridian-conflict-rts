@@ -37,28 +37,60 @@ const IDLE_BURN: (i32, i32) = (2, 5);
 const GROUND_REFUEL_TICKS: i32 = 180 * TICKS_PER_SECOND as i32;
 /// Dry: the share of its speed, acceleration and turn an aircraft keeps.
 const DRY: (i32, i32) = (1, 2);
-/// How far astern of a directional deck the approach starts.
-const APPROACH: i32 = 500;
-/// Close enough to the approach point to turn in.
+/// How far astern of a directional deck's landing point its final approach starts: the
+/// gate.
+const APPROACH: i32 = 900;
+/// Height over the deck an aircraft comes through the gate at, let down to from cruise
+/// over the last `DESCENT` metres to it.
+const PATTERN: i32 = 60;
+const DESCENT: i32 = 1500;
+/// Its circuit round a directional deck: downwind this far abeam of the ship, to a
+/// corner `BASE_TURN` aft of the gate, so it never crosses over the ship and turns in on
+/// the gate rather than reversing on it.
+const ABEAM: i32 = 450;
+const BASE_TURN: i32 = 300;
+/// Through the gate within this much of it, along and across: on final.
 const ON_APPROACH: i32 = 140;
-/// Close enough over the landing point to come down on it.
+/// The leg of a directional deck's circuit an aircraft on a `Stage` is flying, kept in
+/// the order's `radius`: downwind to the corner, the base leg to the gate, final.
+const DOWNWIND: Fx = Fx::ZERO;
+const BASE_LEG: Fx = Fx::ONE;
+const FINAL: Fx = Fx::from_int(2);
+/// The last metres to a directional deck's landing point are flown level, `SKIM` over
+/// the deck: in through the stern mouth.
+const FLARE: i32 = 40;
+const SKIM: Fx = Fx::ONE;
+/// On final, the speed it still has over the deck's at the landing point, metres a
+/// second.
+const CLOSING: i32 = 12;
+/// On final, past the landing point by this much (not taken aboard), it goes round again.
+const OVERSHOOT: i32 = 15;
+/// Close enough over a pad (not a directional deck) to come down on it.
 const TOUCHDOWN: i32 = 60;
-/// On a deck flown into from astern (a carrier's tunnel): close enough to be inside the
-/// stern mouth, so it is not taken aboard out over the water.
-const TOUCHDOWN_ASTERN: i32 = 20;
-/// The glide down to the deck starts this far out.
-const GLIDE: i32 = 450;
+/// Low enough over the deck to be taken aboard.
+const TOUCHDOWN_HEIGHT: i32 = 4;
+/// On a pad, the glide down from cruise starts this far out.
+const GLIDE: i32 = 900;
+/// Down its glide an aircraft slows with the share of it left to fly, to this share of
+/// its top speed.
+const LANDING_PACE: Fx = Fx::ratio(2, 5);
 /// Looked at twice a second, spread over the rows.
 const LOOK_EVERY: usize = 16;
 
 impl World {
-    /// `motion` as this aircraft flies it now: slower and wider once its tank is dry.
-    pub(crate) fn fuelled_motion(&self, row: usize, motion: &Motion) -> Motion {
+    /// `motion` as this aircraft flies it now: slower and wider once its tank is dry, and
+    /// slowing to land on its glide down to a staging base.
+    pub(crate) fn flown_motion(&self, row: usize, motion: &Motion) -> Motion {
         let mut m = *motion;
         if self.bp(row).fuel.is_some() && self.state.units.fuel[row] <= Fx::ZERO {
             m.speed = m.speed * DRY.0 / DRY.1;
             m.accel = m.accel * DRY.0 / DRY.1;
             m.turn_rate = (m.turn_rate as i32 * DRY.0 / DRY.1).max(1) as u16;
+        }
+        if let Some((left, base)) = self.glide_left(row).filter(|_| !m.hover) {
+            // Never slower than the deck it is catching.
+            let deck = self.state.units.speed[base] + Fx::from_int(CLOSING);
+            m.speed = (m.speed * left.max(LANDING_PACE)).max(deck.min(m.speed));
         }
         m
     }
@@ -222,8 +254,10 @@ impl World {
         Ok(())
     }
 
-    /// `OrderKind::Stage`: fly to the base (round to astern of a directional deck first),
-    /// come down, and go aboard once a pad is free.
+    /// `OrderKind::Stage`: fly to the base and come down on it once a pad is free. A
+    /// directional deck is flown into from astern round a circuit: downwind beside the
+    /// ship, the base leg in to the gate at pattern height, then final, down the glide and
+    /// in level; past the landing point, or the gate with no pad free, round again.
     pub(crate) fn run_stage(&mut self, row: usize, o: &Order) -> Result<(), SimError> {
         if self.state.units.hangar[row] != Handle::NONE {
             return Ok(());
@@ -235,28 +269,58 @@ impl World {
         let s = self.bp(base).staging.expect("staging base");
         let land = self.ship_point(base, s.land.xy());
         let pos = self.state.units.pos[row];
-        if s.directional() && o.radius == Fx::ZERO {
-            let astern =
-                land - FxVec2::from_angle(self.state.units.heading[base]) * Fx::from_int(APPROACH);
-            if pos.distance(astern) > Fx::from_int(ON_APPROACH) {
-                return self.ensure_moving(row, astern, astern);
+        let head = self.state.units.order_head[row] as usize;
+        let ready = self.pads_free(base) && self.state.units.deploy[base] >= s.door_ticks;
+        let low = self.state.units.z[row]
+            <= self.state.units.z[base] + s.land.z + Fx::from_int(TOUCHDOWN_HEIGHT);
+        if !s.directional() {
+            if pos.distance(land) <= Fx::from_int(TOUCHDOWN) && ready && low {
+                self.stow_aboard(row, base);
+                return Ok(());
             }
-            let head = self.state.units.order_head[row];
-            self.state.orders.order[head as usize].radius = Fx::ONE;
+            return self.ensure_moving(row, land, land);
         }
-        let touchdown = if s.directional() {
-            TOUCHDOWN_ASTERN
-        } else {
-            TOUCHDOWN
+        let local = (pos - self.state.units.pos[base]).rotate(-self.state.units.heading[base]);
+        let gate = FxVec2::new(s.land.x - Fx::from_int(APPROACH), Fx::ZERO);
+        let near = Fx::from_int(ON_APPROACH);
+        let leg = match o.radius {
+            FINAL if local.x > s.land.x + Fx::from_int(OVERSHOOT) || local.y.abs() > near * 3 => {
+                DOWNWIND
+            }
+            FINAL => {
+                // Taken aboard where this tick's flight carries it over the landing point.
+                let step = self.state.units.speed[row] / TICKS_PER_SECOND as i32 + Fx::from_int(2);
+                if pos.distance(land) <= step && ready && low {
+                    self.stow_aboard(row, base);
+                    return Ok(());
+                }
+                // Braking for a point a little up the deck, it closes on a ship under way.
+                let lead = self.state.units.speed[base] / 2 + Fx::from_int(CLOSING / 2);
+                let aim = land + FxVec2::from_angle(self.state.units.heading[base]) * lead;
+                return self.ensure_moving(row, aim, aim);
+            }
+            // Past the gate without a free pad: round again, a holding racetrack.
+            BASE_LEG if local.x > gate.x + near => DOWNWIND,
+            BASE_LEG
+                if local.x > gate.x - near && local.y.abs() < near * 2 && self.pads_free(base) =>
+            {
+                FINAL
+            }
+            BASE_LEG => BASE_LEG,
+            _ if local.x < gate.x - near => BASE_LEG,
+            _ => DOWNWIND,
         };
-        if pos.distance(land) <= Fx::from_int(touchdown)
-            && self.pads_free(base)
-            && self.state.units.deploy[base] >= s.door_ticks
-        {
-            self.stow_aboard(row, base);
-            return Ok(());
-        }
-        self.ensure_moving(row, land, land)
+        self.state.orders.order[head].radius = leg;
+        let to = match leg {
+            FINAL => land,
+            BASE_LEG => self.ship_point(base, gate),
+            _ => {
+                let side = if local.y < Fx::ZERO { -ABEAM } else { ABEAM };
+                let corner = FxVec2::new(gate.x - Fx::from_int(BASE_TURN), Fx::from_int(side));
+                self.ship_point(base, corner)
+            }
+        };
+        self.ensure_moving(row, to, to)
     }
 
     /// The base a `Stage` names, while it is still up and friendly.
@@ -286,26 +350,63 @@ impl World {
             .is_some_and(|s| self.aboard(base) < s.pads as usize)
     }
 
-    /// Height an aircraft on a `Stage` glides at over `pos`: down to the deck over the
-    /// last `GLIDE` metres to the landing point. `None` when it is not coming down.
+    /// Height an aircraft on a `Stage` flies at over `pos` near its base, `None` when it
+    /// keeps to cruise. Onto a pad: down from cruise over the last `GLIDE` metres. Onto a
+    /// directional deck: down to `PATTERN` on the way to the gate, then the glide from
+    /// there to the deck, level over the last `FLARE` metres.
     pub(crate) fn stage_glide_z(&self, row: usize, pos: FxVec2, cruise: Fx) -> Option<Fx> {
-        let units = &self.state.units;
-        let o = self.state.orders.front(units, row)?;
-        if o.kind != OrderKind::Stage {
+        let (base, s, final_leg) = self.staging_to(row)?;
+        let land = self.ship_point(base, s.land.xy());
+        let deck = self.state.units.z[base] + s.land.z;
+        let d = pos.distance(land);
+        let top = (cruise - deck).max(Fx::ZERO);
+        if !s.directional() {
+            let glide = Fx::from_int(GLIDE);
+            return (d < glide).then(|| deck + top * d / glide);
+        }
+        let pattern = Fx::from_int(PATTERN);
+        if final_leg {
+            let along = (d - Fx::from_int(FLARE)).max(Fx::ZERO);
+            let slope = (pattern - SKIM) / Fx::from_int(APPROACH - FLARE);
+            return Some(deck + SKIM + (along * slope).min(top));
+        }
+        let gate = self.ship_point(
+            base,
+            FxVec2::new(s.land.x - Fx::from_int(APPROACH), Fx::ZERO),
+        );
+        let descent = Fx::from_int(DESCENT);
+        let dg = pos.distance(gate);
+        (dg < descent && top > pattern).then(|| deck + pattern + (top - pattern) * dg / descent)
+    }
+
+    /// The base an aircraft on a `Stage` is going to, its staging, and whether it is on
+    /// final (a directional deck's glide, past the gate).
+    fn staging_to(&self, row: usize) -> Option<(usize, mc_data::Staging, bool)> {
+        let o = self.state.orders.front(&self.state.units, row)?;
+        if o.kind != OrderKind::Stage || self.state.units.hangar[row] != Handle::NONE {
             return None;
         }
         let base = self.stage_base(row, o.target)?;
-        let s = self.bp(base).staging?;
-        if s.directional() && o.radius == Fx::ZERO {
+        Some((base, self.bp(base).staging?, o.radius == FINAL))
+    }
+
+    /// On a directional deck's circuit, short of final: it flies through its corners
+    /// rather than braking for them.
+    pub(crate) fn on_circuit(&self, row: usize) -> bool {
+        self.staging_to(row)
+            .is_some_and(|(_, s, final_leg)| s.directional() && !final_leg)
+    }
+
+    /// How far along its glide to a staging base an aircraft has still to go, as a share
+    /// of the glide, and the base; `None` off it.
+    pub(crate) fn glide_left(&self, row: usize) -> Option<(Fx, usize)> {
+        let (base, s, final_leg) = self.staging_to(row)?;
+        let glide = Fx::from_int(if s.directional() { APPROACH } else { GLIDE });
+        if s.directional() && !final_leg {
             return None;
         }
-        let d = pos.distance(self.ship_point(base, s.land.xy()));
-        let glide = Fx::from_int(GLIDE);
-        if d >= glide {
-            return None;
-        }
-        let deck = units.z[base] + s.land.z;
-        Some(deck + (cruise - deck).max(Fx::ZERO) * d / glide)
+        let d = self.state.units.pos[row].distance(self.ship_point(base, s.land.xy()));
+        (d < glide).then(|| (d / glide, base))
     }
 
     /// Stows the aircraft in `row` aboard `base`, keeping its queue for when it leaves.

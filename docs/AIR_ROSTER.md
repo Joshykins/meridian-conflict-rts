@@ -148,9 +148,15 @@ an aircraft is stowed like lift ship cargo (`Units::hangar`, `IN_FACTORY`), ride
 the base, fills in `refuel` seconds from empty and mends `repair` of its health a second,
 and dies with the base. Full and mended it leaves off the `launch` points in turn, one
 every `launch_gap` seconds. A base whose single launch point differs from its landing
-point (a carrier) is approached from astern and left off the bow; a Roost opens its
-hatch (`doors`, driven in `Units::deploy`) for an aircraft coming down and fires it out
-of its corner tunnels. A Roost upgrades in place, keeping what it holds.
+point (a carrier) is flown into and left off the bow. Aircraft fly a circuit round it:
+downwind 450 m abeam (never over the ship), a base turn in to a gate 900 m astern of
+the landing point at 60 m over the deck, then final. On final they glide down, slow to
+2/5 of top speed (never under the ship's speed plus 12 m/s), fly the last 40 m level
+1 m over the deck and in through the stern mouth, and are taken aboard as they reach
+the landing point. Past it, or past the gate with no pad free, they go round again.
+Onto a Roost they glide down from cruise over the last 900 m. A Roost opens its hatch
+(`doors`, driven in `Units::deploy`) for an aircraft coming down and fires it out of
+its corner tunnels. A Roost upgrades in place, keeping what it holds.
 
 ## Carrier air wings (2026-10-10)
 

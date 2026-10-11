@@ -108,7 +108,7 @@ impl World {
                     continue;
                 }
                 if let Some(motion) = this.bp(row).motion {
-                    let motion = this.fuelled_motion(row, &motion);
+                    let motion = this.flown_motion(row, &motion);
                     let engaged = attack_altitudes[row].is_some();
                     out.push(this.move_unit(row, &motion, formation[row], engaged));
                 }
@@ -228,6 +228,8 @@ impl World {
             if strike {
                 want_z = self.strike_height(row, m.pos, want_z);
             }
+            // Coming down on a staging base it holds to its glide (`staging.rs`).
+            let staging = self.stage_glide_z(row, m.pos, want_z).is_some();
             let vertical_delta = match self.bp(row).motion {
                 // A lift ship eases up and down at its own rate (`transport.rs`).
                 Some(mo) if mo.layer == MoveLayer::Air && self.lands_on_order(row) => {
@@ -260,6 +262,7 @@ impl World {
                             || torpedo_run
                             || bomb_run
                             || strike
+                            || staging
                         {
                             mo.speed * Fx::ratio(7, 20) / DT
                         } else {
@@ -273,7 +276,11 @@ impl World {
                         } else {
                             limit
                         };
-                        let desired = (remaining / 12).clamp(-limit, limit);
+                        let desired = if staging {
+                            remaining.clamp(-limit, limit)
+                        } else {
+                            (remaining / 12).clamp(-limit, limit)
+                        };
                         // A strafing run at speed has to tip into its dive quickly, or the
                         // fixed nose gun comes down on the target too shallow to bear.
                         let ease = if torpedo_run
@@ -281,6 +288,8 @@ impl World {
                             || (assault && self.state.units.has_flag(row, flag::AIR_RUN))
                         {
                             Fx::ratio(3, 10)
+                        } else if staging {
+                            Fx::ratio(1, 2)
                         } else {
                             Fx::ratio(3, 20)
                         };
@@ -653,7 +662,10 @@ impl World {
             && (motion.hover || units.flags[row] & flag::AIR_RUN == 0);
         // A lone aircraft with another waypoint queued flies through this one:
         // it neither brakes for it nor docks on it (`run_air_move` moves it on).
-        let passing = transit_air && formation.is_none() && self.air_waypoint_after(row).is_some();
+        // So does one flying the circuit round a carrier (`staging.rs`).
+        let passing = transit_air
+            && formation.is_none()
+            && (self.air_waypoint_after(row).is_some() || self.on_circuit(row));
         let docking = transit_air
             && !passing
             && moving
@@ -860,10 +872,12 @@ impl World {
             }
         }
         // Lift clear before accelerating horizontally out of a landing site. A capital
-        // ship has its own rule (`lift_speed_cap`), and glides in lower than this.
+        // ship has its own rule (`lift_speed_cap`), and glides in lower than this, as
+        // does one gliding in to a staging base.
         if motion.layer == MoveLayer::Air
             && moving
             && !self.lands_on_order(row)
+            && self.glide_left(row).is_none()
             && units.z[row] < self.ground_surface(pos) + Fx::from_int(16).min(motion.altitude)
         {
             target_speed = Fx::ZERO;
