@@ -135,7 +135,8 @@ an aircraft keeps half its speed, acceleration and turn (`World::fuelled_motion`
 its fuel line under the health bar turns red. An enemy's tanks are not shown.
 
 A unit with a `staging:` block takes aircraft in (`mc-sim/src/staging.rs`): the Roost I-III
-(`aster_t1_airbase`, mesh `airbase`) and the carriers (Atoll, Mantlet). A *free* aircraft
+(`aster_t1_airbase`, mesh `airbase`), its Regency peer the Mews I-III (`regency_t1_airbase`,
+mesh `regency_mews`) and the carriers (Atoll, Mantlet). A *free* aircraft
 (no order, guarding or patrolling; not one in a fight or on a player's move) goes down on
 its own:
 - within a base's `radius` once under 60% fuel or 70% health;
@@ -156,7 +157,10 @@ the landing point at 60 m over the deck, then final. On final they glide down, s
 the landing point. Past it, or past the gate with no pad free, they go round again.
 Onto a Roost they glide down from cruise over the last 900 m. A Roost opens its hatch
 (`doors`, driven in `Units::deploy`) for an aircraft coming down and fires it out of
-its corner tunnels. A Roost upgrades in place, keeping what it holds.
+its corner tunnels. The Mews has nothing to open: aircraft settle into the cradle in its
+middle and leave off the rails at its three arms' tips (`LAUNCH` in
+`mc-models/src/regency/mews.rs`, held to the unit file by a test). Both upgrade in place,
+keeping what they hold.
 
 ## Carrier air wings (2026-10-10)
 

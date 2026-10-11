@@ -226,6 +226,7 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 | Battle tank / mobile anti-air (T2) | Glaive / Vane |
 | Anti-spaceship gun, heavy artillery (T3) | Spire, Kiln |
 | Land / air / naval factory | Anvil (II, III) / Skyforge (II, III) / Slipway (II, III) |
+| Air staging base (T1 to T3, upgrades in place) | Mews (II, III) |
 | Attack boat, submarine, frigate | Dirk, Stiletto, Falchion |
 | Heavy destroyer, cruiser | Claymore, Pavise |
 | Bombardment walker (T2) | Sower |

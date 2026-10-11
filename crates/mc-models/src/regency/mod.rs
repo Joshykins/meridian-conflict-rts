@@ -35,8 +35,10 @@ mod heart;
 mod hover_tank;
 mod kit;
 mod lift;
+mod loft;
 mod machine;
 mod mattock;
+mod mews;
 mod mobile_aa;
 pub(crate) mod naval;
 mod palisade;
@@ -193,6 +195,12 @@ pub(super) const MODELS: &[ModelDef] = &[
         [(46.0, 20.0), (46.0, 24.0), (46.0, 32.0)],
         tidebrood::tidebrood,
     ),
+    // Air staging: the Mews (`mews`), tech 1 to 3 in place, its tech 3 crown standing taller.
+    ModelDef::tiered(
+        "regency_mews",
+        [(34.0, 8.0), (34.0, 8.0), (34.0, 15.0)],
+        mews::mews,
+    ),
     // Economy: the sealed bore (`taproot`), the star core (`heart`), the vault and cells
     // (`cyst`).
     ModelDef::tiered(
@@ -304,6 +312,8 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_brood" | "regency_hatchery" => 15000,
         // The Slipway's scaled shell, legs, arms and tech 3 arch.
         "regency_tidebrood" => 12000,
+        // Three scaled arms, the cradle and its talons, the tech 2 collar and tech 3 crown.
+        "regency_mews" => 7000,
         // The tech 1 hulls; the tech 2 warships have a capital ship's detail, lighter.
         "regency_attack_boat" => 2400,
         // The tech 1 air force: jets by the dozen, a transport the size of a frigate.
