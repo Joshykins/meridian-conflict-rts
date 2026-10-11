@@ -11,11 +11,16 @@ use std::{path::Path, sync::Arc};
 
 /// A flat 8 km map: a Commander AI in slot 0 against an idle player.
 fn world() -> World {
+    world_with(false)
+}
+
+/// `world`, with or without the fog of war.
+fn world_with(fog: bool) -> World {
     let data = Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
     let config = MatchConfig {
         seed: 9,
         cheats: true,
-        fog: false,
+        fog,
         spawn_commanders: true,
         players: (0..2)
             .map(|i| PlayerSetup {
@@ -217,5 +222,83 @@ fn a_filling_store_is_read_as_floating_and_asks_for_sinks() {
         eco.upgrades > before.upgrades && eco.payback > before.payback,
         "more mine upgrades, and longer ones, while it floats: {}",
         w.state.ai[0].commander.summary()
+    );
+}
+
+/// A Behemoth of the AI's at home, and a factory of the enemy's halfway with `guards`
+/// tech 3 point defence turrets round it (1500 m: the Behemoth outranges them).
+fn titan_world(guards: i32, fog: bool) -> (World, crate::tables::UnitId, FxVec2) {
+    let mut w = world_with(fog);
+    let titan = w.blueprints.id_of("aster_t5_titan").unwrap();
+    let row = w
+        .spawn_unit(titan, 0, FxVec2::from_ints(1400, 1400), Angle::ZERO, true)
+        .unwrap();
+    let id = w.state.units.id(row);
+    let at = FxVec2::from_ints(4600, 4600);
+    let factory = w.blueprints.id_of("aster_t1_land_factory").unwrap();
+    w.spawn_unit(factory, 1, at, Angle::ZERO, true).unwrap();
+    let pd = w.blueprints.id_of("aster_t3_point_defense").unwrap();
+    for i in 0..guards {
+        let off = FxVec2::from_ints([160, -160, 0, 0][i as usize], [0, 0, 160, -160][i as usize]);
+        w.spawn_unit(pd, 1, at + off, Angle::ZERO, true).unwrap();
+    }
+    if guards > 0 {
+        let shield = w.blueprints.id_of("aster_t3_shield").unwrap();
+        for off in [FxVec2::from_ints(110, 110), FxVec2::from_ints(-110, -110)] {
+            w.spawn_unit(shield, 1, at + off, Angle::ZERO, true)
+                .unwrap();
+        }
+    }
+    (w, id, at)
+}
+
+#[test]
+fn a_titan_goes_out_alone_at_once() {
+    let (mut w, id, _) = titan_world(0, false);
+    run(&mut w, 300);
+    let c = &w.state.ai[0].commander;
+    let op = c
+        .ops
+        .iter()
+        .find(|o| o.has(id))
+        .unwrap_or_else(|| panic!("the titan is in no operation: {}", c.summary()));
+    assert_eq!(op.kind, OpKind::Titan, "{}", c.summary());
+    let row = w.state.units.row(id).unwrap();
+    assert!(
+        w.state.units.pos[row].distance(FxVec2::from_ints(1400, 1400)) > Fx::from_int(200),
+        "the titan stood at home: {}",
+        c.summary()
+    );
+}
+
+#[test]
+fn a_titan_razes_a_guarded_base_from_beyond_its_guns() {
+    // In the fog it finds the base only on its way, and takes it from where it sees it.
+    let (mut w, id, at) = titan_world(4, true);
+    let theirs = |w: &World| {
+        w.state
+            .units
+            .slots
+            .iter()
+            .filter(|&r| w.state.units.owner[r] == 1)
+            .count()
+    };
+    let mut nearest = Fx::from_int(1 << 20);
+    for _ in 0..30 {
+        run(&mut w, 50);
+        let row = w.state.units.row(id).expect("the titan died");
+        // Once the base is gone it walks on over it, to their commander.
+        if theirs(&w) > 1 {
+            nearest = nearest.min(w.state.units.pos[row].distance(at));
+        }
+    }
+    let c = &w.state.ai[0].commander;
+    // Only their commander is left, far off at their start.
+    assert_eq!(theirs(&w), 1, "the base stands: {}", c.summary());
+    // The tech 3 point defence reaches 1500 m.
+    assert!(
+        nearest > Fx::from_int(1500),
+        "it walked in to {nearest} m of the guns: {}",
+        c.summary()
     );
 }

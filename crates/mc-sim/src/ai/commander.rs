@@ -16,6 +16,7 @@ mod ops;
 mod ops_air_sea;
 mod ops_ground;
 mod ops_space;
+mod ops_titan;
 mod plans;
 pub(in crate::ai) mod profile;
 mod reach;
@@ -64,6 +65,9 @@ pub(in crate::ai) struct Ctx<'a> {
     /// The ground split into zones, and what the side believes of each (`zones.rs`).
     pub zones: &'a Zones,
     pub zv: &'a ZoneView,
+    /// A finished space elevator of the side's stands (`role::ELEVATOR`): its units
+    /// come down from orbit free, so its land army is cheap to spend.
+    pub cheap_army: bool,
 }
 
 impl Ctx<'_> {
@@ -225,6 +229,14 @@ impl World {
         self.state.ai[player as usize].commander.rally = Some(staging);
         let mut arrived = self.arrived_army(player);
         arrived.sort_unstable();
+        let units = &self.state.units;
+        let cheap_army = units.slots.iter().any(|r| {
+            units.owner[r] == player
+                && units.is_active(r)
+                && profiles
+                    .get(units.blueprint[r])
+                    .has(profile::role::ELEVATOR)
+        });
         let ctx = Ctx {
             player,
             start,
@@ -239,6 +251,7 @@ impl World {
             reach: &reach,
             zones: &zones,
             zv: &zv,
+            cheap_army,
         };
         self.review_plans(&ctx, census);
         self.keep_ops(&ctx);
@@ -397,6 +410,7 @@ impl World {
             OpKind::Fleet | OpKind::Wolfpack => self.run_fleet(ctx, op, out),
             OpKind::Warships => self.run_warships(ctx, op, out),
             OpKind::Scout => self.run_scouts(ctx, op, out),
+            OpKind::Titan => self.run_titan(ctx, op, out),
         }
     }
 

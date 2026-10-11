@@ -284,7 +284,7 @@ under two minutes of income.
 
 Each change is a `Note` (tick, plan, stake, why), shown in the overlay.
 
-### 6. Operations (`ops.rs`, `ops_ground.rs`, `ops_air_sea.rs`, `ops_space.rs`)
+### 6. Operations (`ops.rs`, `ops_ground.rs`, `ops_titan.rs`, `ops_air_sea.rs`, `ops_space.rs`)
 
 An operation is a group with one goal, owned by a plan:
 
@@ -302,6 +302,7 @@ An operation is a group with one goal, owned by a plan:
 | `Warships` | armed spaceships: jump in, fight, go home |
 | `Siege` | artillery and map guns on a target from beyond its defences |
 | `Scout` | eyes where the beliefs are least sure, around anti-air |
+| `Titan` | the side's titans (lot-built fighting units on land or hover): out alone at once, on an attack-move |
 
 Lifecycle: `Gathering` (at its rally; idle units of the right kind join) ->
 `Executing` (group orders toward the goal) -> `Withdrawing` (the whole group, by
@@ -340,6 +341,16 @@ Ground rules learnt in the tournaments (each is a comment at its code):
 - a wave that cannot fill goes with three quarters of its mark after two minutes
   gathering and with half after four: a Hard side on 7 a second waited a whole
   match for a 380-materials wave and never attacked;
+- a titan is the titans' own, never the guard's or the army's: in the guard a
+  Behemoth stood among the mines for a whole match. It sets out the moment it is
+  built, takes a nearer objective found on the way, and falls back only below 30%
+  health and outmatched two to one; its own guns outrange what it meets (a Behemoth
+  razed two shields, four tech 3 turrets and a factory from 2.4 km in ten seconds);
+- a side with a finished space elevator (`Ctx::cheap_army`) gets its units free, so
+  its army goes as a probe does (at three fifths of the enemy army, blind), is
+  never held at home, and does not break off a fight for the trade: with 50 000
+  materials of free tanks at its rally, a side waited five minutes, then fell back
+  from an even fight with 136 units standing;
 - an army held at home (Pressure off) goes once it holds a minute of income, at
   least 3000 materials, and that mark never shrinks with waiting: held at nothing, two
   aggressive sides on an island map kept 436 000 and 122 000 materials at home;

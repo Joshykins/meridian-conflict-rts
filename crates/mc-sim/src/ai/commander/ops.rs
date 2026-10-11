@@ -12,11 +12,27 @@ use mc_data::cat;
 /// Most units one operation takes: one order's worth.
 pub(in crate::ai) const MOST_UNITS: usize = crate::command::MAX_COMMAND_UNITS;
 
+/// Whether a unit of profile `p` is a titan: a fighting unit built on a lot (a tier 4
+/// or 5) that walks or floats. One is worth a whole wave, and it goes on its own
+/// (`run_titan`) instead of waiting in the guard or behind the army's checks.
+pub(in crate::ai) fn titan(p: &Profile) -> bool {
+    p.has(role::PROJECT)
+        && p.armed()
+        && !p.has(role::TRANSPORT)
+        && matches!(p.domain, Some(Domain::Land | Domain::Hover))
+}
+
 /// Whether a unit of profile `p` belongs in an operation of `kind`.
 pub(in crate::ai) fn fits(kind: OpKind, p: &Profile, land_route: bool) -> bool {
     let ground = matches!(p.domain, Some(Domain::Land | Domain::Hover));
     let crosses = p.domain == Some(Domain::Hover);
+    // A titan is the titans' own: the guard took them first and held them among the
+    // mines, where they waited for raids that never came.
+    if titan(p) {
+        return kind == OpKind::Titan && (land_route || crosses);
+    }
     match kind {
+        OpKind::Titan => false,
         OpKind::Army | OpKind::Defend => {
             ground
                 && (land_route || crosses)

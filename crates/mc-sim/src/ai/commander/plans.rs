@@ -565,6 +565,7 @@ impl World {
             OpKind::Wolfpack,
             OpKind::Warships,
             OpKind::Scout,
+            OpKind::Titan,
         ] {
             // The army: one wave always gathering at staging, whatever is out.
             let exists =
@@ -586,6 +587,7 @@ impl World {
                     OpKind::Fleet => (PlanKind::SeaControl, FxVec2::ZERO),
                     OpKind::Wolfpack => (PlanKind::SubWar, FxVec2::ZERO),
                     OpKind::Warships => (PlanKind::Warships, space_rally),
+                    OpKind::Titan => (PlanKind::Titan, ctx.staging),
                     _ => (PlanKind::Intel, ctx.start),
                 };
                 self.open_op(ctx.player, kind, plan, rally, rally, Fx::ZERO);
@@ -733,7 +735,11 @@ impl World {
             }
         }
         // How much each waits for before it goes.
-        let pressure = c.plan(PlanKind::Pressure);
+        // Free units are not held at home: an army gathers to go.
+        let pressure = match c.plan(PlanKind::Pressure) {
+            Stake::Off if ctx.cheap_army => Stake::Probe,
+            s => s,
+        };
         let air = c.plan(PlanKind::AirPower);
         let sea = c.plan(PlanKind::SeaControl);
         let subs = c.plan(PlanKind::SubWar);

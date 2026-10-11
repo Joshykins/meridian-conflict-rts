@@ -12,7 +12,7 @@ use mc_data::{cat, MoveLayer};
 /// 20 damage a second for 100 materials.
 pub(in crate::ai) const THREAT_MATERIALS: i32 = 5;
 /// A group falls back, as a group, once what it faces is this many times it.
-const OUTMATCHED: Fx = Fx::from_int(2);
+pub(in crate::ai) const OUTMATCHED: Fx = Fx::from_int(2);
 /// How near a target a hovercraft must be able to float for a hover army to go for it.
 const HOVER_NEAR: i32 = 256;
 /// How far from its rally point a gathering wave goes after enemy groups it beats.
@@ -370,9 +370,13 @@ impl World {
                     // as much, and never blind; a probe goes only at soft targets. In a
                     // mirror match a wave that set out at once, unseeing, met the
                     // enemy by its own base and was wiped out.
-                    let probe = stake == super::state::Stake::Probe;
+                    // A side whose units come down free from its elevator goes as a
+                    // probe does, and blind: with 50 000 materials of free tanks at its
+                    // rally point, a side waited five minutes for a third more than
+                    // the enemy's army.
+                    let probe = stake == super::state::Stake::Probe || ctx.cheap_army;
                     let bold = match stake {
-                        super::state::Stake::Probe => Fx::ratio(3, 5),
+                        _ if probe => Fx::ratio(3, 5),
                         super::state::Stake::AllIn => Fx::ONE,
                         _ => Fx::ratio(13, 10),
                     };
@@ -448,7 +452,10 @@ impl World {
                 // Half of what set out lost, and losing the trade: an even fight is
                 // fought out. Breaking off one on the move (units on a move order do not
                 // shoot) handed the enemy the rest of the wave as it chased.
+                // Free units (`Ctx::cheap_army`) are spent at any trade: a side with
+                // an elevator fell back from an even fight with 136 units standing.
                 let bled = op.launched > Fx::ZERO
+                    && !ctx.cheap_army
                     && materials * 2 < op.launched
                     && op.ledger.killed < op.ledger.lost * 7 / 10;
                 // Under aircraft or a warship it has nothing to shoot back with.
@@ -471,7 +478,12 @@ impl World {
                 // it out there. Falling back from beside it ended the operation on
                 // the spot and dissolved the army in the middle of a battle.
                 let home = centre.distance(op.rally) < Fx::from_int(1500);
-                if (facing > here * OUTMATCHED || bled)
+                let outmatched = if ctx.cheap_army {
+                    OUTMATCHED * 2
+                } else {
+                    OUTMATCHED
+                };
+                if (facing > here * outmatched || bled)
                     && op.kind != OpKind::Defend
                     && !ashore
                     && !home
@@ -615,7 +627,7 @@ impl World {
 
     /// The nearest enemy land group within `PREY_REACH` of `at` that `materials` beats by
     /// a fifth, off any turret's cover, on ground the army can walk to.
-    fn prey_near(&self, ctx: &Ctx, at: FxVec2, materials: Fx) -> Option<FxVec2> {
+    pub(in crate::ai) fn prey_near(&self, ctx: &Ctx, at: FxVec2, materials: Fx) -> Option<FxVec2> {
         let tick = self.state.tick;
         self.state.ai[ctx.player as usize]
             .contacts

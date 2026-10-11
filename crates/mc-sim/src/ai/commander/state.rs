@@ -183,9 +183,11 @@ pub(in crate::ai) enum OpKind {
     Scout = 10,
     /// Fast units held among the side's mines that answer raids anywhere.
     Guard = 11,
+    /// The side's titans (site-built fighting giants), each sent on its own.
+    Titan = 12,
 }
 
-pub(in crate::ai) const OPS: [OpKind; 12] = [
+pub(in crate::ai) const OPS: [OpKind; 13] = [
     OpKind::Army,
     OpKind::Defend,
     OpKind::Raid,
@@ -198,6 +200,7 @@ pub(in crate::ai) const OPS: [OpKind; 12] = [
     OpKind::Siege,
     OpKind::Scout,
     OpKind::Guard,
+    OpKind::Titan,
 ];
 
 impl OpKind {
@@ -215,6 +218,7 @@ impl OpKind {
             OpKind::Siege => "siege",
             OpKind::Scout => "scout",
             OpKind::Guard => "guard",
+            OpKind::Titan => "titan",
         }
     }
 }
@@ -391,7 +395,7 @@ pub(in crate::ai) struct CommanderState {
     /// Every operation's trade over the match, by `OpKind as usize`: which kinds of
     /// operation work for this side.
     #[serde(default)]
-    pub trades: [Ledger; 12],
+    pub trades: [Ledger; OPS.len()],
     /// Where and when the side last lost something to aircraft or a warship.
     #[serde(default)]
     pub hit_from_above: Option<(FxVec2, u32)>,
