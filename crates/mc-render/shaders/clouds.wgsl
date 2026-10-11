@@ -27,6 +27,8 @@
 // (written by the resolve, read by the composite).
 @group(1) @binding(3) var cloud_history: texture_2d<f32>;
 @group(1) @binding(4) var cloud_now: texture_2d<f32>;
+// This frame's half of the march (`fs_march`), half as wide as `cloud_march`.
+@group(1) @binding(6) var cloud_march_half: texture_2d<u32>;
 
 // Horizontal repeat of the billow texture and of the fine erosion, metres.
 const SHAPE_PERIOD: f32 = 5200.0;
@@ -575,8 +577,22 @@ var<private> march_depth: f32;
 // How far the march went: to the scene, or 1e9 over the sky (the composite's upsample).
 var<private> march_reach: f32;
 
+// Which texels of row `y` are marched this frame: those whose x is this odd or even.
+// Half a frame, flipping each frame, a checkerboard in all: every texel is marched
+// every other frame, and `fs_fill` fills the rest from the four marched round it.
+fn march_phase(y: i32) -> i32 {
+    return (y + i32(atmos.frame.x)) & 1;
+}
+
+// Drawn half as wide as the march (`cloud_march_half`): each texel marches the ray
+// of the full march's texel it stands for this frame (`march_phase`).
 @fragment
-fn fs_march(in: FullOut) -> @location(0) vec4<u32> {
+fn fs_march(half: FullOut) -> @location(0) vec4<u32> {
+    let full = vec2<f32>(textureDimensions(cloud_history));
+    let y = floor(half.clip.y);
+    var in = half;
+    in.clip = vec4<f32>(floor(half.clip.x) * 2.0 + f32(march_phase(i32(y))) + 0.5, y + 0.5, half.clip.zw);
+    in.uv = in.clip.xy / full;
     march_depth = 0.0;
     march_reach = 1.0e9;
     var c = march(in);
@@ -816,8 +832,9 @@ fn fire_glow(p: vec3<f32>) -> vec3<f32> {
 fn march(in: FullOut) -> vec4<f32> {
     // The farthest of the full-size depths at this texel's corners.
     let full = vec2<f32>(textureDimensions(scene_depth));
-    // Full-size pixels per march texel, from how fast uv moves across it.
-    let scale = round(vec2<f32>(abs(dpdx(in.uv.x)), abs(dpdy(in.uv.y))) * full);
+    let size = vec2<f32>(textureDimensions(cloud_history));
+    // Full-size pixels per march texel.
+    let scale = round(full / size);
     let px = vec2<i32>(floor(in.uv * full - scale * 0.5 + 0.5));
     let step = vec2<i32>(max(scale - 1.0, vec2<f32>(0.0)));
     let dims = vec2<i32>(full) - vec2<i32>(1);
@@ -827,8 +844,11 @@ fn march(in: FullOut) -> vec4<f32> {
     }
     let eye = globals.camera.xyz;
     let rd = view_ray(in.uv);
-    // A march texel's angle across, before any branch.
-    let texel_angle = max(length(fwidth(rd)), 1e-6);
+    // A march texel's angle across. (Not `fwidth`: neighbouring fragments of the half
+    // march stand for texels two apart, `fs_march`.)
+    let across = view_ray(in.uv + vec2<f32>(1.0 / size.x, 0.0)) - rd;
+    let down = view_ray(in.uv + vec2<f32>(0.0, 1.0 / size.y)) - rd;
+    let texel_angle = max(length(abs(across) + abs(down)), 1e-6);
     var t_scene = 1.0e9;
     if depth > 0.0 {
         t_scene = distance(unproject(in.uv, depth), eye);
@@ -1284,6 +1304,8 @@ fn sample_smooth(tex: texture_2d<f32>, uv: vec2<f32>) -> vec4<f32> {
 @fragment
 fn fs_resolve(in: FullOut) -> @location(0) vec4<f32> {
     let px = vec2<i32>(in.clip.xy);
+    // Marched this frame (`march_phase`), or filled in from the four round it.
+    let marched = (px.x & 1) == march_phase(px.y);
     let last = vec2<i32>(textureDimensions(cloud_march)) - vec2<i32>(1);
     let now = march_texel(px);
     if atmos.frame.y < 0.5 {
@@ -1372,7 +1394,81 @@ fn fs_resolve(in: FullOut) -> @location(0) vec4<f32> {
         mix(mean - spread * k, max(lo, mean - spread * k), motion),
         mix(mean + spread * k, min(hi, mean + spread * k), motion),
     );
-    return mix(before, now, mix(0.06, 0.14, motion));
+    // A filled texel brings nothing new (it is its neighbours' average): it keeps its
+    // history, clamped as above; a marched one counts twice, being marched every
+    // other frame, so the clouds keep the pace they settle and follow at.
+    return mix(before, now, mix(0.06, 0.14, motion) * select(0.0, 2.0, marched));
+}
+
+// The march at full size (`cloud_march`, read by the resolve, the composite and
+// `past_clouds`): this frame's marched texels from `cloud_march_half`, and between
+// them the average of the four marched round each that went about as far (as the
+// resolve's neighbourhood does), so a treetop's texel is not filled with the sky's.
+@fragment
+fn fs_fill(in: FullOut) -> @location(0) vec4<u32> {
+    let px = vec2<i32>(in.clip.xy);
+    let last = vec2<i32>(textureDimensions(cloud_march_half)) - vec2<i32>(1);
+    if (px.x & 1) == march_phase(px.y) {
+        return textureLoad(cloud_march_half, min(vec2<i32>(px.x >> 1u, px.y), last), 0);
+    }
+    // How far this texel's march would have gone: to the nearest scene at its
+    // corners, as `march` finds it.
+    let full = vec2<f32>(textureDimensions(scene_depth));
+    let size = vec2<f32>(textureDimensions(cloud_history));
+    let scale = round(full / size);
+    let corner = vec2<i32>(floor(in.uv * full - scale * 0.5 + 0.5));
+    let step = vec2<i32>(max(scale - 1.0, vec2<f32>(0.0)));
+    let dims = vec2<i32>(full) - vec2<i32>(1);
+    var depth = 1.0;
+    for (var i = 0; i < 4; i++) {
+        depth = min(depth, textureLoad(scene_depth, min(corner + vec2<i32>(i & 1, i >> 1u) * step, dims), 0));
+    }
+    var reach = 1.0e9;
+    if depth > 0.0 {
+        reach = distance(unproject(in.uv, depth), globals.camera.xyz);
+    }
+    // Left and right in this row; above and below, whose rows march the other half.
+    let rows = i32(size.y) - 1;
+    var at = array<vec2<i32>, 4>(
+        vec2<i32>(px.x - 1, px.y),
+        vec2<i32>(px.x + 1, px.y),
+        vec2<i32>(px.x, px.y - 1),
+        vec2<i32>(px.x, px.y + 1),
+    );
+    var sum = vec4<f32>(0.0);
+    var depth_sum = 0.0;
+    var hits = 0.0;
+    var n = 0.0;
+    var nearest = vec4<u32>(0u);
+    var apart = 1.0e9;
+    for (var i = 0; i < 4; i++) {
+        let q = at[i];
+        if q.x < 0 || q.y < 0 || q.y > rows || (q.x >> 1u) > last.x {
+            continue;
+        }
+        let v = textureLoad(cloud_march_half, vec2<i32>(q.x >> 1u, q.y), 0);
+        let off = abs(log2(max(bitcast<f32>(v.w), 0.1) / max(reach, 0.1)));
+        if off < apart {
+            apart = off;
+            nearest = v;
+        }
+        if off > 0.3 {
+            continue;
+        }
+        sum += vec4<f32>(unpack2x16float(v.x), unpack2x16float(v.y));
+        let d = bitcast<f32>(v.z);
+        if d > 0.0 {
+            depth_sum += d;
+            hits += 1.0;
+        }
+        n += 1.0;
+    }
+    if n == 0.0 {
+        return vec4<u32>(nearest.xyz, bitcast<u32>(reach));
+    }
+    let c = sum / n;
+    let d = select(0.0, depth_sum / max(hits, 1.0), hits > n * 0.5);
+    return vec4<u32>(pack2x16float(c.rg), pack2x16float(c.ba), bitcast<u32>(d), bitcast<u32>(reach));
 }
 
 // ---- Laid over the picture ------------------------------------------------------

@@ -60,7 +60,12 @@ const DRAW_SET: &[Binding] = &[
     (3, vk::DescriptorType::SAMPLED_IMAGE),
     (4, vk::DescriptorType::SAMPLED_IMAGE),
     (5, vk::DescriptorType::STORAGE_IMAGE),
+    (6, vk::DescriptorType::SAMPLED_IMAGE),
 ];
+
+/// The target the march draws this frame's half of its texels into (`Sky::resize`);
+/// `fs_fill` lays them out at full size in target 0.
+const MARCH_HALF: usize = 3;
 
 const SHADE_RES: u32 = 512;
 const NOISE_RES: u32 = 128;
@@ -504,6 +509,7 @@ pub struct Sky {
     shade_pipeline: vk::Pipeline,
     sky_pipeline: vk::Pipeline,
     march_pipeline: vk::Pipeline,
+    fill_pipeline: vk::Pipeline,
     resolve_pipeline: vk::Pipeline,
     composite_pipeline: vk::Pipeline,
     rain_pipeline: vk::Pipeline,
@@ -796,7 +802,7 @@ impl Sky {
         let sim_module = gpu.shader(crate::shader_reload::spirv!("clouds_sim"))?;
         let draw_module = gpu.shader(crate::shader_reload::spirv!("clouds"))?;
         // All at once (`warm`): after a shader change the march alone compiles for seconds.
-        let [advect, force, noise_pipeline, shade_pipeline, sky_pipeline, march_pipeline, resolve_pipeline, composite_pipeline, rain_pipeline] =
+        let [advect, force, noise_pipeline, shade_pipeline, sky_pipeline, march_pipeline, fill_pipeline, resolve_pipeline, composite_pipeline, rain_pipeline] =
             crate::warm::warmed(
                 gpu,
                 || {
@@ -856,6 +862,13 @@ impl Sky {
                         Blend::Opaque,
                         Depth::Off,
                     )?;
+                    let fill_pipeline = graphics(
+                        c"fs_fill",
+                        draw_pipeline_layout,
+                        passes.cloud_march,
+                        Blend::Opaque,
+                        Depth::Off,
+                    )?;
                     let resolve_pipeline = graphics(
                         c"fs_resolve",
                         draw_pipeline_layout,
@@ -891,6 +904,7 @@ impl Sky {
                         shade_pipeline,
                         sky_pipeline,
                         march_pipeline,
+                        fill_pipeline,
                         resolve_pipeline,
                         composite_pipeline,
                         rain_pipeline,
@@ -952,6 +966,7 @@ impl Sky {
             shade_pipeline,
             sky_pipeline,
             march_pipeline,
+            fill_pipeline,
             resolve_pipeline,
             composite_pipeline,
             rain_pipeline,
@@ -1794,7 +1809,8 @@ impl Sky {
         })
     }
 
-    /// The cloud march and its fold into the history, between the scene pass and `scene_over`.
+    /// The cloud march (half its texels a frame), laid out at full size and folded into
+    /// the history, between the scene pass and `scene_over`.
     pub fn record_march(&self, gpu: &Gpu, cmd: vk::CommandBuffer, scene_set: vk::DescriptorSet) {
         let (w, h) = self.march_size;
         if w == 0 || !self.clouds {
@@ -1803,18 +1819,25 @@ impl Sky {
         let dev = &gpu.device;
         let k = self.history();
         let set = self.draw_sets[k];
-        for (fb, pass, pipeline) in [
-            (self.target_fbs[0], self.march_pass, self.march_pipeline),
+        for (fb, pass, pipeline, w) in [
+            (
+                self.target_fbs[MARCH_HALF],
+                self.march_pass,
+                self.march_pipeline,
+                w.div_ceil(2),
+            ),
+            (self.target_fbs[0], self.march_pass, self.fill_pipeline, w),
             (
                 self.target_fbs[1 + k],
                 self.resolve_pass,
                 self.resolve_pipeline,
+                w,
             ),
         ] {
             // SAFETY: the renderer calls `record_march` with its recording `cmd`, outside any
             // render pass, after `resize` (`w` > 0); each framebuffer was made for the pass it
-            // is paired with at `march_size`, the render area, and each pass is ended in this
-            // block.
+            // is paired with at the size it is drawn at (`MARCH_HALF` half as wide as
+            // `march_size`), the render area, and each pass is ended in this block.
             unsafe {
                 dev.cmd_begin_render_pass(
                     cmd,
@@ -1932,6 +1955,7 @@ impl Sky {
                 self.shade_pipeline,
                 self.sky_pipeline,
                 self.march_pipeline,
+                self.fill_pipeline,
                 self.resolve_pipeline,
                 self.composite_pipeline,
                 self.rain_pipeline,

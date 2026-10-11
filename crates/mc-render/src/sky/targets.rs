@@ -3,9 +3,10 @@
 use super::*;
 
 impl Sky {
-    /// Size-dependent targets: the march, its two histories, and the depth it stops at.
-    /// The march and the histories also go into the scene set (bindings 36-38), for the
-    /// effects drawn past the clouds (bindings.wgsl `past_clouds`).
+    /// Size-dependent targets: the march, its two histories, the half of the march
+    /// marched each frame (`MARCH_HALF`), and the depth it stops at. The march and the
+    /// histories also go into the scene set (bindings 36-38), for the effects drawn past
+    /// the clouds (bindings.wgsl `past_clouds`).
     pub fn resize(
         &mut self,
         gpu: &Gpu,
@@ -27,11 +28,14 @@ impl Sky {
         }
         let div = cloud_divisor.clamp(1, 4);
         let (w, h) = (width.div_ceil(div).max(1), height.div_ceil(div).max(1));
-        for k in 0..3 {
+        for k in 0..4 {
+            let march = k == 0 || k == MARCH_HALF;
+            // Half as wide: each row marches every other texel (clouds.wgsl `march_phase`).
+            let tw = if k == MARCH_HALF { w.div_ceil(2) } else { w };
             let image = gpu.image(&ImageDesc {
-                width: w,
+                width: tw,
                 height: h,
-                format: if k == 0 {
+                format: if march {
                     CLOUD_MARCH_FORMAT
                 } else {
                     HDR_FORMAT
@@ -42,19 +46,19 @@ impl Sky {
                 array: false,
             })?;
             let views = [image.view];
-            // SAFETY: `image` was just made at `w`x`h` in the format of the pass it is paired
-            // with (`CLOUD_MARCH_FORMAT` for the march, `HDR_FORMAT` for the resolve); the
-            // create info and `views` live to the end of the call.
+            // SAFETY: `image` was just made at `tw`x`h` in the format of the pass it is paired
+            // with (`CLOUD_MARCH_FORMAT` for the march and its fill, `HDR_FORMAT` for the
+            // resolve); the create info and `views` live to the end of the call.
             let fb = unsafe {
                 gpu.device.create_framebuffer(
                     &vk::FramebufferCreateInfo::default()
-                        .render_pass(if k == 0 {
+                        .render_pass(if march {
                             self.march_pass
                         } else {
                             self.resolve_pass
                         })
                         .attachments(&views)
-                        .width(w)
+                        .width(tw)
                         .height(h)
                         .layers(1),
                     None,
@@ -95,6 +99,7 @@ impl Sky {
             write_image(gpu, *set, 2, sampled, self.targets[0].view, read);
             write_image(gpu, *set, 3, sampled, self.targets[1 + (1 - k)].view, read);
             write_image(gpu, *set, 4, sampled, self.targets[1 + k].view, read);
+            write_image(gpu, *set, 6, sampled, self.targets[MARCH_HALF].view, read);
         }
         for (binding, target) in [(36, 0), (37, 1), (38, 2)] {
             write_image(
