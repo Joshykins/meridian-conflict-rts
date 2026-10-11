@@ -303,8 +303,9 @@ impl World {
             .max()
             .unwrap_or(Fx::ZERO);
         let back = self.state.ai[player as usize].commander.rally_back;
-        let t =
-            (furthest - Fx::from_int(150) - back).clamp(Fx::from_int(260), span * Fx::ratio(9, 20));
+        // Starts closer than about 580 m (the test range) leave no room past 260 m.
+        let far = span * Fx::ratio(9, 20);
+        let t = (furthest - Fx::from_int(150) - back).clamp(Fx::from_int(260).min(far), far);
         // Back toward home until the army can walk there and no enemy fire known
         // reaches it: units walking up one by one to a rally under the enemy's
         // artillery were picked off one every few seconds.
