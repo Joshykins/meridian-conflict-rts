@@ -127,7 +127,8 @@ impl World {
     }
 
     /// The nearest target other than `hidden` that `weapon` of `row` may shoot and can
-    /// see, trying at most `MAX_CANDIDATES` of them.
+    /// see, trying at most `MAX_CANDIDATES` of them. Never a wall: a gun whose target
+    /// is hidden holds on it rather than turn on the wall (`World::is_wall`).
     pub(crate) fn visible_alternative(
         &self,
         row: usize,
@@ -143,6 +144,7 @@ impl World {
                 let t = e.row as usize;
                 if t != hidden
                     && self.unit_entry_is_current(e)
+                    && !self.is_wall(t)
                     && self.is_valid_target(row, t, weapon)
                 {
                     near.push((at.distance(units.pos[t]), t));

@@ -873,7 +873,11 @@ impl World {
                         } else {
                             Fx::ZERO
                         };
-                        let in_grid = |prefer: u32| {
+                        // Walls are left for last (`World::is_wall`): a search that passes
+                        // one over notes it, so the search for walls runs only when one
+                        // was there to find.
+                        let wall_seen = std::cell::Cell::new(false);
+                        let in_grid = |prefer: u32, walls: bool| {
                             this.index
                                 .nearest_foe(
                                     from,
@@ -889,39 +893,57 @@ impl World {
                                     },
                                     this.team_mask(units.owner[row]),
                                     |e| {
-                                        this.unit_entry_is_current(e)
-                                            && !doomed(e.row as usize)
-                                            && this.is_valid_target(row, e.row as usize, weapon)
-                                            && (prefer == 0
-                                                || this.hittable(e.row as usize, prefer))
+                                        let t = e.row as usize;
+                                        if !this.unit_entry_is_current(e)
+                                            || doomed(t)
+                                            || (prefer != 0 && !this.hittable(t, prefer))
+                                            || !this.is_valid_target(row, t, weapon)
+                                        {
+                                            return false;
+                                        }
+                                        if !walls && this.is_wall(t) {
+                                            wall_seen.set(true);
+                                            return false;
+                                        }
+                                        true
                                     },
                                 )
                                 .map(|e| e.row as usize)
                         };
-                        let nearest = |prefer: u32| {
+                        let nearest = |prefer: u32, walls: bool| {
                             if weapon.range_max > MAP_GUN_REACH {
-                                this.nearest_on_map(row, weapon, prefer)
+                                this.nearest_on_map(row, weapon, prefer, walls)
                             } else {
-                                in_grid(prefer)
+                                in_grid(prefer, walls)
                             }
                         };
                         // A weapon with a preference (`Weapon::prefer_mask`) leaves what it
                         // is on for one of those as soon as one is in range.
                         let preferred = (weapon.prefer_mask != 0 && this.fires_at_will(row))
-                            .then(|| nearest(weapon.prefer_mask))
+                            .then(|| nearest(weapon.prefer_mask, false))
                             .flatten();
                         if let Some(t) = current {
-                            match preferred {
-                                Some(p) if !this.hittable(t, weapon.prefer_mask) => {
-                                    targets[w] = units.id(p);
-                                }
-                                _ => {}
+                            // A gun on a wall turns to anything else that comes into reach,
+                            // unless an order names the wall.
+                            let other = if this.is_wall(t) && ordered != Some(t) {
+                                preferred.or_else(|| nearest(0, false))
+                            } else {
+                                preferred.filter(|_| !this.hittable(t, weapon.prefer_mask))
+                            };
+                            if let Some(p) = other {
+                                targets[w] = units.id(p);
                             }
                             continue;
                         }
                         targets[w] = if this.fires_at_will(row) {
                             preferred
-                                .or_else(|| nearest(0))
+                                .or_else(|| nearest(0, false))
+                                .or_else(|| {
+                                    let map_gun = weapon.range_max > MAP_GUN_REACH;
+                                    (wall_seen.get() || map_gun)
+                                        .then(|| nearest(0, true))
+                                        .flatten()
+                                })
                                 .map_or(Handle::NONE, |t| units.id(t))
                         } else {
                             Handle::NONE

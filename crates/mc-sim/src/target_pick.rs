@@ -1,9 +1,13 @@
 //! How the map guns find their nearest target: their reach is most of the map, so a
 //! grid search round the gun would cover the whole map anyway, and a look over the
 //! unit table is far cheaper than one over the ~100k grid cells a 22 km reach spans.
+//!
+//! A wall (`cat::WALL`) is the last thing a gun takes on its own: it stands in the way
+//! and stops the shots that meet it, but a gun only lays on it when no other enemy is
+//! in reach. An order still names one.
 
 use mc_core::Fx;
-use mc_data::Weapon;
+use mc_data::{cat, Weapon};
 
 use crate::world::World;
 
@@ -18,10 +22,21 @@ pub(crate) const MAP_GUN_REACH: Fx = Fx::from_int(5000);
 const LOOK_EVERY: u32 = 10;
 
 impl World {
+    /// Whether `row` is a wall: what a gun takes only when nothing else is in reach.
+    pub(crate) fn is_wall(&self, row: usize) -> bool {
+        self.bp(row).has(cat::WALL)
+    }
+
     /// The nearest enemy `weapon` on `row` may shoot now, of the kinds in `prefer` (all
-    /// kinds if zero), the lowest row on a tie: what the grid search finds for a gun of
-    /// ordinary reach. `None` between looks (`LOOK_EVERY`).
-    pub(crate) fn nearest_on_map(&self, row: usize, weapon: &Weapon, prefer: u32) -> Option<usize> {
+    /// kinds if zero), walls only if `walls`, the lowest row on a tie: what the grid
+    /// search finds for a gun of ordinary reach. `None` between looks (`LOOK_EVERY`).
+    pub(crate) fn nearest_on_map(
+        &self,
+        row: usize,
+        weapon: &Weapon,
+        prefer: u32,
+        walls: bool,
+    ) -> Option<usize> {
         let units = &self.state.units;
         // Guns take their turns to look on different ticks.
         let turn = self.state.tick.wrapping_add(row as u32);
@@ -37,6 +52,7 @@ impl World {
                 || !self.are_enemies(owner, units.owner[t])
                 || !self.weapon_reaches(t, weapon)
                 || (prefer != 0 && !self.hittable(t, prefer))
+                || (!walls && self.is_wall(t))
             {
                 continue;
             }

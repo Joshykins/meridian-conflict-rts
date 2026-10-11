@@ -225,3 +225,101 @@ fn artillery_lobs_over_the_hill() {
     }
     assert!(shot, "artillery should shell a target behind a hill");
 }
+
+/// A tank at (500, 1200), on flat ground well clear of the hill, with an enemy wall
+/// 50 m east of it that can be hurt; the tank holds position. Returns (shooter, wall).
+fn tank_by_a_wall(w: &mut World) -> (usize, usize) {
+    w.tick(&[
+        spawn(w, 0, "aster_t1_tank", 500, 1200, 0),
+        spawn(w, 1, "aster_wall", 552, 1200, flag::PASSIVE),
+    ])
+    .unwrap();
+    let shooter = rows_of(w, 0)[0];
+    let wall = rows_of(w, 1)[0];
+    w.tick(&[cmd(Command::SetFireState {
+        units: vec![w.state.units.id(shooter)],
+        state: FireState::HoldPosition,
+    })])
+    .unwrap();
+    (shooter, wall)
+}
+
+fn spawn_tank_behind(w: &mut World) -> usize {
+    w.tick(&[spawn(w, 1, "aster_t1_tank", 640, 1200, DUMMY)])
+        .unwrap();
+    rows_of(w, 1)
+        .into_iter()
+        .find(|&r| w.state.units.pos[r].x > Fx::from_int(600))
+        .unwrap()
+}
+
+#[test]
+fn a_gun_takes_a_wall_only_when_nothing_else_is_in_reach() {
+    let mut w = world();
+    let (shooter, wall) = tank_by_a_wall(&mut w);
+    for _ in 0..20 {
+        w.tick(&[]).unwrap();
+    }
+    assert_eq!(
+        w.state.units.weapon_target[shooter][0],
+        w.state.units.id(wall),
+        "with nothing else in reach it should shoot the wall"
+    );
+    // An enemy comes up behind the wall: the gun leaves the wall for it, and the wall,
+    // nearer, still stands in the way of its shots.
+    let tank = spawn_tank_behind(&mut w);
+    for _ in 0..20 {
+        w.tick(&[]).unwrap();
+    }
+    assert_eq!(
+        w.state.units.weapon_target[shooter][0],
+        w.state.units.id(tank),
+        "it should turn from the wall to the tank behind it"
+    );
+}
+
+#[test]
+fn a_gun_passes_over_a_nearer_wall() {
+    let mut w = world();
+    let (shooter, _) = tank_by_a_wall(&mut w);
+    let tank = spawn_tank_behind(&mut w);
+    for _ in 0..20 {
+        w.tick(&[]).unwrap();
+    }
+    assert_eq!(
+        w.state.units.weapon_target[shooter][0],
+        w.state.units.id(tank),
+        "it should lay on the tank, not the nearer wall"
+    );
+    // The wall stands in the line of fire and takes the shots meant for the tank.
+    let wall = rows_of(&w, 1).into_iter().find(|&r| r != tank).unwrap();
+    let full = w.state.units.health[wall];
+    for _ in 0..200 {
+        w.tick(&[]).unwrap();
+    }
+    assert!(
+        w.state.units.health[wall] < full,
+        "the wall should block the fire"
+    );
+}
+
+#[test]
+fn an_order_still_names_a_wall() {
+    let mut w = world();
+    let (shooter, wall) = tank_by_a_wall(&mut w);
+    spawn_tank_behind(&mut w);
+    w.tick(&[cmd(Command::Attack {
+        units: vec![w.state.units.id(shooter)],
+        target: w.state.units.id(wall),
+        queue: false,
+    })])
+    .unwrap();
+    for _ in 0..20 {
+        w.tick(&[]).unwrap();
+    }
+    assert_eq!(
+        w.state.units.weapon_target[shooter][0],
+        w.state.units.id(wall),
+        "an order on the wall keeps the gun on it"
+    );
+}

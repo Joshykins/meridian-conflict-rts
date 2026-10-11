@@ -2350,8 +2350,8 @@ impl World {
     /// An idle armed land or naval unit that sees an enemy just out of range goes
     /// after it, then walks back. The chase is an `Attack` whose `pos` is home
     /// and whose `radius` is the leash (`run_attack` ends it there), followed by
-    /// an attack-move home. Builders keep to their work, and a unit already
-    /// shooting something stays put. True if it set off.
+    /// an attack-move home. Builders keep to their work, a unit already
+    /// shooting something stays put, and a wall is never chased. True if it set off.
     fn idle_chase(&mut self, row: usize) -> Result<bool, SimError> {
         // Looked at a few times a second, spread over the rows.
         if !(self.state.tick as usize + row).is_multiple_of(4) {
@@ -2381,6 +2381,7 @@ impl World {
                 self.unit_entry_is_current(e)
                     && self.are_enemies(owner, units.owner[t])
                     && !units.has_flag(t, flag::IN_FACTORY)
+                    && !self.is_wall(t)
                     && self.can_strike(row, t)
                     && self.detects(owner, t)
             })
