@@ -12,7 +12,7 @@ use mc_data::{BlueprintId, Blueprints, FactionId};
 
 mod dialog;
 mod tab;
-pub(super) use tab::{hover_card, tab, toggle_button};
+pub(super) use tab::{hover_card, mode_frame, tab, toggle_button};
 
 /// The prefabs' share of the HUD: whether the construction panel shows prefabs, the
 /// save box, and a delete waiting to be confirmed.

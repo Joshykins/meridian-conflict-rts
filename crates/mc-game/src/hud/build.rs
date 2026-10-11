@@ -217,6 +217,9 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
     }
 
     hud.glass(ui, r);
+    if prefab_mode {
+        super::prefabs::mode_frame(ui, r);
+    }
     let (x, cw) = (r.x + 14.0, r.w - 28.0);
     let mut tx = x;
     // A tier's digit or U from the keyboard picks the tab.

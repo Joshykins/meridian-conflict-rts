@@ -34,8 +34,9 @@ struct Slot<'a> {
     n: usize,
 }
 
-/// The Prefabs toggle at `x` on the tab row, lit while the panel shows prefabs.
-/// Returns its width and whether it was clicked.
+/// The Prefabs toggle at `x` on the tab row, filled with the accent while the panel
+/// shows prefabs, so the mode cannot pass for a tier tab. Returns its width and
+/// whether it was clicked.
 pub(in crate::hud) fn toggle_button(
     hud: &mut Hud,
     ui: &mut Ui,
@@ -45,6 +46,12 @@ pub(in crate::hud) fn toggle_button(
 ) -> (f32, bool) {
     let tr = Rect::new(x, y, 104.0, 26.0);
     let t = hud.tile(ui, id("prefab-toggle", 0), tr, on, true);
+    let k = ui.ease(id("prefab-toggle", 1), if on { 1.0 } else { 0.0 }, 16.0);
+    if k > 0.01 {
+        ui.fill_cut(tr, 5.0, rgb(palette::ACCENT_DEEP, 0.85 * k));
+        ui.fill_cut(tr, 5.0, rgb(palette::ACCENT, 0.25 * k + 0.1 * t.glow * k));
+        ui.outline_cut(tr, 5.0, rgb(palette::ACCENT, k), rgb(palette::ACCENT, k));
+    }
     let tone = if on {
         rgb(0xFFFFFF, 1.0)
     } else {
@@ -70,6 +77,23 @@ pub(in crate::hud) fn toggle_button(
         ui.audio.play(Sfx::Tick);
     }
     (tr.w, t.clicked)
+}
+
+/// The construction panel `r` marked as turned to prefabs: an accent edge round it
+/// and a band of accent along its top, behind the tab row.
+pub(in crate::hud) fn mode_frame(ui: &mut Ui, r: Rect) {
+    // The band stays inside the panel's cut corners (10 across).
+    let (top, clear) = (rgb(palette::ACCENT, 0.16), rgb(palette::ACCENT, 0.0));
+    ui.fill(Rect::new(r.x + 10.0, r.y + 1.0, r.w - 20.0, 9.0), top);
+    ui.gradient_v(
+        Rect::new(r.x + 1.0, r.y + 10.0, r.w - 2.0, 34.0),
+        top,
+        clear,
+    );
+    let edge = rgb(palette::ACCENT, 0.8);
+    ui.outline_cut(r, 10.0, edge, rgb(palette::ACCENT, 1.0));
+    let inner = rgb(palette::ACCENT, 0.3);
+    ui.outline_cut(r.inset(1.0), 9.6, inner, inner);
 }
 
 /// The prefabs of the open tier (`hud.tab`) in `grid`, shelf by shelf, for a builder
