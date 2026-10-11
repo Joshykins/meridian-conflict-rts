@@ -35,6 +35,16 @@
 #                                      look at X,Y from ZOOM metres, turned YAW degrees
 #   scripts/live.sh shot [-o NAME]     screenshot of the player's screen, to
 #                                      artifacts/live/NAME.png (default: the time)
+#   scripts/live.sh grow [OPTIONS]     hand a side to the Commander AI (Hard) to grow a
+#                                      base from a new start, with its commander:
+#       --at X,Y|cursor|camera|pad     its start (default: camera)
+#       --front X,Y|cursor|camera|pad  move the other side's start there; the AI's
+#                                      base faces it
+#       --side N                       default 1 (red)
+#       --speed PCT                    game speed, nearest step up to 1200
+#       --free | --paid                free building on or off for the side
+#       --no-commander                 do not put a commander down
+#   scripts/live.sh ungrow [--side N]  hand the side back to the player
 #   scripts/live.sh send FILE|-|JSON   any request as it is ({"op": ..., ...})
 #
 # The game must be in the test range; "no game is listening" otherwise. A refused
@@ -118,6 +128,27 @@ case "$cmd" in
         mkdir -p "$repo/artifacts/live"
         mv "$box/$file" "$repo/artifacts/live/$name.png"
         echo "$repo/artifacts/live/$name.png" ;;
+    grow)
+        # A spot is a name or "X,Y".
+        spot() { [[ $1 == *,* ]] && echo "[${1}]" || echo "\"$1\""; }
+        req='{"op":"grow"}'
+        while [[ $# -gt 0 ]]; do
+            case "$1" in
+                --at) req=$(jq -c --argjson v "$(spot "$2")" '. + {at: $v}' <<< "$req"); shift 2 ;;
+                --front) req=$(jq -c --argjson v "$(spot "$2")" '. + {front: $v}' <<< "$req"); shift 2 ;;
+                --side) req=$(jq -c --argjson v "$2" '. + {side: $v}' <<< "$req"); shift 2 ;;
+                --speed) req=$(jq -c --argjson v "$2" '. + {speed: $v}' <<< "$req"); shift 2 ;;
+                --free) req=$(jq -c '. + {free_build: true}' <<< "$req"); shift ;;
+                --paid) req=$(jq -c '. + {free_build: false}' <<< "$req"); shift ;;
+                --no-commander) req=$(jq -c '. + {commander: false}' <<< "$req"); shift ;;
+                *) echo "live.sh grow: unknown option $1" >&2; exit 2 ;;
+            esac
+        done
+        send "$req" ;;
+    ungrow)
+        side=1
+        [[ ${1:-} == --side ]] && side="$2"
+        send "$(jq -cn --argjson s "$side" '{op: "grow", on: false, side: $s}')" ;;
     send) send "$(body "${1:--}" | jq -c .)" ;;
     *) usage >&2; exit 2 ;;
 esac

@@ -47,6 +47,13 @@ README "The live desk" has the overview.
 - Use `scripts/live.sh camera X Y ZOOM` to frame what you laid first. A zoom of
   300 to 900 shows a base.
 
+## Watching the AI grow a base
+
+- `scripts/live.sh grow --at cursor --front pad --speed 800` hands red to the Commander
+  AI (Hard) with its commander at `--at`; blue's start moves to `--front`, which the
+  AI's base faces. `--free` stops it waiting on the economy. The player keeps blue.
+- `scripts/live.sh ungrow` hands red back. Use `shot` to see how far it got.
+
 ## Taking the user's work back
 
 - "This one", or what they selected: `scripts/live.sh capture` returns it as a

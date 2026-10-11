@@ -429,6 +429,21 @@ pub enum Command {
         player: u8,
         permille: u16,
     },
+    /// Test range: `player` is played by the Commander AI with `config` (`on`), from a
+    /// fresh AI state, or handed back to a person. With `commander` and none alive, its
+    /// faction's commander is put down at its start and counts as its commander.
+    DebugSetAi {
+        player: u8,
+        on: bool,
+        config: crate::AiConfig,
+        commander: bool,
+    },
+    /// Test range: moves `player`'s start, which the AI builds its base round and
+    /// which other AIs take for where that player lives.
+    DebugSetStart {
+        player: u8,
+        pos: FxVec2,
+    },
 }
 
 impl Command {
@@ -509,6 +524,8 @@ impl Command {
             | Command::DebugStock { .. }
             | Command::DebugIncome { .. }
             | Command::DebugBuildRate { .. }
+            | Command::DebugSetAi { .. }
+            | Command::DebugSetStart { .. }
             | Command::DebugStorage { .. }
             | Command::DebugWrecks { .. }
             | Command::SetFocus { .. } => 0,

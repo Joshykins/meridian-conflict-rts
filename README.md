@@ -268,8 +268,10 @@ drops requests in `%APPDATA%\meridian-conflict\live` and the game answers each b
 It lays structures and prefabs (finished, as unbuilt sites, or built by spawned engineers in the
 prefab's order), checks each site with the player's placement rules, reads back every structure
 and the selection, captures the selection as a prefab, keeps one in the player's library, moves
-the camera and saves a screenshot. It is for designing base layouts with an agent while you
-play. `scripts/live.sh --help` lists the requests.
+the camera and saves a screenshot. It also hands a side to the Commander AI at a start you
+pick (`live.sh grow --at cursor --front pad --speed 800`), so you can watch it grow a base from
+nothing, and hands it back (`live.sh ungrow`). It is for designing base layouts with an agent
+while you play. `scripts/live.sh --help` lists the requests.
 
 ```bash
 scripts/live.sh lay '{"structures":[{"key":"aster_t1_power","x":0,"y":0},{"key":"aster_t1_power","x":24,"y":0}],"at":"cursor","how":"build"}'

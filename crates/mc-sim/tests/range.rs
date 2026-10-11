@@ -444,3 +444,55 @@ fn orders_given_on_pause_are_carried_out_without_the_clock_moving() {
     }
     assert!(w.state.units.pos[row].x > at.x, "the order was lost");
 }
+
+#[test]
+fn a_side_handed_to_the_ai_builds_a_base_round_its_new_start_and_can_be_handed_back() {
+    let mut w = world(true);
+    let home = FxVec2::from_ints(1000, 600);
+    let config = mc_sim::AiConfig::default();
+    w.tick(&[
+        cmd(Command::DebugFreeBuild {
+            player: 1,
+            on: true,
+        }),
+        cmd(Command::DebugSetStart {
+            player: 1,
+            pos: home,
+        }),
+        cmd(Command::DebugSetAi {
+            player: 1,
+            on: true,
+            config,
+            commander: true,
+        }),
+    ])
+    .unwrap();
+    assert_eq!(w.state.players[1].controller, Controller::Ai);
+    assert_eq!(w.state.players[1].start, home);
+    let commander = w.state.units.row(w.state.players[1].commander).unwrap();
+    assert_eq!(w.state.units.pos[commander], home);
+    for _ in 0..600 {
+        w.tick(&[]).unwrap();
+    }
+    let u = &w.state.units;
+    let built: Vec<_> = u
+        .slots
+        .iter()
+        .filter(|&r| u.owner[r] == 1 && w.blueprints.unit(u.blueprint[r]).is_structure())
+        .collect();
+    assert!(!built.is_empty(), "the AI put nothing down in a minute");
+    assert!(
+        built
+            .iter()
+            .all(|&r| u.pos[r].distance(home) < Fx::from_int(800)),
+        "the AI built away from its new start"
+    );
+    w.tick(&[cmd(Command::DebugSetAi {
+        player: 1,
+        on: false,
+        config: Default::default(),
+        commander: false,
+    })])
+    .unwrap();
+    assert_eq!(w.state.players[1].controller, Controller::Human);
+}

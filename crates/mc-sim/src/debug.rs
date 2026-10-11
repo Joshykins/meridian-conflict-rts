@@ -7,7 +7,7 @@ use crate::command::{Command, PlayerCommand};
 use crate::tables::*;
 use crate::world::snap_turned_to_build_grid;
 use crate::{SimError, World};
-use mc_core::{Fx, FxVec2};
+use mc_core::{Angle, Fx, FxVec2};
 
 impl World {
     /// Applies `pc` if it is a debug command. Returns whether it was one.
@@ -25,6 +25,8 @@ impl World {
                 | Command::DebugStock { .. }
                 | Command::DebugIncome { .. }
                 | Command::DebugBuildRate { .. }
+                | Command::DebugSetAi { .. }
+                | Command::DebugSetStart { .. }
                 | Command::DebugStorage { .. }
                 | Command::DebugWrecks { .. }
         );
@@ -166,6 +168,51 @@ impl World {
                         *crate::ai_config::BUILD_RANGE.start(),
                         *crate::ai_config::BUILD_RANGE.end(),
                     );
+                }
+            }
+            Command::DebugSetAi {
+                player,
+                on,
+                config,
+                commander,
+            } => {
+                let p = *player as usize;
+                if p >= player_count {
+                    return Ok(true);
+                }
+                self.state.players[p].controller = if *on {
+                    Controller::Ai
+                } else {
+                    Controller::Human
+                };
+                if !*on {
+                    return Ok(true);
+                }
+                self.state.players[p].defeated = false;
+                self.state.ai[p] = crate::ai::AiState::new(*config);
+                let alive = self
+                    .state
+                    .units
+                    .row(self.state.players[p].commander)
+                    .is_some();
+                if *commander && !alive {
+                    let start = self.state.players[p].start;
+                    let faction = self.state.players[p].faction as usize;
+                    let bp = self.blueprints.factions[faction].commander;
+                    // It faces the nearest other start, as the AI's base does.
+                    let toward = (0..player_count)
+                        .filter(|&q| q != p)
+                        .map(|q| self.state.players[q].start)
+                        .min_by_key(|s| s.distance_sq(start));
+                    let heading = toward.map_or(Angle::ZERO, |s| (s - start).angle());
+                    let row = self.spawn_unit(bp, *player, start, heading, true)?;
+                    self.state.players[p].commander = self.state.units.id(row);
+                }
+            }
+            Command::DebugSetStart { player, pos } => {
+                let pos = self.clamp_to_map(*pos);
+                if let Some(p) = self.state.players.get_mut(*player as usize) {
+                    p.start = pos;
                 }
             }
             Command::DebugStorage {

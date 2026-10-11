@@ -579,6 +579,8 @@ impl World {
             | Command::DebugStock { .. }
             | Command::DebugIncome { .. }
             | Command::DebugBuildRate { .. }
+            | Command::DebugSetAi { .. }
+            | Command::DebugSetStart { .. }
             | Command::DebugStorage { .. }
             | Command::DebugWrecks { .. } => Ok(()),
         }

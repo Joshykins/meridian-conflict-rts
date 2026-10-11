@@ -9,7 +9,7 @@
 
 use super::Game;
 use crate::hud;
-use crate::live::{self, At, How, KeptPrefab, Lay, Mailbox, Request, Spot};
+use crate::live::{self, At, Grow, How, KeptPrefab, Lay, Mailbox, Request, Spot};
 use crate::orders::{self, Field};
 use crate::prefabs::{self, Laid, Prefab, PrefabId, Turn};
 use crate::range;
@@ -128,6 +128,10 @@ impl Game {
                 json!({ "ok": true })
             }
             Request::Camera { at, zoom, yaw } => self.live_camera(at, zoom, yaw, renderer),
+            Request::Grow(grow) => match self.live_grow(grow, renderer) {
+                Ok(v) => v,
+                Err(why) => refuse(why),
+            },
             Request::Shot => {
                 self.live.shot = Some(Shot {
                     id: id.to_owned(),
@@ -609,5 +613,78 @@ impl Game {
             }
             Err(e) => mailbox.answer(&shot.id, &refuse(e)),
         }
+    }
+
+    /// Hands a side to the AI at a new start (or back to the player), and sets the pace.
+    fn live_grow(&mut self, grow: Grow, renderer: &Renderer) -> Result<Value, String> {
+        let side = grow.side;
+        if side as usize >= self.view.status.players.len() {
+            return Err(format!("there is no side {side}"));
+        }
+        if let Some(speed) = grow.speed {
+            let step = hud::SPEEDS
+                .iter()
+                .copied()
+                .min_by_key(|s| s.abs_diff(speed))
+                .unwrap_or(100);
+            self.set_speed(step);
+        }
+        let config = mc_sim::AiConfig {
+            difficulty: mc_sim::Difficulty::Hard,
+            ..Default::default()
+        };
+        if !grow.on {
+            self.send(Command::DebugSetAi {
+                player: side,
+                on: false,
+                config,
+                commander: false,
+            });
+            return Ok(json!({ "ok": true, "side": side, "ai": false }));
+        }
+        let at = self.live_point(grow.at, renderer)?;
+        let front = grow
+            .front
+            .map(|f| self.live_point(f, renderer))
+            .transpose()?;
+        if let Some(on) = grow.free_build {
+            self.send(Command::DebugFreeBuild { player: side, on });
+        }
+        let fx = |p: Vec2| FxVec2::new(Fx::from_f32(p.x), Fx::from_f32(p.y));
+        self.send(Command::DebugSetStart {
+            player: side,
+            pos: fx(at),
+        });
+        if let Some(front) = front {
+            for other in 0..self.view.status.players.len() as u8 {
+                if other != side {
+                    self.send(Command::DebugSetStart {
+                        player: other,
+                        pos: fx(front),
+                    });
+                }
+            }
+        }
+        self.send(Command::DebugSetAi {
+            player: side,
+            on: true,
+            config,
+            commander: grow.commander,
+        });
+        // The player keeps the other side: commands of theirs given as the AI's side
+        // would fight it for its units.
+        if self.view.local == side {
+            self.take_control(if side == range::BLUE {
+                range::RED
+            } else {
+                range::BLUE
+            });
+        }
+        Ok(json!({
+            "ok": true, "side": side, "ai": true,
+            "at": [round(at.x), round(at.y)],
+            "front": front.map(|f| [round(f.x), round(f.y)]),
+            "speed": self.view.speed,
+        }))
     }
 }

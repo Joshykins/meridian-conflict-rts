@@ -71,6 +71,44 @@ pub enum Request {
     },
     /// A screenshot of the next frame, saved in the mailbox as `<id>.png`.
     Shot,
+    /// Hands a side to the Commander AI (Hard), to grow a base from a new start, or
+    /// (`on: false`) back to the player.
+    Grow(Grow),
+}
+
+/// Who the AI plays, from where, against what, and how fast the range runs.
+#[derive(Deserialize, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct Grow {
+    #[serde(default = "yes")]
+    pub on: bool,
+    /// The side the AI plays; red when not given.
+    #[serde(default = "red")]
+    pub side: u8,
+    /// Its new start, which it builds round.
+    #[serde(default)]
+    pub at: At,
+    /// Where the other side lives, which the AI's base faces: the other side's start
+    /// moves there. Left where it is when not given.
+    #[serde(default)]
+    pub front: Option<At>,
+    /// Puts its faction's commander down at the start when it has none alive.
+    #[serde(default = "yes")]
+    pub commander: bool,
+    /// Turns free building on or off for the side first.
+    #[serde(default)]
+    pub free_build: Option<bool>,
+    /// Game speed in percent, to the nearest step the game has (up to 1200).
+    #[serde(default)]
+    pub speed: Option<u32>,
+}
+
+fn yes() -> bool {
+    true
+}
+
+fn red() -> u8 {
+    crate::range::RED
 }
 
 /// What `lay` puts down, where, and how.
@@ -331,6 +369,14 @@ mod tests {
         };
         assert_eq!(lay.at, At::Spot(Spot::Pad));
         assert_eq!(lay.how, How::Done);
+        let Request::Grow(grow) = parse(r#"{"op":"grow","at":"cursor","front":"pad"}"#).unwrap()
+        else {
+            panic!("not a grow");
+        };
+        assert!(grow.on && grow.commander);
+        assert_eq!(grow.side, crate::range::RED);
+        assert_eq!(grow.front, Some(At::Spot(Spot::Pad)));
+        assert_eq!(grow.speed, None);
     }
 
     #[test]
