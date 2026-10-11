@@ -321,6 +321,11 @@ impl World {
     /// back, when the army can walk there and no enemy fire reaches it. Gathered on the
     /// line between the two starts, an army stood far from the border its mines were
     /// lost along.
+    ///
+    /// The army stays behind the front it gathers at until another has half as much
+    /// again at stake: picked afresh each think, two fronts near level traded places
+    /// every minute and the rally point jumped kilometres, so the wave never stood
+    /// gathered and never set out (one army op held 1 to 30 units from minute 2 to 18).
     fn front_rally(
         &self,
         player: u8,
@@ -329,7 +334,8 @@ impl World {
         wm: &WorldModel,
     ) -> Option<FxVec2> {
         let c = &self.state.ai[player as usize].commander;
-        c.scratch
+        let rallies: Vec<(i32, u32, FxVec2)> = c
+            .scratch
             .fronts
             .iter()
             .filter(|f| !f.water)
@@ -338,8 +344,20 @@ impl World {
                 (reach.reaches(at) && wm.threat_at(at, profile::Target::Land) == Fx::ZERO)
                     .then_some((f.stake_us + f.stake_them / 2, f.id, at))
             })
-            .max_by_key(|&(stake, id, _)| (stake, std::cmp::Reverse(id)))
-            .map(|(.., at)| at)
+            .collect();
+        let best = rallies
+            .iter()
+            .max_by_key(|&&(stake, id, _)| (stake, std::cmp::Reverse(id)))?;
+        let held = c.rally.and_then(|r| {
+            rallies
+                .iter()
+                .filter(|&&(stake, _, at)| {
+                    at.distance(r) < Fx::from_int(600) && stake * 3 >= best.0 * 2
+                })
+                .max_by_key(|&&(stake, id, _)| (stake, std::cmp::Reverse(id)))
+                .map(|_| r)
+        });
+        Some(held.unwrap_or(best.2))
     }
 
     /// Each operation's orders, the most urgent first, while the side's attention

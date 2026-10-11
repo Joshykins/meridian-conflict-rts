@@ -303,7 +303,7 @@ impl World {
                     .sum();
                 // An enemy group in reach that it outnumbers: a wave in the field takes
                 // it on, the way a player's army keeps the map clear around it.
-                if op.kind == OpKind::Army && gathered > Fx::ZERO {
+                if op.kind == OpKind::Army && gathered > Fx::ZERO && gathered * 2 >= op.want {
                     if let Some(prey) = self.prey_near(ctx, op.rally, gathered) {
                         op.target = prey;
                         op.launched = materials;
@@ -365,21 +365,19 @@ impl World {
                     let stake = self.state.ai[ctx.player as usize].commander.plan(op.plan);
                     let enemy = ctx.beliefs.army[super::profile::Domain::Land as usize]
                         + ctx.beliefs.army[super::profile::Domain::Hover as usize];
-                    // Fights near their base favour them (turrets, reinforcements): a
-                    // wave goes at a third more than the army it believes in, all in at
-                    // as much, and never blind; a probe goes only at soft targets. In a
-                    // mirror match a wave that set out at once, unseeing, met the
-                    // enemy by its own base and was wiped out.
+                    // A wave goes once it matches the army it believes in (that belief
+                    // already counts a fifth more than was seen), and never blind; a
+                    // probe goes only at soft targets. In a mirror match a wave that
+                    // set out at once, unseeing, met the enemy by its own base and was
+                    // wiped out. Asked for a third more on top, waves sat at their
+                    // rally point most of the match and read as a side that never
+                    // attacked.
                     // A side whose units come down free from its elevator goes as a
                     // probe does, and blind: with 50 000 materials of free tanks at its
                     // rally point, a side waited five minutes for a third more than
                     // the enemy's army.
                     let probe = stake == super::state::Stake::Probe || ctx.cheap_army;
-                    let bold = match stake {
-                        _ if probe => Fx::ratio(3, 5),
-                        super::state::Stake::AllIn => Fx::ONE,
-                        _ => Fx::ratio(13, 10),
-                    };
+                    let bold = if probe { Fx::ratio(3, 5) } else { Fx::ONE };
                     // Not blind: their army has been seen, or their base lately with
                     // none there to see.
                     // Three times the army it believes in, gathered three minutes with
@@ -564,7 +562,9 @@ impl World {
                     OpKind::Defend => None,
                     OpKind::Siege => self.siege_spot(ctx, centre, &rows),
                     OpKind::Raid => self.land_objective(ctx, centre, materials, true),
-                    OpKind::Army if !ashore => self.prey_near(ctx, centre, materials),
+                    OpKind::Army if !ashore => self
+                        .prey_near(ctx, centre, materials)
+                        .or_else(|| self.press_on(ctx, centre, materials)),
                     _ => self.land_objective(ctx, centre, materials, false),
                 }
                 .filter(|t| t.distance(centre) > Fx::from_int(150));
@@ -578,6 +578,12 @@ impl World {
                         });
                         orders += 1;
                     }
+                    // Nothing it can beat in reach: a wave that has not bled holds the
+                    // ground it took, and what gathers behind it joins it there. Walking
+                    // home after every win gave back the ground and read as a side
+                    // that never meant to attack: a wave of nine that had killed 390
+                    // for 147 turned round and went home.
+                    None if op.kind == OpKind::Army && !bled => {}
                     None if op.kind == OpKind::Army || op.kind == OpKind::Siege => {
                         op.phase = Phase::Withdrawing;
                         op.phase_since = tick;
@@ -648,6 +654,16 @@ impl World {
                 self.enemy_strength_at(ctx, p, Fx::from_int(700), Target::Land) * 6 <= materials * 5
             })
             .min_by_key(|p| (p.distance_sq(at), p.x, p.y))
+    }
+
+    /// Where a wave that has taken its target goes on to: the next enemy structure
+    /// it beats (`land_objective`), with the guns round it at most four fifths of the
+    /// wave and no stronger fire on the way, as a wave at its rally point is sent.
+    fn press_on(&self, ctx: &Ctx, at: FxVec2, materials: Fx) -> Option<FxVec2> {
+        self.land_objective(ctx, at, materials, false).filter(|&t| {
+            self.enemy_strength_at(ctx, t, Fx::from_int(800), Target::Land) * 5 <= materials * 4
+                && ctx.wm.threat_along(at, t, Target::Land) * THREAT_MATERIALS <= materials * 6 / 5
+        })
     }
 
     /// Whether the land army can get to `p`: walk there from home or, on a side with

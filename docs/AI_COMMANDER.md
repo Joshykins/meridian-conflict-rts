@@ -312,8 +312,8 @@ committed, killed and lost; finished operations hand it to their plan, and
 
 Ground rules learnt in the tournaments (each is a comment at its code):
 
-- a wave goes only at a third more than the land army it believes in, with the
-  anti-air the enemy's air calls for, and never blind: their army seen, or their
+- a wave goes once it matches the land army it believes in (a third more held
+  waves at their rally point most of the match), with the anti-air the enemy's air calls for, and never blind: their army seen, or their
   base seen lately with none in it; three times the army it believes in, gathered
   three minutes with nothing seen, goes all the same, at their start;
 - scouts belong to the scouting operation only: the army and raids, filled first,
@@ -329,7 +329,9 @@ Ground rules learnt in the tournaments (each is a comment at its code):
 - the waves gather behind the land front with most at stake (what it holds there
   and half what it could take), in our zone at its back (`front_rally`), when the
   army can walk there and no fire reaches it; with no fronts yet, on the line
-  between the starts as before;
+  between the starts as before. It stays behind that front until another has half
+  as much again at stake: picked afresh each think, the rally point jumped
+  kilometres between near-level fronts and no wave ever stood gathered;
 - shelled while gathering: helpless against aircraft, it goes home; against
   ground guns it charges them or steps the rally back;
 - a group that has lost half and is losing the trade, or is helpless, withdraws as
@@ -340,7 +342,17 @@ Ground rules learnt in the tournaments (each is a comment at its code):
   raiders, and a little), or let go;
 - a wave that cannot fill goes with three quarters of its mark after two minutes
   gathering and with half after four: a Hard side on 7 a second waited a whole
-  match for a 380-materials wave and never attacked;
+  match for a 380-materials wave and never attacked. The mark is never more than
+  half as much again as the enemy army it believes in: sized by income alone, it
+  chased an income that grew faster than the army, and 141 units sat gathering
+  for 21 minutes;
+- a raid is filled to its mark and no further, as the guard is: filled first and
+  without end, raids left the army 1 to 3 units for its first 12 minutes;
+- a wave still gathering takes on an enemy group near its rally only once it holds
+  half its mark: one tank charging alone read as a trickle;
+- a wave that took its target goes on to the next structure it beats, by the
+  same checks as at the rally point, or holds the ground it took, and what gathers
+  behind it joins it there; it no longer walks home after every win;
 - a titan is the titans' own, never the guard's or the army's: in the guard a
   Behemoth stood among the mines for a whole match. It sets out the moment it is
   built, takes a nearer objective found on the way, and falls back only below 30%

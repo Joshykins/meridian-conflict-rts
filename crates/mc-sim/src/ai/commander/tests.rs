@@ -126,6 +126,51 @@ fn an_army_that_has_gathered_goes_for_the_enemy_and_trades_are_kept() {
 }
 
 #[test]
+fn a_wave_that_takes_its_target_goes_on_rather_than_home() {
+    let mut w = world();
+    let tank = w.blueprints.id_of("aster_t2_tank").unwrap();
+    for i in 0..24 {
+        w.spawn_unit(
+            tank,
+            0,
+            FxVec2::from_ints(1300 + (i % 8) * 20, 1500 + (i / 8) * 20),
+            Angle::ZERO,
+            true,
+        )
+        .unwrap();
+    }
+    // Two undefended mines a kilometre apart: once the first falls there is no armed
+    // group near to take on, and the wave used to walk home.
+    let mine = w.blueprints.id_of("aster_core_mine").unwrap();
+    let mines = [
+        w.spawn_unit(mine, 1, FxVec2::from_ints(4000, 4000), Angle::ZERO, true)
+            .unwrap(),
+        w.spawn_unit(mine, 1, FxVec2::from_ints(4900, 4600), Angle::ZERO, true)
+            .unwrap(),
+    ]
+    .map(|r| w.state.units.id(r));
+    for _ in 0..90 {
+        run(&mut w, 100);
+        let c = &w.state.ai[0].commander;
+        assert!(
+            !c.ops
+                .iter()
+                .any(|o| o.kind == OpKind::Army && o.phase == super::state::Phase::Withdrawing),
+            "a winning wave fell back at tick {}:\n{}",
+            w.state.tick,
+            c.op_lines().join("\n")
+        );
+        if mines.iter().all(|&m| w.state.units.row(m).is_none()) {
+            return;
+        }
+    }
+    panic!(
+        "the wave never took both mines:\n{}",
+        w.state.ai[0].commander.op_lines().join("\n")
+    );
+}
+
+#[test]
 fn bombers_seen_bring_anti_air_into_the_army() {
     let mut w = world();
     let f = w.blueprints.id_of("aster_t1_land_factory").unwrap();

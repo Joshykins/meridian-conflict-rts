@@ -790,6 +790,14 @@ impl World {
             };
             if o.kind == OpKind::Army {
                 o.rally = ctx.staging;
+                // Never more than half as much again as the enemy army it believes in:
+                // a wave sized by seconds of income alone chased an income that grew
+                // faster than the army, and 141 units sat gathering for 21 minutes.
+                if !held {
+                    let enemy = ctx.beliefs.army[Domain::Land as usize]
+                        + ctx.beliefs.army[Domain::Hover as usize];
+                    o.want = o.want.min((enemy * 3 / 2).max(Fx::from_int(150 + i * 10)));
+                }
             }
             if o.kind == OpKind::Guard {
                 o.want = Fx::from_int((i * 8).clamp(150, 1200));

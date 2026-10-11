@@ -255,7 +255,10 @@ impl World {
             free.retain(|&r| {
                 if took >= limit
                     || op.units.len() >= MOST_UNITS
+                    // A raid is filled to its want, as the guard is: raids filled
+                    // first and without end left the army 1 to 3 units for 12 minutes.
                     || (op.kind == OpKind::Guard && op.materials() >= op.want)
+                    || (op.kind == OpKind::Raid && op.materials() >= op.want)
                 {
                     return true;
                 }
