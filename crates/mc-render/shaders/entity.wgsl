@@ -500,7 +500,7 @@ fn charge_gear_pose(p0: vec3<f32>, n0: vec3<f32>, gear: u32, rig: vec4<f32>, bor
         let along = select(vec3<f32>(1.0, 0.0, 0.0), normalize(bore), dot(bore, bore) > 0.25);
         let off = p - rig.xyz;
         let out = off - along * dot(off, along);
-        let open = smoothstep(0.0, 0.9, coil_state(e, time).x);
+        let open = smoothstep(0.0, 0.9, coil_state(rec, time).x);
         p += normalize(out + vec3<f32>(0.0, 0.0, 1e-4)) * CHARGE_GEAR_FLARE_M * rig.w * open;
     }
     if gear == CHARGE_GEAR_SPIN {
