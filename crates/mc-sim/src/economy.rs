@@ -222,13 +222,12 @@ impl World {
         // Strategic launchers assembling rounds (`nukes.rs`): paid like any other build,
         // with the rest unless the launcher has a priority of its own.
         let launchers = self.launcher_jobs();
-        for &(row, _, want, tier) in &launchers {
-            let p = self.state.units.owner[row] as usize;
-            demand[p].0 += want[0];
-            demand[p].1 += want[1];
-            tiers[p][tier].add(want, false);
-            self.flows[row].wanted[0] += want[0];
-            self.flows[row].wanted[1] += want[1];
+        for job in &launchers {
+            let p = self.state.units.owner[job.row] as usize;
+            demand[p].0 += job.want[0];
+            demand[p].1 += job.want[1];
+            tiers[p][job.tier].add(job.want, false);
+            self.split_launcher_flow(job, job.want, false);
         }
         // Air wings building aboard carriers (`air_wings.rs`): paid like a launcher's round.
         let wings = self.wing_jobs();
@@ -398,16 +397,16 @@ impl World {
             }
         }
 
-        for &(row, rate, want, tier) in &launchers {
-            let p = self.state.units.owner[row] as usize;
-            let e = paid[p][tier];
-            power[p][tier].0 += rate;
-            power[p][tier].1 += rate * e;
-            spent[p].0 += want[0] * e;
-            spent[p].1 += want[1] * e;
-            self.flows[row].used[0] += want[0] * e;
-            self.flows[row].used[1] += want[1] * e;
-            self.advance_launchers(row, rate * e);
+        for job in &launchers {
+            let p = self.state.units.owner[job.row] as usize;
+            let e = paid[p][job.tier];
+            power[p][job.tier].0 += job.rate;
+            power[p][job.tier].1 += job.rate * e;
+            let got = [job.want[0] * e, job.want[1] * e];
+            spent[p].0 += got[0];
+            spent[p].1 += got[1];
+            self.split_launcher_flow(job, got, true);
+            self.advance_launchers(job.row, job.rate * e);
         }
         for &(row, rate, want, tier) in &wings {
             let p = self.state.units.owner[row] as usize;

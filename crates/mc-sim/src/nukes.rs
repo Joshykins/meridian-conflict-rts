@@ -407,6 +407,20 @@ impl WarheadPath {
 
 /// The curve through `p` at `t = num / den`, `num` in 32-bit fixed point: evaluated in
 /// wide integers, so a long curve walked a few metres a tick does not jitter.
+/// One launcher's round being assembled this tick (`World::launcher_jobs`).
+pub(crate) struct LauncherJob {
+    pub(crate) row: usize,
+    /// Build time a tick at full supply.
+    pub(crate) rate: Fx,
+    /// Materials and energy a tick at full supply.
+    pub(crate) want: [Fx; 2],
+    pub(crate) tier: usize,
+    /// The launcher's own power and its helpers' together.
+    pub(crate) power: Fx,
+    /// Engineers assisting it, by row, with their power.
+    pub(crate) helpers: Vec<(usize, Fx)>,
+}
+
 fn cubic(p: &[FxVec3; 4], num: i128, den: i128) -> FxVec3 {
     const ONE: i128 = 1 << 32;
     let t = (num / den).clamp(0, ONE);
@@ -732,14 +746,15 @@ impl World {
     }
 
     /// Paid out of `run_economy`: what every launcher still assembling a round wants this
-    /// tick at full supply (materials, energy per tick), by row, with its build-time rate (its
-    /// own power and that of every engineer assisting it) and the tier it is paid in. The rate is not cut to what is
+    /// tick at full supply, with its build-time rate (its own power and that of every
+    /// engineer assisting it) and the tier it is paid in. The rate is not cut to what is
     /// left of the round, so a stall slows the round down but never its last bit
     /// (`advance_launchers` stops at the end).
-    pub(crate) fn launcher_jobs(&mut self) -> Vec<(usize, Fx, [Fx; 2], usize)> {
+    pub(crate) fn launcher_jobs(&mut self) -> Vec<LauncherJob> {
         let mut jobs = Vec::new();
-        // Engineers on an assist whose work is a launcher's round (`run_assist`).
-        let mut helpers: BTreeMap<UnitId, Fx> = BTreeMap::new();
+        // Engineers on an assist whose work is a launcher's round (`run_assist`), by row
+        // with their power.
+        let mut helpers: BTreeMap<UnitId, Vec<(usize, Fx)>> = BTreeMap::new();
         for row in self.state.units.slots.iter() {
             let units = &self.state.units;
             if units.flags[row] & flag::BUILDING == 0 || units.has_flag(row, flag::REPAIRING) {
@@ -753,7 +768,7 @@ impl World {
                 .row(target)
                 .is_some_and(|t| self.launcher_spec(t).is_some())
             {
-                *helpers.entry(target).or_insert(Fx::ZERO) += b.power;
+                helpers.entry(target).or_default().push((row, b.power));
             }
         }
         for row in self.state.units.slots.iter() {
@@ -764,7 +779,8 @@ impl World {
             let id = self.state.units.id(row);
             let l = self.state.strategic.launchers.get(&id);
             let done = l.map_or(Fx::ZERO, |l| l.progress);
-            let power = spec.power + helpers.get(&id).copied().unwrap_or(Fx::ZERO);
+            let helpers = helpers.remove(&id).unwrap_or_default();
+            let power = spec.power + helpers.iter().map(|&(_, p)| p).sum::<Fx>();
             let rate = power / mc_core::TICKS_PER_SECOND as i32;
             let left = rate.min(spec.round_time - done);
             if left <= Fx::ZERO {
@@ -776,9 +792,44 @@ impl World {
             ];
             // Even is the rest's tier: a launcher round is paid with the rest by default.
             let tier = self.state.units.priority[row].tier();
-            jobs.push((row, rate, want, tier));
+            jobs.push(LauncherJob {
+                row,
+                rate,
+                want,
+                tier,
+                power,
+                helpers,
+            });
         }
         jobs
+    }
+
+    /// Writes `amount` of a launcher job's spending into the flows of the units doing the
+    /// work: each helper its share by power, the launcher the rest. A helper shows what
+    /// it costs, not nothing beside an array that seems to spend for two.
+    pub(crate) fn split_launcher_flow(&mut self, job: &LauncherJob, amount: [Fx; 2], used: bool) {
+        let mut own = amount;
+        for &(h, p) in &job.helpers {
+            let share = [amount[0] * p / job.power, amount[1] * p / job.power];
+            let flow = &mut self.flows[h];
+            let f = if used {
+                &mut flow.used
+            } else {
+                &mut flow.wanted
+            };
+            f[0] += share[0];
+            f[1] += share[1];
+            own[0] -= share[0];
+            own[1] -= share[1];
+        }
+        let flow = &mut self.flows[job.row];
+        let f = if used {
+            &mut flow.used
+        } else {
+            &mut flow.wanted
+        };
+        f[0] += own[0];
+        f[1] += own[1];
     }
 
     /// The economy's answer to `launcher_jobs`: each job gets `efficiency` of its rate.

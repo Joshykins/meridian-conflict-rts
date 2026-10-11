@@ -886,3 +886,40 @@ fn regency_launches_and_blasts_carry_the_plasma_look() {
     })
     .expect("which breaks the ARC warhead");
 }
+
+/// A station helping an array with its next interceptor shows what it spends on it, and
+/// the array only its own part: the spending is split by power, not billed to the array.
+#[test]
+fn a_station_helping_a_round_shows_its_share_of_the_spending() {
+    let mut w = world();
+    free(&mut w, 0);
+    let array = spawn(&mut w, 0, "aster_t3_nuke_defense", 600, 600);
+    let station = spawn(&mut w, 0, "aster_t3_eng_station", 600, 680);
+    let mut helped = false;
+    for _ in 0..600 {
+        w.tick(&[]).unwrap();
+        let s = w.state.units.row(station).unwrap();
+        if w.state.units.build_target[s] == array && w.flows[s].used[1] > Fx::ZERO {
+            helped = true;
+            break;
+        }
+    }
+    assert!(
+        helped,
+        "the station takes up the array's round and pays for it"
+    );
+    let (s, a) = (
+        w.state.units.row(station).unwrap(),
+        w.state.units.row(array).unwrap(),
+    );
+    let array_power = w.bp(a).strategic.as_ref().unwrap().power;
+    let station_power = w.bp(s).builder.as_ref().unwrap().power;
+    // Shares by power: station / array is its power over the array's own. Materials, as
+    // the array's energy carries its upkeep too.
+    let (got, own) = (w.flows[s].used[0], w.flows[a].used[0]);
+    let want = station_power / array_power;
+    assert!(
+        (got / own - want).abs() < Fx::ratio(1, 100),
+        "station {got} vs array {own}: shares {want} by power"
+    );
+}
