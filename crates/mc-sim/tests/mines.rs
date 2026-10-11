@@ -55,7 +55,7 @@ fn world_on(terrain: Heightfield, ore: Vec<OreRegion>) -> World {
     let mut w =
         World::with_terrain(terrain, map, blueprints, Arc::new(Pool::new(1)), &config).unwrap();
     for p in &mut w.state.players {
-        p.mass_capacity = Fx::from_int(100_000);
+        p.materials_capacity = Fx::from_int(100_000);
         p.energy_capacity = Fx::from_int(1_000_000);
     }
     w
@@ -147,7 +147,7 @@ fn every_hectare_in_reach_pays_and_ore_pays_more() {
     // Both are paid into the owner's income, their upkeep paid.
     w.state.players[0].energy = Fx::from_int(1000);
     w.tick(&[]).unwrap();
-    let income = w.state.players[0].mass_income;
+    let income = w.state.players[0].materials_income;
     let sum = made(&w, bare) + made(&w, rich);
     assert!(
         (income - sum).abs() < Fx::ratio(1, 100),
@@ -264,7 +264,7 @@ fn mines_climb_one_tier_past_the_side_tech_and_the_deep_core_waits_for_tech_3() 
     assert_eq!(needs("aster_core_mine_t4"), 3);
     assert_eq!(needs("regency_t2_extractor"), 1);
     // Everything else still waits for its own tier.
-    assert_eq!(needs("aster_mass_storage_t2"), 2);
+    assert_eq!(needs("aster_materials_storage_t2"), 2);
 }
 
 #[test]
@@ -272,12 +272,12 @@ fn a_mine_stops_paying_when_it_dies() {
     let mut w = world(Vec::new());
     let id = mine(&mut w, 0, 5002, 5002);
     w.tick(&[]).unwrap();
-    assert!(w.state.players[0].mass_income > Fx::ZERO);
+    assert!(w.state.players[0].materials_income > Fx::ZERO);
     w.tick(&[cmd(0, Command::DebugRemove { units: vec![id] })])
         .unwrap();
     w.tick(&[]).unwrap();
     assert!(w.state.mines.by_unit.is_empty());
-    assert_eq!(w.state.players[0].mass_income, Fx::ZERO);
+    assert_eq!(w.state.players[0].materials_income, Fx::ZERO);
 }
 
 #[test]
@@ -352,7 +352,7 @@ fn a_mine_short_of_energy_digs_slower_down_to_a_quarter() {
         w.tick(&[]).unwrap();
         let p = &w.state.players[0];
         (
-            p.mass_income.to_f64(),
+            p.materials_income.to_f64(),
             p.mine_lost.to_f64(),
             p.mine_power.to_f64(),
         )

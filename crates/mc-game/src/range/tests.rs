@@ -186,11 +186,15 @@ fn the_elevator_scenario_queues_a_mixed_batch() {
         };
         assert_eq!(who, bp.id, "the batch is queued on the elevator itself");
         let payload = bp.elevator.unwrap().payload;
-        let mass = batch
+        let materials = batch
             .iter()
-            .map(|&(id, n)| b.unit(id).cost_mass * n as i32)
+            .map(|&(id, n)| b.unit(id).cost_materials * n as i32)
             .fold(Fx::ZERO, |a, m| a + m);
-        assert!(mass <= payload, "{}: the batch rides one platform", bp.key);
+        assert!(
+            materials <= payload,
+            "{}: the batch rides one platform",
+            bp.key
+        );
         assert!(
             batch.iter().any(|&(id, _)| b.unit(id).tech >= 4),
             "a tech-4 machine is in it"

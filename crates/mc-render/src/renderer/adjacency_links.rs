@@ -89,7 +89,7 @@ impl LinkInstance {
             flags |= link::TURNS;
         }
         let rgb = match l.resource {
-            Resource::Mass => tone::MASS,
+            Resource::Materials => tone::MATERIALS,
             Resource::Energy => srgb_word(line.color),
         };
         LinkInstance {

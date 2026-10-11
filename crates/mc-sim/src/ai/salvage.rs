@@ -13,10 +13,10 @@ use mc_data::BlueprintId;
 const SALVAGE_RADIUS: i32 = 2600;
 /// Wrecks within this of one another are one field.
 const FIELD_RADIUS: i32 = 450;
-/// A field worth putting a tower by, in mass.
+/// A field worth putting a tower by, in materials.
 const TOWER_FIELD: i32 = 250;
-/// Wreck mass in reach of home that is worth one more salvage unit.
-const MASS_PER_SALVAGER: i32 = 1500;
+/// Wreck materials in reach of home that is worth one more salvage unit.
+const MATERIALS_PER_SALVAGER: i32 = 1500;
 /// Most salvage units and towers the AI keeps.
 const MOST_SALVAGERS: usize = 3;
 const MOST_TOWERS: usize = 4;
@@ -30,7 +30,7 @@ const MOST_FIELDS: usize = 6;
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Field {
     pub(super) at: FxVec2,
-    pub(super) mass: Fx,
+    pub(super) materials: Fx,
 }
 
 impl World {
@@ -41,7 +41,7 @@ impl World {
             .slots
             .iter()
             .filter(|&w| {
-                wrecks.mass[w] > Fx::ZERO
+                wrecks.materials[w] > Fx::ZERO
                     && wrecks.pos[w].distance(start) <= Fx::from_int(SALVAGE_RADIUS)
             })
             .map(|w| (wrecks.pos[w].distance_sq(start), w))
@@ -58,20 +58,20 @@ impl World {
             .iter()
             .map(|&(_, w)| {
                 let at = wrecks.pos[w];
-                let mass = near
+                let materials = near
                     .iter()
                     .filter(|&&(_, o)| wrecks.pos[o].distance(at) <= reach)
-                    .fold(Fx::ZERO, |m, &(_, o)| m + wrecks.mass[o]);
-                (mass, w)
+                    .fold(Fx::ZERO, |m, &(_, o)| m + wrecks.materials[o]);
+                (materials, w)
             })
             .collect();
         // Richest first; the wreck row settles ties.
-        around.sort_by_key(|&(mass, w)| (std::cmp::Reverse(mass), w));
+        around.sort_by_key(|&(materials, w)| (std::cmp::Reverse(materials), w));
         let mut fields: Vec<Field> = Vec::new();
-        for (mass, w) in around {
+        for (materials, w) in around {
             let at = wrecks.pos[w];
             if fields.iter().all(|f| f.at.distance(at) > reach * 2) {
-                fields.push(Field { at, mass });
+                fields.push(Field { at, materials });
                 if fields.len() == MOST_FIELDS {
                     break;
                 }
@@ -124,7 +124,7 @@ impl World {
             .salvage
             .iter()
             .filter(|f| {
-                f.mass >= Fx::from_int(TOWER_FIELD)
+                f.materials >= Fx::from_int(TOWER_FIELD)
                     && allow(f.at)
                     && planned
                         .towers
@@ -152,13 +152,13 @@ impl World {
         planned_salvagers: usize,
         salvage: &[Field],
     ) -> Option<BlueprintId> {
-        let lying = salvage.iter().fold(Fx::ZERO, |m, f| m + f.mass);
-        let mut want = (1 + (lying / Fx::from_int(MASS_PER_SALVAGER)).floor_int() as usize)
+        let lying = salvage.iter().fold(Fx::ZERO, |m, f| m + f.materials);
+        let mut want = (1 + (lying / Fx::from_int(MATERIALS_PER_SALVAGER)).floor_int() as usize)
             .min(MOST_SALVAGERS);
         // One early and more as its income grows: three in the
         // first hundred seconds held back its engineers and its power.
         let owner = self.state.units.owner[factory];
-        let income = self.state.players[owner as usize].mass_income;
+        let income = self.state.players[owner as usize].materials_income;
         want = want.min(1 + (income / Fx::from_int(15)).floor_int().max(0) as usize);
         if salvage.is_empty() || census.salvagers + planned_salvagers >= want {
             return None;
@@ -172,7 +172,7 @@ impl World {
                 let bp = self.blueprints.unit(*b);
                 bp.is_salvager()
             })
-            .min_by_key(|b| (self.blueprints.unit(*b).cost_mass, b.0))
+            .min_by_key(|b| (self.blueprints.unit(*b).cost_materials, b.0))
     }
 
     /// Idle salvage units with nothing in their reach go to the richest safe field.
@@ -193,7 +193,7 @@ impl World {
             let busy = wrecks
                 .slots
                 .iter()
-                .any(|w| wrecks.mass[w] > Fx::ZERO && wrecks.pos[w].distance(pos) <= reach);
+                .any(|w| wrecks.materials[w] > Fx::ZERO && wrecks.pos[w].distance(pos) <= reach);
             if busy {
                 continue;
             }
@@ -201,7 +201,7 @@ impl World {
             let Some(field) = salvage
                 .iter()
                 .enumerate()
-                .max_by_key(|(i, f)| (f.mass - f.at.distance(pos) / 4, std::cmp::Reverse(*i)))
+                .max_by_key(|(i, f)| (f.materials - f.at.distance(pos) / 4, std::cmp::Reverse(*i)))
                 .map(|(_, f)| f)
             else {
                 continue;

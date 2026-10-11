@@ -10,7 +10,7 @@
         tech: 1,
         categories: ["Naval", "DirectFire"],
         health: 380,
-        cost: (mass: 60, energy: 330, time: 300),
+        cost: (materials: 60, energy: 330, time: 300),
         radius: 6, height: 4,
         vision: 350,
         motion: (layer: Naval, size: 0, speed: 60, accel: 38, turn: 120),
@@ -33,7 +33,7 @@
         tech: 1,
         categories: ["Naval", "DirectFire", "AntiAir"],
         health: 2600,
-        cost: (mass: 230, energy: 1500, time: 1150),
+        cost: (materials: 230, energy: 1500, time: 1150),
         radius: 15, height: 10,
         vision: 650, radar: 1400,
         motion: (layer: Naval, size: 2, speed: 38, accel: 14, turn: 36),
@@ -69,7 +69,7 @@
         tech: 1,
         categories: ["Naval", "DirectFire"],
         health: 900,
-        cost: (mass: 150, energy: 1000, time: 750),
+        cost: (materials: 150, energy: 1000, time: 750),
         // Surfaced, the sail stands `height` over the water; dived, `dive.depth`
         // metres of water close over it.
         radius: 10, height: 3.6,
@@ -97,7 +97,7 @@
         tech: 1,
         categories: ["Naval", "Intel"],
         health: 180,
-        cost: (mass: 70, energy: 620, time: 90),
+        cost: (materials: 70, energy: 620, time: 90),
         radius: 6, height: 12, footprint: (1, 1),
         vision: 200, sonar: 1600, water_build: true,
         economy: (energy_upkeep: 30),
@@ -112,7 +112,7 @@
         tech: 2,
         categories: ["Naval", "Intel"],
         health: 540,
-        cost: (mass: 160, energy: 3000, time: 700),
+        cost: (materials: 160, energy: 3000, time: 700),
         radius: 6, height: 15, footprint: (1, 1),
         vision: 260, sonar: 3200, water_build: true,
         economy: (energy_upkeep: 120),
@@ -127,7 +127,7 @@
         tech: 3,
         categories: ["Naval", "Intel"],
         health: 1500,
-        cost: (mass: 640, energy: 9600, time: 2200),
+        cost: (materials: 640, energy: 9600, time: 2200),
         radius: 6, height: 18, footprint: (1, 1),
         vision: 320, sonar: 6400, water_build: true,
         economy: (energy_upkeep: 320),
@@ -137,7 +137,7 @@
     // Torpedo launchers: moored and seabed defences that put attack torpedoes into any
     // hull in reach, dived submarines included (docs/NAVY.md). A launcher gives up moving,
     // so it wins on cost: at each tier it carries about twice a submarine's DPS and HP per
-    // unit of mass. The tier 1 reaches a little past the Barracuda's tubes. The tier 2 is
+    // unit of materials. The tier 1 reaches a little past the Barracuda's tubes. The tier 2 is
     // refitted onto the tier 1 where it floats; the tier 3 is an installation of its own on
     // the seabed, and the only one that still meets torpedoes coming in.
     (
@@ -147,7 +147,7 @@
         tech: 1,
         categories: ["Naval", "Defense", "DirectFire"],
         health: 1300,
-        cost: (mass: 110, energy: 880, time: 300),
+        cost: (materials: 110, energy: 880, time: 300),
         radius: 7, height: 5, footprint: (2, 2),
         // Its hydrophones hear a little past its launcher's reach.
         vision: 220, sonar: 700, water_build: true,
@@ -173,7 +173,7 @@
         tech: 2,
         categories: ["Naval", "Defense", "DirectFire"],
         health: 6800,
-        cost: (mass: 400, energy: 4000, time: 1100),
+        cost: (materials: 400, energy: 4000, time: 1100),
         radius: 7, height: 7, footprint: (2, 2),
         vision: 260, sonar: 1000, water_build: true,
         // Two launcher turrets, one under the other, with heavier torpedoes that run
@@ -211,7 +211,7 @@
         tech: 3,
         categories: ["Naval", "Defense", "DirectFire"],
         health: 40000,
-        cost: (mass: 2200, energy: 22000, time: 5500),
+        cost: (materials: 2200, energy: 22000, time: 5500),
         radius: 16, height: 9, footprint: (4, 4),
         vision: 200, sonar: 1200, water_build: true, seabed: true,
         // Each of the four batteries' tube pairs fires heavy torpedoes at hulls (two
@@ -273,7 +273,7 @@
         tech: 2,
         categories: ["Naval", "DirectFire", "AntiAir"],
         health: 12000,
-        cost: (mass: 920, energy: 6440, time: 5520),
+        cost: (materials: 920, energy: 6440, time: 5520),
         radius: 26.4, height: 14.4,
         vision: 800, radar: 1500, sonar: 900,
         motion: (layer: Naval, size: 3, speed: 40, accel: 14, turn: 34),
@@ -329,7 +329,7 @@
         tech: 2,
         categories: ["Naval", "AntiAir", "Intel"],
         health: 8500,
-        cost: (mass: 900, energy: 6300, time: 5400),
+        cost: (materials: 900, energy: 6300, time: 5400),
         radius: 26.4, height: 16.8,
         vision: 1000, radar: 2800,
         // Two interceptor lasers, one off the tower's front and one on the quarterdeck,
@@ -372,7 +372,7 @@
         tech: 2,
         categories: ["Naval", "Artillery"],
         health: 6000,
-        cost: (mass: 880, energy: 6160, time: 5280),
+        cost: (materials: 880, energy: 6160, time: 5280),
         radius: 20, height: 10,
         vision: 400, radar: 1200,
         motion: (layer: Naval, size: 3, speed: 34, accel: 12, turn: 30),
@@ -401,7 +401,7 @@
         tech: 2,
         categories: ["Naval", "DirectFire"],
         health: 5200,
-        cost: (mass: 600, energy: 4200, time: 3600),
+        cost: (materials: 600, energy: 4200, time: 3600),
         radius: 14, height: 4.2,
         vision: 550, sonar: 1300,
         dive: (depth: 3, time: 2.5),
@@ -444,7 +444,7 @@
         tech: 2,
         categories: ["Naval", "Shield"],
         health: 3500,
-        cost: (mass: 700, energy: 4900, time: 4200),
+        cost: (materials: 700, energy: 4900, time: 4200),
         radius: 16, height: 12,
         vision: 380,
         motion: (layer: Naval, size: 2, speed: 38, accel: 14, turn: 40),
@@ -463,7 +463,7 @@
         tech: 3,
         categories: ["Naval", "DirectFire"],
         health: 60000,
-        cost: (mass: 4200, energy: 37800, time: 25200),
+        cost: (materials: 4200, energy: 37800, time: 25200),
         radius: 72, height: 38,
         vision: 1440,
         // Engaged and stopped, it lays its beam to the mark, a little forward of square, so
@@ -567,7 +567,7 @@
         tech: 3,
         categories: ["Naval", "AntiAir", "Intel"],
         health: 32000,
-        cost: (mass: 3400, energy: 30600, time: 20400),
+        cost: (materials: 3400, energy: 30600, time: 20400),
         radius: 60, height: 24,
         vision: 900, radar: 4000,
         // Four interceptor lasers: the citadel's, the plateau's aft corners, and the port
@@ -634,7 +634,7 @@
         tech: 3,
         categories: ["Naval", "DirectFire", "Artillery"],
         health: 26000,
-        cost: (mass: 2600, energy: 23400, time: 15600),
+        cost: (materials: 2600, energy: 23400, time: 15600),
         radius: 30, height: 5,
         vision: 650, sonar: 2000,
         dive: (depth: 4, time: 4),
@@ -680,7 +680,7 @@
         tech: 4,
         categories: ["Naval", "DirectFire", "Artillery", "Experimental"],
         health: 48000,
-        cost: (mass: 14000, energy: 150000, time: 48000),
+        cost: (materials: 14000, energy: 150000, time: 48000),
         radius: 74.25, height: 9.45, footprint: (14, 5), hull: (74.25, 13.5),
         vision: 800, sonar: 2600, water_build: true,
         dive: (depth: 6, time: 6),
@@ -690,7 +690,7 @@
         strategic: (
             kind: Nuke,
             // A warhead assembled aboard, as the silo's, and held four at most.
-            missile: (mass: 6000, energy: 120000, time: 18000),
+            missile: (materials: 6000, energy: 120000, time: 18000),
             // Drawn as a boat's missile, smaller than the silo's round.
             missile_scale: 0.35,
             // The twin round silos aft (models/aster/naval/submarine_titan.rs `SILO_*`),
@@ -763,7 +763,7 @@
         tech: 3,
         categories: ["Naval", "AntiAir"],
         health: 40000,
-        cost: (mass: 3800, energy: 34200, time: 22800),
+        cost: (materials: 3800, energy: 34200, time: 22800),
         radius: 84, height: 34,
         vision: 1200,
         motion: (layer: Naval, size: 5, speed: 34, accel: 7, turn: 20),

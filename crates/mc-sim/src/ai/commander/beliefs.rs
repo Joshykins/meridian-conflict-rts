@@ -12,13 +12,13 @@ pub(in crate::ai) type Sure = i32;
 
 #[derive(Clone, Debug, Default)]
 pub(in crate::ai) struct Beliefs {
-    /// Their mass income, estimated.
+    /// Their materials income, estimated.
     pub income: Fx,
     /// Highest tier seen, and the tier their time and income make likely.
     pub tech: u8,
-    /// Enemy armed mobile mass seen lately, by domain (`Domain as usize`).
+    /// Enemy armed mobile materials seen lately, by domain (`Domain as usize`).
     pub army: [Fx; 7],
-    /// Mass of what holds their ground seen: turrets, map guns, artillery.
+    /// Materials of what holds their ground seen: turrets, map guns, artillery.
     pub fortified: Fx,
     /// Strength of their anti-air seen.
     pub anti_air: Fx,
@@ -34,7 +34,7 @@ pub(in crate::ai) struct Beliefs {
     pub interceptors: Vec<(FxVec2, Fx, u32)>,
     /// Sonar coverage seen (structures and ships with sonar).
     pub sonar: usize,
-    /// Where their main army was last seen, and its mass.
+    /// Where their main army was last seen, and its materials.
     pub army_at: Option<(FxVec2, Fx)>,
     /// Ticks since we last had eyes on their start.
     pub base_unseen: u32,
@@ -43,7 +43,7 @@ pub(in crate::ai) struct Beliefs {
 }
 
 impl Beliefs {
-    pub(in crate::ai) fn army_mass(&self) -> Fx {
+    pub(in crate::ai) fn army_materials(&self) -> Fx {
         self.army.iter().copied().sum()
     }
 }
@@ -73,7 +73,7 @@ impl World {
             mines += bp.has(cat::EXTRACTOR) as i32;
             // Guns that hold ground: turrets, map guns, and an artillery park.
             if p.has(role::DEFENSE) || p.has(role::MAP_GUN) || p.has(role::ARTILLERY) {
-                b.fortified += bp.cost_mass;
+                b.fortified += bp.cost_materials;
             }
             if p.has(role::ANTI_AIR) {
                 b.anti_air += p.dps[2];
@@ -96,7 +96,7 @@ impl World {
                 continue;
             }
             if let Some(d) = p.domain {
-                b.army[d as usize] += bp.cost_mass;
+                b.army[d as usize] += bp.cost_materials;
                 match d {
                     Domain::Air => sticky.air_seen = tick,
                     Domain::Naval => sticky.navy_seen = tick,
@@ -110,8 +110,8 @@ impl World {
                 .iter_mut()
                 .find(|(at, _)| at.distance(c.pos) < Fx::from_int(1500))
             {
-                Some((_, m)) => *m += bp.cost_mass,
-                None => clusters.push((c.pos, bp.cost_mass)),
+                Some((_, m)) => *m += bp.cost_materials,
+                None => clusters.push((c.pos, bp.cost_materials)),
             }
         }
         for &(at, m) in &clusters {
@@ -186,7 +186,7 @@ impl World {
         }
         // Quiet: little army seen for what they earn.
         let spent = b.income * Fx::from_int(240);
-        b.quiet = minutes >= 10 && b.army_mass() * 3 < spent;
+        b.quiet = minutes >= 10 && b.army_materials() * 3 < spent;
         // Nukes: certain once seen. Unseen, likelier with time, income, tech and
         // quiet; less likely while we keep looking at their base and see none.
         b.nukes = if sticky.nukes_seen > 0 {

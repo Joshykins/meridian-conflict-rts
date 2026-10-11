@@ -24,9 +24,9 @@ const HOLD: i32 = 15;
 const MARGIN: i32 = 12;
 /// Ticks a newly taken stake is held against a dip in its appeal (three minutes).
 const COMMIT: u32 = 1800;
-/// Mass traded before a plan's record counts for or against it.
+/// Materials traded before a plan's record counts for or against it.
 const EVIDENCE: Fx = Fx::from_int(1200);
-/// Least mass an army held at home (Pressure off) gathers before it goes.
+/// Least materials an army held at home (Pressure off) gathers before it goes.
 const HELD_ARMY: i32 = 3000;
 
 /// A personality, as tastes over the plans (`docs/AI_COMMANDER.md`, "Personalities").
@@ -114,12 +114,12 @@ impl Menu<'_> {
     }
 }
 
-/// Minutes of income a space elevator may cost, mass and energy each, to be wanted:
-/// its drops pay its mass back in four minutes (`payload` every `period`), but
+/// Minutes of income a space elevator may cost, materials and energy each, to be wanted:
+/// its drops pay its materials back in four minutes (`payload` every `period`), but
 /// until it stands that income goes to nothing else.
 pub(in crate::ai) const ELEVATOR_MINUTES: i32 = 12;
 
-/// Mass of our structures in one zone below which a maybe-nuke is not hedged.
+/// Materials of our structures in one zone below which a maybe-nuke is not hedged.
 const HEDGE_WORTH: i32 = 11_000;
 
 impl World {
@@ -134,7 +134,7 @@ impl World {
         }
     }
 
-    /// Our own armed mobile mass, by domain.
+    /// Our own armed mobile materials, by domain.
     pub(in crate::ai) fn our_army(&self, ctx: &Ctx) -> [Fx; 7] {
         let units = &self.state.units;
         let mut by = [Fx::ZERO; 7];
@@ -145,7 +145,7 @@ impl World {
             let p = ctx.profiles.get(units.blueprint[r]);
             if p.armed() && p.mobile() && p.roles & role::BUILDER == 0 {
                 if let Some(d) = p.domain {
-                    by[d as usize] += p.mass;
+                    by[d as usize] += p.materials;
                 }
             }
         }
@@ -156,7 +156,7 @@ impl World {
     fn appeal(&self, ctx: &Ctx, k: PlanKind, menu: &Menu, census: &Census) -> i32 {
         let b = ctx.beliefs;
         let pl = &self.state.players[ctx.player as usize];
-        let income = pl.mass_income.floor_int();
+        let income = pl.materials_income.floor_int();
         let minutes = (self.state.tick / 600) as i32;
         let ours = self.our_army(ctx);
         let our_land = ours[Domain::Land as usize] + ours[Domain::Hover as usize];
@@ -165,14 +165,14 @@ impl World {
         let scouted = !ctx.intel.enemy_factories.is_empty();
         let weak_aa = scouted && b.anti_air * 5 < Fx::from_int(income.max(5) * 60);
         let has = |f: &dyn Fn(&Profile) -> bool| menu.any(f);
-        // What has been killing the side lately, in mass.
+        // What has been killing the side lately, in materials.
         let hurt = self.state.ai[ctx.player as usize].commander.hurt;
         let hurt_by = |k: super::state::Hurt| hurt[k as usize].floor_int();
         let from_above = hurt_by(super::state::Hurt::Air) + hurt_by(super::state::Hurt::Space);
         let by_guns = hurt_by(super::state::Hurt::Artillery) + hurt_by(super::state::Hurt::Static);
         let fortified = b.fortified.floor_int() + by_guns;
         // A big project is a smaller commitment the more the side earns: at 300 a
-        // second a 16 000-mass warship is under a minute of income. Without this a
+        // second a 16 000-materials warship is under a minute of income. Without this a
         // side earning twice its enemy's income built no project in 88 minutes and
         // lost to the enemy's dreadnoughts and nukes.
         let rich = ((income - 80) / 4).clamp(0, 50);
@@ -335,7 +335,7 @@ impl World {
                             let p = ctx.profiles.get(units.blueprint[r]);
                             units.owner[r] == ctx.player && p.has(role::ANTI_AIR) && p.mobile()
                         })
-                        .map(|r| ctx.profiles.get(units.blueprint[r]).mass.floor_int())
+                        .map(|r| ctx.profiles.get(units.blueprint[r]).materials.floor_int())
                         .sum()
                 };
                 // Aircraft that outreach its ground anti-air are not covered by it.
@@ -538,7 +538,7 @@ impl World {
         let player = ctx.player as usize;
         let tick = self.state.tick;
         let stake = |w: &World, k: PlanKind| w.state.ai[player].commander.plan(k);
-        let income = self.state.players[player].mass_income;
+        let income = self.state.players[player].materials_income;
         let back = super::super::offset_toward(
             ctx.start,
             ctx.start + (ctx.start - ctx.staging),
@@ -699,7 +699,7 @@ impl World {
             }
         }
         // One army, not a trickle: while a wave is out fighting, what gathers behind
-        // it joins it once it is worth a thousand mass, instead of setting out alone
+        // it joins it once it is worth a thousand materials, instead of setting out alone
         // later. Waves of two and three thousand each met a five-thousand enemy
         // army one after another and traded 1:3.
         if let Some(out) = c
@@ -712,15 +712,15 @@ impl World {
                     let o = &c.ops[i];
                     o.kind == OpKind::Army
                         && o.phase == Phase::Gathering
-                        && o.mass() >= Fx::from_int(1000)
+                        && o.materials() >= Fx::from_int(1000)
                 })
                 .collect();
             for i in joining {
                 let units = std::mem::take(&mut c.ops[i].units);
-                let mass: Fx = units.iter().map(|&(_, m)| m).sum();
+                let materials: Fx = units.iter().map(|&(_, m)| m).sum();
                 let o = &mut c.ops[out];
                 o.units.extend(units);
-                o.launched += mass;
+                o.launched += materials;
             }
         }
         // How much each waits for before it goes.
@@ -741,7 +741,7 @@ impl World {
                 // Off: the army holds at home and answers raids, until it holds a
                 // minute of income (more than an all-in wave): then it is more than
                 // home needs, and goes. Held at nothing, two aggressive sides on an
-                // island map kept 436 000 and 122 000 mass of hover tanks at home
+                // island map kept 436 000 and 122 000 materials of hover tanks at home
                 // while the factories made more.
                 // Otherwise a wave is so many seconds of income: sized by what had
                 // been seen, the first wave waited nine minutes while the enemy took
@@ -763,7 +763,7 @@ impl World {
                 _ => o.want,
             };
             // Two minutes gathering: go with three quarters; four: with half. A Hard
-            // side on 7 a second waited all match for a 380-mass wave that never
+            // side on 7 a second waited all match for a 380-materials wave that never
             // filled, and never once attacked.
             // An army held at home goes at its full mark, however long it waits.
             let held = o.kind == OpKind::Army && pressure == Stake::Off;
@@ -791,7 +791,7 @@ impl World {
         let c = &self.state.ai[player].commander;
         let stake = |k: PlanKind| c.plan(k);
         let pl = &self.state.players[player];
-        let income = pl.mass_income;
+        let income = pl.materials_income;
         let held = |f: &dyn Fn(&Profile) -> bool| -> usize {
             let units = &self.state.units;
             units
@@ -808,12 +808,12 @@ impl World {
             let fits = menu
                 .items
                 .iter()
-                .filter(|p| f(p) && p.mass <= budget.max(Fx::from_int(300)));
+                .filter(|p| f(p) && p.materials <= budget.max(Fx::from_int(300)));
             if big {
-                fits.max_by_key(|p| (p.mass, std::cmp::Reverse(p.id.0)))
+                fits.max_by_key(|p| (p.materials, std::cmp::Reverse(p.id.0)))
                     .map(|p| p.id)
             } else {
-                fits.min_by_key(|p| (p.mass, p.id.0)).map(|p| p.id)
+                fits.min_by_key(|p| (p.materials, p.id.0)).map(|p| p.id)
             }
         };
         let mut wants: Vec<BlueprintId> = Vec::new();
@@ -839,7 +839,7 @@ impl World {
         let need_int = match b.nukes {
             100.. => (2 + b.silos).min(8),
             90.. => 1,
-            // A hedge is worth its mass only where there is something to lose: a
+            // A hedge is worth its materials only where there is something to lose: a
             // zone holding as much as `HEDGE_WORTH` of our structures.
             40..=89
                 if stake(PlanKind::Fortify) >= Stake::Probe
@@ -858,20 +858,20 @@ impl World {
         }
         // A space elevator once the income would pay for one in `ELEVATOR_MINUTES`,
         // a second at twice that income, and so on: three falls of free units a
-        // minute outweigh any army the same mass would buy.
+        // minute outweigh any army the same materials would buy.
         let elevator = |p: &Profile| p.has(role::ELEVATOR);
         let energy_income = pl.energy_income;
         let affords = |p: &&Profile| {
             let bp = self.blueprints.unit(p.id);
             let span = Fx::from_int(ELEVATOR_MINUTES * 60);
             let times = |income: Fx, cost: Fx| (income * span / cost.max(Fx::ONE)).floor_int();
-            times(income, bp.cost_mass).min(times(energy_income, bp.cost_energy)) as usize
+            times(income, bp.cost_materials).min(times(energy_income, bp.cost_energy)) as usize
         };
         if let Some(best) = menu
             .items
             .iter()
             .filter(|p| elevator(p))
-            .min_by_key(|p| (p.mass, p.id.0))
+            .min_by_key(|p| (p.materials, p.id.0))
         {
             if held(&elevator) < affords(best) {
                 want(Some(best.id));
@@ -963,7 +963,7 @@ impl World {
             }
         }
         let aa = |p: &Profile| p.has(role::ANTI_AIR) && p.has(role::DEFENSE);
-        // Bombed lately: anti-air where it hit, one more for each 1500 mass lost.
+        // Bombed lately: anti-air where it hit, one more for each 1500 materials lost.
         let c = &self.state.ai[player].commander;
         let above =
             c.hurt[super::state::Hurt::Air as usize] + c.hurt[super::state::Hurt::Space as usize];
@@ -977,7 +977,7 @@ impl World {
             want(pick(&aa, 2, above > Fx::from_int(3000)));
         }
         // Aircraft that outreach its anti-air: the longest-reaching anti-air turret
-        // it can afford, one for each three thousand mass of them. The cheapest
+        // it can afford, one for each three thousand materials of them. The cheapest
         // turret reached 640 m; corvettes shot from 1500.
         let outranging = self.outranging_air(ctx.player, ctx.profiles);
         // Warships that warp in, strike and jump out are seldom on the map at a
@@ -989,11 +989,11 @@ impl World {
             let longest = menu
                 .items
                 .iter()
-                .filter(|p| aa(p) && p.mass <= budget)
+                .filter(|p| aa(p) && p.materials <= budget)
                 .max_by_key(|p| {
                     (
                         p.reach[super::profile::Target::Air as usize],
-                        p.mass,
+                        p.materials,
                         std::cmp::Reverse(p.id.0),
                     )
                 })

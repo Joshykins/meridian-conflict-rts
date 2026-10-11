@@ -2,7 +2,7 @@
 //! to itself, the ore in its territory, and what its next tier would add and
 //! how long that takes to pay back.
 
-use super::{Scene, MASS};
+use super::{Scene, MATERIALS};
 use crate::ui::{palette, rgb, type_scale, Rect, Ui};
 use mc_data::{Blueprints, UnitBlueprint};
 use mc_sim::mirror::{MineView, UnitInstance};
@@ -47,7 +47,7 @@ pub fn upgrade_gain(
 /// difference between its ends.
 pub fn climb_gain(bp: &UnitBlueprint, to: &UnitBlueprint, view: &MineView) -> Option<(f32, f32)> {
     let gain = rate_on(to, view) - rate_on(bp, view);
-    let cost = (to.cost_mass - bp.cost_mass).to_f32().max(0.0);
+    let cost = (to.cost_materials - bp.cost_materials).to_f32().max(0.0);
     (gain > 0.0).then(|| (gain, cost / gain))
 }
 
@@ -82,15 +82,15 @@ pub fn panel(ui: &mut Ui, s: &Scene, mines: &[(MineView, &UnitBlueprint)], r: Re
         x + w,
         y,
         type_scale::VALUE,
-        rgb(MASS, 1.0),
+        rgb(MATERIALS, 1.0),
         &format!("{rate:.1}/s"),
     );
     let bar = Rect::new(x, y + 9.0, w, 4.0);
     ui.fill(bar, rgb(palette::LINE, 0.12));
     ui.gradient_h(
         Rect::new(bar.x, bar.y, bar.w * share.clamp(0.0, 1.0), bar.h),
-        rgb(MASS, 0.6),
-        rgb(MASS, 1.0),
+        rgb(MATERIALS, 0.6),
+        rgb(MATERIALS, 1.0),
     );
     y += 18.0;
 

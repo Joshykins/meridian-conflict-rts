@@ -1,4 +1,4 @@
-//! Hull repair: putting mass and energy back into a finished unit.
+//! Hull repair: putting materials and energy back into a finished unit.
 //!
 //! An engineer told to assist a damaged friend already does this. One with
 //! nothing to do looks for a wounded ally in reach and mends it where it

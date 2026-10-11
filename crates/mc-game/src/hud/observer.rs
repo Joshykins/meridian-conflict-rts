@@ -3,7 +3,7 @@
 //! economy and forces, with a short history of their income.
 
 use super::economy_panel::{mines_short, shown_spend};
-use super::{whole, Hud, HudAction, Scene, EDGE, ENERGY, GAP, MASS};
+use super::{whole, Hud, HudAction, Scene, EDGE, ENERGY, GAP, MATERIALS};
 use crate::audio::Sfx;
 use crate::sim_thread::PlayerStatus;
 use crate::ui::{id, ink, palette, rgb, teams, type_scale, Color, Rect, Ui};
@@ -48,7 +48,7 @@ enum Item {
 #[derive(Default)]
 pub struct History {
     last_second: Option<u32>,
-    mass: Vec<VecDeque<f32>>,
+    materials: Vec<VecDeque<f32>>,
     /// The first item shown (`Item`), when the cards scroll.
     scroll: usize,
 }
@@ -60,13 +60,13 @@ impl History {
             return;
         }
         // A new match (or a rewind) starts the graphs over.
-        if self.last_second.is_some_and(|s| s > second) || self.mass.len() != players.len() {
+        if self.last_second.is_some_and(|s| s > second) || self.materials.len() != players.len() {
             *self = History::default();
-            self.mass = vec![VecDeque::new(); players.len()];
+            self.materials = vec![VecDeque::new(); players.len()];
         }
         self.last_second = Some(second);
-        for (series, p) in self.mass.iter_mut().zip(players) {
-            series.push_back(p.mass_income + p.reclaim_income);
+        for (series, p) in self.materials.iter_mut().zip(players) {
+            series.push_back(p.materials_income + p.reclaim_income);
             if series.len() > HISTORY {
                 series.pop_front();
             }
@@ -316,14 +316,14 @@ impl Hud {
         let income: f32 = members
             .iter()
             .filter(|p| !p.defeated)
-            .map(|p| p.mass_income + p.reclaim_income)
+            .map(|p| p.materials_income + p.reclaim_income)
             .sum();
         let x = r.right() - 12.0;
         ui.text_right(
             x,
             y,
             type_scale::VALUE,
-            rgb(MASS, 1.0),
+            rgb(MATERIALS, 1.0),
             &format!("+{}", rate(income)),
         );
         let w = ui.text_width(type_scale::VALUE, &format!("+{}", rate(income)));
@@ -612,7 +612,7 @@ impl Hud {
                     format!(
                         "Army {}  +{}",
                         short(p.forces.army_value),
-                        rate(p.mass_income + p.reclaim_income)
+                        rate(p.materials_income + p.reclaim_income)
                     ),
                     palette::DIM,
                 )
@@ -669,16 +669,16 @@ impl Hud {
             let mut x = r.x + 14.0;
             for (have, net, tone) in [
                 (
-                    p.mass,
-                    p.mass_income + p.reclaim_income
+                    p.materials,
+                    p.materials_income + p.reclaim_income
                         - shown_spend(
-                            p.mass,
-                            p.mass_income + p.reclaim_income,
-                            p.mass_demand,
-                            p.mass_spent,
+                            p.materials,
+                            p.materials_income + p.reclaim_income,
+                            p.materials_demand,
+                            p.materials_spent,
                             false,
                         ),
-                    MASS,
+                    MATERIALS,
                 ),
                 (
                     p.energy,
@@ -726,17 +726,17 @@ impl Hud {
         let rows_w = graph.x - 14.0 - (r.x + 14.0);
         for (k, (have, cap, income, spend, tone)) in [
             (
-                p.mass,
-                p.mass_capacity,
-                p.mass_income + p.reclaim_income,
+                p.materials,
+                p.materials_capacity,
+                p.materials_income + p.reclaim_income,
                 shown_spend(
-                    p.mass,
-                    p.mass_income + p.reclaim_income,
-                    p.mass_demand,
-                    p.mass_spent,
+                    p.materials,
+                    p.materials_income + p.reclaim_income,
+                    p.materials_demand,
+                    p.materials_spent,
                     false,
                 ),
-                MASS,
+                MATERIALS,
             ),
             (
                 p.energy,
@@ -790,11 +790,11 @@ impl Hud {
 
         // Materials income over the last few minutes.
         ui.fill(graph, ink(0.35));
-        if let Some(series) = self.observed.mass.get(i) {
+        if let Some(series) = self.observed.materials.get(i) {
             // Every card on one scale, so the graphs compare at a glance.
             let peak = self
                 .observed
-                .mass
+                .materials
                 .iter()
                 .flat_map(|s| s.iter().copied())
                 .fold(1.0f32, f32::max);
@@ -809,7 +809,7 @@ impl Hud {
                     )
                 };
                 for (j, (a, b)) in series.iter().zip(series.iter().skip(1)).enumerate() {
-                    ui.stroke(at(j, *a), at(j + 1, *b), 1.4, rgb(MASS, 0.9 * alive));
+                    ui.stroke(at(j, *a), at(j + 1, *b), 1.4, rgb(MATERIALS, 0.9 * alive));
                 }
             }
         }

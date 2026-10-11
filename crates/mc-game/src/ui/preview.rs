@@ -516,7 +516,7 @@ fn structures(map: &MapFile, frame: &Frame, rgba: &mut [u8]) {
 
 /// Ore fields as the match marks them: a materials red-orange rim round a faint fill.
 fn ore(map: &MapFile, frame: &Frame, rgba: &mut [u8]) {
-    let ore = crate::hud::MASS;
+    let ore = crate::hud::MATERIALS;
     let fill = rgb((ore >> 16) as u8, (ore >> 8) as u8, ore as u8);
     let mpp = frame.metres_per_px;
     let h = frame.h as f32;

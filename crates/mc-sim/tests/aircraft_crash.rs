@@ -108,7 +108,7 @@ fn aircraft_falls_with_momentum_before_leaving_salvage() {
         .iter()
         .any(|e| matches!(e, SimEvent::UnitDied { airborne: true, .. })));
     let origin = w.state.aircraft_crashes[0].pos;
-    let mass = w.state.aircraft_crashes[0].mass;
+    let materials = w.state.aircraft_crashes[0].materials;
     assert!(w.state.aircraft_crashes[0].velocity.x > Fx::ZERO);
     for _ in 0..10 {
         w.tick(&[]).unwrap();
@@ -129,7 +129,7 @@ fn aircraft_falls_with_momentum_before_leaving_salvage() {
     assert!(w.state.aircraft_crashes.is_empty());
     assert_eq!(w.state.wrecks.slots.live(), 1);
     let row = w.state.wrecks.slots.iter().next().unwrap();
-    assert_eq!(w.state.wrecks.mass[row], mass);
+    assert_eq!(w.state.wrecks.materials[row], materials);
     assert_eq!(w.state.wrecks.z[row], Fx::from_int(20));
     assert!(w.state.wrecks.pos[row].x > origin.x);
     w.write_render_frame(None, &mut frame);
@@ -303,7 +303,7 @@ fn aircraft_without_salvage_still_completes_its_crash() {
     let mut w = world();
     let id = plane(&mut w);
     kill(&mut w, id);
-    w.state.aircraft_crashes[0].mass = Fx::ZERO;
+    w.state.aircraft_crashes[0].materials = Fx::ZERO;
     assert_eq!(finish(&mut w), 1);
     assert_eq!(w.state.wrecks.slots.live(), 0);
 }

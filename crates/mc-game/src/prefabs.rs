@@ -95,7 +95,7 @@ impl Prefab {
         let (members, _) = self.resolve(blueprints);
         members.iter().fold((0.0, 0.0), |(m, e), r| {
             let bp = blueprints.unit(r.blueprint);
-            (m + bp.cost_mass.to_f32(), e + bp.cost_energy.to_f32())
+            (m + bp.cost_materials.to_f32(), e + bp.cost_energy.to_f32())
         })
     }
 

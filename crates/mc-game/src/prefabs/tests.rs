@@ -15,7 +15,7 @@ fn base(b: &Blueprints) -> Vec<(BlueprintId, FxVec2)> {
         (id("aster_t1_land_factory"), at(600, 600)),
         (id("aster_t1_power"), at(660, 600)),
         (id("aster_t1_power"), at(660, 624)),
-        (id("aster_mass_storage"), at(666, 570)),
+        (id("aster_materials_storage"), at(666, 570)),
     ]
 }
 

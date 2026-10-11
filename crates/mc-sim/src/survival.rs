@@ -15,7 +15,7 @@
 //! Shapers can be destroyed (while being raised too), and a destroyed one
 //! leaves a rich wreck: they are the bonus objectives.
 //!
-//! Nothing is handed out. The defenders' mass is what the engine sends them:
+//! Nothing is handed out. The defenders' materials are what the engine sends them:
 //! every unit it prints dies into a wreck worth most of its cost, so a
 //! survival map carries little ore and the field is the economy (reclaim).
 //!
@@ -108,16 +108,16 @@ impl SurvivalRules {
         tier.min(cap) as u8
     }
 
-    /// Mass the engine plans to spend on `round`: 800 at the first, a
+    /// Materials the engine plans to spend on `round`: 800 at the first, a
     /// quarter more each round after. Tiers cost about four times the one
     /// below, so this keeps the rounds' numbers up as the tiers climb. What it
     /// spends is also most of what the defenders can reclaim afterwards.
     pub fn budget(&self, round: u16) -> i64 {
-        let mut mass: i64 = 800;
+        let mut materials: i64 = 800;
         for _ in 1..round.clamp(1, 200) {
-            mass = (mass * 5 / 4).min(1 << 40);
+            materials = (materials * 5 / 4).min(1 << 40);
         }
-        mass * self.intensity as i64 / 1000
+        materials * self.intensity as i64 / 1000
     }
 
     /// The budget the engine actually spends: the planned one, or a share of
@@ -362,7 +362,7 @@ pub struct SurvivalStatus {
     /// Shapers the facility starts raising with the next round (or this one,
     /// while it is being printed).
     pub shapers_next: u8,
-    /// Mass per second the defender takes in from wrecks now.
+    /// Materials per second the defender takes in from wrecks now.
     pub reclaim: f32,
 }
 
@@ -594,7 +594,7 @@ impl crate::World {
             .enumerate()
             .filter(|(p, pl)| *p as u8 != side && !pl.defeated)
             .fold(Fx::ZERO, |sum, (_, pl)| {
-                sum + pl.mass_income + pl.reclaim_income
+                sum + pl.materials_income + pl.reclaim_income
             });
         let mut budget = rules.budget_against(round, income);
         let mut out = Vec::new();
@@ -686,7 +686,7 @@ impl crate::World {
     }
 
     /// Fighting units of `domain` up to `tier`, of any faction: blueprint, tech,
-    /// mass. Experimentals are not in it: they come one at a time (`heavies`).
+    /// materials. Experimentals are not in it: they come one at a time (`heavies`).
     fn roster(&self, domain: Domain, tier: u8) -> Vec<(BlueprintId, u8, i64)> {
         self.fighters(domain, false)
             .into_iter()
@@ -715,7 +715,7 @@ impl crate::World {
                     && u.motion.is_some_and(|m| domain_of(m.layer) == domain)
                     && !bps.units.iter().any(|o| o.drone == Some(u.id))
             })
-            .map(|u| (u.id, u.tech, u.cost_mass.round_int().max(1) as i64))
+            .map(|u| (u.id, u.tech, u.cost_materials.round_int().max(1) as i64))
             .collect()
     }
 
@@ -1216,7 +1216,7 @@ impl crate::World {
                 .map(|b| self.blueprints.unit(b));
             let wreck = match node {
                 Some(bp) if n.raised => {
-                    (bp.cost_mass * bp.wreck_fraction).round_int().max(0) as u32
+                    (bp.cost_materials * bp.wreck_fraction).round_int().max(0) as u32
                 }
                 _ => 0,
             };

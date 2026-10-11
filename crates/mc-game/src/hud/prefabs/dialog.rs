@@ -5,7 +5,7 @@
 
 use super::plan;
 use crate::audio::Sfx;
-use crate::hud::{whole, Hud, HudAction, Scene, ENERGY, MASS};
+use crate::hud::{whole, Hud, HudAction, Scene, ENERGY, MATERIALS};
 use crate::prefabs::{self, Prefab};
 use crate::ui::{id, ink, palette, rgb, type_scale, ButtonKind, Key, Rect, Ui};
 
@@ -103,10 +103,10 @@ pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene) {
             &format!("and {more} more"),
         );
     }
-    let (mass, energy) = draft.prefab.cost(s.blueprints);
+    let (materials, energy) = draft.prefab.cost(s.blueprints);
     let cy = r.y + 192.0;
     for (i, (label, value, tone)) in [
-        ("Materials", whole(mass), MASS),
+        ("Materials", whole(materials), MATERIALS),
         ("Energy", whole(energy), ENERGY),
     ]
     .into_iter()

@@ -55,7 +55,7 @@
 //! layer (renderer only too) after that.
 //!
 //! Wreck record (`WRECK_RECORD_LEN`, 72 bytes): `blueprint key [u8; 48]`
-//! (UTF-8, zero padded), `x i64, y i64, heading u16 (Angle), bank i16, mass
+//! (UTF-8, zero padded), `x i64, y i64, heading u16 (Angle), bank i16, materials
 //! u16 (thousandths of the unit's new wreck), pad u16`. Laid by
 //! `wreckage::stamp`; the sim puts them down when the match starts.
 //!
@@ -777,8 +777,8 @@ pub struct MapWreck {
     pub heading: Angle,
     /// Roll it lies at, binary angle steps: a hull on the seabed lists.
     pub bank: i16,
-    /// Mass left, in thousandths of what the unit's wreck would hold new.
-    pub mass_milli: u16,
+    /// Materials left, in thousandths of what the unit's wreck would hold new.
+    pub materials_milli: u16,
 }
 
 /// An ore field: a simple polygon of corners in metres, either winding. Ore lies
@@ -1100,7 +1100,9 @@ pub(crate) fn content_id(
         for w in wrecks {
             h.write_u8s(w.blueprint.as_bytes());
             h.write_u64(
-                w.heading.0 as u64 | (w.bank as u16 as u64) << 16 | (w.mass_milli as u64) << 32,
+                w.heading.0 as u64
+                    | (w.bank as u16 as u64) << 16
+                    | (w.materials_milli as u64) << 32,
             );
             h.write_i64(w.pos.x.0);
             h.write_i64(w.pos.y.0);
@@ -1271,7 +1273,7 @@ pub(crate) fn write_wreck(w: &MapWreck, out: &mut Vec<u8>) {
     out.extend_from_slice(&w.pos.y.0.to_le_bytes());
     out.extend_from_slice(&w.heading.0.to_le_bytes());
     out.extend_from_slice(&w.bank.to_le_bytes());
-    out.extend_from_slice(&w.mass_milli.to_le_bytes());
+    out.extend_from_slice(&w.materials_milli.to_le_bytes());
     out.extend_from_slice(&0u16.to_le_bytes());
 }
 
@@ -1284,14 +1286,14 @@ pub(crate) fn parse_wreck(r: &mut Reader<'_>) -> Result<MapWreck, MapError> {
     let pos = FxVec2::new(Fx(r.i64()?), Fx(r.i64()?));
     let heading = Angle(r.u16()?);
     let bank = r.u16()? as i16;
-    let mass_milli = r.u16()?;
+    let materials_milli = r.u16()?;
     r.u16()?;
     Ok(MapWreck {
         blueprint,
         pos,
         heading,
         bank,
-        mass_milli,
+        materials_milli,
     })
 }
 

@@ -110,7 +110,7 @@ pub enum IconKind {
     /// A tier-5 titan: a giant striding on two legs, a gun on each arm, framed in corner
     /// brackets so it stands out from everything else on the map.
     Titan = 28,
-    /// A reclaim structure: the Extractor's disc (salvage feeds mass as a mine does)
+    /// A reclaim structure: the Extractor's disc (salvage feeds materials as a mine does)
     /// inside a ring for its reach. Every salvage icon carries that disc.
     Salvage = 29,
     // retired: 30 (the salvage boat).
@@ -495,7 +495,7 @@ pub(crate) struct Unit {
     pub refits: Vec<crate::refit::RawRefitSlot>,
     #[serde(default)]
     pub weapons: Vec<RawWeapon>,
-    /// Share of its mass its wreck keeps; by tier when left out ([`default_wreck`]).
+    /// Share of its materials its wreck keeps; by tier when left out ([`default_wreck`]).
     #[serde(default)]
     pub wreck_fraction: Option<f64>,
     #[serde(default)]
@@ -509,7 +509,7 @@ pub(crate) struct Unit {
     pub sounds: UnitSounds,
 }
 
-/// Share of its mass a unit's wreck keeps: more the higher its tier, so the
+/// Share of its materials a unit's wreck keeps: more the higher its tier, so the
 /// battlefields of the late game are where the materials are.
 fn default_wreck(tech: u8) -> f64 {
     match tech {
@@ -522,7 +522,7 @@ fn default_wreck(tech: u8) -> f64 {
 #[derive(Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Cost {
-    pub mass: f64,
+    pub materials: f64,
     pub energy: f64,
     pub time: f64,
 }
@@ -724,10 +724,10 @@ pub struct RawStorm {
 #[derive(Deserialize, Default, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct RawEconomy {
-    pub mass_income: f64,
+    pub materials_income: f64,
     pub energy_income: f64,
     pub energy_upkeep: f64,
-    pub mass_storage: f64,
+    pub materials_storage: f64,
     pub energy_storage: f64,
 }
 
@@ -744,7 +744,7 @@ pub(crate) struct RawMine {
     #[serde(default)]
     pub grow_upkeep: f64,
     /// It drives a pile hammer, blow by blow (the ARC core mine). False: it draws its
-    /// mass up without striking (the Regency Taproot), so there is no beat to show or hear.
+    /// materials up without striking (the Regency Taproot), so there is no beat to show or hear.
     #[serde(default = "yes")]
     pub hammer: bool,
 }
@@ -754,7 +754,7 @@ pub(crate) struct RawMine {
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawFabricator {
     /// Materials a second, with its energy upkeep paid in full.
-    pub mass: f64,
+    pub materials: f64,
 }
 
 /// A provider's saving for its neighbours; see [`crate::Adjacency`].
@@ -764,7 +764,7 @@ pub(crate) enum RawAdjacency {
     /// Saves energy, by the energy it makes.
     Energy,
     /// Saves materials, by the materials it makes.
-    Mass,
+    Materials,
 }
 
 fn yes() -> bool {
@@ -820,7 +820,7 @@ pub(crate) struct RawBuildArm {
 #[derive(Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawReclaimer {
-    /// Mass a second the whole unit pulls, split across its working heads.
+    /// Materials a second the whole unit pulls, split across its working heads.
     pub power: f64,
     pub range: f64,
     /// Seconds a head must stay on a target before its beam comes on.
@@ -1567,25 +1567,26 @@ fn compile_adjacency(
     let a = match kind {
         RawAdjacency::Energy if e.energy_income > 0.0 => crate::Adjacency {
             energy: crate::Adjacency::ring(crate::Adjacency::ENERGY_RING, fx(e.energy_income)),
-            mass: Fx::ZERO,
+            materials: Fx::ZERO,
         },
-        RawAdjacency::Mass
-            if fabricator.is_some_and(|f| f.mass > 0.0)
+        RawAdjacency::Materials
+            if fabricator.is_some_and(|f| f.materials > 0.0)
                 || mine.is_some_and(|m| m.base > 0.0)
-                || e.mass_income > 0.0 =>
+                || e.materials_income > 0.0 =>
         {
             // A mine's rated output is its shaft (`base`): what it pays from the moment it
             // is finished, whatever ore lies in its reach.
-            let made =
-                e.mass_income + fabricator.map_or(0.0, |f| f.mass) + mine.map_or(0.0, |m| m.base);
+            let made = e.materials_income
+                + fabricator.map_or(0.0, |f| f.materials)
+                + mine.map_or(0.0, |m| m.base);
             crate::Adjacency {
                 energy: Fx::ZERO,
-                mass: crate::Adjacency::ring(crate::Adjacency::MASS_RING, fx(made)),
+                materials: crate::Adjacency::ring(crate::Adjacency::MATERIALS_RING, fx(made)),
             }
         }
         _ => return Err(invalid("saves what it makes, and it makes none of it")),
     };
-    if a.energy >= Fx::ONE || a.mass >= Fx::ONE {
+    if a.energy >= Fx::ONE || a.materials >= Fx::ONE {
         return Err(invalid(
             "of a full ring comes to all of a neighbour's use: it makes too much",
         ));
@@ -2294,7 +2295,7 @@ impl Unit {
             health: fx(self.health),
             regen: fx(self.regen),
             nanite_regen: self.nanite_regen,
-            cost_mass: fx(self.cost.mass),
+            cost_materials: fx(self.cost.materials),
             cost_energy: fx(self.cost.energy),
             build_time: fx(self.cost.time),
             radius: fx(self.radius),
@@ -2430,10 +2431,10 @@ impl Unit {
             },
             motion,
             economy: Economy {
-                mass_income: fx(e.mass_income),
+                materials_income: fx(e.materials_income),
                 energy_income: fx(e.energy_income),
                 energy_upkeep: fx(e.energy_upkeep),
-                mass_storage: fx(e.mass_storage),
+                materials_storage: fx(e.materials_storage),
                 energy_storage: fx(e.energy_storage),
             },
             mine: self.mine.as_ref().map(|m| Mine {
@@ -2444,10 +2445,9 @@ impl Unit {
                 grow_upkeep: fx(m.grow_upkeep),
                 hammer: m.hammer,
             }),
-            fabricator: self
-                .fabricator
-                .as_ref()
-                .map(|f| crate::Fabricator { mass: fx(f.mass) }),
+            fabricator: self.fabricator.as_ref().map(|f| crate::Fabricator {
+                materials: fx(f.materials),
+            }),
             death_blast: match &self.death_blast {
                 Some(d) if d.radius <= 0.0 || d.damage <= 0.0 => {
                     return Err(DataError::Invalid(format!(

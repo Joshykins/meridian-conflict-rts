@@ -152,7 +152,7 @@ impl Report {
             tab: Tab::Overview,
             age: 0.0,
             tab_age: 0.0,
-            economy: Metric::MassIncome,
+            economy: Metric::MaterialsIncome,
             military: Metric::ArmyValue,
             focus: None,
             field,

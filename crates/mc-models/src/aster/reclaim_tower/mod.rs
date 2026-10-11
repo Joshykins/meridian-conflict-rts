@@ -18,7 +18,7 @@
 //!   starts looking north).
 //! - It stands on a two-step foundation kept clean: the model's dust line holds the
 //!   footing's dirt to the foundation's foot (`MeshBuilder::set_dust_line`).
-//! - Glazed channels wear `pattern::MASS_FLOW`: dark glazing, and a stream of glowing
+//! - Glazed channels wear `pattern::MATERIALS_FLOW`: dark glazing, and a stream of glowing
 //!   Materials red-orange falling down them while the tower reclaims.
 
 use glam::Vec3;
@@ -77,10 +77,10 @@ pub(super) fn tower(b: &mut MeshBuilder, tech: u8) {
 }
 
 /// A glazed chute carrying reclaimed material from `from` down to `to`: dark
-/// `MASS_FLOW` glazing, with a steel collar at each end at full detail.
+/// `MATERIALS_FLOW` glazing, with a steel collar at each end at full detail.
 fn chute(b: &mut MeshBuilder, from: Vec3, to: Vec3, radius: f32) {
     let sides = if b.fine() { 8 } else { 4 };
-    b.paint(ACCENT).pattern(pattern::MASS_FLOW);
+    b.paint(ACCENT).pattern(pattern::MATERIALS_FLOW);
     b.cylinder_between(from, to, radius, radius, sides);
     if b.fine() {
         let dir = (to - from).normalize_or_zero();
@@ -144,7 +144,7 @@ mod tests {
                 let flow = mesh
                     .vertices
                     .iter()
-                    .filter(|v| (v.surface & 0xFF) == pattern::MASS_FLOW)
+                    .filter(|v| (v.surface & 0xFF) == pattern::MATERIALS_FLOW)
                     .count();
                 assert!(flow > 0, "{key} t{tech}: no chute");
                 for (lod, m) in built.lods.iter().enumerate() {

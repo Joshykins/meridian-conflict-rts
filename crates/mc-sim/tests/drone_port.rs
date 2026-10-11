@@ -70,9 +70,9 @@ fn drones_of(w: &World, row: usize) -> Vec<usize> {
 #[test]
 fn the_port_makes_two_free_drones_that_salvage_far_off_and_come_home() {
     let mut w = world();
-    w.state.players[0].mass = Fx::ZERO;
+    w.state.players[0].materials = Fx::ZERO;
     w.state.players[0].energy = Fx::ZERO;
-    w.state.players[0].mass_capacity = Fx::from_int(20000);
+    w.state.players[0].materials_capacity = Fx::from_int(20000);
     let acu = ported_commander(&mut w, 900, 900);
     let reach = w.blueprints.unit(w.state.units.blueprint[acu]).drone_radius;
     assert!(reach >= Fx::from_int(600), "a very large radius: {reach:?}");
@@ -100,10 +100,11 @@ fn the_port_makes_two_free_drones_that_salvage_far_off_and_come_home() {
         "one drone for each pad, built with nothing in the bank"
     );
     assert!(
-        !w.state.wrecks.slots.is_alive(wreck) || w.state.wrecks.mass[wreck] < Fx::from_int(300),
+        !w.state.wrecks.slots.is_alive(wreck)
+            || w.state.wrecks.materials[wreck] < Fx::from_int(300),
         "the drones salvage the far wreck"
     );
-    assert!(w.state.players[0].reclaimed_mass > Fx::ZERO);
+    assert!(w.state.players[0].reclaimed_materials > Fx::ZERO);
     // The commander itself never walked there: its drones did the work.
     assert!(w.state.units.pos[acu].distance(FxVec2::from_ints(900, 900)) < Fx::from_int(5));
     for _ in 0..1800 {
@@ -151,12 +152,12 @@ fn starved_port(w: &mut World, mines: Priority) -> usize {
         w.spawn_unit(id, 0, FxVec2::from_ints(x, y), Angle::ZERO, true)
             .unwrap()
     };
-    // The commander's trickle of mass is all the side makes.
+    // The commander's trickle of materials are all the side makes.
     let acu = ported_commander(w, 900, 900);
-    add(w, "aster_mass_storage", 300, 300);
+    add(w, "aster_materials_storage", 300, 300);
     add(w, "aster_t1_power", 360, 300);
     let engineer = add(w, "aster_t1_engineer", 400, 400);
-    w.state.players[0].mass = Fx::ZERO;
+    w.state.players[0].materials = Fx::ZERO;
     w.state.players[0].energy = Fx::ZERO;
     w.state.players[0].focus = Focus {
         mines,
@@ -195,7 +196,7 @@ fn a_port_on_a_starved_economy_fields_its_drones_with_materials_first() {
     let mut most_in_store = Fx::ZERO;
     for _ in 0..200 {
         w.tick(&[]).unwrap();
-        most_in_store = most_in_store.max(w.state.players[0].mass);
+        most_in_store = most_in_store.max(w.state.players[0].materials);
     }
     assert!(
         most_in_store < Fx::from_int(5),
@@ -223,7 +224,8 @@ fn a_port_on_a_starved_economy_fields_its_drones_with_materials_first() {
         w.tick(&[]).unwrap();
     }
     assert!(
-        !w.state.wrecks.slots.is_alive(wreck) || w.state.wrecks.mass[wreck] < Fx::from_int(200),
+        !w.state.wrecks.slots.is_alive(wreck)
+            || w.state.wrecks.materials[wreck] < Fx::from_int(200),
         "the drones salvaged the wreck"
     );
 }
@@ -255,7 +257,7 @@ fn port_drones_glide_on_and_off_their_pads_and_ride_the_back() {
     let mut w = world();
     w.state.players[0].free_build = true;
     // Room in store for what they bring home.
-    let storage = w.blueprints.id_of("aster_mass_storage").unwrap();
+    let storage = w.blueprints.id_of("aster_materials_storage").unwrap();
     w.spawn_unit(storage, 0, FxVec2::from_ints(300, 300), Angle::ZERO, true)
         .unwrap();
     let acu = ported_commander(&mut w, 900, 900);

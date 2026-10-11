@@ -127,7 +127,9 @@ fn the_cable_comes_down_then_crates_fall_on_the_period() {
     let docked: Vec<_> = events
         .iter()
         .filter_map(|ev| match ev {
-            SimEvent::ElevatorDocked { unit, mass, .. } => Some((*unit, *mass)),
+            SimEvent::ElevatorDocked {
+                unit, materials, ..
+            } => Some((*unit, *materials)),
             _ => None,
         })
         .collect();
@@ -136,7 +138,7 @@ fn the_cable_comes_down_then_crates_fall_on_the_period() {
     assert_eq!(inbound.len(), 2, "crates each period");
     assert_eq!(docked.len(), 2, "each fall lands");
     assert!(docked.iter().all(|&(u, _)| u == id));
-    // With nothing queued the whole payload comes down as mass.
+    // With nothing queued the whole payload comes down as materials.
     assert!(docked.iter().all(|&(_, m)| m == e.payload));
 }
 
@@ -147,9 +149,9 @@ fn empty_crates_pay_their_payload_into_the_store() {
     let e = spec(&w);
     let n = first_dock(&w) - 1;
     run(&mut w, n, &[]);
-    let before = w.state.players[0].mass;
+    let before = w.state.players[0].materials;
     run(&mut w, 1, &[]);
-    let gained = w.state.players[0].mass - before;
+    let gained = w.state.players[0].materials - before;
     assert!(
         gained >= e.payload - Fx::from_int(1),
         "the store gains the payload: {gained:?}"
@@ -166,9 +168,9 @@ fn queued_units_come_down_free_up_to_the_payload_and_seats_in_order() {
     let breacher = w.blueprints.id_of("aster_t4_breacher").unwrap();
     let (cost, radius) = {
         let bp = w.blueprints.unit(breacher);
-        (bp.cost_mass, bp.radius)
+        (bp.cost_materials, bp.radius)
     };
-    let (fits, mass) =
+    let (fits, materials) =
         mc_sim::mirror::crate_load(std::iter::repeat_n((radius, cost), 6), e.payload);
     assert_eq!(fits, 3, "a Breacher to a crate");
     let cmds = [
@@ -186,12 +188,14 @@ fn queued_units_come_down_free_up_to_the_payload_and_seats_in_order() {
     let paid = events
         .iter()
         .find_map(|ev| match ev {
-            SimEvent::ElevatorDocked { units, mass, .. } => Some((*units, *mass)),
+            SimEvent::ElevatorDocked {
+                units, materials, ..
+            } => Some((*units, *materials)),
             _ => None,
         })
         .unwrap();
     assert_eq!(paid.0, fits);
-    assert_eq!(paid.1, e.payload - mass);
+    assert_eq!(paid.1, e.payload - materials);
     // The next fall takes the last Breacher and the tanks.
     run(&mut w, e.period_ticks, &[]);
     assert_eq!(count_of(&w, "aster_t4_breacher"), fits as usize + 1);
@@ -202,13 +206,13 @@ fn queued_units_come_down_free_up_to_the_payload_and_seats_in_order() {
 fn nothing_is_built_while_waiting_and_nothing_is_paid_for() {
     let mut w = world();
     let id = elevator(&mut w);
-    w.state.players[0].mass = Fx::from_int(0);
+    w.state.players[0].materials = Fx::from_int(0);
     let order = produce(&w, id, "aster_t3_assault_bot", 3);
     run(&mut w, 40, &[order]);
     assert_eq!(count_of(&w, "aster_t3_assault_bot"), 0, "no hull on a pad");
     let row = w.state.units.row(id).unwrap();
     assert!(!w.state.units.has_flag(row, flag::BUILDING));
-    assert_eq!(w.state.players[0].mass, Fx::ZERO, "nothing spent");
+    assert_eq!(w.state.players[0].materials, Fx::ZERO, "nothing spent");
 }
 
 #[test]
@@ -292,7 +296,7 @@ fn an_unfinished_elevator_lowers_nothing() {
 }
 
 #[test]
-fn a_paused_elevator_holds_its_queue_and_brings_down_mass() {
+fn a_paused_elevator_holds_its_queue_and_brings_down_materials() {
     let mut w = world();
     let id = elevator(&mut w);
     let e = spec(&w);
@@ -309,7 +313,7 @@ fn a_paused_elevator_holds_its_queue_and_brings_down_mass() {
     let events = run(&mut w, n, &[]);
     assert_eq!(count_of(&w, "aster_t1_tank"), 0, "the queue waits");
     assert!(events.iter().any(
-        |ev| matches!(ev, SimEvent::ElevatorDocked { units: 0, mass, .. } if *mass == e.payload)
+        |ev| matches!(ev, SimEvent::ElevatorDocked { units: 0, materials, .. } if *materials == e.payload)
     ));
 }
 

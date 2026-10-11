@@ -41,13 +41,13 @@ pub(super) fn elevator_batch(
         .ok_or("It Brings Down No Aircraft")?;
     let heavy = builds
         .filter(|b| b.tech >= 4)
-        .min_by_key(|b| b.cost_mass)
+        .min_by_key(|b| b.cost_materials)
         .ok_or("It Brings Down No Experimentals")?;
     // As many tech 4s as leave a little of the payload over, so some materials come
     // down too: at least one, at most four.
     let payload = bp.elevator.map_or(Fx::ZERO, |e| e.payload);
-    let room = payload * 9 / 10 - tank.cost_mass * 6 - air.cost_mass * 4;
-    let heavies = (room / heavy.cost_mass.max(Fx::ONE))
+    let room = payload * 9 / 10 - tank.cost_materials * 6 - air.cost_materials * 4;
+    let heavies = (room / heavy.cost_materials.max(Fx::ONE))
         .floor_int()
         .clamp(1, 4) as u8;
     let order = PendingOrder::ProduceMix {
@@ -94,7 +94,7 @@ pub(super) fn fracture_camp(
         },
         Command::DebugStock {
             player: BLUE,
-            mass: None,
+            materials: None,
             energy: Some(1000),
         },
     ];

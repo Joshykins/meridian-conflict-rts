@@ -2,7 +2,7 @@
 //! The check for AI difficulty and economy changes; run with
 //! `DUEL=crosswater:easy:hard:30 cargo test --release -p mc-sim --test sim -- zz_ai_duel_probe:: --ignored --nocapture`
 //! (map, player 0's difficulty, player 1's, minutes; optional `:seed` and `:swap` to trade starts).
-//! `DUEL_SALVAGE=1` adds each side's reclaim towers, salvage units and mass reclaimed.
+//! `DUEL_SALVAGE=1` adds each side's reclaim towers, salvage units and materials reclaimed.
 use mc_data::{cat, Blueprints};
 use mc_jobs::Pool;
 use mc_sim::tables::Controller;
@@ -23,7 +23,7 @@ fn report(w: &World, minute: u32) {
     for p in 0..s.players.len() {
         let pl = &s.players[p];
         let (mut mines, mut eff, mut mine_tiers) = (0, 0.0f32, [0; 5]);
-        let (mut factories, mut army, mut army_mass, mut engineers) = (0, 0, 0.0f32, 0);
+        let (mut factories, mut army, mut army_materials, mut engineers) = (0, 0, 0.0f32, 0);
         let (mut power, mut builders, mut busy) = ([0; 4], [0; 4], 0);
         let (mut pd, mut fac_tiers) = (0, [0; 4]);
         for row in s
@@ -55,7 +55,7 @@ fn report(w: &World, minute: u32) {
                 busy += (s.units.order_head[row] != mc_sim::tables::NO_ORDER) as usize;
             } else if bp.is_mobile() && !bp.weapons.is_empty() && !bp.has(cat::COMMANDER) {
                 army += 1;
-                army_mass += bp.cost_mass.to_f32();
+                army_materials += bp.cost_materials.to_f32();
             }
         }
         if std::env::var("DUEL_SALVAGE").is_ok() {
@@ -78,11 +78,11 @@ fn report(w: &World, minute: u32) {
                 .wrecks
                 .slots
                 .iter()
-                .map(|x| s.wrecks.mass[x].to_f32())
+                .map(|x| s.wrecks.materials[x].to_f32())
                 .sum();
             println!(
                 "      salvage P{p}: towers {towers} salvagers {salvagers} reclaimed {:.0} (wrecks hold {lying:.0})",
-                pl.reclaimed_mass.to_f32()
+                pl.reclaimed_materials.to_f32()
             );
         }
         if std::env::var("DUEL_WHY").is_ok() {
@@ -114,8 +114,8 @@ fn report(w: &World, minute: u32) {
                 })
                 .count();
             println!(
-                "      why P{p}: flow eff {:.2} mass {:.0}/{:.0} energy {:.0}/{:.0} in {:.0} out {:.0} | pd {} radar {} power {} | mines upgrading {upgrading}",
-                pl.efficiency.to_f32(), pl.mass.to_f32(), pl.mass_capacity.to_f32(), pl.energy.to_f32(), pl.energy_capacity.to_f32(),
+                "      why P{p}: flow eff {:.2} materials {:.0}/{:.0} energy {:.0}/{:.0} in {:.0} out {:.0} | pd {} radar {} power {} | mines upgrading {upgrading}",
+                pl.efficiency.to_f32(), pl.materials.to_f32(), pl.materials_capacity.to_f32(), pl.energy.to_f32(), pl.energy_capacity.to_f32(),
                 pl.energy_income.to_f32(), pl.energy_demand.to_f32(),
                 count(cat::DEFENSE | cat::DIRECT_FIRE), count(cat::INTEL), count(cat::POWER),
             );
@@ -152,13 +152,13 @@ fn report(w: &World, minute: u32) {
             }
         }
         println!(
-            "  {minute:>2}m P{p} {:?}: stored {:.0}/{:.0} demand {:.0}/s defenses {pd} factories T1-3 {:?} | mass {:>6.1}/s energy {:>7.1}/s eff {:.2} tech {} | mines {mines} (T1-4 {:?}) avg eff {:.2} | power T1-3 {:?} builders T1-3 {:?} busy {busy} | factories {factories} engineers {engineers} army {army} ({:.0} mass) | killed {} lost {}",
+            "  {minute:>2}m P{p} {:?}: stored {:.0}/{:.0} demand {:.0}/s defenses {pd} factories T1-3 {:?} | materials {:>6.1}/s energy {:>7.1}/s eff {:.2} tech {} | mines {mines} (T1-4 {:?}) avg eff {:.2} | power T1-3 {:?} builders T1-3 {:?} busy {busy} | factories {factories} engineers {engineers} army {army} ({:.0} materials) | killed {} lost {}",
             s.ai[p].config.difficulty,
-            pl.mass.to_f32(),
-            pl.mass_capacity.to_f32(),
-            pl.mass_demand.to_f32(),
+            pl.materials.to_f32(),
+            pl.materials_capacity.to_f32(),
+            pl.materials_demand.to_f32(),
             &fac_tiers[1..],
-            pl.mass_income.to_f32(),
+            pl.materials_income.to_f32(),
             pl.energy_income.to_f32(),
             pl.efficiency.to_f32(),
             w.side_tech(p as u8),
@@ -166,7 +166,7 @@ fn report(w: &World, minute: u32) {
             if mines > 0 { eff / mines as f32 } else { 0.0 },
             &power[1..],
             &builders[1..],
-            army_mass,
+            army_materials,
             pl.units_killed,
             pl.units_lost,
         );

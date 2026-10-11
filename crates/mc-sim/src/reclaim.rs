@@ -1,6 +1,6 @@
-//! Reclaim: taking wrecks and live units apart for their mass.
+//! Reclaim: taking wrecks and live units apart for their materials.
 //!
-//! A wreck gives up its mass at the reclaimer's power. A live unit is unbuilt
+//! A wreck gives up its materials at the reclaimer's power. A live unit is unbuilt
 //! at the same power it would take to build: it loses health as it goes, and
 //! when the last of it is taken it is simply gone (`flag::RECLAIMED`). A site
 //! still going up loses its build progress too, as fast as it was built. Reclaimers
@@ -17,7 +17,7 @@ use crate::{SimError, World};
 use mc_core::{Fx, FxVec2, FxVec3, TICKS_PER_SECOND};
 
 const DT: i32 = TICKS_PER_SECOND as i32;
-/// Share of a live unit's mass that comes back. Less than a repair costs, so
+/// Share of a live unit's materials that comes back. Less than a repair costs, so
 /// mending a unit and taking it apart again never turns a profit.
 const UNIT_YIELD: Fx = Fx::ratio(1, 5);
 /// An armed builder leaves wrecks alone while an enemy is within this many times its guns' reach.
@@ -35,7 +35,7 @@ pub struct ReclaimWork {
     pub at: FxVec3,
     pub radius: Fx,
     pub height: Fx,
-    /// Mass riding from this drone back into its carrier's belly.
+    /// Materials riding from this drone back into its carrier's belly.
     pub relay: bool,
     /// Which of a reclaimer's heads the beam leaves (`mc_data::Reclaimer::heads`).
     pub head: u8,
@@ -150,7 +150,7 @@ impl World {
                     kind = BEAM_RELAY;
                 }
             }
-            // The drone also ferries mass home. A second key, or the renderer
+            // The drone also ferries materials home. A second key, or the renderer
             // treats the jump from the wreck to the carrier as a new beam and
             // the one that left hangs in the air.
             let key = if work.relay { 1 << 31 } else { 0 };
@@ -197,10 +197,10 @@ impl World {
     /// Energy never matters: reclaim takes none, even in a stall.
     pub(crate) fn no_room_for_salvage(&self, player: u8) -> bool {
         let p = &self.state.players[player as usize];
-        !p.free_build && p.mass >= p.mass_capacity
+        !p.free_build && p.materials >= p.materials_capacity
     }
 
-    /// One tick of pulling mass out of a wreck. True once there is none left.
+    /// One tick of pulling materials out of a wreck. True once there is none left.
     /// A wreck gives up no more than its owner-to-be has room to store: what does
     /// not fit stays in the wreck for later, never lost.
     pub(crate) fn drain_wreck(&mut self, row: usize, w: usize, power: Fx, head: u8) -> bool {
@@ -208,22 +208,22 @@ impl World {
         let wrecks = &mut self.state.wrecks;
         // Free building (the test range) keeps no books: it never waits for room.
         let room = if player.free_build {
-            wrecks.mass[w]
+            wrecks.materials[w]
         } else {
-            (player.mass_capacity - player.mass).max(Fx::ZERO)
+            (player.materials_capacity - player.materials).max(Fx::ZERO)
         };
         let take = (power * World::reclaim_rate())
-            .min(wrecks.mass[w])
+            .min(wrecks.materials[w])
             .min(room);
         if take <= Fx::ZERO {
             return false;
         }
-        wrecks.mass[w] -= take;
+        wrecks.materials[w] -= take;
         wrecks.reclaimed[w] += take;
         wrecks.drained[w] = self.state.tick;
         let bp = self.blueprints.unit(wrecks.blueprint[w]);
         let at = wrecks.pos[w].extend(wrecks.z[w]);
-        let gone = wrecks.mass[w] <= Fx::ZERO;
+        let gone = wrecks.materials[w] <= Fx::ZERO;
         if gone {
             wrecks.slots.free(w);
             self.events.push(SimEvent::Reclaimed {
@@ -268,7 +268,7 @@ impl World {
         let (full, time, cost, radius, height) = (
             tbp.health,
             tbp.build_time,
-            tbp.cost_mass,
+            tbp.cost_materials,
             tbp.radius,
             tbp.height,
         );
@@ -279,7 +279,7 @@ impl World {
         );
         let enemies = self.are_enemies(by, of);
         let units = &mut self.state.units;
-        let (taken, mass, gone) = if units.has_flag(t, flag::UNDER_CONSTRUCTION) {
+        let (taken, materials, gone) = if units.has_flag(t, flag::UNDER_CONSTRUCTION) {
             // A site is unbuilt the way it went up: its progress falls at the power that
             // would raise it, its health with it, and it is gone once nothing is left built.
             // What comes back is a share of what had been put in.
@@ -326,21 +326,21 @@ impl World {
             relay: false,
             head,
         });
-        self.credit(row, mass);
+        self.credit(row, materials);
         gone
     }
 
-    fn credit(&mut self, row: usize, mass: Fx) {
+    fn credit(&mut self, row: usize, materials: Fx) {
         let player = &mut self.state.players[self.state.units.owner[row] as usize];
-        player.mass += mass;
-        player.reclaimed_mass += mass;
+        player.materials += materials;
+        player.reclaimed_materials += materials;
         let units = &mut self.state.units;
-        units.reclaimed[row] += mass;
+        units.reclaimed[row] += materials;
         if let Some(parent) = units.row(units.drone_parent[row]) {
-            units.reclaimed[parent] += mass;
+            units.reclaimed[parent] += materials;
         }
         units.flags[row] |= flag::RECLAIMING;
-        self.flow(row).made[0] += mass;
+        self.flow(row).made[0] += materials;
     }
 
     pub(crate) fn run_reclaim_unit(&mut self, row: usize, o: &Order) -> Result<(), SimError> {
@@ -414,7 +414,7 @@ impl World {
     }
 
     /// What a reclaimer with no orders does by itself: it clears the wrecks within
-    /// its reach while there is room to store the mass. It never leaves where it
+    /// its reach while there is room to store the materials. It never leaves where it
     /// stands, and it never turns its beam on a live unit unasked: that takes an
     /// order. A builder that carries weapons leaves wrecks alone while there is
     /// anything about to shoot at, so its torso is never on a wreck between two targets.

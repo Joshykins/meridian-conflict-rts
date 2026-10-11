@@ -27,7 +27,7 @@ pub(super) fn kit(
     }
 }
 
-// ---- Mass extractor ------------------------------------------------------------
+// ---- Materials extractor -------------------------------------------------------
 /// A wellhead around an open bore: the deposit's cracks stay visible, and the
 /// machine mines them with intake bells that sweep the fissures, not a drill.
 /// The 2x2 lot is four build cells meeting at the deposit; each cell holds one

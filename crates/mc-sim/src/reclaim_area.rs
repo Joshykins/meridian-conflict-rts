@@ -136,7 +136,7 @@ impl World {
             let w = e.row as usize;
             wrecks.slots.is_alive(w)
                 && wrecks.pos[w] == e.pos
-                && wrecks.mass[w] > Fx::ZERO
+                && wrecks.materials[w] > Fx::ZERO
                 && given_up != Some(w)
                 && self.wreck_known(w, owner)
                 && (e.pos.distance(pos) <= sweep + e.radius

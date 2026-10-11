@@ -60,7 +60,7 @@ fn vs_main(@location(0) grid: vec2<f32>, @builtin(instance_index) instance: u32)
     // Crags finer than the samples: the wall broken into rock (rock.wgsl).
     let crag = crag_relief(world, distance(world, eye), node.morph.z);
     world.z += crag.lift;
-    out.crag = vec4<f32>(crag.weight, crag.fine, crag.mass_lift, crag.facet_lift);
+    out.crag = vec4<f32>(crag.weight, crag.fine, crag.materials_lift, crag.facet_lift);
     if (push.pass_kind & PASS_KIND_MASK) == PASS_SHADOW {
         out.clip = globals.shadow_cascades[push.pass_kind >> PASS_CASCADE_SHIFT] * vec4<f32>(world, 1.0);
     } else {
@@ -617,7 +617,7 @@ fn shade_ground(world: vec3<f32>, crag: vec4<f32>, pixel: vec2<f32>, dpx: vec3<f
         var c: Crag;
         c.weight = crag_w;
         c.fine = crag.y;
-        c.mass_lift = crag.z;
+        c.materials_lift = crag.z;
         c.facet_lift = crag.w;
         let shade = crag_shade(xy, base_n, px, c);
         facet = shade.normal;
@@ -805,7 +805,7 @@ fn shade_ground(world: vec3<f32>, crag: vec4<f32>, pixel: vec2<f32>, dpx: vec3<f
         // the shade between them.
         let upright = clamp((eye.z - z) / max(dist, 1.0), 0.0, 1.0);
         let graze = 1.0 - smoothstep(0.05, 0.45, upright);
-        let field = grass_mass(grassy, hab, mix(0.5, 0.85, graze)) * ground_tone(hab, green_part) * macro_mod
+        let field = grass_materials(grassy, hab, mix(0.5, 0.85, graze)) * ground_tone(hab, green_part) * macro_mod
             * (1.0 + graze * 0.12);
         let drawn = grass_drawn(world);
         let close = drawn * smoothstep(8.0, 24.0, GRASS_CELL_M * globals.lod.x / max(dist, 1.0));

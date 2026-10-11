@@ -19,29 +19,29 @@ pub struct PlayerStatus {
     pub name: String,
     pub team: u8,
     pub defeated: bool,
-    pub mass: f32,
+    pub materials: f32,
     pub energy: f32,
-    pub mass_capacity: f32,
+    pub materials_capacity: f32,
     pub energy_capacity: f32,
-    pub mass_income: f32,
-    /// Materials a second coming in from reclaim, on top of `mass_income`.
+    pub materials_income: f32,
+    /// Materials a second coming in from reclaim, on top of `materials_income`.
     pub reclaim_income: f32,
     /// Materials a second the mines will add as they finish growing into their
-    /// territories and digging out to their ore: `mass_income` plus this is the
+    /// territories and digging out to their ore: `materials_income` plus this is the
     /// income once every mine is fully grown.
     pub mine_growth: f32,
     pub energy_income: f32,
-    /// What the side is paid of its mass and energy income, as factors: the seat's
+    /// What the side is paid of its materials and energy income, as factors: the seat's
     /// set-up multiplier or the test range's dial. Previews made from blueprints are
     /// turned by it.
     pub income_dial: [f32; 2],
     /// How fast the side's builders work, as a factor of their build power: the seat's
     /// set-up multiplier or the test range's dial. Build times shown are turned by it.
     pub build_dial: f32,
-    pub mass_demand: f32,
+    pub materials_demand: f32,
     pub energy_demand: f32,
     /// What was really spent: the demand as far as the stall let it be paid.
-    pub mass_spent: f32,
+    pub materials_spent: f32,
     pub energy_spent: f32,
     pub efficiency: f32,
     /// How fast building actually goes against full speed (see `mc_sim::Player::build_speed`).
@@ -254,7 +254,7 @@ fn forces_of(world: &World, players: &mut [PlayerStatus]) {
             f.engineers += 1;
         } else if !bp.has(cat::COMMANDER) && !bp.is_salvager() {
             f.army += 1;
-            f.army_value += bp.cost_mass.to_f32();
+            f.army_value += bp.cost_materials.to_f32();
         }
     }
 }
@@ -275,19 +275,19 @@ pub fn status_of(world: &World, worst: u64) -> SimStatus {
                 name: p.name.clone(),
                 team: p.team,
                 defeated: p.defeated,
-                mass: f(p.mass),
+                materials: f(p.materials),
                 energy: f(p.energy),
-                mass_capacity: f(p.mass_capacity),
+                materials_capacity: f(p.materials_capacity),
                 energy_capacity: f(p.energy_capacity),
-                mass_income: f(p.mass_income),
+                materials_income: f(p.materials_income),
                 reclaim_income: f(p.reclaim_income),
                 mine_growth: 0.0,
                 energy_income: f(p.energy_income),
                 income_dial: p.income_permille.map(|v| v as f32 / 1000.0),
                 build_dial: p.build_permille as f32 / 1000.0,
-                mass_demand: f(p.mass_demand),
+                materials_demand: f(p.materials_demand),
                 energy_demand: f(p.energy_demand),
-                mass_spent: f(p.mass_spent),
+                materials_spent: f(p.materials_spent),
                 energy_spent: f(p.energy_spent),
                 efficiency: f(p.efficiency),
                 build_speed: f(p.build_speed),

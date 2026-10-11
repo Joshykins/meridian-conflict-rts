@@ -342,14 +342,14 @@ fn stores_income_and_wrecks_can_be_set_up() {
         spawn(&w, 0, "aster_t1_power", 500, 0, 1000),
         cmd(Command::DebugStorage {
             player: 0,
-            mass: 1000,
+            materials: 1000,
             energy: 5000,
         }),
     ])
     .unwrap();
     let p = |w: &World| w.state.players[0].clone();
     assert_eq!(
-        p(&w).mass_capacity,
+        p(&w).materials_capacity,
         Fx::from_int(1000),
         "stores with no storage built"
     );
@@ -358,7 +358,7 @@ fn stores_income_and_wrecks_can_be_set_up() {
     // Half full, then the generator's output turned off: the store stays put.
     w.tick(&[cmd(Command::DebugStock {
         player: 0,
-        mass: None,
+        materials: None,
         energy: Some(500),
     })])
     .unwrap();
@@ -366,7 +366,7 @@ fn stores_income_and_wrecks_can_be_set_up() {
     assert!(made > Fx::ZERO);
     w.tick(&[cmd(Command::DebugIncome {
         player: 0,
-        mass: 1000,
+        materials: 1000,
         energy: 0,
     })])
     .unwrap();
@@ -377,14 +377,14 @@ fn stores_income_and_wrecks_can_be_set_up() {
     // Doubled, it comes in twice as fast.
     w.tick(&[cmd(Command::DebugIncome {
         player: 0,
-        mass: 1000,
+        materials: 1000,
         energy: 2000,
     })])
     .unwrap();
     assert_eq!(p(&w).energy_income, made * 2);
     w.tick(&[cmd(Command::DebugStock {
         player: 0,
-        mass: Some(1000),
+        materials: Some(1000),
         energy: Some(0),
     })])
     .unwrap();
@@ -392,7 +392,7 @@ fn stores_income_and_wrecks_can_be_set_up() {
         p(&w).energy <= made * 2 / mc_core::TICKS_PER_SECOND as i32,
         "emptied, bar one tick of income"
     );
-    assert_eq!(p(&w).mass, Fx::from_int(1000));
+    assert_eq!(p(&w).materials, Fx::from_int(1000));
 
     w.tick(&[cmd(Command::DebugWrecks {
         blueprint: w.blueprints.id_of("aster_t1_tank").unwrap(),

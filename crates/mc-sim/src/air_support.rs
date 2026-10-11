@@ -173,7 +173,7 @@ impl World {
             && self.port_wants(row, w)
     }
 
-    /// Whether port `row` is after wreck `w` at all: one with mass left that its side
+    /// Whether port `row` is after wreck `w` at all: one with materials left that its side
     /// knows of (`wreck_known`, as the player is shown it) and, while it is clearing a circle (`ReclaimArea`), inside that circle.
     fn port_wants(&self, row: usize, w: usize) -> bool {
         let units = &self.state.units;
@@ -185,7 +185,7 @@ impl World {
             .front(units, row)
             .filter(|o| o.kind == OrderKind::ReclaimArea && o.radius > Fx::ZERO);
         circle.is_none_or(|o| at.distance(o.pos) <= o.radius)
-            && wrecks.mass[w] > Fx::ZERO
+            && wrecks.materials[w] > Fx::ZERO
             && self.wreck_known(w, units.owner[row])
     }
 
@@ -232,7 +232,7 @@ impl World {
     }
 
     /// Drones going up on their sockets, for the economy to pay for like any build:
-    /// (carrier, drone, build-time units a tick at full speed, mass and energy that
+    /// (carrier, drone, build-time units a tick at full speed, materials and energy that
     /// asks for, the tier it is paid in). A drone makes materials, so the side's
     /// materials priority (`Focus::mines`) says when it is paid in a stall, unless the
     /// carrier has a priority of its own.
@@ -249,7 +249,7 @@ impl World {
                 let bp = self.bp(drone);
                 let rate = Fx::ONE.min(bp.build_time - units.build_progress[drone]);
                 let want = [
-                    bp.cost_mass * rate / bp.build_time,
+                    bp.cost_materials * rate / bp.build_time,
                     bp.cost_energy * rate / bp.build_time,
                 ];
                 let focus = self.state.players[units.owner[drone] as usize].focus;

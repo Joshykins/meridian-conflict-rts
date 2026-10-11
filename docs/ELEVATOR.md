@@ -19,10 +19,10 @@ come down: they land, open, let their units drive out and sink into the ground.
   starts.
 - The tick the crates touch down they set down the front of the elevator's queue, free,
   seated inside them (`elevator::seat_units`), as long as the next unit fits in what is
-  left of the `payload` (20000 mass) and has a seat: a crate is 72 m wide and 100 m long
+  left of the `payload` (20000 materials) and has a seat: a crate is 72 m wide and 100 m long
   and units are packed in rows from its doors inward, the first crate first. The queue
   keeps its order: the first unit that does not fit, and everything behind it, waits for
-  the next fall. Whatever of the payload is left goes into the side's store as mass (past a
+  the next fall. Whatever of the payload is left goes into the side's store as materials (past a
   full store it is lost, like any other income).
 - Its queue is a factory's: the same build menu, Repeat, rally point and standing orders.
   Nothing is ever built on a pad and nothing is paid for.

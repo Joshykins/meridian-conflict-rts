@@ -283,13 +283,13 @@
     "aster_t3_fabricator": (
         lore: "The same chamber refitted under heavier coils, drinking a whole Reactor III for a draw that would light a city. Built against its reactor, the two go up as one.",
     ),
-    "aster_mass_storage": (
+    "aster_materials_storage": (
         lore: "A squat bunker buffering refined ore between the mines and the factory floor.",
     ),
-    "aster_mass_storage_t2": (
+    "aster_materials_storage_t2": (
         lore: "A deeper vault, dug down to hold what the mines and the salvage crews bring in.",
     ),
-    "aster_mass_storage_t3": (
+    "aster_materials_storage_t3": (
         lore: "A reinforced strategic reserve, big enough to bank a battlefield's worth of salvage.",
     ),
     "aster_energy_storage": (

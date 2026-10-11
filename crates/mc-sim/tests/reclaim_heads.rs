@@ -63,9 +63,9 @@ fn world_on(terrain: Heightfield) -> World {
     };
     let mut w =
         World::with_terrain(terrain, map, blueprints, Arc::new(Pool::new(1)), &config).unwrap();
-    w.state.players[0].mass = Fx::ZERO;
+    w.state.players[0].materials = Fx::ZERO;
     w.state.players[0].energy = Fx::from_int(100_000);
-    w.state.players[0].mass_capacity = Fx::from_int(100_000);
+    w.state.players[0].materials_capacity = Fx::from_int(100_000);
     w.state.players[0].energy_capacity = Fx::from_int(200_000);
     w
 }
@@ -76,7 +76,7 @@ fn add(w: &mut World, key: &str, x: i32, y: i32) -> usize {
         .unwrap()
 }
 
-fn wreck(w: &mut World, x: i32, y: i32, mass: i32) -> usize {
+fn wreck(w: &mut World, x: i32, y: i32, materials: i32) -> usize {
     let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
     w.state
         .wrecks
@@ -85,16 +85,16 @@ fn wreck(w: &mut World, x: i32, y: i32, mass: i32) -> usize {
             FxVec2::from_ints(x, y),
             Fx::from_int(20),
             Angle::ZERO,
-            Fx::from_int(mass),
+            Fx::from_int(materials),
             0,
         )
         .unwrap()
 }
 
-/// Mass stores are counted afresh each tick: keep the room the test set.
+/// Materials stores are counted afresh each tick: keep the room the test set.
 fn tick(w: &mut World, commands: &[PlayerCommand]) {
     w.tick(commands).unwrap();
-    w.state.players[0].mass_capacity = Fx::from_int(100_000);
+    w.state.players[0].materials_capacity = Fx::from_int(100_000);
 }
 
 #[test]
@@ -115,16 +115,16 @@ fn a_reclaimer_turns_its_head_on_a_house_to_a_wreck_and_pulls_at_its_power() {
         }
     }
     assert!(working, "its head found the wreck");
-    let before = w.state.players[0].reclaimed_mass;
+    let before = w.state.players[0].reclaimed_materials;
     for _ in 0..100 {
         tick(&mut w, &[]);
     }
-    let pulled = w.state.players[0].reclaimed_mass - before;
+    let pulled = w.state.players[0].reclaimed_materials - before;
     assert!(
         pulled <= power * 10 + Fx::ONE && pulled > power * 9,
         "{pulled:?} in ten seconds at {power:?}"
     );
-    assert!(w.state.wrecks.mass[off] < Fx::from_int(5000));
+    assert!(w.state.wrecks.materials[off] < Fx::from_int(5000));
     // Its head is posed like a gun in a house of its own, turned off the nose.
     w.write_render_frame(None, &mut frame);
     let row = frame
@@ -170,9 +170,9 @@ fn a_reclaimer_on_a_move_order_reclaims_what_it_passes_without_stopping() {
         last = now;
     }
     assert!(
-        w.state.players[0].reclaimed_mass > Fx::from_int(40),
+        w.state.players[0].reclaimed_materials > Fx::from_int(40),
         "it salvaged on the way: {:?}",
-        w.state.players[0].reclaimed_mass
+        w.state.players[0].reclaimed_materials
     );
     assert_eq!(stopped, 0, "it kept moving");
     assert!(w.state.units.pos[reclaimer].x > Fx::from_int(1500));
@@ -245,7 +245,7 @@ fn a_tower_reclaims_near_and_far_wrecks_through_an_energy_stall() {
     let mut w = world();
     let tower = add(&mut w, "aster_t1_reclaimer", 900, 900);
     assert_eq!(w.bp(tower).economy.energy_upkeep, Fx::ZERO);
-    add(&mut w, "aster_mass_storage", 300, 300);
+    add(&mut w, "aster_materials_storage", 300, 300);
     let engineer = add(&mut w, "aster_t1_engineer", 400, 400);
     let factory = w.blueprints.id_of("aster_t1_land_factory").unwrap();
     let id = w.state.units.id(engineer);
@@ -302,7 +302,7 @@ fn a_free_building_side_with_a_full_store_still_reclaims() {
     let mut beam = false;
     for _ in 0..600 {
         w.tick(&[]).unwrap();
-        w.state.players[0].mass = w.state.players[0].mass_capacity;
+        w.state.players[0].materials = w.state.players[0].materials_capacity;
         beam |= w
             .state
             .units
@@ -405,7 +405,7 @@ fn a_gleaner_upgrades_in_place_once_the_side_has_tech_2() {
         &mut w,
         &[order(Command::DebugStorage {
             player: 0,
-            mass: 10_000,
+            materials: 10_000,
             energy: 100_000,
         })],
     );
@@ -413,7 +413,7 @@ fn a_gleaner_upgrades_in_place_once_the_side_has_tech_2() {
         &mut w,
         &[order(Command::DebugStock {
             player: 0,
-            mass: Some(1000),
+            materials: Some(1000),
             energy: Some(10_000),
         })],
     );

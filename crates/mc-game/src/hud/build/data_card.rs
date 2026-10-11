@@ -4,7 +4,7 @@
 //! its aircraft, named for the wing and priced for all of it.
 
 use crate::hud::style::Domain;
-use crate::hud::{whole, Hud, Scene, ENERGY, MASS};
+use crate::hud::{whole, Hud, Scene, ENERGY, MATERIALS};
 use crate::ui::{palette, rgb, type_scale, Rect, Ui};
 use mc_core::TICKS_PER_SECOND;
 use mc_data::UnitBlueprint;
@@ -57,8 +57,8 @@ pub(in crate::hud) fn data_card(
     for (label, v, tone, sign) in [
         (
             "Materials Income",
-            e.mass_income.to_f32() * dial[0],
-            MASS,
+            e.materials_income.to_f32() * dial[0],
+            MATERIALS,
             "+",
         ),
         (
@@ -68,7 +68,12 @@ pub(in crate::hud) fn data_card(
             "+",
         ),
         ("Energy Upkeep", e.energy_upkeep.to_f32(), ENERGY, "-"),
-        ("Materials Storage", e.mass_storage.to_f32(), MASS, "+"),
+        (
+            "Materials Storage",
+            e.materials_storage.to_f32(),
+            MATERIALS,
+            "+",
+        ),
         ("Energy Storage", e.energy_storage.to_f32(), ENERGY, "+"),
     ] {
         if v > 0.0 {
@@ -77,13 +82,13 @@ pub(in crate::hud) fn data_card(
     }
     // A fabricator: what it makes with its upkeep paid, and how soon that buys it back.
     if let Some(f) = item.fabricator {
-        let rate = f.mass.to_f32() * dial[0];
-        rows.push(("Makes".into(), format!("+{rate:.0} materials/s"), MASS));
+        let rate = f.materials.to_f32() * dial[0];
+        rows.push(("Makes".into(), format!("+{rate:.0} materials/s"), MATERIALS));
         if rate > 0.0 {
             rows.push((
                 "Pays Back In".into(),
-                crate::hud::mine::duration(item.cost_mass.to_f32() / rate),
-                MASS,
+                crate::hud::mine::duration(item.cost_materials.to_f32() / rate),
+                MATERIALS,
             ));
             let per = e.energy_upkeep.to_f32() / rate;
             rows.push(("Energy per Material".into(), format!("{per:.0}"), ENERGY));
@@ -106,7 +111,7 @@ pub(in crate::hud) fn data_card(
                 r.power.to_f32(),
                 r.range.to_f32()
             ),
-            MASS,
+            MATERIALS,
         ));
     }
     if let Some(b) = &item.builder {
@@ -210,11 +215,15 @@ pub(in crate::hud) fn data_card(
     );
     crate::hud::volatile::chip(ui, item, end + 8.0, r.y + 48.0);
 
-    // The price: mass, energy, and how long this builder takes over it. An elevator's
-    // platform brings it down free, taking its mass out of the payload.
+    // The price: materials, energy, and how long this builder takes over it. An elevator's
+    // platform brings it down free, taking its materials out of the payload.
     let built = |power: f32, n: f32| {
         [
-            ("Materials", whole(item.cost_mass.to_f32() * n), MASS),
+            (
+                "Materials",
+                whole(item.cost_materials.to_f32() * n),
+                MATERIALS,
+            ),
             ("Energy", whole(item.cost_energy.to_f32() * n), ENERGY),
             (
                 "Time",
@@ -230,7 +239,10 @@ pub(in crate::hud) fn data_card(
         Pace::Platform(payload) => [
             (
                 "Of Payload",
-                format!("{:.0}%", 100.0 * item.cost_mass.to_f32() / payload.max(1.0)),
+                format!(
+                    "{:.0}%",
+                    100.0 * item.cost_materials.to_f32() / payload.max(1.0)
+                ),
                 crate::hud::elevator::CABLE,
             ),
             ("Price", "Free".to_owned(), palette::TEXT),

@@ -33,7 +33,7 @@ impl World {
         if !self.state.units.is_active(row) {
             return Some(0.0);
         }
-        let full = f.mass / mc_core::TICKS_PER_SECOND as i32;
+        let full = f.materials / mc_core::TICKS_PER_SECOND as i32;
         let made = self
             .flows
             .get(row)

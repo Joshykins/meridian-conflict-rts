@@ -2,7 +2,7 @@
 //! its spot. A few times a second it looks for work inside the area, nearest first by
 //! kind: work to help with (a structure going up, a unit upgrading or refitting, a
 //! factory's product, a launcher's next round, a dome missing charge), then a friend to mend,
-//! then, only while there is room to store the mass, a wreck to reclaim. It goes and does
+//! then, only while there is room to store the materials, a wreck to reclaim. It goes and does
 //! it with an order put in front of the guard, which carries on when that is done, so
 //! work that turns up later is picked up too. Reclaim is the least of it: a wreck in hand
 //! is dropped as soon as there is raising or mending to do, or the store is full.
@@ -51,7 +51,7 @@ impl World {
             let w = e.row as usize;
             wrecks.slots.is_alive(w)
                 && wrecks.pos[w] == e.pos
-                && wrecks.mass[w] > Fx::ZERO
+                && wrecks.materials[w] > Fx::ZERO
                 && e.pos.distance(centre) <= radius + e.radius
                 && self.wreck_known(w, owner)
         });
@@ -67,7 +67,7 @@ impl World {
     }
 
     /// An engineer reclaiming a wreck it took up from its area gives the wreck up when
-    /// there is no room left for the mass, or when something in the area wants raising
+    /// there is no room left for the materials, or when something in the area wants raising
     /// or mending, which it then goes to. True when it gave the wreck up.
     pub(crate) fn area_reclaim_yields(&mut self, row: usize) -> Result<bool, SimError> {
         if !self.area_looks(row) {

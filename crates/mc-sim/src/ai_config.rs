@@ -29,7 +29,7 @@ pub struct AiConfig {
     /// Production preferences for land, air, and naval units (0..=200).
     /// Zero disables combat production in that domain.
     pub domain_weights: [u8; 3],
-    /// What share of a side's normal mass and energy income this seat gets, in
+    /// What share of a side's normal materials and energy income this seat gets, in
     /// thousandths: 1000 is a fair match, 2000 doubles it. Every seat carries
     /// one, a person's as well as an AI's: the set-up's way to make an AI harder
     /// than its difficulty alone, or to give a person a head start or a handicap.
@@ -57,15 +57,15 @@ pub struct Skill {
     /// with the mines already standing, to be worth building.
     pub bare_mine_efficiency: i32,
     /// Seconds a mine upgrade may take to pay back its cost (its energy
-    /// counted as mass); doubled while materials pile up.
+    /// counted as materials); doubled while materials pile up.
     pub upgrade_payback: i32,
-    /// Energy income kept at this many times mass income.
+    /// Energy income kept at this many times materials income.
     pub power_ratio: i32,
     /// Most factories it builds, however much material goes unspent.
     pub factory_cap: i32,
-    /// Mass a second before factories are upgraded.
+    /// Materials a second before factories are upgraded.
     pub tech_income: i32,
-    /// Factories are upgraded once a few hundred mass are in store, not only
+    /// Factories are upgraded once a few hundred materials are in store, not only
     /// once materials pile up.
     pub eager_tech: bool,
     /// Units added to (or taken from) every attack wave.

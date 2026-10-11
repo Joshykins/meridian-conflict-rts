@@ -10,7 +10,7 @@
 //! Hovering a row of the band lights that neighbour's link on the ground.
 
 use super::selection::wrap_text;
-use super::{Scene, ENERGY, MASS};
+use super::{Scene, ENERGY, MATERIALS};
 use crate::ui::{id, palette, rgb, type_scale, Rect, Ui};
 use glam::Vec2;
 use mc_core::{Fx, FxVec2};
@@ -31,7 +31,7 @@ pub struct Focus {
 /// The resource's tone and its word.
 pub fn tone(r: Resource) -> u32 {
     match r {
-        Resource::Mass => MASS,
+        Resource::Materials => MATERIALS,
         Resource::Energy => ENERGY,
     }
 }
@@ -40,8 +40,8 @@ pub fn tone(r: Resource) -> u32 {
 /// for energy (`Blueprints::power_line`, linear light, here as sRGB for the interface),
 /// the materials tone for materials. The panels keep the economy's own tones (`tone`).
 pub fn line_tone(blueprints: &Blueprints, provider: BlueprintId, r: Resource) -> u32 {
-    if r == Resource::Mass {
-        return MASS;
+    if r == Resource::Materials {
+        return MATERIALS;
     }
     let srgb = |c: f32| (c.clamp(0.0, 1.0).powf(1.0 / 2.2) * 255.0).round() as u32;
     let [cr, cg, cb] = blueprints.power_line(provider).color;
@@ -50,7 +50,7 @@ pub fn line_tone(blueprints: &Blueprints, provider: BlueprintId, r: Resource) ->
 
 pub fn word(r: Resource) -> &'static str {
     match r {
-        Resource::Mass => "Materials",
+        Resource::Materials => "Materials",
         Resource::Energy => "Energy",
     }
 }
@@ -183,7 +183,7 @@ pub fn planned_links(
         .collect()
 }
 
-/// What the incoming ties save: `[mass, energy]`.
+/// What the incoming ties save: `[materials, energy]`.
 pub fn totals(ties: &[Tie]) -> [f32; 2] {
     let mut t = [0.0f32; 2];
     for tie in ties.iter().filter(|t| t.incoming) {
@@ -226,7 +226,7 @@ fn providers(
         .filter(|p| p.faction == bp.faction)
         .filter_map(|p| p.adjacency)
         .map(|a| match resource {
-            Resource::Mass => a.mass.to_f32(),
+            Resource::Materials => a.materials.to_f32(),
             Resource::Energy => a.energy.to_f32(),
         })
         .filter(|&s| s > 0.0)
@@ -234,7 +234,7 @@ fn providers(
     let lo = shares.iter().copied().fold(f32::MAX, f32::min);
     let hi = shares.iter().copied().fold(0.0, f32::max);
     let name = match resource {
-        Resource::Mass => "Fabricators",
+        Resource::Materials => "Fabricators",
         Resource::Energy => "Power Plants",
     };
     (hi > 0.0).then_some((lo, hi, name))
@@ -256,7 +256,7 @@ pub fn card_rows(blueprints: &Blueprints, bp: &UnitBlueprint) -> Vec<(String, St
     if !bp.is_structure() {
         return rows;
     }
-    for r in [Resource::Energy, Resource::Mass] {
+    for r in [Resource::Energy, Resource::Materials] {
         if !adjacency::uses(bp, r) {
             continue;
         }
@@ -264,7 +264,7 @@ pub fn card_rows(blueprints: &Blueprints, bp: &UnitBlueprint) -> Vec<(String, St
             let what = match (r, bp.builder.is_some()) {
                 (Resource::Energy, false) => "upkeep",
                 (Resource::Energy, true) => "energy per build",
-                (Resource::Mass, _) => "materials per build",
+                (Resource::Materials, _) => "materials per build",
             };
             rows.push((
                 format!("Ringed by {name}"),
@@ -274,11 +274,14 @@ pub fn card_rows(blueprints: &Blueprints, bp: &UnitBlueprint) -> Vec<(String, St
         }
     }
     if let Some(a) = bp.adjacency {
-        for (r, share) in [(Resource::Energy, a.energy), (Resource::Mass, a.mass)] {
+        for (r, share) in [
+            (Resource::Energy, a.energy),
+            (Resource::Materials, a.materials),
+        ] {
             if share > Fx::ZERO {
                 let whom = match r {
                     Resource::Energy => "upkeep and factory builds",
-                    Resource::Mass => "a factory's builds",
+                    Resource::Materials => "a factory's builds",
                 };
                 rows.push((
                     "Saves a Ringed Neighbour".into(),
@@ -297,7 +300,7 @@ pub fn hint(blueprints: &Blueprints, bp: &UnitBlueprint, ties: &[Tie]) -> Option
         return None;
     }
     let has = |r: Resource| ties.iter().any(|t| t.incoming && t.resource == r);
-    let wants: Vec<_> = [Resource::Energy, Resource::Mass]
+    let wants: Vec<_> = [Resource::Energy, Resource::Materials]
         .into_iter()
         .filter(|&r| adjacency::uses(bp, r) && !has(r))
         .filter_map(|r| providers(blueprints, bp, r).map(|(_, hi, name)| (r, hi, name)))
@@ -314,10 +317,10 @@ pub fn hint(blueprints: &Blueprints, bp: &UnitBlueprint, ties: &[Tie]) -> Option
     }
 }
 
-/// What the incoming savings come to a second: `[mass, energy]`. The full upkeep is the
+/// What the incoming savings come to a second: `[materials, energy]`. The full upkeep is the
 /// blueprint's; a factory's build draw is what it asks for now, already less the saving.
 fn per_second(s: &Scene, u: &UnitInstance, bp: &UnitBlueprint, saved: [f32; 2]) -> [f32; 2] {
-    let (mass, energy) = super::economy::flows(s, u, bp);
+    let (materials, energy) = super::economy::flows(s, u, bp);
     let upkeep = if u.paused() {
         0.0
     } else {
@@ -331,7 +334,10 @@ fn per_second(s: &Scene, u: &UnitInstance, bp: &UnitBlueprint, saved: [f32; 2]) 
         }
     };
     if bp.builder.is_some() {
-        [build(mass.wanted, saved[0]), build(energy.wanted, saved[1])]
+        [
+            build(materials.wanted, saved[0]),
+            build(energy.wanted, saved[1]),
+        ]
     } else {
         [0.0, upkeep * saved[1]]
     }
@@ -392,7 +398,7 @@ pub fn band(
     let saved = totals(&ties);
     let rate = per_second(s, u, bp, saved);
     let mut right = x + cw;
-    for r in [Resource::Energy, Resource::Mass] {
+    for r in [Resource::Energy, Resource::Materials] {
         let share = saved[r as usize];
         if share <= 0.0 {
             continue;
@@ -523,7 +529,7 @@ mod tests {
         assert!((ringed(fab, &ties) - 0.25).abs() < 1e-3);
         assert!(ties
             .iter()
-            .any(|t| !t.incoming && t.partner == 2 && t.resource == Resource::Mass));
+            .any(|t| !t.incoming && t.partner == 2 && t.resource == Resource::Materials));
     }
 
     #[test]

@@ -83,9 +83,9 @@ fn orders_a_minute(d: Difficulty) -> i32 {
 }
 
 impl World {
-    /// A unit of `player` killed `mass` of the enemy: credited to its operation at the
+    /// A unit of `player` killed `materials` of the enemy: credited to its operation at the
     /// side's next think.
-    pub(crate) fn note_kill_for_ai(&mut self, player: u8, killer: UnitId, mass: Fx) {
+    pub(crate) fn note_kill_for_ai(&mut self, player: u8, killer: UnitId, materials: Fx) {
         if self
             .state
             .players
@@ -100,11 +100,11 @@ impl World {
         };
         // A deliberate cap: the oldest kills are lost if a side somehow never thinks.
         if ai.commander.kills.len() < MOST_KILLS {
-            ai.commander.kills.push((killer, mass));
+            ai.commander.kills.push((killer, materials));
         }
     }
 
-    /// A unit of `player` of blueprint `lost`, worth `mass`, was killed by a unit of
+    /// A unit of `player` of blueprint `lost`, worth `materials`, was killed by a unit of
     /// blueprint `by`: what hurts the side, by the killer's kind (`state::Hurt`),
     /// steers production; a mine or plant lost to a ground raid calls for a turret
     /// there (`plans.rs`).
@@ -113,7 +113,7 @@ impl World {
         player: u8,
         by: mc_data::BlueprintId,
         lost: mc_data::BlueprintId,
-        mass: Fx,
+        materials: Fx,
         at: FxVec2,
     ) {
         let kind = state::Hurt::of(self.blueprints.unit(by));
@@ -135,7 +135,7 @@ impl World {
             return;
         };
         {
-            ai.commander.hurt[kind as usize] += mass;
+            ai.commander.hurt[kind as usize] += materials;
             // Where the bombers keep hitting: anti-air goes there (`plans.rs`).
             if matches!(kind, state::Hurt::Air | state::Hurt::Space) {
                 ai.commander.hit_from_above = Some((at, tick));
@@ -185,9 +185,11 @@ impl World {
             .commander
             .ops
             .iter()
-            .map(|o| o.mass())
+            .map(|o| o.materials())
             .sum();
-        let theirs = beliefs.army_mass().max(beliefs.income * Fx::from_int(120));
+        let theirs = beliefs
+            .army_materials()
+            .max(beliefs.income * Fx::from_int(120));
         self.state.ai[player as usize].commander.behind = ours < theirs;
         self.ops_upkeep(player);
         self.recall_commander(player, out);
@@ -422,7 +424,7 @@ impl World {
             }
             if let Some(o) = c.ops.iter_mut().find(|o| o.id == id) {
                 o.units = cargo.iter().map(|(u, m, _)| (*u, *m)).collect();
-                o.ledger.committed += o.mass();
+                o.ledger.committed += o.materials();
                 o.phase_since = tick;
             }
             out.push(Command::Board {

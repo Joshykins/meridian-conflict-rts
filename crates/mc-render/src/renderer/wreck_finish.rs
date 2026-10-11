@@ -1,6 +1,6 @@
 //! The last of a wreck going up a reclaim beam (`SimEvent::Reclaimed` with `wreck`).
 //!
-//! The sim frees a wreck the tick its last mass goes, so the hull would simply vanish
+//! The sim frees a wreck the tick its last materials go, so the hull would simply vanish
 //! while it still glowed with the work. Here a copy of the hull as it was last drawn
 //! stays for [`GOING`] seconds: the reclaim net spreads over all of it and flares, then
 //! the metal burns away from the top down behind a white-hot edge (`wreck.wgsl`
@@ -23,7 +23,7 @@ const GOING: f32 = 1.4;
 pub(super) const MOST_SHOWN: usize = 256;
 /// Motes all going hulls may shed in one tick, at most (cosmetic).
 const MOTES_PER_TICK: usize = 160;
-/// Seconds since reclaim last took mass from a wreck, under which it may be finishing.
+/// Seconds since reclaim last took materials from a wreck, under which it may be finishing.
 const WORKED: f32 = 1.0;
 
 struct Going {
@@ -43,7 +43,7 @@ impl WreckFinish {
         *self = WreckFinish::default();
     }
 
-    /// Starts the hulls whose last mass went up a beam this tick, from how they were drawn
+    /// Starts the hulls whose last materials went up a beam this tick, from how they were drawn
     /// last tick, and notes which wrecks reclaim is working now.
     fn note(&mut self, units: &[UnitInstance], events: &[SimEvent], time: f32) {
         let mut ids: Vec<u32> = Vec::new();
@@ -263,7 +263,7 @@ mod tests {
         let idle = wreck(8, 2.0, 0.0, 600.0);
         let near = wreck(9, 3.0, 0.5, 0.0);
         f.note(&[worked, idle, near], &[], 0.0);
-        // Wreck 7's last mass went; 8 and 9 are still there.
+        // Wreck 7's last materials went; 8 and 9 are still there.
         f.note(&[idle, near], &[reclaimed(0)], 0.1);
         let going = f.instances(0.1 + GOING * 0.5);
         assert_eq!(going.len(), 1);

@@ -4,8 +4,8 @@ use super::*;
 impl World {
     pub(super) fn direct_upgrades(&self, player: u8, census: &Census, out: &mut Vec<Command>) {
         let pl = &self.state.players[player as usize];
-        let income = pl.mass_income;
-        let mass_rich = pl.mass > pl.mass_capacity * Fx::ratio(6, 10);
+        let income = pl.materials_income;
+        let materials_rich = pl.materials > pl.materials_capacity * Fx::ratio(6, 10);
         if census.power.len() < 2 {
             return;
         }
@@ -48,7 +48,7 @@ impl World {
         if let Some(row) = self.tech_step(player, census) {
             candidates.push((0, row));
         }
-        if income >= Fx::from_int(10) && pl.mass > Fx::from_int(400) {
+        if income >= Fx::from_int(10) && pl.materials > Fx::from_int(400) {
             if let Some(cmd) = self.state.units.row(pl.commander) {
                 if (self.bp(cmd).upgrades_to.is_some() || self.ai_next_refit(cmd).is_some())
                     && self.state.units.order_head[cmd] == NO_ORDER
@@ -75,7 +75,7 @@ impl World {
         if let Some(row) = self.fabricator_to_upgrade(player, census) {
             candidates.push((2, row));
         }
-        let surplus = mass_rich || (skill.eager_tech && pl.mass > Fx::from_int(400));
+        let surplus = materials_rich || (skill.eager_tech && pl.materials > Fx::from_int(400));
         // A factory being upgraded builds nothing: a few at a time, however
         // often this AI thinks, so the army keeps coming.
         let upgrading = census
@@ -124,7 +124,7 @@ impl World {
     /// idle when the AI looked, which held the side at tech 2 for twenty minutes.
     pub(super) fn tech_step(&self, player: u8, census: &Census) -> Option<usize> {
         let skill = self.state.ai[player as usize].config.skill();
-        let income = self.state.players[player as usize].mass_income;
+        let income = self.state.players[player as usize].materials_income;
         let best = census
             .factories
             .iter()
@@ -229,7 +229,7 @@ impl World {
     ) -> Option<(usize, &UnitBlueprint)> {
         let pl = &self.state.players[player as usize];
         let units = &self.state.units;
-        if pl.mass_income < Fx::from_int(3) {
+        if pl.materials_income < Fx::from_int(3) {
             return None;
         }
         let directives = self.commander_directives(player);
@@ -250,12 +250,12 @@ impl World {
         let horizon = Fx::from_int(directives.payback as i32);
         // No saving up first: a mine upgrade is paid before the factories in a
         // stall, and a good one is the best thing the side can spend on.
-        // Energy counts at what a tech 1 mine costs in it for each unit of mass.
+        // Energy counts at what a tech 1 mine costs in it for each unit of materials.
         open.filter_map(|(row, next)| {
             let state = self.state.mines.by_unit.get(&units.id(row))?;
             let gain = state.full_rate(&next.mine?) - state.full_rate(&self.bp(row).mine?);
-            let (mass, energy) = self.blueprints.upgrade_cost(next);
-            let cost = mass + energy / ENERGY_PER_MASS;
+            let (materials, energy) = self.blueprints.upgrade_cost(next);
+            let cost = materials + energy / ENERGY_PER_MATERIALS;
             (gain > Fx::ZERO).then(|| (row, next, cost / gain))
         })
         .filter(|&(_, _, payback)| payback <= horizon)
@@ -274,7 +274,7 @@ impl World {
                 set.fit(&loadout.fitted, s, m).is_ok()
                     && set.replaces(&loadout.fitted, s, m).is_none()
             })
-            .min_by_key(|&(s, m)| (set.module(s, m).cost_mass, s, m))
+            .min_by_key(|&(s, m)| (set.module(s, m).cost_materials, s, m))
             .map(|(s, m)| set.module(s, m).kit)
     }
 }

@@ -1,18 +1,18 @@
 use super::*;
 
-fn mass(m: i32) -> Fx {
+fn materials(m: i32) -> Fx {
     Fx::from_int(m)
 }
 
 fn holding(player: u8, factories: i32, army: i32, tick: u32) -> Holding {
     let mut h = Holding::empty(player);
     if factories > 0 {
-        h.built[Built::Factory as usize] = mass(factories);
+        h.built[Built::Factory as usize] = materials(factories);
         h.count[Built::Factory as usize] = 1;
         h.built_at = tick;
     }
     if army > 0 {
-        h.army[Domain::Land as usize] = mass(army);
+        h.army[Domain::Land as usize] = materials(army);
         h.army_at = tick;
     }
     h
@@ -26,7 +26,7 @@ fn a_zone_wholly_in_view_shows_what_is_there_now() {
     let new = refresh(&old, &now, 1000, 900);
     assert_eq!(new.len(), 1);
     assert_eq!(new[0].built[Built::Factory as usize], Fx::ZERO);
-    assert_eq!(new[0].army[Domain::Land as usize], mass(200));
+    assert_eq!(new[0].army[Domain::Land as usize], materials(200));
     assert_eq!(new[0].built_at, 900);
 }
 
@@ -41,7 +41,7 @@ fn a_zone_out_of_view_keeps_what_was_known() {
 fn half_in_view_keeps_half_of_what_was_not_seen_again() {
     let old = vec![holding(1, 800, 0, 100)];
     let new = refresh(&old, &[], 500, 900);
-    assert_eq!(new[0].built[Built::Factory as usize], mass(400));
+    assert_eq!(new[0].built[Built::Factory as usize], materials(400));
     // Mostly looked at: the knowledge is fresh, though less is there.
     assert_eq!(new[0].built_at, 900);
 }
@@ -51,7 +51,7 @@ fn something_on_radar_is_never_less_than_what_was_known() {
     let old = vec![holding(1, 800, 0, 100)];
     let now = vec![holding(1, 300, 0, 900)];
     let new = refresh(&old, &now, 0, 900);
-    assert_eq!(new[0].built[Built::Factory as usize], mass(800));
+    assert_eq!(new[0].built[Built::Factory as usize], materials(800));
 }
 
 #[test]
@@ -59,7 +59,7 @@ fn an_army_long_unseen_is_forgotten_but_structures_are_kept() {
     let old = vec![holding(1, 800, 500, 100)];
     let new = refresh(&old, &[], 0, 100 + ARMY_FORGET);
     assert_eq!(new[0].army[Domain::Land as usize], Fx::ZERO);
-    assert_eq!(new[0].built[Built::Factory as usize], mass(800));
+    assert_eq!(new[0].built[Built::Factory as usize], materials(800));
 }
 
 #[test]
@@ -78,5 +78,5 @@ fn sureness_fades_slowly_for_structures_and_fast_for_armies() {
     assert_eq!(h.built_sure(1000 + BUILT_FADE * 2), BUILT_FLOOR);
     assert_eq!(h.army_sure(1000 + ARMY_SURE), 100);
     assert_eq!(h.army_sure(1000 + ARMY_FORGET), 0);
-    assert!(h.army_now(1000 + 1000) < mass(500));
+    assert!(h.army_now(1000 + 1000) < materials(500));
 }

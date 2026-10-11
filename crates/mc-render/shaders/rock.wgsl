@@ -191,9 +191,9 @@ struct Crag {
     // How much of a crag it is, 0-1, and how much of the fine facets it carries.
     weight: f32,
     fine: f32,
-    // The lift is `mass_lift * crag_mass + facet_lift * crag_depth`: the fragment
+    // The lift is `materials_lift * crag_mass + facet_lift * crag_depth`: the fragment
     // shader lights the rock from these, not from the triangles they are drawn on.
-    mass_lift: f32,
+    materials_lift: f32,
     facet_lift: f32,
 }
 
@@ -219,9 +219,9 @@ fn crag_relief(p: vec3<f32>, dist: f32, fade: f32) -> Crag {
     }
     // The facets are a few metres across: on the steepest walls their lift is
     // held down, or a 2 m cell would stand on end and face nothing but shade.
-    c.mass_lift = min(grade, 3.0) * c.weight;
+    c.materials_lift = min(grade, 3.0) * c.weight;
     c.facet_lift = min(grade, 1.8) * c.fine;
-    c.lift = c.mass_lift * crag_mass(p);
+    c.lift = c.materials_lift * crag_mass(p);
     if c.fine > 0.0 {
         c.lift += c.facet_lift * crag_depth(p);
     }
@@ -261,7 +261,7 @@ fn crag_shade(xy: vec2<f32>, wall: vec3<f32>, px: f32, c: Crag) -> CragShade {
     let f0 = crag_fields(vec3<f32>(xy, z), fine);
     let fx = crag_fields(vec3<f32>(xy + vec2<f32>(e, 0.0), z + rise.x * e), fine);
     let fy = crag_fields(vec3<f32>(xy + vec2<f32>(0.0, e), z + rise.y * e), fine);
-    let lift = (vec2<f32>(fx.x, fy.x) - f0.x) * c.mass_lift + (vec2<f32>(fx.y, fy.y) - f0.y) * c.facet_lift;
+    let lift = (vec2<f32>(fx.x, fy.x) - f0.x) * c.materials_lift + (vec2<f32>(fx.y, fy.y) - f0.y) * c.facet_lift;
     out.normal = normalize(vec3<f32>(-(rise + lift / e), 1.0));
     out.depth = f0.x + f0.y * c.fine / max(c.weight, 0.004);
     return out;

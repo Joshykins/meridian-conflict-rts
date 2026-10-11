@@ -166,9 +166,9 @@ pub(super) const MODELS: &[ModelDef] = &[
     // The Material Fabricator (`fabricator`): tech 2, upgrading in place to tech 3.
     ModelDef::tiered("fabricator", fabricator::SIZES, fabricator::carousel::build),
     ModelDef::tiered(
-        "storage_mass",
+        "storage_materials",
         [(16.5, 8.0), (16.5, 13.0), (16.5, 19.0)],
-        storage::vault::storage_mass,
+        storage::vault::storage_materials,
     ),
     ModelDef::tiered(
         "storage_energy",

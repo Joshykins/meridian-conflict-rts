@@ -1,6 +1,6 @@
 //! Orders for the operations in the air and at sea: bomber strikes, fighter cover,
 //! the surface fleet and the submarines.
-use super::ops_ground::THREAT_MASS;
+use super::ops_ground::THREAT_MATERIALS;
 use super::profile::{role, Domain, Target};
 use super::state::{Operation, Phase};
 use super::Ctx;
@@ -50,11 +50,11 @@ impl World {
                     || (guns(c) && tick.saturating_sub(c.seen) <= 600)
             })
             .filter_map(|c| {
-                let aa = ctx.wm.threat_along(from, c.pos, Target::Air) * THREAT_MASS;
+                let aa = ctx.wm.threat_along(from, c.pos, Target::Air) * THREAT_MATERIALS;
                 (aa <= wing).then(|| {
                     // While our warheads wait on their interceptors, those are the mark.
                     let strip = strip && ctx.profiles.get(c.blueprint).has(role::INTERCEPTOR);
-                    let worth = self.blueprints.unit(c.blueprint).cost_mass
+                    let worth = self.blueprints.unit(c.blueprint).cost_materials
                         * if strip || (shelled && guns(c)) { 6 } else { 1 };
                     let score = (worth * 4 - aa).floor_int() as i64 * 1000
                         / (c.pos.distance(from).floor_int() as i64 + 2000);
@@ -78,7 +78,7 @@ impl World {
             return 0;
         }
         let tick = self.state.tick;
-        let mass: Fx = rows.iter().map(|&r| self.bp(r).cost_mass).sum();
+        let materials: Fx = rows.iter().map(|&r| self.bp(r).cost_materials).sum();
         let centre = self.centre_of(&rows).unwrap_or(op.rally);
         match op.phase {
             Phase::Gathering => {
@@ -104,7 +104,7 @@ impl World {
                     .copied()
                     .filter(|&r| self.state.units.pos[r].distance(op.rally) <= AIR_HOME)
                     .collect();
-                let gathered: Fx = home.iter().map(|&r| self.bp(r).cost_mass).sum();
+                let gathered: Fx = home.iter().map(|&r| self.bp(r).cost_materials).sum();
                 if gathered >= op.want && op.want > Fx::ZERO {
                     if let Some(target) = self.strike_target(ctx, op.rally, gathered) {
                         op.target = target;
@@ -121,11 +121,11 @@ impl World {
                 orders
             }
             Phase::Executing => {
-                let aa = ctx.wm.threat_at(centre, Target::Air) * THREAT_MASS;
+                let aa = ctx.wm.threat_at(centre, Target::Air) * THREAT_MATERIALS;
                 let done = rows
                     .iter()
                     .all(|&r| self.state.units.order_head[r] == crate::tables::NO_ORDER);
-                if aa > mass * 2 || done || tick > op.phase_since + 1200 {
+                if aa > materials * 2 || done || tick > op.phase_since + 1200 {
                     op.phase = Phase::Gathering;
                     op.phase_since = tick;
                     out.push(Command::Move {
@@ -223,7 +223,7 @@ impl World {
                 op.rally = a;
             }
         }
-        let mass: Fx = rows.iter().map(|&r| self.bp(r).cost_mass).sum();
+        let materials: Fx = rows.iter().map(|&r| self.bp(r).cost_materials).sum();
         let centre = self.centre_of(&rows).unwrap_or(op.rally);
         let subs = ctx.profiles.get(self.state.units.blueprint[first]).domain == Some(Domain::Sub);
         let class = if subs {
@@ -261,7 +261,7 @@ impl World {
                 let gathered: Fx = rows
                     .iter()
                     .filter(|&&r| self.state.units.pos[r].distance(op.rally) <= FLEET_HOME * 2)
-                    .map(|&r| self.bp(r).cost_mass)
+                    .map(|&r| self.bp(r).cost_materials)
                     .sum();
                 // A contact close to the anchorage is fought at once.
                 let close =
@@ -283,7 +283,7 @@ impl World {
             }
             Phase::Executing => {
                 let facing = self.enemy_strength_at(ctx, centre, Fx::from_int(1200), class);
-                if facing > mass * 2 {
+                if facing > materials * 2 {
                     op.phase = Phase::Withdrawing;
                     op.phase_since = tick;
                     out.push(Command::Move {
@@ -352,7 +352,7 @@ impl World {
             .filter_map(|c| {
                 let goal = self.nav.nearest_passable(m.layer, m.size_class, c.pos)?;
                 (goal.distance(c.pos) <= range && sea.reaches(goal)).then(|| {
-                    let sonar = ctx.wm.threat_at(goal, Target::Submerged) * THREAT_MASS;
+                    let sonar = ctx.wm.threat_at(goal, Target::Submerged) * THREAT_MATERIALS;
                     let cost =
                         goal.distance(from).floor_int() as i64 / 4 + sonar.floor_int() as i64 * 3;
                     (cost, goal)

@@ -327,7 +327,7 @@ impl Terrain {
     }
 
     /// How thickly trees grow: each region's own woods, thick jungle, open
-    /// pinyon and juniper, spruce in stands. (Trees carry no mass and slow no
+    /// pinyon and juniper, spruce in stands. (Trees carry no materials and slow no
     /// one, so the regions need not have the same.) None on the plateau.
     pub(super) fn tripoint_forest(&self, x: f64, y: f64, height: f64, slope: f64) -> (f64, f64) {
         let l = self.l_forest;

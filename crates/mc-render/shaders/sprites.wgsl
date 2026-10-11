@@ -86,7 +86,7 @@ fn weapon_color(kind: u32) -> vec3<f32> {
     }
     if kind == EFFECT_MATERIALS {
         // The last of a hull going up a reclaim beam: Materials red-orange.
-        return vec3<f32>(MASS_R, MASS_G, MASS_B);
+        return vec3<f32>(MATERIALS_R, MATERIALS_G, MATERIALS_B);
     }
     if kind == 9u {
         // An ARC rail gun's flash and strike (renderer/rail_fx.rs): white-hot.

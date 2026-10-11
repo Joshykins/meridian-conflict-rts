@@ -505,7 +505,7 @@ pub fn strategic(ui: &mut Ui, kind: IconKind, tech: u8, c: Vec2, r: f32, color: 
 }
 
 /// The salvage icons, as `icons.wgsl` draws them: the Extractor's disc (salvage feeds
-/// mass as a mine does) with its domain's mark: a reach ring for a structure, a hull for a
+/// materials as a mine does) with its domain's mark: a reach ring for a structure, a hull for a
 /// boat, wings and a tail for a carrier, nothing for a drone. Given in the renderer's icon
 /// square (y up), placed in a box of half-size `r`; `cut` fills the disc's cross.
 fn salvage(ui: &mut Ui, kind: IconKind, c: Vec2, r: f32, color: Color, cut: Color) {

@@ -235,8 +235,8 @@ pub fn run_sim(
                     s.players[i].units_killed
                 );
                 let pl = &s.players[i];
-                println!("    mass={:.0}/{:.0} income={:.1} energy={:.0}/{:.0} income={:.1} efficiency={:.2}",
-                    pl.mass.to_f32(), pl.mass_capacity.to_f32(), pl.mass_income.to_f32(),
+                println!("    materials={:.0}/{:.0} income={:.1} energy={:.0}/{:.0} income={:.1} efficiency={:.2}",
+                    pl.materials.to_f32(), pl.materials_capacity.to_f32(), pl.materials_income.to_f32(),
                     pl.energy.to_f32(), pl.energy_capacity.to_f32(), pl.energy_income.to_f32(), pl.efficiency.to_f32());
                 let mut roster = std::collections::BTreeMap::<&str, usize>::new();
                 for row in s

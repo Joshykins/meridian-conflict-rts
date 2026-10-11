@@ -30,7 +30,7 @@ use mc_data::UnitBlueprint;
 /// What a provider saves its neighbour.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Resource {
-    Mass = 0,
+    Materials = 0,
     Energy = 1,
 }
 
@@ -51,7 +51,7 @@ pub struct Link {
 #[derive(Default)]
 pub struct Links {
     pub links: Vec<Link>,
-    /// Share of its use each unit is saved, by row: `[mass, energy]`.
+    /// Share of its use each unit is saved, by row: `[materials, energy]`.
     saving: Vec<[Fx; 2]>,
 }
 
@@ -115,7 +115,7 @@ pub fn edge_share(full: Fx, edge: (FxVec2, FxVec2), consumer: Lot) -> Fx {
 pub fn uses(bp: &UnitBlueprint, resource: Resource) -> bool {
     let factory = bp.is_structure() && bp.builder.is_some();
     match resource {
-        Resource::Mass => factory,
+        Resource::Materials => factory,
         Resource::Energy => factory || bp.economy.energy_upkeep > Fx::ZERO,
     }
 }
@@ -129,7 +129,10 @@ pub fn offers(provider: &UnitBlueprint, consumer: &UnitBlueprint) -> [Option<(Re
     let one = |resource, share: Fx| {
         (share > Fx::ZERO && uses(consumer, resource)).then_some((resource, share))
     };
-    [one(Resource::Mass, a.mass), one(Resource::Energy, a.energy)]
+    [
+        one(Resource::Materials, a.materials),
+        one(Resource::Energy, a.energy),
+    ]
 }
 
 impl World {
@@ -147,7 +150,7 @@ impl World {
             let bp = self.bp(row);
             if !bp.is_structure()
                 || (bp.adjacency.is_none()
-                    && !uses(bp, Resource::Mass)
+                    && !uses(bp, Resource::Materials)
                     && !uses(bp, Resource::Energy))
             {
                 continue;
@@ -210,17 +213,20 @@ impl World {
         full - full * self.adjacency.saving(row, Resource::Energy)
     }
 
-    /// What the unit in `row` pays of the full `(mass, energy)` cost of building the
+    /// What the unit in `row` pays of the full `(materials, energy)` cost of building the
     /// one in `target`: a factory pays less for its products by what its neighbours
     /// save it.
     pub(crate) fn builder_pays(&self, row: usize, target: usize, cost: (Fx, Fx)) -> (Fx, Fx) {
         if !self.state.units.has_flag(target, flag::IN_FACTORY)
-            || !uses(self.bp(row), Resource::Mass)
+            || !uses(self.bp(row), Resource::Materials)
         {
             return cost;
         }
         let less = |v: Fx, r| v - v * self.adjacency.saving(row, r);
-        (less(cost.0, Resource::Mass), less(cost.1, Resource::Energy))
+        (
+            less(cost.0, Resource::Materials),
+            less(cost.1, Resource::Energy),
+        )
     }
 }
 

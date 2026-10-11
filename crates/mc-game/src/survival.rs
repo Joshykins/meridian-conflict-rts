@@ -254,15 +254,15 @@ pub fn log_tick(world: &mc_sim::World, tick: u32) {
         if let Some(s) = world.survival_status() {
             let p = &world.state.players[0];
             println!(
-                "[{min:5.1} min] {:?} round {} | hostile {} | nodes {} | defender units {} mass {:.0}/{:.0} +{:.0}/s reclaim +{:.0}/s | tick {:.2} ms",
+                "[{min:5.1} min] {:?} round {} | hostile {} | nodes {} | defender units {} materials {:.0}/{:.0} +{:.0}/s reclaim +{:.0}/s | tick {:.2} ms",
                 s.phase,
                 s.round,
                 s.hostile,
                 s.nodes.len(),
                 world.state.units.slots.iter().filter(|&r| world.state.units.owner[r] == 0).count(),
-                p.mass.to_f32(),
-                p.mass_capacity.to_f32(),
-                p.mass_income.to_f32(),
+                p.materials.to_f32(),
+                p.materials_capacity.to_f32(),
+                p.materials_income.to_f32(),
                 p.reclaim_income.to_f32(),
                 world.timings.total_ns as f64 / 1e6
             );

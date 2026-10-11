@@ -75,9 +75,9 @@ use mine_marks::{mine_marks, mines_in_sight, territory, TERRITORY_SEGMENTS};
 pub use mine_marks::{ore_claimed, ore_claims};
 pub use minimap::MINIMAP_SLOT;
 
-/// Materials (the sim's `mass`): red-orange. The world's materials conduits light the
+/// Materials (the sim's `materials`): red-orange. The world's materials conduits light the
 /// same colour (`gpu_consts::tone`).
-pub const MASS: u32 = mc_render::gpu_consts::tone::MASS;
+pub const MATERIALS: u32 = mc_render::gpu_consts::tone::MATERIALS;
 /// Healthy units: the green that used to be the materials colour.
 pub const HEALTHY: u32 = 0x6FE39B;
 pub const ENERGY: u32 = 0xF4C25E;
@@ -224,7 +224,7 @@ pub struct Scene<'a> {
     pub gpu: &'a FrameStats,
     /// Live unit under the pointer, when it can be read.
     pub hover: Option<u32>,
-    /// Control is held: survey reclaimable mass on the battlefield.
+    /// Control is held: survey reclaimable materials on the battlefield.
     pub show_reclaim: bool,
     /// While placing: the site under the pointer.
     pub placing: Option<mc_core::FxVec2>,
@@ -253,7 +253,7 @@ impl Scene<'_> {
         crate::sim_thread::queue_of(&self.view.status.queues, u.unit_id)
     }
 
-    /// What `owner` is paid of its income, `[mass, energy]` as factors
+    /// What `owner` is paid of its income, `[materials, energy]` as factors
     /// (`PlayerStatus::income_dial`).
     fn income_dial(&self, owner: u8) -> [f32; 2] {
         self.view
@@ -1015,7 +1015,7 @@ pub fn cursor_hint(
                 }
                 Targeting::Move | Targeting::Patrol => style::Family::Movement.tone(),
                 Targeting::Assist => style::Family::Engineering.tone(),
-                Targeting::Reclaim => MASS,
+                Targeting::Reclaim => MATERIALS,
                 Targeting::Guard => style::Family::Stance.tone(),
                 Targeting::Land | Targeting::Unload => style::Family::Transport.tone(),
                 Targeting::Nuke => silo::WARHEAD,

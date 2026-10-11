@@ -49,7 +49,7 @@ buy a tier path.
 a second by tier on a duel field, mines one tier past the tech, fabricators by tier, tier
 paths dearer): rerun the search before leaning on any
 of the plan below. The plan and numbers below were searched before the 2026-09-30 rebalance (build time follows
-mass, build power by tier, reactors 15 / 350 / 2000): rerun the search before leaning on them.
+materials, build power by tier, reactors 15 / 350 / 2000): rerun the search before leaning on them.
 Searched again on the new numbers (4 maps x 2 starts): the best plan is the same but with
 **3 mines instead of 6**, at 12.4 minutes. With mine upgrades now costing build power, builders
 spent climbing the one Deep Core line beat builders spent spreading mines. Upgrading Masons

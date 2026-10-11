@@ -45,8 +45,8 @@ fn world() -> World {
     };
     let mut w =
         World::with_terrain(terrain, map, blueprints, Arc::new(Pool::new(1)), &config).unwrap();
-    // Somewhere to put the mass: stores are counted afresh every tick.
-    let storage = spawn(&w, 0, "aster_mass_storage", 200, 0);
+    // Somewhere to put the materials: stores are counted afresh every tick.
+    let storage = spawn(&w, 0, "aster_materials_storage", 200, 0);
     w.tick(&[storage]).unwrap();
     w
 }
@@ -138,11 +138,11 @@ fn an_enemy_reclaimed_to_nothing_goes_quietly_and_pays() {
         "and nothing was left lying about"
     );
     assert!(w.state.stains.is_empty());
-    let cost = w.blueprints.unit_by_key(TANK).unwrap().cost_mass;
-    let got = w.state.players[0].reclaimed_mass;
+    let cost = w.blueprints.unit_by_key(TANK).unwrap().cost_materials;
+    let got = w.state.players[0].reclaimed_materials;
     assert!(
         got > cost * Fx::ratio(15, 100) && got <= cost * Fx::ratio(1, 5),
-        "a fifth of its mass came back: {got:?} of {cost:?}"
+        "a fifth of its materials came back: {got:?} of {cost:?}"
     );
     let by: Fx = engineer
         .iter()
@@ -169,7 +169,7 @@ fn own_structures_can_be_reclaimed_and_allies_cannot() {
     })])
     .unwrap();
     run_until(&mut w, 2000, |w| w.state.units.row(power).is_none());
-    assert!(w.state.players[0].reclaimed_mass > Fx::ZERO);
+    assert!(w.state.players[0].reclaimed_materials > Fx::ZERO);
     // The ground it stood on is free again, and the pour went with it.
     let bp = w.blueprints.unit_by_key("aster_t1_power").unwrap().clone();
     let lot = mc_sim::world::snap_to_build_grid(&bp, FxVec2::from_ints(548, 512));
@@ -209,7 +209,11 @@ fn a_site_reclaimed_comes_down_the_way_it_went_up() {
     let site = ids(&w, 0, "aster_t1_power")[0];
     let row = w.state.units.row(site).unwrap();
     assert!(w.state.units.has_flag(row, flag::UNDER_CONSTRUCTION));
-    let (time, full, cost) = (w.bp(row).build_time, w.bp(row).health, w.bp(row).cost_mass);
+    let (time, full, cost) = (
+        w.bp(row).build_time,
+        w.bp(row).health,
+        w.bp(row).cost_materials,
+    );
     let start = w.state.units.build_progress[row];
     w.tick(&[cmd(Command::ReclaimUnit {
         units: ids(&w, 0, ENGINEER),
@@ -228,7 +232,7 @@ fn a_site_reclaimed_comes_down_the_way_it_went_up() {
         "health {health:?} follows progress (expected {expected:?})"
     );
     run_until(&mut w, 4000, |w| w.state.units.row(site).is_none());
-    let got = w.state.players[0].reclaimed_mass;
+    let got = w.state.players[0].reclaimed_materials;
     let put_in = cost * start / time;
     assert!(
         got > put_in * Fx::ratio(19, 100) && got <= put_in * Fx::ratio(1, 5),
@@ -260,7 +264,7 @@ fn an_engineer_sent_to_reclaim_a_far_wreck_takes_what_it_passes_on_the_way() {
             .unwrap()
     };
     let (passed, far) = (at(600), at(1000));
-    let (full, far_id) = (wrecks.mass[passed], wrecks.slots.handle(far));
+    let (full, far_id) = (wrecks.materials[passed], wrecks.slots.handle(far));
     w.tick(&[cmd(Command::ReclaimWreck {
         units: ids(&w, 0, ENGINEER),
         wreck: far_id,
@@ -272,7 +276,7 @@ fn an_engineer_sent_to_reclaim_a_far_wreck_takes_what_it_passes_on_the_way() {
         w.state.units.pos[engineer].x > Fx::from_int(700)
     });
     assert!(
-        !w.state.wrecks.slots.is_alive(passed) || w.state.wrecks.mass[passed] < full,
+        !w.state.wrecks.slots.is_alive(passed) || w.state.wrecks.materials[passed] < full,
         "it took from the wreck it passed"
     );
     run_until(&mut w, 3000, |w| !w.state.wrecks.slots.is_alive(far));
@@ -299,14 +303,14 @@ fn an_idle_engineer_clears_the_wrecks_in_reach_while_there_is_room() {
     w.tick(&[]).unwrap();
     assert_eq!(w.state.wrecks.slots.iter().count(), 2);
 
-    // Full stores: the wreck keeps its mass for later.
-    w.state.players[0].mass = w.state.players[0].mass_capacity;
+    // Full stores: the wreck keeps its materials for later.
+    w.state.players[0].materials = w.state.players[0].materials_capacity;
     for _ in 0..20 {
         w.tick(&[]).unwrap();
     }
-    assert_eq!(w.state.players[0].reclaimed_mass, Fx::ZERO);
+    assert_eq!(w.state.players[0].reclaimed_materials, Fx::ZERO);
 
-    w.state.players[0].mass = Fx::ZERO;
+    w.state.players[0].materials = Fx::ZERO;
     let events = run_until(&mut w, 2000, |w| w.state.wrecks.slots.iter().count() == 1);
     assert!(events
         .iter()
@@ -342,17 +346,17 @@ fn a_wreck_left_half_reclaimed_is_drawn_whole_with_the_share_taken() {
         permille: 1000,
     })])
     .unwrap();
-    w.state.players[0].mass = Fx::ZERO;
+    w.state.players[0].materials = Fx::ZERO;
     let row = w.state.wrecks.slots.iter().next().unwrap();
-    let full = w.state.wrecks.mass_max[row];
-    run_until(&mut w, 2000, |w| w.state.wrecks.mass[row] * 2 < full);
+    let full = w.state.wrecks.materials_max[row];
+    run_until(&mut w, 2000, |w| w.state.wrecks.materials[row] * 2 < full);
     // Stores full: the work stops with the wreck half taken.
-    w.state.players[0].mass = w.state.players[0].mass_capacity;
+    w.state.players[0].materials = w.state.players[0].materials_capacity;
     for _ in 0..30 {
         w.tick(&[]).unwrap();
     }
     let wrecks = &w.state.wrecks;
-    assert_eq!(wrecks.mass[row] + wrecks.reclaimed[row], full);
+    assert_eq!(wrecks.materials[row] + wrecks.reclaimed[row], full);
     let mut frame = RenderFrame::default();
     w.write_render_frame(Some(0), &mut frame);
     let drawn = frame
@@ -364,7 +368,7 @@ fn a_wreck_left_half_reclaimed_is_drawn_whole_with_the_share_taken() {
     let taken = (wrecks.reclaimed[row] / full).to_f32();
     assert!((drawn.fx[2] - taken).abs() < 1e-3 && taken > 0.5);
     assert!(drawn.fx[3] >= 2.5, "the work has cooled: {}", drawn.fx[3]);
-    let left = (wrecks.mass[row] / full).to_f32();
+    let left = (wrecks.materials[row] / full).to_f32();
     assert!((drawn.wreck_left() - left).abs() < 1e-3);
 }
 
@@ -393,7 +397,7 @@ fn a_reclaimer_tower_clears_wrecks_by_itself_but_only_takes_live_units_on_an_ord
             "nothing was drained unasked"
         );
     }
-    assert_eq!(w.state.players[0].reclaimed_mass, Fx::ZERO);
+    assert_eq!(w.state.players[0].reclaimed_materials, Fx::ZERO);
 
     // A wreck within reach it clears by itself.
     w.tick(&[cmd(Command::DebugDamage {
@@ -467,7 +471,7 @@ fn a_scavenger_tower_bites_at_once_and_shows_no_beam_until_it_does() {
         }
     });
     assert!(on.is_some_and(|t| t < 25), "bit after {on:?} ticks");
-    assert!(w.state.players[0].reclaimed_mass > Fx::ZERO);
+    assert!(w.state.players[0].reclaimed_materials > Fx::ZERO);
     run_until(&mut w, 400, |w| w.state.wrecks.slots.iter().count() == 0);
 
     // Nothing in reach: the head holds still, its beam off.
@@ -540,7 +544,7 @@ fn an_armed_builder_leaves_wrecks_alone_while_an_enemy_is_about() {
         w.write_render_frame(None, &mut frame);
         assert!(frame.beams.is_empty(), "its torso stays on the enemy");
     }
-    assert_eq!(w.state.players[0].reclaimed_mass, Fx::ZERO);
+    assert_eq!(w.state.players[0].reclaimed_materials, Fx::ZERO);
 
     // The enemy gone, it gets on with the wreck.
     w.tick(&[cmd(Command::DebugRemove {

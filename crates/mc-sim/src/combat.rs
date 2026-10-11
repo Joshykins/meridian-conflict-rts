@@ -2879,7 +2879,7 @@ impl World {
         let complete = !units.has_flag(row, flag::UNDER_CONSTRUCTION);
         // A lift ship's wreck holds what its hold did: the cargo dies unseen with it
         // (`lose_orphaned_cargo`), so its salvage goes into the ship's.
-        let cargo_mass = if bp.transport.is_some() {
+        let cargo_materials = if bp.transport.is_some() {
             let id = units.id(row);
             units
                 .slots
@@ -2887,13 +2887,13 @@ impl World {
                 .filter(|&r| units.hangar[r] == id)
                 .map(|r| {
                     let c = self.bp(r);
-                    c.cost_mass * c.wreck_fraction
+                    c.cost_materials * c.wreck_fraction
                 })
                 .fold(Fx::ZERO, |a, m| a + m)
         } else {
             Fx::ZERO
         };
-        let wreck_mass = bp.cost_mass * bp.wreck_fraction + cargo_mass;
+        let wreck_materials = bp.cost_materials * bp.wreck_fraction + cargo_materials;
         // Taken apart to the last plate: nothing is left to blow up or to lie about.
         // A commander's reactor goes up all the same.
         let reclaimed = units.has_flag(row, flag::RECLAIMED) && !bp.has(cat::COMMANDER);
@@ -2913,7 +2913,7 @@ impl World {
             heading,
             bank: units.bank[row],
             age: 0,
-            mass: wreck_mass,
+            materials: wreck_materials,
             splashed: 0,
             floor: Fx::ZERO,
             pitch: 0,
@@ -2936,7 +2936,7 @@ impl World {
                 heading,
                 self.terrain.height_at(pos),
                 bp.height,
-                wreck_mass,
+                wreck_materials,
             )
         });
         // An AI side remembers where its buildings were shot down and keeps
@@ -2983,8 +2983,8 @@ impl World {
                 self.state.sinking.push(hull);
             } else if leave_wreck && !reclaimed {
                 self.add_stain(pos, bp.radius * Fx::ratio(3, 2), 72);
-                let mass = wreck_mass;
-                if complete && mass > Fx::ZERO {
+                let materials = wreck_materials;
+                if complete && materials > Fx::ZERO {
                     let wreck_z = if bp.motion.map(|m| m.layer) == Some(mc_data::MoveLayer::Air) {
                         let ground = self.terrain.height_at(pos);
                         ground.max(self.terrain.water_level())
@@ -2993,7 +2993,7 @@ impl World {
                     };
                     let tick = self.state.tick;
                     let wrecks = &mut self.state.wrecks;
-                    let row = wrecks.spawn(bp.id, pos, wreck_z, heading, mass, tick)?;
+                    let row = wrecks.spawn(bp.id, pos, wreck_z, heading, materials, tick)?;
                     wrecks.turret[row] = turret;
                 }
                 // The lot was poured; death does not take it up. The scorch

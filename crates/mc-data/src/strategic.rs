@@ -37,7 +37,7 @@ pub enum StrategicLook {
 #[derive(Clone, Copy, Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RawRoundCost {
-    pub mass: f64,
+    pub materials: f64,
     pub energy: f64,
     pub time: f64,
 }
@@ -126,7 +126,7 @@ impl NuclearBlast {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Strategic {
     pub kind: StrategicKind,
-    pub round_mass: Fx,
+    pub round_materials: Fx,
     pub round_energy: Fx,
     /// Build-time units of one round: done at `power` a second in `round_time / power` s.
     pub round_time: Fx,
@@ -190,7 +190,7 @@ impl RawStrategic {
         }
         Ok(Strategic {
             kind: self.kind,
-            round_mass: fx(self.missile.mass),
+            round_materials: fx(self.missile.materials),
             round_energy: fx(self.missile.energy),
             round_time: fx(self.missile.time),
             power: fx(self.power),
@@ -213,7 +213,7 @@ impl Strategic {
     pub(crate) fn hash(&self, h: &mut StateHasher) {
         h.write_u64(self.kind as u64 | (self.stock as u64) << 8);
         for v in [
-            self.round_mass,
+            self.round_materials,
             self.round_energy,
             self.round_time,
             self.power,

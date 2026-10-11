@@ -3,8 +3,8 @@
 //! factories, upkeep and the mines alike. The one order is the player's own
 //! (`focus.rs`): new power or new mines can be paid in full first, or only out of
 //! what the rest leaves over. Mines dig only as hard as their
-//! energy is paid: a side out of energy makes less mass, which is what makes an
-//! energy stall bad. A mass stall does not slow them, or it would feed itself.
+//! energy is paid: a side out of energy makes fewer materials, which is what makes an
+//! energy stall bad. A materials stall does not slow them, or it would feed itself.
 
 use crate::mirror::SimEvent;
 use crate::tables::*;
@@ -21,16 +21,16 @@ const REST: usize = 1;
 /// What one tier of a side's spending asks for this tick, per tick.
 #[derive(Clone, Copy, Default)]
 struct Tier {
-    mass: Fx,
+    materials: Fx,
     /// All the energy it asks for, `energy_only` included.
     energy: Fx,
-    /// The part of `energy` asked for by draws that take no mass.
+    /// The part of `energy` asked for by draws that take no materials.
     energy_only: Fx,
 }
 
 impl Tier {
     fn add(&mut self, want: [Fx; 2], energy_only: bool) {
-        self.mass += want[0];
+        self.materials += want[0];
         self.energy += want[1];
         if energy_only {
             self.energy_only += want[1];
@@ -57,7 +57,7 @@ pub(crate) fn dialed(v: Fx, permille: u16) -> Fx {
     }
 }
 
-/// One unit's part in its side's economy this tick, in units per tick: `[mass, energy]`.
+/// One unit's part in its side's economy this tick, in units per tick: `[materials, energy]`.
 /// Not state; the mirror reports it to the interface.
 #[derive(Clone, Copy, Default, Debug)]
 pub struct UnitFlow {
@@ -120,21 +120,21 @@ impl World {
             let mut e = self.bp(row).economy;
             e.energy_upkeep = self.upkeep(row);
             let p = self.state.units.owner[row] as usize;
-            income[p].0 += e.mass_income / DT;
+            income[p].0 += e.materials_income / DT;
             income[p].1 += e.energy_income / DT;
             upkeep[p] += e.energy_upkeep / DT;
-            capacity[p].0 += e.mass_storage;
+            capacity[p].0 += e.materials_storage;
             capacity[p].1 += e.energy_storage;
             // A unit's own figure is what its side is paid: after the income dial.
             let dial = self.state.players[p].income_permille;
             let flow = &mut self.flows[row];
-            flow.made[0] += dialed(e.mass_income / DT, dial[0]);
+            flow.made[0] += dialed(e.materials_income / DT, dial[0]);
             flow.made[1] += dialed(e.energy_income / DT, dial[1]);
             flow.wanted[1] += e.energy_upkeep / DT;
         }
         // A seat's set-up multiplier or the test range can turn a side's income up or down,
         // and the range can give it stores.
-        // Mass is turned once the mines are counted, below.
+        // Materials are turned once the mines are counted, below.
         for (p, pl) in self.state.players.iter().enumerate() {
             capacity[p].0 += pl.bonus_storage[0];
             capacity[p].1 += pl.bonus_storage[1];
@@ -193,9 +193,10 @@ impl World {
                 [Fx::ZERO, tbp.cost_energy * progress / tbp.build_time]
             } else {
                 let scale = repair_scale(repair);
-                let (mass, energy) = self.builder_pays(row, target, self.work_cost(target, repair));
+                let (materials, energy) =
+                    self.builder_pays(row, target, self.work_cost(target, repair));
                 [
-                    mass * progress / tbp.build_time * scale,
+                    materials * progress / tbp.build_time * scale,
                     energy * progress / tbp.build_time * scale,
                 ]
             };
@@ -266,7 +267,7 @@ impl World {
         }
 
         // Mines draw their upkeep with the rest, and dig as hard as the rest's energy
-        // is covered. Mass is not known yet (the mines make it), so what is put first is
+        // is covered. Materials are not known yet (the mines make it), so what is put first is
         // taken to spend all the energy it asks for: never more than it does.
         let mut powered = vec![Fx::ONE; player_count];
         for (p, pl) in self.state.players.iter().enumerate() {
@@ -284,8 +285,8 @@ impl World {
         }
 
         // How much of each tier each player can cover, in turn, each out of what the
-        // tiers before it left. `paid` is for work that takes mass and energy, `paid_energy`
-        // for energy-only draws (upkeep, shield regen), which a mass stall does not slow.
+        // tiers before it left. `paid` is for work that takes materials and energy, `paid_energy`
+        // for energy-only draws (upkeep, shield regen), which a materials stall does not slow.
         let mut paid = vec![[Fx::ONE; TIERS]; player_count];
         let mut paid_energy = vec![[Fx::ONE; TIERS]; player_count];
         for p in 0..player_count {
@@ -293,13 +294,13 @@ impl World {
             if pl.free_build {
                 continue;
             }
-            let mut left = (pl.mass + income[p].0, pl.energy + income[p].1);
+            let mut left = (pl.materials + income[p].0, pl.energy + income[p].1);
             for (t, tier) in tiers[p].iter().enumerate() {
                 let energy = ratio(left.1, tier.energy);
-                let both = ratio(left.0, tier.mass).min(energy);
+                let both = ratio(left.0, tier.materials).min(energy);
                 paid[p][t] = both;
                 paid_energy[p][t] = energy;
-                left.0 = (left.0 - tier.mass * both).max(Fx::ZERO);
+                left.0 = (left.0 - tier.materials * both).max(Fx::ZERO);
                 left.1 =
                     (left.1 - tier.energy_only * energy - (tier.energy - tier.energy_only) * both)
                         .max(Fx::ZERO);
@@ -332,7 +333,7 @@ impl World {
             } else {
                 tbp.health
             };
-            let (cost_mass, cost_energy) = self.builder_pays(
+            let (cost_materials, cost_energy) = self.builder_pays(
                 job.builder,
                 job.target,
                 self.work_cost(job.target, job.repair),
@@ -353,7 +354,7 @@ impl World {
             } else {
                 let scale = repair_scale(job.repair);
                 let got = [
-                    cost_mass * step / build_time * scale,
+                    cost_materials * step / build_time * scale,
                     cost_energy * step / build_time * scale,
                 ];
                 spent[p].0 += got[0];
@@ -444,22 +445,22 @@ impl World {
         for p in 0..player_count {
             let pl = &mut self.state.players[p];
             let e = paid_energy[p][REST];
-            pl.mass_capacity = capacity[p].0;
+            pl.materials_capacity = capacity[p].0;
             pl.energy_capacity = capacity[p].1;
             if pl.free_build {
                 spent[p] = (Fx::ZERO, Fx::ZERO);
                 upkeep[p] = Fx::ZERO;
             }
             let energy_spent = upkeep[p] * e + spent[p].1;
-            pl.mass = (pl.mass + income[p].0 - spent[p].0).clamp(Fx::ZERO, capacity[p].0);
+            pl.materials = (pl.materials + income[p].0 - spent[p].0).clamp(Fx::ZERO, capacity[p].0);
             pl.energy = (pl.energy + income[p].1 - energy_spent).clamp(Fx::ZERO, capacity[p].1);
-            pl.mass_spent = spent[p].0 * DT;
+            pl.materials_spent = spent[p].0 * DT;
             pl.energy_spent = energy_spent * DT;
-            pl.mass_income = income[p].0 * DT;
-            pl.reclaim_income = (pl.reclaimed_mass - pl.reclaimed_counted) * DT;
-            pl.reclaimed_counted = pl.reclaimed_mass;
+            pl.materials_income = income[p].0 * DT;
+            pl.reclaim_income = (pl.reclaimed_materials - pl.reclaimed_counted) * DT;
+            pl.reclaimed_counted = pl.reclaimed_materials;
             pl.energy_income = income[p].1 * DT;
-            pl.mass_demand = demand[p].0 * DT;
+            pl.materials_demand = demand[p].0 * DT;
             pl.energy_demand = demand[p].1 * DT;
             pl.efficiency = paid[p].iter().fold(Fx::ONE, |a, &b| a.min(b));
             pl.upkeep_efficiency = e;
@@ -515,7 +516,7 @@ impl World {
         if !repair && self.state.units.has_flag(target, flag::UPGRADE) {
             self.blueprints.upgrade_cost(tbp)
         } else {
-            (tbp.cost_mass, tbp.cost_energy)
+            (tbp.cost_materials, tbp.cost_energy)
         }
     }
 
@@ -568,7 +569,7 @@ impl World {
         Ok(())
     }
 
-    /// Mass an engineer pulls out of a wreck per tick per point of build power.
+    /// Materials an engineer pulls out of a wreck per tick per point of build power.
     pub(crate) fn reclaim_rate() -> Fx {
         Fx::ratio(1, DT as i64)
     }

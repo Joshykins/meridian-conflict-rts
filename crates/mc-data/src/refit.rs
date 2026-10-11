@@ -145,12 +145,12 @@ pub struct Module {
     /// Index in the slot of the module this one is the next tier of.
     pub after: Option<u8>,
     pub tech: u8,
-    pub cost_mass: Fx,
+    pub cost_materials: Fx,
     pub cost_energy: Fx,
     pub build_time: Fx,
-    /// It adds to the unit's mass income and to its energy income. A refit to it is
+    /// It adds to the unit's materials income and to its energy income. A refit to it is
     /// paid under the economy focus of what it makes (mc-sim `focus.rs`).
-    pub makes_mass: bool,
+    pub makes_materials: bool,
     pub makes_energy: bool,
     /// The hidden blueprint a refit to this module assembles: its price and time.
     pub kit: BlueprintId,
@@ -395,10 +395,10 @@ pub(crate) fn expand(
                     icon: raw.icon,
                     after,
                     tech: raw.tech,
-                    cost_mass: units[kit.index()].cost_mass,
+                    cost_materials: units[kit.index()].cost_materials,
                     cost_energy: units[kit.index()].cost_energy,
                     build_time: units[kit.index()].build_time,
-                    makes_mass: raw.economy.mass_income > 0.0,
+                    makes_materials: raw.economy.materials_income > 0.0,
                     makes_energy: raw.economy.energy_income > 0.0,
                     kit,
                     bit,
@@ -552,10 +552,10 @@ fn loadout_unit(unit: &Unit, fitted: &[u8; MAX_REFIT_SLOTS]) -> Unit {
             }
         }
         let e = &mut out.economy;
-        e.mass_income += m.economy.mass_income;
+        e.materials_income += m.economy.materials_income;
         e.energy_income += m.economy.energy_income;
         e.energy_upkeep += m.economy.energy_upkeep;
-        e.mass_storage += m.economy.mass_storage;
+        e.materials_storage += m.economy.materials_storage;
         e.energy_storage += m.economy.energy_storage;
         if let Some(b) = &mut out.builder {
             b.power += m.build_power;

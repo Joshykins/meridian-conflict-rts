@@ -125,7 +125,7 @@ impl Role {
     pub fn of(bp: &UnitBlueprint) -> Role {
         let has = |c: u32| bp.categories & c != 0;
         let energy_store = bp.economy.energy_storage > mc_core::Fx::ZERO
-            && bp.economy.mass_storage == mc_core::Fx::ZERO;
+            && bp.economy.materials_storage == mc_core::Fx::ZERO;
         if has(cat::ENGINEER) {
             Role::Engineer
         } else if bp.is_salvager() {

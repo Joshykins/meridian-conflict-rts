@@ -4,7 +4,7 @@
 //! what a mine would make at the site under the pointer.
 
 use super::mine_coast::Survey;
-use super::{Scene, MASS};
+use super::{Scene, MATERIALS};
 use crate::game::Mode;
 use crate::ui::{palette, rgb, type_scale, Rect, Ui};
 use glam::{Vec2, Vec3};
@@ -358,7 +358,7 @@ fn planned(ui: &mut Ui, s: &Scene, points: &[Vec3], width: f32, alpha: f32, phas
         width,
         rgb(PLANNED, alpha),
         phase,
-        Some(rgb(MASS, alpha.max(0.6))),
+        Some(rgb(MATERIALS, alpha.max(0.6))),
     );
 }
 
@@ -794,7 +794,7 @@ fn draw_territory(
     let (outline, coarse) = (&plan.outline, &plan.coarse);
     let look = tier_look(site.tier);
     let tone = site.alarm.unwrap_or(if site.kind == SiteKind::Built {
-        heat(MASS, look.heat)
+        heat(MATERIALS, look.heat)
     } else {
         PLANNED
     });
@@ -947,20 +947,20 @@ fn draw_workings(
             (top, shaft_r),
             (foot, shaft_r),
             2.5 + site.tier as f32,
-            MASS,
+            MATERIALS,
             alpha,
         );
         if dug < bottom {
             let pulse = 0.5 + 0.5 * (time * 6.0).sin();
             if let Some(p) = s.camera.project(foot) {
-                ui.disc(p / scale, 3.0 + 3.0 * pulse, rgb(MASS, 0.9));
+                ui.disc(p / scale, 3.0 + 3.0 * pulse, rgb(MATERIALS, 0.9));
                 ui.arc(
                     p / scale,
                     8.0 + 6.0 * pulse,
                     0.0,
                     TAU,
                     1.2,
-                    rgb(MASS, 0.6 * (1.0 - pulse)),
+                    rgb(MATERIALS, 0.6 * (1.0 - pulse)),
                 );
             }
         }
@@ -979,14 +979,22 @@ fn draw_workings(
             let head = from.lerp(to, if length > 0.0 { driven / length } else { 1.0 });
             planned(ui, s, &[head, to], 1.2, 0.55 * strength, time * 12.0);
             if driven > 0.0 {
-                tube(ui, s, (from, drift_r), (head, drift_r), 2.0, MASS, alpha);
+                tube(
+                    ui,
+                    s,
+                    (from, drift_r),
+                    (head, drift_r),
+                    2.0,
+                    MATERIALS,
+                    alpha,
+                );
                 let pulse = 0.5 + 0.5 * (time * 6.0 + f as f32).sin();
                 if let Some(p) = s.camera.project(head) {
-                    ui.disc(p / scale, 2.5 + 2.5 * pulse, rgb(MASS, 0.9));
+                    ui.disc(p / scale, 2.5 + 2.5 * pulse, rgb(MATERIALS, 0.9));
                 }
             }
         } else {
-            tube(ui, s, (from, drift_r), (to, drift_r), 2.0, MASS, alpha);
+            tube(ui, s, (from, drift_r), (to, drift_r), 2.0, MATERIALS, alpha);
             // Reached: ore running back along the drift and up the shaft.
             let path = [to, from, top];
             let legs = [length.max(1.0), depth.max(1.0)];
@@ -1089,7 +1097,7 @@ fn ghost_readout(
     // As this side is paid it.
     let rate = share.rate(&mine).to_f32() * s.income_dial(s.view.local)[0];
     let efficiency = share.efficiency(&mine).to_f32();
-    let cost = s.blueprints.unit(bp).cost_mass.to_f32();
+    let cost = s.blueprints.unit(bp).cost_materials.to_f32();
     let z = overview_height(s.map, site);
     let Some(p) = s.camera.project(site.extend(z)) else {
         return;
@@ -1117,7 +1125,7 @@ fn ghost_readout(
         "Never pays back".to_owned()
     };
     let lines = [
-        (format!("{rate:.1} materials/s"), MASS),
+        (format!("{rate:.1} materials/s"), MATERIALS),
         (
             format!("Efficiency {:.0}%  \u{b7}  {payback}", efficiency * 100.0),
             tone,
@@ -1127,7 +1135,7 @@ fn ghost_readout(
     let w = 236.0;
     let r = Rect::new(c.x + 40.0, c.y - 28.0, w, 56.0);
     ui.frost(r, 0.9);
-    ui.fill(Rect::new(r.x, r.y, 2.0, r.h), rgb(MASS, 1.0));
+    ui.fill(Rect::new(r.x, r.y, 2.0, r.h), rgb(MATERIALS, 1.0));
     for (i, (text, tone)) in lines.iter().enumerate() {
         ui.text(
             r.x + 10.0,
@@ -1164,17 +1172,17 @@ fn mine_readout(ui: &mut Ui, p: Vec2, view: &mc_sim::mirror::MineView) {
         26.0 + ui.text_width(type_scale::VALUE, &rate) + ui.text_width(type_scale::MICRO, &share);
     let r = Rect::new(p.x - w * 0.5, p.y - 44.0, w, 22.0);
     ui.frost(r, 0.9);
-    ui.fill(Rect::new(r.x, r.y, 2.0, r.h), rgb(MASS, 1.0));
+    ui.fill(Rect::new(r.x, r.y, 2.0, r.h), rgb(MATERIALS, 1.0));
     let after = r.x + 8.0 + ui.text_width(type_scale::VALUE, &rate) + 6.0;
     ui.text(
         r.x + 8.0,
         r.y + 4.0,
         type_scale::VALUE,
-        rgb(MASS, 1.0),
+        rgb(MATERIALS, 1.0),
         &rate,
     );
     ui.text(after, r.y + 6.0, type_scale::MICRO, rgb(tone, 1.0), &share);
-    ui.stroke(Vec2::new(p.x, r.bottom()), p, 1.4, rgb(MASS, 0.8));
+    ui.stroke(Vec2::new(p.x, r.bottom()), p, 1.4, rgb(MATERIALS, 0.8));
 }
 
 fn share_tone(share: f32) -> u32 {
@@ -1259,18 +1267,18 @@ fn mine_card(
     for k in 0..4 {
         let a = time * 0.6 + k as f32 * std::f32::consts::FRAC_PI_2;
         let d = Vec2::new(a.cos(), a.sin());
-        ui.stroke(p + d * 14.0, p + d * 22.0, 2.0, rgb(MASS, 0.9));
+        ui.stroke(p + d * 14.0, p + d * 22.0, 2.0, rgb(MATERIALS, 0.9));
     }
-    ui.arc(p, 17.0, 0.0, TAU, 1.2, rgb(MASS, 0.5));
+    ui.arc(p, 17.0, 0.0, TAU, 1.2, rgb(MATERIALS, 0.5));
     ui.stroke(
         Vec2::new(r.x + r.w * 0.5, r.bottom()),
         p - Vec2::Y * 22.0,
         1.2,
-        rgb(MASS, 0.6),
+        rgb(MATERIALS, 0.6),
     );
 
     ui.frost(r, 0.92);
-    ui.fill(Rect::new(r.x, r.y, 3.0, r.h), rgb(MASS, 1.0));
+    ui.fill(Rect::new(r.x, r.y, 3.0, r.h), rgb(MATERIALS, 1.0));
     let x = r.x + 12.0;
     let right = r.right() - 10.0;
     ui.text(
@@ -1284,7 +1292,7 @@ fn mine_card(
         right,
         r.y + 7.0,
         type_scale::VALUE,
-        rgb(MASS, 1.0),
+        rgb(MATERIALS, 1.0),
         &format!("{:.1}/s", view.rate),
     );
     let mut y = r.y + 26.0;
@@ -1294,7 +1302,7 @@ fn mine_card(
             after,
             y,
             type_scale::MICRO,
-            rgb(MASS, 1.0),
+            rgb(MATERIALS, 1.0),
             &format!("{:.1}/s", view.full),
         );
         ui.text_right(
@@ -1305,7 +1313,7 @@ fn mine_card(
             &super::mine::duration(left),
         );
         let done = view.age / (view.age + left).max(1.0);
-        progress(ui, Rect::new(x, y + 10.0, right - x, 3.0), done, MASS);
+        progress(ui, Rect::new(x, y + 10.0, right - x, 3.0), done, MATERIALS);
         y += 22.0;
     } else {
         ui.text(
@@ -1345,22 +1353,22 @@ fn deposit_card(
     taken: &mut Vec<Rect>,
 ) {
     let reached = vein.eta <= 0.0;
-    let tone = if reached { MASS } else { PLANNED };
+    let tone = if reached { MATERIALS } else { PLANNED };
     if let Some(h) = heart {
         ui.stroke(p, h, 1.0, rgb(tone, 0.35));
     }
     let start = -std::f32::consts::FRAC_PI_2;
     if reached {
         let pulse = 0.5 + 0.5 * (time * 3.0).sin();
-        ui.disc(p, 3.0, rgb(MASS, 1.0));
-        ui.arc(p, 7.0, 0.0, TAU, 2.0, rgb(MASS, 1.0));
+        ui.disc(p, 3.0, rgb(MATERIALS, 1.0));
+        ui.arc(p, 7.0, 0.0, TAU, 2.0, rgb(MATERIALS, 1.0));
         ui.arc(
             p,
             10.0 + 4.0 * pulse,
             0.0,
             TAU,
             1.0,
-            rgb(MASS, 0.5 * (1.0 - pulse)),
+            rgb(MATERIALS, 0.5 * (1.0 - pulse)),
         );
     } else {
         let done = if vein.dig > 0.0 {
@@ -1370,7 +1378,7 @@ fn deposit_card(
         };
         ui.arc(p, 7.0, 0.0, TAU, 2.0, rgb(PLANNED, 0.45));
         if done > 0.0 {
-            ui.arc(p, 7.0, start, start + TAU * done, 2.0, rgb(MASS, 1.0));
+            ui.arc(p, 7.0, start, start + TAU * done, 2.0, rgb(MATERIALS, 1.0));
         }
     }
 
@@ -1420,11 +1428,11 @@ fn deposit_card(
         r.x + 8.0,
         r.y + 10.0,
         type_scale::VALUE,
-        rgb(MASS, if strong { 1.0 } else { 0.7 }),
+        rgb(MATERIALS, if strong { 1.0 } else { 0.7 }),
         &rate,
     );
     let note_tone = if reached {
-        rgb(MASS, 1.0)
+        rgb(MATERIALS, 1.0)
     } else if next {
         rgb(palette::TEXT, 0.95)
     } else {

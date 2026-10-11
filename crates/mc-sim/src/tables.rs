@@ -83,7 +83,7 @@ pub mod flag {
     pub const REPEAT: u16 = 1 << 6;
     /// The unit's order wants it to stand still this tick (in range, engaging, working).
     pub const HOLD: u16 = 1 << 7;
-    /// Pulling mass out of a wreck this tick.
+    /// Pulling materials out of a wreck this tick.
     pub const RECLAIMING: u16 = 1 << 8;
     /// Test range: never picks a target or fires.
     pub const PASSIVE: u16 = 1 << 9;
@@ -212,7 +212,7 @@ pub struct Units {
     /// batch (`orbs.rs`). Zero for everything else.
     pub orb_stock: Vec<u8>,
     pub orb_clock: Vec<u16>,
-    /// Mass this unit has reclaimed since it was made; a carrier also counts its drones'.
+    /// Materials this unit has reclaimed since it was made; a carrier also counts its drones'.
     pub reclaimed: Vec<Fx>,
     /// Current hit points of a projected shield bubble. Zero when the unit has none.
     pub shield_hp: Vec<Fx>,
@@ -882,19 +882,19 @@ pub struct Player {
     pub start: FxVec2,
     pub defeated: bool,
     pub commander: UnitId,
-    pub mass: Fx,
+    pub materials: Fx,
     pub energy: Fx,
-    pub mass_capacity: Fx,
+    pub materials_capacity: Fx,
     pub energy_capacity: Fx,
     /// Last tick's flows in units per second, for the UI and the AI.
-    pub mass_income: Fx,
+    pub materials_income: Fx,
     pub energy_income: Fx,
-    pub mass_demand: Fx,
+    pub materials_demand: Fx,
     pub energy_demand: Fx,
     /// What was really spent last tick, in units per second: the demand as far as the
     /// stall let it be paid. A stall of one resource holds back the other's spending too.
     #[serde(default)]
-    pub mass_spent: Fx,
+    pub materials_spent: Fx,
     #[serde(default)]
     pub energy_spent: Fx,
     /// Share of requested spending that was met last tick, zero to one.
@@ -922,12 +922,12 @@ pub struct Player {
     /// tick; `None` when nothing in that tier was being built.
     #[serde(default)]
     pub tier_speed: [Option<Fx>; 3],
-    pub reclaimed_mass: Fx,
+    pub reclaimed_materials: Fx,
     /// Materials a second reclaimed over the last tick, for the UI and the AI; not in
-    /// `mass_income`, which is what the mines and generators make.
+    /// `materials_income`, which is what the mines and generators make.
     #[serde(default)]
     pub reclaim_income: Fx,
-    /// `reclaimed_mass` when `reclaim_income` was last worked out.
+    /// `reclaimed_materials` when `reclaim_income` was last worked out.
     #[serde(default)]
     pub reclaimed_counted: Fx,
     pub units_built: u32,
@@ -937,7 +937,7 @@ pub struct Player {
     pub acts_as: u8,
     /// Test range: building costs this player nothing and never stalls.
     pub free_build: bool,
-    /// What share of their mass and energy income this player gets, thousandths: the
+    /// What share of their materials and energy income this player gets, thousandths: the
     /// seat's set-up multiplier (`AiConfig::income`), or the test range's dial.
     #[serde(default = "full_income")]
     pub income_permille: [u16; 2],
@@ -945,7 +945,7 @@ pub struct Player {
     /// seat's set-up multiplier (`AiConfig::build`), or the test range's dial.
     #[serde(default = "full_build")]
     pub build_permille: u16,
-    /// Test range: mass and energy storage on top of what this player's units hold.
+    /// Test range: materials and energy storage on top of what this player's units hold.
     #[serde(default)]
     pub bonus_storage: [Fx; 2],
 }
@@ -973,13 +973,13 @@ impl Player {
         );
         h.write_u64(self.commander.0 as u64);
         for v in [
-            self.mass,
+            self.materials,
             self.energy,
-            self.mass_capacity,
+            self.materials_capacity,
             self.energy_capacity,
             self.efficiency,
             self.upkeep_efficiency,
-            self.reclaimed_mass,
+            self.reclaimed_materials,
         ] {
             h.write_i64(v.0);
         }
@@ -1156,8 +1156,8 @@ pub struct Wrecks {
     /// Signed roll the hull lies at, binary angle steps: a sunk ship's list on the seabed.
     pub bank: Vec<i16>,
     pub prev_bank: Vec<i16>,
-    pub mass: Vec<Fx>,
-    pub mass_max: Vec<Fx>,
+    pub materials: Vec<Fx>,
+    pub materials_max: Vec<Fx>,
     /// Laid by the map before the match: known to every player from the start,
     /// fog or not.
     #[serde(default)]
@@ -1172,10 +1172,10 @@ pub struct Wrecks {
     /// How it came to lie there ([`Landing`] as its number): the renderer breaks up,
     /// buries and settles it by this and its model.
     pub landing: Vec<u8>,
-    /// Mass reclaim has taken out of it (blasts take theirs off `mass_max`'s share
+    /// Materials reclaim has taken out of it (blasts take theirs off `materials_max`'s share
     /// without counting here): the renderer shows that share of the hull being unmade.
     pub reclaimed: Vec<Fx>,
-    /// Tick reclaim last took mass from it: the renderer burns the work bright while it
+    /// Tick reclaim last took materials from it: the renderer burns the work bright while it
     /// goes on and lets it cool once it stops. Meaningless while `reclaimed` is zero.
     pub drained: Vec<u32>,
 }
@@ -1205,8 +1205,8 @@ impl Wrecks {
             heading: Vec::new(),
             bank: Vec::new(),
             prev_bank: Vec::new(),
-            mass: Vec::new(),
-            mass_max: Vec::new(),
+            materials: Vec::new(),
+            materials_max: Vec::new(),
             from_map: Vec::new(),
             born: Vec::new(),
             turret: Vec::new(),
@@ -1223,7 +1223,7 @@ impl Wrecks {
         pos: FxVec2,
         z: Fx,
         heading: Angle,
-        mass: Fx,
+        materials: Fx,
         born: u32,
     ) -> Result<usize, SimError> {
         let row = self
@@ -1236,8 +1236,8 @@ impl Wrecks {
         put(&mut self.heading, row, heading);
         put(&mut self.bank, row, 0);
         put(&mut self.prev_bank, row, 0);
-        put(&mut self.mass, row, mass);
-        put(&mut self.mass_max, row, mass);
+        put(&mut self.materials, row, materials);
+        put(&mut self.materials_max, row, materials);
         put(&mut self.from_map, row, false);
         put(&mut self.born, row, born);
         put(&mut self.turret, row, Angle(0));
@@ -1259,7 +1259,7 @@ impl Wrecks {
             h.write_i64(self.pos[row].x.0);
             h.write_i64(self.pos[row].y.0);
             h.write_i64(self.z[row].0);
-            h.write_i64(self.mass[row].0);
+            h.write_i64(self.materials[row].0);
             h.write_u64(self.born[row] as u64 | (self.turret[row].0 as u64) << 32);
             h.write_u64(self.pitch[row] as u16 as u64 | (self.landing[row] as u64) << 16);
             h.write_i64(self.reclaimed[row].0);

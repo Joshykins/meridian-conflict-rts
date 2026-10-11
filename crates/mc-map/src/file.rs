@@ -382,14 +382,14 @@ mod tests {
                 pos: FxVec2::new(Fx::from_int(700), Fx::ratio(1201, 2)),
                 heading: Angle(40_000),
                 bank: -1_200,
-                mass_milli: 640,
+                materials_milli: 640,
             },
             crate::MapWreck {
                 blueprint: "a".repeat(crate::format::MAX_WRECK_KEY),
                 pos: FxVec2::from_ints(10, 2000),
                 heading: Angle(0),
                 bank: 0,
-                mass_milli: 1000,
+                materials_milli: 1000,
             },
         ];
         let (with, id_with) = write("wrecked", wrecks.clone());
@@ -468,7 +468,7 @@ mod tests {
             pos: FxVec2::from_ints(700, 600),
             heading: Angle(0),
             bank: 0,
-            mass_milli: 1000,
+            materials_milli: 1000,
         };
         w.set_snow(snow.clone()).unwrap();
         w.set_wrecks(vec![wreck.clone()]).unwrap();

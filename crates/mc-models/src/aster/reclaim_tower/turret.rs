@@ -328,7 +328,7 @@ fn barrel(b: &mut MeshBuilder, p: Vec3, k: f32, tech: u8) {
 
 /// The feed from under the head down through the turntable into the tower.
 fn feed_drop(b: &mut MeshBuilder, pivot: Vec3, top: f32) {
-    b.paint(ACCENT).pattern(pattern::MASS_FLOW);
+    b.paint(ACCENT).pattern(pattern::MATERIALS_FLOW);
     b.cylinder_between(
         v3(-1.2 * S, 0.0, pivot.z - 1.2 * S),
         v3(-0.6 * S, 0.0, top - 0.4 * S),

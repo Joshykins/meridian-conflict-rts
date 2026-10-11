@@ -3,7 +3,7 @@
     (
         key: "aster_t2_lift_ship", name: "Courier", role: "Light Transport", title: "Transport",
         tech: 2, categories: ["Air"],
-        health: 1400, cost: (mass: 280, energy: 4200, time: 1400),
+        health: 1400, cost: (materials: 280, energy: 4200, time: 1400),
         radius: 58, height: 38, footprint: (10, 6), hull: (59, 36), vision: 320,
         motion: (layer: Air, size: 0, speed: 150, accel: 42, turn: 90, altitude: 280, hover: true, deploy: 0.9),
         transport: (capacity: 8, descent: 120, hold: (-16, 0), ramp: (-36, -42), width: 28, floor: 0, clearance: 26, unload: 0.25),
@@ -21,7 +21,7 @@
         tech: 1,
         categories: ["Air", "AntiAir", "DirectFire"],
         health: 250,
-        cost: (mass: 45, energy: 770, time: 360),
+        cost: (materials: 45, energy: 770, time: 360),
         radius: 3.6, height: 1.8,
         vision: 480,
         motion: (layer: Air, size: 0, speed: 120, accel: 32, turn: 72, altitude: 200),
@@ -45,7 +45,7 @@
         tech: 1,
         categories: ["Air"],
         health: 250,
-        cost: (mass: 60, energy: 980, time: 420),
+        cost: (materials: 60, energy: 980, time: 420),
         radius: 5.6, height: 2.6,
         vision: 520,
         motion: (layer: Air, size: 0, speed: 84, accel: 22, turn: 42, altitude: 200),
@@ -67,7 +67,7 @@
 
 (
  key: "aster_t1_air_scout", name: "Swift", role: "Air Scout", title: "Air Scout", tech: 1, categories: ["Air", "Scout", "Intel"],
- health: 55, cost: (mass: 20, energy: 350, time: 120),
+ health: 55, cost: (materials: 20, energy: 350, time: 120),
  radius: 3.5, height: 1.7, vision: 1100,
  motion: (layer: Air, size: 0, speed: 115, accel: 50, turn: 110, altitude: 240, hover: false),
  fuel: (range: 70),
@@ -76,7 +76,7 @@
 ),
 (
  key: "aster_t1_rotor_gunship", name: "Wasp", role: "Rotor Gunship", title: "Gunship", tech: 1, categories: ["Air"],
- health: 160, cost: (mass: 45, energy: 750, time: 260),
+ health: 160, cost: (materials: 45, energy: 750, time: 260),
  radius: 5.5, height: 3.2, vision: 460,
  motion: (layer: Air, size: 0, speed: 70, accel: 22, turn: 150, altitude: 38, hover: true),
  fuel: (range: 40),
@@ -87,7 +87,7 @@
 ),
 (
  key: "aster_t3_support", name: "Argus", role: "Radar / Anti-Missile Support", tech: 3, categories: ["Air", "Intel"],
- health: 2400, cost: (mass: 1200, energy: 36000, time: 6000),
+ health: 2400, cost: (materials: 1200, energy: 36000, time: 6000),
  radius: 9.2, height: 4.0, vision: 2000,
  motion: (layer: Air, size: 0, speed: 165, accel: 70, turn: 64, altitude: 450, hover: false),
  fuel: (range: 90),
@@ -107,7 +107,7 @@
  key: "aster_reclaim_drone", name: "Salvage Drone", role: "Commander Reclaim Drone", tech: 1, categories: ["Air"],
  // Cheap: built on the commander's drone port pad under the side's materials
  // priority, like any other build.
- health: 150, cost: (mass: 3, energy: 30, time: 30),
+ health: 150, cost: (materials: 3, energy: 30, time: 30),
  radius: 1.8, height: 1.2, vision: 360,
  motion: (layer: Air, size: 0, speed: 100, accel: 45, turn: 240, altitude: 22, hover: true),
  weapons: [], mesh: "reclaim_drone", icon: SalvageDrone,
@@ -115,7 +115,7 @@
 ),
 (
  key: "aster_t2_gunship", name: "Kestrel", role: "Heavy Gunship", title: "Heavy Gunship", tech: 2, categories: ["Air"],
- health: 1300, cost: (mass: 220, energy: 7600, time: 1360),
+ health: 1300, cost: (materials: 220, energy: 7600, time: 1360),
  radius: 7.5, height: 3.5, vision: 560,
  motion: (layer: Air, size: 0, speed: 85, accel: 31, turn: 130, altitude: 65, hover: true),
  fuel: (range: 45),
@@ -139,7 +139,7 @@
 ),
 (
  key: "aster_t2_fire_bomber", name: "Hellkite", role: "Flying Fortress Fire Bomber", title: "Fire Bomber", tech: 2, categories: ["Air"],
- health: 3687, cost: (mass: 250, energy: 8750, time: 1560),
+ health: 3687, cost: (materials: 250, energy: 8750, time: 1560),
  radius: 13, height: 5, vision: 640,
  motion: (layer: Air, size: 0, speed: 130, accel: 45, turn: 55, altitude: 280, hover: false),
  fuel: (range: 50),
@@ -155,7 +155,7 @@ burn: 20, burn_dps: 75, flash: 0.2, impact: 3, trail: true, wake: 1.2, sounds: (
 ),
 (
  key: "aster_t2_torpedo_bomber", name: "Gannet", role: "Torpedo Bomber", title: "Torpedo Bomber", tech: 2, categories: ["Air"],
- health: 1050, cost: (mass: 180, energy: 6100, time: 1150),
+ health: 1050, cost: (materials: 180, energy: 6100, time: 1150),
  radius: 7.2, height: 3, vision: 600, sonar: 900,
  motion: (layer: Air, size: 0, speed: 86, accel: 36, turn: 48, altitude: 120, hover: false),
  fuel: (range: 55),
@@ -171,7 +171,7 @@ burn: 20, burn_dps: 75, flash: 0.2, impact: 3, trail: true, wake: 1.2, sounds: (
 ),
 (
  key: "aster_t2_interceptor", name: "Peregrine", role: "Interceptor", title: "Interceptor", tech: 2, categories: ["Air", "AntiAir"],
- health: 1000, cost: (mass: 170, energy: 5800, time: 1040),
+ health: 1000, cost: (materials: 170, energy: 5800, time: 1040),
  radius: 5, height: 2.4, vision: 700,
  motion: (layer: Air, size: 0, speed: 160, accel: 72, turn: 122, altitude: 260, hover: false),
  fuel: (range: 45),
@@ -181,7 +181,7 @@ burn: 20, burn_dps: 75, flash: 0.2, impact: 3, trail: true, wake: 1.2, sounds: (
 ),
 (
  key: "aster_t3_air_superiority", name: "Raptor", role: "Air Superiority Fighter", title: "Air Superiority", tech: 3, categories: ["Air", "AntiAir"],
- health: 3200, cost: (mass: 620, energy: 23500, time: 3800),
+ health: 3200, cost: (materials: 620, energy: 23500, time: 3800),
  // The model is authored at radius 7 and drawn 1.4x (radius 9.8); muzzles are 1.4x the
  // model's `LANCE`. Two bolt rifles fire in turn: a fast blue bolt that bursts in
  // lightning round what it hits (`discharge`).
@@ -196,7 +196,7 @@ burn: 20, burn_dps: 75, flash: 0.2, impact: 3, trail: true, wake: 1.2, sounds: (
 ),
 (
  key: "aster_t3_strategic_bomber", name: "Eclipse", role: "Strategic Bomber", title: "Strategic Bomber", tech: 3, categories: ["Air"],
- health: 6000, cost: (mass: 1150, energy: 45000, time: 7200),
+ health: 6000, cost: (materials: 1150, energy: 45000, time: 7200),
  radius: 16, height: 4.5, vision: 1000,
  motion: (layer: Air, size: 0, speed: 210, accel: 95, turn: 62, altitude: 300, hover: false),
  fuel: (range: 60),
@@ -209,7 +209,7 @@ trail: true, wake: 1.2, sounds: (fire: "bomb_release", impact: "aster_bore_heavy
 ),
 (
  key: "aster_t3_assault_aircraft", name: "Thunderhead", role: "Assault Aircraft", title: "Assault Aircraft", tech: 3, categories: ["Air"],
- health: 7641, cost: (mass: 1350, energy: 52000, time: 8400),
+ health: 7641, cost: (materials: 1350, energy: 52000, time: 8400),
  radius: 15.6, height: 7.15, vision: 1000,
  motion: (layer: Air, size: 0, speed: 188, accel: 83, turn: 104, altitude: 95, hover: false),
  fuel: (range: 50),
@@ -232,7 +232,7 @@ trail: true, wake: 1.2, sounds: (fire: "bomb_release", impact: "aster_bore_heavy
  // sight (`slant`): from the clouds they cannot, and they start to sweep the landing site
  // as it comes down.
  key: "aster_t3_lift_ship", name: "Bastion", role: "Assault Transport", title: "Heavy Transport", tech: 3, categories: ["Air", "Space"],
- health: 16000, cost: (mass: 4200, energy: 63000, time: 25200),
+ health: 16000, cost: (materials: 4200, energy: 63000, time: 25200),
  radius: 160, height: 95, footprint: (28, 13), hull: (166, 76), vision: 520,
  motion: (layer: Air, size: 0, speed: 78, accel: 14, turn: 16, altitude: 560, hover: true, deploy: 2.2),
  transport: (capacity: 96, descent: 80, hold: (20, 0), ramp: (-16, -84), width: 40, floor: 34, clearance: 34, unload: 0.4),

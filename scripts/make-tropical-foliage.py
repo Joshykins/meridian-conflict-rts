@@ -183,7 +183,7 @@ def rainforest_cluster(canvas, rng):
 
 
 def dense_clump(canvas, rng):
-    """Bottom right: a lobed mass of overlapping leaves pointing outward, the
+    """Bottom right: a lobed materials of overlapping leaves pointing outward, the
     later (upper) ones lighter, for crowns seen from far off."""
     cx, cy = N * 0.75, N * 0.75
     lobes = [(rng.uniform(0, math.tau), rng.uniform(0.75, 1.0)) for _ in range(6)]

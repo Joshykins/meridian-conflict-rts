@@ -9,7 +9,7 @@ use crate::ui::{id, palette, rgb, type_scale, Color, Rect, Ui};
 
 /// The curves to pick from, with the chip each is picked by.
 const METRICS: [(Metric, &str); 8] = [
-    (Metric::MassIncome, "Income"),
+    (Metric::MaterialsIncome, "Income"),
     (Metric::ReclaimRate, "Reclaim"),
     (Metric::Collected, "Collected"),
     (Metric::Reclaimed, "Reclaimed"),

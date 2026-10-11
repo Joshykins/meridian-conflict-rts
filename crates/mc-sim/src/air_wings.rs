@@ -76,11 +76,11 @@ impl World {
         self.wing(row, index).map(|w| self.wing_cost(w)[0])
     }
 
-    /// Build time, mass and energy of a whole wing.
+    /// Build time, materials and energy of a whole wing.
     fn wing_cost(&self, wing: &Wing) -> [Fx; 3] {
         let a = self.blueprints.unit(wing.aircraft);
         let n = wing.count as i32;
-        [a.build_time * n, a.cost_mass * n, a.cost_energy * n]
+        [a.build_time * n, a.cost_materials * n, a.cost_energy * n]
     }
 
     /// `Command::QueueWing`: `count` more of wing `index` on each carrier among `ids`.
@@ -155,13 +155,13 @@ impl World {
             let Some(wing) = self.wing(row, index) else {
                 continue;
             };
-            let [time, mass, energy] = self.wing_cost(wing);
+            let [time, materials, energy] = self.wing_cost(wing);
             let rate = a.power / TICKS_PER_SECOND as i32;
             let left = rate.min(time - bay.progress);
             if left <= Fx::ZERO || time <= Fx::ZERO {
                 continue;
             }
-            let want = [mass * left / time, energy * left / time];
+            let want = [materials * left / time, energy * left / time];
             jobs.push((row, rate, want, units.priority[row].tier()));
         }
         jobs

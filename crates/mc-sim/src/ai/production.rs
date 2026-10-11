@@ -79,20 +79,20 @@ impl World {
                 .collect();
             if let Some(e) = self.bp(row).elevator {
                 // Free units: fighters only, a whole payload of them each fall, else
-                // the rest comes down as mass (and is lost to a full store).
+                // the rest comes down as materials (and is lost to a full store).
                 let mut left = e.payload;
                 while let Some(id) = {
                     let fits: Vec<BlueprintId> = fighters
                         .iter()
                         .copied()
                         .filter(|b| {
-                            let m = self.blueprints.unit(*b).cost_mass;
+                            let m = self.blueprints.unit(*b).cost_materials;
                             m > Fx::ZERO && m <= left
                         })
                         .collect();
                     self.solve_production(player, &fits, &composition, counter)
                 } {
-                    left -= self.blueprints.unit(id).cost_mass;
+                    left -= self.blueprints.unit(id).cost_materials;
                     *composition.entry(id).or_insert(0) += 1;
                     counter = counter.wrapping_add(1);
                     match out.last_mut() {

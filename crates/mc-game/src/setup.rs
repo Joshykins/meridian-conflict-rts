@@ -657,7 +657,7 @@ pub fn opening_commands(
                     player,
                     command: Command::DebugStorage {
                         player,
-                        mass: 20_000,
+                        materials: 20_000,
                         energy: 400_000,
                     },
                 });
@@ -881,7 +881,7 @@ pub fn opening_commands(
             out.push(spawn(0, "aster_t2_reclaimer", base, Angle::ZERO, 1));
             out.push(spawn(
                 0,
-                "aster_mass_storage",
+                "aster_materials_storage",
                 base + FxVec2::from_ints(-96, -64),
                 Angle::ZERO,
                 1,
@@ -906,7 +906,7 @@ pub fn opening_commands(
         }
         Scene::Repair => {
             // Idle masons among wounded friends: they mend what they can
-            // reach. Storage so the stitch has mass and energy to spend.
+            // reach. Storage so the stitch has materials and energy to spend.
             let base = map.start_positions().first().copied().unwrap_or(centre);
             let friend = |key: &str, at: (i32, i32)| PlayerCommand {
                 player: 0,
@@ -922,7 +922,7 @@ pub fn opening_commands(
             };
             out.push(spawn(
                 0,
-                "aster_mass_storage",
+                "aster_materials_storage",
                 base + FxVec2::from_ints(-120, -80),
                 Angle::ZERO,
                 1,
@@ -1089,7 +1089,7 @@ pub fn scene_orders(
                 player,
                 command: Command::DebugStock {
                     player,
-                    mass: Some(1000),
+                    materials: Some(1000),
                     energy: Some(1000),
                 },
             })

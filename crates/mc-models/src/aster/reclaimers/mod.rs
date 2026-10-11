@@ -5,7 +5,7 @@
 //!
 //! Reclaim is plant, not a weapon: dark processors, intake mouths, hoppers. The
 //! light is the Materials red-orange: the intakes (`GLOW_MATERIALS`) and the glazing
-//! that shows the haul (`pattern::MASS_FLOW`).
+//! that shows the haul (`pattern::MATERIALS_FLOW`).
 
 use glam::Vec3;
 
@@ -109,7 +109,7 @@ fn lance(b: &mut MeshBuilder, p: Vec3, s: f32) -> Vec3 {
     // flanks that shows the haul going through, a lit strip along its lid.
     mouth(b, mouth_at, 0.4 * s);
     mirror_about(b, p.y, |b| {
-        b.paint(ACCENT).pattern(pattern::MASS_FLOW);
+        b.paint(ACCENT).pattern(pattern::MATERIALS_FLOW);
         b.block(
             v3(p.x - 0.5 * s, 0.44 * s, p.z + 0.02 * s),
             v3(p.x + 0.85 * s, 0.49 * s, p.z + 0.42 * s),
@@ -184,9 +184,9 @@ fn shell(
 }
 
 /// An open salvage hopper on a deck at `at`: a glazed bin that shows the haul pouring in
-/// while the unit reclaims (`pattern::MASS_FLOW`), a metal rim, scrap heaped in it.
+/// while the unit reclaims (`pattern::MATERIALS_FLOW`), a metal rim, scrap heaped in it.
 pub(super) fn hopper(b: &mut MeshBuilder, at: Vec3, size: glam::Vec2, depth: f32) {
-    b.paint(ACCENT).pattern(pattern::MASS_FLOW);
+    b.paint(ACCENT).pattern(pattern::MATERIALS_FLOW);
     b.frustum(at, size * 0.86, size, depth, v2(0.0, 0.0));
     b.pattern(pattern::GENERIC);
     if !b.fine() {
@@ -216,10 +216,10 @@ pub(super) fn hopper(b: &mut MeshBuilder, at: Vec3, size: glam::Vec2, depth: f32
     }
 }
 
-/// A glazed chute from `top` down to `bottom` carrying the haul (`pattern::MASS_FLOW`):
+/// A glazed chute from `top` down to `bottom` carrying the haul (`pattern::MATERIALS_FLOW`):
 /// a dark square duct `width` across, a metal band at each end.
 pub(super) fn chute(b: &mut MeshBuilder, top: Vec3, bottom: Vec3, width: f32) {
-    b.paint(ACCENT).pattern(pattern::MASS_FLOW);
+    b.paint(ACCENT).pattern(pattern::MATERIALS_FLOW);
     b.beam(top, bottom, v2(width, width), v2(width, width));
     b.pattern(pattern::GENERIC);
     if !b.fine() {

@@ -30,7 +30,7 @@ pub(super) fn strength(bp: &UnitBlueprint) -> i64 {
     let cost = if bp.has(cat::COMMANDER) {
         400
     } else {
-        bp.cost_mass.floor_int() as i64
+        bp.cost_materials.floor_int() as i64
     };
     (cost + bp.health.floor_int() as i64 / 10).max(1)
 }

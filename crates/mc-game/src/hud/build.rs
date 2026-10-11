@@ -8,7 +8,7 @@
 use super::icons;
 use super::selection::dps;
 use super::style::{domain_wash, role_backdrop, Domain, Purpose, Role, ITEM_KEYS};
-use super::{has_flag, whole, Hud, HudAction, Scene, ENERGY, GAP, MASS};
+use super::{has_flag, whole, Hud, HudAction, Scene, ENERGY, GAP, MATERIALS};
 use crate::audio::Sfx;
 use crate::game::Mode;
 use crate::ui::{id, ink, palette, rgb, type_scale, Rect, Ui};
@@ -875,7 +875,7 @@ fn tiles<'a>(
             true,
         );
         unit_face(hud, ui, item, tr, t.glow);
-        caption(ui, item, tr, t.glow, item.cost_mass.to_f32());
+        caption(ui, item, tr, t.glow, item.cost_materials.to_f32());
         if slot.n < ITEM_KEYS.len() && slot.shelf == current {
             key_cap(ui, tr.right() - 19.0, tr.y + 4.0, ITEM_KEYS[slot.n], live);
         }
@@ -1199,8 +1199,8 @@ fn upgrade_card(
     for (label, a, b, k) in [
         (
             "Materials Income",
-            e.0.mass_income,
-            e.1.mass_income,
+            e.0.materials_income,
+            e.1.materials_income,
             dial[0],
         ),
         (
@@ -1259,7 +1259,7 @@ fn upgrade_card(
         );
     }
     // A fabricator: what it makes now and at the next tier.
-    let made = |bp: &UnitBlueprint| bp.fabricator.map(|f| f.mass.to_f32() * dial[0]);
+    let made = |bp: &UnitBlueprint| bp.fabricator.map(|f| f.materials.to_f32() * dial[0]);
     if let (Some(a), Some(b)) = (made(from), made(next)) {
         rows.insert(0, ("Materials / s", a, b, ""));
     }
@@ -1270,7 +1270,9 @@ fn upgrade_card(
         .and_then(|v| super::mine::climb_gain(current, next, &v))
         .or_else(|| {
             let gain = made(next)? - made(current)?;
-            let cost = (next.cost_mass - current.cost_mass).to_f32().max(0.0);
+            let cost = (next.cost_materials - current.cost_materials)
+                .to_f32()
+                .max(0.0);
             (gain > 0.0).then(|| (gain, cost / gain))
         });
 
@@ -1309,14 +1311,14 @@ fn upgrade_card(
         ),
     );
 
-    // The price: mass, energy, and how long it takes to put on.
+    // The price: materials, energy, and how long it takes to put on.
     let power = s
         .blueprints
         .upgrade_power(from, next, mc_core::Fx::from_int(SELF_UPGRADE_POWER))
         .to_f32();
-    let (mass, energy) = s.blueprints.upgrade_cost(next);
+    let (materials, energy) = s.blueprints.upgrade_cost(next);
     let costs = [
-        ("Materials", whole(mass.to_f32()), MASS),
+        ("Materials", whole(materials.to_f32()), MATERIALS),
         ("Energy", whole(energy.to_f32()), ENERGY),
         (
             "Time",
@@ -1361,7 +1363,7 @@ fn upgrade_card(
             x + cw,
             y,
             type_scale::VALUE,
-            rgb(MASS, 1.0),
+            rgb(MATERIALS, 1.0),
             &format!("{}  \u{b7}  +{gain:.1}/s", super::mine::duration(payback)),
         );
         y += 24.0;
@@ -1446,7 +1448,7 @@ fn tile_caption(ui: &mut Ui, title: &str, name: Option<&str>, tr: Rect, glow: f3
         x,
         tr.bottom() - 8.5,
         type_scale::MICRO,
-        rgb(MASS, 0.95),
+        rgb(MATERIALS, 0.95),
         &whole(price),
     );
 }

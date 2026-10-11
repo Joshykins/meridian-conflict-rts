@@ -125,7 +125,10 @@ pub fn classify(prev: StoreState, stock: Fx, capacity: Fx, old: Option<Fx>) -> S
 }
 
 fn stores(p: &Player) -> [(Fx, Fx); 2] {
-    [(p.mass, p.mass_capacity), (p.energy, p.energy_capacity)]
+    [
+        (p.materials, p.materials_capacity),
+        (p.energy, p.energy_capacity),
+    ]
 }
 
 impl StoreWatch {
@@ -160,7 +163,7 @@ impl World {
             let owner = s.units.owner[row];
             let which = if bp.economy.energy_storage > Fx::ZERO {
                 1
-            } else if bp.economy.mass_storage > Fx::ZERO {
+            } else if bp.economy.materials_storage > Fx::ZERO {
                 0
             } else {
                 continue;

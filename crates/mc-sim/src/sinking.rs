@@ -58,7 +58,7 @@ pub struct SinkingHull {
     pub top: Fx,
     pub floor: Fx,
     pub age: u16,
-    pub mass: Fx,
+    pub materials: Fx,
     /// How much faster than a frigate it gathers pace and sinks: its height over the
     /// frigate's, at least one.
     #[serde(default = "default_pace")]
@@ -76,7 +76,7 @@ impl SinkingHull {
         heading: Angle,
         seabed: Fx,
         height: Fx,
-        mass: Fx,
+        materials: Fx,
     ) -> SinkingHull {
         let seed = unit_id.wrapping_mul(0x9E37_79B1);
         let side = if seed & 1 == 0 { 1 } else { -1 };
@@ -110,7 +110,7 @@ impl SinkingHull {
             top: z,
             floor,
             age: 0,
-            mass,
+            materials,
             pace,
         }
     }
@@ -134,7 +134,7 @@ impl SinkingHull {
             self.sink,
             self.top,
             self.floor,
-            self.mass,
+            self.materials,
             self.pace,
         ] {
             h.write_i64(v.0);
@@ -195,13 +195,13 @@ impl World {
                 continue;
             }
             let hull = self.state.sinking.remove(i);
-            if hull.mass > Fx::ZERO {
+            if hull.materials > Fx::ZERO {
                 let row = self.state.wrecks.spawn(
                     hull.blueprint,
                     hull.pos,
                     hull.floor,
                     hull.heading,
-                    hull.mass,
+                    hull.materials,
                     self.state.tick,
                 )?;
                 let wrecks = &mut self.state.wrecks;

@@ -661,7 +661,7 @@ fn the_range_economy_tab_fills_starves_and_scatters_wrecks() {
     let tank = rig.blueprints.id_of("aster_t1_tank").unwrap();
     rig.view.range = Some(Range::new(mc_core::FxVec2::from_ints(4000, 4000), tank));
     for p in &mut rig.view.status.players {
-        (p.mass_capacity, p.energy_capacity) = (1000.0, 5000.0);
+        (p.materials_capacity, p.energy_capacity) = (1000.0, 5000.0);
     }
     let range = |a| vec![HudAction::Range(a)];
     assert!(
@@ -673,7 +673,7 @@ fn the_range_economy_tab_fills_starves_and_scatters_wrecks() {
         rig.click(Vec2::new(160.0, 368.0 + focus::FOCUS_H)),
         range(RangeAction::Stock {
             player: BLUE,
-            mass: Some(1000),
+            materials: Some(1000),
             energy: None
         }),
         "fill the materials"
@@ -694,7 +694,7 @@ fn the_range_economy_tab_fills_starves_and_scatters_wrecks() {
         rig.click(Vec2::new(57.0, 428.0 + focus::FOCUS_H)),
         range(RangeAction::Stock {
             player: RED,
-            mass: None,
+            materials: None,
             energy: Some(0)
         }),
         "empty red's energy"
@@ -711,7 +711,7 @@ fn the_range_economy_tab_fills_starves_and_scatters_wrecks() {
             }),
             HudAction::Range(RangeAction::Stock {
                 player: RED,
-                mass: None,
+                materials: None,
                 energy: Some(0)
             }),
         ]

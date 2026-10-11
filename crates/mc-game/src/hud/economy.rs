@@ -1,7 +1,7 @@
 //! What a unit makes and spends, drawn the same way wherever a unit is shown:
 //! one row with a Materials half and an Energy half, each the net per second.
 
-use super::{Scene, ENERGY, MASS};
+use super::{Scene, ENERGY, MATERIALS};
 use crate::ui::{id, palette, rgb, type_scale, Rect, Ui};
 use mc_data::UnitBlueprint;
 use mc_sim::mirror::UnitInstance;
@@ -35,16 +35,16 @@ impl Flow {
     }
 }
 
-/// A unit's mass and energy flows: the sim's own figures when it reports them (the
+/// A unit's materials and energy flows: the sim's own figures when it reports them (the
 /// selection, the unit under the pointer and the side's busy units: `sim_thread::Watch`),
 /// else what its blueprint says.
 pub fn flows(s: &Scene, u: &UnitInstance, bp: &UnitBlueprint) -> (Flow, Flow) {
     match s.queue_of(u) {
         Some(q) => (
             Flow {
-                made: q.mass_made,
-                wanted: q.mass_wanted,
-                used: q.mass_used,
+                made: q.materials_made,
+                wanted: q.materials_wanted,
+                used: q.materials_used,
             },
             Flow {
                 made: q.energy_made,
@@ -63,7 +63,8 @@ fn rated(bp: &UnitBlueprint, dial: [f32; 2]) -> (Flow, Flow) {
     let upkeep = e.energy_upkeep.to_f32();
     (
         Flow {
-            made: (e.mass_income.to_f32() + bp.fabricator.map_or(0.0, |f| f.mass.to_f32()))
+            made: (e.materials_income.to_f32()
+                + bp.fabricator.map_or(0.0, |f| f.materials.to_f32()))
                 * dial[0],
             ..Default::default()
         },
@@ -112,8 +113,8 @@ pub const STRIP_H: f32 = 24.0;
 /// right, green while it gains, red while it drains, amber with a bar of the share it
 /// gets while the side is short. What comes in, goes out and was wanted shows under
 /// the pointer. Nothing is drawn, and false returned, when both flows are empty.
-pub fn strip(ui: &mut Ui, mass: Flow, energy: Flow, r: Rect) -> bool {
-    if mass.is_empty() && energy.is_empty() {
+pub fn strip(ui: &mut Ui, materials: Flow, energy: Flow, r: Rect) -> bool {
+    if materials.is_empty() && energy.is_empty() {
         return false;
     }
     ui.fill_cut(r, 4.0, rgb(0xFFFFFF, 0.035));
@@ -122,9 +123,12 @@ pub fn strip(ui: &mut Ui, mass: Flow, energy: Flow, r: Rect) -> bool {
     let unit_w = ui.text_width(type_scale::MICRO, "/s");
     let pulse = 0.7 + 0.3 * (ui.time * 4.0).sin().abs();
     let mut hovered = None;
-    for (i, (name, flow, tone)) in [("Materials", mass, MASS), ("Energy", energy, ENERGY)]
-        .into_iter()
-        .enumerate()
+    for (i, (name, flow, tone)) in [
+        ("Materials", materials, MATERIALS),
+        ("Energy", energy, ENERGY),
+    ]
+    .into_iter()
+    .enumerate()
     {
         let (x, w) = (r.x + i as f32 * half + 10.0, half - 20.0);
         if i > 0 {
@@ -196,10 +200,10 @@ mod tests {
         let blueprints = Blueprints::load(&Blueprints::locate_data_dir().expect("data dir"))
             .expect("blueprints");
         let bp = blueprints.unit(blueprints.id_of("aster_t2_fabricator").expect("fabricator"));
-        let made = bp.fabricator.expect("a fabricator").mass.to_f32();
-        let (mass, energy) = rated(bp, [1.0; 2]);
+        let made = bp.fabricator.expect("a fabricator").materials.to_f32();
+        let (materials, energy) = rated(bp, [1.0; 2]);
         assert!(made > 0.0);
-        assert_eq!(mass.made, made + bp.economy.mass_income.to_f32());
+        assert_eq!(materials.made, made + bp.economy.materials_income.to_f32());
         assert_eq!(energy.used, bp.economy.energy_upkeep.to_f32());
     }
 
@@ -209,8 +213,8 @@ mod tests {
             .expect("blueprints");
         let bp = blueprints.unit(blueprints.id_of("aster_t2_fabricator").expect("fabricator"));
         let (base, base_e) = rated(bp, [1.0; 2]);
-        let (mass, energy) = rated(bp, [3.0, 2.0]);
-        assert_eq!(mass.made, base.made * 3.0);
+        let (materials, energy) = rated(bp, [3.0, 2.0]);
+        assert_eq!(materials.made, base.made * 3.0);
         assert_eq!(energy.made, base_e.made * 2.0);
         // Upkeep is not income: the dial leaves it alone.
         assert_eq!(energy.used, base_e.used);

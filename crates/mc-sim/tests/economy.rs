@@ -77,7 +77,7 @@ fn spawn(w: &mut World, key: &str, x: i32, y: i32, build: u16) -> UnitId {
 }
 
 /// A reactor site and a factory site, one engineer on each, on 20 energy a second
-/// with none in store and mass to spare, with new mines paid `mines` and new power `power`. How fast each goes up, in
+/// with none in store and materials to spare, with new mines paid `mines` and new power `power`. How fast each goes up, in
 /// build time a second, and the side's player record after.
 fn race(mines: Priority, power: Priority) -> (f64, f64, mc_sim::tables::Player) {
     race_with("aster_t1_power", mines, power)
@@ -90,7 +90,7 @@ fn race_with(first: &str, mines: Priority, power: Priority) -> (f64, f64, mc_sim
     // The reactor makes 25 a second; turned down to 20, so the reactor site's 18 fits and
     // leaves a little for the factory.
     w.state.players[0].income_permille[1] = 800;
-    spawn(&mut w, "aster_mass_storage", 330, 300, 1000);
+    spawn(&mut w, "aster_materials_storage", 330, 300, 1000);
     let reactor = spawn(&mut w, first, 500, 500, 100);
     let factory = spawn(&mut w, "aster_t1_land_factory", 600, 500, 100);
     let a = spawn(&mut w, "aster_t1_engineer", 520, 470, 1000);
@@ -113,7 +113,7 @@ fn race_with(first: &str, mines: Priority, power: Priority) -> (f64, f64, mc_sim
     .unwrap();
     let starve = |w: &mut World| {
         w.state.players[0].energy = Fx::ZERO;
-        w.state.players[0].mass = Fx::from_int(1000);
+        w.state.players[0].materials = Fx::from_int(1000);
         w.tick(&[]).unwrap();
     };
     for _ in 0..20 {
@@ -213,7 +213,7 @@ fn power_last_builds_at_full_speed_with_energy_to_spare() {
     .unwrap();
     for _ in 0..20 {
         w.state.players[0].energy = Fx::from_int(1000);
-        w.state.players[0].mass = Fx::from_int(1000);
+        w.state.players[0].materials = Fx::from_int(1000);
         w.tick(&[]).unwrap();
     }
     let pl = &w.state.players[0];
@@ -240,13 +240,13 @@ fn mines_first_builds_scavenger_towers_first_and_last_never_holds_them_back() {
 }
 
 #[test]
-fn a_mass_stall_holds_energy_spending_back_and_says_so() {
-    // Energy to spare and almost no mass: the factory site asks for its energy at the
-    // full rate but gets only the mass-stalled share of it, and the side's record
+fn a_materials_stall_holds_energy_spending_back_and_says_so() {
+    // Energy to spare and almost no materials: the factory site asks for its energy at the
+    // full rate but gets only the materials-stalled share of it, and the side's record
     // reports what was really spent (the HUD's net), not what was asked for.
     let mut w = world();
     spawn(&mut w, "aster_t1_power", 300, 300, 1000);
-    spawn(&mut w, "aster_mass_storage", 330, 300, 1000);
+    spawn(&mut w, "aster_materials_storage", 330, 300, 1000);
     spawn(&mut w, "aster_energy_storage", 360, 300, 1000);
     let factory = spawn(&mut w, "aster_t1_land_factory", 600, 500, 100);
     let a = spawn(&mut w, "aster_t1_engineer", 580, 470, 1000);
@@ -259,12 +259,12 @@ fn a_mass_stall_holds_energy_spending_back_and_says_so() {
     let hz = mc_core::TICKS_PER_SECOND as f64;
     // The engineer gets to work first.
     for _ in 0..20 {
-        w.state.players[0].mass = Fx::ratio(1, 10);
+        w.state.players[0].materials = Fx::ratio(1, 10);
         w.tick(&[]).unwrap();
     }
     for _ in 0..20 {
         let pl = &mut w.state.players[0];
-        pl.mass = Fx::ratio(1, 10);
+        pl.materials = Fx::ratio(1, 10);
         pl.energy = pl.energy_capacity / 2;
         let before = pl.energy;
         w.tick(&[]).unwrap();
@@ -290,7 +290,7 @@ fn a_mass_stall_holds_energy_spending_back_and_says_so() {
             "store rose {rise}/s, reported net {}",
             income - spent
         );
-        assert!(pl.mass_spent > Fx::ZERO && pl.mass_spent <= pl.mass_demand);
+        assert!(pl.materials_spent > Fx::ZERO && pl.materials_spent <= pl.materials_demand);
     }
 }
 

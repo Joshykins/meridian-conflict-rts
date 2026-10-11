@@ -45,10 +45,10 @@ const SHAPE_RIBBON: f32 = 0.0;
 const SHAPE_GLOW: f32 = 1.0;
 const SHAPE_BIT: f32 = 2.0;
 
-// Reclaim is Materials: the HUD's red-orange (`MASS_*`, gpu_consts.rs) for its body, a
+// Reclaim is Materials: the HUD's red-orange (`MATERIALS_*`, gpu_consts.rs) for its body, a
 // hot core just short of white, a deeper red at its edge. Never the construction amber.
 const WHITE: vec3<f32> = vec3<f32>(1.0, 0.84, 0.74);
-const MATERIALS: vec3<f32> = vec3<f32>(MASS_R, MASS_G, MASS_B);
+const MATERIALS: vec3<f32> = vec3<f32>(MATERIALS_R, MATERIALS_G, MATERIALS_B);
 const RED: vec3<f32> = vec3<f32>(0.85, 0.05, 0.02);
 const MINT: vec3<f32> = vec3<f32>(0.78, 1.0, 0.88);
 const TEAL: vec3<f32> = vec3<f32>(0.18, 0.82, 0.52);
@@ -299,7 +299,7 @@ fn fs_beam_lit(in: BeamOut) -> vec4<f32> {
     }
     if in.state.x < 0.5 {
         // Reclaim: hot core, Materials red-orange about it, red to the edge.
-        // Repair: mint core, teal body, deep green edge — mass going back in.
+        // Repair: mint core, teal body, deep green edge — materials going back in.
         let half_m = max(in.state.z, 0.05);
         let y = abs(in.uv.y) * half_m;
         let pulse = beam_pulse(run, run_px, time, repair);

@@ -12,7 +12,7 @@
 //!   stays up a while; the crates landing is a quiet note.
 
 use super::notices::{Glyph, Live};
-use super::{Hud, Scene, GAP, MASS};
+use super::{Hud, Scene, GAP, MATERIALS};
 use crate::titan_marks::SIGHTED_CARD_SECONDS;
 use crate::ui::{ink, palette, rgb, type_scale, Rect, Ui};
 use glam::Vec2;
@@ -116,12 +116,12 @@ pub fn alerts(hud: &mut Hud, ui: &mut Ui, s: &Scene, dt: f32) {
                     pos,
                     owner,
                     units,
-                    mass,
+                    materials,
                     ..
                 } if ours(*owner) => {
                     hud.notices.note(
                         "elevator-docked",
-                        docked_title(*units, mass.to_f32()),
+                        docked_title(*units, materials.to_f32()),
                         CABLE,
                         Glyph::Elevator,
                         Some(Vec2::from(pos.xy().to_f32())),
@@ -255,13 +255,16 @@ pub fn alerts(hud: &mut Hud, ui: &mut Ui, s: &Scene, dt: f32) {
 }
 
 /// The crates' landing note: what came off them.
-fn docked_title(units: u16, mass: f32) -> String {
+fn docked_title(units: u16, materials: f32) -> String {
     let what = match units {
         0 => "no units".to_owned(),
         1 => "1 unit".to_owned(),
         n => format!("{n} units"),
     };
-    format!("Crates landed: {what}, {} materials", super::whole(mass))
+    format!(
+        "Crates landed: {what}, {} materials",
+        super::whole(materials)
+    )
 }
 
 /// The first of our own finished elevators among the selection, its view, and how many
@@ -305,7 +308,7 @@ pub(super) fn strip(v: &ElevatorView) -> (&'static str, f32, f32) {
     (doing, v.approach, v.to_touchdown)
 }
 
-/// The mass of each unit riding the next crates, in order: the front of the queue, as
+/// The materials of each unit riding the next crates, in order: the front of the queue, as
 /// many as the view says ride.
 fn riders(s: &Scene, u: &UnitInstance, v: &ElevatorView) -> Vec<f32> {
     s.queue_of(u)
@@ -313,7 +316,7 @@ fn riders(s: &Scene, u: &UnitInstance, v: &ElevatorView) -> Vec<f32> {
         .flat_map(|q| &q.orders)
         .take_while(|o| o.kind == OrderKind::Produce)
         .take(v.riding as usize)
-        .map(|o| s.blueprints.unit(o.blueprint).cost_mass.to_f32())
+        .map(|o| s.blueprints.unit(o.blueprint).cost_materials.to_f32())
         .collect()
 }
 
@@ -463,14 +466,14 @@ pub fn panel(
     let inner = Rect::new(bar.x + 2.0, bar.y + 2.0, bar.w - 4.0, bar.h - 4.0);
     let payload = v.payload.max(1.0);
     let mut px = inner.x;
-    for &mass in &riders {
-        let w = inner.w * mass / payload;
+    for &materials in &riders {
+        let w = inner.w * materials / payload;
         let block = Rect::new(px, inner.y, (w - 1.0).max(1.0), inner.h);
         ui.gradient_v(block, rgb(CABLE, 0.95), rgb(CABLE, 0.55));
         px += w;
     }
     let rest = Rect::new(px, inner.y, (inner.right() - px).max(0.0), inner.h);
-    ui.gradient_h(rest, rgb(MASS, 0.55), rgb(MASS, 0.3));
+    ui.gradient_h(rest, rgb(MATERIALS, 0.55), rgb(MATERIALS, 0.3));
     ui.frame(bar, rgb(CABLE, 0.35));
     y += 32.0;
     if compact {
@@ -478,10 +481,10 @@ pub fn panel(
     }
 
     // Its figures, a column each: label over value.
-    let materials = (v.payload - v.riding_mass).max(0.0);
+    let materials = (v.payload - v.riding_materials).max(0.0);
     let facts = [
-        ("Units", super::whole(v.riding_mass), CABLE),
-        ("Materials", super::whole(materials), MASS),
+        ("Units", super::whole(v.riding_materials), CABLE),
+        ("Materials", super::whole(materials), MATERIALS),
         ("Payload", super::whole(v.payload), palette::TEXT),
         ("Every", format!("{:.0} s", v.period), palette::TEXT),
     ];

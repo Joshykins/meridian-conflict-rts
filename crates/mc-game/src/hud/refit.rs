@@ -7,7 +7,7 @@
 //! whose file lists `refits` gets this tab.
 
 use super::selection::dps;
-use super::{whole, Hud, HudAction, Scene, ENERGY, GAP, MASS};
+use super::{whole, Hud, HudAction, Scene, ENERGY, GAP, MATERIALS};
 use crate::audio::Sfx;
 use crate::ui::{id, palette, rgb, type_scale, ButtonKind, Key, Rect, Ui};
 use glam::Vec2;
@@ -274,15 +274,15 @@ fn chain_tile(
         State::Queued(i) => (palette::TEXT, format!("Queued  \u{b7}  {}", ordinal(i + 1))),
         State::Open => {
             let route = plan.route(slot, m);
-            let mass: f32 = route
+            let materials: f32 = route
                 .iter()
-                .map(|&x| plan.set.module(slot, x).cost_mass.to_f32())
+                .map(|&x| plan.set.module(slot, x).cost_materials.to_f32())
                 .sum();
             let energy: f32 = route
                 .iter()
                 .map(|&x| plan.set.module(slot, x).cost_energy.to_f32())
                 .sum();
-            let price = format!("{}  \u{b7}  {}", short(mass), short(energy));
+            let price = format!("{}  \u{b7}  {}", short(materials), short(energy));
             let status = if total > 1 {
                 format!("{tier}  \u{b7}  {price}")
             } else {
@@ -611,10 +611,10 @@ fn card(
     let dial = s.income_dial((u.owner_flags & 0xFF) as u8);
     diff(
         "Materials Income",
-        ea.mass_income.to_f32() * dial[0],
-        eb.mass_income.to_f32() * dial[0],
+        ea.materials_income.to_f32() * dial[0],
+        eb.materials_income.to_f32() * dial[0],
         " / s",
-        MASS,
+        MATERIALS,
     );
     diff(
         "Energy Income",
@@ -716,9 +716,9 @@ fn card(
         },
     );
     // The price of this module (and the tiers queued before it), and how long this unit takes.
-    let (mass, energy, time): (f32, f32, f32) = if route.is_empty() {
+    let (materials, energy, time): (f32, f32, f32) = if route.is_empty() {
         (
-            module.cost_mass.to_f32(),
+            module.cost_materials.to_f32(),
             module.cost_energy.to_f32(),
             module.build_time.to_f32(),
         )
@@ -726,7 +726,7 @@ fn card(
         route.iter().fold((0.0, 0.0, 0.0), |(a, b, c), &x| {
             let mm = plan.set.module(slot, x);
             (
-                a + mm.cost_mass.to_f32(),
+                a + mm.cost_materials.to_f32(),
                 b + mm.cost_energy.to_f32(),
                 c + mm.build_time.to_f32(),
             )
@@ -734,7 +734,7 @@ fn card(
     };
     let seconds = time / power(s.bp(u)).max(0.1);
     for (i, (label, value, tone)) in [
-        ("Materials", whole(mass), MASS),
+        ("Materials", whole(materials), MATERIALS),
         ("Energy", whole(energy), ENERGY),
         ("Time", super::clock(seconds), palette::TEXT),
     ]

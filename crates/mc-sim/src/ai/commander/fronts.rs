@@ -15,9 +15,9 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 
-/// Least claim (mass) that makes a zone a source of a side's reach.
+/// Least claim (materials) that makes a zone a source of a side's reach.
 const CLAIM_MIN: i32 = 250;
-/// Metres further a claim reaches for each 10 mass of it, up to `REACH_MOST`.
+/// Metres further a claim reaches for each 10 materials of it, up to `REACH_MOST`.
 const REACH_MOST: i64 = 1500;
 /// Metres within which both sides reach a zone about as soon: it is on the border
 /// (as is a zone touching the other side's ground).
@@ -72,7 +72,7 @@ pub(in crate::ai) struct Front {
     /// What stands within `BEHIND` hops behind it, ours and theirs: what is at stake.
     pub stake_us: i32,
     pub stake_them: i32,
-    /// Armed mass near it: ours, and what we believe of theirs.
+    /// Armed materials near it: ours, and what we believe of theirs.
     pub ours: i32,
     pub theirs: i32,
     /// Hops from it to their nearest held zone of most value: how far a push gets.
@@ -81,7 +81,7 @@ pub(in crate::ai) struct Front {
 
 /// What each side holds in each zone, as claims.
 pub(in crate::ai) struct Claims {
-    /// Our structure and army mass, by zone.
+    /// Our structure and army materials, by zone.
     pub ours: Vec<i32>,
     pub our_army: Vec<i32>,
     /// What we believe enemy `p` holds (structures, sure-weighted, and army), by zone.
@@ -109,7 +109,7 @@ impl Claims {
                 if !enemies.get(p).copied().unwrap_or(false) {
                     continue;
                 }
-                theirs[p][z] += (h.built_mass() * h.built_sure(tick) / 100).floor_int();
+                theirs[p][z] += (h.built_materials() * h.built_sure(tick) / 100).floor_int();
                 their_army[p][z] += h.army_now(tick).floor_int();
             }
         }
@@ -456,7 +456,7 @@ impl crate::World {
             let p = profiles.get(units.blueprint[r]);
             if p.armed() && p.mobile() {
                 if let Some(z) = zones.of(units.pos[r]) {
-                    our_army[z as usize] += p.mass.floor_int();
+                    our_army[z as usize] += p.materials.floor_int();
                 }
             }
         }

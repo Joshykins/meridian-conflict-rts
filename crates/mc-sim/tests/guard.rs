@@ -518,14 +518,14 @@ fn an_area_engineer_helps_an_engineer_upgrade_in_its_ring() {
     assert_eq!(o.kind, OrderKind::Guard, "then it went back on guard");
 }
 
-/// An engineer on Area Assist at work on a wreck that holds far more mass than it can
+/// An engineer on Area Assist at work on a wreck that holds far more materials than it can
 /// take in the test: the wreck and the engineer's row.
 fn area_engineer_on_a_wreck() -> (World, usize, usize) {
     let mut w = field();
     // Out of the ring: only storage, so there is somewhere to put the salvage.
     add(&mut w, 0, "aster_commander", 100, 950);
     run(&mut w, 1);
-    w.state.players[0].mass = Fx::ZERO;
+    w.state.players[0].materials = Fx::ZERO;
     let mason = add(&mut w, 0, "aster_t1_engineer", 500, 500);
     let units = vec![id(&w, mason)];
     give(
@@ -551,9 +551,9 @@ fn area_engineer_on_a_wreck() -> (World, usize, usize) {
     );
     run(&mut w, 2);
     let wreck = w.state.wrecks.slots.iter().next().expect("a wreck");
-    w.state.wrecks.mass[wreck] = Fx::from_int(50_000);
+    w.state.wrecks.materials[wreck] = Fx::from_int(50_000);
     let reclaiming = until(&mut w, 3000, |w| {
-        w.state.wrecks.mass[wreck] < Fx::from_int(50_000)
+        w.state.wrecks.materials[wreck] < Fx::from_int(50_000)
     });
     assert!(reclaiming.is_some(), "it went to reclaim the wreck");
     let o = w.state.orders.front(&w.state.units, mason).unwrap();
@@ -610,9 +610,9 @@ fn an_area_engineer_leaves_a_wreck_for_a_site_going_up() {
 }
 
 #[test]
-fn an_area_engineer_leaves_wrecks_alone_while_the_mass_store_is_full() {
+fn an_area_engineer_leaves_wrecks_alone_while_the_materials_store_is_full() {
     let (mut w, mason, _) = area_engineer_on_a_wreck();
-    w.state.players[0].mass = w.state.players[0].mass_capacity;
+    w.state.players[0].materials = w.state.players[0].materials_capacity;
     let dropped = until(&mut w, 10, |w| {
         w.state
             .orders
@@ -626,7 +626,7 @@ fn an_area_engineer_leaves_wrecks_alone_while_the_mass_store_is_full() {
         assert_eq!(o.kind, OrderKind::Guard, "no reclaim taken up while full");
     }
     // Room again: back to the wreck.
-    w.state.players[0].mass = Fx::ZERO;
+    w.state.players[0].materials = Fx::ZERO;
     let back = until(&mut w, 30, |w| {
         w.state
             .orders

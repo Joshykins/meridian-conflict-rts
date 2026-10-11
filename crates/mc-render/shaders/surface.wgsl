@@ -83,7 +83,7 @@ struct SurfaceIn {
     time: f32,
     // The unit is at work (a factory building).
     working: f32,
-    // The unit is pulling mass out of a wreck this tick (`UNIT_FLAG_RECLAIMING`).
+    // The unit is pulling materials out of a wreck this tick (`UNIT_FLAG_RECLAIMING`).
     reclaiming: f32,
     tech: f32,
     // Zero on a tech 1 line unit, where nothing is lit: its lines are paint.
@@ -1133,7 +1133,7 @@ fn surf_relief(i: SurfaceIn, st: vec2<f32>) -> f32 {
     var h = mix(1.0, surf_rise(surf_face_edge(i, st), 0.0, bevel * 1.2), outlined);
     switch i.pattern {
         case 1u: {}
-        case MASS_FLOW_PATTERN: {}
+        case MATERIALS_FLOW_PATTERN: {}
         // Melted rock is one skin, not plates: no outline where two faces meet.
         case MELT_PATTERN: { h = 1.0; }
         case 2u: { h = min(h, surf_relief_shutter(i, st)); }
@@ -1744,12 +1744,12 @@ fn surface_at(i: SurfaceIn) -> Surface {
                 out.cavity = 1.0 - 0.3 * surf_band(d_face, gap * 0.8, fw) * outlined;
                 out.rough = 0.1 * seen;
             }
-            case MASS_FLOW_PATTERN: {
+            case MATERIALS_FLOW_PATTERN: {
                 // A chute of reclaimed material: dark glazing over the channel. While the unit
                 // reclaims, clumps of glowing material tumble down it. The fall runs in model z,
                 // not along the face, so a spiral or a raked run carries the same stream.
-                let mass = vec3<f32>(MASS_R, MASS_G, MASS_B);
-                let fall = i.local + vec3<f32>(0.0, 0.0, i.time * MASS_FLOW_SPEED + i.unit * 97.0);
+                let materials = vec3<f32>(MATERIALS_R, MATERIALS_G, MATERIALS_B);
+                let fall = i.local + vec3<f32>(0.0, 0.0, i.time * MATERIALS_FLOW_SPEED + i.unit * 97.0);
                 // Clumps about a metre long, stretched down the fall; a finer churn in them.
                 let clump = surf_noise3(fall * vec3<f32>(0.9, 0.9, 0.55));
                 let churn = 0.5 + surf_fbm3(fall, i.scale * 0.1, fw);
@@ -1760,7 +1760,7 @@ fn surface_at(i: SurfaceIn) -> Surface {
                 let frame = surf_step(d_face, min(bevel * 2.0, small * 0.2), fw);
                 let idle = 0.012 + 0.008 * sin(i.time * 1.3 + i.unit * 31.0);
                 let glow = mix(idle, 0.35 + 4.5 * lump, i.reclaiming) * frame;
-                out.emissive = mass * glow * lamp * 0.55;
+                out.emissive = materials * glow * lamp * 0.55;
                 out.paint = vec4<f32>(0.018, 0.017, 0.016, frame * 0.92);
                 out.rough = -0.35 * frame;
                 out.cavity = 1.0 - 0.3 * surf_band(d_face, gap * 0.8, fw) * outlined;

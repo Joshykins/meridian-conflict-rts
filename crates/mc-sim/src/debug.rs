@@ -138,13 +138,13 @@ impl World {
             }
             Command::DebugStock {
                 player,
-                mass,
+                materials,
                 energy,
             } => {
                 if let Some(p) = self.state.players.get_mut(*player as usize) {
                     let share = |permille: u16| Fx::from_int(permille.min(1000) as i32) / 1000;
-                    if let Some(m) = mass {
-                        p.mass = p.mass_capacity * share(*m);
+                    if let Some(m) = materials {
+                        p.materials = p.materials_capacity * share(*m);
                     }
                     if let Some(e) = energy {
                         p.energy = p.energy_capacity * share(*e);
@@ -153,11 +153,11 @@ impl World {
             }
             Command::DebugIncome {
                 player,
-                mass,
+                materials,
                 energy,
             } => {
                 if let Some(p) = self.state.players.get_mut(*player as usize) {
-                    p.income_permille = [*mass, *energy];
+                    p.income_permille = [*materials, *energy];
                 }
             }
             Command::DebugBuildRate { player, permille } => {
@@ -170,12 +170,12 @@ impl World {
             }
             Command::DebugStorage {
                 player,
-                mass,
+                materials,
                 energy,
             } => {
                 if let Some(p) = self.state.players.get_mut(*player as usize) {
                     let whole = |v: u32| Fx::from_int(v.min(10_000_000) as i32);
-                    p.bonus_storage = [whole(*mass), whole(*energy)];
+                    p.bonus_storage = [whole(*materials), whole(*energy)];
                 }
             }
             Command::DebugWrecks {
@@ -187,8 +187,8 @@ impl World {
                     return Ok(true);
                 }
                 let bp = self.blueprints.unit(*blueprint);
-                let mass = bp.cost_mass * bp.wreck_fraction;
-                if mass <= Fx::ZERO {
+                let materials = bp.cost_materials * bp.wreck_fraction;
+                if materials <= Fx::ZERO {
                     return Ok(true);
                 }
                 // A loose square block, a little apart so each can be picked on its own.
@@ -210,7 +210,7 @@ impl World {
                     let tick = self.state.tick;
                     self.state
                         .wrecks
-                        .spawn(*blueprint, p, z, heading, mass, tick)?;
+                        .spawn(*blueprint, p, z, heading, materials, tick)?;
                 }
             }
             _ => {}

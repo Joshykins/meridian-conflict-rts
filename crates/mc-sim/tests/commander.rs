@@ -979,7 +979,7 @@ fn a_new_back_pack_replaces_the_old_and_a_shield_comes_up() {
         run_until(&mut w, row, with_shield, 6000),
         "the shield replaced the engine"
     );
-    assert_eq!(w.bp(row).economy.mass_income, Fx::from_int(1));
+    assert_eq!(w.bp(row).economy.materials_income, Fx::from_int(1));
     let full = w.bp(row).shield.unwrap().health;
     assert_eq!(
         w.state.units.shield_hp[row], full,

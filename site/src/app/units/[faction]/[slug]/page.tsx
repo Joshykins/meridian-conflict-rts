@@ -147,7 +147,7 @@ export default async function UnitPage({ params }: Params) {
 
             {/* Cost, as the build card shows it. */}
             <div className="rise mt-8 grid grid-cols-3 border border-white/[0.08]" style={{ ["--i" as string]: 3 }}>
-              <Cost label="Mass" value={fmt(unit.stats.mass)} color="var(--color-land)" />
+              <Cost label="Materials" value={fmt(unit.stats.materials)} color="var(--color-land)" />
               <Cost label="Energy" value={fmt(unit.stats.energy)} color="var(--color-warn)" />
               <Cost label="Build time" value={fmt(unit.stats.buildTime)} color="var(--color-dim)" />
             </div>
@@ -218,7 +218,7 @@ export default async function UnitPage({ params }: Params) {
                             <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                               <h4 className="font-display text-xl font-semibold">{m.name}</h4>
                               <span className="num font-display text-sm text-dim">
-                                {fmt(m.cost.mass)} mass · {fmt(m.cost.energy)} energy · {fmt(m.cost.time)} work
+                                {fmt(m.cost.materials)} materials · {fmt(m.cost.energy)} energy · {fmt(m.cost.time)} work
                               </span>
                             </div>
                             {m.after && <p className="text-sm text-faint">Goes on over {m.after}</p>}

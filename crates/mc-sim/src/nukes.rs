@@ -732,7 +732,7 @@ impl World {
     }
 
     /// Paid out of `run_economy`: what every launcher still assembling a round wants this
-    /// tick at full supply (mass, energy per tick), by row, with its build-time rate (its
+    /// tick at full supply (materials, energy per tick), by row, with its build-time rate (its
     /// own power and that of every engineer assisting it) and the tier it is paid in. The rate is not cut to what is
     /// left of the round, so a stall slows the round down but never its last bit
     /// (`advance_launchers` stops at the end).
@@ -771,7 +771,7 @@ impl World {
                 continue;
             }
             let want = [
-                spec.round_mass * left / spec.round_time,
+                spec.round_materials * left / spec.round_time,
                 spec.round_energy * left / spec.round_time,
             ];
             // Even is the rest's tier: a launcher round is paid with the rest by default.

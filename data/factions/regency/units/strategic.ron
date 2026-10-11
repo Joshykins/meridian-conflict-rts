@@ -15,7 +15,7 @@
         tech: 4,
         categories: ["Land", "Strategic", "Experimental"],
         health: 42000,
-        cost: (mass: 9000, energy: 90000, time: 36000),
+        cost: (materials: 9000, energy: 90000, time: 36000),
         radius: 42.5, height: 26, footprint: (8, 8),
         vision: 300,
         strategic: (
@@ -23,7 +23,7 @@
             // One warhead: about five minutes on the silo's own assembly line, as a Sunfall's.
             // Its own power is high and the round long, so engineers assisting add little: a
             // nuke is hard to rush (user, 2026-10-07).
-            missile: (mass: 6000, energy: 120000, time: 720000),
+            missile: (materials: 6000, energy: 120000, time: 720000),
             power: 2400,
             stock: 2,
             speed: 320,
@@ -43,13 +43,13 @@
         tech: 4,
         categories: ["Land", "Strategic", "Experimental"],
         health: 16000,
-        cost: (mass: 3200, energy: 32000, time: 8000),
+        cost: (materials: 3200, energy: 32000, time: 8000),
         radius: 18.75, height: 20, footprint: (4, 4),
         vision: 300, radar: 2400,
         economy: (energy_upkeep: 25),
         strategic: (
             kind: Interceptor,
-            missile: (mass: 1500, energy: 30000, time: 180000),
+            missile: (materials: 1500, energy: 30000, time: 180000),
             power: 1800,
             stock: 4,
             speed: 900,
@@ -69,7 +69,7 @@
         // Culverin it shells the nearest enemy its side can see or has on radar anywhere
         // in reach, building, army or fleet.
         //
-        // Balance: the Culverin's (10000 mass, 30000 HP, 5200 every 9 s, 45 m splash, 1
+        // Balance: the Culverin's (10000 materials, 30000 HP, 5200 every 9 s, 45 m splash, 1
         // degree of spread, 22 km), bent the Regency way as the Kiln is bent from the
         // Trebuchet: a harder strike (5600) in a tighter blast (40 m), laid truer (0.8
         // degrees) and charged longer (4 s), a little slower to load (10 s), so about the
@@ -85,7 +85,7 @@
         tech: 4,
         categories: ["Land", "Artillery", "Strategic", "Experimental"],
         health: 30000,
-        cost: (mass: 10000, energy: 100000, time: 36000),
+        cost: (materials: 10000, energy: 100000, time: 36000),
         radius: 30, height: 48, footprint: (6, 6),
         vision: 300,
         weapons: [(
@@ -138,7 +138,7 @@
         tech: 4,
         categories: ["Land", "Defense", "Experimental"],
         health: 26000,
-        cost: (mass: 6500, energy: 65000, time: 26000),
+        cost: (materials: 6500, energy: 65000, time: 26000),
         radius: 18.75, height: 66, footprint: (4, 4),
         vision: 450, radar: 900,
         economy: (energy_upkeep: 30),

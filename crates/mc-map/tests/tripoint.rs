@@ -17,7 +17,7 @@
 //!   only there, juniper, pinyon and cottonwood only in the desert, jungle
 //!   and palms only in the jungle;
 //! * all three have the same wreckage (their woods are their own: trees
-//!   carry no mass and slow no one);
+//!   carry no materials and slow no one);
 //! * the map's sidecar gives the renderer the walls' own lines, the climates
 //!   between them and the lift the mesas were cut to.
 //!

@@ -665,9 +665,9 @@ impl World {
     }
 
     /// Mines' output for this tick: into `income` (per player, per tick) and each mine's flow.
-    /// Adds every mine's output to its owner's mass income, scaled by `powered`,
+    /// Adds every mine's output to its owner's materials income, scaled by `powered`,
     /// the share of its side's first-paid energy that is covered. Returns the
-    /// mass per tick each side's mines fell short of their full output by.
+    /// materials per tick each side's mines fell short of their full output by.
     pub(crate) fn mine_income(&mut self, income: &mut [(Fx, Fx)], powered: &[Fx]) -> Vec<Fx> {
         let mut lost = vec![Fx::ZERO; income.len()];
         for (&id, m) in &mut self.state.mines.by_unit {
@@ -705,7 +705,7 @@ impl World {
                 continue;
             };
             let p = self.state.units.owner[row] as usize;
-            let made = f.mass / DT * powered[p].clamp(Fx::ZERO, Fx::ONE);
+            let made = f.materials / DT * powered[p].clamp(Fx::ZERO, Fx::ONE);
             income[p].0 += made;
             if row >= self.flows.len() {
                 self.flows.resize(row + 1, Default::default());

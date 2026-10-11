@@ -112,7 +112,7 @@ fn a_strafing_cannon_fires_on_a_titan() {
     );
 }
 
-/// Forty Thunderheads, under half the titan's mass, bring it down, and none is lost: it has no anti-air.
+/// Forty Thunderheads, under half the titan's materials, bring it down, and none is lost: it has no anti-air.
 #[test]
 fn an_air_wing_brings_a_titan_down() {
     let mut w = world();

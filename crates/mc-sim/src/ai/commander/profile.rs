@@ -3,7 +3,7 @@
 //! Nothing here names a unit or a race: a new unit, a T5 included, is understood the
 //! day its blueprint is written. Built once per think from the blueprints (a few
 //! microseconds for the whole roster), never stored in `State`.
-use super::super::ENERGY_PER_MASS;
+use super::super::ENERGY_PER_MATERIALS;
 use mc_core::{Fx, TICKS_PER_SECOND};
 use mc_data::strategic::StrategicKind;
 use mc_data::{cat, BlueprintId, Blueprints, MoveLayer, UnitBlueprint, Weapon};
@@ -115,9 +115,9 @@ pub(in crate::ai) struct Gun {
 pub(in crate::ai) struct Profile {
     pub guns: Vec<Gun>,
     pub id: BlueprintId,
-    /// Mass plus energy at `ENERGY_PER_MASS`.
+    /// Materials plus energy at `ENERGY_PER_MATERIALS`.
     pub cost: Fx,
-    pub mass: Fx,
+    pub materials: Fx,
     pub tech: u8,
     /// Damage a second it puts on each target class.
     pub dps: [Fx; TARGETS],
@@ -223,8 +223,8 @@ impl Profile {
     pub(in crate::ai) fn of(bp: &UnitBlueprint) -> Profile {
         let mut p = Profile {
             id: bp.id,
-            cost: bp.cost_mass + bp.cost_energy / ENERGY_PER_MASS,
-            mass: bp.cost_mass,
+            cost: bp.cost_materials + bp.cost_energy / ENERGY_PER_MATERIALS,
+            materials: bp.cost_materials,
             tech: bp.tech,
             ehp: bp.health + bp.shield.as_ref().map_or(Fx::ZERO, |s| s.health),
             speed: bp.motion.map_or(Fx::ZERO, |m| m.speed),
@@ -289,7 +289,9 @@ fn roles(bp: &UnitBlueprint, p: &Profile) -> u32 {
             role::BUILDER
         };
     }
-    if bp.economy.mass_income > Fx::ZERO || bp.economy.energy_income > Fx::ZERO || bp.mine.is_some()
+    if bp.economy.materials_income > Fx::ZERO
+        || bp.economy.energy_income > Fx::ZERO
+        || bp.mine.is_some()
     {
         r |= role::ECONOMY;
     }

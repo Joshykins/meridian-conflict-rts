@@ -6,18 +6,18 @@ live in `docs/STYLE.md` "The navy"; the tier arithmetic in `docs/BALANCE.md`.
 ## The navy runs one tier ahead of the land
 
 A warship is priced like a land unit of the tier above it: a tier 1 warship like tier 2
-land, tier 2 like tier 3 land, and tier 3 ships beyond anything on land. Energy per mass
+land, tier 2 like tier 3 land, and tier 3 ships beyond anything on land. Energy per materials
 for warships is 6 / 7 / 9 by tier.
 
 ## Ships buy range and hull, not firepower
 
-A warship wins by outranging and outlasting, never by out-damaging land for its mass
+A warship wins by outranging and outlasting, never by out-damaging land for its materials
 (the user's call, 2026-10-09, after a comparison with Forged Alliance, whose warships carry
-a quarter to a tenth of the land's DPS per mass):
+a quarter to a tenth of the land's DPS per materials):
 
-- Health per mass about that of the same-tier land line, or a little over (10-14 a mass).
+- Health per unit of materials about that of the same-tier land line, or a little over (10-14 per unit of materials).
 - Range two to six times the land unit of the same tier.
-- DPS per mass well under the land's (tanks 0.36-0.57): about 0.15-0.25 for a tier 2 or
+- DPS per materials well under the land's (tanks 0.36-0.57): about 0.15-0.25 for a tier 2 or
   3 surface gun line, about 0.2-0.35 for a submarine's torpedoes. Anti-air is measured
   against aircraft (`docs/BALANCE.md` "Air and anti-air"), not here.
 - The tier 1 boats (Skiff, Dirk) are tanks at sea, not long-range ships, and keep tank
@@ -60,7 +60,7 @@ submarine) gives itself away every time it launches.
 
 Three structures put attack torpedoes into any hull in reach, dived submarines included.
 A launcher gives up moving, so it wins on cost: at each tier it carries about twice the
-torpedo DPS and twice the health per unit of mass of the submarine it meets, and it
+torpedo DPS and twice the health per unit of materials of the submarine it meets, and it
 reaches a little past that submarine's tubes (`torpedo_launchers.rs` checks all three).
 
 - The **Breakwater** (tier 1, 600 m, past the Barracuda's 550) is a moored float with one
@@ -116,7 +116,7 @@ unit spotting for it. Killing the spotters blinds it.
 Ships sink and lie on the seabed. Any reclaimer takes a wreck within its reach however deep it
 lies, engineers included; the **Reclaimer**, a hover salvager every naval yard builds,
 can go out over the shallows to it.
-Tier 3 wrecks keep 90%: a sunk Leviathan is nearly 4,000 mass on the seabed. Controlling the
+Tier 3 wrecks keep 90%: a sunk Leviathan is nearly 4,000 materials on the seabed. Controlling the
 sea after a battle pays for the battle.
 
 ## The roster

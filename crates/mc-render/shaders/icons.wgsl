@@ -160,7 +160,7 @@ fn sd_segment(p: vec2<f32>, a: vec2<f32>, b: vec2<f32>) -> f32 {
     return length(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0));
 }
 // The Extractor's disc with its cross cut out, centred on `c`, radius `r`: every salvage
-// icon carries it, since salvage feeds mass as a mine does.
+// icon carries it, since salvage feeds materials as a mine does.
 fn sd_ore_disc(p: vec2<f32>, c: vec2<f32>, r: f32) -> f32 {
     let q = p - c;
     let cross = min(sd_box(q, vec2<f32>(0.12, r * 0.8)), sd_box(q, vec2<f32>(r * 0.8, 0.12)));
@@ -323,7 +323,7 @@ fn icon_shape(shape: u32, p: vec2<f32>) -> f32 {
         // shoulders, the rotary rail cluster on its right arm and the long bore on its
         // left (`hud/icons.rs` draws the same; `fs_icon` frames it).
         case 28u: { return sd_titan(p); }
-        // Salvage: the Extractor's disc (salvage feeds mass as a mine does) with its
+        // Salvage: the Extractor's disc (salvage feeds materials as a mine does) with its
         // domain's mark (`hud/icons.rs` draws the same). A structure rings it with its reach.
         case 29u: { return min(sd_ore_disc(p, vec2<f32>(0.0), 0.5), abs(length(p) - 0.8) - 0.07); }
         // Salvage carrier, from above: the disc with swept wings out of its sides and a tail.
@@ -787,7 +787,7 @@ fn fs_ring(in: RingOut) -> @location(0) vec4<f32> {
     var tint = vec3<f32>(0.30, 1.0, 0.62);
     if reclaim {
         // Under a reclaim pointer: the Materials red-orange, whoever owns it.
-        tint = vec3<f32>(MASS_R, MASS_G, MASS_B);
+        tint = vec3<f32>(MATERIALS_R, MATERIALS_G, MATERIALS_B);
     } else if enemy {
         tint = vec3<f32>(1.0, 0.26, 0.16);
     } else if hovered {

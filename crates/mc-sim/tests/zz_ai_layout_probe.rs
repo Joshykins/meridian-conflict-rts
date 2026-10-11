@@ -63,7 +63,7 @@ fn layout() {
         mut sum_shields,
         mut sum_clusters,
     ) = (0, 0, 0, 0, 0, 0);
-    // Seconds each side spent short of energy, and mass it made.
+    // Seconds each side spent short of energy, and materials it made.
     let mut short = vec![0u32; players as usize];
     let mut made = vec![0f32; players as usize];
     for minute in 1..=minutes {
@@ -74,7 +74,7 @@ fn layout() {
                     short[p] += (pl.energy_demand > pl.energy_income
                         && pl.energy < pl.energy_capacity / 10)
                         as u32;
-                    made[p] += pl.mass_income.to_f32();
+                    made[p] += pl.materials_income.to_f32();
                 }
             }
         }
@@ -88,7 +88,7 @@ fn layout() {
                 continue;
             }
             let start = s.players[p].start;
-            // (pos, footprint metres, blueprint categories, mass cost, shield radius)
+            // (pos, footprint metres, blueprint categories, materials cost, shield radius)
             let mut own: Vec<(FxVec2, i32, u32, f32, f32)> = Vec::new();
             for row in s
                 .units
@@ -104,7 +104,7 @@ fn layout() {
                     s.units.pos[row],
                     bp.footprint.0.max(bp.footprint.1) as i32 * mc_map::BUILD_CELL_M,
                     bp.categories,
-                    bp.cost_mass.to_f32(),
+                    bp.cost_materials.to_f32(),
                     bp.shield.as_ref().map_or(0.0, |sh| sh.radius.to_f32()),
                 ));
             }
@@ -183,7 +183,7 @@ fn layout() {
                 sum_clusters += clusters;
             }
             println!(
-                "  {minute:>2}m P{p}: mass made {:.0} energy-starved {}s factories {} structures {} | power {} alone {alone} >700m {far} clusters {clusters} | shields {} covering {:?} (useless {useless})",
+                "  {minute:>2}m P{p}: materials made {:.0} energy-starved {}s factories {} structures {} | power {} alone {alone} >700m {far} clusters {clusters} | shields {} covering {:?} (useless {useless})",
                 made[p],
                 short[p],
                 own.iter().filter(|o| o.2 & cat::FACTORY != 0).count(),

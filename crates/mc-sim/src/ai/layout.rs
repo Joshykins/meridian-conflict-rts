@@ -21,7 +21,7 @@ const FARM_SPACING: i32 = 230;
 const FARM_RINGS: [i32; 3] = [240, 330, 420];
 /// Ground sampled around a farm centre to judge it, on this pitch.
 const FARM_SAMPLE_M: i32 = 24;
-/// A shield pays for itself only over at least this much of its own mass cost
+/// A shield pays for itself only over at least this much of its own materials cost
 /// in buildings not yet under another shield, in percent.
 const SHIELD_WORTH: i64 = 150;
 /// Buildings this far from the start are not the base a shield is for.
@@ -324,7 +324,7 @@ impl World {
             {
                 continue;
             }
-            worth.push((pos, other.cost_mass));
+            worth.push((pos, other.cost_materials));
         }
         worth.retain(|(p, _)| !shields.iter().any(|(c, r)| inside(*p, *c, *r)));
         worth
@@ -346,5 +346,5 @@ fn covered(worth: &[(FxVec2, Fx)], centre: FxVec2, radius: Fx) -> Fx {
 }
 
 fn shield_need(bp: &UnitBlueprint) -> Fx {
-    bp.cost_mass * Fx::ratio(SHIELD_WORTH, 100)
+    bp.cost_materials * Fx::ratio(SHIELD_WORTH, 100)
 }

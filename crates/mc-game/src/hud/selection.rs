@@ -260,7 +260,7 @@ pub fn info(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
             right,
             r.y + 20.0,
             type_scale::MICRO,
-            rgb(super::MASS, 1.0),
+            rgb(super::MATERIALS, 1.0),
             &format!("{} materials reclaimed", whole(reclaimed)),
         );
     }
@@ -272,10 +272,10 @@ pub fn info(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
         health_tone(health),
     );
     // What the whole selection makes and spends, in the same strip as for one unit.
-    let (mass, energy) = super::economy::total(s, units);
+    let (materials, energy) = super::economy::total(s, units);
     let economy = super::economy::strip(
         ui,
-        mass,
+        materials,
         energy,
         Rect::new(x - 4.0, r.y + 44.0, cw + 8.0, super::economy::STRIP_H),
     );
@@ -1113,7 +1113,7 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
             glyph: Glyph::Assist,
             label: "Assist",
             key: "C",
-            hint: "Assist (C): click a unit to help it build, repair it or feed its shield. Press on open ground and drag out a ring (a click there gives the usual size) for an area assist: the engineers stay on it and work everything inside, raising what goes up (factories' products too) and mending what is hurt first, reclaiming wrecks only while there is room for the mass, and take up new work as it appears. Stays until another order.",
+            hint: "Assist (C): click a unit to help it build, repair it or feed its shield. Press on open ground and drag out a ring (a click there gives the usual size) for an area assist: the engineers stay on it and work everything inside, raising what goes up (factories' products too) and mending what is hurt first, reclaiming wrecks only while there is room for the materials, and take up new work as it appears. Stays until another order.",
             action: HudAction::Target(Targeting::Assist),
             lit: targeting(Targeting::Assist),
         });
@@ -1213,7 +1213,7 @@ pub fn orders(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r:
         for (i, o) in orders.iter().enumerate() {
             // Reclaim is lit in the Materials red-orange it brings in, not the family's colour.
             let tone = if o.action == HudAction::Target(Targeting::Reclaim) {
-                super::MASS
+                super::MATERIALS
             } else {
                 tone
             };

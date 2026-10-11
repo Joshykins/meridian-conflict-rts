@@ -590,7 +590,7 @@ pub(super) fn machine_gun(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, radiu
     });
 }
 
-/// Reclaim processor: a focusing tube that draws mass in. The first half is
+/// Reclaim processor: a focusing tube that draws materials in. The first half is
 /// a dark housing with feed pipes and charge collars — plant, not a point-
 /// defence lance. The mouth is a dark intake ring. Orange bore.
 pub(super) fn reclaim_gun(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, radius: f32) {

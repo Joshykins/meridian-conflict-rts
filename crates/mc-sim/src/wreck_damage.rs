@@ -1,7 +1,7 @@
 //! Blasts wear wrecks down. Splash, bombs, a volatile unit going up, a warhead's front
-//! and an AEB storm take mass off every wreck they reach, as reclaim does, until
+//! and an AEB storm take materials off every wreck they reach, as reclaim does, until
 //! there is nothing left and the wreck is gone. The renderer shows the loss as it
-//! goes (`health`, the share of its mass left, wears it away). A wreck just left takes
+//! goes (`health`, the share of its materials left, wears it away). A wreck just left takes
 //! nothing for its first second (`FRESH_TICKS`), so the blast that killed a unit, or the
 //! next shell of the same salvo, does not blow its wreck away at once.
 use crate::spatial::kind;
@@ -51,10 +51,10 @@ impl World {
                 continue;
             }
             let wrecks = &mut self.state.wrecks;
-            let lost = wrecks.mass_max[w] * dealt / (bp.health * TOUGHNESS).max(Fx::ONE);
-            let left = wrecks.mass[w];
-            wrecks.mass[w] = left - lost.min(left);
-            if wrecks.mass[w] <= Fx::ZERO {
+            let lost = wrecks.materials_max[w] * dealt / (bp.health * TOUGHNESS).max(Fx::ONE);
+            let left = wrecks.materials[w];
+            wrecks.materials[w] = left - lost.min(left);
+            if wrecks.materials[w] <= Fx::ZERO {
                 wrecks.slots.free(w);
             }
         }

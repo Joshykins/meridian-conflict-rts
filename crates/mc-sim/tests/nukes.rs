@@ -789,7 +789,7 @@ fn a_salvo_is_met_one_interceptor_a_warhead_without_doubling_back() {
 }
 
 #[test]
-fn a_round_finishes_through_a_mass_stall() {
+fn a_round_finishes_through_a_materials_stall() {
     // A stall used to scale the round's last bit as well, which then shrank every tick
     // until it rounded to nothing: the array sat at 100% and never got its interceptor.
     let mut w = world();
@@ -814,12 +814,12 @@ fn a_round_finishes_through_a_mass_stall() {
         .strategic
         .clone()
         .unwrap();
-    // About a third of the mass both ask for, every tick; energy to spare.
-    let per_tick = |s: &mc_data::strategic::Strategic| s.round_mass * s.power / s.round_time;
+    // About a third of the materials both ask for, every tick; energy to spare.
+    let per_tick = |s: &mc_data::strategic::Strategic| s.round_materials * s.power / s.round_time;
     let trickle = (per_tick(&spec) + per_tick(&silo)) / 30;
     let mut ready = None;
     for t in 0..600 {
-        w.state.players[0].mass = trickle;
+        w.state.players[0].materials = trickle;
         w.state.players[0].energy = Fx::from_int(1_000_000);
         w.tick(&[]).unwrap();
         if w.events
@@ -833,7 +833,7 @@ fn a_round_finishes_through_a_mass_stall() {
     let l = &w.state.strategic.launchers[&array];
     assert!(
         ready.is_some(),
-        "the round is finished while mass stalls (stuck at {} of {})",
+        "the round is finished while materials stall (stuck at {} of {})",
         l.progress,
         spec.round_time
     );

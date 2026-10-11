@@ -348,11 +348,11 @@ pub struct Dive {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Economy {
     /// Per second.
-    pub mass_income: Fx,
+    pub materials_income: Fx,
     pub energy_income: Fx,
     /// Per second, drawn while the unit is active.
     pub energy_upkeep: Fx,
-    pub mass_storage: Fx,
+    pub materials_storage: Fx,
     pub energy_storage: Fx,
 }
 
@@ -384,7 +384,7 @@ pub struct Mine {
 #[derive(Clone, Copy, Debug)]
 pub struct Fabricator {
     /// Materials per second with its upkeep paid in full.
-    pub mass: Fx,
+    pub materials: Fx,
 }
 
 /// A provider's adjacency bonus: what it saves each finished building of its owner's
@@ -401,14 +401,14 @@ pub struct Adjacency {
     /// Share of a ringed neighbour's energy use it saves.
     pub energy: Fx,
     /// Share of a ringed neighbouring factory's materials it saves.
-    pub mass: Fx,
+    pub materials: Fx,
 }
 
 impl Adjacency {
     /// Energy: a ring of 2000/s reactors (Reactor III) saves 60%.
     pub const ENERGY_RING: (Fx, Fx) = (Fx::ratio(3, 5), Fx::from_int(2000));
     /// Materials: a ring of 5/s fabricators (Fabricator III) saves 40%.
-    pub const MASS_RING: (Fx, Fx) = (Fx::ratio(2, 5), Fx::from_int(5));
+    pub const MATERIALS_RING: (Fx, Fx) = (Fx::ratio(2, 5), Fx::from_int(5));
 
     /// What a ring of providers making `made` a second saves, against the `(share, made)`
     /// reference: by the fourth root of the output, so a bigger plant saves more but
@@ -486,7 +486,7 @@ pub const MAX_RECLAIM_HEADS: usize = 4;
 /// unit with a reclaimer carries no weapons, so the slots are the heads'.
 #[derive(Clone, Copy, Debug)]
 pub struct Reclaimer {
-    /// Build time units undone per second, and mass per second out of a wreck, for the
+    /// Build time units undone per second, and materials per second out of a wreck, for the
     /// whole unit: this tick's share is split evenly across the heads that are working.
     pub power: Fx,
     /// Horizontal reach from the unit's middle to the edge of its work: a wreck deep
@@ -885,7 +885,7 @@ pub struct UnitBlueprint {
     /// Its regen is nanites at work: it keeps mending while it is hit (`run_regen`), and
     /// the renderer draws the nanites while it mends.
     pub nanite_regen: bool,
-    pub cost_mass: Fx,
+    pub cost_materials: Fx,
     pub cost_energy: Fx,
     /// Build time units; divide by build power for seconds.
     pub build_time: Fx,
@@ -971,7 +971,7 @@ pub struct UnitBlueprint {
     /// Reclaimer). `None`: the caller's fallback.
     pub upgrade_power: Option<Fx>,
     pub weapons: Vec<Weapon>,
-    /// Share of `cost_mass` left in the wreck.
+    /// Share of `cost_materials` left in the wreck.
     pub wreck_fraction: Fx,
     pub visual: Visual,
     /// Names from the sound library.
@@ -1201,10 +1201,10 @@ impl Blueprints {
         let from = self.units.iter().find(|u| u.upgrades_to == Some(to.id));
         match from {
             Some(f) => (
-                (to.cost_mass - f.cost_mass).max(Fx::ZERO),
+                (to.cost_materials - f.cost_materials).max(Fx::ZERO),
                 (to.cost_energy - f.cost_energy).max(Fx::ZERO),
             ),
-            None => (to.cost_mass, to.cost_energy),
+            None => (to.cost_materials, to.cost_energy),
         }
     }
 
@@ -1516,7 +1516,7 @@ impl Blueprints {
                 if made.is_structure()
                     || made.motion.is_none()
                     || naval
-                    || made.cost_mass > e.payload
+                    || made.cost_materials > e.payload
                     || !mc_core::elevator_bay::seats(made.radius)
                 {
                     return Err(DataError::Invalid(format!(
@@ -1591,7 +1591,7 @@ impl Blueprints {
             for v in [
                 u.health,
                 u.regen,
-                u.cost_mass,
+                u.cost_materials,
                 u.cost_energy,
                 u.build_time,
                 u.radius,
@@ -1633,10 +1633,10 @@ impl Blueprints {
             }
             let e = &u.economy;
             for v in [
-                e.mass_income,
+                e.materials_income,
                 e.energy_income,
                 e.energy_upkeep,
-                e.mass_storage,
+                e.materials_storage,
                 e.energy_storage,
             ] {
                 h.write_i64(v.0);
@@ -1649,7 +1649,7 @@ impl Blueprints {
                 }
                 None => h.write_u64(u64::MAX),
             }
-            h.write_i64(u.fabricator.map_or(-1, |f| f.mass.0));
+            h.write_i64(u.fabricator.map_or(-1, |f| f.materials.0));
             match &u.death_blast {
                 Some(d) => {
                     h.write_i64(d.radius.0);
@@ -1660,7 +1660,7 @@ impl Blueprints {
             match &u.adjacency {
                 Some(a) => {
                     h.write_i64(a.energy.0);
-                    h.write_i64(a.mass.0);
+                    h.write_i64(a.materials.0);
                 }
                 None => h.write_u64(u64::MAX),
             }
@@ -2384,7 +2384,10 @@ mod tests {
         let (mfe, shield) = (module("back", "mfe"), module("back", "shield"));
         let with_mfe = bp.refit_result(with_rail, mfe).unwrap();
         let e = &bp.unit(with_mfe).economy;
-        assert_eq!(e.mass_income, acu.economy.mass_income + Fx::from_int(5));
+        assert_eq!(
+            e.materials_income,
+            acu.economy.materials_income + Fx::from_int(5)
+        );
         assert_eq!(
             e.energy_income,
             acu.economy.energy_income + Fx::from_int(1500)
@@ -2394,8 +2397,8 @@ mod tests {
         let with_shield = bp.refit_result(with_mfe, shield).unwrap();
         assert!(bp.unit(with_shield).shield.is_some_and(|s| s.is_hull()));
         assert_eq!(
-            bp.unit(with_shield).economy.mass_income,
-            acu.economy.mass_income
+            bp.unit(with_shield).economy.materials_income,
+            acu.economy.materials_income
         );
 
         // The engineering suites: II, then III over it, with the tiers they unlock.
@@ -2449,14 +2452,14 @@ mod tests {
         assert!(b.unfold_ticks > 0);
         // Kits carry the module's price, and are nobody's commander.
         assert_eq!(
-            bp.unit(aux).cost_mass,
-            set.module(slot("shoulder"), 2).cost_mass
+            bp.unit(aux).cost_materials,
+            set.module(slot("shoulder"), 2).cost_materials
         );
         assert!(!bp.unit(aux).has(cat::COMMANDER));
         // Loadouts are worth their base as a wreck, whatever is on them.
         assert_eq!(
-            bp.unit(full).cost_mass * bp.unit(full).wreck_fraction,
-            acu.cost_mass * acu.wreck_fraction
+            bp.unit(full).cost_materials * bp.unit(full).wreck_fraction,
+            acu.cost_materials * acu.wreck_fraction
         );
         // Every loadout keeps within the sim's weapon slots and reads its unit's lore.
         for &id in &set.loadouts {

@@ -99,9 +99,9 @@ fn gunships_orbit_and_keep_the_target_in_front() {
 fn port_drones_divide_and_orbit_wrecks_and_ignore_orders() {
     let mut w = world();
     let c = super::drone_port::ported_commander(&mut w, 900, 900);
-    w.state.players[0].mass = Fx::ZERO;
+    w.state.players[0].materials = Fx::ZERO;
     w.state.players[0].energy = Fx::ZERO;
-    w.state.players[0].mass_capacity = Fx::from_int(100000);
+    w.state.players[0].materials_capacity = Fx::from_int(100000);
     let parent = w.state.units.id(c);
     let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
     let mut drones = Vec::new();
@@ -147,9 +147,9 @@ fn port_drones_divide_and_orbit_wrecks_and_ignore_orders() {
     for (i, &d) in drones.iter().enumerate() {
         assert!(distance[i] > Fx::from_int(80), "drone stationary");
         assert!(
-            w.state.wrecks.mass[wrecks[i]] < Fx::from_int(950),
+            w.state.wrecks.materials[wrecks[i]] < Fx::from_int(950),
             "wreck {i} not reclaimed: {:?}, drone at {:?}",
-            w.state.wrecks.mass[wrecks[i]],
+            w.state.wrecks.materials[wrecks[i]],
             w.state.units.pos[d]
         );
     }

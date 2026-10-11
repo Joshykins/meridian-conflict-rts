@@ -12,9 +12,9 @@
     // ahead of a raid is ready for it. It charges for a long beat, then pinches out one
     // fast shot of fusion up at the hull, and shoots at nothing else: escorts keep it alive.
     //
-    // Balance: the Narwhal's land peer (3800 mass, 40000 HP, 12000 every 6 s at 3000 m,
-    // 0.53 DPS a mass point). Bent the Regency way: it hits harder for its mass (13000
-    // every 7 s, 0.58 a mass point) from a shorter reach (2800 m) on a lighter hull
+    // Balance: the Narwhal's land peer (3800 materials, 40000 HP, 12000 every 6 s at 3000 m,
+    // 0.53 DPS per unit of materials). Bent the Regency way: it hits harder for its materials (13000
+    // every 7 s, 0.58 per unit of materials point) from a shorter reach (2800 m) on a lighter hull
     // (26000 HP), and pays for both with the plant: nine seconds before the first shot,
     // nine more before it can leave. One shot takes an ARC corvette; three, the Suzerain
     // through its shield; two of them bring down an ARC frigate (55000 HP) in about 15 s.
@@ -28,7 +28,7 @@
         tech: 3,
         categories: ["Land", "AntiAir"],
         health: 26000,
-        cost: (mass: 3400, energy: 34000, time: 20000),
+        cost: (materials: 3400, energy: 34000, time: 20000),
         radius: 22.0, height: 37.0,
         vision: 900,
         motion: (layer: Land, size: 4, speed: 15, accel: 6, turn: 28, deploy: 9.0, deploy_idle: true),
@@ -53,7 +53,7 @@
     // field that lands with the Sunspear's strike: the ground melted into a glowing pool and a
     // knot of fusion left burning over it.
     //
-    // Balance: the Trebuchet's (800 mass, 4715 HP, 4467 damage every 10 s at 1800 m, 48 m
+    // Balance: the Trebuchet's (800 materials, 4715 HP, 4467 damage every 10 s at 1800 m, 48 m
     // splash, 4.6 degrees of spread). Bent the Regency way: it hits harder (5200) in a tighter
     // blast (40 m), laid truer (2.5 degrees) from a shorter reach (1600 m), and charges longer
     // (2.8 s against 2.4 s).
@@ -67,7 +67,7 @@
         tech: 3,
         categories: ["Land", "Artillery"],
         health: 4900,
-        cost: (mass: 820, energy: 6600, time: 4800),
+        cost: (materials: 820, energy: 6600, time: 4800),
         radius: 11.0, height: 9.5,
         vision: 220,
         motion: (layer: Land, size: 2, speed: 22, accel: 16, turn: 70),
@@ -118,7 +118,7 @@
         tech: 3,
         categories: ["Land", "DirectFire"],
         health: 4400,
-        cost: (mass: 520, energy: 4700, time: 3200),
+        cost: (materials: 520, energy: 4700, time: 3200),
         radius: 7.6, height: 4.6,
         vision: 380,
         motion: (layer: Hover, size: 1, speed: 25, accel: 18, turn: 75),
@@ -145,7 +145,7 @@
     // anywhere in the well and however long it has been in it. It cannot defend itself up
     // close.
     //
-    // Balance: the Arbalest's class (560 mass, 4200 HP, 1250 every 6 s at 1400 m: 208 a
+    // Balance: the Arbalest's class (560 materials, 4200 HP, 1250 every 6 s at 1400 m: 208 a
     // second on one target). Bent the Regency way: a shorter reach (1200 m) and less on one
     // target (160 a second), but on everything round it, and what it holds keeps only 40%
     // of its speed. The front needs a line of fire to leave, none once out; it runs at
@@ -160,7 +160,7 @@
         tech: 3,
         categories: ["Land", "DirectFire"],
         health: 4200,
-        cost: (mass: 560, energy: 5600, time: 3200),
+        cost: (materials: 560, energy: 5600, time: 3200),
         radius: 8.5, height: 7.5,
         vision: 1250,
         motion: (layer: Land, size: 1, speed: 28, accel: 22, turn: 80, deploy: 4.0, deploy_idle: true),
@@ -181,7 +181,7 @@
         sounds: (death: "blast_large", moving: "tracks_heavy"),
     ),
     // Executioner: Paladin-class assault tank. 11,400 combined hull/shield versus
-    // 10,787; 475 precise DPS plus up to 90 rocket DPS, paid for with 13% more mass
+    // 10,787; 475 precise DPS plus up to 90 rocket DPS, paid for with 13% more materials
     // and slower movement. Rocket scatter makes the extra damage situational.
     (
         key: "regency_t3_assault_tank", name: "Executioner",
@@ -189,7 +189,7 @@
         tech: 3, categories: ["Land", "DirectFire"],
         health: 8400, shield: (kind: Hull, health: 3000, regen: 30),
         economy: (energy_upkeep: 65),
-        cost: (mass: 950, energy: 7600, time: 5400),
+        cost: (materials: 950, energy: 7600, time: 5400),
         radius: 10.5, height: 7.0, vision: 650,
         motion: (layer: Land, size: 2, speed: 25, accel: 20, turn: 85),
         weapons: [

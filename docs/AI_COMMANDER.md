@@ -75,7 +75,7 @@ Builders and factories are executors (`builders.rs`, `production.rs`,
 
 ### 1. Profiles (`profile.rs`)
 
-For every blueprint, from its data alone: mass, `dps` and `reach` for each target
+For every blueprint, from its data alone: materials, `dps` and `reach` for each target
 class (`Land`, `Structure`, `Air`, `Surface`, `Submerged`, `Space`), with each
 gun's share of hits by its flight time and spread against that class; effective
 health, speed, radius, movement domain (land, hover, amphibious, naval, sub, air,
@@ -86,11 +86,11 @@ space); lift room; and **roles** derived from the above: `LINE`, `RAIDER`,
 
 ### 2. Matchups (`matchup.rs`)
 
-`fight(a, b)`: who wins equal mass of `a` against `b`, Lanchester-style from the
+`fight(a, b)`: who wins equal materials of `a` against `b`, Lanchester-style from the
 profiles, with the range edge (free volleys while the gap closes) and splash.
 `edge` compares a group with a believed enemy. Calibrated against staged headless
 fights: `zz_matchup_probe` (in `matchup_tests.rs`) fights every pair of combat units
-at equal mass and prints where the estimate and the sim disagree; the estimate picks
+at equal materials and prints where the estimate and the sim disagree; the estimate picks
 the winner of about 90% of pairs. Run it with
 `MATCHUP=0/4 cargo test --profile gate -p mc-sim --lib -- zz_matchup_probe --ignored --nocapture`
 (`MATCHUP_ONLY=key` for one unit's pairs).
@@ -126,18 +126,18 @@ the same on every machine and is rebuilt after a restore rather than saved.
 - **Links**: `adj` joins zones on the same ground a unit can cross between; `coast`
   joins land to the water it touches.
 - Each think a `ZoneView` reads what changes from the world model and contacts: land
-  fire, enemy mass, and the mass of our own structures in each zone.
-- **Value**: 250 mass per ore field plus the enemy mass remembered in the zone;
+  fire, enemy materials, and the materials of our own structures in each zone.
+- **Value**: 250 materials per ore field plus the enemy materials remembered in the zone;
   incursions are answered most valuable first. Target choice (`land_objective`) keeps
-  the old "mass within 600 m" value and subtracts the worst fire on the zones between
-  (`fire_along`): ranking by a whole zone's mass or ore sent waves at the strongest
+  the old "materials within 600 m" value and subtracts the worst fire on the zones between
+  (`fire_along`): ranking by a whole zone's materials or ore sent waves at the strongest
   ground (decided matches fell from 11 of 16 to 6-9 in the 2x-resource ARC mirror).
   Scouts revisit ground with ore sooner than bare ground.
 - **Shortfalls**: a defence raised against aircraft, shelling or raiders posts what it
   found missing (`commander.role_need`: anti-air, artillery, raiders, per mille) as a
   floor on that role's share of new units, fading over a few minutes (`solver.rs`).
 - **Hedging nukes**: with the nukes only a maybe (40-89), an interceptor is raised
-  only when one zone holds 11 000 mass of our structures.
+  only when one zone holds 11 000 materials of our structures.
 - **Opening**: starts close together raise Pressure (a rush), free ore on its half
   raises Boom for the first 12 minutes.
 - A structure the plans' wants found no lot for is skipped at that place for three
@@ -149,10 +149,10 @@ The side's long memory of the map, by zone, saved with the match. Contacts are i
 short memory of single units (the freshest 256, forgotten in seconds to minutes);
 knowledge keeps, for every zone, what each enemy player was seen to hold there:
 
-- structure mass and count by kind (`Built`: economy, factories, airfields,
+- structure materials and count by kind (`Built`: economy, factories, airfields,
   shipyards, guns, anti-air, artillery, launchers, interceptors, shields, sensors,
   other), and when they were last refreshed;
-- armed mobile mass by domain, builders, and when they were last refreshed;
+- armed mobile materials by domain, builders, and when they were last refreshed;
 - when their commander was last seen there;
 - per zone: when it was last mostly in view, how much of it is in view now, and the
   enemy radar blips there it cannot name.
@@ -169,19 +169,19 @@ thirty; an army is sure for twenty seconds and is forgotten at three minutes.
 Where the side's ground meets an enemy's, found each think, one set per enemy
 player, on land and at sea:
 
-- **Claims**: our structure mass in each zone, and half our armed mobile mass; the
+- **Claims**: our structure materials in each zone, and half our armed mobile materials; the
   enemy's from knowledge, structures by how sure they still are and the army
   believed there now. An enemy start never seen is still claimed (1000). At sea, a
   water zone also takes half the claim of the land on its coast.
 - **Reach**: each claim of 250 or more spreads over the zone graph by walk (or sail)
-  distance between zone middles, starting ahead by a tenth of its mass in metres
+  distance between zone middles, starting ahead by a tenth of its materials in metres
   (1.5 km at most): a strong base pushes the border away from it.
 - **Border**: a zone both sides reach within 250 m of each other, or one touching the
   other side's ground. A connected run of border zones is cut into sectors of four
   hops from one of its ends, so a border across the map is several fronts; a cliff
   or a strait breaks a run of itself.
 - Each front reads: its zones, their zones beside it (`entries`), what is at stake
-  behind it within two hops on each side (structures and ore), armed mass near it on
+  behind it within two hops on each side (structures and ore), armed materials near it on
   each side (one hop), and how many zones lie from it to their most valuable ground.
   A front of two zones or fewer with less than 600 at stake on both sides is dropped;
   at most 48 are kept, those with most at stake.
@@ -190,7 +190,7 @@ player, on land and at sea:
   pick first, so a front that splits keeps its id on its larger part and two that
   merge keep the older one (`CommanderState::fronts`).
 
-On the overlay, fronts are outlined orange with their id and the armed mass near
+On the overlay, fronts are outlined orange with their id and the armed materials near
 each side; the AI Mind card lists the four with most at stake.
 
 ### 4. Beliefs (`beliefs.rs`)
@@ -257,7 +257,7 @@ A plan's record is its operations' kills and losses, credited as they happen
 only from finished ones never learnt it was losing).
 
 Big projects (titans, silos, map guns, warships) grow in appeal with income
-(`rich`, up to 50 from 80 a second on): at 300 a second a 16 000-mass warship
+(`rich`, up to 50 from 80 a second on): at 300 a second a 16 000-materials warship
 is under a minute of income. A probe of such a plan builds one when it costs
 under two minutes of income.
 
@@ -284,7 +284,7 @@ An operation is a group with one goal, owned by a plan:
 
 Lifecycle: `Gathering` (at its rally; idle units of the right kind join) ->
 `Executing` (group orders toward the goal) -> `Withdrawing` (the whole group, by
-attack-move so it fights its way back) -> `Done`. Each keeps a **ledger** of mass
+attack-move so it fights its way back) -> `Done`. Each keeps a **ledger** of materials
 committed, killed and lost; finished operations hand it to their plan, and
 `trades` keeps a running total per kind.
 
@@ -311,16 +311,16 @@ Ground rules learnt in the tournaments (each is a comment at its code):
   raiders, and a little), or let go;
 - a wave that cannot fill goes with three quarters of its mark after two minutes
   gathering and with half after four: a Hard side on 7 a second waited a whole
-  match for a 380-mass wave and never attacked;
+  match for a 380-materials wave and never attacked;
 - an army held at home (Pressure off) goes once it holds a minute of income, at
-  least 3000 mass, and that mark never shrinks with waiting: held at nothing, two
-  aggressive sides on an island map kept 436 000 and 122 000 mass at home;
+  least 3000 materials, and that mark never shrinks with waiting: held at nothing, two
+  aggressive sides on an island map kept 436 000 and 122 000 materials at home;
 - on a side with no land route its army is its hovercraft, and a target counts
   as reached where a hovercraft can float (`army_reaches`): asked only whether
   home's ground reached them, a hover army of 663 never found a target;
 - the tier path never takes the side's only factory: upgrading it stops the army;
 - one army, not a trickle: while a wave is out fighting, what gathers behind it
-  joins it once it is worth a thousand mass (waves of two and three thousand met a
+  joins it once it is worth a thousand materials (waves of two and three thousand met a
   five-thousand army one after another);
 - a wave in the field moves on once its middle stands at the target with nothing
   to fight, or after five minutes with nothing in front of it: a wave of 340 never
@@ -355,7 +355,7 @@ income allows, and a turret by a mine or plant a ground raid took. The commander
 unit takes only wants at home.
 
 **Space elevator.** Not a plan but an investment: one is wanted once the side's
-mass and energy income would each pay for it in `ELEVATOR_MINUTES` (12), a second
+materials and energy income would each pay for it in `ELEVATOR_MINUTES` (12), a second
 at twice that income, and so on, and its site starts on the same horizon (other
 wants start on four minutes). While it rises it takes the builders the income can
 keep busy on it, called home from anywhere (`elevator_short_of_help`; expanders
@@ -383,7 +383,7 @@ builders, factories and upgrades it steers. It balances three things all game:
   factory ahead of more far mines, then more builders.
 - **Never stall energy.** Mines dig less while their upkeep goes unpaid. Power is
   kept ahead of spending the whole income at the difficulty's energy ratio (8 a
-  unit of mass on Hard; costs run 4 to 7) plus the upkeep of everything standing
+  unit of materials on Hard; costs run 4 to 7) plus the upkeep of everything standing
   or going up, a tenth over. Wanted: plants come after the mine claims at home;
   urgent (the store under 15%, or mines short of upkeep): plants come first,
   every builder helps, expanders included, and new mine upgrades wait. Only as
@@ -403,7 +403,7 @@ And it grows:
   mine at home, then power; the factory's first engineer goes straight out as an
   expander, then a reclaimer (one early, more as income grows) before scouts.
 - **The commander roams** for its first twelve minutes: mines and reclaim out to
-  two fifths of the way to the enemy (2.5 km at most), home as soon as 200 mass of
+  two fifths of the way to the enemy (2.5 km at most), home as soon as 200 materials of
   armed enemy is within 1.6 km of it, or its health falls under 70%.
 - **Tech 3** waits while its army is behind the one it believes in.
 - **Mine upgrades are never put last** (`direct_focus`): begun as the sink for a
@@ -435,8 +435,8 @@ shows
 
 - its plans, held ones first, each with a stake bar (orange: all in) and its appeal
   at the last review, then the next few it is weighing;
-- its operations: kind, phase (orange while it is out executing), units, mass
-  against what it wants, and enemy mass killed / own mass lost (red when losing);
+- its operations: kind, phase (orange while it is out executing), units, materials
+  against what it wants, and enemy materials killed / own materials lost (red when losing);
 - `SEEN`: minutes since it last saw each kind of force (air, navy, subs, space,
   nukes; a dash for never) and `HURT BY`: what has been killing it lately;
 - its last decisions: minute, plan, new stake and why ("looks good", "working",
@@ -480,7 +480,7 @@ own in its header. Notes on reading the results:
   same match. Vary maps, seats and the opponent's doctrine instead.
 - **Seats are not fair** on every map: serac_divide and twin_shoals favour one start
   by a wide margin. Always play both ways round.
-- A match that ends without a winner is scored by worth (standing mass): half again
+- A match that ends without a winner is scored by worth (standing materials): half again
   as much is a lead. The mean log of the worth ratio (`log((c+1k)/(o+1k))`) shows
   smaller shifts than wins do; an eliminated side counts as worth 0.
 - `TOURNEY_ARMY=key*n,...` gives both sides the same army at the start: a mirror that
@@ -535,7 +535,7 @@ same four maps, means; "dry" is an energy store under 10% with building slowed):
 | Build speed (share of full speed paid) | 66-75% | 42-56% |
 | Player-minutes floating (store 90% full) | 4 of 160 | 2 of 160 |
 | Player-minutes dry of energy | 16 of 160 | 3 of 160 |
-| Army mass at 20 min | 20.5k | 14.3k |
+| Army materials at 20 min | 20.5k | 14.3k |
 
 Score: a win 1, a lead 0.75, a draw 0.5. The classic AI still has the edge, mostly
 on serac_divide; dev16 (retired) and meridian_basin are now draws. Per-operation trades over

@@ -40,10 +40,10 @@ function shieldRows(s: Shield): Row[] {
 
 function economyRows(e: Economy): Row[] {
   return [
-    ...num("Mass income", e.massIncome, "/s", 1),
+    ...num("Materials income", e.materialsIncome, "/s", 1),
     ...num("Energy income", e.energyIncome, "/s", 1),
     ...num("Energy upkeep", e.energyUpkeep, "/s", 1, "Drawn while it is active"),
-    ...num("Mass storage", e.massStorage),
+    ...num("Materials storage", e.materialsStorage),
     ...num("Energy storage", e.energyStorage),
   ];
 }
@@ -64,7 +64,7 @@ export function sheetOf(unit: Unit, makers: Maker[], droneName: (key: string) =>
     ...(unit.shield ? shieldRows(unit.shield) : []),
     row("Size", `${fmt(hull.radius * 2, 1)} × ${fmt(hull.height, 1)}`, "m", "Across and tall"),
     ...(hull.footprint && hull.footprint[0] > 0 ? [row("Lot", `${hull.footprint[0]} × ${hull.footprint[1]}`, "cells")] : []),
-    ...num("Wreck", hull.wreckMass, "mass", 0, `${fmt(hull.wreckShare * 100)}% of its cost left to reclaim`),
+    ...num("Wreck", hull.wreckMaterials, "materials", 0, `${fmt(hull.wreckShare * 100)}% of its cost left to reclaim`),
     ...num("Room in a hold", hull.cargoRoom, undefined, 0, "Of a lift ship's capacity"),
     ...flag("Built on water", hull.waterBuild && !hull.seabed),
     ...flag("Built on the seabed", hull.seabed, "Under the surface: only sonar finds it, only torpedoes reach it"),
@@ -158,7 +158,7 @@ export function sheetOf(unit: Unit, makers: Maker[], droneName: (key: string) =>
       ? [
           row(
             "As an upgrade",
-            `${fmt(unit.upgradeCost.mass)} mass`,
+            `${fmt(unit.upgradeCost.materials)} materials`,
             undefined,
             `and ${fmt(unit.upgradeCost.energy)} energy: only what it costs over the tier before`,
           ),
@@ -173,7 +173,7 @@ export function sheetOf(unit: Unit, makers: Maker[], droneName: (key: string) =>
   if (s) {
     add(s.kind === "Nuke" ? "Warheads" : "Interceptors", [
       row("Holds", fmt(s.stock), s.kind === "Nuke" ? "warheads" : "interceptors"),
-      row("Each costs", `${fmt(s.round.mass)} mass`, undefined, `and ${fmt(s.round.energy)} energy`),
+      row("Each costs", `${fmt(s.round.materials)} materials`, undefined, `and ${fmt(s.round.energy)} energy`),
       row("Assembled in", seconds(s.round.time / s.power), "s", `Its own line, build power ${fmt(s.power)}`),
       row("Missile speed", fmt(s.speed), "m/s"),
       ...num("Climbs to", s.apogee, "m"),

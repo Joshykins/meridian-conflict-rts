@@ -323,16 +323,16 @@ function firepower(weapons) {
 }
 
 const economyOf = (e = {}) => ({
-  massIncome: e.mass_income ?? 0,
+  materialsIncome: e.materials_income ?? 0,
   energyIncome: e.energy_income ?? 0,
   energyUpkeep: e.energy_upkeep ?? 0,
-  massStorage: e.mass_storage ?? 0,
+  materialsStorage: e.materials_storage ?? 0,
   energyStorage: e.energy_storage ?? 0,
 });
 
 const shieldOf = (s) => (s ? { kind: s.kind ?? "Dome", radius: some(s.radius), health: s.health, regen: s.regen } : null);
 
-/** `raw.rs` `default_wreck`: the share of its mass a wreck keeps, more the higher the tier. */
+/** `raw.rs` `default_wreck`: the share of its materials a wreck keeps, more the higher the tier. */
 const wreckShare = (u) => u.wreck_fraction ?? (u.tech <= 1 ? 0.81 : u.tech === 2 ? 0.85 : 0.9);
 
 /** `UnitBlueprint::cargo_room`: the room a land unit takes in a lift ship's hold. */
@@ -351,7 +351,7 @@ function refitsOf(u, loreWeapons, factionKey) {
       // The module it goes on over: its next tier. Every other module in the slot is an alternative.
       after: m.after ? (slot.modules.find((o) => o.key === m.after)?.name ?? null) : null,
       tech: some(m.tech),
-      cost: { mass: m.cost.mass, energy: m.cost.energy, time: m.cost.time },
+      cost: { materials: m.cost.materials, energy: m.cost.energy, time: m.cost.time },
       health: m.health ?? 0,
       regen: m.regen ?? 0,
       vision: m.vision ?? 0,
@@ -387,7 +387,7 @@ function unitOf(u, factionKey, lore) {
     stats: {
       health: u.health ?? 0,
       shield: u.shield?.health ?? null,
-      mass: u.cost?.mass ?? 0,
+      materials: u.cost?.materials ?? 0,
       energy: u.cost?.energy ?? 0,
       buildTime: u.cost?.time ?? 0,
       speed: m?.speed ?? null,
@@ -405,7 +405,7 @@ function unitOf(u, factionKey, lore) {
       height: u.height,
       footprint: u.footprint ?? null,
       wreckShare: share,
-      wreckMass: round((u.cost?.mass ?? 0) * share, 0),
+      wreckMaterials: round((u.cost?.materials ?? 0) * share, 0),
       cargoRoom: cargoRoom(u),
       waterBuild: !!u.water_build,
       seabed: !!u.seabed,
@@ -457,7 +457,7 @@ function unitOf(u, factionKey, lore) {
     strategic: u.strategic
       ? {
           kind: u.strategic.kind,
-          round: { mass: u.strategic.missile.mass, energy: u.strategic.missile.energy, time: u.strategic.missile.time },
+          round: { materials: u.strategic.missile.materials, energy: u.strategic.missile.energy, time: u.strategic.missile.time },
           power: u.strategic.power,
           stock: u.strategic.stock,
           speed: u.strategic.speed,
@@ -560,7 +560,7 @@ export function readUnits() {
       const from = all.find((o) => o.upgradesTo === unit.key);
       if (from) {
         unit.upgradeCost = {
-          mass: Math.max(0, unit.stats.mass - from.stats.mass),
+          materials: Math.max(0, unit.stats.materials - from.stats.materials),
           energy: Math.max(0, unit.stats.energy - from.stats.energy),
         };
       }
@@ -604,7 +604,7 @@ export function writeContent({ factions, units, teams }, art) {
       domain: unit.domain,
       icon: unit.icon,
       health: unit.stats.health,
-      mass: unit.stats.mass,
+      materials: unit.stats.materials,
       dps: unit.stats.dps,
       range: unit.stats.range,
       lore: unit.lore,

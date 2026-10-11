@@ -7,7 +7,7 @@
 //!   lapped down it into a spike at the foot, a lit red slot in each face of its shoulder
 //!   where the melt runs hot, the owner's colour round the lid.
 //! - The mast: plated, three sleeves of plates lapped down its square faces, a glazed chute
-//!   (`pattern::MASS_FLOW`) down each diagonal face from the head to the vault lid.
+//!   (`pattern::MATERIALS_FLOW`) down each diagonal face from the head to the vault lid.
 //! - The head is the Breaker's (`reclaimer::house`, `reclaimer::head`) at [`K`] times its
 //!   size: a graphite yaw collar, armoured cheeks, a keeled cowl and the nozzle with the
 //!   Materials lens at its tip, where the stream leaves.
@@ -278,11 +278,11 @@ fn mast(b: &mut MeshBuilder) {
 }
 
 /// A glazed chute carrying what the strands bring home from `from` down to `to`: dark
-/// `MASS_FLOW` glazing that runs with the Materials red while the tower reclaims, a
+/// `MATERIALS_FLOW` glazing that runs with the Materials red while the tower reclaims, a
 /// graphite collar at each end at full detail.
 fn chute(b: &mut MeshBuilder, from: Vec3, to: Vec3, r: f32) {
     let sides = if b.fine() { 8 } else { 4 };
-    b.paint(ACCENT).pattern(pattern::MASS_FLOW);
+    b.paint(ACCENT).pattern(pattern::MATERIALS_FLOW);
     b.cylinder_between(from, to, r, r, sides);
     if b.fine() {
         let dir = (to - from).normalize_or_zero();

@@ -81,11 +81,11 @@ fn ids(w: &World, owner: u8, key: &str) -> Vec<UnitId> {
 #[test]
 fn a_regency_salvager_takes_a_wreck_apart_with_a_nanite_stream() {
     let mut w = world();
-    // Somewhere for each side to put the mass, a salvager each, and a wreck in front of
+    // Somewhere for each side to put the materials, a salvager each, and a wreck in front of
     // each salvager.
     w.tick(&[
         spawn(&w, 0, "regency_storage", 300, 512, 0),
-        spawn(&w, 1, "aster_mass_storage", 300, 1500, 0),
+        spawn(&w, 1, "aster_materials_storage", 300, 1500, 0),
         spawn(&w, 0, REGENCY_RECLAIMER, 500, 512, 0),
         spawn(&w, 1, ARC_RECLAIMER, 500, 1500, 0),
         spawn(&w, 2, TANK, 560, 512, flag::PASSIVE),
@@ -115,7 +115,7 @@ fn a_regency_salvager_takes_a_wreck_apart_with_a_nanite_stream() {
     assert_eq!(seen, vec![BEAM_RECLAIM, BEAM_NANITE_RECLAIM]);
     assert!(seen.iter().all(|&k| is_reclaim(k)));
     assert!(
-        w.state.players[0].reclaimed_mass > Fx::ZERO,
+        w.state.players[0].reclaimed_materials > Fx::ZERO,
         "the Breaker is paid"
     );
 }
@@ -141,12 +141,12 @@ fn a_breaker_iii_takes_an_experimentals_wreck_apart_in_seconds() {
             0,
         )
         .unwrap();
-    // Its pull for the whole mass, and a few seconds to get there and charge.
+    // Its pull for all of the materials, and a few seconds to get there and charge.
     let seconds = (Fx::from_int(2400) / power).ceil_int() + 8;
     for _ in 0..seconds * mc_core::TICKS_PER_SECOND as i32 {
         w.tick(&[]).unwrap();
-        // Mass stores are counted afresh each tick: keep room for what is reclaimed.
-        w.state.players[0].mass_capacity = Fx::from_int(1_000_000);
+        // Materials stores are counted afresh each tick: keep room for what is reclaimed.
+        w.state.players[0].materials_capacity = Fx::from_int(1_000_000);
         if !w.state.wrecks.slots.is_alive(big) {
             break;
         }

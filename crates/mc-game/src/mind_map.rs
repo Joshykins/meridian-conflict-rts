@@ -45,11 +45,11 @@ struct Shown<'a> {
     /// Never looked at (Mind only).
     unseen: bool,
     held: Vec<&'a MindHolding>,
-    /// Army believed or there, mass, and how sure (0..1).
+    /// Army believed or there, materials, and how sure (0..1).
     army: Option<(i32, f32)>,
 }
 
-/// The holder a zone is tinted for: whoever holds the most structure mass there, or,
+/// The holder a zone is tinted for: whoever holds the most structure materials there, or,
 /// with none standing, the largest army.
 fn chief<'a>(held: &[&'a MindHolding]) -> Option<&'a MindHolding> {
     held.iter().copied().max_by_key(|h| {
@@ -61,7 +61,7 @@ fn chief<'a>(held: &[&'a MindHolding]) -> Option<&'a MindHolding> {
     })
 }
 
-fn built_mass(h: &MindHolding) -> i32 {
+fn built_materials(h: &MindHolding) -> i32 {
     h.built.iter().map(|b| b.1).sum()
 }
 
@@ -281,8 +281,8 @@ pub fn draw(
         if !on_screen(p) {
             continue;
         }
-        if let Some((mass, sure)) = s.army {
-            let radius = 60.0 + (mass as f32).sqrt() * 2.5;
+        if let Some((materials, sure)) = s.army {
+            let radius = 60.0 + (materials as f32).sqrt() * 2.5;
             ring(ui, field, mid, radius, sure, mode == MapMode::Mind);
         }
         let Some(c) = chief(&s.held) else {
@@ -292,7 +292,7 @@ pub fn draw(
         if c.player == who && mode == MapMode::Mind && !BASES.contains(&c.tag) {
             continue;
         }
-        let built = built_mass(c);
+        let built = built_materials(c);
         let text = if built > 0 {
             format!("{}  {}", c.tag, kilo(built))
         } else {
@@ -392,8 +392,12 @@ pub fn card(ui: &mut Ui, field: &Field, mode: MapMode, who: u8, z: u16, at: Vec2
             format!("{name}  \u{b7}  {}", h.tag),
             true,
         ));
-        for (kind, mass, count) in &h.built {
-            lines.push((text, format!("  {count} {kind}  {}", kilo(*mass)), false));
+        for (kind, materials, count) in &h.built {
+            lines.push((
+                text,
+                format!("  {count} {kind}  {}", kilo(*materials)),
+                false,
+            ));
         }
         if !h.built.is_empty() && belief {
             lines.push((
@@ -453,7 +457,7 @@ pub fn card(ui: &mut Ui, field: &Field, mode: MapMode, who: u8, z: u16, at: Vec2
                     let name = names.get(h.player as usize).copied().unwrap_or("?");
                     format!(
                         "{name} {} built, {} army",
-                        kilo(built_mass(h)),
+                        kilo(built_materials(h)),
                         kilo(h.army)
                     )
                 })

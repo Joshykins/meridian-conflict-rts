@@ -17,7 +17,7 @@
 //! The builders, factories and upgrades carry it out (`Directives`).
 use super::state::{PlanKind, Stake};
 use crate::ai::salvage::Field;
-use crate::ai::{Census, Claim, Intel, Job, ENERGY_PER_MASS, HOME_RADIUS};
+use crate::ai::{Census, Claim, Intel, Job, ENERGY_PER_MATERIALS, HOME_RADIUS};
 use crate::command::Command;
 use crate::tables::UnitId;
 use crate::tables::WreckId;
@@ -45,9 +45,9 @@ const ROAM_SHARE: Fx = Fx::ratio(2, 5);
 const ROAM_MOST: i32 = 2500;
 const ROAM_SAFE: i32 = 1600;
 const ROAM_UNTIL: u32 = 7200;
-/// Armed enemy mass near the commander that sends it home (a scout or two do not).
+/// Armed enemy materials near the commander that sends it home (a scout or two do not).
 const ROAM_THREAT: i32 = 200;
-/// A wreck field worth the commander's walk, in mass.
+/// A wreck field worth the commander's walk, in materials.
 const ROAM_FIELD: i32 = 150;
 /// Ticks a deposit no lot was found by is skipped (three minutes).
 pub(in crate::ai) const BLOCKED_FOR: u32 = 1800;
@@ -140,9 +140,9 @@ impl World {
     pub(in crate::ai) fn plan_economy(&mut self, player: u8, census: &Census, intel: &Intel) {
         let p = player as usize;
         let pl = &self.state.players[p];
-        let income = pl.mass_income + pl.reclaim_income;
-        let fill = if pl.mass_capacity > Fx::ZERO {
-            pl.mass / pl.mass_capacity
+        let income = pl.materials_income + pl.reclaim_income;
+        let fill = if pl.materials_capacity > Fx::ZERO {
+            pl.materials / pl.materials_capacity
         } else {
             Fx::ZERO
         };
@@ -150,7 +150,7 @@ impl World {
         let (speed_now, mine_power) = (pl.build_speed, pl.mine_power);
         let (energy, energy_cap) = (pl.energy, pl.energy_capacity);
         let (energy_income, energy_spent) = (pl.energy_income, pl.energy_spent);
-        let mass_spent = pl.mass_spent;
+        let materials_spent = pl.materials_spent;
         let skill = self.state.ai[p].config.skill();
         let start = pl.start;
 
@@ -168,7 +168,7 @@ impl World {
         let stalling = !floating && speed < STALL_SPEED;
 
         // Power for spending the whole income (nearly everything costs energy and
-        // mass in about one ratio) and the upkeep of all that stands or
+        // materials in about one ratio) and the upkeep of all that stands or
         // goes up, with room to spare. Judged by builders' draw it read 900 a second
         // short of a side spending 110 materials, and the mines dug at half pay.
         let upkeep: Fx = self
@@ -181,10 +181,10 @@ impl World {
             .sum();
         // Spent, not earned, while the store pays for more: the opening spends its
         // starting materials, and reading income alone it ran its energy dry.
-        let spending = income.max(mass_spent).max(Fx::from_int(5));
-        // At the skill's ratio (8 on Hard): costs run 4 to 7 energy a unit of mass,
+        let spending = income.max(materials_spent).max(Fx::from_int(5));
+        // At the skill's ratio (8 on Hard): costs run 4 to 7 energy a unit of materials,
         // and at 6 the store ran dry a seventh of the game.
-        let need = upkeep + spending * skill.power_ratio.max(ENERGY_PER_MASS);
+        let need = upkeep + spending * skill.power_ratio.max(ENERGY_PER_MATERIALS);
         let short = (need * 11 / 10 - energy_income).max(Fx::ZERO);
         let dry = energy < energy_cap * Fx::ratio(3, 20);
         let draining = energy < energy_cap / 2 && energy_spent > energy_income;
@@ -223,7 +223,7 @@ impl World {
         } else {
             income * 11 / 10
         };
-        let factory_draw = self.factory_mass_draw(player);
+        let factory_draw = self.factory_materials_draw(player);
         // A filling store always has room for more: what it cannot spend is lost.
         let room = |draw: Fx, share: Fx| floating || (!stalling && draw < spend * share);
 
@@ -314,7 +314,7 @@ impl World {
                         && c.pos.distance(at) < Fx::from_int(ROAM_SAFE)
                         && self.state.tick.saturating_sub(c.seen) < 600
                 })
-                .map(|c| self.blueprints.unit(c.blueprint).cost_mass)
+                .map(|c| self.blueprints.unit(c.blueprint).cost_materials)
                 .sum::<Fx>()
                 >= Fx::from_int(ROAM_THREAT)
         };
@@ -469,10 +469,16 @@ impl World {
         let field = fields
             .iter()
             .filter(|f| {
-                f.mass >= Fx::from_int(ROAM_FIELD)
+                f.materials >= Fx::from_int(ROAM_FIELD)
                     && f.at.distance(pl.start) <= roam.max(HOME_RADIUS)
             })
-            .max_by_key(|f| (f.mass - f.at.distance(units.pos[row]) / 4, f.at.x, f.at.y))?;
+            .max_by_key(|f| {
+                (
+                    f.materials - f.at.distance(units.pos[row]) / 4,
+                    f.at.x,
+                    f.at.y,
+                )
+            })?;
         self.near_wreck(field.at, Fx::from_int(450))
     }
 

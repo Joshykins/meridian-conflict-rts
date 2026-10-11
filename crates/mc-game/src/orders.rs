@@ -1469,7 +1469,7 @@ fn tone_of(kind: OrderKind) -> u32 {
         OrderKind::Patrol => PATROL,
         OrderKind::Guard => hud::style::Family::Stance.tone(),
         OrderKind::Build | OrderKind::Assist => palette::WARN,
-        OrderKind::Reclaim | OrderKind::ReclaimUnit | OrderKind::ReclaimArea => hud::MASS,
+        OrderKind::Reclaim | OrderKind::ReclaimUnit | OrderKind::ReclaimArea => hud::MATERIALS,
         _ => palette::ACCENT,
     }
 }

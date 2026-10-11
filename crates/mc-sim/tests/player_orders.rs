@@ -898,7 +898,7 @@ fn a_stalled_engineer_gets_its_share_of_what_it_wants() {
     let eng = add(&mut w, "aster_t1_engineer", 0, 400, 400);
     let power = w.blueprints.id_of("aster_t1_power").unwrap();
     let site = mc_sim::snap_to_build_grid(w.blueprints.unit(power), FxVec2::from_ints(440, 400));
-    w.state.players[0].mass = Fx::from_int(5000);
+    w.state.players[0].materials = Fx::from_int(5000);
     w.state.players[0].energy = Fx::from_int(50_000);
     w.tick(&order(Command::Build {
         units: vec![eng],
@@ -911,18 +911,21 @@ fn a_stalled_engineer_gets_its_share_of_what_it_wants() {
     let mut full = None;
     for _ in 0..200 {
         // Nothing here stores resources, so the stock is topped up before every tick.
-        w.state.players[0].mass = Fx::from_int(5000);
+        w.state.players[0].materials = Fx::from_int(5000);
         w.state.players[0].energy = Fx::from_int(50_000);
         w.tick(&[]).unwrap();
         let e = economy_of(&w, eng);
-        if e.mass_wanted > 0.0 {
+        if e.materials_wanted > 0.0 {
             full = Some(e);
             break;
         }
     }
     let full = full.expect("the engineer began building");
     assert!(full.energy_wanted > 0.0);
-    assert!((full.mass_used - full.mass_wanted).abs() < 1e-3, "{full:?}");
+    assert!(
+        (full.materials_used - full.materials_wanted).abs() < 1e-3,
+        "{full:?}"
+    );
     assert_eq!(full.efficiency, 1.0);
     let eta = full
         .eta
@@ -930,8 +933,8 @@ fn a_stalled_engineer_gets_its_share_of_what_it_wants() {
     assert!(eta > 0.0, "{full:?}");
 
     // A third of a tick's want in store: the side stalls and the engineer slows.
-    let per_tick = Fx::from_f32(full.mass_wanted / 10.0);
-    w.state.players[0].mass = per_tick / 3;
+    let per_tick = Fx::from_f32(full.materials_wanted / 10.0);
+    w.state.players[0].materials = per_tick / 3;
     w.state.players[0].energy = Fx::from_int(50_000);
     w.tick(&[]).unwrap();
     let stalled = economy_of(&w, eng);
@@ -939,9 +942,12 @@ fn a_stalled_engineer_gets_its_share_of_what_it_wants() {
         stalled.efficiency < 0.5 && stalled.efficiency > 0.2,
         "{stalled:?}"
     );
-    assert!((stalled.mass_wanted - full.mass_wanted).abs() < 1e-3);
-    let expect = stalled.mass_wanted * stalled.efficiency;
-    assert!((stalled.mass_used - expect).abs() < 1e-2, "{stalled:?}");
+    assert!((stalled.materials_wanted - full.materials_wanted).abs() < 1e-3);
+    let expect = stalled.materials_wanted * stalled.efficiency;
+    assert!(
+        (stalled.materials_used - expect).abs() < 1e-2,
+        "{stalled:?}"
+    );
     assert!((stalled.energy_used - stalled.energy_wanted * stalled.efficiency).abs() < 1e-2);
     // At under half the pace the finish is over twice as far off.
     let slow = stalled.eta.expect("a stalled site still moves");
@@ -959,8 +965,8 @@ fn mines_and_radar_report_their_flows() {
     let income = w.state.mines.by_unit[&mex].rate(&m, None).to_f32();
     let m = economy_of(&w, mex);
     assert!(income > 0.0);
-    assert!((m.mass_made - income).abs() < 1e-3, "{m:?}");
-    assert_eq!((m.mass_wanted, m.mass_used), (0.0, 0.0));
+    assert!((m.materials_made - income).abs() < 1e-3, "{m:?}");
+    assert_eq!((m.materials_wanted, m.materials_used), (0.0, 0.0));
     let upkeep = w.bp(row(&w, radar)).economy.energy_upkeep.to_f32();
     let r = economy_of(&w, radar);
     assert!(upkeep > 0.0);

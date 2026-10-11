@@ -312,16 +312,20 @@ fn what_is_in_the_hold_dies_with_the_ship() {
     );
     // Its wreck holds the tank's salvage as well as its own.
     let bp = |k: &str| w.blueprints.unit(w.blueprints.id_of(k).unwrap());
-    let want = bp(SHIP).cost_mass * bp(SHIP).wreck_fraction
-        + bp("aster_t1_tank").cost_mass * bp("aster_t1_tank").wreck_fraction;
+    let want = bp(SHIP).cost_materials * bp(SHIP).wreck_fraction
+        + bp("aster_t1_tank").cost_materials * bp("aster_t1_tank").wreck_fraction;
     let wreck = w
         .state
         .wrecks
         .slots
         .iter()
-        .map(|r| w.state.wrecks.mass[r])
+        .map(|r| w.state.wrecks.materials[r])
         .max();
-    assert_eq!(wreck, Some(want), "the wreck holds the hold's mass too");
+    assert_eq!(
+        wreck,
+        Some(want),
+        "the wreck holds the hold's materials too"
+    );
 }
 
 #[test]

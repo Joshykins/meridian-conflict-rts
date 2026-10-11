@@ -8,16 +8,16 @@ use crate::World;
 use mc_core::{Fx, FxVec2};
 use mc_data::{cat, MoveLayer};
 
-/// Enemy damage a second worth one mass of fighting strength: a T1 tank is about
-/// 20 damage a second for 100 mass.
-pub(in crate::ai) const THREAT_MASS: i32 = 5;
+/// Enemy damage a second worth one materials of fighting strength: a T1 tank is about
+/// 20 damage a second for 100 materials.
+pub(in crate::ai) const THREAT_MATERIALS: i32 = 5;
 /// A group falls back, as a group, once what it faces is this many times it.
 const OUTMATCHED: Fx = Fx::from_int(2);
 /// How near a target a hovercraft must be able to float for a hover army to go for it.
 const HOVER_NEAR: i32 = 256;
 /// How far from its rally point a gathering wave goes after enemy groups it beats.
 const PREY_REACH: i32 = 2500;
-/// Enemy mass below which an incursion is left to the turrets: a scout.
+/// Enemy materials below which an incursion is left to the turrets: a scout.
 const SMALL_FRY: i32 = 120;
 /// Enemies this close to what the side holds are in its ground.
 const NEAR_HOLD: Fx = Fx::from_int(1200);
@@ -25,7 +25,7 @@ const NEAR_HOLD: Fx = Fx::from_int(1200);
 const FRESH: u32 = 300;
 
 impl World {
-    /// Enemy strength (in mass) around `at`: what we remember standing there, or the
+    /// Enemy strength (in materials) around `at`: what we remember standing there, or the
     /// fire that reaches it, whichever says more.
     pub(in crate::ai) fn enemy_strength_at(&self, ctx: &Ctx, at: FxVec2, r: Fx, t: Target) -> Fx {
         let seen: Fx = self.state.ai[ctx.player as usize]
@@ -39,20 +39,20 @@ impl World {
                 if bp.has(cat::COMMANDER) {
                     Fx::from_int(2000)
                 } else {
-                    bp.cost_mass
+                    bp.cost_materials
                 }
             })
             .sum();
-        seen.max(ctx.wm.threat_at(at, t) * THREAT_MASS)
+        seen.max(ctx.wm.threat_at(at, t) * THREAT_MATERIALS)
     }
 
-    /// Where a land group of `mass` at `from` should go: the enemy value it can win
+    /// Where a land group of `materials` at `from` should go: the enemy value it can win
     /// at, most for the walk. Value near a target counts; fire on it counts against.
     pub(in crate::ai) fn land_objective(
         &self,
         ctx: &Ctx,
         from: FxVec2,
-        mass: Fx,
+        materials: Fx,
         soft: bool,
     ) -> Option<FxVec2> {
         let tick = self.state.tick;
@@ -83,7 +83,7 @@ impl World {
             })
             .filter_map(|c| {
                 let threat = self.enemy_strength_at(ctx, c.pos, Fx::from_int(700), Target::Land);
-                (threat * OUTMATCHED <= mass * 2).then(|| {
+                (threat * OUTMATCHED <= materials * 2).then(|| {
                     // What stands within 600 m of it, less the fire on the zones
                     // between. (Counting the target's whole zone, or its ore,
                     // sent waves at the strongest ground: 11 of 16 test matches
@@ -92,7 +92,7 @@ impl World {
                     let value: Fx = contacts
                         .iter()
                         .filter(|o| o.pos.distance(c.pos) < Fx::from_int(600))
-                        .map(|o| self.blueprints.unit(o.blueprint).cost_mass)
+                        .map(|o| self.blueprints.unit(o.blueprint).cost_materials)
                         .sum();
                     let along = zone.map_or(Fx::ZERO, |b| {
                         fire.get(b as usize).copied().unwrap_or(Fx::ZERO)
@@ -100,7 +100,8 @@ impl World {
                     // Near targets first, by the square of the walk: a wave sent
                     // 8 km at the enemy's base bled out on its defences on the way.
                     let walk = c.pos.distance(from).floor_int() as i64 / 100 + 15;
-                    let score = (value - threat / 2 - along * THREAT_MASS / 4).floor_int() as i64
+                    let score = (value - threat / 2 - along * THREAT_MATERIALS / 4).floor_int()
+                        as i64
                         * 10_000
                         / (walk * walk);
                     (score, c.pos)
@@ -133,7 +134,7 @@ impl World {
             return 0;
         }
         let centre = self.centre_of(&rows).unwrap_or(op.rally);
-        let mass: Fx = rows.iter().map(|&r| self.bp(r).cost_mass).sum();
+        let materials: Fx = rows.iter().map(|&r| self.bp(r).cost_materials).sum();
         let tick = self.state.tick;
         let ids = |rows: &[usize]| self.ids_of(rows);
         let mut orders = 0;
@@ -191,13 +192,14 @@ impl World {
                 .map(|c| c.pos)
                 .min_by_key(|p| (p.distance_sq(centre), p.x, p.y));
             let charge = guns.filter(|g| {
-                self.enemy_strength_at(ctx, *g, Fx::from_int(700), Target::Land) * 4 <= mass * 5
+                self.enemy_strength_at(ctx, *g, Fx::from_int(700), Target::Land) * 4
+                    <= materials * 5
                     && self.army_reaches(ctx, *g)
             });
             match charge {
                 Some(g) => {
                     op.target = g;
-                    op.launched = mass;
+                    op.launched = materials;
                     op.phase = Phase::Executing;
                     op.phase_since = tick;
                     out.push(Command::AttackMove {
@@ -241,14 +243,14 @@ impl World {
                 let gathered: Fx = rows
                     .iter()
                     .filter(|&&row| self.state.units.pos[row].distance(op.rally) <= r * 3)
-                    .map(|&row| self.bp(row).cost_mass)
+                    .map(|&row| self.bp(row).cost_materials)
                     .sum();
                 // An enemy group in reach that it outnumbers: a wave in the field takes
                 // it on, the way a player's army keeps the map clear around it.
                 if op.kind == OpKind::Army && gathered > Fx::ZERO {
                     if let Some(prey) = self.prey_near(ctx, op.rally, gathered) {
                         op.target = prey;
-                        op.launched = mass;
+                        op.launched = materials;
                         op.phase = Phase::Executing;
                         op.phase_since = tick;
                         out.push(Command::AttackMove {
@@ -341,7 +343,7 @@ impl World {
                             p.dps[Target::Air as usize].max(p.dps[Target::Space as usize])
                         })
                         .sum::<Fx>()
-                        * THREAT_MASS;
+                        * THREAT_MATERIALS;
                     let covered = our_aa * 2 >= enemy_air;
                     // Artillery goes out behind a wave already out near its spot, or
                     // where little of the enemy stands: alone it walked up to the
@@ -360,12 +362,12 @@ impl World {
                             && seen
                             && covered
                             && target.is_some_and(|t| {
-                                ctx.wm.threat_along(op.rally, t, Target::Land) * THREAT_MASS
+                                ctx.wm.threat_along(op.rally, t, Target::Land) * THREAT_MATERIALS
                                     <= gathered * 6 / 5
                             }));
                     if let Some(target) = target.filter(|_| strong) {
                         op.target = target;
-                        op.launched = mass;
+                        op.launched = materials;
                         op.phase = Phase::Executing;
                         op.phase_since = tick;
                         out.push(Command::AttackMove {
@@ -384,14 +386,14 @@ impl World {
                 let here: Fx = rows
                     .iter()
                     .filter(|&&r| self.state.units.pos[r].distance(centre) < Fx::from_int(700))
-                    .map(|&r| self.bp(r).cost_mass)
+                    .map(|&r| self.bp(r).cost_materials)
                     .sum();
                 let ashore = op.kind == OpKind::Landing && !ctx.land_route;
                 // Half of what set out lost, and losing the trade: an even fight is
                 // fought out. Breaking off one on the move (units on a move order do not
                 // shoot) handed the enemy the rest of the wave as it chased.
                 let bled = op.launched > Fx::ZERO
-                    && mass * 2 < op.launched
+                    && materials * 2 < op.launched
                     && op.ledger.killed < op.ledger.lost * 7 / 10;
                 // Under aircraft or a warship it has nothing to shoot back with.
                 let helpless = shelled
@@ -493,9 +495,9 @@ impl World {
                 let next = match op.kind {
                     OpKind::Defend => None,
                     OpKind::Siege => self.siege_spot(ctx, centre, &rows),
-                    OpKind::Raid => self.land_objective(ctx, centre, mass, true),
-                    OpKind::Army if !ashore => self.prey_near(ctx, centre, mass),
-                    _ => self.land_objective(ctx, centre, mass, false),
+                    OpKind::Raid => self.land_objective(ctx, centre, materials, true),
+                    OpKind::Army if !ashore => self.prey_near(ctx, centre, materials),
+                    _ => self.land_objective(ctx, centre, materials, false),
                 }
                 .filter(|t| t.distance(centre) > Fx::from_int(150));
                 match next {
@@ -524,8 +526,8 @@ impl World {
             Phase::Withdrawing => {
                 // What chases it is no stronger than what it has: turn and fight.
                 let facing = self.enemy_strength_at(ctx, centre, Fx::from_int(900), Target::Land);
-                if facing > Fx::ZERO && facing <= mass && op.kind != OpKind::Defend {
-                    if let Some(prey) = self.prey_near(ctx, centre, mass) {
+                if facing > Fx::ZERO && facing <= materials && op.kind != OpKind::Defend {
+                    if let Some(prey) = self.prey_near(ctx, centre, materials) {
                         op.target = prey;
                         op.phase = Phase::Executing;
                         op.phase_since = tick;
@@ -555,9 +557,9 @@ impl World {
         orders
     }
 
-    /// The nearest enemy land group within `PREY_REACH` of `at` that `mass` beats by
+    /// The nearest enemy land group within `PREY_REACH` of `at` that `materials` beats by
     /// a fifth, off any turret's cover, on ground the army can walk to.
-    fn prey_near(&self, ctx: &Ctx, at: FxVec2, mass: Fx) -> Option<FxVec2> {
+    fn prey_near(&self, ctx: &Ctx, at: FxVec2, materials: Fx) -> Option<FxVec2> {
         let tick = self.state.tick;
         self.state.ai[ctx.player as usize]
             .contacts
@@ -575,7 +577,7 @@ impl World {
             })
             .map(|c| c.pos)
             .filter(|&p| {
-                self.enemy_strength_at(ctx, p, Fx::from_int(700), Target::Land) * 6 <= mass * 5
+                self.enemy_strength_at(ctx, p, Fx::from_int(700), Target::Land) * 6 <= materials * 5
             })
             .min_by_key(|p| (p.distance_sq(at), p.x, p.y))
     }
@@ -697,9 +699,9 @@ impl World {
                 continue;
             }
             if p.has(role::ARTILLERY) {
-                guns += p.mass;
+                guns += p.materials;
             } else if p.has(role::RAIDER) {
-                raiders += p.mass;
+                raiders += p.materials;
             }
         }
         let share = |m: Fx| (m.floor_int() / 4).clamp(120, 450) as i16;
@@ -743,7 +745,7 @@ impl World {
                             Some(super::profile::Domain::Air | super::profile::Domain::Space)
                         )
                     })
-                    .map(|p| p.mass)
+                    .map(|p| p.materials)
                     .sum()
             } else {
                 self.enemy_strength_at(ctx, enemy, Fx::from_int(600), Target::Land)

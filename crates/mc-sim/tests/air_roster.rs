@@ -149,9 +149,9 @@ fn guard_circles_follows_a_friendly_and_stop_cancels() {
 #[test]
 fn port_builds_two_free_drones_and_reclaims_only_inside_radius() {
     let mut w = world();
-    w.state.players[0].mass = Fx::from_int(100);
+    w.state.players[0].materials = Fx::from_int(100);
     w.state.players[0].energy = Fx::from_int(100000);
-    w.state.players[0].mass_capacity = Fx::from_int(20000);
+    w.state.players[0].materials_capacity = Fx::from_int(20000);
     w.state.players[0].energy_capacity = Fx::from_int(200000);
     let acu = super::drone_port::ported_commander(&mut w, 200, 900);
     let reach = w.blueprints.unit(w.state.units.blueprint[acu]).drone_radius;
@@ -195,11 +195,12 @@ fn port_builds_two_free_drones_and_reclaims_only_inside_radius() {
         .filter(|&r| w.state.units.drone_parent[r] == parent)
         .collect();
     assert_eq!(children.len(), 2);
-    assert!(w.state.players[0].reclaimed_mass > Fx::from_int(100));
+    assert!(w.state.players[0].reclaimed_materials > Fx::from_int(100));
     assert!(
-        !w.state.wrecks.slots.is_alive(inside) || w.state.wrecks.mass[inside] < Fx::from_int(100)
+        !w.state.wrecks.slots.is_alive(inside)
+            || w.state.wrecks.materials[inside] < Fx::from_int(100)
     );
-    assert_eq!(w.state.wrecks.mass[outside], Fx::from_int(300));
+    assert_eq!(w.state.wrecks.materials[outside], Fx::from_int(300));
     w.state.units.health[acu] = Fx::ZERO;
     w.tick(&[]).unwrap();
     assert!(children.iter().all(|&r| !w.state.units.slots.is_alive(r)));
@@ -209,9 +210,9 @@ fn port_builds_two_free_drones_and_reclaims_only_inside_radius() {
 #[test]
 fn port_calls_home_drones_left_behind() {
     let mut w = world();
-    w.state.players[0].mass = Fx::from_int(100);
+    w.state.players[0].materials = Fx::from_int(100);
     w.state.players[0].energy = Fx::from_int(100000);
-    w.state.players[0].mass_capacity = Fx::from_int(20000);
+    w.state.players[0].materials_capacity = Fx::from_int(20000);
     w.state.players[0].energy_capacity = Fx::from_int(200000);
     let acu = super::drone_port::ported_commander(&mut w, 1000, 900);
     for _ in 0..200 {
@@ -245,7 +246,7 @@ fn port_calls_home_drones_left_behind() {
         w.tick(&[]).unwrap();
     }
     assert!(
-        w.state.wrecks.mass[wreck] < Fx::from_int(5000),
+        w.state.wrecks.materials[wreck] < Fx::from_int(5000),
         "the drones went to work on the far wreck"
     );
     // It walks away until the wreck lies well past its drones' reach.
@@ -278,7 +279,7 @@ fn port_calls_home_drones_left_behind() {
 #[test]
 fn an_empty_economy_still_starts_a_drone() {
     let mut w = world();
-    w.state.players[0].mass = Fx::ZERO;
+    w.state.players[0].materials = Fx::ZERO;
     w.state.players[0].energy = Fx::ZERO;
     super::drone_port::ported_commander(&mut w, 900, 900);
     for _ in 0..100 {
@@ -293,7 +294,7 @@ fn sam_launches_vertically_then_curves_to_a_moving_aircraft() {
     let target = add(&mut w, "aster_t2_gunship", 1, 1050, 900);
     let target_id = w.state.units.id(target);
     w.state.units.flags[target] |= flag::PASSIVE;
-    w.state.players[1].mass = Fx::ZERO;
+    w.state.players[1].materials = Fx::ZERO;
     w.state.players[1].energy = Fx::ZERO;
     let go = [PlayerCommand {
         player: 1,
@@ -527,7 +528,7 @@ fn overlapping_incendiaries_stack_and_the_patch_has_an_edge() {
 fn port_and_guard_snapshot_continue_deterministically() {
     let mut a = world();
     let mut b = world();
-    a.state.players[0].mass = Fx::from_int(10000);
+    a.state.players[0].materials = Fx::from_int(10000);
     a.state.players[0].energy = Fx::from_int(100000);
     let c = super::drone_port::ported_commander(&mut a, 900, 900);
     let id = a.state.units.id(c);

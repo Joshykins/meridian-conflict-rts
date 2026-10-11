@@ -15,9 +15,9 @@ pub(in crate::ai) struct WorldModel {
     pub h: i32,
     /// Enemy damage a second that reaches each cell, per target class.
     pub threat: Vec<[Fx; TARGETS]>,
-    /// Enemy mass standing in each cell (the commander counted heavily).
+    /// Enemy materials standing in each cell (the commander counted heavily).
     pub value: Vec<Fx>,
-    /// Our own armed mass in each cell.
+    /// Our own armed materials in each cell.
     pub ours: Vec<Fx>,
 }
 
@@ -77,7 +77,7 @@ impl World {
                 m.value[i] += if bp.has(cat::COMMANDER) {
                     Fx::from_int(5000)
                 } else {
-                    bp.cost_mass
+                    bp.cost_materials
                 };
             }
             if !p.armed() {
@@ -111,7 +111,7 @@ impl World {
             let p = profiles.get(units.blueprint[r]);
             if p.armed() && p.mobile() {
                 if let Some(i) = m.cell(units.pos[r]) {
-                    m.ours[i] += p.mass;
+                    m.ours[i] += p.materials;
                 }
             }
         }

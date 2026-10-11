@@ -7,7 +7,7 @@
 //! front of the elevator's queue (its `OrderKind::Produce` orders, queued like a
 //! factory's) as finished units, free, seated in the crates (`seat_units`) as long as
 //! the next one fits in what is left of the `payload`; the rest of the payload goes into
-//! its side's store as mass. A crate's units drive out of its doors row by row
+//! its side's store as materials. A crate's units drive out of its doors row by row
 //! (`state.rollouts`, like a factory's) and, once they are all out, leave as one group on
 //! the elevator's standing orders or rally (`Squad`), unless the elevator is batching.
 //! Never up: the crates only ever come down.
@@ -227,13 +227,13 @@ impl World {
                     });
                 }
                 Phase::Cycle { ticks } if ticks == e.touchdown() => {
-                    let (units, mass) = self.unload_crates(row, &e)?;
+                    let (units, materials) = self.unload_crates(row, &e)?;
                     self.events.push(SimEvent::ElevatorDocked {
                         unit: id,
                         pos,
                         owner,
                         units,
-                        mass,
+                        materials,
                     });
                 }
                 Phase::Cycle { ticks } if ticks == e.touchdown() + e.dock_ticks => {
@@ -253,13 +253,13 @@ impl World {
 
     /// Lets off the front of the elevator's queue, as much as fits in the payload and
     /// the crates' seats, and pays the rest of the payload into its side's store.
-    /// Returns how many units came off and the mass paid in.
+    /// Returns how many units came off and the materials paid in.
     fn unload_crates(
         &mut self,
         row: usize,
         e: &mc_data::elevator::Elevator,
     ) -> Result<(u16, Fx), SimError> {
-        // Paused, its queue is held: the crates bring the whole payload down as mass.
+        // Paused, its queue is held: the crates bring the whole payload down as materials.
         let queue: Vec<_> = if self.work_paused(row) {
             Vec::new()
         } else {
@@ -271,7 +271,7 @@ impl World {
         let seats = seat_units(
             queue.iter().map(|o| {
                 let bp = self.blueprints.unit(o.blueprint);
-                (bp.radius, bp.cost_mass)
+                (bp.radius, bp.cost_materials)
             }),
             e.payload,
         );
@@ -285,7 +285,7 @@ impl World {
         let mut squads: Vec<Squad> = Vec::new();
         let mut left = e.payload;
         for (o, seat) in queue.iter().zip(&seats) {
-            left -= self.blueprints.unit(o.blueprint).cost_mass;
+            left -= self.blueprints.unit(o.blueprint).cost_materials;
             self.state.orders.pop_front(&mut self.state.units, row);
             if repeat {
                 self.state
@@ -316,7 +316,7 @@ impl World {
             self.state.elevators.squads.extend(squads);
         }
         if left > Fx::ZERO {
-            self.state.players[owner as usize].mass += left;
+            self.state.players[owner as usize].materials += left;
             self.flow(row).made[0] += left;
         }
         Ok((seats.len() as u16, left))
@@ -454,7 +454,7 @@ fn bay_frame(bearing: Angle) -> (FxVec2, FxVec2) {
 }
 
 /// Seats units in the crates, in queue order, and returns a seat for each that rides:
-/// `queue` is each unit's radius and mass. Units fill the first crate in rows across it
+/// `queue` is each unit's radius and materials. Units fill the first crate in rows across it
 /// from the doors inward, then the next; a unit rides while it fits in what is left of
 /// `payload` and some crate has room for it, and the first that does not stops the load,
 /// so the queue keeps its order. Shared by the sim and the interface's preview.

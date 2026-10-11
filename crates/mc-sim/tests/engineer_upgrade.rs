@@ -43,13 +43,13 @@ fn world() -> World {
     // The stock is set the tick after the storage, once it counts in what they can hold.
     w.tick(&[cmd(Command::DebugStorage {
         player: 0,
-        mass: 10_000,
+        materials: 10_000,
         energy: 100_000,
     })])
     .unwrap();
     w.tick(&[cmd(Command::DebugStock {
         player: 0,
-        mass: Some(1000),
+        materials: Some(1000),
         energy: Some(1000),
     })])
     .unwrap();
@@ -108,7 +108,7 @@ fn an_engineer_upgrades_itself_once_the_side_has_the_tier() {
     for _ in 0..40 * TICKS_PER_SECOND {
         w.tick(&[]).unwrap();
         let pl = &w.state.players[0];
-        paid.0 += pl.mass_spent.to_f64() / TICKS_PER_SECOND as f64;
+        paid.0 += pl.materials_spent.to_f64() / TICKS_PER_SECOND as f64;
         paid.1 += pl.energy_spent.to_f64() / TICKS_PER_SECOND as f64;
         if w.state
             .units

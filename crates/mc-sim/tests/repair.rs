@@ -43,7 +43,7 @@ fn world() -> World {
     let mut w =
         World::with_terrain(terrain, map, blueprints, Arc::new(Pool::new(1)), &config).unwrap();
     w.tick(&[
-        spawn(&w, 0, "aster_mass_storage", 200, 0),
+        spawn(&w, 0, "aster_materials_storage", 200, 0),
         spawn(&w, 0, "aster_energy_storage", 260, 0),
     ])
     .unwrap();
@@ -53,7 +53,7 @@ fn world() -> World {
 
 fn fill_banks(w: &mut World) {
     let p = &mut w.state.players[0];
-    p.mass = p.mass_capacity;
+    p.materials = p.materials_capacity;
     p.energy = p.energy_capacity;
 }
 
@@ -143,11 +143,11 @@ fn repair_costs_a_quarter_of_the_build_and_puts_a_repair_beam_on_the_hull() {
         .as_ref()
         .unwrap()
         .power;
-    let full = tank_bp.cost_mass * power / tank_bp.build_time;
-    let demand = w.state.players[0].mass_demand;
+    let full = tank_bp.cost_materials * power / tank_bp.build_time;
+    let demand = w.state.players[0].materials_demand;
     assert!(
         demand > full * Fx::ratio(24, 100) && demand <= full * Fx::ratio(1, 4),
-        "repair asks for a quarter of the build's mass ({demand:?} of {full:?})"
+        "repair asks for a quarter of the build's materials ({demand:?} of {full:?})"
     );
 }
 
@@ -222,7 +222,7 @@ fn idle_repair_leaves_enemies_alone_and_prefers_a_wounded_friend_to_a_wreck() {
     w.tick(&[]).unwrap();
     assert_eq!(w.state.wrecks.slots.iter().count(), 1);
     let enemy_hurt = health_of(&w, enemies[0]);
-    let wreck_mass = w.state.wrecks.mass[w.state.wrecks.slots.iter().next().unwrap()];
+    let wreck_materials = w.state.wrecks.materials[w.state.wrecks.slots.iter().next().unwrap()];
 
     let start = health_of(&w, friend);
     for _ in 0..80 {
@@ -242,8 +242,8 @@ fn idle_repair_leaves_enemies_alone_and_prefers_a_wounded_friend_to_a_wreck() {
         "an enemy is not patched unasked"
     );
     assert_eq!(
-        w.state.wrecks.mass[w.state.wrecks.slots.iter().next().unwrap()],
-        wreck_mass,
+        w.state.wrecks.materials[w.state.wrecks.slots.iter().next().unwrap()],
+        wreck_materials,
         "the wreck waits while there is a hull to mend"
     );
 }

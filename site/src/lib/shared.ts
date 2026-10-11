@@ -13,7 +13,7 @@ export type UnitSummary = {
   domain: Domain;
   icon: string | null;
   health: number;
-  mass: number;
+  materials: number;
   dps: number | null;
   range: number | null;
   lore: string | null;
@@ -97,16 +97,16 @@ export type Weapon = {
 };
 
 export type Economy = {
-  massIncome: number;
+  materialsIncome: number;
   energyIncome: number;
   energyUpkeep: number;
-  massStorage: number;
+  materialsStorage: number;
   energyStorage: number;
 };
 
 export type Shield = { kind: "Dome" | "Hull"; radius: number | null; health: number; regen: number };
 export type Drones = { key: string; count: number; radius: number };
-export type Cost = { mass: number; energy: number; time: number };
+export type Cost = { materials: number; energy: number; time: number };
 
 /** A part fitted onto the unit where it stands, and what it adds. */
 export type RefitModule = {
@@ -141,7 +141,7 @@ export type Unit = {
   stats: {
     health: number;
     shield: number | null;
-    mass: number;
+    materials: number;
     energy: number;
     buildTime: number;
     speed: number | null;
@@ -159,7 +159,7 @@ export type Unit = {
     height: number;
     footprint: [number, number] | null;
     wreckShare: number;
-    wreckMass: number;
+    wreckMaterials: number;
     cargoRoom: number | null;
     waterBuild: boolean;
     seabed: boolean;
@@ -203,7 +203,7 @@ export type Unit = {
   refits: { name: string; modules: RefitModule[] }[];
   builds: string[];
   upgradesTo: string | null;
-  upgradeCost: { mass: number; energy: number } | null;
+  upgradeCost: { materials: number; energy: number } | null;
   /** A drone that flies for its carrier: never built or ordered on its own. */
   carried: boolean;
   mesh: string | null;

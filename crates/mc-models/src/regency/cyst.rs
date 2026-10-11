@@ -1,9 +1,9 @@
 //! The Reliquary, the Regency storage, on its 3 x 3 lot (36 m square): a vault between two cells.
 //! It upgrades in place (tech 2 and 3), each tier adding working machinery round it.
 //!
-//! One building keeps mass and energy both:
+//! One building keeps materials and energy both:
 //!
-//! - The mass vault in the middle: an armoured octagon, plates lapped down its faces into
+//! - The materials vault in the middle: an armoured octagon, plates lapped down its faces into
 //!   spikes, a bronze hatch drum on its roof, the owner's colour across the hatch.
 //! - Either side a long energy cell lying along x: a plated drum in bronze bands on plated
 //!   saddles, bronze end caps, a red slot along its crown showing the charge, a course of
@@ -97,7 +97,7 @@ fn coarse(b: &mut MeshBuilder, tech: u8) {
     b.face(&[v3(r, 0.0, z), v3(0.0, r, z), v3(-r, 0.0, z), v3(0.0, -r, z)]);
 }
 
-/// The mass vault: its plated octagon, plates lapped down its faces, the hatch drum on
+/// The materials vault: its plated octagon, plates lapped down its faces, the hatch drum on
 /// the roof, the owner's colour across the hatch.
 fn vault(b: &mut MeshBuilder) {
     let fine = b.fine();

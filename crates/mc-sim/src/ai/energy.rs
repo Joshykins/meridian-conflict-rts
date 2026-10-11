@@ -1,5 +1,5 @@
 //! What a side's factories and builders will draw: energy, so its power goes
-//! up before a stall and not after one, and mass, so it has the factories to
+//! up before a stall and not after one, and materials, so it has the factories to
 //! spend its income. A stall slows every factory and builder at once; the AI
 //! used to notice only once demand passed income, then built one plant at a
 //! time while everything waited.
@@ -15,7 +15,7 @@ impl World {
     /// Energy a second the side draws with every factory and builder at work,
     /// plus the upkeep of everything it has standing or going up and the draw
     /// of the upgrades running, and never less than what it really spends right now
-    /// (not what it asks for: in a mass stall that is far more than it is paid).
+    /// (not what it asks for: in a materials stall that is far more than it is paid).
     pub(super) fn energy_need(&self, player: u8) -> Fx {
         let units = &self.state.units;
         let mut need = Fx::ZERO;
@@ -53,9 +53,9 @@ impl World {
         need.max(self.state.players[player as usize].energy_spent)
     }
 
-    /// Mass a second `player`'s finished factories would spend with every
+    /// Materials a second `player`'s finished factories would spend with every
     /// one of them at work.
-    pub(super) fn factory_mass_draw(&self, player: u8) -> Fx {
+    pub(super) fn factory_materials_draw(&self, player: u8) -> Fx {
         let units = &self.state.units;
         units
             .slots
@@ -64,7 +64,7 @@ impl World {
             .filter_map(|r| {
                 let bp = self.bp(r);
                 let power = bp.builder.as_ref().filter(|_| bp.has(cat::FACTORY))?.power;
-                Some(power * self.product_rate(bp, |u| u.cost_mass))
+                Some(power * self.product_rate(bp, |u| u.cost_materials))
             })
             .fold(Fx::ZERO, |a, b| a + b)
     }
@@ -112,7 +112,7 @@ impl World {
     /// on top of what it draws now, with its store not run down. (Measured
     /// against the full `energy_need` no upgrade ever started: builders are
     /// seldom all at work at once.) Energy only: a side spending all its
-    /// materials is short of mass nearly all the time, and judged by the whole
+    /// materials are short of materials nearly all the time, and judged by the whole
     /// stall it upgraded six mines in half an hour. What is spent, not what is asked
     /// for: in a materials stall everything asks for more energy than it can use,
     /// and judged by the asking a side with a full energy store started no mine
@@ -126,8 +126,8 @@ impl World {
     }
 
     /// Puts first (`focus.rs`) whatever the side is running out of: new power while
-    /// energy stalls, new mines and mine upgrades while mass does. Energy first,
-    /// since a side out of energy digs less mass too.
+    /// energy stalls, new mines and mine upgrades while materials do. Energy first,
+    /// since a side out of energy digs fewer materials too.
     pub(super) fn direct_focus(&self, player: u8, out: &mut Vec<Command>) {
         let pl = &self.state.players[player as usize];
         let short = |have: Fx, capacity: Fx, income: Fx, demand: Fx| {
@@ -143,12 +143,17 @@ impl World {
         if energy_short {
             focus.power = Priority::First;
         }
-        let mass_short = short(pl.mass, pl.mass_capacity, pl.mass_income, pl.mass_demand);
+        let materials_short = short(
+            pl.materials,
+            pl.materials_capacity,
+            pl.materials_income,
+            pl.materials_demand,
+        );
         // Mine upgrades are begun as the sink for a filling store and never put
         // last: once the store stopped filling the budget fell under the four
         // begun, they went last behind factories asking ten times the income, and
         // none of them finished in thirteen minutes while income stood at 50.
-        if !energy_short && mass_short {
+        if !energy_short && materials_short {
             focus.mines = Priority::First;
         }
         if focus != pl.focus {

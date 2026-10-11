@@ -97,15 +97,15 @@ impl World {
         let kills = std::mem::take(&mut c.kills);
         // (plan, killed, lost) to credit once the operations are walked.
         let mut credit: Vec<(PlanKind, Fx, Fx)> = Vec::new();
-        for (killer, mass) in kills {
+        for (killer, materials) in kills {
             if let Some(op) = c
                 .ops
                 .iter_mut()
                 .find(|o| o.has(killer) || o.carrier == killer)
             {
-                op.ledger.killed += mass;
-                c.trades[op.kind as usize].killed += mass;
-                credit.push((op.plan, mass, Fx::ZERO));
+                op.ledger.killed += materials;
+                c.trades[op.kind as usize].killed += materials;
+                credit.push((op.plan, materials, Fx::ZERO));
             }
         }
         for op in &mut c.ops {
@@ -239,7 +239,7 @@ impl World {
             free.retain(|&r| {
                 if took >= limit
                     || op.units.len() >= MOST_UNITS
-                    || (op.kind == OpKind::Guard && op.mass() >= op.want)
+                    || (op.kind == OpKind::Guard && op.materials() >= op.want)
                 {
                     return true;
                 }
@@ -247,8 +247,8 @@ impl World {
                 if !fits(op.kind, p, land_route) || p.has(role::TRANSPORT) {
                     return true;
                 }
-                op.units.push((units.id(r), p.mass));
-                op.ledger.committed += p.mass;
+                op.units.push((units.id(r), p.materials));
+                op.ledger.committed += p.materials;
                 took += 1;
                 false
             });
@@ -265,7 +265,7 @@ impl World {
             .collect()
     }
 
-    /// The middle of `rows`, and their mass.
+    /// The middle of `rows`, and their materials.
     pub(in crate::ai) fn centre_of(&self, rows: &[usize]) -> Option<FxVec2> {
         let first = *rows.first()?;
         let base = self.state.units.pos[first];

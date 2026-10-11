@@ -84,8 +84,8 @@ fn arena(b: &Arc<Blueprints>, sea: bool) -> World {
 /// Most units a side fields in one staged fight.
 const MOST: i32 = 48;
 
-/// Stages equal mass of `a` (player 0) against `b` (player 1) and plays it out:
-/// the mass each has left. `None` when the pair cannot be staged.
+/// Stages equal materials of `a` (player 0) against `b` (player 1) and plays it out:
+/// the materials each has left. `None` when the pair cannot be staged.
 fn stage(blueprints: &Arc<Blueprints>, a: &Profile, b: &Profile) -> Option<(Fx, Fx)> {
     let sea = |p: &Profile| matches!(p.domain, Some(Domain::Naval | Domain::Sub));
     let land = |p: &Profile| matches!(p.domain, Some(Domain::Land));
@@ -126,13 +126,13 @@ fn stage(blueprints: &Arc<Blueprints>, a: &Profile, b: &Profile) -> Option<(Fx, 
             .map(|r| w.state.units.id(r))
             .collect()
     };
-    let mass = |w: &World, owner: u8| -> Fx {
+    let materials = |w: &World, owner: u8| -> Fx {
         w.state
             .units
             .slots
             .iter()
             .filter(|&r| w.state.units.owner[r] == owner)
-            .map(|r| w.bp(r).cost_mass * w.state.units.health[r] / w.bp(r).health)
+            .map(|r| w.bp(r).cost_materials * w.state.units.health[r] / w.bp(r).health)
             .sum()
     };
     for t in 0..2400 {
@@ -159,15 +159,15 @@ fn stage(blueprints: &Arc<Blueprints>, a: &Profile, b: &Profile) -> Option<(Fx, 
             vec![]
         };
         w.tick(&cmds).unwrap();
-        if t % 50 == 0 && (mass(&w, 0) == Fx::ZERO || mass(&w, 1) == Fx::ZERO) {
+        if t % 50 == 0 && (materials(&w, 0) == Fx::ZERO || materials(&w, 1) == Fx::ZERO) {
             break;
         }
     }
-    let start_a = a.mass * na;
-    let start_b = b.mass * nb;
+    let start_a = a.materials * na;
+    let start_b = b.materials * nb;
     Some((
-        mass(&w, 0) / start_a.max(Fx::ONE),
-        mass(&w, 1) / start_b.max(Fx::ONE),
+        materials(&w, 0) / start_a.max(Fx::ONE),
+        materials(&w, 1) / start_b.max(Fx::ONE),
     ))
 }
 

@@ -1716,11 +1716,11 @@ impl Game {
             RangeAction::Sky(sky) => range.sky = Some(sky),
             RangeAction::Stock {
                 player,
-                mass,
+                materials,
                 energy,
             } => commands.push(Command::DebugStock {
                 player,
-                mass,
+                materials,
                 energy,
             }),
             RangeAction::Income {
@@ -3977,7 +3977,7 @@ impl Game {
             let cost = self
                 .blueprints
                 .unit(BlueprintId(u.blueprint as u16))
-                .cost_mass
+                .cost_materials
                 .to_f32();
             match voices.iter_mut().find(|v| v.0 == sound) {
                 Some(v) => (v.1, v.2) = (v.1 + 1, v.2.max(cost)),

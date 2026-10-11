@@ -206,9 +206,9 @@ fn a_filling_store_is_read_as_floating_and_asks_for_sinks() {
     let mut w = world();
     run(&mut w, 1200);
     let before = w.state.ai[0].commander.eco.clone();
-    let cap = w.state.players[0].mass_capacity;
+    let cap = w.state.players[0].materials_capacity;
     for _ in 0..8 {
-        w.state.players[0].mass = cap;
+        w.state.players[0].materials = cap;
         run(&mut w, 30);
     }
     let eco = &w.state.ai[0].commander.eco;

@@ -82,7 +82,7 @@ pub enum Command {
         wreck: crate::tables::WreckId,
         queue: bool,
     },
-    /// Take a live unit apart for mass: one of the player's own, or an enemy's. It loses
+    /// Take a live unit apart for materials: one of the player's own, or an enemy's. It loses
     /// health as it goes, and what is reclaimed to nothing leaves no blast and no wreck.
     ReclaimUnit {
         units: Vec<UnitId>,
@@ -257,20 +257,20 @@ pub enum Command {
     /// Test range: sets `player`'s stores to these thousandths of what they can hold.
     DebugStock {
         player: u8,
-        mass: Option<u16>,
+        materials: Option<u16>,
         energy: Option<u16>,
     },
     /// Test range: `player`'s mines and generators make these thousandths of what they
     /// should (1000 is normal, 0 nothing), to stage a shortage or a glut.
     DebugIncome {
         player: u8,
-        mass: u16,
+        materials: u16,
         energy: u16,
     },
     /// Test range: stores `player` has on top of what its units hold, whole units.
     DebugStorage {
         player: u8,
-        mass: u32,
+        materials: u32,
         energy: u32,
     },
     /// Test range: `count` wrecks of `blueprint` in a block centred on `pos`, for reclaim.

@@ -2656,7 +2656,7 @@ impl World {
             self.finish_order(row);
             return Ok(());
         }
-        // Trees on the lot go first: no mass in them, so it is quick.
+        // Trees on the lot go first: no materials in them, so it is quick.
         if !self.clear_lot(row, bp.footprint, o.pos) {
             return Ok(());
         }

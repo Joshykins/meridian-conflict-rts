@@ -272,9 +272,9 @@ impl Hud {
                 op.phase,
             );
             let size = if op.want > 0 {
-                format!("{}u {}/{}", op.units, kilo(op.mass), kilo(op.want))
+                format!("{}u {}/{}", op.units, kilo(op.materials), kilo(op.want))
             } else {
-                format!("{}u {}", op.units, kilo(op.mass))
+                format!("{}u {}", op.units, kilo(op.materials))
             };
             ui.text(x + 158.0, y, type_scale::MICRO, dim, &size);
             let good = op.killed >= op.lost;

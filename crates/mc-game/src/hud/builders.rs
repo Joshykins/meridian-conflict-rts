@@ -1,7 +1,7 @@
 //! The left column under the economy: the commander's card, then a card each for
 //! idle engineers, idle factories and idle reclaimers (salvage units, not towers).
 //! All of them say "idle" the same way: a bar down the card's left edge and a dot
-//! before the word, pulsing together; amber, but the reclaimers' in the mass colour.
+//! before the word, pulsing together; amber, but the reclaimers' in the materials colour.
 //!
 //! An idle card is one short strip: its title and idle count on the left, then a
 //! small tile per type, tier included (a T1 and a T2 engineer are two tiles). Click
@@ -13,7 +13,8 @@ use std::collections::HashMap;
 
 use super::style::{domain_wash, Domain};
 use super::{
-    build, flag, has_flag, icons, refit, selection, whole, Hud, HudAction, Scene, HEALTHY, MASS,
+    build, flag, has_flag, icons, refit, selection, whole, Hud, HudAction, Scene, HEALTHY,
+    MATERIALS,
 };
 use crate::audio::Sfx;
 use crate::selected::Selection;
@@ -44,7 +45,7 @@ fn pulse(ui: &Ui) -> f32 {
     0.55 + 0.45 * (ui.time * 3.0).sin().abs()
 }
 
-/// The bar down an idle card's left edge in `tone` (amber, or mass for the
+/// The bar down an idle card's left edge in `tone` (amber, or materials for the
 /// reclaimers), clear of its cut corners.
 fn idle_edge(ui: &mut Ui, r: Rect, tone: u32, k: f32) {
     let edge = Rect::new(r.x, r.y + 10.0, 3.0, r.h - 20.0);
@@ -225,11 +226,11 @@ pub(super) fn commander_card(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, dt:
 type Kind<'a> = (&'a UnitBlueprint, Vec<u32>);
 
 /// The idle cards, top down: the title, what shift-click on the title takes, and
-/// the idle tone. Reclaimers idle in the mass colour, the stuff they bring in.
+/// the idle tone. Reclaimers idle in the materials colour, the stuff they bring in.
 const CARDS: [(&str, &str, u32); 3] = [
     ("Engineers", "every idle engineer", palette::WARN),
     ("Factories", "every idle factory", palette::WARN),
-    ("Reclaimers", "every idle reclaimer", MASS),
+    ("Reclaimers", "every idle reclaimer", MATERIALS),
 ];
 
 /// Idle engineers (not the commander, which has its own card), idle factories and

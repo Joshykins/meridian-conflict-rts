@@ -67,10 +67,10 @@ pub mod material {
     /// A helmet visor: mirrored gold-orange glass with a faint warm light behind it,
     /// so it reads as the commander's face from strategic zoom.
     pub const VISOR: u32 = 26;
-    /// Reclaim emitters: the Materials red-orange (`gpu_consts::mass`), burning steady
+    /// Reclaim emitters: the Materials red-orange (`gpu_consts::materials`), burning steady
     /// while the unit reclaims and banked low while it does not. Emissive. Every
     /// reclaimer's emitter tips use it, so reclaim never reads as construction amber.
-    pub const GLOW_MATERIALS: u32 = crate::gpu_consts::mass::GLOW_MATERIAL;
+    pub const GLOW_MATERIALS: u32 = crate::gpu_consts::materials::GLOW_MATERIAL;
     /// Pinch fusion's light (`gpu_consts::prism`): a white-hot face with a soft pastel
     /// prism turning round its rim, rose, magenta, lavender and peach-gold. A Regency star
     /// core. Emissive.
@@ -149,8 +149,8 @@ pub mod pattern {
     pub const EMBER: u32 = COIL_TURN_BACK + 1;
     /// A chute carrying reclaimed material (`ACCENT` faces): dark glazing over the channel,
     /// and while the unit reclaims a stream of glowing clumps falling down it, in model z,
-    /// so a spiral or a raked run carries the same fall (`gpu_consts::mass`).
-    pub const MASS_FLOW: u32 = crate::gpu_consts::mass::FLOW_PATTERN;
+    /// so a spiral or a raked run carries the same fall (`gpu_consts::materials`).
+    pub const MATERIALS_FLOW: u32 = crate::gpu_consts::materials::FLOW_PATTERN;
     /// Rock melted by a beam (`ACCENT` faces): a dark glassy crust broken by glowing cracks
     /// over a melt that runs down, hotter with depth below model z = 0 and with the tier
     /// (`gpu_consts::melt`). A Regency mine's bore.

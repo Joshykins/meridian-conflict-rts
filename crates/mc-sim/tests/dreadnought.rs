@@ -343,7 +343,7 @@ fn one_zenith_brings_down_a_dominion() {
 fn w_cost(key: &str) -> f32 {
     let w = world();
     let bp = w.blueprints.unit(w.blueprints.id_of(key).unwrap());
-    bp.cost_mass.to_f32()
+    bp.cost_materials.to_f32()
 }
 
 /// Where the entity shader draws the tips of weapon `wi`'s barrels on `u`: each muzzle

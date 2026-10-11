@@ -9,7 +9,7 @@ use crate::hud;
 use crate::hud::style::{Family, AIR, LAND, NAVY, SUPPORT};
 use crate::ui::palette;
 
-pub const MATERIALS: u32 = hud::MASS;
+pub const MATERIALS: u32 = hud::MATERIALS;
 pub const ENERGY: u32 = hud::ENERGY;
 pub const SALVAGE: u32 = 0x3FE0C5;
 /// How much of the asked-for spending was paid.
@@ -37,7 +37,9 @@ pub const SPEND: [u32; 6] = [
 
 pub fn metric(m: Metric) -> u32 {
     match m {
-        Metric::MassIncome | Metric::Collected | Metric::Spending | Metric::Stored => MATERIALS,
+        Metric::MaterialsIncome | Metric::Collected | Metric::Spending | Metric::Stored => {
+            MATERIALS
+        }
         Metric::EnergyIncome => ENERGY,
         Metric::Efficiency => EFFICIENCY,
         Metric::ArmyValue | Metric::ArmySize => ARMY,

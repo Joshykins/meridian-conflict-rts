@@ -53,7 +53,7 @@ fn spawn(w: &mut World, key: &str, x: i32, y: i32) -> usize {
     .unwrap()
 }
 
-/// A field of tank wrecks, `n` of them 100 mass each, round (x, y).
+/// A field of tank wrecks, `n` of them 100 materials each, round (x, y).
 fn field(w: &mut World, x: i32, y: i32, n: i32) {
     let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
     for i in 0..n {
@@ -83,7 +83,11 @@ fn a_field_near_home_gets_a_tower_and_a_covered_one_does_not() {
     let mut planned = w.plan_counts(0, &census);
     planned.salvage = w.wreck_fields(start, &intel);
     assert_eq!(planned.salvage.len(), 2);
-    assert_eq!(planned.salvage[0].mass, Fx::from_int(800), "richest first");
+    assert_eq!(
+        planned.salvage[0].materials,
+        Fx::from_int(800),
+        "richest first"
+    );
     let job = w
         .salvage_job(engineer, &planned, &|_| true)
         .expect("a tower for the big field");
@@ -142,7 +146,7 @@ fn factories_make_a_cheap_salvager_while_wrecks_lie_about_and_idle_ones_go_to_th
     }
     assert!(
         w.salvage_product(land, &census, 1, &fields).is_none(),
-        "one is enough for 600 mass"
+        "one is enough for 600 materials"
     );
     // A Gleaner idle at home, out of reach of the field, is sent to it.
     let reclaimer = spawn(&mut w, "aster_t1_mobile_reclaimer", 320, 320);

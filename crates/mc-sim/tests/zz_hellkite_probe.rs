@@ -1,6 +1,6 @@
-//! Probe: what a Hellkite does to ground targets, beside the same mass of Petrels and
+//! Probe: what a Hellkite does to ground targets, beside the same materials of Petrels and
 //! Kestrels (and a pair of Hellkites). Passive targets, parked or driving off, 60 s, three
-//! seeds: damage, kills, mass killed per own mass, first hit, bombs, time to kill them all. `cargo test --profile gate -p mc-sim --test sim -- zz_hellkite_probe::
+//! seeds: damage, kills, materials killed per own materials, first hit, bombs, time to kill them all. `cargo test --profile gate -p mc-sim --test sim -- zz_hellkite_probe::
 //! --ignored --nocapture`
 
 use mc_core::{Angle, Fx, FxVec2};
@@ -63,7 +63,7 @@ enum Order {
     Sweep,
 }
 
-/// Returns (damage dealt, kills, mass killed, first-hit second, salvos).
+/// Returns (damage dealt, kills, materials killed, first-hit second, salvos).
 fn scene(
     seed: u64,
     bomber: &str,
@@ -85,9 +85,9 @@ fn scene(
     for &t in &targets {
         w.state.units.flags[t] |= flag::PASSIVE;
     }
-    let bp_mass = {
+    let bp_materials = {
         let id = w.blueprints.id_of(key).unwrap();
-        w.blueprints.unit(id).cost_mass.to_f64()
+        w.blueprints.unit(id).cost_materials.to_f64()
     };
     let bomber_bp = w.blueprints.id_of(bomber).unwrap();
     let tids: Vec<_> = targets.iter().map(|&t| w.state.units.id(t)).collect();
@@ -156,7 +156,14 @@ fn scene(
     }
     let dealt: f64 = hp_last.iter().zip(&max).map(|(h, m)| m - h).sum();
     let kills = hp_last.iter().filter(|&&h| h <= 0.0).count();
-    (dealt, kills, kills as f64 * bp_mass, first, salvos, cleared)
+    (
+        dealt,
+        kills,
+        kills as f64 * bp_materials,
+        first,
+        salvos,
+        cleared,
+    )
 }
 
 fn grid(n: i32, gap: i32) -> Vec<(i32, i32)> {
@@ -170,7 +177,7 @@ fn report(
     label: &str,
     bomber: &str,
     n: i32,
-    mass: f64,
+    materials: f64,
     f: impl Fn(u64) -> (f64, usize, f64, f64, usize, f64),
 ) {
     let runs: Vec<_> = (1..=3).map(f).collect();
@@ -182,8 +189,8 @@ fn report(
     let cleared = runs.iter().map(|r| r.5).sum::<f64>() / 3.0;
     let salvos = runs.iter().map(|r| r.4).sum::<usize>() as f64 / 3.0;
     println!(
-        "{label:<34} {n} x {bomber:<24} dmg {dealt:>7.0}  kills {kills:>4.1}  mass killed {killed:>6.0} ({:>4.2}x own)  first hit {first:>5.1}s  bombs {salvos:>5.1}  all dead {cleared:>5.1}s",
-        killed / mass
+        "{label:<34} {n} x {bomber:<24} dmg {dealt:>7.0}  kills {kills:>4.1}  materials killed {killed:>6.0} ({:>4.2}x own)  first hit {first:>5.1}s  bombs {salvos:>5.1}  all dead {cleared:>5.1}s",
+        killed / materials
     );
 }
 
@@ -287,8 +294,8 @@ fn zz_hellkite_probe() {
         ),
     ];
     for (label, key, spots, order, walk, secs) in &cases {
-        for &(bomber, n, mass) in fleets {
-            report(label, bomber, n, mass, |seed| {
+        for &(bomber, n, materials) in fleets {
+            report(label, bomber, n, materials, |seed| {
                 scene(seed, bomber, n, key, spots, *order, *walk, *secs)
             });
         }

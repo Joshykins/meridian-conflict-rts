@@ -6,8 +6,8 @@ How to play them, and the economy race that measures it, is in `ECONOMY.md`.
 ## Tiers
 
 Tier 1 is the anchor: its combat stats set the scale. Each tier costs about 4x the one below
-(mass) and is worth about 1.3x as much per unit of mass, measured as
-`sqrt(health * dps) / mass` against the tier 1 unit of the same line. So a tier 2 unit is about
+(materials) and is worth about 1.3x as much per unit of materials, measured as
+`sqrt(health * dps) / materials` against the tier 1 unit of the same line. So a tier 2 unit is about
 5x a tier 1 unit, and a tier 3 about 25x. Health and damage are raised together (never lowered)
 to reach the target; range specialists (SAM, strategic bomber) are capped at 3x.
 
@@ -18,15 +18,15 @@ kills, which `sqrt(health * dps)` cannot see.
 
 Off the lines, measured the same way:
 
-- Arbalest (T3 lightning sniper, 560 mass): about 1.7 per unit of mass against the
+- Arbalest (T3 lightning sniper, 560 materials): about 1.7 per unit of materials against the
   Paladin's 2.7. It is a range specialist (520 m against the Paladin's 280) and cannot
   defend itself up close, so it sits under the rule on purpose.
-- Fulgur (T4 super-heavy tank, 3400 mass, about 4x a Paladin): 60000 health plus an
+- Fulgur (T4 super-heavy tank, 3400 materials, about 4x a Paladin): 60000 health plus an
   18000 hull field, about 1067 direct dps from the AEB-2 and two bolt rifles, so about 2.6 per
-  unit of mass, near the Paladin's. What puts it over is the AEB-2's channel: 2000 damage to
+  unit of materials, near the Paladin's. What puts it over is the AEB-2's channel: 2000 damage to
   everything within 7 m of it, which a column or a clump pays for many times. Raised on a
   lot by Mason IIIs (build power 150: one takes about 135 s); it has no factory.
-- Strider (Regency T4 assault tripod, 3400 mass, the Fulgur's price): 60000 health and no
+- Strider (Regency T4 assault tripod, 3400 materials, the Fulgur's price): 60000 health and no
   shield, about 1830 direct dps from two Pinch-fusion Cannons (4200 a shot with 24 m of
   splash, taking turns half a reload apart) out to 1250 m, and about 420 more from eight
   Gravitic Seekers thrown up and spread over the ground targets within 1250 m, each going
@@ -35,7 +35,7 @@ Off the lines, measured the same way:
   and caught inside the gatlings' 750 m it loses, either way badly hurt
   (mc-sim `tests/strider.rs`). Shorter reach than the Fulgur's AEB-2 and nothing against
   aircraft. Raised on a lot by Artificer IIIs or the Exarch's Engineering Suite III.
-- Colossus (Regency T4 four-legged siege walker, 4200 mass, the Strider's and the
+- Colossus (Regency T4 four-legged siege walker, 4200 materials, the Strider's and the
   Breacher's peer; made a T4 in full 2026-10-08 at the user's word): 75000 health plus an
   18000 hull field. Its Heavy Pinched Lance, a tight red stream, charges 3 s and then burns 5 s (50 ticks
   of 1200 with 40 m of splash, every 40 s): about 12000 dps through the burn, 1500 averaged
@@ -46,14 +46,14 @@ Off the lines, measured the same way:
   stomp), has nothing for the air, and is raised on a lot by Artificer IIIs or the Exarch's
   Engineering Suite III. Unplayed: the numbers are a first pass (mc-sim
   `tests/colossus.rs`).
-- Breacher (T4 assault walker, 3800 mass): 72000 health plus a 16000 hull field, about 2000
+- Breacher (T4 assault walker, 3800 materials): 72000 health plus a 16000 hull field, about 2000
   dps from its two gatling-breach cannons at full spin (300 a shot, 0.3 s) and 430 from the
-  thermobaric launchers (32 rockets of 240 every 18 s), so about 3.9 per unit of mass, a little
+  thermobaric launchers (32 rockets of 240 every 18 s), so about 3.9 per unit of materials, a little
   over the 1.3x a tier 3 rule: it has to close to 600 m (the Fulgur stands off at 1500).
   Each rocket also leaves 16 s of burning ground (40 a second to each enemy in it), which a
   clump standing in the field pays for many times. Raised on a lot by Mason IIIs like the
   Fulgur; it carries nothing for the air.
-- Nimbus (ARC T4 storm bomber, 4000 mass): 52000 health plus an 18000 hull field, and two
+- Nimbus (ARC T4 storm bomber, 4000 materials): 52000 health plus an 18000 hull field, and two
   lasers that burn missiles within 680 m (the Argus's). It flies runs like any bomber, and
   while any foe is within 600 m its Storm Seeder lets a cloud go from the tail every second,
   aimed at nothing: a run lays a trail of them. Each hangs about where it was let go, grows
@@ -67,27 +67,27 @@ Off the lines, measured the same way:
   wing. Air is its counter: slow (75 m/s), and it turns wide. A first pass, unplayed (mc-sim
   `tests/storm_bomber.rs`).
 
-- Strategic weapons (`docs/NUKES.md`): the Sunfall silo (T4, 9000 mass) assembles warheads
-  of 6000 mass / 120000 energy in about 300 s at its own power (60), holds 2, and each does
+- Strategic weapons (`docs/NUKES.md`): the Sunfall silo (T4, 9000 materials) assembles warheads
+  of 6000 materials / 120000 energy in about 300 s at its own power (60), holds 2, and each does
   80000 inside 230 m falling to 2500 at 598 m: it erases a base's core, domes included. The
-  Parhelion array (T3, 3200 mass) answers it at a quarter of the price a round (1500 mass,
+  Parhelion array (T3, 3200 materials) answers it at a quarter of the price a round (1500 materials,
   about 100 s), four held, covering marks within 2.4 km. A side that sees silos should
   build arrays; one array stops one warhead per interceptor it holds.
-- The Culverin (T4 map gun, 10000 mass) shells bases from 1.5 to 22 km: 5200 damage in
+- The Culverin (T4 map gun, 10000 materials) shells bases from 1.5 to 22 km: 5200 damage in
   45 m every 9 s, about 580 dps on paper. It shells the nearest structure, land unit or
   ship its side sees or has on radar, and a 1 degree spread lands its shells evenly over a
   disc of about 210 m radius at 12 km (140 m off on average, `tests/culverin.rs`), so by
   area only about one shell in ten lands on the building it was aimed at, the rest on
   what stands round it. A dome is the answer: a T2 dome (9000, 90/s) goes down in about 20 s of hits, a T3
   dome (36000, 360/s) holds one gun off for nearly 3 minutes and two for under one.
-- The Behemoth (ARC T5 walker, 120000 mass) is countered by air (2026-10-06): 1.3 M
-  health and a 200000 hull field (600/s), about 12 health per mass, half a T4's. Rank
+- The Behemoth (ARC T5 walker, 120000 materials) is countered by air (2026-10-06): 1.3 M
+  health and a 200000 hull field (600/s), about 12 health per materials, half a T4's. Rank
   adds up to half again and 1600/s of mending, and a Behemoth in a fight ranks fast. Its
   guns outrange the ground and its feet crush what gets under it, but it has no anti-air
   at all: it needs escorts. Measured (aircraft attacking it from one side, unopposed):
   40 Thunderheads kill it in 85 s, 25 in 140 s, 15 in 240 s; 40 Eclipses in 125 s; 100
   Kestrels in 120 s.
-- The Seraph (Regency T5 strike titan, 60000 mass, half a Behemoth; first pass 2026-10-09,
+- The Seraph (Regency T5 strike titan, 60000 materials, half a Behemoth; first pass 2026-10-09,
   unplayed): 220000 health under a 260000 hull field (1200/s; 10-09: most of its weight
   moved into the field), 2000 energy/s upkeep, hovering at 70 m/s. Two Rapid Fusion
   Repeaters (1500 with 18 m splash every 0.5 s each, 1000 m, also at spacecraft, each
@@ -102,10 +102,10 @@ Off the lines, measured the same way:
   or hold position. It lands under a siege gun's `range_min` (the Behemoth's Tempest
   900 m, rockets 600 m), so it is the Behemoth's ground answer; nothing against aircraft, though its forearms reach spacecraft.
   Measured (mc-sim `tests/seraph.rs`): it kills four Striders and lives.
-- The Skyhook space elevator (ARC T5, 160000 mass / 1.6 M energy, `docs/ELEVATOR.md`):
+- The Skyhook space elevator (ARC T5, 160000 materials / 1.6 M energy, `docs/ELEVATOR.md`):
   once its cable is clamped (24 s after it is finished) three crates land every 30 s with
-  20000 mass: the front of its queue, free, then the rest as plain mass. That is about
-  670 mass a second, more than a whole late-game economy (about 250 a second at 20
+  20000 materials: the front of its queue, free, then the rest as plain materials. That is about
+  670 materials a second, more than a whole late-game economy (about 250 a second at 20
   minutes), so it pays for itself in four minutes if left alone. It is the reason to
   reach tier 5 and the first thing an enemy should want dead: 1.5 M health, no shield,
   no guns. It brings down land and air units and the T4 land walkers and tanks, never
@@ -113,7 +113,7 @@ Off the lines, measured the same way:
 - The Regency's Springald (same cost and reach) is bent as the Kiln is from the Trebuchet:
   5600 in 40 m every 10 s (560 dps on paper), a 0.8 degree spread and a 4 s charge. Its
   shot is one shell, so a dome takes it as it takes a Culverin shell.
-- The Regency's Carillon (T4 area defence, 6500 mass, 26000 HP, 30 energy/s upkeep) is
+- The Regency's Carillon (T4 area defence, 6500 materials, 26000 HP, 30 energy/s upkeep) is
   a store of damage, not a rate of it: it makes eight plasma flecks every 4 s and holds
   up to thirty-two (`Weapon::orbs`, `orb_time`), drifting round the spire like fireflies,
   so a quiet 16 s stores 6400 damage (200 each in 14 m), and spends it in under two
@@ -127,7 +127,7 @@ Off the lines, measured the same way:
 ## Air and anti-air
 
 Set 2026-09-30 against Forged Alliance (FAF), whose land units our T1/T2 already match
-almost exactly (a T1 tank is 56 mass / 300 health in both). Aircraft raid and live through
+almost exactly (a T1 tank is 56 materials / 300 health in both). Aircraft raid and live through
 a pass; anti-air punishes them over seconds, not in one shot.
 
 - **No AA shell or bullet one-shots a same-tier aircraft.** Flak keeps its wide splash
@@ -145,7 +145,7 @@ a pass; anti-air punishes them over seconds, not in one shot.
   several bombers or passes. The Eclipse is a glass hammer: 5000 a bomb (a T2 mine in one,
   a bare commander in three), 6000 health, so two Skyguard volleys or about 9 s of one
   Raptor bring it down.
-- **Gunships hit like the ground of their tier, not harder.** Damage per mass against the
+- **Gunships hit like the ground of their tier, not harder.** Damage per materials against the
   same-tier tank: FAF's gunships 0.6-0.8x. The Kestrel is about 0.8x (it killed T2 tanks
   at 3x before); the Thunderhead is 0.6x our Paladin line and stays as it is.
 
@@ -155,11 +155,11 @@ Measure in the sim with `zz_aa_probe` (what each AA lands on each aircraft) and
 ## The navy
 
 2026-10-09, against FAF (spooky-db; 1 ogrid ≈ 16 m of range): our warships used to carry
-land-grade DPS per mass and four to six times the land's range, while FAF's carry a
-quarter to a tenth of the land's DPS per mass. Prices and health stayed; firepower came
+land-grade DPS per materials and four to six times the land's range, while FAF's carry a
+quarter to a tenth of the land's DPS per materials. Prices and health stayed; firepower came
 down to the rule in `docs/NAVY.md` "Ships buy range and hull, not firepower".
 
-| hull | mass | DPS against hulls and land, before -> after | per mass after | FAF peer per mass |
+| hull | materials | DPS against hulls and land, before -> after | per materials after | FAF peer per materials |
 |---|---|---|---|---|
 | Barracuda / Stiletto | 150 / 160 | 68 / 74 -> 48 / 52 torpedo | 0.32 | 0.10 |
 | Marlin | 920 | 211 + 100 torp -> 158 + 73 | 0.17 + 0.08 | ~0.13 + 0.04 |
@@ -173,13 +173,13 @@ down to the rule in `docs/NAVY.md` "Ships buy range and hull, not firepower".
 
 The big guns kept their weight a shot and fire less often (the Leviathan 1,500 a shell
 every 18 s, was 2,000 every 12 s), so a broadside is still an event. The torpedo launchers
-came down with the submarines they meet and keep about twice their DPS per mass
+came down with the submarines they meet and keep about twice their DPS per materials
 (`torpedo_launchers.rs`). Left as they were: the Skiff and Dirk (tanks at sea), the Pike and
 Falchion (already under the land), the anti-air hulls (Manta, Pavise, Atoll, Mantlet:
 measured against aircraft), the Narwhal (shoots only spaceships) and the Megalodon (an
-experimental, 0.13 a mass already).
+experimental, 0.13 per unit of materials already).
 
-## Energy per mass
+## Energy per materials
 
 | kind | T1 | T2 | T3 |
 |---|---|---|---|
@@ -218,7 +218,7 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   engineer), and a mine upgrades itself at `upgrade_power` 15 / 40 / 60, so tier 2 takes
   about 73 s, tier 3 150 s and the Deep Core 250 s (110 / 600 / 1,500 s before). Engineers
   assisting add their power.
-- Prices (mass / energy): 45 / 270, 750 / 4,500, 4,000 / 24,000, Deep Core 11,000 / 66,000.
+- Prices (materials / energy): 45 / 270, 750 / 4,500, 4,000 / 24,000, Deep Core 11,000 / 66,000.
   A new mine on a field pays back in under a minute; an upgrade pays only the difference
   between the tiers, about 2, 5 and 7 minutes on a duel field. The Regency's Excavators,
   Power Generators and Condensers are ARC's Core Mines, Reactors and Fabricators number
@@ -242,33 +242,33 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
 - Mines run on energy: upkeep 2 / 8 / 30 / 60 a second (T1-T4). A mine digs at the share of
   the side's energy demand that is covered (behind the focus, if one is on): at worst a
   quarter of its output (`UNPOWERED` in `mines.rs`), so a side out of energy loses most of
-  its mass too. A mass stall does not slow the mines, or it would feed itself.
-- Reactors: 25 / 350 / 2000 energy/s for 125 / 700 / 2800 mass: 5 / 2 / 1.4 mass per energy a
+  its materials too. A materials stall does not slow the mines, or it would feed itself.
+- Reactors: 25 / 350 / 2000 energy/s for 125 / 700 / 2800 materials: 5 / 2 / 1.4 materials per energy a
   second, so each tier is far cheaper per unit of energy than the one below. A field of tier 1
   reactors is the stopgap of the opening, not the way to power a side (the user, 2026-09-30:
   "t1 pgens are too good of a deal"; they were 20 / 250 / 1500, only a third dearer than tier 2).
-  On 2026-10-04 tier 1 went from 15/s to 25/s with its whole price (mass, energy, time)
-  scaled by the same 5/3, so the mass per energy held.
+  On 2026-10-04 tier 1 went from 15/s to 25/s with its whole price (materials, energy, time)
+  scaled by the same 5/3, so the materials per energy held.
 - Every tier upgrade, structure or engineer, pays only what the new tier costs over the old
-  one (`Blueprints::upgrade_cost`: Mason to Mason II 148 mass / 940 energy, core mine tier 1
+  one (`Blueprints::upgrade_cost`: Mason to Mason II 148 materials / 940 energy, core mine tier 1
   to 2 705 / 4,230). A refit kit is paid in full.
-- Commander's Material Formation Engine: +3 mass, +100 energy a second for 1,200 mass, about
+- Commander's Material Formation Engine: +3 materials, +100 energy a second for 1,200 materials, about
   a tier 1 mine and a half on a field, carried on the unit that ends the game if it dies.
 - **Tier paths are the commitment** (the user, 2026-10-02: "tiering more expensive, more of a
   commitment", units cheaper against it). Only the ways to a new tier cost more; unit prices
-  stay. Land and air factories 240 / 3,000 / 9,000 mass (Forge to II 2,760, II to III 6,000;
+  stay. Land and air factories 240 / 3,000 / 9,000 materials (Forge to II 2,760, II to III 6,000;
   naval 260 / 3,080 / 9,100; Regency alike), build times 3,700 / 10,000. The commander's
   Engineering Suite II costs 2,400 and Suite III 6,000 (kits pay in full; 1,800 / 4,500 time).
 - **Engineers climb in the field**: an engineer puts its own next tier on at that tier's build
   power (`Blueprints::upgrade_power`), so Mason to Mason II takes 30 s and II to III about
   21 s (180 s and 107 s at its own power before). It still waits for the side's tech.
-- **Material fabricators** (`fabricator: (mass)`) turn energy into material, as far as their
+- **Material fabricators** (`fabricator: (materials)`) turn energy into material, as far as their
   upkeep is paid (nothing in a full stall, nothing while paused), and go up like reactors.
   One 2x2 building from tech 2 (the user, 2026-10-03), upgraded in place to tech 3. Dear in
   energy, as in FAF (the user, 2026-10-10: "more expensive, especially on energy"): a T2
   eats a whole Reactor II, a T3 half a Reactor III, and tech 3 is the better buy:
 
-  | Tier | Makes | Draws | Mass | Payback with its power plant |
+  | Tier | Makes | Draws | Materials | Payback with its power plant |
   | --- | --- | --- | --- | --- |
   | T2 (2x2) | 1.5/s | 350 E/s (233 a material) | 900 | ~18 min |
   | T3 (2x2, upgrade 1,600) | 5/s | 1,000 E/s (200 a material) | 2,500 | ~13 min |
@@ -276,7 +276,7 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   All pay back slower than the mine upgrades, so they come after the mines; they need no
   ground, so a side whose mines are done grows on them. They share the Mines priority
   switch. The Regency Condensers are the same.
-- **Adjacency** (`adjacency: Energy | Mass`, mc-sim `adjacency.rs`): a provider saves each
+- **Adjacency** (`adjacency: Energy | Materials`, mc-sim `adjacency.rs`): a provider saves each
   finished building of its owner's whose lot shares an edge with its own (a corner is not
   enough). Power plants save energy: upkeep (fabricators, mines, shields, radar) and what a
   factory builds. Fabricators and mines save a factory's materials (a mine's rated output is its shaft, `base`: T1 0.3/s 20%, T4 3.6/s 35%). A provider's saving is what it
@@ -304,7 +304,7 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   and the mines (checked on load). Guns, missile launchers, missile defence, nuke silos and
   reclaim cost energy to build, never to keep (2026-09-29: the Zenith, Narwhal, Sunfall,
   Culverin and Corona lost theirs).
-- **Build time follows mass.** Every build takes about as long per material as others of its
+- **Build time follows materials.** Every build takes about as long per material as others of its
   kind, economy included: a mine upgrade takes about 1.6 build-power seconds per material it
   pays (core mine times 72 / 1100 / 6000 / 15000), reactors about 1.7 (Reactor III 4800).
   Growing income now competes for build power with spending it.
@@ -321,7 +321,7 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
 
 Measured 2026-10-03 with `zz_eco_ledger_probe` (36 min, Hard against Hard, Serac Divide,
 the old dev16 and Twin Shoals), before -> after: income at 6 minutes 5 -> 13-17 a second and at 12
-minutes 5 -> 19-32; tech 2 at 21-30 -> about 12 minutes; mass mined over the game 14-20k ->
+minutes 5 -> 19-32; tech 2 at 21-30 -> about 12 minutes; materials mined over the game 14-20k ->
 51-78k; tech 3 and the first experimentals by minute 36. The AI's own tech timing is
 untuned; its tier 3 comes late.
 
@@ -331,10 +331,10 @@ Materials are never destroyed, only moved: wrecks never decay and weapons cannot
 Ore does not run out (the user's call), so reclaim grows with how much is fought over rather than
 replacing the mines.
 
-- Wrecks keep more the higher the tier: 81% / 85% / 90% of the unit's mass (`default_wreck` in
+- Wrecks keep more the higher the tier: 81% / 85% / 90% of the unit's materials (`default_wreck` in
   `raw.rs`; `wreck_fraction` in a unit file overrides it: the commander keeps 20%).
 - A wreck gives up only what its reclaimer's side has room to store; the rest waits in the wreck.
-- Reclaim power is build power (1 mass a second per point), so it rises with the engineer tiers.
+- Reclaim power is build power (1 materials a second per point), so it rises with the engineer tiers.
 - Reclaim is cheap and quick to pay back at every tier: a unit whose job is reclaim pays for
   itself in well under a minute of beam time on a wreck field, so it is a real income next to the
   mines. Its reach is far past an engineer's walk. A reclaimer's `power` is the whole unit's,
@@ -342,10 +342,10 @@ replacing the mines.
 - A Reclaimer on guard (Ctrl+G on a friendly unit) follows it and takes the wrecks anywhere in
   the guard ring, not only those in reach, then picks up the guard again (`area_work.rs`).
 - Reclaiming takes no energy, not even a tower's: no reclaimer draws upkeep for it, and an
-  energy stall never stops or slows it (checked on load). Only a full mass store holds reclaim back, and never on a side
+  energy stall never stops or slows it (checked on load). Only a full materials store holds reclaim back, and never on a side
   that builds for free (the test range).
 
-  | Unit | Tier | Mass | Power | Reach | Payback (beam) |
+  | Unit | Tier | Materials | Power | Reach | Payback (beam) |
   | --- | --- | --- | --- | --- | --- |
   | Scavenger (tower, upgrades in place) | 1 | 120 | 6 | 640 | 20 s |
   | Scavenger II | 2 | 420 | 40 | 1,100 | 11 s |
@@ -358,8 +358,8 @@ replacing the mines.
   | Gleaner III | 3 | 840 | 70 | 1,100 | 12 s |
   | Breaker, the Regency Reclaimer (I / II / III) | 1-3 | 60 / 240 / 840 | 6 / 24 / 84 | 450 / 650 / 900 | 10 s |
   | Commander drone port (2 drones) | 2 | 450 | 10 | 1,400 | 45 s |
-- Materials Vault tiers hold 1,500 / 6,000 / 24,000 for 150 / 400 / 1,000 mass: storage gets cheaper per
-  unit the higher the tier, so it never taxes a big economy. The Capacitor Bank costs 120 mass.
+- Materials Vault tiers hold 1,500 / 6,000 / 24,000 for 150 / 400 / 1,000 materials: storage gets cheaper per
+  unit the higher the tier, so it never taxes a big economy. The Capacitor Bank costs 120 materials.
 - Economy structures (mines, vaults, Scavengers, Crucibles) upgrade only as far as the side's tech.
 - The HUD shows reclaim in the materials income and its share ("40% reclaim").
 
@@ -371,7 +371,7 @@ no separate space layer, and any anti-air weapon can hit them.
 - Every spaceship sits a tier above the land and air units of its cost band, and pays 1.75x what
   it did as a tier lower (2026-10-02); only the Dominion kept its tier and price:
 
-  | Ship | Tier | Mass | Energy | Build time |
+  | Ship | Tier | Materials | Energy | Build time |
   | --- | --- | --- | --- | --- |
   | Courier (light transport) | 2 | 280 | 4,200 | 1,400 |
   | Coffer (Regency light transport) | 2 | 280 | 4,200 | 1,400 |
@@ -389,10 +389,10 @@ no separate space layer, and any anti-air weapon can hit them.
   - anti-space guns;
   - other warships;
   - fighters, against most hulls, when the ship has no anti-air cover.
-- A ground anti-space gun outranges the warship it answers and beats it for less mass:
-  - one Zenith (T4, 11,200 mass, 3,200 m) reliably kills one Dominion (16,000 mass, 2,500 m) at
-    about 70% of its mass;
-  - the Narwhal (T3, 3,800 mass, 3,000 m) does the same to a Resolute (T4, 8,750 mass) at
-    under half its mass, but on its own it loses to a Dominion.
+- A ground anti-space gun outranges the warship it answers and beats it for fewer materials:
+  - one Zenith (T4, 11,200 materials, 3,200 m) reliably kills one Dominion (16,000 materials, 2,500 m) at
+    about 70% of its materials;
+  - the Narwhal (T3, 3,800 materials, 3,000 m) does the same to a Resolute (T4, 8,750 materials) at
+    under half its materials, but on its own it loses to a Dominion.
 - `tests/dreadnought.rs` and `tests/narwhal.rs` fight each of these duels three ways: parked
   close, parked at the ship's own reach, and with the ship ordered in from out of range.

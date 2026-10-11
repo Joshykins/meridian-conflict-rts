@@ -5,7 +5,7 @@
 //! Like the rest of the HUD it only reports what was asked for.
 
 use super::economy_panel::{mines_short, shown_spend};
-use super::{has_flag, Hud, HudAction, Scene, EDGE, ENERGY, GAP, MASS};
+use super::{has_flag, Hud, HudAction, Scene, EDGE, ENERGY, GAP, MATERIALS};
 use crate::audio::Sfx;
 use crate::game::Mode;
 use crate::range::{self as rng, Range, RangeAction, Scenario, Side, BLUE, RED};
@@ -531,21 +531,21 @@ fn economy_page(
     ui.text_right(x + w, y + 12.0, type_scale::MICRO, rgb(tone, 1.0), &what);
     y += 26.0;
 
-    for (n, (name, tone)) in [("Materials", MASS), ("Energy", ENERGY)]
+    for (n, (name, tone)) in [("Materials", MATERIALS), ("Energy", ENERGY)]
         .into_iter()
         .enumerate()
     {
         let (have, cap, income, spend, reclaim) = status.map_or((0.0, 0.0, 0.0, 0.0, 0.0), |p| {
             if n == 0 {
                 (
-                    p.mass,
-                    p.mass_capacity,
-                    p.mass_income + p.reclaim_income,
+                    p.materials,
+                    p.materials_capacity,
+                    p.materials_income + p.reclaim_income,
                     shown_spend(
-                        p.mass,
-                        p.mass_income + p.reclaim_income,
-                        p.mass_demand,
-                        p.mass_spent,
+                        p.materials,
+                        p.materials_income + p.reclaim_income,
+                        p.materials_demand,
+                        p.materials_spent,
                         free,
                     ),
                     p.reclaim_income,
@@ -573,7 +573,7 @@ fn economy_page(
                 end + 8.0,
                 y + 6.0,
                 type_scale::MICRO,
-                rgb(MASS, 0.9),
+                rgb(MATERIALS, 0.9),
                 &format!("reclaim +{reclaim:.1}"),
             );
         }
@@ -614,7 +614,7 @@ fn economy_page(
             ) {
                 asked.push(RangeAction::Stock {
                     player: side,
-                    mass: (n == 0).then_some(permille),
+                    materials: (n == 0).then_some(permille),
                     energy: (n == 1).then_some(permille),
                 });
             }
@@ -687,7 +687,7 @@ fn economy_page(
             });
             asked.push(RangeAction::Stock {
                 player: side,
-                mass: (n == 0).then_some(0),
+                materials: (n == 0).then_some(0),
                 energy: (n == 1).then_some(0),
             });
         }
@@ -718,7 +718,7 @@ fn economy_page(
         });
         asked.push(RangeAction::Stock {
             player: side,
-            mass: Some(1000),
+            materials: Some(1000),
             energy: Some(1000),
         });
     }
@@ -733,7 +733,7 @@ fn economy_page(
         "Wreck Field",
         false,
         true,
-        MASS,
+        MATERIALS,
     ) {
         asked.push(RangeAction::Wrecks);
     }

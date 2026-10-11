@@ -139,7 +139,7 @@ fn spire(b: &mut MeshBuilder) {
     faces(b, &[0, 1, 2, 3], |b| {
         panel(b, z0, z1);
         let (z0, z1) = (FOOT - 0.2, CAP + 0.2);
-        b.paint(ACCENT).pattern(pattern::MASS_FLOW);
+        b.paint(ACCENT).pattern(pattern::MATERIALS_FLOW);
         b.beam(
             v3(spire_half(z0) + 0.05, 0.0, z0),
             v3(spire_half(z1) + 0.05, 0.0, z1),

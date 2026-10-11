@@ -265,7 +265,7 @@ fn tank(b: &mut MeshBuilder, at: Vec2) {
             );
         });
         let p = (to_tower * (TANK_R + 0.02)).extend(0.0);
-        b.paint(ACCENT).pattern(pattern::MASS_FLOW);
+        b.paint(ACCENT).pattern(pattern::MATERIALS_FLOW);
         b.beam(
             p + Vec3::Z * 1.8,
             p + Vec3::Z * (top - 1.8),

@@ -2539,7 +2539,7 @@ fn vs_main(in: VsIn) -> VsOut {
         out.drive_at = vec4<f32>(0.0, 0.0, 0.0, CHARGE_GEAR_SLOT_TAG);
     }
     // A fabricator's matter and lamps know its work, its stroke and whether it is paused.
-    if (coil_pat == FAB_PATTERN_MATTER || coil_pat == FAB_PATTERN_LAMP) && in.material == MASS_GLOW_MATERIAL {
+    if (coil_pat == FAB_PATTERN_MATTER || coil_pat == FAB_PATTERN_LAMP) && in.material == MATERIALS_GLOW_MATERIAL {
         let beat = fab_beat(e, time, t);
         out.drive = vec4<f32>(beat.w, beat.z, select(0.0, 1.0, (e.status[0] & UNIT_PAUSED) != 0u), 0.0);
         out.drive_at = vec4<f32>(0.0, 0.0, 0.0, FAB_DRIVE_TAG);
@@ -3066,9 +3066,9 @@ fn material_of(id: u32, owner: u32, skin: u32) -> Pbr {
         m.emissive = vec3<f32>(1.0, 0.94, 0.98) * 5.0;
         m.roughness = 0.2;
     }
-    if id == MASS_GLOW_MATERIAL {
+    if id == MATERIALS_GLOW_MATERIAL {
         // A reclaim emitter: Materials red-orange (`fs_main` banks it while idle).
-        let materials = vec3<f32>(MASS_R, MASS_G, MASS_B);
+        let materials = vec3<f32>(MATERIALS_R, MATERIALS_G, MATERIALS_B);
         m.albedo = materials * 0.3;
         m.emissive = materials * 4.5;
         m.roughness = 0.3;
@@ -3635,7 +3635,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         m.emissive *= 0.14;
         m.albedo *= 0.6;
     }
-    if in.material == MASS_GLOW_MATERIAL {
+    if in.material == MATERIALS_GLOW_MATERIAL {
         // Reclaim emitters burn steady while the unit pulls material in; otherwise, and
         // unpowered, they sit banked low.
         let live = (flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) == 0u;
@@ -3680,7 +3680,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         let gutter = select(1.0, 0.25 + 0.75 * step(0.25, hash11(floor(time * 6.0) + in.state.w * 50.0)), hurt > 0.5);
         m.emissive *= (1.0 - 0.6 * smoothstep(0.4, 1.0, hurt)) * gutter;
     }
-    if in.material == MASS_GLOW_MATERIAL && in.drive_at.w == FAB_DRIVE_TAG
+    if in.material == MATERIALS_GLOW_MATERIAL && in.drive_at.w == FAB_DRIVE_TAG
         && (flags & (KIND_WRECK | KIND_GHOST)) == 0u {
         // A fabricator's matter and status lamps (`gpu_consts::fab`, `fab_beat`).
         let work = in.drive.x;
@@ -3690,12 +3690,12 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         let sputter = select(1.0, 0.3 + 0.7 * step(0.2 + 0.5 * (1.0 - work), hash11(floor(time * 13.0) + seed)), short);
         let held_pat = (in.model_class >> 16u) & 0xFFu;
         if held_pat == FAB_PATTERN_MATTER {
-            let mass = vec3<f32>(MASS_R, MASS_G, MASS_B);
+            let materials = vec3<f32>(MATERIALS_R, MATERIALS_G, MATERIALS_B);
             // Kept low enough to stay the Materials red-orange, not burn out to yellow.
             let glow = (0.3 + 0.6 * work + 2.6 * in.drive.y) * sputter * step(0.001, work);
-            m.emissive = mass * glow;
+            m.emissive = materials * glow;
             // Dark glass when it rests.
-            m.albedo = mass * 0.03 + vec3<f32>(0.02);
+            m.albedo = materials * 0.03 + vec3<f32>(0.02);
         } else {
             var lamp = vec3<f32>(0.0);
             if (flags & FLAG_UNDER_CONSTRUCTION) != 0u {
@@ -3904,7 +3904,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         }
     }
     if (flags & (KIND_PROP | KIND_GHOST)) == 0u && in.material != MAT_GLOW && in.material != MAT_GLOW_ORANGE && in.material != MAT_GLOW_AMBER && in.material != MAT_GLOW_RED && in.material != MAT_GLOW_VIOLET && in.material != MAT_GLOW_LASER && in.material != MAT_GLOW_PRECURSOR
-        && in.material != MAT_GLOW_NAV_RED && in.material != MAT_GLOW_NAV_GREEN && in.material != MAT_GLOW_LAMP && in.material != MAT_GLOW_SHIELD && in.material != MAT_PRECURSOR_INLAY && in.material != MAT_VISOR && in.material != MASS_GLOW_MATERIAL && in.material != PRISM_GLOW_MATERIAL {
+        && in.material != MAT_GLOW_NAV_RED && in.material != MAT_GLOW_NAV_GREEN && in.material != MAT_GLOW_LAMP && in.material != MAT_GLOW_SHIELD && in.material != MAT_PRECURSOR_INLAY && in.material != MAT_VISOR && in.material != MATERIALS_GLOW_MATERIAL && in.material != PRISM_GLOW_MATERIAL {
         // Field dirt (`surf_dirt`): mud and spatter thrown up over the running gear and
         // lower hull, runs down the steep faces, dust on the decks, grime in the seams.
         // Plain tech 1 kit is the dirtiest; the higher tiers stay closer to parade white.
@@ -3995,7 +3995,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         m.emissive = vec3<f32>(0.0);
     }
     if wreck {
-        // Burnt out (wreck.wgsl); worn away raggedly from the top as blasts take its mass, and a
+        // Burnt out (wreck.wgsl); worn away raggedly from the top as blasts take its materials, and a
         // section of a broken hull only its own stretch.
         // A hull that went down in the sea burns out over its first seconds on the bottom,
         // on from the paint it sank in.

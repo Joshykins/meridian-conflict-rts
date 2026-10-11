@@ -67,7 +67,7 @@ impl Reach {
             Reach::Torpedo => 0x39E05A,
             Reach::Radar => 0x4F7DFF,
             Reach::Build => 0xE6F2F0,
-            Reach::Reclaim => crate::hud::MASS,
+            Reach::Reclaim => crate::hud::MATERIALS,
             Reach::Shield => 0x7AD4FF,
             Reach::AntiMissile => 0xFF7A1A,
             Reach::Sonar => 0x1D7A3A,

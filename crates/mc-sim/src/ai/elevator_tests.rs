@@ -83,10 +83,13 @@ fn an_ai_elevator_comes_down_with_a_full_payload_of_combat_units() {
         .filter(|o| o.kind == OrderKind::Produce)
         .map(|o| o.blueprint)
         .collect();
-    let mass: Fx = queued.iter().map(|b| w.blueprints.unit(*b).cost_mass).sum();
+    let materials: Fx = queued
+        .iter()
+        .map(|b| w.blueprints.unit(*b).cost_materials)
+        .sum();
     assert!(
-        mass <= e.payload && mass * 10 >= e.payload * 9,
-        "queued {mass} of {} in {} units",
+        materials <= e.payload && materials * 10 >= e.payload * 9,
+        "queued {materials} of {} in {} units",
         e.payload,
         queued.len()
     );

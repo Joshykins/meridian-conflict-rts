@@ -157,7 +157,7 @@ impl Pointer {
                 // through the Materials red-orange to white as they chase each other round,
                 // like what goes up the beam.
                 let (r, t) = (11.5, 2.0);
-                for (i, heat) in [0xE0301A, crate::hud::MASS, 0xFFE6D8]
+                for (i, heat) in [0xE0301A, crate::hud::MATERIALS, 0xFFE6D8]
                     .into_iter()
                     .enumerate()
                 {

@@ -14,7 +14,7 @@
         tech: 4,
         categories: ["Land", "DirectFire", "Experimental"],
         health: 60000,
-        cost: (mass: 3400, energy: 34000, time: 20000),
+        cost: (materials: 3400, energy: 34000, time: 20000),
         radius: 31.35, height: 24.75,
         footprint: (6, 6),
         vision: 1200,
@@ -80,7 +80,7 @@
         tech: 4,
         categories: ["Land", "DirectFire", "Experimental"],
         health: 72000,
-        cost: (mass: 3800, energy: 38000, time: 22000),
+        cost: (materials: 3800, energy: 38000, time: 22000),
         radius: 30, height: 67.5,
         footprint: (8, 8),
         vision: 1250,
@@ -154,7 +154,7 @@
         tech: 4,
         categories: ["Air", "Experimental"],
         health: 52000,
-        cost: (mass: 4000, energy: 48000, time: 24000),
+        cost: (materials: 4000, energy: 48000, time: 24000),
         radius: 110, height: 24,
         footprint: (8, 19),
         vision: 1300,
@@ -243,7 +243,7 @@
         // Air is its counter: its guns outrange anything on the ground and its feet crush
         // what gets under them, but it has no anti-air at all; it wants escorts.
         health: 1300000,
-        cost: (mass: 120000, energy: 1200000, time: 400000),
+        cost: (materials: 120000, energy: 1200000, time: 400000),
         radius: 160, height: 480,
         footprint: (32, 32),
         vision: 2400, radar: 4200,
@@ -329,19 +329,19 @@
         // the well and they close on it. From then on three cargo crates fall down the
         // cable every `period`, sirens sounding as they come, land in the ways out between
         // the towers and open; what was queued on the elevator drives out of them as
-        // groups, free, up to the `payload` of mass and the crates' seats, and the empty
+        // groups, free, up to the `payload` of materials and the crates' seats, and the empty
         // crates sink into the ground. Whatever of the payload the queue leaves is brought
-        // down as plain mass for the store.
+        // down as plain materials for the store.
         key: "aster_t5_space_elevator",
         name: "Skyhook",
         role: "Space Elevator", title: "Space Elevator",
         tech: 5,
         categories: ["Land", "Factory", "Experimental"],
         health: 1500000,
-        cost: (mass: 160000, energy: 1600000, time: 500000),
+        cost: (materials: 160000, energy: 1600000, time: 500000),
         radius: 150, height: 300, footprint: (26, 26), hull: (22, 22),
         vision: 600,
-        // 20 000 mass every 30 s: about 670 mass a second once it is running, so it
+        // 20 000 materials every 30 s: about 670 materials a second once it is running, so it
         // pays for itself in four minutes if nothing touches it.
         elevator: (period: 30, payload: 20000, tether: 24, descent: 7, dock: 18, sink: 4),
         // What it brings down: everything ARC's land and air factories make, and the
@@ -368,7 +368,7 @@
         categories: ["Structure"],
         footprint: (1, 1),
         health: 1,
-        cost: (mass: 0, energy: 0, time: 1),
+        cost: (materials: 0, energy: 0, time: 1),
         radius: 7.5, height: 6,
         vision: 0,
         mesh: "titan_sabot", icon: Bot,

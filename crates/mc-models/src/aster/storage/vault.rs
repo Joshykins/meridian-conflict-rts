@@ -1,4 +1,4 @@
-//! The Materials Vault (mesh `storage_mass`): four vats round a manifold, built up in
+//! The Materials Vault (mesh `storage_materials`): four vats round a manifold, built up in
 //! place tier on tier.
 
 use std::f32::consts::FRAC_PI_4;
@@ -18,9 +18,9 @@ use crate::material::*;
 ///   gantries out to the vats and loaders on the four sides.
 /// - Tech 3 (19 m): an armoured strongroom silo over the tower, corner pylons
 ///   feeding it, and banded armour round the vats.
-pub(in crate::aster) fn storage_mass(b: &mut MeshBuilder, tech: u8) {
+pub(in crate::aster) fn storage_materials(b: &mut MeshBuilder, tech: u8) {
     if b.coarse() {
-        storage_mass_coarse(b, tech);
+        storage_materials_coarse(b, tech);
         return;
     }
     // Slab: dark foot, white deck.
@@ -290,7 +290,7 @@ const VAULT_VAT_OUT: f32 = 9.4;
 const VAULT_VAT_R: f32 = 4.4;
 
 /// A block per tier: the slab and vats, the tower, the strongroom.
-fn storage_mass_coarse(b: &mut MeshBuilder, tech: u8) {
+fn storage_materials_coarse(b: &mut MeshBuilder, tech: u8) {
     b.paint(PLATING);
     b.cuboid_open(
         v3(0.0, 0.0, VAULT_DECK * 0.5),

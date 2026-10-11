@@ -158,7 +158,7 @@ fn domains() {
             let (mut mines, mut mine_sites) = (0, 0);
             let mut factories = [0; 5];
             let mut army = [[0u32; 3]; 5];
-            let mut army_mass = [0f32; 5];
+            let mut army_materials = [0f32; 5];
             let mut lifts = 0;
             for r in s
                 .units
@@ -204,7 +204,7 @@ fn domains() {
                         0
                     };
                     army[d][band] += 1;
-                    army_mass[d] += bp.cost_mass.to_f32();
+                    army_materials[d] += bp.cost_materials.to_f32();
                 }
             }
             let armies: Vec<String> = (0..5)
@@ -216,15 +216,15 @@ fn domains() {
                         army[d][0],
                         army[d][1],
                         army[d][2],
-                        army_mass[d] / 1000.0,
+                        army_materials[d] / 1000.0,
                         parked[p][d]
                     )
                 })
                 .collect();
             println!(
-                "  P{p} t{} mines {mines} (+{mine_sites}) mass {:>5.1}/s tech {} | factories L/H/N/A {:?} | army home/out/enemy half: {} | lift ships {lifts} jumps {} | kills {} lost {} | {}",
+                "  P{p} t{} mines {mines} (+{mine_sites}) materials {:>5.1}/s tech {} | factories L/H/N/A {:?} | army home/out/enemy half: {} | lift ships {lifts} jumps {} | kills {} lost {} | {}",
                 (starts[p].x > mid) as u8,
-                pl.mass_income.to_f32(),
+                pl.materials_income.to_f32(),
                 w.side_tech(p as u8),
                 &factories[..4],
                 armies.join(", "),

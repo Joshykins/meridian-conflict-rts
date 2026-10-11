@@ -106,7 +106,7 @@ fn a_blast_wears_down_the_wrecks_it_reaches_and_blows_the_nearest_apart() {
     let far = wreck(&mut w, 800, 1100);
     let handle = |w: &World, r: usize| w.state.wrecks.slots.handle(r);
     let (near_id, edge_id, far_id) = (handle(&w, near), handle(&w, edge), handle(&w, far));
-    let full = w.state.wrecks.mass[edge];
+    let full = w.state.wrecks.materials[edge];
     // Past the moment a fresh wreck is spared.
     for _ in 0..TICKS_PER_SECOND {
         w.tick(&[]).unwrap();
@@ -122,12 +122,15 @@ fn a_blast_wears_down_the_wrecks_it_reaches_and_blows_the_nearest_apart() {
         .slots
         .resolve(edge_id)
         .expect("the wreck at the edge is still there");
-    assert!(wr.mass[edge] < full, "the wreck at the edge lost mass");
+    assert!(
+        wr.materials[edge] < full,
+        "the wreck at the edge lost materials"
+    );
     let far = wr
         .slots
         .resolve(far_id)
         .expect("the far wreck is untouched");
-    assert_eq!(wr.mass[far], full);
+    assert_eq!(wr.materials[far], full);
 }
 
 /// The wreck a unit leaves takes no blast damage for about a second, so the splash of
@@ -140,7 +143,7 @@ fn a_fresh_wreck_is_spared_blasts_for_a_second() {
     let wr = &w.state.wrecks;
     let row = wr.slots.iter().next().expect("the tank left a wreck");
     let id = wr.slots.handle(row);
-    let full = wr.mass[row];
+    let full = wr.materials[row];
     // A reactor going up beside it at once: close enough to blow an old wreck apart.
     let reactor = spawn(&mut w, "aster_t3_power", 800, 800);
     destroy(&mut w, reactor);
@@ -149,7 +152,7 @@ fn a_fresh_wreck_is_spared_blasts_for_a_second() {
         .slots
         .resolve(id)
         .expect("the fresh wreck was blown away");
-    assert_eq!(wr.mass[row], full, "the fresh wreck lost mass");
+    assert_eq!(wr.materials[row], full, "the fresh wreck lost materials");
 
     // A second on, the next blast wears it as any other.
     for _ in 0..TICKS_PER_SECOND {
@@ -159,7 +162,7 @@ fn a_fresh_wreck_is_spared_blasts_for_a_second() {
     destroy(&mut w, reactor);
     let wr = &w.state.wrecks;
     assert!(
-        wr.slots.resolve(id).is_none_or(|r| wr.mass[r] < full),
+        wr.slots.resolve(id).is_none_or(|r| wr.materials[r] < full),
         "a blast a second later left it whole"
     );
 }

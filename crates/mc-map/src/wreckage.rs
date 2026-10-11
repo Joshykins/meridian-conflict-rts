@@ -9,14 +9,14 @@
 //!
 //! What goes where:
 //! - a couple of small scrap piles a few hundred metres out from each start,
-//!   early mass for the first engineers;
+//!   early materials for the first engineers;
 //! - skirmish, clash and heavy fields in open ground away from the starts, the
 //!   heavier ones where the players' ground meets (a heavy field can hold a T3
 //!   hulk);
 //! - ship hulks lying on the seabed, listing, where the map has deep enough water.
 //!
 //! Wrecks are named by blueprint key; the tiers are budgeted by rough weight
-//! (T1 1, T2 4, T3 16) since the map does not know unit costs. The mass each
+//! (T1 1, T2 4, T3 16) since the map does not know unit costs. The materials each
 //! holds comes from the blueprints when the match starts, less weathering.
 
 use crate::format::{MapError, MapWreck, MapWriter, Prop};
@@ -549,7 +549,7 @@ impl<'a> Planner<'a> {
         let copies = self.images.len() as f64;
         let area_km2 = self.size.0 * self.size.1 / 1.0e6;
         // Weight per player grows with the ground each player has, within bounds.
-        // About 4000 to 10000 mass a player (`zz_map_salvage_report`).
+        // About 4000 to 10000 materials a player (`zz_map_salvage_report`).
         let per_player = (area_km2 / players * 2.0).clamp(70.0, 170.0);
         let mut budget = per_player * players / copies;
         let mut laid_weight = 0.0;
@@ -752,7 +752,7 @@ impl<'a> Planner<'a> {
         radius: f64,
         kinds: &[Kind],
         hash: u64,
-        mass: (u16, u16),
+        materials: (u16, u16),
         out: &mut Vec<(MapWreck, f64)>,
     ) -> f64 {
         let front = unit(hash, 20) * TAU;
@@ -793,7 +793,7 @@ impl<'a> Planner<'a> {
                 } else {
                     0
                 };
-                let milli = mass.0 + ((mass.1 - mass.0) as f64 * unit(h, 40)) as u16;
+                let milli = materials.0 + ((materials.1 - materials.0) as f64 * unit(h, 40)) as u16;
                 for &image in &self.images {
                     let at = self.image(image, p);
                     // A mirrored copy lists the other way.
@@ -808,7 +808,7 @@ impl<'a> Planner<'a> {
                             pos: fx2(at),
                             heading: angle(image.angle(heading)),
                             bank,
-                            mass_milli: milli,
+                            materials_milli: milli,
                         },
                         k.radius,
                     ));

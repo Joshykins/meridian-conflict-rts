@@ -72,7 +72,7 @@ impl Terrain {
                     pos: mc_core::FxVec2::new(fx(p.0), fx(p.1)),
                     heading: mc_core::Angle((h >> 40) as u16),
                     bank: ((unit(h, 44) - 0.5) * 1_200.0) as i16,
-                    mass_milli: 550 + (unit(h, 52) * 400.0) as u16,
+                    materials_milli: 550 + (unit(h, 52) * 400.0) as u16,
                 });
             }
         }

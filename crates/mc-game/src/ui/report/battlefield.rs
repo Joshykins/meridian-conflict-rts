@@ -345,8 +345,8 @@ fn salvage(
     let mut worked = vec![0.0f32; GRID * GRID];
     for f in a.frames.iter().take_while(|f| f.tick as f32 <= t) {
         for sf in &f.sides {
-            for &(cell, mass) in &sf.salvage {
-                worked[cell as usize] += mass;
+            for &(cell, materials) in &sf.salvage {
+                worked[cell as usize] += materials;
             }
         }
     }
@@ -364,9 +364,9 @@ fn salvage(
         let age = ((t - f.tick as f32) / (GLINT * tps)).clamp(0.0, 1.0);
         for (side, sf) in f.sides.iter().enumerate() {
             let c = colors.get(side).copied().unwrap_or([1.0; 4]);
-            for &(cell, mass) in &sf.salvage {
+            for &(cell, materials) in &sf.salvage {
                 let p = at(cell_centre(a.size, cell));
-                let rad = (3.0 + mass.sqrt() * 0.5).min(11.0) * scale;
+                let rad = (3.0 + materials.sqrt() * 0.5).min(11.0) * scale;
                 let fade = 1.0 - age;
                 ui.dot(p, rad * 2.2, [c[0], c[1], c[2], 0.12 * fade]);
                 ui.dot(p, rad * 0.8, rgb(super::tones::SALVAGE, 0.9 * fade));

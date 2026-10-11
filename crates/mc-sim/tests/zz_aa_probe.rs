@@ -2,7 +2,7 @@
 //! shooter (its non-air weapons told to target nothing) a passive flight of four
 //! circles it at 60% of its longest air reach, too tough to die, for 20 s after 6 s to
 //! settle. Prints damage landed per second, the share of the paper figure it reached,
-//! and the mass of aircraft killed per second per 1000 mass of shooter.
+//! and the materials' worth of aircraft killed per second per 1000 materials of shooter.
 //!
 //! `cargo test --profile gate -p mc-sim --test sim -- zz_aa_probe:: --ignored --nocapture`
 //! Knob: AA_PROBE_ONLY=<shooter key> runs one shooter.
@@ -103,7 +103,7 @@ fn world(sea: bool) -> World {
     .unwrap()
 }
 
-/// Damage per second on paper, and the mass killed per second per 1000 shooter mass.
+/// Damage per second on paper, and the materials killed per second per 1000 shooter materials.
 fn run(shooter: &str, target: &str) -> (f32, f32, f32) {
     let probe = world(false);
     let sid = probe.blueprints.id_of(shooter).unwrap();
@@ -124,14 +124,14 @@ fn run(shooter: &str, target: &str) -> (f32, f32, f32) {
         .iter()
         .map(|w| w.damage.to_f32() * w.salvo.max(1) as f32 / (w.reload_ticks.max(1) as f32 * 0.1))
         .sum();
-    let smass = sbp.cost_mass.to_f32();
+    let smass = sbp.cost_materials.to_f32();
     let mut w = world(sea);
     let centre = FxVec2::from_ints(4000, 4000);
     let row = w.spawn_unit(sid, 0, centre, Angle::ZERO, true).unwrap();
     let sid_handle = w.state.units.id(row);
     let tid = w.blueprints.id_of(target).unwrap();
     let tbp = w.blueprints.unit(tid);
-    let (thp, tmass) = (tbp.health.to_f32(), tbp.cost_mass.to_f32());
+    let (thp, tmass) = (tbp.health.to_f32(), tbp.cost_materials.to_f32());
     let motion = tbp.motion.unwrap();
     let orbit = (reach * 0.6) as i32;
     let mut ids = Vec::new();
@@ -205,7 +205,7 @@ fn zz_aa_probe() {
         for &t in TARGETS {
             let (dps, share, trade) = run(s, t);
             println!(
-                "  vs {t:<28} {dps:>7.0}/s  {share:>4.0}% of paper  {trade:>6.2} mass/s per 1k"
+                "  vs {t:<28} {dps:>7.0}/s  {share:>4.0}% of paper  {trade:>6.2} materials/s per 1k"
             );
         }
     }

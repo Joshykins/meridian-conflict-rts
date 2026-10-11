@@ -8,7 +8,7 @@
 // is anchored on and where it is bent the Regency way.
 [
     // Air superiority fighter: a long blade of a jet round one Pinch-fusion Rifle laid
-    // down its keel, the muzzle under the nose blade. Anchored on the Raptor (620 mass,
+    // down its keel, the muzzle under the nose blade. Anchored on the Raptor (620 materials,
     // 3200 HP, 660 DPS against air at 350 m); the same DPS as one harder, slower shot
     // (660 every second, not 330 every half).
     (
@@ -18,7 +18,7 @@
         tech: 3,
         categories: ["Air", "AntiAir"],
         health: 3200,
-        cost: (mass: 620, energy: 23500, time: 3800),
+        cost: (materials: 620, energy: 23500, time: 3800),
         radius: 9.8, height: 3.0,
         vision: 1000,
         motion: (layer: Air, size: 0, speed: 255, accel: 114, turn: 100, altitude: 300, hover: false),
@@ -42,7 +42,7 @@
     ),
     // Strategic bomber: one Pinch-fusion Bomb, a small caged star hung in a cradle under its
     // belly, let go over its mark, where it flashes like a star on the ground. Anchored on
-    // the Eclipse (1150 mass, 6000 HP, 5000 damage in 65 m every 10 s); bent the Regency
+    // the Eclipse (1150 materials, 6000 HP, 5000 damage in 65 m every 10 s); bent the Regency
     // way: harder (5600) in a tighter blast (55 m).
     (
         key: "regency_t3_strategic_bomber",
@@ -51,7 +51,7 @@
         tech: 3,
         categories: ["Air"],
         health: 6000,
-        cost: (mass: 1150, energy: 45000, time: 7200),
+        cost: (materials: 1150, energy: 45000, time: 7200),
         radius: 16, height: 3.6,
         vision: 1000,
         motion: (layer: Air, size: 0, speed: 210, accel: 95, turn: 62, altitude: 300, hover: false),
@@ -79,7 +79,7 @@
         tech: 3,
         categories: ["Air", "Scout", "Intel"],
         health: 2000,
-        cost: (mass: 700, energy: 24000, time: 4000),
+        cost: (materials: 700, energy: 24000, time: 4000),
         radius: 12, height: 2.8,
         vision: 2400,
         // Above the weather (`above_weather`): a gun reaches it only along the line of sight,

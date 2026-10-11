@@ -252,7 +252,7 @@ pub enum RangeAction {
     /// Set a side's stores to thousandths of what they hold; `None` leaves one as it is.
     Stock {
         player: u8,
-        mass: Option<u16>,
+        materials: Option<u16>,
         energy: Option<u16>,
     },
     /// Step a side's income share (`resource` 0 materials, 1 energy) through `INCOME_STEPS`.
@@ -562,10 +562,10 @@ impl Range {
 
     /// What `player`'s income share is set to, as a command.
     pub fn income_command(&self, player: u8) -> Command {
-        let [mass, energy] = self.income[player.min(1) as usize];
+        let [materials, energy] = self.income[player.min(1) as usize];
         Command::DebugIncome {
             player,
-            mass: INCOME_STEPS[mass],
+            materials: INCOME_STEPS[materials],
             energy: INCOME_STEPS[energy],
         }
     }
@@ -574,7 +574,7 @@ impl Range {
     pub fn wrecks(&self, blueprints: &Blueprints) -> Option<Command> {
         let leaves = |id: BlueprintId| {
             let bp = blueprints.unit(id);
-            bp.cost_mass * bp.wreck_fraction > Fx::ZERO
+            bp.cost_materials * bp.wreck_fraction > Fx::ZERO
         };
         let blueprint = Some(self.subject)
             .filter(|&id| leaves(id))
@@ -751,7 +751,7 @@ fn storage_command(player: u8, step: usize) -> Command {
     let k = STORAGE_STEPS[step.min(STORAGE_STEPS.len() - 1)];
     Command::DebugStorage {
         player,
-        mass: BASE_STORAGE[0] * k,
+        materials: BASE_STORAGE[0] * k,
         energy: BASE_STORAGE[1] * k,
     }
 }
@@ -1187,12 +1187,12 @@ fn stage(
                     },
                     Command::DebugStorage {
                         player: BLUE,
-                        mass: BASE_STORAGE[0],
+                        materials: BASE_STORAGE[0],
                         energy: 0,
                     },
                     Command::DebugIncome {
                         player: BLUE,
-                        mass: 1000,
+                        materials: 1000,
                         energy: share.clamp(1, u16::MAX as i32) as u16,
                     },
                     Command::DebugSpawn {
@@ -1252,12 +1252,12 @@ fn stage(
             let mut spawns = vec![
                 Command::DebugStorage {
                     player: BLUE,
-                    mass: 0,
+                    materials: 0,
                     energy: (drive.charge(Fx::from_int(1800)) * 2).ceil_int().max(0) as u32,
                 },
                 Command::DebugStock {
                     player: BLUE,
-                    mass: None,
+                    materials: None,
                     energy: Some(1000),
                 },
             ];
@@ -1307,7 +1307,7 @@ fn stage(
                     },
                 )
             });
-            let worth = |w: &UnitBlueprint| w.cost_mass * w.wreck_fraction;
+            let worth = |w: &UnitBlueprint| w.cost_materials * w.wreck_fraction;
             let heaviest = || {
                 blueprints
                     .units

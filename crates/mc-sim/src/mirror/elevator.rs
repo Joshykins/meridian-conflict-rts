@@ -36,30 +36,30 @@ pub struct ElevatorView {
     /// How far through the crates' cycle (descent, dock, sink, away), zero to one;
     /// how far the cable is down while it is tethering.
     pub cycle: f32,
-    /// Seconds from one fall to the next, and the mass each brings down.
+    /// Seconds from one fall to the next, and the materials each brings down.
     pub period: f32,
     pub payload: f32,
     /// Seconds of the crates' descent, their stay landed and their sink.
     pub trip: [f32; 3],
     /// The front of the queue that rides the next crates (`crate_load`): how many
-    /// units, and their mass. The rest of the payload comes down as materials.
+    /// units, and their materials. The rest of the payload comes down as materials.
     pub riding: u16,
-    pub riding_mass: f32,
+    pub riding_materials: f32,
 }
 
-/// What of a queue rides one fall of crates of `payload` mass, the elevator's own rule
+/// What of a queue rides one fall of crates of `payload` materials, the elevator's own rule
 /// (`elevator::seat_units`): units in queue order while the next still fits in what is
 /// left and some crate has a seat for it, stopping at the first that does not. `queue` is
-/// the radius and mass of each unit at the front of the queue, in order. Returns how many
-/// ride and their mass.
+/// the radius and materials of each unit at the front of the queue, in order. Returns how many
+/// ride and their materials.
 pub fn crate_load(queue: impl IntoIterator<Item = (Fx, Fx)>, payload: Fx) -> (u16, Fx) {
     let queue: Vec<(Fx, Fx)> = queue.into_iter().collect();
     let seats = crate::elevator::seat_units(queue.iter().copied(), payload);
-    let mass = queue
+    let materials = queue
         .iter()
         .take(seats.len())
         .fold(Fx::ZERO, |m, &(_, cost)| m + cost);
-    (u16::try_from(seats.len()).unwrap_or(u16::MAX), mass)
+    (u16::try_from(seats.len()).unwrap_or(u16::MAX), materials)
 }
 
 impl World {
@@ -121,9 +121,9 @@ impl World {
             .take_while(|o| o.kind == OrderKind::Produce && !self.work_paused(row))
             .map(|o| {
                 let bp = self.blueprints.unit(o.blueprint);
-                (bp.radius, bp.cost_mass)
+                (bp.radius, bp.cost_materials)
             });
-        let (riding, riding_mass) = crate_load(costs, e.payload);
+        let (riding, riding_materials) = crate_load(costs, e.payload);
         Some(ElevatorView {
             phase,
             left,
@@ -139,7 +139,7 @@ impl World {
                 secs(e.sink_ticks),
             ],
             riding,
-            riding_mass: riding_mass.to_f32(),
+            riding_materials: riding_materials.to_f32(),
         })
     }
 }
@@ -179,7 +179,7 @@ mod tests {
         assert_eq!(load(&[(8, 25_000), (8, 100)], 20_000), (0, 0));
     }
 
-    /// The crates' seats run out before the payload does: scouts at 100 mass.
+    /// The crates' seats run out before the payload does: scouts at 100 materials.
     #[test]
     fn the_crates_hold_only_so_many_units() {
         let scouts = vec![(4, 100); 400];

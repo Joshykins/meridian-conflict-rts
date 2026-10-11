@@ -63,7 +63,7 @@ Target: 60 fps on a mid-range PC. 8-player matches.
 
 **Game**
 
-- Commander, mass and energy flow economy, engineers, factories, tech tiers, reclaimable wreckage, fog of war, strategic icons, AI opponents, multiplayer.
+- Commander, materials and energy flow economy, engineers, factories, tech tiers, reclaimable wreckage, fog of war, strategic icons, AI opponents, multiplayer.
 - Factions are data. The engine supports many. Two are defined: Aster and the Regency. Aster is built first.
 - First playable: a land war. Then air. Then naval and experimentals.
 

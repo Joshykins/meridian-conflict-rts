@@ -130,12 +130,12 @@ const LOOKED: i32 = 500;
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub(in crate::ai) struct Holding {
     pub player: u8,
-    /// Structure mass, and count, by `Built`.
+    /// Structure materials, and count, by `Built`.
     pub built: [Fx; BUILT],
     pub count: [u16; BUILT],
     /// Tick the structures were last refreshed.
     pub built_at: u32,
-    /// Armed mobile mass by domain (builders and the commander apart).
+    /// Armed mobile materials by domain (builders and the commander apart).
     pub army: [Fx; DOMAINS],
     pub builders: u16,
     /// Tick the army was last refreshed.
@@ -183,12 +183,12 @@ impl Holding {
         }
     }
 
-    /// Structure mass of all kinds.
-    pub(in crate::ai) fn built_mass(&self) -> Fx {
+    /// Structure materials of all kinds.
+    pub(in crate::ai) fn built_materials(&self) -> Fx {
         self.built.iter().copied().sum()
     }
 
-    /// Army mass believed here now: what was seen, by how sure it still is.
+    /// Army materials believed here now: what was seen, by how sure it still is.
     pub(in crate::ai) fn army_now(&self, tick: u32) -> Fx {
         self.army.iter().copied().sum::<Fx>() * self.army_sure(tick) / 100
     }
@@ -324,7 +324,7 @@ pub(in crate::ai) fn add(
     let h = &mut now[i];
     if bp.is_structure() {
         let k = Built::of(bp, p) as usize;
-        h.built[k] += bp.cost_mass;
+        h.built[k] += bp.cost_materials;
         h.count[k] = h.count[k].saturating_add(1);
     } else if bp.has(cat::COMMANDER) {
         h.king_at = tick;
@@ -332,7 +332,7 @@ pub(in crate::ai) fn add(
         h.builders = h.builders.saturating_add(1);
     } else if p.armed() {
         let d = p.domain.unwrap_or(Domain::Land) as usize;
-        h.army[d] += bp.cost_mass;
+        h.army[d] += bp.cost_materials;
     }
 }
 

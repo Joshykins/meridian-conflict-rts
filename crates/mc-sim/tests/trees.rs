@@ -91,7 +91,7 @@ fn a_lot_is_cleared_of_trees_before_the_structure_goes_down() {
     })])
     .unwrap();
 
-    let mass = w.state.players[0].reclaimed_mass;
+    let materials = w.state.players[0].reclaimed_materials;
     // Tick each wave came, and the wave each tree went in.
     let mut waves: Vec<(u8, u32)> = Vec::new();
     let mut went = vec![None; lot + 2];
@@ -170,7 +170,7 @@ fn a_lot_is_cleared_of_trees_before_the_structure_goes_down() {
     assert!(went[..=lot].iter().all(Option::is_some));
     assert!(w.is_prop_alive(lot + 1), "trees elsewhere stay");
     assert_eq!(
-        w.state.players[0].reclaimed_mass, mass,
+        w.state.players[0].reclaimed_materials, materials,
         "trees are worth nothing"
     );
 }

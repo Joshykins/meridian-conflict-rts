@@ -50,7 +50,7 @@ fn wreck_pose(e: Entity, model: ModelInfo, t: f32) -> WreckPose {
 
 // How deep a wreck lies in the ground, metres: a structure slumps onto its lot, a vehicle
 // settles into the dirt, a ship into the silt, and anything out of the sky is driven in,
-// a spacecraft's sections deepest. The more of it is gone (`health`, the share of its mass
+// a spacecraft's sections deepest. The more of it is gone (`health`, the share of its materials
 // left) the lower what is left lies.
 fn wreck_bury(model: ModelInfo, w: WreckPose, health: f32) -> f32 {
     if !w.posed {
@@ -245,8 +245,8 @@ fn wreck_keeps(local: vec3<f32>, lo: f32, hi: f32, reach: f32) -> bool {
 }
 
 // Where a wreck is worn away from the top as blasts (or the years, for a map's own)
-// take its mass, raggedly: `height` is the point's share of the model's height, `health`
-// of the mass left. Reclaim does not wear it away (`wreck_reclaim`).
+// take its materials, raggedly: `height` is the point's share of the model's height, `health`
+// of the materials left. Reclaim does not wear it away (`wreck_reclaim`).
 fn wreck_worn(local: vec3<f32>, height: f32, health: f32, reach: f32) -> bool {
     let wear = 1.0 - clamp(health, 0.0, 1.0);
     let ragged = (value_noise2(local.xy + vec2<f32>(local.z * 0.7, local.z * 0.4), max(reach * 0.15, 0.8)) - 0.5) * 0.7 * wear;
@@ -450,7 +450,7 @@ fn wreck_surface(paint: Pbr, i: SurfaceIn, up: f32, inner: bool, dl1: vec3<f32>,
 //
 // Reclaim does not wear a wreck away: the hull stays whole, and the share reclaim has
 // taken (`Entity::fx.z`) shows on it as the work, eaten in from the top down, raggedly.
-// While a beam works it (`fx.w`, seconds since reclaim last took mass) what is taken is
+// While a beam works it (`fx.w`, seconds since reclaim last took materials) what is taken is
 // blackened metal run through with a net of glowing Materials red-orange, light pouring
 // up it toward the beam, motes lifting off, and a white-hot edge crawling on where it
 // eats in, the metal ahead of it heating. Once the beam stops the work cools over a few
@@ -498,7 +498,7 @@ fn wreck_reclaim(local: vec3<f32>, height: f32, reach: f32, unmade: f32, since: 
     let ember = mix(1.0, 0.6, smoothstep(5.0, 120.0, since));
     let band = 0.015 + 0.03 * on;
     let taken = smoothstep(0.0, band * 0.6, inside);
-    let materials = vec3<f32>(MASS_R, MASS_G, MASS_B);
+    let materials = vec3<f32>(MATERIALS_R, MATERIALS_G, MATERIALS_B);
 
     // The net through the taken metal: the zero lines of two noise fields, the finer
     // fainter, each fading out before it is finer than a few pixels.

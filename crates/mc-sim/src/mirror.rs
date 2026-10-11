@@ -336,7 +336,7 @@ pub enum SimEvent {
         product: BlueprintId,
     },
     /// Survival: the node at `site` was destroyed (`raised`: after it came online);
-    /// `wreck`: mass its wreck holds for the defenders to reclaim (0 if it never rose).
+    /// `wreck`: materials its wreck holds for the defenders to reclaim (0 if it never rose).
     NodeDestroyed {
         site: u8,
         pos: mc_core::FxVec2,
@@ -531,14 +531,14 @@ pub enum SimEvent {
         pos: FxVec3,
         owner: u8,
     },
-    /// The crates landed: `units` were set down in them, and `mass` of their payload went
+    /// The crates landed: `units` were set down in them, and `materials` of their payload went
     /// into the store.
     ElevatorDocked {
         unit: UnitId,
         pos: FxVec3,
         owner: u8,
         units: u16,
-        mass: Fx,
+        materials: Fx,
     },
     /// The empty crates start to sink into the ground.
     ElevatorSinking {
@@ -714,7 +714,7 @@ pub struct UnitInstance {
     /// its charge is, 0 to -1), then how stunned it is, last tick and this (0 to 1,
     /// falling to 0 over the stun's last seconds). A settled wreck: zero, zero, then the
     /// share of the hull reclaim has taken (0 to 1) and seconds since reclaim last worked it.
-    /// The renderer's copy of a wreck whose last mass went sends 1 + how far it has gone
+    /// The renderer's copy of a wreck whose last materials went sends 1 + how far it has gone
     /// in the share (`mc_render` wreck_finish.rs).
     pub fx: [f32; 4],
     /// A spacecraft's stern drives (`CapitalRig::drives`): how far their nozzles are swung,
@@ -741,7 +741,7 @@ impl UnitInstance {
                 || (self.refit_modules >> WRECK_SECTION_SHIFT) & 0xF != 0)
     }
 
-    /// A settled wreck: the share of a fresh wreck's mass still in it. Its `health` leaves
+    /// A settled wreck: the share of a fresh wreck's materials still in it. Its `health` leaves
     /// out what reclaim took, since reclaim does not wear the hull away (`fx`).
     pub fn wreck_left(&self) -> f32 {
         self.health * (1.0 - self.fx[2])
@@ -941,7 +941,7 @@ fn beam_brace(weapon: &mc_data::Weapon, spin: [u16; 4], cooldown: u16) -> (f32, 
     (level(spin[0]), level(spin[3]))
 }
 
-/// `owner_flags` bit: the record is a wreck. `health` holds the share of mass left.
+/// `owner_flags` bit: the record is a wreck. `health` holds the share of materials left.
 pub const KIND_WRECK: u32 = 1 << 31;
 /// _pad on a KIND_WRECK instance: intact falling hull, not settled salvage.
 pub const WRECK_FALLING: u32 = 1;
@@ -1056,15 +1056,15 @@ pub struct UnitOrders {
     /// Per second, last tick. Made: what it produced (generator or mine output, materials
     /// reclaimed). Wanted: what its building, repairs and upkeep asked for at the full rate.
     /// Used: what it was given of that; less than wanted while its side stalls.
-    pub mass_made: f32,
+    pub materials_made: f32,
     pub energy_made: f32,
-    pub mass_wanted: f32,
+    pub materials_wanted: f32,
     pub energy_wanted: f32,
-    pub mass_used: f32,
+    pub materials_used: f32,
     pub energy_used: f32,
     /// Its side's share of demand met last tick, zero to one: below one is a stall.
     pub efficiency: f32,
-    /// Mass it has reclaimed since it was made (a carrier's includes its drones').
+    /// Materials it has reclaimed since it was made (a carrier's includes its drones').
     pub reclaimed: f32,
     /// The highest tier its side has reached ([`World::side_tech`]): mines upgrade no further.
     pub side_tech: u8,
@@ -1167,7 +1167,7 @@ pub struct MineView {
     /// (after the income dial).
     pub rate: f32,
     pub full: f32,
-    /// What its side is paid of mass income, as a factor (the income dial): `rate` and
+    /// What its side is paid of materials income, as a factor (the income dial): `rate` and
     /// `full` are turned by it already; a preview made from another blueprint is turned
     /// by it too.
     pub dial: f32,
@@ -3026,11 +3026,11 @@ impl World {
                 standing,
                 progress,
                 eta,
-                mass_made: rate(flow.made[0]),
+                materials_made: rate(flow.made[0]),
                 energy_made: rate(flow.made[1]),
-                mass_wanted: rate(flow.wanted[0]),
+                materials_wanted: rate(flow.wanted[0]),
                 energy_wanted: rate(flow.wanted[1]),
-                mass_used: rate(flow.used[0]),
+                materials_used: rate(flow.used[0]),
                 energy_used: rate(flow.used[1]),
                 efficiency: s.players[s.units.owner[row] as usize].efficiency.to_f32(),
                 reclaimed: s.units.reclaimed[row].to_f32(),
@@ -3066,7 +3066,7 @@ impl World {
             return Vec::new();
         };
         let tps = TICKS_PER_SECOND as f32;
-        let dial = self.mass_dial(row);
+        let dial = self.materials_dial(row);
         m.veins
             .iter()
             .map(|v| MineVein {
@@ -3082,9 +3082,9 @@ impl World {
             .collect()
     }
 
-    /// What the owner of `row` is paid of its mass income, as a factor: the seat's
+    /// What the owner of `row` is paid of its materials income, as a factor: the seat's
     /// set-up multiplier or the test range's dial.
-    fn mass_dial(&self, row: usize) -> f32 {
+    fn materials_dial(&self, row: usize) -> f32 {
         let owner = self.state.units.owner[row] as usize;
         self.state
             .players
@@ -3095,7 +3095,7 @@ impl World {
     fn mine_view(&self, row: usize) -> Option<MineView> {
         let spec = self.bp(row).mine?;
         let m = self.state.mines.by_unit.get(&self.state.units.id(row))?;
-        let dial = self.mass_dial(row);
+        let dial = self.materials_dial(row);
         Some(MineView {
             land: m.land,
             share: m.land.efficiency(&spec).to_f32(),

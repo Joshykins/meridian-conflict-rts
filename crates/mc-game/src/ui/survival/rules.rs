@@ -171,7 +171,7 @@ pub fn engagement(
     let r = row(4.0);
     ui.fill(
         Rect::new(r.x, r.y + 4.0, 2.0, r.h - 8.0),
-        rgb(crate::hud::MASS, 0.8),
+        rgb(crate::hud::MATERIALS, 0.8),
     );
     let note = "No materials are handed out: every unit the engine sends leaves a wreck worth most of its cost - reclaim the field.";
     for (k, l) in ui
@@ -440,7 +440,7 @@ fn forecast(ui: &mut Ui, rules: &SurvivalRules, counts: [usize; 3], area: Rect) 
                 y,
                 type_scale::MICRO,
                 rgb(palette::FAINT, 1.0),
-                &mass(peak * k / 3),
+                &materials(peak * k / 3),
             );
         }
     }
@@ -591,11 +591,11 @@ fn forecast(ui: &mut Ui, rules: &SurvivalRules, counts: [usize; 3], area: Rect) 
         Some(i) => {
             let round = round_of(i);
             let budget = rules.budget(round);
-            let parts: Vec<String> = attacking.iter().map(|d| format!("{} {}", d.label(), mass(budget * weight(*d) / wsum))).collect();
+            let parts: Vec<String> = attacking.iter().map(|d| format!("{} {}", d.label(), materials(budget * weight(*d) / wsum))).collect();
             format!(
                 "Round {round}  \u{b7}  T{}  \u{b7}  {} materials  \u{b7}  {}{}{}",
                 rules.tier_at(round),
-                mass(budget),
+                materials(budget),
                 parts.join("  "),
                 match rules.nodes_raised(round) {
                     0 => String::new(),
@@ -623,7 +623,7 @@ fn forecast(ui: &mut Ui, rules: &SurvivalRules, counts: [usize; 3], area: Rect) 
                     1 => "  \u{b7}  1 heavy".to_owned(),
                     k => format!("  \u{b7}  {k} heavies"),
                 },
-                mass(rules.budget(total))
+                materials(rules.budget(total))
             )
         }
     };

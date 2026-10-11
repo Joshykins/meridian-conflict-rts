@@ -15,7 +15,7 @@
         tech: 4,
         categories: ["Land", "Strategic", "Experimental"],
         health: 42000,
-        cost: (mass: 9000, energy: 90000, time: 36000),
+        cost: (materials: 9000, energy: 90000, time: 36000),
         radius: 42.5, height: 26, footprint: (8, 8),
         vision: 300,
         strategic: (
@@ -23,7 +23,7 @@
             // One warhead: about five minutes on the silo's own assembly line.
             // Its own power is high and the round long, so engineers assisting add little: a
             // nuke is hard to rush (user, 2026-10-07).
-            missile: (mass: 6000, energy: 120000, time: 720000),
+            missile: (materials: 6000, energy: 120000, time: 720000),
             power: 2400,
             stock: 2,
             // Metres a second along its path once the boost is done (it comes in faster),
@@ -48,13 +48,13 @@
         tech: 4,
         categories: ["Land", "Strategic", "Experimental"],
         health: 16000,
-        cost: (mass: 3200, energy: 32000, time: 8000),
+        cost: (materials: 3200, energy: 32000, time: 8000),
         radius: 18.75, height: 20, footprint: (4, 4),
         vision: 300, radar: 2400,
         economy: (energy_upkeep: 25),
         strategic: (
             kind: Interceptor,
-            missile: (mass: 1500, energy: 30000, time: 180000),
+            missile: (materials: 1500, energy: 30000, time: 180000),
             power: 1800,
             stock: 4,
             speed: 900,
@@ -80,7 +80,7 @@
         tech: 4,
         categories: ["Land", "Artillery", "Strategic", "Experimental"],
         health: 30000,
-        cost: (mass: 10000, energy: 100000, time: 36000),
+        cost: (materials: 10000, energy: 100000, time: 36000),
         radius: 30, height: 27, footprint: (6, 6),
         vision: 300,
         weapons: [(

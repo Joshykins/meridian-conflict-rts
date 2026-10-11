@@ -19,11 +19,11 @@
         tech: 1,
         categories: ["Land", "Commander", "Engineer", "DirectFire"],
         health: 11000, regen: 10,
-        cost: (mass: 18000, energy: 5000000, time: 6000000),
+        cost: (materials: 18000, energy: 5000000, time: 6000000),
         radius: 10.4, height: 25,
         vision: 600, radar: 1500,
         motion: (layer: Amphibious, size: 0, speed: 17, accel: 17, turn: 150),
-        economy: (mass_income: 1, energy_income: 20, mass_storage: 1000, energy_storage: 5000),
+        economy: (materials_income: 1, energy_income: 20, materials_storage: 1000, energy_storage: 5000),
         // `arm`: the taloned hand. The torso turns to face the work, then the forearm pitches at it
         // about the elbow (`pivot`); the beam leaves the violet emitter in its palm.
         builder: (power: 10, range: 70, arm: (turn: 140, emitter: (5.2, 5.2, 14.6), pivot: (-0.5, 5.2, 14.6)), builds: [
@@ -45,7 +45,7 @@
                     (
                         key: "eng_2", icon: Engineer, name: "Engineering Suite II", tech: 2,
                         summary: "More build power and reach: twin nanite emitters and feed canisters on the build arm, heavier plating; and it builds the tech 2 structures.",
-                        cost: (mass: 1680, energy: 16800, time: 1260),
+                        cost: (materials: 1680, energy: 16800, time: 1260),
                         health: 3000, regen: 5, build_power: 30, build_range: 5,
                         // The emitters come to work (rock on the forearm) over this long.
                         unfold: 0.6,
@@ -55,7 +55,7 @@
                     (
                         key: "eng_3", icon: Engineer, name: "Engineering Suite III", tech: 3, after: "eng_2",
                         summary: "Far more build power and reach: a fabrication lance out of the hand, a ring of emitters round the wrist, a feed drum over the elbow, heavy plating; and it builds the tech 3 structures.",
-                        cost: (mass: 4200, energy: 42000, time: 3150),
+                        cost: (materials: 4200, energy: 42000, time: 3150),
                         health: 7000, regen: 15, build_power: 150, build_range: 10,
                         // The lance runs out of the palm while it builds: the beam leaves its tip.
                         arm_emitter: (8.18, 5.2, 14.6),
@@ -70,7 +70,7 @@
                     (
                         key: "pinched", icon: Tank, name: "Pinched-plasmeric Cannon",
                         summary: "The cannon forearm rebuilt longer, the plasma squeezed by gravity into a dense stream: heavier hits at longer reach.",
-                        cost: (mass: 700, energy: 8400, time: 800),
+                        cost: (materials: 700, energy: 8400, time: 800),
                         // The forearm is one gun: the new one takes the Repeater's place.
                         replaces: "Plasmeric Repeater",
                         weapons: [(
@@ -85,7 +85,7 @@
                     (
                         key: "fusion", icon: Tank, name: "Pinch-fusion Cannon", after: "pinched",
                         summary: "The cannon pushed until the plasma fuses: long, white-hot pinch-fusion jets that burst like small stars.",
-                        cost: (mass: 2000, energy: 24000, time: 2400),
+                        cost: (materials: 2000, energy: 24000, time: 2400),
                         replaces: "Plasmeric Repeater",
                         weapons: [(
                             name: "Pinch-fusion Cannon",
@@ -104,14 +104,14 @@
                     (
                         key: "nano_repair", icon: Engineer, name: "Nanite Repair",
                         summary: "Plates of nanites down the spine: heavier plating, and they mend the Exarch's hull fast, even under fire.",
-                        cost: (mass: 900, energy: 10800, time: 1100),
+                        cost: (materials: 900, energy: 10800, time: 1100),
                         // Nanites keep at it under fire: this regen does not wait out hits.
                         health: 3000, regen: 140, nanite_regen: true,
                     ),
                     (
                         key: "nano_field", icon: Engineer, name: "Nanite Repair Field", after: "nano_repair",
                         summary: "The nanites go out in a cloud: every unit and structure of its side near the Exarch mends, and the Exarch mends faster still, under heavier plating.",
-                        cost: (mass: 2200, energy: 26400, time: 2600),
+                        cost: (materials: 2200, energy: 26400, time: 2600),
                         // It takes Nanite Repair's place, so it carries its plating and regen too.
                         health: 6000, regen: 240, nanite_regen: true,
                         // A fiftieth of each friend's full health a second, within 150 m.
@@ -120,10 +120,10 @@
                     (
                         key: "mfe", icon: Power, name: "Material Formation Engine",
                         summary: "Makes materials and energy on the Exarch's back.",
-                        cost: (mass: 1200, energy: 14400, time: 1400),
+                        cost: (materials: 1200, energy: 14400, time: 1400),
                         // As ARC's: a tech 3 reactor running a tech 3 fabricator, for far
                         // less, carried on the one unit that ends the game if it dies.
-                        economy: (mass_income: 5, energy_income: 1500),
+                        economy: (materials_income: 5, energy_income: 1500),
                     ),
                 ],
             ),
@@ -133,7 +133,7 @@
                     (
                         key: "aux_eng", icon: Engineer, name: "Auxiliary Engineering Suite",
                         summary: "A nanite projector rises on the left shoulder and builds with a second beam.",
-                        cost: (mass: 800, energy: 9600, time: 900),
+                        cost: (materials: 800, energy: 9600, time: 900),
                         build_power: 60,
                         // A projector in a yoke on the pauldron: stowed it tips its muzzle up;
                         // out, it pitches on its trunnions (`hinge`) to point at the work, the
@@ -162,7 +162,7 @@
         tech: 1,
         categories: ["Land", "Engineer"],
         health: 170,
-        cost: (mass: 55, energy: 280, time: 280),
+        cost: (materials: 55, energy: 280, time: 280),
         radius: 4.2, height: 3.267,
         vision: 180,
         motion: (layer: Hover, size: 0, speed: 28, accel: 30, turn: 170),
@@ -186,7 +186,7 @@
         tech: 2,
         categories: ["Land", "Engineer"],
         health: 460,
-        cost: (mass: 210, energy: 1260, time: 940),
+        cost: (materials: 210, energy: 1260, time: 940),
         radius: 5.0, height: 3.889,
         vision: 200,
         motion: (layer: Hover, size: 0, speed: 27, accel: 28, turn: 160),
@@ -209,7 +209,7 @@
         tech: 3,
         categories: ["Land", "Engineer"],
         health: 980,
-        cost: (mass: 840, energy: 6700, time: 3300),
+        cost: (materials: 840, energy: 6700, time: 3300),
         radius: 6.0, height: 4.667,
         vision: 220,
         motion: (layer: Hover, size: 1, speed: 26, accel: 26, turn: 150),
@@ -236,7 +236,7 @@
         tech: 1,
         categories: ["Land"],
         health: 300,
-        cost: (mass: 60, energy: 360, time: 240),
+        cost: (materials: 60, energy: 360, time: 240),
         radius: 4.6, height: 3.4,
         vision: 400,
         motion: (layer: Hover, size: 0, speed: 31, accel: 28, turn: 110),
@@ -258,7 +258,7 @@
         tech: 2,
         categories: ["Land"],
         health: 950,
-        cost: (mass: 240, energy: 1440, time: 1000),
+        cost: (materials: 240, energy: 1440, time: 1000),
         radius: 5.367, height: 3.967,
         vision: 550,
         motion: (layer: Hover, size: 0, speed: 30, accel: 28, turn: 110),
@@ -280,7 +280,7 @@
         tech: 3,
         categories: ["Land"],
         health: 2300,
-        cost: (mass: 840, energy: 6000, time: 3200),
+        cost: (materials: 840, energy: 6000, time: 3200),
         radius: 6.133, height: 4.533,
         vision: 700,
         motion: (layer: Hover, size: 1, speed: 29, accel: 28, turn: 110),

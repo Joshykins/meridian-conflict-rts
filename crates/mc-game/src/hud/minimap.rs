@@ -152,7 +152,7 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
         let c = chart_pos(s, chart, centre);
         // Past the allowance a mine still shows where it is, without its ground.
         if ui.o.vertices.len() > budget_end {
-            ui.dot(c, 2.6, rgb(super::MASS, 1.0));
+            ui.dot(c, 2.6, rgb(super::MATERIALS, 1.0));
             continue;
         }
         // A territory is a few pixels across on the chart: as many points as it has pixels round.
@@ -173,13 +173,13 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
             .map(|p| chart_pos(s, chart, p))
             .collect();
         for pair in pts.windows(2) {
-            ui.triangle(c, pair[0], pair[1], rgb(super::MASS, fill));
-            ui.stroke(pair[0], pair[1], 1.2, rgb(super::MASS, line));
+            ui.triangle(c, pair[0], pair[1], rgb(super::MATERIALS, fill));
+            ui.stroke(pair[0], pair[1], 1.2, rgb(super::MATERIALS, line));
         }
         if let (Some(&a), Some(&b)) = (pts.last(), pts.first()) {
-            ui.stroke(a, b, 1.2, rgb(super::MASS, line));
+            ui.stroke(a, b, 1.2, rgb(super::MATERIALS, line));
         }
-        ui.dot(c, 2.6, rgb(super::MASS, 1.0));
+        ui.dot(c, 2.6, rgb(super::MATERIALS, 1.0));
     }
 
     // Reach: the side's radar cover and shield domes, the selection's guns and eyes.

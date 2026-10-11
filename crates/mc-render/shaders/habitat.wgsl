@@ -513,7 +513,7 @@ fn grass_colours(kind: u32, dry: f32) -> GrassColours {
 // tone: its blades' middles and tips (`tip` of it the tips, more of them seen
 // from low down), mixed by kind as `grass_share` gives them. The terrain takes it on where grass grows, so the ground seen between
 // far-off blades, and beyond where they are drawn, is the grass's own colour.
-fn grass_mass(g: vec4<f32>, h: Habitat, tip: f32) -> vec3<f32> {
+fn grass_materials(g: vec4<f32>, h: Habitat, tip: f32) -> vec3<f32> {
     let dry = grass_dryness(h);
     var lush = grass_colours(GRASS_LUSH, dry);
     var meadow = grass_colours(GRASS_MEADOW, dry);

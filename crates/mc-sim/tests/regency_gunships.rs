@@ -48,9 +48,9 @@ fn world() -> World {
 fn rich(w: &mut World, player: usize) {
     spawn(w, "regency_commander", player as u8, 150, 150);
     let p = &mut w.state.players[player];
-    p.mass_capacity = Fx::from_int(20000);
+    p.materials_capacity = Fx::from_int(20000);
     p.energy_capacity = Fx::from_int(200000);
-    p.mass = Fx::from_int(20000);
+    p.materials = Fx::from_int(20000);
     p.energy = Fx::from_int(200000);
 }
 
@@ -195,9 +195,9 @@ fn a_quiver_with_empty_bays_waits_for_its_wicks() {
     let mut w = world();
     // Nothing in the bank: no Wick is ever finished, so nothing is let go.
     let p = &mut w.state.players[0];
-    p.mass = Fx::ZERO;
+    p.materials = Fx::ZERO;
     p.energy = Fx::ZERO;
-    p.mass_capacity = Fx::ZERO;
+    p.materials_capacity = Fx::ZERO;
     p.energy_capacity = Fx::ZERO;
     let quiver = spawn(&mut w, "regency_t2_drone_carrier", 0, 600, 600);
     let tank = target(&mut w, "aster_t1_tank", 900, 600);

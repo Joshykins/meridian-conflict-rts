@@ -36,11 +36,11 @@ const MIN_PIXELS: f32 = 2.5;
 
 const _: () = assert!(CLUSTERS == 13824, "lights.wgsl LIGHT_CLUSTERS");
 
-/// Materials as light (`gpu_consts::mass`, the HUD's red-orange): reclaim's colour.
+/// Materials as light (`gpu_consts::materials`, the HUD's red-orange): reclaim's colour.
 const MATERIALS: Vec3 = Vec3::new(
-    crate::gpu_consts::mass::R,
-    crate::gpu_consts::mass::G,
-    crate::gpu_consts::mass::B,
+    crate::gpu_consts::materials::R,
+    crate::gpu_consts::materials::G,
+    crate::gpu_consts::materials::B,
 );
 
 const KIND_POINT: u32 = 0;

@@ -26,10 +26,10 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 const TPS: u32 = 10;
-/// Energy counted as worth one mass when weighing an upgrade (economy structures' ratio).
-const ENERGY_PER_MASS: f32 = 6.0;
+/// Energy counted as worth one materials when weighing an upgrade (economy structures' ratio).
+const ENERGY_PER_MATERIALS: f32 = 6.0;
 
-/// The dials. Rates are materials a second (the side's mass income).
+/// The dials. Rates are materials a second (the side's materials income).
 #[derive(Clone, Debug)]
 struct Plan {
     name: String,
@@ -43,7 +43,7 @@ struct Plan {
     engineers: usize,
     /// Mines the commander puts down before the Forge.
     factory_after: usize,
-    /// Energy income kept per mass of income, beyond the mines' upkeep.
+    /// Energy income kept per materials of income, beyond the mines' upkeep.
     ratio: f32,
     /// Idle builders reclaim wrecks within this of the start (0: never).
     reclaim: f32,
@@ -75,7 +75,7 @@ struct Plan {
     /// side has tech 3).
     early_line: bool,
     /// Economy focus: 0 never set, 1 power first when out of energy, mines first when
-    /// out of mass, 2 mines always first (power first while out of energy).
+    /// out of materials, 2 mines always first (power first while out of energy).
     focus: u8,
     /// Idle builders help the goal (its upgrades, the commander's tech refits).
     assist: bool,
@@ -539,10 +539,10 @@ impl Bot {
         if tech >= 3 && self.tech3.is_none() {
             self.tech3 = Some(secs);
         }
-        let income = pl.mass_income.to_f32();
+        let income = pl.materials_income.to_f32();
         let e_income = pl.energy_income.to_f32();
         let e_frac = pl.energy.to_f32() / pl.energy_capacity.to_f32().max(1.0);
-        let m_frac = pl.mass.to_f32() / pl.mass_capacity.to_f32().max(1.0);
+        let m_frac = pl.materials.to_f32() / pl.materials_capacity.to_f32().max(1.0);
         let e_dry = e_frac < 0.1 && pl.energy_spent.to_f32() >= e_income * 0.95;
         let mut now = Now {
             start: pl.start,
@@ -557,7 +557,7 @@ impl Bot {
         };
         let mut out = Vec::new();
         if plan.focus > 0 {
-            let m_dry = m_frac < 0.05 && pl.mass_demand > pl.mass_income;
+            let m_dry = m_frac < 0.05 && pl.materials_demand > pl.materials_income;
             let want = Focus {
                 power: if e_dry {
                     Priority::First
@@ -672,7 +672,7 @@ impl Bot {
             let gain = ms.full_rate(&next.mine.unwrap()).to_f32()
                 - ms.full_rate(&bp.mine.unwrap()).to_f32();
             let (cm, ce) = w.blueprints.upgrade_cost(next);
-            let payback = (cm.to_f32() + ce.to_f32() / ENERGY_PER_MASS) / gain.max(0.01);
+            let payback = (cm.to_f32() + ce.to_f32() / ENERGY_PER_MATERIALS) / gain.max(0.01);
             if payback < plan.horizon {
                 cands.push((payback, r));
             }
@@ -937,7 +937,7 @@ fn nearest_wreck(
     let wr = &w.state.wrecks;
     wr.slots
         .iter()
-        .filter(|&r| wr.mass[r] > Fx::ZERO && wr.pos[r].distance(start).to_f32() <= radius)
+        .filter(|&r| wr.materials[r] > Fx::ZERO && wr.pos[r].distance(start).to_f32() <= radius)
         .filter(|&r| !taken.contains(&wr.slots.handle(r).0))
         .min_by_key(|&r| (wr.pos[r].distance_sq(from), r))
 }
@@ -948,7 +948,7 @@ fn wreck_field(w: &World, start: FxVec2, reach: f32, towers: &[FxVec2]) -> Optio
     let live: Vec<usize> = wr
         .slots
         .iter()
-        .filter(|&r| wr.mass[r] > Fx::ZERO && wr.pos[r].distance(start).to_f32() < 3500.0)
+        .filter(|&r| wr.materials[r] > Fx::ZERO && wr.pos[r].distance(start).to_f32() < 3500.0)
         .filter(|&r| {
             towers
                 .iter()
@@ -960,7 +960,7 @@ fn wreck_field(w: &World, start: FxVec2, reach: f32, towers: &[FxVec2]) -> Optio
         let sum: f32 = live
             .iter()
             .filter(|&&b| wr.pos[a].distance(wr.pos[b]).to_f32() < reach * 0.8)
-            .map(|&b| wr.mass[b].to_f32())
+            .map(|&b| wr.materials[b].to_f32())
             .sum();
         // A field far off pays later: worth a little less.
         let score = sum / (1.0 + wr.pos[a].distance(start).to_f32() / 3000.0);
@@ -1019,9 +1019,9 @@ fn play(
         for r in wr.slots.iter() {
             let b = ((wr.pos[r].distance(start).to_f32() / 1000.0) as usize).min(5);
             bands[b].0 += 1;
-            bands[b].1 += wr.mass[r].to_f32();
+            bands[b].1 += wr.materials[r].to_f32();
         }
-        eprintln!("wrecks by km from start (count, mass): {bands:?}");
+        eprintln!("wrecks by km from start (count, materials): {bands:?}");
     }
     let trace: u32 = std::env::var("ECO_TRACE")
         .ok()
@@ -1078,7 +1078,7 @@ fn play(
         if w.state.tick.is_multiple_of(60 * TPS) {
             let m = secs / 60;
             if m.is_multiple_of(5) && (m / 5) as usize <= 5 && m > 0 {
-                bot.income_at[(m / 5 - 1) as usize] = pl.mass_income.to_f32();
+                bot.income_at[(m / 5 - 1) as usize] = pl.materials_income.to_f32();
             }
             if log {
                 let v = look(&w, 0, &k);
@@ -1087,11 +1087,11 @@ fn play(
                     a
                 });
                 bot.log.push(format!(
-                    "  {m:>2}m mass {:>6.1}/s (reclaim {:>5.1}) store {:>6.0}/{:<6.0} energy {:>6.0}/s store {:>6.0}/{:<6.0} tech {} mines {:?} builders {} upgrading {} stall {:>4}s",
-                    pl.mass_income.to_f32(),
+                    "  {m:>2}m materials {:>6.1}/s (reclaim {:>5.1}) store {:>6.0}/{:<6.0} energy {:>6.0}/s store {:>6.0}/{:<6.0} tech {} mines {:?} builders {} upgrading {} stall {:>4}s",
+                    pl.materials_income.to_f32(),
                     pl.reclaim_income.to_f32(),
-                    pl.mass.to_f32(),
-                    pl.mass_capacity.to_f32(),
+                    pl.materials.to_f32(),
+                    pl.materials_capacity.to_f32(),
                     pl.energy_income.to_f32(),
                     pl.energy.to_f32(),
                     pl.energy_capacity.to_f32(),
@@ -1165,7 +1165,7 @@ fn play(
         bot.income_at[1],
         bot.income_at[2],
         bot.income_at[3],
-        pl.reclaimed_mass.to_f32(),
+        pl.reclaimed_materials.to_f32(),
         bot.stall_ticks / TPS,
         v.mines.len(),
         plants,

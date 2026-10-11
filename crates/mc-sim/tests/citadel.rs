@@ -128,7 +128,7 @@ fn a_citadel_breaks_a_paladin_that_a_redoubt_cannot() {
     );
     assert!(!redoubt.stands, "a Redoubt held a Paladin");
     // Its 400 m range leaves the Paladin a long walk under the Citadel's 1500 m gun:
-    // two of them (1680 mass against its 2400) both fall.
+    // two of them (1680 materials against its 2400) both fall.
     let pair = push(CITADEL, "aster_t3_assault_bot", 2);
     assert!(
         pair.stands && pair.left == 0,
@@ -139,17 +139,17 @@ fn a_citadel_breaks_a_paladin_that_a_redoubt_cannot() {
 }
 
 /// Every slug kills a light tank outright and most of it is wasted, so a swarm does
-/// better per mass than heavies do: a third more than its own mass overruns it.
+/// better per materials than heavies do: a third more than its own materials overruns it.
 #[test]
 fn a_swarm_of_light_tanks_overruns_a_citadel() {
     let w = world();
-    let mass = |key| {
+    let materials = |key| {
         w.blueprints
             .unit(w.blueprints.id_of(key).unwrap())
-            .cost_mass
+            .cost_materials
             .to_f64()
     };
-    let tanks = (mass(CITADEL) * 1.35 / mass("aster_t2_tank")) as usize;
+    let tanks = (materials(CITADEL) * 1.35 / materials("aster_t2_tank")) as usize;
     let swarm = push(CITADEL, "aster_t2_tank", tanks);
     assert!(
         !swarm.stands,

@@ -74,7 +74,7 @@ export function UnitTile({ unit, compact = false, morph = true }: { unit: UnitSu
         {!compact && (
           <dl className="num mt-auto grid grid-cols-3 gap-2 pt-3 font-display text-sm">
             <Stat label="Health" value={fmt(unit.health)} />
-            <Stat label="Mass" value={fmt(unit.mass)} />
+            <Stat label="Materials" value={fmt(unit.materials)} />
             <Stat label="DPS" value={fmt(unit.dps)} hot={!!unit.dps} />
           </dl>
         )}

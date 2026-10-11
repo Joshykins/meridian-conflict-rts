@@ -1,9 +1,9 @@
 //! The space elevator (`docs/ELEVATOR.md`): a T5 structure whose cable reaches orbit.
 //!
 //! Once it is finished its cable is lowered from orbit and clamped. From then on a set of
-//! cargo crates falls down the cable every `period` seconds carrying `payload` mass: the
+//! cargo crates falls down the cable every `period` seconds carrying `payload` materials: the
 //! units queued on the elevator (like a factory's queue, but free), and whatever of the
-//! payload the queue leaves as plain mass for its side's store. The crates only ever come
+//! payload the queue leaves as plain materials for its side's store. The crates only ever come
 //! down: they land, open and let their units drive out, then sink into the ground.
 
 use mc_core::{Fx, StateHasher};
@@ -16,7 +16,7 @@ use crate::DataError;
 pub struct RawElevator {
     /// Seconds from one platform's arrival to the next.
     pub period: f64,
-    /// Mass each platform brings down.
+    /// Materials each platform brings down.
     pub payload: f64,
     /// Seconds the cable takes to come down once the elevator is finished, clamps and all.
     pub tether: f64,
@@ -83,7 +83,7 @@ impl Elevator {
         h.write_i64(self.payload.0);
     }
 
-    /// Ticks into a cycle the crates touch down: units come off and leftover mass is paid.
+    /// Ticks into a cycle the crates touch down: units come off and leftover materials are paid.
     pub fn touchdown(&self) -> u32 {
         self.descent_ticks
     }

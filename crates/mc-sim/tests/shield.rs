@@ -333,7 +333,7 @@ fn a_dome_drops_when_construction_stalls_the_grid() {
     p.free_build = false;
     p.income_permille[1] = 7_200;
     p.bonus_storage = [mc_core::Fx::from_int(100_000); 2];
-    p.mass = mc_core::Fx::from_int(100_000);
+    p.materials = mc_core::Fx::from_int(100_000);
     // Little in store: the upgrade (priced at the difference between the tiers) runs it dry.
     p.energy = mc_core::Fx::from_int(20);
     w.tick(&[cmd(Command::Upgrade {

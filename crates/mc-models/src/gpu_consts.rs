@@ -1244,14 +1244,14 @@ shared! {
         pub const WORK_BEAT: f32 = 7.0;
     }
 
-    /// Materials (the sim's mass) as a light: the HUD's Materials red-orange
-    /// (`hud::MASS`, 0xFF6B3D) in linear RGB. Reclaim's beams, the stream down a reclaim
-    /// tower's chutes and anything else that shows mass on the move share it.
-    pub mod mass as "MASS_" {
+    /// Materials as a light: the HUD's Materials red-orange
+    /// (`hud::MATERIALS`, 0xFF6B3D) in linear RGB. Reclaim's beams, the stream down a reclaim
+    /// tower's chutes and anything else that shows materials on the move share it.
+    pub mod materials as "MATERIALS_" {
         pub const R: f32 = 1.0;
         pub const G: f32 = 0.147;
         pub const B: f32 = 0.0467;
-        /// `pattern::MASS_FLOW`: a chute with material falling down it while the unit reclaims.
+        /// `pattern::MATERIALS_FLOW`: a chute with material falling down it while the unit reclaims.
         pub const FLOW_PATTERN: u32 = 30;
         /// How fast the clumps fall down a chute, metres a second.
         pub const FLOW_SPEED: f32 = 7.0;
@@ -1411,7 +1411,7 @@ shared! {
         pub const ENEMY: u32 = 2;
         /// No selection ring, only the status bars (work under way, seen unselected).
         pub const BARS_ONLY: u32 = 4;
-        /// What a click would take apart: ringed in the Materials red-orange (`MASS_*`).
+        /// What a click would take apart: ringed in the Materials red-orange (`MATERIALS_*`).
         pub const RECLAIM: u32 = 8;
     }
 
@@ -1702,11 +1702,11 @@ shared! {
         pub const WAKE_POINTS: u32 = 12;
     }
 
-    /// Materials (the sim's `mass`) as the interface colours them (mc-game `hud::MASS`) and
+    /// Materials as the interface colours them (mc-game `hud::MATERIALS`) and
     /// the world's materials conduits light them (renderer/adjacency_links.rs), sRGB
     /// `0xRRGGBB`. Energy is the faction's own (`mc_data::PowerLine::color`).
     pub mod tone as "TONE_" {
-        pub const MASS: u32 = 0xFF6B3D;
+        pub const MATERIALS: u32 = 0xFF6B3D;
     }
 
     /// An adjacency conduit (`renderer/adjacency_links.rs` `LinkInstance::flags`, links.wgsl).
@@ -1855,7 +1855,7 @@ shared! {
     /// Bits of `UnitInstance::owner_flags` (`owner | flags << 8`) the shaders read that the
     /// older hand-written `FLAG_*` list in common.wgsl does not hold.
     pub mod unit_flag as "UNIT_FLAG_" {
-        /// `mc_sim::tables::flag::RECLAIMING << 8`: pulling mass out of a wreck this tick.
+        /// `mc_sim::tables::flag::RECLAIMING << 8`: pulling materials out of a wreck this tick.
         pub const RECLAIMING: u32 = 0x10000;
     }
 }

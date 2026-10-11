@@ -725,9 +725,9 @@ over about a minute. Both are drawn only near the camera.
 
 ## Ore fields and materials
 
-- **One red-orange for everything materials** (`hud::MASS`, 0xFF6B3D; linear
+- **One red-orange for everything materials** (`hud::MATERIALS`, 0xFF6B3D; linear
   `(1.0, 0.147, 0.047)` in ground.wgsl): numbers, fields, veins, territories,
-  shafts, the minimap. The sim still calls it `mass`; the old mint green is
+  shafts, the minimap. The sim still calls it `materials`; the old mint green is
   now `hud::HEALTHY`, for unit health only.
 - **In play an ore field is a faint outline**, nothing else. The ore inside
   the reach of a mine in sight dims to a dull rust (on the minimap too), and
@@ -851,7 +851,7 @@ same treatment.
   hologram, then each piece goes up in turn, hot at first and cooling into the
   finished part, while work light passes over the unit and the welding sparks
   concentrate where the change is (a commander's build arm). The finished tier
-  is the same pieces, plain. A mass extractor is refitted the same way: the
+  is the same pieces, plain. A materials extractor is refitted the same way: the
   next kit is built onto the wellhead, and the cracks it mines stay in view.
   Other structures (factory and the rest) rebuild like any other site, and an
   engineer helping them prints with a build beam.
@@ -860,7 +860,7 @@ same treatment.
 
 ## Repair
 
-- **Repair is mint-green**, the mass colour, and only repair is that: a thin mint
+- **Repair is mint-green**, the materials colour, and only repair is that: a thin mint
   core, teal around it, deep green at the edge. The beam is a tool, thinner
   than reclaim's cone, tight at the projector and a little wider where it
   meets the hull.

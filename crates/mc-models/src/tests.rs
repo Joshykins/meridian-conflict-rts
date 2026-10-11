@@ -298,9 +298,9 @@ const BLUEPRINTS: &[Blueprint] = &[
     structure("power", 42.5, 52.0, 3, 8, &[]),
     structure("fabricator", 11.0, 16.0, 2, 2, &[]),
     structure("fabricator", 11.0, 22.0, 3, 2, &[]),
-    structure("storage_mass", 12.9, 6.3, 1, 3, &[]),
-    structure("storage_mass", 12.9, 10.2, 2, 3, &[]),
-    structure("storage_mass", 12.9, 14.9, 3, 3, &[]),
+    structure("storage_materials", 12.9, 6.3, 1, 3, &[]),
+    structure("storage_materials", 12.9, 10.2, 2, 3, &[]),
+    structure("storage_materials", 12.9, 14.9, 3, 3, &[]),
     structure("storage_energy", 14.2, 10.2, 1, 3, &[]),
     structure("storage_energy", 14.2, 14.3, 2, 3, &[]),
     structure("storage_energy", 14.2, 19.4, 3, 3, &[]),
@@ -802,7 +802,7 @@ const ASSAULT_TANK_TRIANGLES: usize = 9200;
 /// (`None` keeps the rule). Each wants lighter levels, made and judged on a shot
 /// sheet; its row goes once it meets the rules.
 const OVER_BUDGET: &[Over] = &[
-    ("storage_mass", Some(102), Some(0.72), Some(2770)),
+    ("storage_materials", Some(102), Some(0.72), Some(2770)),
     ("sonar", Some(176), None, None),
     ("reclaimer", Some(122), Some(0.54), Some(3604)),
     ("airbase", None, Some(0.53), None),

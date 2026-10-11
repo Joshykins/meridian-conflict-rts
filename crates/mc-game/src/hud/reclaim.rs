@@ -1,15 +1,15 @@
-//! Reclaim survey: hold Control and every settled wreck shows the mass left in
+//! Reclaim survey: hold Control and every settled wreck shows the materials left in
 //! it. Nearby marks share one label, and the join distance grows with the
 //! camera so a zoomed-out view collapses a field into a few sums. Up close
 //! each wreck draws a leader to its label; zoomed out a group folds into one
 //! bracketed field around its wrecks with a single leader and a wreck count,
-//! each wreck still a rimmed pip sized by its mass.
+//! each wreck still a rimmed pip sized by its materials.
 //!
-//! The salvage units light up with it: each one's icon turns into a mass-coloured
-//! badge, its reach is drawn on the ground, and a reclaimer says how much mass a
+//! The salvage units light up with it: each one's icon turns into a materials-coloured
+//! badge, its reach is drawn on the ground, and a reclaimer says how many materials a
 //! second it can pull.
 
-use super::{icons, mine_marks::overview_height, Scene, MASS};
+use super::{icons, mine_marks::overview_height, Scene, MATERIALS};
 use crate::audio::Sfx;
 use crate::ui::{ink, rgb, type_scale, Rect, Ui};
 use glam::{Vec2, Vec3};
@@ -21,23 +21,23 @@ use std::f32::consts::TAU;
 
 struct Mark {
     at: Vec2,
-    mass: f32,
+    materials: f32,
 }
 
 struct Cluster {
     marks: Vec<usize>,
     centre: Vec2,
-    mass: f32,
+    materials: f32,
 }
 
 fn merge(a: &mut Cluster, b: Cluster) {
-    let mass = a.mass + b.mass;
-    a.centre = if mass > 0.0 {
-        (a.centre * a.mass + b.centre * b.mass) / mass
+    let materials = a.materials + b.materials;
+    a.centre = if materials > 0.0 {
+        (a.centre * a.materials + b.centre * b.materials) / materials
     } else {
         (a.centre + b.centre) * 0.5
     };
-    a.mass = mass;
+    a.materials = materials;
     a.marks.extend(b.marks);
 }
 
@@ -46,7 +46,7 @@ fn cluster_marks(marks: &[Mark], radius: f32) -> Vec<Cluster> {
     let single = |(i, m): (usize, &Mark)| Cluster {
         marks: vec![i],
         centre: m.at,
-        mass: m.mass,
+        materials: m.materials,
     };
     // A big field is first binned into half-radius cells, so the pairwise
     // joining below only ever sees a screenful of cells, never every wreck.
@@ -95,13 +95,13 @@ fn cluster_marks(marks: &[Mark], radius: f32) -> Vec<Cluster> {
     groups
 }
 
-fn reclaim_mass(s: &Scene, u: &UnitInstance) -> f32 {
+fn reclaim_materials(s: &Scene, u: &UnitInstance) -> f32 {
     let flags = u.owner_flags;
     if flags & (KIND_GHOST | KIND_PROP | STATE_RADAR | STATE_UNIDENTIFIED) != 0 {
         return 0.0;
     }
     let bp = s.bp(u);
-    let cost = bp.cost_mass.to_f32();
+    let cost = bp.cost_materials.to_f32();
     if flags & KIND_WRECK == 0 || u.packed == WRECK_FALLING || u.is_wreck_extra() {
         return 0.0;
     }
@@ -137,8 +137,8 @@ fn join_radius(camera_distance: f32) -> f32 {
 
 /// A zoomed-out wreck's pip radius, in points: a scrap heap is a dot, a
 /// fallen titan a mark worth walking to.
-fn pip_radius(mass: f32) -> f32 {
-    (1.6 + mass.max(0.0).sqrt() * 0.1).clamp(2.4, 4.8)
+fn pip_radius(materials: f32) -> f32 {
+    (1.6 + materials.max(0.0).sqrt() * 0.1).clamp(2.4, 4.8)
 }
 
 /// 1 up close, where every wreck gets its own leader; 0 once zoomed out far
@@ -159,8 +159,8 @@ pub(super) fn draw(ui: &mut Ui, s: &Scene, open: f32) {
     let viewport = s.camera.viewport;
     let mut marks = Vec::new();
     for u in &s.view.frame.units {
-        let mass = reclaim_mass(s, u);
-        if mass < 0.5 {
+        let materials = reclaim_materials(s, u);
+        if materials < 0.5 {
             continue;
         }
         let xy = Vec2::new(u.pos[0], u.pos[1]);
@@ -170,7 +170,10 @@ pub(super) fn draw(ui: &mut Ui, s: &Scene, open: f32) {
         if p.x < -80.0 || p.y < -80.0 || p.x > viewport.x + 80.0 || p.y > viewport.y + 80.0 {
             continue;
         }
-        marks.push(Mark { at: p / ui.s, mass });
+        marks.push(Mark {
+            at: p / ui.s,
+            materials,
+        });
     }
     let groups = cluster_marks(&marks, join_radius(s.camera.distance));
     let detail = leader_detail(s.camera.distance);
@@ -198,7 +201,7 @@ pub(super) fn draw(ui: &mut Ui, s: &Scene, open: f32) {
         let lift_far = ring + 16.0;
         let lift = lift_near + (lift_far - lift_near) * field;
         let label = g.centre + Vec2::new(0.0, -lift);
-        let text = format!("+{}", super::whole(g.mass));
+        let text = format!("+{}", super::whole(g.materials));
         let count = (n > 1).then(|| format!("{n}"));
         let tw = ui.text_width(type_scale::CAPTION, &text);
         let cw = count
@@ -206,26 +209,26 @@ pub(super) fn draw(ui: &mut Ui, s: &Scene, open: f32) {
             .map_or(0.0, |c| ui.text_width(type_scale::CAPTION, c) + 10.0);
         let w = tw + 18.0 + cw * field;
         let r = Rect::new(label.x - w * 0.5, label.y - 9.0, w, 18.0);
-        let a = rise * if g.mass >= 1.0 { 1.0 } else { 0.55 };
+        let a = rise * if g.materials >= 1.0 { 1.0 } else { 0.55 };
         for &i in &g.marks {
             let at = marks[i].at;
             if own > 0.01 {
-                // Grow from the mass out to the label, and stay joined while Control is held.
+                // Grow from the materials out to the label, and stay joined while Control is held.
                 let la = a * own;
                 let anchor = label_join(r, at);
                 let tip = at.lerp(anchor, rise);
                 let mid = tip.lerp(at, 0.55);
-                ui.stroke(tip, mid, 1.15, rgb(MASS, 0.55 * la));
-                ui.stroke(mid, at, 1.35, rgb(MASS, 0.9 * la));
-                let tick = (ui.time * 0.55 + marks[i].mass * 0.01).fract();
+                ui.stroke(tip, mid, 1.15, rgb(MATERIALS, 0.55 * la));
+                ui.stroke(mid, at, 1.35, rgb(MATERIALS, 0.9 * la));
+                let tick = (ui.time * 0.55 + marks[i].materials * 0.01).fract();
                 let glint = at.lerp(tip, tick);
                 ui.arc(glint, 1.6, 0.0, TAU, 1.4, rgb(0xFFFFFF, 0.55 * la * pulse));
-                ui.arc(at, 3.2 + pulse, 0.0, TAU, 1.3, rgb(MASS, 0.9 * la));
+                ui.arc(at, 3.2 + pulse, 0.0, TAU, 1.3, rgb(MATERIALS, 0.9 * la));
             }
         }
         if field > 0.01 {
             // Zoomed out, a wreck is a pip inside its group's brackets, sized by
-            // its mass. Every dark rim goes down before any fill, so a dense field
+            // its materials. Every dark rim goes down before any fill, so a dense field
             // stays a cluster of dots instead of rims eating their neighbours.
             let fa = a * field;
             // A pip is one quad (`dot`), not a fan of them: a late survival match
@@ -233,11 +236,11 @@ pub(super) fn draw(ui: &mut Ui, s: &Scene, open: f32) {
             // overlay, so the panels drawn after it flickered out.
             for &i in &g.marks {
                 let m = &marks[i];
-                ui.dot(m.at, pip_radius(m.mass) + 1.3, ink(0.8 * fa));
+                ui.dot(m.at, pip_radius(m.materials) + 1.3, ink(0.8 * fa));
             }
             for &i in &g.marks {
                 let m = &marks[i];
-                ui.dot(m.at, pip_radius(m.mass), rgb(MASS, fa));
+                ui.dot(m.at, pip_radius(m.materials), rgb(MATERIALS, fa));
             }
         }
         if field > 0.01 {
@@ -255,12 +258,12 @@ pub(super) fn draw(ui: &mut Ui, s: &Scene, open: f32) {
                     at - half,
                     at + half,
                     1.3,
-                    rgb(MASS, 0.75 * fa),
+                    rgb(MATERIALS, 0.75 * fa),
                 );
             }
             let tip = top.lerp(Vec2::new(label.x, r.bottom()), rise);
-            ui.stroke(top, tip, 1.2, rgb(MASS, 0.8 * fa));
-            let tick = (ui.time * 0.55 + g.mass * 0.01).fract();
+            ui.stroke(top, tip, 1.2, rgb(MATERIALS, 0.8 * fa));
+            let tick = (ui.time * 0.55 + g.materials * 0.01).fract();
             ui.arc(
                 top.lerp(tip, tick),
                 1.6,
@@ -271,12 +274,12 @@ pub(super) fn draw(ui: &mut Ui, s: &Scene, open: f32) {
             );
         }
         ui.fill(r, ink(0.72 * a));
-        ui.fill(Rect::new(r.x, r.y, r.w, 1.0), rgb(MASS, 0.9 * a));
+        ui.fill(Rect::new(r.x, r.y, r.w, 1.0), rgb(MATERIALS, 0.9 * a));
         ui.text(
             r.x + 9.0,
             r.mid_y(),
             type_scale::CAPTION,
-            rgb(MASS, a),
+            rgb(MATERIALS, a),
             &text,
         );
         if let Some(c) = count.filter(|_| field > 0.01) {
@@ -296,8 +299,8 @@ pub(super) fn draw(ui: &mut Ui, s: &Scene, open: f32) {
 const REACH_SEGMENTS: usize = 64;
 
 /// Every salvage unit in sight while the survey is up: its strategic icon redrawn
-/// in mass colour on a dark badge ringed in its owner's colour, and for the player's
-/// own, its reach on the ground and (a reclaimer's) mass a second.
+/// in materials colour on a dark badge ringed in its owner's colour, and for the player's
+/// own, its reach on the ground and (a reclaimer's) materials a second.
 fn salvage_badges(ui: &mut Ui, s: &Scene, rise: f32) {
     let viewport = s.camera.viewport;
     let pulse = 0.65 + 0.35 * (ui.time * 2.4).sin();
@@ -341,7 +344,7 @@ fn salvage_badges(ui: &mut Ui, s: &Scene, rise: f32) {
                 })
                 .collect();
             if ring.len() == REACH_SEGMENTS {
-                ui.polyline(&ring, 1.3, rgb(MASS, 0.45 * rise), true);
+                ui.polyline(&ring, 1.3, rgb(MATERIALS, 0.45 * rise), true);
             }
         }
         // About the size of the world icon (`px` output pixels either side, the symbol a
@@ -352,14 +355,21 @@ fn salvage_badges(ui: &mut Ui, s: &Scene, rise: f32) {
         let team = s.team_color(owner);
         ui.disc(c, badge, ink(0.8 * rise));
         ui.arc(c, badge, 0.0, TAU, 1.3, [team[0], team[1], team[2], rise]);
-        ui.arc(c, badge + 2.0 + pulse, 0.0, TAU, 1.1, rgb(MASS, 0.7 * rise));
+        ui.arc(
+            c,
+            badge + 2.0 + pulse,
+            0.0,
+            TAU,
+            1.1,
+            rgb(MATERIALS, 0.7 * rise),
+        );
         icons::strategic(
             ui,
             bp.visual.icon,
             0,
             c,
             size * 0.6,
-            rgb(MASS, rise),
+            rgb(MATERIALS, rise),
             ink(0.9 * rise),
         );
         if let Some(rec) = bp.reclaimer.as_ref().filter(|_| own && px > 14.0) {
@@ -367,7 +377,7 @@ fn salvage_badges(ui: &mut Ui, s: &Scene, rise: f32) {
                 c.x + badge + 6.0,
                 c.y,
                 type_scale::CAPTION,
-                rgb(MASS, rise),
+                rgb(MATERIALS, rise),
                 &format!("+{}/s", super::whole(rec.power.to_f32())),
             );
         }
@@ -383,15 +393,15 @@ pub(super) fn cue(ui: &Ui, on: bool) {
 mod tests {
     use super::*;
 
-    fn mark(x: f32, y: f32, mass: f32) -> Mark {
+    fn mark(x: f32, y: f32, materials: f32) -> Mark {
         Mark {
             at: Vec2::new(x, y),
-            mass,
+            materials,
         }
     }
 
     #[test]
-    fn nearby_mass_becomes_one_label() {
+    fn nearby_materials_becomes_one_label() {
         let marks = vec![
             mark(0.0, 0.0, 10.0),
             mark(20.0, 0.0, 30.0),
@@ -400,7 +410,7 @@ mod tests {
         let groups = cluster_marks(&marks, 40.0);
         assert_eq!(groups.len(), 2);
         let joined = groups.iter().find(|g| g.marks.len() == 2).unwrap();
-        assert!((joined.mass - 40.0).abs() < 0.01);
+        assert!((joined.materials - 40.0).abs() < 0.01);
         assert!(joined.centre.x > 10.0 && joined.centre.x < 20.0);
     }
 
@@ -427,13 +437,13 @@ mod tests {
     }
 
     #[test]
-    fn a_big_field_joins_without_losing_mass() {
+    fn a_big_field_joins_without_losing_materials() {
         let marks: Vec<Mark> = (0..400)
             .map(|i| mark((i % 20) as f32 * 9.0, (i / 20) as f32 * 9.0, 2.0))
             .collect();
         let groups = cluster_marks(&marks, 200.0);
         assert!(groups.len() <= 2, "{} groups", groups.len());
-        let total: f32 = groups.iter().map(|g| g.mass).sum();
+        let total: f32 = groups.iter().map(|g| g.materials).sum();
         assert!((total - 800.0).abs() < 0.1);
         assert_eq!(groups.iter().map(|g| g.marks.len()).sum::<usize>(), 400);
     }

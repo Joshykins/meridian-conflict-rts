@@ -10,7 +10,7 @@ use mc_data::{cat, BlueprintId, Blueprints, UnitBlueprint};
 /// The curves a chart can show, one value per side per sample.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Metric {
-    MassIncome,
+    MaterialsIncome,
     EnergyIncome,
     Collected,
     Spending,
@@ -26,7 +26,7 @@ pub enum Metric {
 
 impl Metric {
     pub const ALL: [Metric; 12] = [
-        Metric::MassIncome,
+        Metric::MaterialsIncome,
         Metric::EnergyIncome,
         Metric::Collected,
         Metric::Spending,
@@ -42,7 +42,7 @@ impl Metric {
 
     pub fn name(self) -> &'static str {
         match self {
-            Metric::MassIncome => "Materials Income",
+            Metric::MaterialsIncome => "Materials Income",
             Metric::EnergyIncome => "Energy Income",
             Metric::Collected => "Materials Collected",
             Metric::Spending => "Spending",
@@ -60,7 +60,7 @@ impl Metric {
     /// What a value is counted in, after the figure.
     pub fn unit(self) -> &'static str {
         match self {
-            Metric::MassIncome | Metric::Spending | Metric::ReclaimRate => "/s",
+            Metric::MaterialsIncome | Metric::Spending | Metric::ReclaimRate => "/s",
             Metric::EnergyIncome => "e/s",
             Metric::Efficiency => "%",
             Metric::ArmySize => "units",
@@ -263,7 +263,7 @@ pub fn short(v: f32) -> String {
 
 /// The worth of a unit for the report: its materials.
 fn worth(bp: &UnitBlueprint) -> f32 {
-    bp.cost_mass.to_f32()
+    bp.cost_materials.to_f32()
 }
 
 fn experimental(bp: &UnitBlueprint) -> bool {
@@ -428,14 +428,14 @@ impl Analysis {
                 if s.defeated_at.is_some_and(|t| sample.tick > t) {
                     continue;
                 }
-                s.mined += v.mass_income * dt;
+                s.mined += v.materials_income * dt;
                 // The record keeps the exact running total.
                 s.reclaimed = v.reclaimed;
                 s.energy_collected += v.energy_income * dt;
-                s.spent += v.mass_spent * dt;
-                s.peak_income = s.peak_income.max(v.mass_income + v.reclaim_income);
+                s.spent += v.materials_spent * dt;
+                s.peak_income = s.peak_income.max(v.materials_income + v.reclaim_income);
                 s.efficiency += v.efficiency.clamp(0.0, 1.0);
-                if v.efficiency < 0.9 && v.mass_spent + v.energy_spent > 0.0 {
+                if v.efficiency < 0.9 && v.materials_spent + v.energy_spent > 0.0 {
                     s.stalled += dt;
                 }
                 if v.army_value > s.peak_army {
@@ -461,13 +461,13 @@ impl Analysis {
     fn salvage(&mut self, c: &Chronicle, blueprints: &Blueprints) {
         for f in &c.frames {
             for (side, sf) in f.sides.iter().enumerate() {
-                for &(cell, mass) in &sf.salvage {
+                for &(cell, materials) in &sf.salvage {
                     if let Some(v) = self
                         .salvage
                         .get_mut(side)
                         .and_then(|m| m.get_mut(cell as usize))
                     {
-                        *v += mass;
+                        *v += materials;
                     }
                 }
             }
@@ -482,7 +482,7 @@ impl Analysis {
                     pos: w.pos,
                     blueprint: w.blueprint,
                     by: w.by,
-                    value: (bp.cost_mass * bp.wreck_fraction).to_f32(),
+                    value: (bp.cost_materials * bp.wreck_fraction).to_f32(),
                 }
             })
             .collect();
@@ -628,15 +628,15 @@ impl Analysis {
                 let v = sample.sides.get(i).copied().unwrap_or_default();
                 let gone = self.sides[i].defeated_at.is_some_and(|t| sample.tick > t);
                 if !gone {
-                    collected[i] += v.mass_income * dt;
+                    collected[i] += v.materials_income * dt;
                 }
                 let live = |x: f32| if gone { 0.0 } else { x };
                 let values = [
-                    live(v.mass_income + v.reclaim_income),
+                    live(v.materials_income + v.reclaim_income),
                     live(v.energy_income),
                     collected[i] + v.reclaimed,
-                    live(v.mass_spent),
-                    live(v.mass),
+                    live(v.materials_spent),
+                    live(v.materials),
                     live(v.efficiency.clamp(0.0, 1.0) * 100.0),
                     live(v.army_value),
                     live(v.army as f32),
@@ -1125,7 +1125,7 @@ fn leads(a: &Analysis, c: &Chronicle, out: &mut Vec<Moment>) {
     const HOLD: u32 = 60 * TICKS_PER_SECOND;
     for (metric, what, floor) in [
         (Metric::ArmyValue, "army strength", 500.0),
-        (Metric::MassIncome, "income", 15.0),
+        (Metric::MaterialsIncome, "income", 15.0),
     ] {
         let curves: Vec<&[f32]> = (0..a.sides.len()).map(|i| a.curve(metric, i)).collect();
         let mut leader: Option<usize> = None;

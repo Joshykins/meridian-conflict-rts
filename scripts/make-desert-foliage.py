@@ -162,7 +162,7 @@ def cottonwood_cluster(canvas, rng):
 
 
 def cottonwood_clump(canvas, rng):
-    """Bottom right: a lobed mass of leaves pointing outward, for far crowns."""
+    """Bottom right: a lobed materials of leaves pointing outward, for far crowns."""
     cx, cy = N * 0.75, N * 0.75
     lobes = [(rng.uniform(0, math.tau), rng.uniform(0.75, 1.0)) for _ in range(6)]
 

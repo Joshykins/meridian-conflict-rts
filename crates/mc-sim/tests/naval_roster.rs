@@ -581,7 +581,7 @@ fn any_reclaimer_reaches_a_wreck_in_deep_water() {
         .expect("a wreck on the bed");
     let wreck = w.state.wrecks.slots.handle(at);
     assert!(Fx::from_int(WATER) - w.state.wrecks.z[at] > Fx::from_int(10));
-    let mass = w.state.wrecks.mass[at];
+    let materials = w.state.wrecks.materials[at];
 
     // An engineer hovering right over it reaches down 17 m.
     let engineer = spawn(&mut w, "aster_t1_engineer", 0, 1000, 1050, 0);
@@ -596,10 +596,10 @@ fn any_reclaimer_reaches_a_wreck_in_deep_water() {
     );
     run(&mut w, 100);
     assert!(
-        w.state.wrecks.slots.is_alive(at) && w.state.wrecks.mass[at] < mass,
+        w.state.wrecks.slots.is_alive(at) && w.state.wrecks.materials[at] < materials,
         "the engineer did not reclaim a deep wreck"
     );
-    let mass = w.state.wrecks.mass[at];
+    let materials = w.state.wrecks.materials[at];
     order(
         &mut w,
         0,
@@ -626,11 +626,11 @@ fn any_reclaimer_reaches_a_wreck_in_deep_water() {
         w.tick(&[]).unwrap();
         let r = row(&w, reclaimer);
         let left = if w.state.wrecks.slots.is_alive(at) {
-            w.state.wrecks.mass[at]
+            w.state.wrecks.materials[at]
         } else {
             Fx::ZERO
         };
-        if left < mass && started.is_none() {
+        if left < materials && started.is_none() {
             started = Some(t);
             assert!(
                 w.state.units.pos[r].distance(FxVec2::from_ints(1250, 1000)) < Fx::from_int(5),

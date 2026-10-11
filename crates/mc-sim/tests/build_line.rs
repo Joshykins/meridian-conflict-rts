@@ -138,7 +138,7 @@ fn build_a_row(key: &str, builders: &[(&str, i32, i32, u16)]) {
 #[test]
 fn builders_from_all_sides_build_the_row_together() {
     build_a_row(
-        "aster_mass_storage",
+        "aster_materials_storage",
         &[
             ("aster_t1_engineer", 500, 400, 1000),
             ("aster_t1_engineer", 700, 620, 1000),

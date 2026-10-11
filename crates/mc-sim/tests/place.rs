@@ -432,7 +432,7 @@ fn packed_generators_leave_a_lane() {
 #[test]
 fn packed_storage_leaves_a_lane() {
     for key in [
-        "aster_mass_storage",
+        "aster_materials_storage",
         "aster_energy_storage",
         "aster_t2_shield",
     ] {

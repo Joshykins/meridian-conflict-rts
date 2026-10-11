@@ -234,7 +234,7 @@ pub(super) fn km(m: f32) -> String {
     format!("{:.1} km", m / 1000.0)
 }
 
-pub(super) fn mass(v: i64) -> String {
+pub(super) fn materials(v: i64) -> String {
     if v >= 10_000_000 {
         format!("{:.0}M", v as f32 / 1e6)
     } else if v >= 1_000_000 {

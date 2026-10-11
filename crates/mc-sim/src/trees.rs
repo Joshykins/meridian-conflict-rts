@@ -5,7 +5,7 @@
 //!
 //! The field is one effect over the whole lot, not a beam per tree: a wave
 //! runs out from the middle every `WAVE_TICKS`, each taking the trees out to
-//! its own reach, until the last reaches the edge. Trees carry no mass, so it
+//! its own reach, until the last reaches the edge. Trees carry no materials, so it
 //! pays nothing. Either way the tree is gone from `props_dead`'s point of view;
 //! the renderer is told which (`SimEvent::TreeVaporized`, `TreeTrampled`) so it
 //! can dissolve it or lay it down.

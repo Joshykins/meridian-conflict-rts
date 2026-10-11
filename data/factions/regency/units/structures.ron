@@ -1,13 +1,13 @@
-// The Regency's own structures: the tech 1 core every side fields (factories, mass, power,
+// The Regency's own structures: the tech 1 core every side fields (factories, materials, power,
 // storage, point defence, anti-air, radar, walls), built as Regency machines: dark armour
 // plates lapped over bronze machinery that works. They are not ARC's buildings in black:
 // each one bends the shared job toward how the Regency fight.
 //
 // - Excavator: cuts the ore with an excavation beam and needs no power, but costs more
-//   mass up front.
+//   materials up front.
 // - Power Generator: gravity squeezes plasma to a star's pressure until it fuses; it never
 //   explodes, so generators can be packed tight where ARC reactors cannot.
-// - Reliquary: one building holds mass and energy both, in three tiers.
+// - Reliquary: one building holds materials and energy both, in three tiers.
 // - Picket, Halberd, Sunspear: point defence of the Sentinel's, Redoubt's and Citadel's
 //   reach and weight; the Halberd and Sunspear trade some damage for a wider burst.
 // - Canopy: a repeater of bursting bolts that hurts a whole flight, not one plane.
@@ -30,7 +30,7 @@
         tech: 1,
         categories: ["Land", "Factory"],
         health: 4600,
-        cost: (mass: 250, energy: 2000, time: 320),
+        cost: (materials: 250, energy: 2000, time: 320),
         radius: 46, height: 22, footprint: (8, 8),
         vision: 200,
         builder: (power: 20, range: 0, builds: [
@@ -49,7 +49,7 @@
         tech: 2,
         categories: ["Land", "Factory"],
         health: 9200,
-        cost: (mass: 3100, energy: 24000, time: 3900),
+        cost: (materials: 3100, energy: 24000, time: 3900),
         radius: 46, height: 22, footprint: (8, 8),
         vision: 200,
         builder: (power: 120, range: 0, builds: [
@@ -68,7 +68,7 @@
         tech: 3,
         categories: ["Land", "Factory"],
         health: 18500,
-        cost: (mass: 9300, energy: 76000, time: 10600),
+        cost: (materials: 9300, energy: 76000, time: 10600),
         radius: 46, height: 35, footprint: (8, 8),
         vision: 200,
         builder: (power: 360, range: 0, builds: [
@@ -84,7 +84,7 @@
         tech: 1,
         categories: ["Land", "Air", "Factory"],
         health: 4400,
-        cost: (mass: 250, energy: 2000, time: 320),
+        cost: (materials: 250, energy: 2000, time: 320),
         radius: 46, height: 30, footprint: (8, 8),
         vision: 200,
         builder: (power: 20, range: 0, builds: [
@@ -103,7 +103,7 @@
         tech: 2,
         categories: ["Land", "Air", "Factory"],
         health: 8800,
-        cost: (mass: 3100, energy: 24000, time: 3900),
+        cost: (materials: 3100, energy: 24000, time: 3900),
         radius: 46, height: 30, footprint: (8, 8),
         vision: 200,
         // The Regency have no fire bomber.
@@ -123,7 +123,7 @@
         tech: 3,
         categories: ["Land", "Air", "Factory"],
         health: 17600,
-        cost: (mass: 9300, energy: 76000, time: 10600),
+        cost: (materials: 9300, energy: 76000, time: 10600),
         radius: 46, height: 38, footprint: (8, 8),
         vision: 200,
         builder: (power: 360, range: 0, builds: [
@@ -139,7 +139,7 @@
         tech: 1,
         categories: ["Naval", "Factory"],
         health: 4600,
-        cost: (mass: 270, energy: 2100, time: 330),
+        cost: (materials: 270, energy: 2100, time: 330),
         radius: 46, height: 20, footprint: (8, 8),
         vision: 200, water_build: true,
         builder: (power: 20, range: 0, builds: [
@@ -156,7 +156,7 @@
         tech: 2,
         categories: ["Naval", "Factory"],
         health: 9200,
-        cost: (mass: 3100, energy: 25500, time: 3800),
+        cost: (materials: 3100, energy: 25500, time: 3800),
         radius: 46, height: 24, footprint: (8, 8),
         vision: 200, water_build: true,
         builder: (power: 120, range: 0, builds: [
@@ -173,7 +173,7 @@
         tech: 3,
         categories: ["Naval", "Factory"],
         health: 18500,
-        cost: (mass: 9100, energy: 80500, time: 10200),
+        cost: (materials: 9100, energy: 80500, time: 10200),
         radius: 46, height: 32, footprint: (8, 8),
         vision: 200, water_build: true,
         builder: (power: 360, range: 0, builds: [
@@ -198,10 +198,10 @@
         tech: 1,
         categories: ["Land", "Economy", "Extractor"],
         health: 600,
-        cost: (mass: 45, energy: 270, time: 60),
+        cost: (materials: 45, energy: 270, time: 60),
         radius: 12.8, height: 11, footprint: (3, 3),
         vision: 300,
-        economy: (mass_storage: 100, energy_upkeep: 2),
+        economy: (materials_storage: 100, energy_upkeep: 2),
         // The beam lifts the ore with no hammer: no blows to show or hear.
         mine: (
             reach: 1000,
@@ -209,7 +209,7 @@
         ),
         upgrade_power: 15,
         upgrades_to: "regency_t2_extractor",
-        adjacency: Mass,
+        adjacency: Materials,
         mesh: "regency_taproot", icon: Extractor,
     ),
     (
@@ -219,17 +219,17 @@
         tech: 2,
         categories: ["Land", "Economy", "Extractor"],
         health: 2000,
-        cost: (mass: 750, energy: 4500, time: 1100),
+        cost: (materials: 750, energy: 4500, time: 1100),
         radius: 12.8, height: 15, footprint: (3, 3),
         vision: 360,
-        economy: (mass_storage: 200, energy_upkeep: 8),
+        economy: (materials_storage: 200, energy_upkeep: 8),
         mine: (
             reach: 1000,
             ground: 0.00486, per_hectare: 2.7, base: 0.9, grow_upkeep: 40, hammer: false,
         ),
         upgrade_power: 40,
         upgrades_to: "regency_t3_extractor",
-        adjacency: Mass,
+        adjacency: Materials,
         mesh: "regency_taproot", icon: Extractor,
     ),
     (
@@ -239,17 +239,17 @@
         tech: 3,
         categories: ["Land", "Economy", "Extractor"],
         health: 5000,
-        cost: (mass: 4000, energy: 24000, time: 6000),
+        cost: (materials: 4000, energy: 24000, time: 6000),
         radius: 12.8, height: 19, footprint: (3, 3),
         vision: 420,
-        economy: (mass_storage: 400, energy_upkeep: 30),
+        economy: (materials_storage: 400, energy_upkeep: 30),
         mine: (
             reach: 1000,
             ground: 0.01134, per_hectare: 6.3, base: 2.1, grow_upkeep: 150, hammer: false,
         ),
         upgrade_power: 60,
         upgrades_to: "regency_t4_extractor",
-        adjacency: Mass,
+        adjacency: Materials,
         mesh: "regency_taproot", icon: Extractor,
     ),
     (
@@ -259,15 +259,15 @@
         tech: 4,
         categories: ["Land", "Economy", "Extractor"],
         health: 10000,
-        cost: (mass: 11000, energy: 66000, time: 15000),
+        cost: (materials: 11000, energy: 66000, time: 15000),
         radius: 12.8, height: 19, footprint: (3, 3),
         vision: 480,
-        economy: (mass_storage: 800, energy_upkeep: 60),
+        economy: (materials_storage: 800, energy_upkeep: 60),
         mine: (
             reach: 1000,
             ground: 0.01944, per_hectare: 10.8, base: 3.6, grow_upkeep: 300, hammer: false,
         ),
-        adjacency: Mass,
+        adjacency: Materials,
         mesh: "regency_taproot", icon: Extractor,
     ),
     // Gravity compresses plasma to the pressure inside a star until it fuses: it gives what
@@ -281,7 +281,7 @@
         tech: 1,
         categories: ["Land", "Economy", "Power"],
         health: 760,
-        cost: (mass: 125, energy: 750, time: 210),
+        cost: (materials: 125, energy: 750, time: 210),
         radius: 6.9, height: 7.5, footprint: (2, 2),
         vision: 120,
         economy: (energy_income: 25),
@@ -299,7 +299,7 @@
         tech: 2,
         categories: ["Land", "Economy", "Power"],
         health: 2200,
-        cost: (mass: 700, energy: 4200, time: 1400),
+        cost: (materials: 700, energy: 4200, time: 1400),
         radius: 18.75, height: 18, footprint: (4, 4),
         vision: 160,
         economy: (energy_income: 350),
@@ -315,7 +315,7 @@
         tech: 3,
         categories: ["Land", "Economy", "Power"],
         health: 9720,
-        cost: (mass: 2800, energy: 16800, time: 4800),
+        cost: (materials: 2800, energy: 16800, time: 4800),
         radius: 42.5, height: 35, footprint: (8, 8),
         vision: 200,
         economy: (energy_income: 2000),
@@ -336,12 +336,12 @@
         tech: 2,
         categories: ["Land", "Economy"],
         health: 1200,
-        cost: (mass: 900, energy: 5400, time: 1300),
+        cost: (materials: 900, energy: 5400, time: 1300),
         radius: 11, height: 16, footprint: (2, 2), hull: (7.0, 7.0),
         vision: 120,
         economy: (energy_upkeep: 350),
-        fabricator: (mass: 1.5),
-        adjacency: Mass,
+        fabricator: (materials: 1.5),
+        adjacency: Materials,
         death_blast: (radius: 50, damage: 3500),
         upgrades_to: "regency_t3_fabricator",
         mesh: "regency_fabricator", icon: Extractor,
@@ -354,19 +354,19 @@
         tech: 3,
         categories: ["Land", "Economy"],
         health: 3000,
-        cost: (mass: 2500, energy: 15000, time: 3600),
+        cost: (materials: 2500, energy: 15000, time: 3600),
         radius: 11, height: 22, footprint: (2, 2), hull: (7.0, 7.0),
         vision: 140,
         economy: (energy_upkeep: 1000),
-        fabricator: (mass: 5),
-        adjacency: Mass,
+        fabricator: (materials: 5),
+        adjacency: Materials,
         death_blast: (radius: 80, damage: 12500),
         mesh: "regency_fabricator", icon: Extractor,
         sounds: (death: "reactor_blast"),
     ),
-    // A mass vault between two energy cells: less mass than a Vault, less energy than a
+    // A materials vault between two energy cells: fewer materials than a Vault, less energy than a
     // Capacitor Bank, in one lot and one build. It upgrades in place, each tier holding four
-    // times the one below as ARC's stores do, for about two thirds of the mass and half the
+    // times the one below as ARC's stores do, for about two thirds of the materials and half the
     // energy the two ARC stores of that tier cost together.
     (
         key: "regency_storage",
@@ -375,10 +375,10 @@
         tech: 1,
         categories: ["Land", "Economy", "Storage"],
         health: 1800,
-        cost: (mass: 180, energy: 1800, time: 320),
+        cost: (materials: 180, energy: 1800, time: 320),
         radius: 12.9, height: 8, footprint: (3, 3),
         vision: 100,
-        economy: (mass_storage: 1000, energy_storage: 3000),
+        economy: (materials_storage: 1000, energy_storage: 3000),
         upgrades_to: "regency_storage_t2",
         mesh: "regency_cyst", icon: Storage,
     ),
@@ -389,10 +389,10 @@
         tech: 2,
         categories: ["Land", "Economy", "Storage"],
         health: 5400,
-        cost: (mass: 540, energy: 4400, time: 900),
+        cost: (materials: 540, energy: 4400, time: 900),
         radius: 12.9, height: 12, footprint: (3, 3),
         vision: 100,
-        economy: (mass_storage: 4000, energy_storage: 12000),
+        economy: (materials_storage: 4000, energy_storage: 12000),
         upgrades_to: "regency_storage_t3",
         mesh: "regency_cyst", icon: Storage,
     ),
@@ -403,10 +403,10 @@
         tech: 3,
         categories: ["Land", "Economy", "Storage"],
         health: 16200,
-        cost: (mass: 1340, energy: 17700, time: 1500),
+        cost: (materials: 1340, energy: 17700, time: 1500),
         radius: 12.9, height: 16, footprint: (3, 3),
         vision: 100,
-        economy: (mass_storage: 16000, energy_storage: 48000),
+        economy: (materials_storage: 16000, energy_storage: 48000),
         mesh: "regency_cyst", icon: Storage,
         sounds: (death: "blast_large"),
     ),
@@ -424,7 +424,7 @@
         tech: 2,
         categories: ["Land", "Defense", "Shield"],
         health: 2400,
-        cost: (mass: 960, energy: 12800, time: 1700),
+        cost: (materials: 960, energy: 12800, time: 1700),
         radius: 13.9, height: 26, footprint: (3, 3), hull: (6.9, 6.9),
         vision: 140,
         economy: (energy_upkeep: 220),
@@ -444,7 +444,7 @@
         tech: 3,
         categories: ["Land", "Defense", "Shield"],
         health: 6000,
-        cost: (mass: 3000, energy: 38400, time: 4300),
+        cost: (materials: 3000, energy: 38400, time: 4300),
         radius: 13.9, height: 32, footprint: (3, 3), hull: (6.9, 6.9),
         vision: 160,
         economy: (energy_upkeep: 540),
@@ -464,7 +464,7 @@
         tech: 1,
         categories: ["Land", "Defense", "DirectFire"],
         health: 1300,
-        cost: (mass: 250, energy: 2000, time: 250),
+        cost: (materials: 250, energy: 2000, time: 250),
         radius: 5.5, height: 8, footprint: (1, 1),
         vision: 360,
         weapons: [(
@@ -492,7 +492,7 @@
         tech: 2,
         categories: ["Land", "Defense", "DirectFire"],
         health: 7800,
-        cost: (mass: 1000, energy: 9000, time: 2000),
+        cost: (materials: 1000, energy: 9000, time: 2000),
         radius: 10.5, height: 11, footprint: (2, 2),
         vision: 300,
         weapons: [(
@@ -526,7 +526,7 @@
         tech: 3,
         categories: ["Land", "Defense", "DirectFire"],
         health: 20000,
-        cost: (mass: 2400, energy: 22000, time: 5400),
+        cost: (materials: 2400, energy: 22000, time: 5400),
         radius: 24, height: 24, footprint: (4, 4),
         vision: 360,
         weapons: [(
@@ -551,7 +551,7 @@
     // than the Halberd's), then pinches it out as one glob on a high arc that bursts and
     // sears the ground where it lands.
     //
-    // Counter-siege and coast defence, as the Onager (1500 mass, 7500 HP, 1400 every 5.5 s
+    // Counter-siege and coast defence, as the Onager (1500 materials, 7500 HP, 1400 every 5.5 s
     // at 1900 m, 36 m splash, 1 degree of spread), bent the Regency way: it hits harder
     // (1650) in a tighter blast (28 m), laid truer (0.8 degrees). Same reach, past the
     // Trebuchet's 1800, the Kiln's 1600 and the warships' guns, so a siege gun or a
@@ -568,7 +568,7 @@
         tech: 2,
         categories: ["Land", "Defense", "Artillery"],
         health: 7500,
-        cost: (mass: 1550, energy: 10850, time: 1600),
+        cost: (materials: 1550, energy: 10850, time: 1600),
         radius: 10.5, height: 12, footprint: (2, 2),
         vision: 260,
         weapons: [(
@@ -598,7 +598,7 @@
         tech: 1,
         categories: ["Land", "Naval", "Defense", "AntiAir"],
         health: 800,
-        cost: (mass: 140, energy: 1100, time: 400),
+        cost: (materials: 140, energy: 1100, time: 400),
         radius: 5.5, height: 7.5, footprint: (1, 1),
         vision: 450, water_build: true,
         weapons: [(
@@ -628,7 +628,7 @@
         tech: 2,
         categories: ["Land", "Naval", "Defense", "AntiAir"],
         health: 5800,
-        cost: (mass: 540, energy: 4800, time: 1600),
+        cost: (materials: 540, energy: 4800, time: 1600),
         radius: 10, height: 9, footprint: (2, 2),
         vision: 450, radar: 650, water_build: true,
         weapons: [(
@@ -660,7 +660,7 @@
         tech: 3,
         categories: ["Land", "Naval", "Defense", "AntiAir"],
         health: 10000,
-        cost: (mass: 1500, energy: 15000, time: 4500),
+        cost: (materials: 1500, energy: 15000, time: 4500),
         radius: 12, height: 14, footprint: (2, 2),
         vision: 450, water_build: true,
         weapons: [(
@@ -696,7 +696,7 @@
         tech: 2,
         categories: ["Land", "Defense"],
         health: 1800,
-        cost: (mass: 360, energy: 3600, time: 900),
+        cost: (materials: 360, energy: 3600, time: 900),
         radius: 5.25, height: 12, footprint: (1, 1),
         vision: 300,
         anti_missile: 300,
@@ -713,7 +713,7 @@
         tech: 3,
         categories: ["Land", "Defense"],
         health: 4200,
-        cost: (mass: 1100, energy: 12000, time: 1800),
+        cost: (materials: 1100, energy: 12000, time: 1800),
         radius: 5.25, height: 15, footprint: (1, 1),
         vision: 400,
         anti_missile: 450,
@@ -729,7 +729,7 @@
         tech: 1,
         categories: ["Land", "Wall", "Defense"],
         health: 5200,
-        cost: (mass: 4, energy: 20, time: 30),
+        cost: (materials: 4, energy: 20, time: 30),
         radius: 6, height: 5.4, footprint: (1, 1),
         vision: 0,
         mesh: "regency_palisade", icon: Wall,
@@ -745,7 +745,7 @@
         tech: 1,
         categories: ["Land", "Intel"],
         health: 300,
-        cost: (mass: 90, energy: 700, time: 90),
+        cost: (materials: 90, energy: 700, time: 90),
         radius: 7, height: 24, footprint: (2, 2),
         vision: 500, radar: 3000,
         economy: (energy_upkeep: 20),
@@ -759,7 +759,7 @@
         tech: 2,
         categories: ["Land", "Intel"],
         health: 900,
-        cost: (mass: 200, energy: 3600, time: 780),
+        cost: (materials: 200, energy: 3600, time: 780),
         radius: 7, height: 28, footprint: (2, 2),
         vision: 600, radar: 6000,
         economy: (energy_upkeep: 100),
@@ -773,7 +773,7 @@
         tech: 3,
         categories: ["Land", "Intel"],
         health: 2600,
-        cost: (mass: 800, energy: 11000, time: 2400),
+        cost: (materials: 800, energy: 11000, time: 2400),
         radius: 7, height: 32, footprint: (2, 2),
         vision: 720, radar: 12000,
         economy: (energy_upkeep: 1000),
@@ -792,7 +792,7 @@
         tech: 1,
         categories: ["Land", "Economy"],
         health: 1400,
-        cost: (mass: 130, energy: 900, time: 260),
+        cost: (materials: 130, energy: 900, time: 260),
         radius: 16.9, height: 28, footprint: (3, 3),
         vision: 400,
         reclaimer: (power: 7, range: 560, charge: 0.8, heads: [
@@ -809,7 +809,7 @@
         tech: 2,
         categories: ["Land", "Economy"],
         health: 3600,
-        cost: (mass: 450, energy: 3300, time: 820),
+        cost: (materials: 450, energy: 3300, time: 820),
         radius: 16.9, height: 28, footprint: (3, 3),
         vision: 600,
         reclaimer: (power: 45, range: 950, charge: 0.8, heads: [
@@ -828,7 +828,7 @@
         tech: 3,
         categories: ["Land", "Economy"],
         health: 10000,
-        cost: (mass: 1800, energy: 10500, time: 1650),
+        cost: (materials: 1800, energy: 10500, time: 1650),
         radius: 16.9, height: 28, footprint: (3, 3),
         vision: 900,
         reclaimer: (power: 220, range: 1450, charge: 0.8, heads: [

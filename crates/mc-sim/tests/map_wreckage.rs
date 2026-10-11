@@ -63,9 +63,12 @@ fn a_map_starts_with_its_wreckage_in_sight() {
     let mut w = world(&map);
     assert_eq!(w.state.wrecks.slots.live(), map.wrecks().len());
     for row in w.state.wrecks.slots.iter() {
-        let (mass, full) = (w.state.wrecks.mass[row], w.state.wrecks.mass_max[row]);
+        let (materials, full) = (
+            w.state.wrecks.materials[row],
+            w.state.wrecks.materials_max[row],
+        );
         assert!(
-            mass > mc_core::Fx::ZERO && mass <= full,
+            materials > mc_core::Fx::ZERO && materials <= full,
             "weathered, never over full"
         );
     }
@@ -87,18 +90,18 @@ fn a_map_starts_with_its_wreckage_in_sight() {
     // start. Weighted smoothly by distance: the baker snaps each start to the
     // build grid, so they can sit a few metres off true symmetry.
     let starts = map.start_positions();
-    let mass_near = |s: mc_core::FxVec2| -> f32 {
+    let materials_near = |s: mc_core::FxVec2| -> f32 {
         w.state
             .wrecks
             .slots
             .iter()
             .map(|r| {
                 let d = (w.state.wrecks.pos[r] - s).length().to_f32();
-                w.state.wrecks.mass[r].to_f32() * (-d / 1000.0).exp()
+                w.state.wrecks.materials[r].to_f32() * (-d / 1000.0).exp()
             })
             .sum()
     };
-    let (a, b) = (mass_near(starts[0]), mass_near(starts[1]));
+    let (a, b) = (materials_near(starts[0]), materials_near(starts[1]));
     assert!(a > 0.0 && (a - b).abs() < 0.02 * a, "{a} vs {b}");
     drop(map);
     let _ = std::fs::remove_file(path);
@@ -122,17 +125,18 @@ fn zz_map_salvage_report() {
     {
         let map = MapFile::open(path).unwrap();
         let players = map.start_positions().len().max(1) as f32;
-        let mut mass = 0.0;
+        let mut materials = 0.0;
         for w in map.wrecks() {
             let u = bp.unit(bp.id_of(&w.blueprint).unwrap());
-            mass += (u.cost_mass * u.wreck_fraction).to_f32() * w.mass_milli as f32 / 1000.0;
+            materials +=
+                (u.cost_materials * u.wreck_fraction).to_f32() * w.materials_milli as f32 / 1000.0;
         }
         println!(
-            "{:>16}: {:4} wrecks, {:7.0} mass, {:6.0} a player",
+            "{:>16}: {:4} wrecks, {:7.0} materials, {:6.0} a player",
             path.file_stem().unwrap().to_string_lossy(),
             map.wrecks().len(),
-            mass,
-            mass / players
+            materials,
+            materials / players
         );
     }
 }

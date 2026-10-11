@@ -71,7 +71,7 @@ impl World {
         match work {
             HeadWork::Wreck(w) => {
                 let wrecks = &self.state.wrecks;
-                if !wrecks.slots.is_alive(w) || wrecks.mass[w] <= Fx::ZERO {
+                if !wrecks.slots.is_alive(w) || wrecks.materials[w] <= Fx::ZERO {
                     return None;
                 }
                 let bp = self.blueprints.unit(wrecks.blueprint[w]);
@@ -201,7 +201,7 @@ impl World {
                 let w = e.row as usize;
                 if wrecks.slots.is_alive(w)
                     && wrecks.pos[w] == e.pos
-                    && wrecks.mass[w] > Fx::ZERO
+                    && wrecks.materials[w] > Fx::ZERO
                     && e.pos.distance(pos) <= r.range + e.radius
                     && self.wreck_known(w, units.owner[row])
                 {

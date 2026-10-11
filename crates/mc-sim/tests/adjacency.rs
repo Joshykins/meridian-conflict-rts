@@ -103,7 +103,7 @@ fn ring(w: &World, key: &str, r: Resource) -> f32 {
         .adjacency
         .unwrap();
     match r {
-        Resource::Mass => a.mass,
+        Resource::Materials => a.materials,
         Resource::Energy => a.energy,
     }
     .to_f32()
@@ -117,8 +117,8 @@ fn a_full_ring_saves_more_the_more_a_provider_makes() {
         ("aster_t2_power", Resource::Energy, 0.388),
         ("aster_t3_power", Resource::Energy, 0.6),
         ("regency_t1_power", Resource::Energy, 0.2006),
-        ("aster_t2_fabricator", Resource::Mass, 0.296),
-        ("aster_t3_fabricator", Resource::Mass, 0.4),
+        ("aster_t2_fabricator", Resource::Materials, 0.296),
+        ("aster_t3_fabricator", Resource::Materials, 0.4),
     ] {
         let got = ring(&w, key, r);
         assert!((got - want).abs() < 2e-3, "{key}: {got}");
@@ -202,9 +202,9 @@ fn fabricators_against_a_factory_save_its_materials_and_reactors_its_energy() {
     // The factory's lot is 96 m square: 384 m round. The fabricators each cover 24 m
     // of its east side, the reactor 36 m (804..840).
     let share = |key, r, m: f32| ring(&w, key, r) * m / 384.0;
-    let mass = share("aster_t3_fabricator", Resource::Mass, 24.0)
-        + share("aster_t2_fabricator", Resource::Mass, 24.0);
-    assert!((saving(&w, factory, Resource::Mass) - mass).abs() < 1e-3);
+    let materials = share("aster_t3_fabricator", Resource::Materials, 24.0)
+        + share("aster_t2_fabricator", Resource::Materials, 24.0);
+    assert!((saving(&w, factory, Resource::Materials) - materials).abs() < 1e-3);
     let energy = share("aster_t2_power", Resource::Energy, 36.0);
     assert!((saving(&w, factory, Resource::Energy) - energy).abs() < 1e-3);
 }

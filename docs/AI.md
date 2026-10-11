@@ -72,7 +72,7 @@ says it can do (`commander/profile.rs`).
   is near. Later bare-ground mines go only where they would get at least the skill's
   share of a whole circle of land, so the gaps between mines are left alone.
 - Mine upgrades go to the mine whose next tier pays back soonest (energy counted at 6
-  per mass), within the payback and as many at once as the economy sets
+  per materials), within the payback and as many at once as the economy sets
   (`commander/economy.rs`: more while the store fills). They wait while power is
   short, and each starts only with the energy to spare for its draw (`can_fund`,
   judged by the energy spent, not asked for). The economy focus (`direct_focus`)
@@ -107,7 +107,7 @@ says it can do (`commander/profile.rs`).
 - Fabricators are built when the side has energy to spare (power not wanted, the store
   three-quarters full), its materials are not piling up, its income is at least three
   times the skill's `tech_income`, their upkeep stays under half the energy income,
-  and the one it can build that pays back soonest (cost, energy at 6 per mass, and the
+  and the one it can build that pays back soonest (cost, energy at 6 per materials, and the
   best plant's price for its upkeep) does so within the economy's payback. One at a
   time; a builder takes it before helping the sites going up, since a materials stall
   is when it pays and it is paid first with the mines (`focus.rs`). Upgrades follow
@@ -119,7 +119,7 @@ says it can do (`commander/profile.rs`).
   of the factory yard), so a farm keeps its place all match. Each farm fills from its
   middle out on a grid one plant apart: 2x2 plants stand flush in a block, bigger
   plants and storage start on the next farm and keep their lanes. A shield goes only
-  where it covers at least 1.5 times its own mass cost in factories, power and
+  where it covers at least 1.5 times its own materials cost in factories, power and
   storage that no other shield covers, on the free lot near there that covers the
   most.
 - Turrets: one per raid spot while defending, a few at the base's front (2 + half the
@@ -146,7 +146,7 @@ says it can do (`commander/profile.rs`).
   covers its weapon range plus 60 m; a building destroyed keeps builders 220 m clear
   for 45 s per loss there in the last 3 minutes, up to 3 minutes.
 - Nukes (`ai/projects.rs`): a ready warhead goes at the remembered enemy spot worth at
-  least twice a warhead's mass under its blast, the enemy commander (seen in the last
+  least twice a warhead's materials under its blast, the enemy commander (seen in the last
   10 s) counted as 60,000. Not where the side's own units are worth a quarter of that,
   and not into an interceptor's cover unless the salvo outnumbers the rounds it holds.
 

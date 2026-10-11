@@ -189,7 +189,7 @@ fn setup(w: &mut World) {
             add("aster_t1_tank", 1, GUNNER.0, GUNNER.1);
         }
         // Room for what the Reclaimers bring in.
-        add("aster_mass_storage", 1, 500, 150);
+        add("aster_materials_storage", 1, 500, 150);
         // An Atoll at sea that builds a wing aboard and launches it (`air_wings.rs`).
         add("aster_t3_carrier", 1, 2900, 650);
         // A Roost under the aircraft (`staging.rs`).
@@ -302,10 +302,10 @@ fn units_of(w: &World, player: u8) -> Vec<UnitId> {
 fn batch_on(w: &World) -> Vec<PlayerCommand> {
     let factories = factories(w);
     [
-        // The mass storage's worth in hand to build them with.
+        // The materials storage's worth in hand to build them with.
         Command::DebugStock {
             player: 0,
-            mass: Some(1000),
+            materials: Some(1000),
             energy: None,
         },
         Command::SetBatch {
@@ -717,7 +717,7 @@ fn reference() -> Vec<u64> {
     // The drone carriers' Wicks went off on their marks.
     assert!(burst > 0, "no Wick burst in the match");
     // The Reclaimers' heads were at work in it, on the move.
-    let reclaimed = w.state.players.iter().map(|p| p.reclaimed_mass).max();
+    let reclaimed = w.state.players.iter().map(|p| p.reclaimed_materials).max();
     assert!(
         reclaimed.is_some_and(|m| m > mc_core::Fx::ZERO),
         "nothing was reclaimed in the match"
@@ -725,7 +725,7 @@ fn reference() -> Vec<u64> {
     // And the warhead wore down every wreck of the field it landed on.
     let wr = &w.state.wrecks;
     let intact = wr.slots.iter().filter(|&r| {
-        wr.pos[r].distance(WRECK_FIELD) < Fx::from_int(60) && wr.mass[r] >= wr.mass_max[r]
+        wr.pos[r].distance(WRECK_FIELD) < Fx::from_int(60) && wr.materials[r] >= wr.materials_max[r]
     });
     assert_eq!(intact.count(), 0, "the blast left wrecks untouched");
     hashes

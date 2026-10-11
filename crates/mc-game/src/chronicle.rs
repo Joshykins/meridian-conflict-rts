@@ -30,13 +30,13 @@ pub struct SideInfo {
 #[derive(Clone, Copy, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct SideSample {
     /// Materials and energy a second: made (mines and generators), reclaimed, spent.
-    pub mass_income: f32,
+    pub materials_income: f32,
     pub reclaim_income: f32,
     pub energy_income: f32,
-    pub mass_spent: f32,
+    pub materials_spent: f32,
     pub energy_spent: f32,
     /// Materials in store.
-    pub mass: f32,
+    pub materials: f32,
     /// Materials taken from wrecks and units by reclaim, over the match so far.
     pub reclaimed: f32,
     /// Share of the asked-for spending that was paid, zero to one.
@@ -331,13 +331,13 @@ impl Chronicle {
             .players
             .iter()
             .map(|p| SideSample {
-                mass_income: f(p.mass_income),
+                materials_income: f(p.materials_income),
                 reclaim_income: f(p.reclaim_income),
                 energy_income: f(p.energy_income),
-                mass_spent: f(p.mass_spent),
+                materials_spent: f(p.materials_spent),
                 energy_spent: f(p.energy_spent),
-                mass: f(p.mass),
-                reclaimed: f(p.reclaimed_mass),
+                materials: f(p.materials),
+                reclaimed: f(p.reclaimed_materials),
                 efficiency: f(p.efficiency),
                 ..Default::default()
             })
@@ -354,14 +354,14 @@ impl Chronicle {
             let bp = world.bp(row);
             if !bp.is_mobile() {
                 s.structures += 1;
-                s.structure_value += bp.cost_mass.to_f32();
+                s.structure_value += bp.cost_materials.to_f32();
                 s.mines += bp.has(cat::EXTRACTOR) as u32;
                 s.factories += bp.has(cat::FACTORY) as u32;
             } else if bp.has(cat::ENGINEER) {
                 s.engineers += 1;
             } else if !bp.has(cat::COMMANDER) && !bp.is_salvager() {
                 s.army += 1;
-                s.army_value += bp.cost_mass.to_f32();
+                s.army_value += bp.cost_materials.to_f32();
             }
         }
         if self.samples.last().is_some_and(|s| s.tick == tick) {
@@ -390,7 +390,7 @@ impl Chronicle {
                     let c = self.cell(at);
                     bases[c] = bases[c].saturating_add(1);
                 } else if !bp.has(cat::ENGINEER) && !bp.is_salvager() {
-                    army[self.cell(at)] += bp.cost_mass.to_f32();
+                    army[self.cell(at)] += bp.cost_materials.to_f32();
                 }
             }
             side.army = (0..GRID * GRID)
@@ -403,7 +403,7 @@ impl Chronicle {
                 .collect();
             // What was reclaimed since the last snapshot, shared out over where the
             // beams worked.
-            side.reclaimed = world.state.players[i].reclaimed_mass.to_f32();
+            side.reclaimed = world.state.players[i].reclaimed_materials.to_f32();
             let before = self
                 .frames
                 .iter()

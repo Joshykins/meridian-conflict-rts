@@ -9,7 +9,7 @@ use crate::audio::Sfx;
 use crate::game::Mode;
 use crate::hud::build::key_cap;
 use crate::hud::style::ITEM_KEYS;
-use crate::hud::{whole, Hud, HudAction, Scene, ENERGY, MASS};
+use crate::hud::{whole, Hud, HudAction, Scene, ENERGY, MATERIALS};
 use crate::prefabs::{Prefab, PrefabId};
 use crate::ui::{id, ink, palette, rgb, type_scale, Rect, Ui};
 use mc_data::{BlueprintId, FactionId};
@@ -178,13 +178,13 @@ fn card(
         rgb(0xFFFFFF, (0.88 + 0.12 * glow) * live),
         &p.name,
     );
-    let (mass, energy) = p.cost(s.blueprints);
+    let (materials, energy) = p.cost(s.blueprints);
     let end = ui.text(
         cr.x + 8.0,
         cr.bottom() - 17.0,
         type_scale::MICRO,
-        rgb(MASS, live),
-        &whole(mass),
+        rgb(MATERIALS, live),
+        &whole(materials),
     );
     ui.text(
         end + 8.0,
@@ -314,9 +314,9 @@ pub(in crate::hud) fn hover_card(
         rgb(palette::TEXT, 1.0),
         &format!("Prefab  \u{b7}  {count} structures"),
     );
-    let (mass, energy) = p.cost(s.blueprints);
+    let (materials, energy) = p.cost(s.blueprints);
     for (i, (label, value, tone)) in [
-        ("Materials", whole(mass), MASS),
+        ("Materials", whole(materials), MATERIALS),
         ("Energy", whole(energy), ENERGY),
     ]
     .into_iter()

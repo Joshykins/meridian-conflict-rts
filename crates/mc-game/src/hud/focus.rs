@@ -6,7 +6,7 @@
 use super::build::tip;
 use super::notices::{Glyph, Notices};
 use super::segmented;
-use super::{Hud, HudAction, ENERGY, LOW, MASS};
+use super::{Hud, HudAction, ENERGY, LOW, MATERIALS};
 use crate::audio::Sfx;
 use crate::sim_thread::PlayerStatus;
 use crate::ui::{id, palette, rgb, type_scale, Color, Rect, Ui};
@@ -57,7 +57,7 @@ struct Kind {
 const KINDS: [Kind; 2] = [
     Kind {
         name: "Mines",
-        tone: MASS,
+        tone: MATERIALS,
         build: "Materials stalling  \u{b7}  build more mines or reclaim wrecks",
         first_also: ", reclaimers, economy refits",
     },

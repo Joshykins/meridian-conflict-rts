@@ -65,7 +65,7 @@ impl Focus {
             // first when what it makes does. It is never held back to Last: it is also
             // the commander's, and stays with the rest.
             let m = set.module(slot, module);
-            let first = (m.makes_mass && self.mines == Priority::First)
+            let first = (m.makes_materials && self.mines == Priority::First)
                 || (m.makes_energy && self.power == Priority::First);
             if first {
                 Priority::First

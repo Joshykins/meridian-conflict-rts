@@ -45,15 +45,16 @@ pub(super) fn feeds(a: &UnitBlueprint, b: &UnitBlueprint) -> bool {
 /// that takes the reactor of its tech is.
 fn ruinous(a: &UnitBlueprint, b: &UnitBlueprint) -> bool {
     let kills = |x: &UnitBlueprint, y: &UnitBlueprint| {
-        y.cost_mass >= x.cost_mass && x.death_blast.is_some_and(|db| db.damage >= y.health)
+        y.cost_materials >= x.cost_materials
+            && x.death_blast.is_some_and(|db| db.damage >= y.health)
     };
     kills(a, b) || kills(b, a)
 }
 
-/// Energy a unit of `resource` is worth: materials at `ENERGY_PER_MASS`.
+/// Energy a unit of `resource` is worth: materials at `ENERGY_PER_MATERIALS`.
 fn worth_of(resource: Resource) -> Fx {
     match resource {
-        Resource::Mass => Fx::from_int(ENERGY_PER_MASS),
+        Resource::Materials => Fx::from_int(ENERGY_PER_MATERIALS),
         Resource::Energy => Fx::ONE,
     }
 }
@@ -66,7 +67,7 @@ impl World {
         let building = bp
             .builder
             .as_ref()
-            .filter(|b| adjacency::uses(bp, Resource::Mass) && !b.builds.is_empty())
+            .filter(|b| adjacency::uses(bp, Resource::Materials) && !b.builds.is_empty())
             .map_or(Fx::ZERO, |b| {
                 let per_time: Fx = b
                     .builds
@@ -74,7 +75,7 @@ impl World {
                     .map(|&id| {
                         let u = self.blueprints.unit(id);
                         let cost = match resource {
-                            Resource::Mass => u.cost_mass,
+                            Resource::Materials => u.cost_materials,
                             Resource::Energy => u.cost_energy,
                         };
                         if u.build_time > Fx::ZERO {
@@ -87,7 +88,7 @@ impl World {
                 b.power * per_time / Fx::from_int(b.builds.len() as i32)
             });
         match resource {
-            Resource::Mass => building,
+            Resource::Materials => building,
             Resource::Energy => building + bp.economy.energy_upkeep,
         }
     }
@@ -227,19 +228,19 @@ impl World {
         directives.power == super::commander::economy::Power::Enough
             && !directives.floating
             && pl.energy >= pl.energy_capacity * Fx::ratio(3, 4)
-            && pl.mass_income >= Fx::from_int(3 * skill.tech_income)
+            && pl.materials_income >= Fx::from_int(3 * skill.tech_income)
             && upkeep * 100 < pl.energy_income * Fx::from_int(FABRICATOR_ENERGY)
     }
 
     /// Seconds a fabricator `step` (a new one, or an upgrade) takes to pay back
     /// `cost` and the power for its upkeep, `extra_upkeep` a second, from the
-    /// `extra_mass` a second it makes: power at what the best plant `row` can raise
-    /// costs, energy at `ENERGY_PER_MASS`.
+    /// `extra_materials` a second it makes: power at what the best plant `row` can raise
+    /// costs, energy at `ENERGY_PER_MATERIALS`.
     fn fabricator_payback(
         &self,
         row: usize,
         cost: (Fx, Fx),
-        extra_mass: Fx,
+        extra_materials: Fx,
         extra_upkeep: Fx,
     ) -> Fx {
         let tech = self
@@ -247,12 +248,12 @@ impl World {
             .max(self.best_builder_tech(self.state.units.owner[row]));
         let per_energy = self
             .best_plant(self.state.units.owner[row], tech)
-            .map_or(Fx::ONE / ENERGY_PER_MASS, |p| {
-                p.cost_mass / p.economy.energy_income
+            .map_or(Fx::ONE / ENERGY_PER_MATERIALS, |p| {
+                p.cost_materials / p.economy.energy_income
             });
-        let total = cost.0 + cost.1 / ENERGY_PER_MASS + extra_upkeep * per_energy;
-        if extra_mass > Fx::ZERO {
-            total / extra_mass
+        let total = cost.0 + cost.1 / ENERGY_PER_MATERIALS + extra_upkeep * per_energy;
+        if extra_materials > Fx::ZERO {
+            total / extra_materials
         } else {
             Fx::MAX
         }
@@ -271,7 +272,7 @@ impl World {
                     && b.tech <= tech
                     && b.economy.energy_income > Fx::ZERO
             })
-            .min_by_key(|b| (b.cost_mass / b.economy.energy_income, b.id.0))
+            .min_by_key(|b| (b.cost_materials / b.economy.energy_income, b.id.0))
     }
 
     /// A fabricator for builder `row`, set where it saves the most: when the
@@ -297,8 +298,8 @@ impl World {
                 let f = bp.fabricator.filter(|_| bp.is_structure())?;
                 let payback = self.fabricator_payback(
                     row,
-                    (bp.cost_mass, bp.cost_energy),
-                    f.mass,
+                    (bp.cost_materials, bp.cost_energy),
+                    f.materials,
                     bp.economy.energy_upkeep,
                 );
                 (payback <= horizon).then_some((id, payback))
@@ -335,7 +336,7 @@ impl World {
                 if self.blueprints.upgrade_needs(next) > side_tech {
                     return None;
                 }
-                let gain = next.fabricator?.mass - bp.fabricator?.mass;
+                let gain = next.fabricator?.materials - bp.fabricator?.materials;
                 let payback = self.fabricator_payback(
                     row,
                     self.blueprints.upgrade_cost(next),

@@ -8,7 +8,7 @@ use mc_sim::mirror::{ElevatorPhase, ElevatorView};
 
 const KEY: &str = "aster_t5_space_elevator";
 
-fn view(phase: ElevatorPhase, riding: u16, riding_mass: f32) -> ElevatorView {
+fn view(phase: ElevatorPhase, riding: u16, riding_materials: f32) -> ElevatorView {
     ElevatorView {
         phase,
         left: 5.2,
@@ -20,7 +20,7 @@ fn view(phase: ElevatorPhase, riding: u16, riding_mass: f32) -> ElevatorView {
         payload: 20_000.0,
         trip: [7.0, 18.0, 4.0],
         riding,
-        riding_mass,
+        riding_materials,
     }
 }
 
@@ -69,11 +69,11 @@ fn an_elevator_shows_its_crates_and_queues_from_its_build_menu() {
         .copied()
         .find(|&b| rig.blueprints.unit(b).tech >= 4)
         .expect("it brings down a tech 4");
-    let mass = rig.blueprints.unit(heavy).cost_mass.to_f32();
+    let materials = rig.blueprints.unit(heavy).cost_materials.to_f32();
     rig.view.status.queues = vec![UnitOrders {
         unit_id: 7,
         orders: vec![produce(heavy), produce(heavy), produce(builds[0])],
-        elevator: Some(view(ElevatorPhase::Inbound, 2, mass * 2.0)),
+        elevator: Some(view(ElevatorPhase::Inbound, 2, materials * 2.0)),
         ..Default::default()
     }];
     rig.settle();

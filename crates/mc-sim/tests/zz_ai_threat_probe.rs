@@ -30,7 +30,7 @@ fn difficulty(s: &str) -> Difficulty {
 fn line(w: &World, p: usize, enemy_start: mc_core::FxVec2) -> String {
     let s = &w.state;
     let pl = &s.players[p];
-    let (mut army, mut army_mass, mut near, mut factories, mut eng) = (0, 0.0f32, 0, 0, 0);
+    let (mut army, mut army_materials, mut near, mut factories, mut eng) = (0, 0.0f32, 0, 0, 0);
     let mut max_unit_tech = 0;
     for row in s
         .units
@@ -45,17 +45,17 @@ fn line(w: &World, p: usize, enemy_start: mc_core::FxVec2) -> String {
             eng += 1;
         } else if bp.is_mobile() && !bp.weapons.is_empty() && !bp.has(cat::COMMANDER) {
             army += 1;
-            army_mass += bp.cost_mass.to_f32();
+            army_materials += bp.cost_materials.to_f32();
             max_unit_tech = max_unit_tech.max(bp.tech);
             near += (s.units.pos[row].distance(enemy_start).to_f32() < 1200.0) as u32;
         }
     }
     format!(
-        "army {army:>3} ({army_mass:>6.0} m, best T{max_unit_tech}) near enemy {near:>3} | mass {:>5.1}/s stored {:>5.0}/{:<5.0} spent {:>5.1}/s energy {:>5.0}/{:<5.0} eff {:.2} | factories {factories} eng {eng} tech {} | kills {} lost {} | {}",
-        pl.mass_income.to_f32(),
-        pl.mass.to_f32(),
-        pl.mass_capacity.to_f32(),
-        pl.mass_demand.to_f32(),
+        "army {army:>3} ({army_materials:>6.0} m, best T{max_unit_tech}) near enemy {near:>3} | materials {:>5.1}/s stored {:>5.0}/{:<5.0} spent {:>5.1}/s energy {:>5.0}/{:<5.0} eff {:.2} | factories {factories} eng {eng} tech {} | kills {} lost {} | {}",
+        pl.materials_income.to_f32(),
+        pl.materials.to_f32(),
+        pl.materials_capacity.to_f32(),
+        pl.materials_demand.to_f32(),
         pl.energy_income.to_f32(),
         pl.energy_demand.to_f32(),
         pl.efficiency.to_f32(),
@@ -283,11 +283,11 @@ fn threat() {
                     if s.units.owner[r] == 1 && w.bp(r).is_structure() && known.insert(id) {
                         let pl = &s.players[1];
                         println!(
-                            "    {:>4}s start {:<28} mass {:>4.0} ({:>4.1}/s) energy {:>5.0} ({:>4.0}/{:<4.0}) eff {:.2}",
+                            "    {:>4}s start {:<28} materials {:>4.0} ({:>4.1}/s) energy {:>5.0} ({:>4.0}/{:<4.0}) eff {:.2}",
                             s.tick / 10,
                             w.bp(r).key,
-                            pl.mass.to_f32(),
-                            pl.mass_income.to_f32(),
+                            pl.materials.to_f32(),
+                            pl.materials_income.to_f32(),
                             pl.energy.to_f32(),
                             pl.energy_income.to_f32(),
                             pl.energy_demand.to_f32(),

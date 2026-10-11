@@ -158,12 +158,12 @@ impl World {
             let id = s.wrecks.slots.handle(row).0;
             // The hull is drawn whole however much reclaim has taken: the share it took
             // shows as the work's glow, so only blasts and weather wear the hull away.
-            let (mass, reclaimed) = (s.wrecks.mass[row], s.wrecks.reclaimed[row]);
-            let health = ((mass + reclaimed) / s.wrecks.mass_max[row])
+            let (materials, reclaimed) = (s.wrecks.materials[row], s.wrecks.reclaimed[row]);
+            let health = ((materials + reclaimed) / s.wrecks.materials_max[row])
                 .to_f32()
                 .min(1.0);
             let unmade = if reclaimed > mc_core::Fx::ZERO {
-                (reclaimed / (mass + reclaimed)).to_f32()
+                (reclaimed / (materials + reclaimed)).to_f32()
             } else {
                 0.0
             };

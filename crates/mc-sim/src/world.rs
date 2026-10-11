@@ -182,7 +182,7 @@ pub struct World {
     pub streams: Vec<crate::mirror::StreamTail>,
     /// Muzzle positions of the shots fired this tick, so the mirror can tell a shot's first stretch. Not state.
     pub muzzles: Vec<mc_core::FxVec3>,
-    /// Who drew mass out of what this tick, for the mirror's reclaim beams. Not state.
+    /// Who drew materials out of what this tick, for the mirror's reclaim beams. Not state.
     pub reclaims: Vec<crate::reclaim::ReclaimWork>,
     /// Each unit's resource flows this tick, by row. Not state.
     pub flows: Vec<crate::economy::UnitFlow>,
@@ -312,9 +312,10 @@ impl World {
                 continue;
             };
             let bp = self.blueprints.unit(id);
-            let full = bp.cost_mass * bp.wreck_fraction;
-            let mass = full * Fx::from_int(w.mass_milli.min(1000) as i32) / Fx::from_int(1000);
-            if mass <= Fx::ZERO {
+            let full = bp.cost_materials * bp.wreck_fraction;
+            let materials =
+                full * Fx::from_int(w.materials_milli.min(1000) as i32) / Fx::from_int(1000);
+            if materials <= Fx::ZERO {
                 continue;
             }
             if self.state.wrecks.slots.live() >= MAX_WRECKS {
@@ -328,11 +329,11 @@ impl World {
                 pos,
                 self.terrain.height_at(pos),
                 w.heading,
-                mass,
+                materials,
                 0,
             )?;
             let wrecks = &mut self.state.wrecks;
-            wrecks.mass_max[row] = full;
+            wrecks.materials_max[row] = full;
             wrecks.bank[row] = w.bank;
             wrecks.prev_bank[row] = w.bank;
             wrecks.from_map[row] = true;
@@ -377,16 +378,16 @@ impl World {
                 start,
                 defeated: false,
                 commander: Handle::NONE,
-                mass: Fx::ZERO,
+                materials: Fx::ZERO,
                 energy: Fx::ZERO,
-                mass_capacity: Fx::ZERO,
+                materials_capacity: Fx::ZERO,
                 energy_capacity: Fx::ZERO,
-                mass_income: Fx::ZERO,
+                materials_income: Fx::ZERO,
                 energy_income: Fx::ZERO,
-                mass_demand: Fx::ZERO,
+                materials_demand: Fx::ZERO,
                 energy_demand: Fx::ZERO,
                 efficiency: Fx::ONE,
-                mass_spent: Fx::ZERO,
+                materials_spent: Fx::ZERO,
                 energy_spent: Fx::ZERO,
                 upkeep_efficiency: Fx::ONE,
                 build_speed: Fx::ONE,
@@ -394,7 +395,7 @@ impl World {
                 mine_lost: Fx::ZERO,
                 focus: crate::focus::Focus::default(),
                 tier_speed: [None; 3],
-                reclaimed_mass: Fx::ZERO,
+                reclaimed_materials: Fx::ZERO,
                 reclaim_income: Fx::ZERO,
                 reclaimed_counted: Fx::ZERO,
                 units_built: 0,
@@ -496,7 +497,7 @@ impl World {
                 let row = world.spawn_unit(bp, p as u8, start, heading, true)?;
                 world.state.players[p].commander = world.state.units.id(row);
                 let acu = world.blueprints.unit(bp).economy;
-                world.state.players[p].mass = acu.mass_storage;
+                world.state.players[p].materials = acu.materials_storage;
                 world.state.players[p].energy = acu.energy_storage;
             }
         }

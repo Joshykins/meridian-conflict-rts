@@ -6,7 +6,7 @@
 //!
 //! The map depends on the terrain classes alone (the pathing grid never takes the
 //! terrain's later edits), so it is the same on every machine and is rebuilt after a
-//! snapshot is restored rather than saved. What changes (fire, enemy mass, what we
+//! snapshot is restored rather than saved. What changes (fire, enemy materials, what we
 //! hold) is read each think (`ZoneView`).
 use super::profile::Target;
 use super::reach::NODE;
@@ -31,7 +31,7 @@ const MIN_POCKET: usize = 4;
 /// Zones a map gets at most (a deliberate cap: on a map that would make more, the
 /// last seeds are dropped and their ground goes to the zones nearest it).
 const MOST_ZONES: usize = 1024;
-/// Mass a mine point is worth to whoever holds the zone.
+/// Materials a mine point is worth to whoever holds the zone.
 pub(in crate::ai) const ORE_VALUE: i32 = 250;
 /// Nodes looked at to judge how much of a zone is in view: every other one each way.
 pub(in crate::ai) const SAMPLE: i32 = 2;
@@ -313,14 +313,14 @@ impl Zones {
 pub(in crate::ai) struct ZoneView {
     /// Land fire on the zone's centre.
     pub threat: Vec<Fx>,
-    /// Enemy mass remembered in the zone (the commander counted heavily).
+    /// Enemy materials remembered in the zone (the commander counted heavily).
     pub enemy: Vec<Fx>,
-    /// Mass of our structures standing in the zone: what a nuke would cost us there.
+    /// Materials of our structures standing in the zone: what a nuke would cost us there.
     pub held: Vec<Fx>,
 }
 
 impl ZoneView {
-    /// Mass the zone is worth: its ore and what the enemy has standing in it.
+    /// Materials the zone is worth: its ore and what the enemy has standing in it.
     pub(in crate::ai) fn value(&self, zones: &Zones, z: u16) -> Fx {
         Fx::from_int(ORE_VALUE * i32::from(zones.zones[z as usize].ore)) + self.enemy[z as usize]
     }
@@ -419,7 +419,7 @@ impl World {
                 enemy[z as usize] += if bp.has(mc_data::cat::COMMANDER) {
                     Fx::from_int(5000)
                 } else {
-                    bp.cost_mass
+                    bp.cost_materials
                 };
             }
         }
@@ -428,7 +428,7 @@ impl World {
         for r in units.slots.iter() {
             if units.owner[r] == player && self.bp(r).is_structure() {
                 if let Some(z) = zones.of(units.pos[r]) {
-                    held[z as usize] += self.bp(r).cost_mass;
+                    held[z as usize] += self.bp(r).cost_materials;
                 }
             }
         }

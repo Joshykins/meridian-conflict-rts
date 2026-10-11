@@ -3,7 +3,8 @@
 
 use super::focus::{self, Short};
 use super::{
-    whole, Hud, Scene, DECK_H, ECONOMY_H, ECONOMY_W, EDGE, ENERGY, GAP, LOW, MASS, STALL_CHIP_W,
+    whole, Hud, Scene, DECK_H, ECONOMY_H, ECONOMY_W, EDGE, ENERGY, GAP, LOW, MATERIALS,
+    STALL_CHIP_W,
 };
 use crate::ui::{ink, palette, rgb, type_scale, Rect, Ui};
 
@@ -31,12 +32,12 @@ impl Hud {
         let rows = [
             (
                 "Materials",
-                p.mass,
-                p.mass_capacity,
-                p.mass_income + p.reclaim_income,
-                p.mass_demand,
-                p.mass_spent,
-                MASS,
+                p.materials,
+                p.materials_capacity,
+                p.materials_income + p.reclaim_income,
+                p.materials_demand,
+                p.materials_spent,
+                MATERIALS,
             ),
             (
                 "Energy",
@@ -268,8 +269,9 @@ fn materials_income(ui: &mut Ui, p: &crate::sim_thread::PlayerStatus, x: f32, y:
             format!("{v:.1}")
         }
     };
-    let made = format!("Income  +{}", rate(p.mass_income));
-    let max = (p.mine_growth > 0.05).then(|| rate(p.mass_income + p.mine_lost + p.mine_growth));
+    let made = format!("Income  +{}", rate(p.materials_income));
+    let max =
+        (p.mine_growth > 0.05).then(|| rate(p.materials_income + p.mine_lost + p.mine_growth));
     let reclaim = (p.reclaim_income > 0.05).then(|| rate(p.reclaim_income));
     let spelt = |long: bool| {
         let max = max.as_ref().map_or(String::new(), |m| {
@@ -303,7 +305,13 @@ fn materials_income(ui: &mut Ui, p: &crate::sim_thread::PlayerStatus, x: f32, y:
         rgb(palette::FAINT, 1.0),
         &max_text,
     );
-    ui.text(end, y, type_scale::MICRO, rgb(MASS, 0.95), &reclaim_text);
+    ui.text(
+        end,
+        y,
+        type_scale::MICRO,
+        rgb(MATERIALS, 0.95),
+        &reclaim_text,
+    );
 }
 
 /// The spending to show beside a resource's income. What was really spent, so a

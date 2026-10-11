@@ -72,7 +72,7 @@ mod tests {
     fn every_tier_has_lamps_and_a_climbing_gauge() {
         for (key, r, heights) in [
             ("storage_energy", 14.2, [10.2, 14.3, 19.4]),
-            ("storage_mass", 12.9, [6.3, 10.2, 14.9]),
+            ("storage_materials", 12.9, [6.3, 10.2, 14.9]),
         ] {
             for (i, h) in heights.into_iter().enumerate() {
                 let model = build_model_scaled(key, r, h, i as u8 + 1).unwrap();

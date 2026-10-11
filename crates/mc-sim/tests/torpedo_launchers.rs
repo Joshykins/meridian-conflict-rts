@@ -334,9 +334,9 @@ fn torpedo_range(bp: &UnitBlueprint) -> f32 {
 }
 
 /// A launcher gives up moving, so at each tier it carries far more torpedo DPS and hull
-/// per unit of mass than the submarine it meets, and it reaches past that submarine.
+/// per unit of materials than the submarine it meets, and it reaches past that submarine.
 #[test]
-fn launchers_are_far_more_mass_efficient_than_submarines() {
+fn launchers_are_far_more_materials_efficient_than_submarines() {
     let w = sea(false);
     let bp = |key: &str| w.blueprints.unit(w.blueprints.id_of(key).unwrap());
     for (launcher, sub) in [
@@ -348,16 +348,16 @@ fn launchers_are_far_more_mass_efficient_than_submarines() {
         (HARPOON_II, "regency_t2_destroyer"),
     ] {
         let (l, s) = (bp(launcher), bp(sub));
-        let per_mass = |b: &UnitBlueprint, v: f32| v / b.cost_mass.to_f32();
-        let dps = per_mass(l, attack_dps(l)) / per_mass(s, attack_dps(s));
-        let hp = per_mass(l, l.health.to_f32()) / per_mass(s, s.health.to_f32());
+        let per_materials = |b: &UnitBlueprint, v: f32| v / b.cost_materials.to_f32();
+        let dps = per_materials(l, attack_dps(l)) / per_materials(s, attack_dps(s));
+        let hp = per_materials(l, l.health.to_f32()) / per_materials(s, s.health.to_f32());
         assert!(
             dps >= 1.7,
-            "{launcher}: only {dps:.2}x {sub}'s torpedo DPS per mass"
+            "{launcher}: only {dps:.2}x {sub}'s torpedo DPS per materials"
         );
         assert!(
             hp >= 1.7,
-            "{launcher}: only {hp:.2}x {sub}'s health per mass"
+            "{launcher}: only {hp:.2}x {sub}'s health per materials"
         );
         assert!(
             torpedo_range(l) > torpedo_range(s),

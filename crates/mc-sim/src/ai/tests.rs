@@ -165,8 +165,8 @@ fn doctrine_is_independent_of_player_slot_and_difficulty_has_no_income_bonus() {
     w.state.ai[1].config = hard;
     w.tick(&[]).unwrap();
     assert_eq!(
-        w.state.players[0].mass_income,
-        w.state.players[1].mass_income
+        w.state.players[0].materials_income,
+        w.state.players[1].materials_income
     );
     assert_eq!(
         w.state.players[0].energy_income,
@@ -191,9 +191,9 @@ fn a_seat_set_up_with_bonus_income_earns_that_much_more_ai_or_person() {
     }
     w.tick(&[]).unwrap();
     let (ai, person) = (&w.state.players[0], &w.state.players[1]);
-    assert!(person.energy_income > Fx::ZERO && person.mass_income > Fx::ZERO);
+    assert!(person.energy_income > Fx::ZERO && person.materials_income > Fx::ZERO);
     assert_eq!(ai.energy_income, person.energy_income * 3);
-    assert_eq!(ai.mass_income, person.mass_income * 3);
+    assert_eq!(ai.materials_income, person.materials_income * 3);
 }
 
 #[test]
@@ -217,9 +217,9 @@ fn a_person_set_up_with_double_income_earns_double() {
     }
     w.tick(&[]).unwrap();
     let (rich, fair) = (&w.state.players[0], &w.state.players[1]);
-    assert!(fair.energy_income > Fx::ZERO && fair.mass_income > Fx::ZERO);
+    assert!(fair.energy_income > Fx::ZERO && fair.materials_income > Fx::ZERO);
     assert_eq!(rich.energy_income, fair.energy_income * 2);
-    assert_eq!(rich.mass_income, fair.mass_income * 2);
+    assert_eq!(rich.materials_income, fair.materials_income * 2);
 }
 
 #[test]
@@ -389,8 +389,8 @@ fn builders_are_reassigned_after_finishing_assistance_and_upgrades_wait_for_powe
     spawn(&mut w, "aster_t1_point_defense", 0, 650, 500);
     spawn(&mut w, "aster_t1_radar", 0, 650, 650);
     spawn(&mut w, "aster_t1_power", 0, 750, 650);
-    w.state.players[0].mass = Fx::from_int(650);
-    w.state.players[0].mass_income = Fx::from_int(20);
+    w.state.players[0].materials = Fx::from_int(650);
+    w.state.players[0].materials_income = Fx::from_int(20);
     w.state.players[0].energy_income = Fx::from_int(40);
     w.state.players[0].energy_demand = Fx::from_int(400);
     let mut out = vec![];
@@ -467,8 +467,8 @@ fn mine_upgrades_go_to_the_mine_that_pays_back_soonest() {
     let alone = spawn(&mut w, "aster_core_mine", 0, 4000, 4000);
     spawn(&mut w, "aster_t2_engineer", 0, 400, 400);
     w.tick(&[]).unwrap();
-    w.state.players[0].mass = Fx::from_int(800);
-    w.state.players[0].mass_income = Fx::from_int(20);
+    w.state.players[0].materials = Fx::from_int(800);
+    w.state.players[0].materials_income = Fx::from_int(20);
     // The economy allows two at once, each paying back within its horizon
     // (`commander/economy.rs`).
     let eco = &mut w.state.ai[0].commander.eco;
@@ -1025,8 +1025,8 @@ fn tech_mark_side() -> World {
     let skill = w.state.ai[0].config.skill();
     let pl = &mut w.state.players[0];
     // Everything it makes is spent: no pile of materials.
-    pl.mass = Fx::from_int(50);
-    pl.mass_income = Fx::from_int(skill.tech_income);
+    pl.materials = Fx::from_int(50);
+    pl.materials_income = Fx::from_int(skill.tech_income);
     pl.energy_income = Fx::from_int(2000);
     pl.energy_demand = Fx::ZERO;
     pl.energy_capacity = Fx::from_int(5000);
@@ -1131,7 +1131,7 @@ fn a_lesser_builder_helps_raise_a_big_plant_and_starts_no_small_one() {
             .any(|c| matches!(c, Command::Build { blueprint, .. } if *blueprint == small)),
         "{out:?}"
     );
-    // A mass stall asks for more energy than comes in, but pays out only a share of it
+    // A materials stall asks for more energy than comes in, but pays out only a share of it
     // and the store fills: that is no call for power.
     let pl = &mut w.state.players[0];
     pl.energy_income = Fx::from_int(2000);
@@ -1156,7 +1156,7 @@ fn an_engineer_goes_up_a_tier_once_the_side_has_it() {
         .map(|i| spawn(&mut w, "aster_t1_engineer", 0, 300 + i * 20, 300))
         .collect();
     let pl = &mut w.state.players[0];
-    pl.mass_income = Fx::from_int(5);
+    pl.materials_income = Fx::from_int(5);
     pl.energy_income = Fx::from_int(1000);
     pl.energy_demand = Fx::ZERO;
     pl.energy_capacity = Fx::from_int(5000);

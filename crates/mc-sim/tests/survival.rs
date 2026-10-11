@@ -200,9 +200,9 @@ fn the_facility_prints_rounds_in_its_bays_and_raises_shapers() {
 
     // Nothing is handed out: the defender takes in only what its own commander makes.
     assert!(
-        w.state.players[0].mass_income < Fx::from_int(5),
+        w.state.players[0].materials_income < Fx::from_int(5),
         "{:?}",
-        w.state.players[0].mass_income
+        w.state.players[0].materials_income
     );
 
     // Round two raises another; they come online printing one kind each.

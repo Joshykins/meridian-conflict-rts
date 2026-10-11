@@ -290,9 +290,9 @@ fn commander_builds_a_base_and_a_factory_builds_tanks() {
     let factory_row = factory_row.expect("factory finished within five minutes");
     assert!(find(&w, power).is_some() && find(&w, extractor).is_some());
     assert!(
-        w.state.players[0].mass_income > Fx::ONE,
+        w.state.players[0].materials_income > Fx::ONE,
         "mine income: {:?}",
-        w.state.players[0].mass_income
+        w.state.players[0].materials_income
     );
     // The ground under the factory is level now.
     let p = w.state.units.pos[factory_row];
@@ -437,13 +437,13 @@ fn a_commander_ai_plays_deterministically_and_restores_from_a_snapshot() {
     eprintln!("determinism: commander_ai final {:016x}", a[a.len() - 1]);
 }
 
-/// The AI spreads its yard and guards mass points instead of stacking
+/// The AI spreads its yard and guards materials points instead of stacking
 /// everything on the start marker.
 #[test]
-fn ai_spreads_out_and_guards_mass() {
+fn ai_spreads_out_and_guards_materials() {
     let mut w = flat_world(0, true, true);
     // Twelve minutes: the mines make little until they reach their ore, and short of
-    // mass (a stall slows everything alike) a side puts up its second factory before
+    // materials (a stall slows everything alike) a side puts up its second factory before
     // its first point defense.
     for _ in 0..7200 {
         w.tick(&[]).unwrap();
@@ -571,7 +571,7 @@ fn a_stalled_economy_still_completes_builds() {
     let mut done = false;
     for _ in 0..3000 {
         // Keep the bank empty so everything runs on income alone.
-        w.state.players[0].mass = Fx::ZERO;
+        w.state.players[0].materials = Fx::ZERO;
         w.tick(&[]).unwrap();
         let u = &w.state.units;
         if u.slots

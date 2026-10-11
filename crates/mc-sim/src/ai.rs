@@ -9,7 +9,7 @@
 //! The Commander (`commander/`, `docs/AI_COMMANDER.md`) decides: it holds game
 //! plans at a stake, runs operations of grouped units, and runs the economy.
 //! The rest of this module carries out what it decides about the base: builders
-//! (spread into yards and farms, turrets over the mass points), factories,
+//! (spread into yards and farms, turrets over the materials points), factories,
 //! upgrades and salvage, steered through its `Directives`.
 
 mod adaptive;
@@ -54,8 +54,8 @@ const MAX_SITE_PROBES: i32 = 360;
 /// A builder this far from the start leaves the base's jobs, power too, to
 /// those at home, and helps only with sites this close.
 const FAR_FROM_HOME: Fx = Fx::from_int(1500);
-/// Energy worth one mass when weighing an upgrade (a tech 1 mine's own ratio).
-const ENERGY_PER_MASS: i32 = 6;
+/// Energy worth one materials when weighing an upgrade (a tech 1 mine's own ratio).
+const ENERGY_PER_MATERIALS: i32 = 6;
 /// Mines a side puts down before anything but its first factory.
 const FIRST_MINES: usize = 3;
 /// Open-ground mine spots whose share is counted per search, nearest first.
@@ -64,7 +64,7 @@ const BARE_MINE_PROBES: usize = 12;
 const RAID_RADIUS: Fx = Fx::from_int(550);
 /// Commander stays inside this radius of the start.
 const HOME_RADIUS: Fx = Fx::from_int(640);
-/// Point defense this close to a mass point is covering it.
+/// Point defense this close to per unit of materials is covering it.
 const GUARD_COVER: Fx = Fx::from_int(210);
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -934,7 +934,7 @@ impl World {
         let builder = self.bp(builder_row).builder.as_ref()?;
         builder.builds.iter().copied().find(|b| {
             let bp = self.blueprints.unit(*b);
-            bp.has(cat::STORAGE) && bp.economy.mass_storage > Fx::ZERO
+            bp.has(cat::STORAGE) && bp.economy.materials_storage > Fx::ZERO
         })
     }
 

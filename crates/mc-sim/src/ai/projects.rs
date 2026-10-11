@@ -11,7 +11,7 @@ use super::*;
 use mc_data::strategic::StrategicKind;
 
 /// Enemy value a warhead must be able to reach, in multiples of its own
-/// mass cost, to be fired.
+/// materials cost, to be fired.
 const NUKE_WORTH: i64 = 2;
 /// A contact seen this recently (ticks) is still where it was seen, for a
 /// unit that moves.
@@ -41,7 +41,7 @@ pub(super) fn project_kind(bp: &UnitBlueprint) -> Option<Project> {
         || bp.has(cat::REPLICATOR)
         || bp.mine.is_some()
         || bp.transport.is_some()
-        || bp.cost_mass <= Fx::ZERO
+        || bp.cost_materials <= Fx::ZERO
         // An unarmed ship (the Vigil) is no project: counted as one, each Vigil
         // finished freed the slot for the next, and sides had 30 to 60 of them
         // by forty minutes (`spotter_job` builds the one a side wants).
@@ -81,7 +81,8 @@ impl World {
         let bp = self.bp(site);
         let pl = &self.state.players[player as usize];
         let fed = |income: Fx, cost: Fx| income * (bp.build_time / cost.max(Fx::ONE));
-        let want = fed(pl.mass_income, bp.cost_mass).min(fed(pl.energy_income, bp.cost_energy));
+        let want =
+            fed(pl.materials_income, bp.cost_materials).min(fed(pl.energy_income, bp.cost_energy));
         let on: Fx = units
             .slots
             .iter()
@@ -139,7 +140,7 @@ impl World {
             if bp.has(cat::COMMANDER) {
                 COMMANDER_WORTH
             } else {
-                bp.cost_mass.floor_int() as i64
+                bp.cost_materials.floor_int() as i64
             }
         };
         // Interceptors cover their ground; a salvo bigger than what they hold
@@ -162,7 +163,7 @@ impl World {
                     units.owner[r] == player
                         && units.pos[r].distance(at) <= blast.radius + Fx::from_int(100)
                 })
-                .map(|r| self.bp(r).cost_mass.floor_int() as i64)
+                .map(|r| self.bp(r).cost_materials.floor_int() as i64)
                 .sum()
         };
         let best = contacts
@@ -177,7 +178,7 @@ impl World {
                 (value, c.pos)
             })
             .filter(|&(value, at)| {
-                value >= spec.round_mass.floor_int() as i64 * NUKE_WORTH
+                value >= spec.round_materials.floor_int() as i64 * NUKE_WORTH
                     && own_value(at) * 4 < value
                     && guarded(at) < free
             })

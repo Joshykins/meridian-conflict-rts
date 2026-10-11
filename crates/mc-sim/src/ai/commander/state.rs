@@ -129,7 +129,7 @@ impl Stake {
     }
 }
 
-/// Mass an operation or plan has put in, destroyed and lost.
+/// Materials an operation or plan has put in, destroyed and lost.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub(in crate::ai) struct Ledger {
     pub committed: Fx,
@@ -138,7 +138,7 @@ pub(in crate::ai) struct Ledger {
 }
 
 impl Ledger {
-    /// Mass destroyed per mass lost; 1 when nothing has happened yet.
+    /// Materials destroyed per materials lost; 1 when nothing has happened yet.
     pub(in crate::ai) fn trade(&self) -> Fx {
         if self.killed + self.lost < Fx::from_int(200) {
             Fx::ONE
@@ -256,14 +256,14 @@ pub(in crate::ai) struct Operation {
     pub rally: FxVec2,
     pub since: u32,
     pub phase_since: u32,
-    /// Mass it waits for before it goes.
+    /// Materials it waits for before it goes.
     pub want: Fx,
     pub ledger: Ledger,
     /// A landing's lift ship.
     pub carrier: UnitId,
     /// Tick of its last order.
     pub ordered: u32,
-    /// Mass it set out with: it falls back once it has lost a third of it.
+    /// Materials it set out with: it falls back once it has lost a third of it.
     #[serde(default)]
     pub launched: Fx,
     /// Its units' health at the last think: losing it while gathering means it
@@ -276,7 +276,7 @@ impl Operation {
     pub(in crate::ai) fn has(&self, id: UnitId) -> bool {
         self.units.iter().any(|(u, _)| *u == id)
     }
-    pub(in crate::ai) fn mass(&self) -> Fx {
+    pub(in crate::ai) fn materials(&self) -> Fx {
         self.units.iter().map(|(_, c)| *c).sum()
     }
 }
@@ -369,7 +369,7 @@ pub(in crate::ai) struct CommanderState {
     pub plans: Vec<Plan>,
     pub ops: Vec<Operation>,
     pub next_op: u32,
-    /// Kills its units made since the last think: who, and the mass destroyed.
+    /// Kills its units made since the last think: who, and the materials destroyed.
     pub kills: Vec<(UnitId, Fx)>,
     /// The project it is saving toward, and the tick it booked it.
     pub project: Option<(BlueprintId, u32)>,
@@ -395,7 +395,7 @@ pub(in crate::ai) struct CommanderState {
     /// Where and when the side last lost something to aircraft or a warship.
     #[serde(default)]
     pub hit_from_above: Option<(FxVec2, u32)>,
-    /// Mass the side has lost lately to each kind of killer (`Hurt`), fading.
+    /// Materials the side has lost lately to each kind of killer (`Hurt`), fading.
     #[serde(default)]
     pub hurt: [Fx; HURTS],
     /// Where the army gathers, held until the front moves (`commander.rs`).
@@ -405,7 +405,7 @@ pub(in crate::ai) struct CommanderState {
     /// the gathering wave is shelled and creeps back once it is quiet.
     #[serde(default)]
     pub rally_back: Fx,
-    /// Its armed mobile mass is less than the enemy army it believes in: the next
+    /// Its armed mobile materials are less than the enemy army it believes in: the next
     /// tier waits (`upgrades.rs`).
     #[serde(default)]
     pub behind: bool,
@@ -581,7 +581,7 @@ impl CommanderState {
                     o.kind.name(),
                     o.phase.name(),
                     o.units.len(),
-                    k(o.mass()),
+                    k(o.materials()),
                     k(o.ledger.killed),
                     k(o.ledger.lost),
                 )
@@ -658,7 +658,7 @@ impl CommanderState {
                     o.kind.name(),
                     o.phase.name(),
                     o.units.len(),
-                    o.mass().floor_int(),
+                    o.materials().floor_int(),
                     o.target.x.floor_int(),
                     o.target.y.floor_int(),
                     o.rally.x.floor_int(),

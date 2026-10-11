@@ -1,6 +1,6 @@
 //! What the Commander has built (`docs/AI_COMMANDER.md`, "Production"): factories
 //! make what the plans need, picked from the menu by how well each unit fares
-//! against the enemy the side believes in, per mass; builders put up what the
+//! against the enemy the side believes in, per materials; builders put up what the
 //! plans want (`wants`); and the economy code is steered by the plans.
 use super::economy::BLOCKED_FOR;
 use super::matchup::edge;
@@ -12,7 +12,7 @@ use mc_core::{Angle, Fx, FxVec2};
 use mc_data::BlueprintId;
 use std::collections::BTreeMap;
 
-/// Enemy types, the heaviest by mass seen, a unit is judged against.
+/// Enemy types, the heaviest by materials seen, a unit is judged against.
 const MATCHED_AGAINST: usize = 8;
 
 /// How the Commander steers the builders, factories and upgrades: its
@@ -75,7 +75,7 @@ impl World {
         }
     }
 
-    /// Mass of the enemy's aircraft and warships seen whose guns outreach the side's
+    /// Materials of the enemy's aircraft and warships seen whose guns outreach the side's
     /// anti-air: the mobile kinds it can make and the turrets it has standing. Only
     /// fighters or a longer-reaching turret answer those. Corvettes shot a commander
     /// from a kilometre while 480 m anti-air tanks stood under them.
@@ -114,7 +114,7 @@ impl World {
                     .max(p.reach[super::profile::Target::Structure as usize]);
                 p.is.is_some_and(|t| reach > best(t))
             })
-            .map(|p| p.mass)
+            .map(|p| p.materials)
             .sum()
     }
 
@@ -138,7 +138,7 @@ impl World {
                     .floor_int() as i64
                     / 1500
                 // Aircraft its ground anti-air cannot reach: fighters, a point for
-                // each thousand mass of them.
+                // each thousand materials of them.
                 + (outranging / 1000).min(6),
             p(PlanKind::SeaControl) + if land_route { 0 } else { 2 },
             p(PlanKind::SubWar),
@@ -152,10 +152,10 @@ impl World {
 
     /// The combat unit an idle factory of `player` should make, from `menu`: first
     /// the force furthest under its share (`force_shares`), then the role in that
-    /// force furthest under its share of the force's mass (anti-air by the enemy's
+    /// force furthest under its share of the force's materials (anti-air by the enemy's
     /// air, artillery by its defences and the siege plan, raiders by the raid plan,
     /// line units for the rest), then the unit for that role that fares best against
-    /// the enemy the side believes in, per mass. Picking the single best need every
+    /// the enemy the side believes in, per materials. Picking the single best need every
     /// time built no anti-air at all: line units always scored higher, and one
     /// enemy warship killed a 40-tank army.
     pub(in crate::ai) fn solve_production(
@@ -171,7 +171,7 @@ impl World {
         let stake = |k: PlanKind| s(c.plan(k));
         let air_seen = c.sticky.air_seen > 0 || c.sticky.space_seen > 0;
         let landing = stake(PlanKind::Landing);
-        // The enemy seen, by mass: air (and warships), defences, all.
+        // The enemy seen, by materials: air (and warships), defences, all.
         let (mut air, mut forts, mut all) = (Fx::ZERO, Fx::ZERO, Fx::ZERO);
         let mut enemy: BTreeMap<BlueprintId, Fx> = BTreeMap::new();
         for contact in &self.state.ai[player as usize].contacts {
@@ -179,13 +179,13 @@ impl World {
             if !p.armed() {
                 continue;
             }
-            *enemy.entry(contact.blueprint).or_insert(Fx::ZERO) += p.mass;
-            all += p.mass;
+            *enemy.entry(contact.blueprint).or_insert(Fx::ZERO) += p.materials;
+            all += p.materials;
             if matches!(p.domain, Some(Domain::Air | Domain::Space)) {
-                air += p.mass;
+                air += p.materials;
             }
             if p.has(role::DEFENSE) {
-                forts += p.mass;
+                forts += p.materials;
             }
         }
         let share = |m: Fx| (m * 1000 / all.max(Fx::ONE)).floor_int() as i64;
@@ -208,7 +208,7 @@ impl World {
             };
         let air_share = air_share.max(from_above);
         let fort_share = fort_share.max(hurt_by(Hurt::Artillery) + hurt_by(Hurt::Static));
-        // Roles within each force and the share (per mille) of its mass each
+        // Roles within each force and the share (per mille) of its materials each
         // should hold; the first role a unit fits is the one it counts toward.
         type Fits = Box<dyn Fn(&Profile) -> bool>;
         // Anti-air held against the aircraft seen: once it outweighs them by half,
@@ -224,12 +224,12 @@ impl World {
                     let p = profiles.get(units.blueprint[r]);
                     units.owner[r] == player && p.has(role::ANTI_AIR) && p.mobile()
                 })
-                .map(|r| profiles.get(units.blueprint[r]).mass)
+                .map(|r| profiles.get(units.blueprint[r]).materials)
                 .sum()
         };
         // Only what goes with the army covers it (turrets at home did not), and
         // never while aircraft do a fifth of the killing: T1 bombers and gunships
-        // light for their mass killed a wave of tanks at its rally point.
+        // light for their materials killed a wave of tanks at its rally point.
         let aa_enough = from_above < 200 && our_aa * 2 >= reachable * 3 + Fx::from_int(1500);
         let aa_land = if aa_enough {
             if air_seen {
@@ -316,9 +316,9 @@ impl World {
             let Some(f) = force(p).filter(|_| p.armed()) else {
                 continue;
             };
-            have[f] += p.mass;
+            have[f] += p.materials;
             if let Some(i) = roles[f].iter().position(|(fits, _)| fits(p)) {
-                have_role[f][i] += p.mass;
+                have_role[f][i] += p.materials;
             }
         }
         let total_share: i64 = shares.iter().sum::<i64>().max(1);
@@ -365,7 +365,7 @@ impl World {
             .iter()
             .filter(|p| force(p) == Some(f) && (slot.is_none() || role_at(p) == slot))
             .map(|p| {
-                // How it fares, per mass, against what it would meet: units that
+                // How it fares, per materials, against what it would meet: units that
                 // cannot meet it (a tank and a ship) do not count either way.
                 let meets = |e: &Profile| {
                     let reach = |a: &Profile, b: &Profile| b.is.is_some_and(|t| a.hits(t));
@@ -391,7 +391,9 @@ impl World {
                 if bp.cost_energy > (pl.energy + pl.energy_income * 20).max(Fx::from_int(200)) {
                     score /= 3;
                 }
-                if bp.cost_mass > (pl.mass + pl.mass_income * 20).max(Fx::from_int(100)) {
+                if bp.cost_materials
+                    > (pl.materials + pl.materials_income * 20).max(Fx::from_int(100))
+                {
                     score /= 3;
                 }
                 // A tier above is worth more: it is where the game goes.
@@ -511,7 +513,7 @@ impl World {
             } else {
                 Fx::from_int(240)
             };
-            if bp.cost_mass > pl.mass + pl.mass_income * seconds
+            if bp.cost_materials > pl.materials + pl.materials_income * seconds
                 || bp.cost_energy > pl.energy + pl.energy_income * seconds
             {
                 continue;
@@ -610,7 +612,7 @@ impl World {
             .slots
             .iter()
             .filter(|&r| units.owner[r] == player && self.bp(r).is_structure())
-            .map(|r| (units.pos[r], self.bp(r).cost_mass))
+            .map(|r| (units.pos[r], self.bp(r).cost_materials))
             .collect();
         valued
             .iter()

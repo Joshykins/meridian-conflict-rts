@@ -17,8 +17,8 @@ const AWAY: u32 = 300;
 const FRESH: u32 = 50;
 /// Metres past the shooters' reach it walks to.
 const MARGIN: i32 = 300;
-/// Mass a commander counts for when it can shoot back: about a tech 2 army's worth.
-const KING_MASS: i32 = 2000;
+/// Materials a commander counts for when it can shoot back: about a tech 2 army's worth.
+const KING_MATERIALS: i32 = 2000;
 
 impl World {
     /// Moves the commander out of reach of what is shooting it when the side cannot
@@ -56,7 +56,7 @@ impl World {
             {
                 continue;
             }
-            theirs += p.mass;
+            theirs += p.materials;
             sum += c.pos - at;
             reach = reach.max(range);
             shooters.push((c.pos, p.is));
@@ -73,7 +73,7 @@ impl World {
             })
         };
         let mut ours = if answers(king, at) {
-            Fx::from_int(KING_MASS)
+            Fx::from_int(KING_MATERIALS)
         } else {
             Fx::ZERO
         };
@@ -87,11 +87,11 @@ impl World {
                 && units.pos[row].distance(at) <= reach + Fx::from_int(MARGIN * 2)
                 && answers(p, units.pos[row])
             {
-                ours += p.mass;
+                ours += p.materials;
             }
         }
         // Worn down past three fifths it goes either way: a commander at half health
-        // stood beside fourteen thousand mass of its own and died to five corvettes.
+        // stood beside fourteen thousand materials of its own and died to five corvettes.
         let worn = health * 5 < full * 3;
         if ours >= theirs && !worn {
             return;

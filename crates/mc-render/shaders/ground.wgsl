@@ -238,7 +238,7 @@ fn fs_ore(in: StainOut) -> @location(0) vec4<f32> {
     // wider while highlighted, unless spoken for.
     let rim_w = 0.8 + far * 2.2 + hi * free * (1.0 + far * 3.0);
     let rim = 1.0 - smoothstep(rim_w * 0.5, rim_w * 0.5 + aa * 1.5, abs(sd + rim_w * 0.6));
-    // The materials red-orange (hud::MASS, 0xFF6B3D), linear, and the dull rust
+    // The materials red-orange (hud::MATERIALS, 0xFF6B3D), linear, and the dull rust
     // it fades to once claimed.
     let ore_col = mix(vec3<f32>(1.0, 0.147, 0.047), vec3<f32>(0.55, 0.3, 0.2), claimed * 0.8);
     let lift = mix(1.0, 0.75, claimed);

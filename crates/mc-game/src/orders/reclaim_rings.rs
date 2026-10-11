@@ -1,5 +1,5 @@
 //! Area reclaim on the battlefield: the circle a Reclaim drag would clear, drawn in
-//! the mass colour the salvage brings in. Queued ones are drawn with the guard rings.
+//! the materials colour the salvage brings in. Queued ones are drawn with the guard rings.
 
 use super::guard_rings::guard_ring;
 use super::Field;
@@ -42,9 +42,9 @@ pub(super) fn draw_reclaim_drag(
         centre,
         reclaim_radius(centre.distance(g)),
         1.0,
-        hud::MASS,
+        hud::MATERIALS,
     );
     if let Some(c) = project(centre) {
-        ui.disc(c, 3.0, ui::rgb(hud::MASS, 1.0));
+        ui.disc(c, 3.0, ui::rgb(hud::MATERIALS, 1.0));
     }
 }

@@ -84,7 +84,7 @@ fn set_priority(units: Vec<UnitId>, priority: Priority) -> PlayerCommand {
 /// A tick with no energy in store and materials to spare.
 fn starve(w: &mut World) {
     w.state.players[0].energy = Fx::ZERO;
-    w.state.players[0].mass = Fx::from_int(1000);
+    w.state.players[0].materials = Fx::from_int(1000);
     w.tick(&[]).unwrap();
 }
 
@@ -103,7 +103,7 @@ fn race(orders: impl FnOnce(&Race) -> Vec<PlayerCommand>) -> (f64, f64) {
     let mut w = world();
     spawn(&mut w, "aster_t1_power", 300, 300, 1000);
     w.state.players[0].income_permille[1] = 800;
-    spawn(&mut w, "aster_mass_storage", 330, 300, 1000);
+    spawn(&mut w, "aster_materials_storage", 330, 300, 1000);
     let r = Race {
         site_a: spawn(&mut w, "aster_t1_power", 500, 500, 100),
         site_b: spawn(&mut w, "aster_t1_power", 600, 500, 100),
@@ -204,7 +204,7 @@ fn everyone_building_a_prioritised_site_is_paid_first() {
 fn helpers_take_the_priority_of_the_factory_they_assist() {
     let mut w = world();
     spawn(&mut w, "aster_t1_power", 300, 300, 1000);
-    spawn(&mut w, "aster_mass_storage", 330, 300, 1000);
+    spawn(&mut w, "aster_materials_storage", 330, 300, 1000);
     let first = spawn(&mut w, "aster_t1_land_factory", 500, 600, 1000);
     let even = spawn(&mut w, "aster_t1_land_factory", 700, 600, 1000);
     let h_first = spawn(&mut w, "aster_t1_engineer", 500, 520, 1000);

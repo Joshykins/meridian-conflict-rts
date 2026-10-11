@@ -23,10 +23,10 @@ pub(super) fn status_page(
     let mut y = vitals(ui, s, u, bp, x, r.y, cw);
     y = doing(ui, s, u, bp, x, y, cw, on_strip);
     y = crate::hud::warp::band(ui, s, u, bp, x, y, cw);
-    let (mass, energy) = economy::flows(s, u, bp);
+    let (materials, energy) = economy::flows(s, u, bp);
     if economy::strip(
         ui,
-        mass,
+        materials,
         energy,
         Rect::new(x - 4.0, y - 4.0, cw + 8.0, economy::STRIP_H),
     ) {
@@ -291,7 +291,7 @@ fn record(ui: &mut Ui, s: &Scene, u: &UnitInstance, bp: &UnitBlueprint, x: f32, 
             x + cw,
             row,
             type_scale::MICRO,
-            rgb(crate::hud::MASS, 1.0),
+            rgb(crate::hud::MATERIALS, 1.0),
             &text,
         );
     }

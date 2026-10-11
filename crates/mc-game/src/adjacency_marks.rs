@@ -180,7 +180,7 @@ fn card(ui: &mut Ui, field: &Field, bp: &mc_data::UnitBlueprint, ties: &[Tie], a
     let mut lines: Vec<(String, u32)> = Vec::new();
     for r in [
         mc_sim::adjacency::Resource::Energy,
-        mc_sim::adjacency::Resource::Mass,
+        mc_sim::adjacency::Resource::Materials,
     ] {
         let share = gains[r as usize];
         if share > 0.0 {
@@ -238,7 +238,7 @@ fn card(ui: &mut Ui, field: &Field, bp: &mc_data::UnitBlueprint, ties: &[Tie], a
     let lead = if gains[1] > 0.0 {
         adj::tone(mc_sim::adjacency::Resource::Energy)
     } else if gains[0] > 0.0 {
-        adj::tone(mc_sim::adjacency::Resource::Mass)
+        adj::tone(mc_sim::adjacency::Resource::Materials)
     } else {
         palette::DIM
     };

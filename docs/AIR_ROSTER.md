@@ -206,7 +206,7 @@ Tests: `crates/mc-sim/tests/guard.rs`, `crates/mc-sim/tests/air_guard.rs`.
 A 300 m spacecraft that keeps station in the cloud deck (560 m) and comes down to put an
 army on the ground. It is tech 3 and not made in a factory: the Mason III and the
 commander's Engineering Suite III place it like a structure on a 26 x 10 lot and build
-it there (4200 mass, 63000 energy, 25200 build time). A finished ship stays on its lot with the ramp down, ready to load.
+it there (4200 materials, 63000 energy, 25200 build time). A finished ship stays on its lot with the ramp down, ready to load.
 
 - **Orders.** Right-click the ship with land units selected: they board (`Command::Board`;
   the pointer turns to a boarding glyph and a note says how much room they take and what
@@ -291,7 +291,7 @@ it themselves, but other traffic still walks under it); the AI neither builds no
 The T2 Courier (`aster_t2_lift_ship`) is built on a 10 x 6 lot by the Mason II and III or the commander's Engineering Suite II and III. It carries
 8 weighted cargo slots (one commander or eight T1 light tanks), cruises at 150 m/s at 140 m altitude,
 accelerates at 42 m/s squared, and climbs/descends at 60 m/s. It has 400 health,
-no weapons, no shield, and costs 280 mass / 4200 energy / 1400 build time.
+no weapons, no shield, and costs 280 materials / 4200 energy / 1400 build time.
 
 It is built in the Bastion's language at a third of the size (`models/aster/air/courier.rs`):
 a dark gunmetal hull of two chined shoulders with pale armour brows (hatch runs, team
@@ -513,7 +513,7 @@ crackling under them. The Reaper is a jet (since 2026-10-09; it was a lift-bell 
   hits, splashes and meets shields like any shot (mc-sim `strike_drones.rs`). A Wick whose
   mark dies first takes the nearest enemy within 160 m or comes home unspent. The bays are
   the magazine: with none home the launcher waits, and the racked Wicks on the hull show
-  it. Spent Wicks are built again in their bays, one at a time (2 mass, 20 energy, 1.5 s
+  it. Spent Wicks are built again in their bays, one at a time (2 materials, 20 energy, 1.5 s
   each), as the commander's salvage drones are (`air_support.rs`). Wicks are aircraft: flak and
   fighters shoot them down on the way in, and they die with their carrier.
 - **Reaper** (`regency_t3_assault_aircraft`, tech 3): a scythe-winged jet, an engine on

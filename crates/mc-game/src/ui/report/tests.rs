@@ -45,9 +45,9 @@ fn chronicle(bp: &Blueprints) -> Chronicle {
             tick,
             sides: (0..2)
                 .map(|i| SideSample {
-                    mass_income: 20.0 + 60.0 * k * (1.0 + i as f32 * 0.2),
+                    materials_income: 20.0 + 60.0 * k * (1.0 + i as f32 * 0.2),
                     energy_income: 200.0 * k,
-                    mass_spent: 18.0 + 50.0 * k,
+                    materials_spent: 18.0 + 50.0 * k,
                     efficiency: 0.95,
                     army: (40.0 * k) as u32,
                     army_value: 4000.0 * k * (1.0 - i as f32 * 0.3),
@@ -149,7 +149,7 @@ fn analysis_tells_the_match() {
     assert_eq!((a.sides[0].kills, a.sides[1].kills), (40, 10));
     let tank = bp
         .unit(bp.id_of("aster_t1_tank").unwrap())
-        .cost_mass
+        .cost_materials
         .to_f32();
     assert!((a.sides[0].destroyed - 40.0 * tank).abs() < 1.0);
     assert!((a.matrix[0][1] - 40.0 * tank).abs() < 1.0);

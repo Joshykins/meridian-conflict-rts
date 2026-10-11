@@ -1,4 +1,4 @@
-//! How equal mass of one unit fares against another, from their profiles
+//! How equal materials of one unit fares against another, from their profiles
 //! (`docs/AI_COMMANDER.md`, "Matchups"). Calibrated against staged fights in the sim
 //! (`matchup_tests.rs`, `zz_matchup_probe`).
 //!
@@ -16,7 +16,7 @@ const CAP: Fx = Fx::from_int(64);
 const CROWD_COST: Fx = Fx::from_int(400);
 /// How much of their damage splash adds against a crowd (x, of 1).
 const SPLASH_BONUS: Fx = Fx::ratio(3, 4);
-/// Equal mass staged: what the comparison is made at.
+/// Equal materials staged: what the comparison is made at.
 const STAKE: Fx = Fx::from_int(4000);
 
 /// Damage a second `a` puts on `b` from `d` metres, crowds counted.
@@ -40,7 +40,7 @@ fn reach(a: &Profile, b: &Profile) -> Fx {
     b.is.map_or(Fx::ZERO, |c: Target| a.reach[c as usize])
 }
 
-/// The result of `STAKE` mass of `a` against as much of `b`: above one `a` wins, by
+/// The result of `STAKE` materials of `a` against as much of `b`: above one `a` wins, by
 /// how much (Lanchester's ratio of fighting worth), capped at `CAP` either way.
 ///
 /// The fight is had at the shorter of the two reaches (the one with the shorter

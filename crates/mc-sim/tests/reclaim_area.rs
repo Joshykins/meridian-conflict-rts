@@ -47,10 +47,10 @@ fn world_on(terrain: Heightfield) -> World {
     };
     let mut w =
         World::with_terrain(terrain, map, blueprints, Arc::new(Pool::new(1)), &config).unwrap();
-    // Somewhere to put the mass: plenty of it.
+    // Somewhere to put the materials: plenty of it.
     w.tick(&[cmd(Command::DebugStorage {
         player: 0,
-        mass: 100_000,
+        materials: 100_000,
         energy: 0,
     })])
     .unwrap();
@@ -260,14 +260,14 @@ fn reclaimer(w: &mut World, x: i32, y: i32) -> UnitId {
     spawn(w, RECLAIMER, &[(x, y)])[0]
 }
 
-/// The mass left in the wreck nearest `(x, y)`, zero once it is gone.
-fn mass_near(w: &World, x: i32, y: i32) -> Fx {
+/// The materials left in the wreck nearest `(x, y)`, zero once it is gone.
+fn materials_near(w: &World, x: i32, y: i32) -> Fx {
     let at = FxVec2::from_ints(x, y);
     let wr = &w.state.wrecks;
     wr.slots
         .iter()
         .filter(|&r| wr.pos[r].distance(at) < Fx::from_int(30))
-        .map(|r| wr.mass[r])
+        .map(|r| wr.materials[r])
         .sum()
 }
 
@@ -318,7 +318,7 @@ fn a_reclaimer_sent_to_a_point_stops_for_the_wrecks_on_its_way() {
     );
     for (x, y) in fields {
         assert_eq!(
-            mass_near(&w, x, y),
+            materials_near(&w, x, y),
             Fx::ZERO,
             "the field at ({x}, {y}) was passed by"
         );

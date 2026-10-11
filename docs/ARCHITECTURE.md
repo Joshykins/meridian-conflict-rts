@@ -233,13 +233,13 @@ What a fight looks and sounds like is decided outside the simulation; `docs/STYL
   (set by `tracked_chassis`), only near the camera.
 - Wrecks (`tables::Wrecks`) carry how they came down (`Landing`: in place, crashed, sank, ditched) and the
   pitch and roll they lie at, from the falling hull's own tumble (`aircraft_crash.rs`) or list and trim
-  (`sinking.rs`). Area damage (splash, death blasts, warheads, AEB storms) takes mass off every wreck it
+  (`sinking.rs`). Area damage (splash, death blasts, warheads, AEB storms) takes materials off every wreck it
   reaches (`wreck_damage.rs`); one with none left is freed. The mirror (`mirror/wrecks.rs`) breaks a big
   hull into sections, one instance each plus one for its inside, all with the wreck's id, and
   `shaders/wreck.wgsl` buries, crumples, clips and burns them out from the model and the pose word alone.
-- Reclaim is `mc-sim/src/reclaim.rs`. A wreck gives mass at the reclaimer's power; a live unit
+- Reclaim is `mc-sim/src/reclaim.rs`. A wreck gives materials at the reclaimer's power; a live unit
   (`Command::ReclaimUnit`, `OrderKind::ReclaimUnit`: the player's own or a detected enemy's, never an ally's) is
-  unbuilt at the rate the same power would build it, pays `UNIT_YIELD` of its mass scaled by how built it is (a fifth;
+  unbuilt at the rate the same power would build it, pays `UNIT_YIELD` of its materials scaled by how built it is (a fifth;
   less than a repair's quarter, so there is no loop to profit from), and when its health runs out gets `flag::RECLAIMED`:
   `despawn_unit` then emits `SimEvent::Reclaimed` instead of `UnitDied` and leaves no wreck or stain (commanders
   excepted). An area reclaim (`Command::ReclaimArea`, `OrderKind::ReclaimArea`, `reclaim_area.rs`) sends mobile
@@ -247,7 +247,7 @@ What a fight looks and sounds like is decided outside the simulation; `docs/STYL
   that circle: each wreck is a `Reclaim` pushed in front of the area order, one another reclaimer nearby is on is left
   to it while there are others. A unit with no orders runs `idle_repair` then `idle_reclaim`: it never moves and holds no order (so it still counts as idle
   to the HUD and the AI). A mobile builder mends wounded allies within reach (`flag::REPAIRING`) unless a friend is already taking the hull apart; a reclaimer
-  clears wrecks within reach while the player's mass store has room. A reclaimer tower
+  clears wrecks within reach while the player's materials store has room. A reclaimer tower
   (`UnitBlueprint::reclaimer`) is the same with a longer reach, a slow turret (`turn`) and a charge
   (`charge_ticks`) before the beam comes on (`World::reclaim_ready`, `Units::reclaim_charge`). Live units are only reclaimed on an order, and a
   builder with weapons does nothing of the sort while it has a target or a detected enemy stands within 1.25 times
@@ -447,7 +447,7 @@ invulnerable unit, and the mirror marks it `SHIELD_VEIL` so it is drawn apart fr
   `World::new`: it removes the facility side's commander, sets it to free build, raises the guns the map lists, and
   puts `State::survival` in place (hashed). There is no engine unit: the facility is the map's.
 - **Rounds.** `run_survival` (after the AI each tick): at `next_at` a round is planned from its budget
-  (`SurvivalRules::budget_against`: 800 mass at the first round and a quarter more each round, or 15%, rising 6
+  (`SurvivalRules::budget_against`: 800 materials at the first round and a quarter more each round, or 15%, rising 6
   points a round, of what the defenders take in from mines and reclaim over one gap, whichever is more) over
   the enabled domains (land 60 / air 25 / naval 20), mostly at `tier_at(round)` with some lower tiers, from every
   listed fighting unit of any faction (so new tiers and factions join by data alone). Nothing appears: each unit is
@@ -463,7 +463,7 @@ invulnerable unit, and the mirror marks it `SHIELD_VEIL` so it is drawn apart fr
   round and the Shapers online) goes to the renderer as `RenderFrame::precursor_activity` and brightens the
   facility's light (`globals.tree_wind.w` in entity.wgsl).
   Events: `RoundPrinting`, `RoundLaunched`, `NodeRaising`, `NodeOnline`, `NodeDestroyed`, `SurvivalWon`.
-- **Economy.** Nothing is handed out. The engine's rounds are the defenders' mass: every unit it prints dies into a
+- **Economy.** Nothing is handed out. The engine's rounds are the defenders' materials: every unit it prints dies into a
   wreck worth most of its cost, so a survival map has little ore and reclaim is the economy. The heart, the print bays and the Shapers are always revealed to the defenders
   (`survival_reveal`). The skirmish AI skips the engine side; an AI *defender* only attacks nodes.
 - **Interface.** `SimStatus::survival` (`World::survival_status`) feeds the HUD's top-centre panel (round, what the

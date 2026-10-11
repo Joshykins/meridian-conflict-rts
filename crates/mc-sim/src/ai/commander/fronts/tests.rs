@@ -27,13 +27,13 @@ fn zones(rows: &[&str], ores: &[FxVec2]) -> Zones {
     )
 }
 
-/// We hold the west end, player 1 the east end: claims of `mass` at each start.
-fn claims(zs: &Zones, mass: i32) -> Claims {
+/// We hold the west end, player 1 the east end: claims of `materials` at each start.
+fn claims(zs: &Zones, materials: i32) -> Claims {
     let n = zs.zones.len();
     let mut ours = vec![0; n];
-    ours[zs.starts[0] as usize] = mass;
+    ours[zs.starts[0] as usize] = materials;
     let mut theirs = vec![0; n];
-    theirs[zs.starts[1] as usize] = mass;
+    theirs[zs.starts[1] as usize] = materials;
     Claims {
         ours,
         our_army: vec![0; n],

@@ -11,7 +11,7 @@
 //! `TOURNEY_SNAP=tick` each side's armed mobile units at that tick,
 //! `TOURNEY_DEATHS=1` every unit that dies, where and when, `TOURNEY_OPS=N` slot N's
 //! operations whenever one changes (every 10 s).
-//! `TOURNEY_RESOURCES=N` (a whole number, default 1) multiplies every player's mass and
+//! `TOURNEY_RESOURCES=N` (a whole number, default 1) multiplies every player's materials and
 //! energy income by N: the harness tops the stores up each tick with the extra, so the
 //! sim itself is untouched.
 //! The `RESULT key=value ...` line sums the match up, with `wall_s`, the real time the
@@ -35,7 +35,7 @@ fn side(spec: &str) -> Doctrine {
     }
 }
 
-/// Mass of everything a side has standing, finished or not.
+/// Materials of everything a side has standing, finished or not.
 fn worth(w: &World, team: u8) -> Fx {
     let s = &w.state;
     s.units
@@ -47,7 +47,7 @@ fn worth(w: &World, team: u8) -> Fx {
             if bp.has(cat::COMMANDER) {
                 Fx::ZERO
             } else {
-                bp.cost_mass
+                bp.cost_materials
             }
         })
         .sum()
@@ -155,8 +155,8 @@ fn match_up() {
             if resources > 1 {
                 // Income is per second and a second is ten ticks.
                 for pl in w.state.players.iter_mut() {
-                    pl.mass =
-                        (pl.mass + pl.mass_income * (resources - 1) / 10).min(pl.mass_capacity);
+                    pl.materials = (pl.materials + pl.materials_income * (resources - 1) / 10)
+                        .min(pl.materials_capacity);
                     pl.energy = (pl.energy + pl.energy_income * (resources - 1) / 10)
                         .min(pl.energy_capacity);
                 }
@@ -228,7 +228,7 @@ fn match_up() {
             }
             if snap == Some(w.state.tick) {
                 for p in 0..w.state.players.len() {
-                    let mut mass = 0;
+                    let mut materials = 0;
                     let mut n = 0;
                     for r in w.state.units.slots.iter() {
                         let bp = w.bp(r);
@@ -237,12 +237,12 @@ fn match_up() {
                             && !bp.weapons.is_empty()
                             && !bp.has(cat::COMMANDER | cat::ENGINEER)
                         {
-                            mass += bp.cost_mass.floor_int();
+                            materials += bp.cost_materials.floor_int();
                             n += 1;
                         }
                     }
                     println!(
-                        "SNAP tick {} P{p} armed {n} units {mass} mass",
+                        "SNAP tick {} P{p} armed {n} units {materials} materials",
                         w.state.tick
                     );
                 }
@@ -255,13 +255,13 @@ fn match_up() {
             println!("{minute:>3}m");
             for (p, pl) in w.state.players.iter().enumerate() {
                 println!(
-                    "  P{p} side {} mass {:>5}/s energy {:>6}/s eff {:>3}% build {:>3}% store {:>3}%/{:>3}% mines {} fabs {} links {} worth {:>7} kills {} lost {} | {}",
+                    "  P{p} side {} materials {:>5}/s energy {:>6}/s eff {:>3}% build {:>3}% store {:>3}%/{:>3}% mines {} fabs {} links {} worth {:>7} kills {} lost {} | {}",
                     ["A", "B"][pl.team as usize],
-                    pl.mass_income.floor_int(),
+                    pl.materials_income.floor_int(),
                     pl.energy_income.floor_int(),
                     (pl.upkeep_efficiency * 100).floor_int(),
                     (pl.build_speed * 100).floor_int(),
-                    (pl.mass * 100 / pl.mass_capacity.max(mc_core::Fx::ONE)).floor_int(),
+                    (pl.materials * 100 / pl.materials_capacity.max(mc_core::Fx::ONE)).floor_int(),
                     (pl.energy * 100 / pl.energy_capacity.max(mc_core::Fx::ONE)).floor_int(),
                     w.state.units.slots.iter().filter(|&r| w.state.units.owner[r] as usize == p && w.bp(r).mine.is_some() && w.state.units.is_active(r)).count(),
                     w.state.units.slots.iter().filter(|&r| w.state.units.owner[r] as usize == p && w.bp(r).fabricator.is_some()).count(),
@@ -331,7 +331,7 @@ fn match_up() {
                 }
             }
             println!("ROSTER P{p}: {roster:?}");
-            // Where its mass stands: army, defence, economy, factories, the rest.
+            // Where its materials stand: army, defence, economy, factories, the rest.
             let mut by: std::collections::BTreeMap<&str, i64> = std::collections::BTreeMap::new();
             for r in w.state.units.slots.iter() {
                 if w.state.units.owner[r] as usize != p {
@@ -355,9 +355,9 @@ fn match_up() {
                 } else {
                     "other"
                 };
-                *by.entry(kind).or_insert(0) += bp.cost_mass.floor_int() as i64;
+                *by.entry(kind).or_insert(0) += bp.cost_materials.floor_int() as i64;
             }
-            println!("MASS P{p}: {by:?}");
+            println!("MATERIALS P{p}: {by:?}");
         }
     }
     println!("PLANS A {}", plans(0));

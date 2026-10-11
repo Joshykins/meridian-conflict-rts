@@ -84,7 +84,7 @@ fn energy(w: &World, p: usize) -> [f32; 4] {
     e
 }
 
-/// Mass standing (finished units' price) by kind: economy, factories, army, defences, T4+.
+/// Materials standing (finished units' price) by kind: economy, factories, army, defences, T4+.
 fn standing(w: &World, p: usize) -> [f32; 5] {
     let s = &w.state;
     let mut v = [0.0; 5];
@@ -107,7 +107,7 @@ fn standing(w: &World, p: usize) -> [f32; 5] {
         } else {
             3
         };
-        v[i] += bp.cost_mass.to_f32();
+        v[i] += bp.cost_materials.to_f32();
     }
     v
 }
@@ -186,21 +186,22 @@ fn ledger() {
             // Once a second.
             for (p, t) in totals.iter_mut().enumerate() {
                 let pl = &w.state.players[p];
-                let income = pl.mass_income.to_f32();
-                let spent = pl.mass_spent.to_f32();
-                let reclaimed = pl.reclaimed_mass.to_f32();
+                let income = pl.materials_income.to_f32();
+                let spent = pl.materials_spent.to_f32();
+                let reclaimed = pl.reclaimed_materials.to_f32();
                 t.mined += income;
                 t.reclaimed += reclaimed - reclaimed_before[p];
                 reclaimed_before[p] = reclaimed;
                 t.spent += spent;
-                let full = pl.mass.to_f32() >= pl.mass_capacity.to_f32() - 1.0;
+                let full = pl.materials.to_f32() >= pl.materials_capacity.to_f32() - 1.0;
                 if full {
                     t.wasted += (income - spent).max(0.0);
                 }
                 t.stall += (pl.energy.to_f32() < 1.0 && pl.energy_demand > pl.energy_income) as u32;
                 if minute > 10 {
                     t.late += 1;
-                    t.late_full += (pl.mass.to_f32() > 0.8 * pl.mass_capacity.to_f32()) as u32;
+                    t.late_full +=
+                        (pl.materials.to_f32() > 0.8 * pl.materials_capacity.to_f32()) as u32;
                     let bp = power(&w, p);
                     t.busy += bp.busy();
                     t.owned += bp.owned();
@@ -221,12 +222,12 @@ fn ledger() {
             let v = standing(&w, p);
             let m = mines(&w, p);
             println!(
-                "  {minute:>2}m P{p} mass {:>5.1}/s +reclaim {:>4.1} spent {:>5.1} store {:>5.0}/{:<5.0} wasted {:>6.0} | bp fac {:>4.0}/{:<4.0} eng {:>4.0}/{:<4.0} cmd {:>3.0}/{:<3.0} | e/s T1 {:>5.0} T2 {:>5.0} T3 {:>5.0} other {:>4.0} | mines {:?} tech {} | standing eco {:>6.0} fac {:>6.0} army {:>6.0} def {:>6.0} T4+ {:>6.0}",
-                pl.mass_income.to_f32(),
+                "  {minute:>2}m P{p} materials {:>5.1}/s +reclaim {:>4.1} spent {:>5.1} store {:>5.0}/{:<5.0} wasted {:>6.0} | bp fac {:>4.0}/{:<4.0} eng {:>4.0}/{:<4.0} cmd {:>3.0}/{:<3.0} | e/s T1 {:>5.0} T2 {:>5.0} T3 {:>5.0} other {:>4.0} | mines {:?} tech {} | standing eco {:>6.0} fac {:>6.0} army {:>6.0} def {:>6.0} T4+ {:>6.0}",
+                pl.materials_income.to_f32(),
                 pl.reclaim_income.to_f32(),
-                pl.mass_spent.to_f32(),
-                pl.mass.to_f32(),
-                pl.mass_capacity.to_f32(),
+                pl.materials_spent.to_f32(),
+                pl.materials.to_f32(),
+                pl.materials_capacity.to_f32(),
                 t.wasted,
                 bp.factory[1],
                 bp.factory[0],

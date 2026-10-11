@@ -66,7 +66,7 @@ pub struct AircraftCrash {
     pub heading: Angle,
     pub bank: i16,
     pub age: u16,
-    pub mass: Fx,
+    pub materials: Fx,
     /// Its age when it went into the sea; zero while it is still in the air.
     pub splashed: u16,
     /// The seabed under it, once it is in the water.
@@ -92,7 +92,7 @@ impl AircraftCrash {
         h.write_u64(self.heading.0 as u64);
         h.write_u64(self.bank as u16 as u64);
         h.write_u64(self.age as u64 | (self.splashed as u64) << 16);
-        h.write_i64(self.mass.0);
+        h.write_i64(self.materials.0);
         h.write_i64(self.floor.0);
         h.write_u64(
             self.pitch as u16 as u64
@@ -205,13 +205,13 @@ impl World {
                 self.state.aircraft_crashes.push(crash);
                 continue;
             }
-            if crash.mass > Fx::ZERO {
+            if crash.materials > Fx::ZERO {
                 let row = self.state.wrecks.spawn(
                     crash.blueprint,
                     crash.pos.xy(),
                     surface,
                     crash.spun_heading(crash.age, heft),
-                    crash.mass,
+                    crash.materials,
                     self.state.tick,
                 )?;
                 let (pitch, roll) = crash.rest_attitude();
@@ -247,7 +247,7 @@ impl World {
             return Ok(true);
         }
         crash.pos.z = crash.floor;
-        if crash.mass > Fx::ZERO {
+        if crash.materials > Fx::ZERO {
             // It stopped spinning when it hit the water, and lies level on the bottom.
             let row = self.state.wrecks.spawn(
                 crash.blueprint,
@@ -257,7 +257,7 @@ impl World {
                     crash.splashed,
                     heft(self.blueprints.unit(crash.blueprint).radius),
                 ),
-                crash.mass,
+                crash.materials,
                 self.state.tick,
             )?;
             self.state.wrecks.landing[row] = Landing::Ditched as u8;

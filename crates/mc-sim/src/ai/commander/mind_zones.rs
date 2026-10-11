@@ -62,11 +62,11 @@ impl ZoneMapView {
 #[derive(Clone, Debug, PartialEq)]
 pub struct MindHolding {
     pub player: u8,
-    /// Structures by kind with any standing: name, mass, count.
+    /// Structures by kind with any standing: name, materials, count.
     pub built: Vec<(&'static str, i32, u16)>,
     /// How sure (0..=100) the structures are still there.
     pub built_sure: i32,
-    /// Army mass seen, and believed there now.
+    /// Army materials seen, and believed there now.
     pub army_seen: i32,
     pub army: i32,
     pub army_sure: i32,
@@ -103,10 +103,10 @@ pub struct MindFront {
     /// Its zones, and their zones beside it: the way through to them.
     pub zones: Vec<u16>,
     pub entries: Vec<u16>,
-    /// Mass at stake behind it, ours and theirs.
+    /// Materials at stake behind it, ours and theirs.
     pub stake_us: i32,
     pub stake_them: i32,
-    /// Armed mass near it: ours, and theirs as believed.
+    /// Armed materials near it: ours, and theirs as believed.
     pub ours: i32,
     pub theirs: i32,
     /// Zones from it to their most valuable ground.
@@ -115,17 +115,17 @@ pub struct MindFront {
     pub age: u32,
 }
 
-/// Mass of guns, anti-air, artillery and shields at which a zone without factories
+/// Materials of guns, anti-air, artillery and shields at which a zone without factories
 /// is a firebase.
 const FIREBASE: i32 = 1500;
-/// Army mass believed in a zone that makes it the army's place.
+/// Army materials believed in a zone that makes it the army's place.
 const ARMY: i32 = 800;
 
 fn tag(h: &Holding, start: bool, tick: u32) -> &'static str {
     let b = |k: Built| h.built[k as usize].floor_int();
     let factories = b(Built::Factory) + b(Built::Airfield) + b(Built::Shipyard);
     let guns = b(Built::Guns) + b(Built::AntiAir) + b(Built::Artillery) + b(Built::Shield);
-    let built = h.built_mass().floor_int();
+    let built = h.built_materials().floor_int();
     if start && built > 0 || factories > 0 && h.king_here(tick) {
         "main base"
     } else if factories > 0 {

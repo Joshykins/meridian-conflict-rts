@@ -1,5 +1,5 @@
 //! Orders for warships, scouts and landings: everything that warps.
-use super::ops_ground::THREAT_MASS;
+use super::ops_ground::THREAT_MATERIALS;
 use super::profile::{role, Domain, Target};
 use super::state::{OpKind, Operation, Phase};
 use super::world_model::CELL;
@@ -32,11 +32,12 @@ impl World {
             return 0;
         }
         let tick = self.state.tick;
-        let mass: Fx = rows.iter().map(|&r| self.bp(r).cost_mass).sum();
+        let materials: Fx = rows.iter().map(|&r| self.bp(r).cost_materials).sum();
         let health: Fx = rows
             .iter()
             .map(|&r| {
-                self.state.units.health[r] * self.bp(r).cost_mass / self.bp(r).health.max(Fx::ONE)
+                self.state.units.health[r] * self.bp(r).cost_materials
+                    / self.bp(r).health.max(Fx::ONE)
             })
             .sum();
         let centre = self.centre_of(&rows).unwrap_or(op.rally);
@@ -59,7 +60,7 @@ impl World {
                     }
                     orders += 1;
                 }
-                let gathered: Fx = at_home.iter().map(|&r| self.bp(r).cost_mass).sum();
+                let gathered: Fx = at_home.iter().map(|&r| self.bp(r).cost_materials).sum();
                 if gathered >= op.want && op.want > Fx::ZERO {
                     let target = self.strike_target(ctx, op.rally, gathered).or_else(|| {
                         self.attack_target(
@@ -82,8 +83,8 @@ impl World {
             }
             Phase::Executing => {
                 // Worn below half of what went: the group jumps home together.
-                let aa = ctx.wm.threat_at(centre, Target::Space) * THREAT_MASS;
-                if health * 2 < op.want || aa > mass * 3 {
+                let aa = ctx.wm.threat_at(centre, Target::Space) * THREAT_MATERIALS;
+                if health * 2 < op.want || aa > materials * 3 {
                     op.phase = Phase::Withdrawing;
                     op.phase_since = tick;
                     for &r in &rows {
@@ -97,7 +98,7 @@ impl World {
                 {
                     return 0;
                 }
-                match self.strike_target(ctx, centre, mass) {
+                match self.strike_target(ctx, centre, materials) {
                     Some(t) if t.distance(centre) > Fx::from_int(300) => {
                         op.target = t;
                         self.jump_then_attack(ctx.player, &rows, t, centre, out);
@@ -257,8 +258,8 @@ impl World {
                     return 0;
                 }
                 // Aboard: where to put them down.
-                let mass = op.mass();
-                let Some(target) = self.landing_spot(ctx, mass) else {
+                let materials = op.materials();
+                let Some(target) = self.landing_spot(ctx, materials) else {
                     return 0;
                 };
                 op.target = target;
@@ -353,7 +354,7 @@ impl World {
     }
 
     /// Land units of the gathering land operations that fit `ship`, nearest it,
-    /// up to `capacity`: (id, mass, room).
+    /// up to `capacity`: (id, materials, room).
     pub(in crate::ai) fn take_cargo(
         &self,
         ctx: &Ctx,
@@ -391,22 +392,22 @@ impl World {
         out
     }
 
-    /// Where a landing of `mass` goes: enemy value it can win at, on ground the
+    /// Where a landing of `materials` goes: enemy value it can win at, on ground the
     /// enemy holds, the least anti-air and guns near. With nothing seen, the enemy
     /// start.
-    fn landing_spot(&self, ctx: &Ctx, mass: Fx) -> Option<FxVec2> {
+    fn landing_spot(&self, ctx: &Ctx, materials: Fx) -> Option<FxVec2> {
         let contacts = &self.state.ai[ctx.player as usize].contacts;
         contacts
             .iter()
             .filter(|c| self.blueprints.unit(c.blueprint).is_structure())
             .filter_map(|c| {
                 let guns = self.enemy_strength_at(ctx, c.pos, Fx::from_int(800), Target::Land);
-                let aa = ctx.wm.threat_at(c.pos, Target::Air) * THREAT_MASS;
-                (guns * 2 <= mass * 3).then(|| {
+                let aa = ctx.wm.threat_at(c.pos, Target::Air) * THREAT_MATERIALS;
+                (guns * 2 <= materials * 3).then(|| {
                     let value: Fx = contacts
                         .iter()
                         .filter(|o| o.pos.distance(c.pos) < Fx::from_int(700))
-                        .map(|o| self.blueprints.unit(o.blueprint).cost_mass)
+                        .map(|o| self.blueprints.unit(o.blueprint).cost_materials)
                         .sum();
                     ((value - guns - aa).floor_int() as i64, c.pos)
                 })

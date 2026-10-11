@@ -30,14 +30,14 @@ pub struct MindOp {
     /// It is moving on its target, not gathering or coming home.
     pub engaged: bool,
     pub units: u32,
-    /// Mass in the group, and the mass it wants.
-    pub mass: i32,
+    /// Materials in the group, and the materials it wants.
+    pub materials: i32,
     pub want: i32,
     /// Where the group stands (metres), when any of it is alive.
     pub at: Option<(i32, i32)>,
     pub target: (i32, i32),
     pub rally: (i32, i32),
-    /// Enemy mass it has killed and own mass it has lost.
+    /// Enemy materials it has killed and own materials it has lost.
     pub killed: i32,
     pub lost: i32,
 }
@@ -81,7 +81,7 @@ pub struct AiMind {
     pub plans: Vec<MindPlan>,
     pub ops: Vec<MindOp>,
     pub notes: Vec<MindNote>,
-    /// Recent losses by what killed them (mass, fading), named.
+    /// Recent losses by what killed them (materials, fading), named.
     pub hurt: Vec<(&'static str, i32)>,
     /// Minutes since each kind of force was last seen; `None`: never.
     pub seen: Vec<(&'static str, Option<u32>)>,
@@ -137,7 +137,7 @@ impl World {
                     phase: o.phase.name(),
                     engaged: o.phase == Phase::Executing && o.kind != OpKind::Guard,
                     units: rows.len() as u32,
-                    mass: o.mass().floor_int(),
+                    materials: o.materials().floor_int(),
                     want: o.want.floor_int(),
                     at: self.centre_of(&rows).map(xy),
                     target: xy(o.target),

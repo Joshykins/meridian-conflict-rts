@@ -321,11 +321,11 @@
         weapons: {},
     ),
     "regency_storage": (
-        lore: "An armoured mass vault between two long energy cells: one building holds both.",
+        lore: "An armoured materials vault between two long energy cells: one building holds both.",
         weapons: {},
     ),
     "regency_storage_t2": (
-        lore: "The vault and its cells built up a storey: more mass under armour, more charge in the cells.",
+        lore: "The vault and its cells built up a storey: more materials under armour, more charge in the cells.",
         weapons: {},
     ),
     "regency_storage_t3": (
