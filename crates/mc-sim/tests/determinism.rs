@@ -205,6 +205,9 @@ fn setup(w: &mut World) {
                 // upkeep, and one against a factory, saving its scouts' materials.
                 add("aster_t2_fabricator", 1, 460, 150);
                 add("aster_t2_fabricator", 1, 260, 450);
+                // An Onager against the reactor's west side: its reload is fed from the grid,
+                // faster and cheaper for the reactor (`fed_reload.rs`).
+                add("aster_t2_artillery", 1, 340, 150);
                 // Two factories linked in one batch: their scouts form up by them and join the attack
                 // together (`batch.rs`), one of them waiting across the snapshot.
                 add("aster_t1_land_factory", 1, 200, 450);

@@ -1256,7 +1256,14 @@ impl World {
         // True if this tick used up a countdown (reload or a first-shot charge).
         // A weapon that sat ready (cooldown already 0) still has to charge before it fires.
         let cooling = units.weapon_cooldown[row][w] > 0;
-        if cooling {
+        // A reload fed from the grid is counted down by the economy (`fed_reload.rs`).
+        if cooling
+            && !crate::fed_reload::fed(
+                weapon,
+                units.weapon_cooldown[row][w],
+                units.weapon_salvo_left[row][w],
+            )
+        {
             units.weapon_cooldown[row][w] -= 1;
         }
         if held && weapon.mount {

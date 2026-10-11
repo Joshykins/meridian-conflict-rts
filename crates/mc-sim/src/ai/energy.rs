@@ -37,7 +37,9 @@ impl World {
                 continue;
             }
             let bp = self.bp(row);
-            need += bp.economy.energy_upkeep + self.mine_grow_upkeep(row);
+            need += bp.economy.energy_upkeep
+                + self.mine_grow_upkeep(row)
+                + crate::fed_reload::full_draw(bp);
             if let Some(next) = bp.upgrades_to.filter(|_| self.upgrading(row)) {
                 need += self.upgrade_draw(row, self.blueprints.unit(next)) * paid;
             }

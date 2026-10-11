@@ -266,6 +266,21 @@ impl World {
             }
         }
 
+        // Fed reloads (`fed_reload.rs`): energy only, paid with the rest.
+        let mut reloads = Vec::new();
+        for row in self.state.units.slots.iter() {
+            if let Some(want) = self.reload_draw(row) {
+                let p = self.state.units.owner[row] as usize;
+                demand[p].1 += want;
+                tiers[p][REST].add([Fx::ZERO, want], true);
+                self.flows[row].wanted[1] += want;
+                reloads.push((row, want));
+            } else {
+                // None running: the next reload starts from a whole tick.
+                self.state.units.reload_carry[row] = Fx::ZERO;
+            }
+        }
+
         // Mines draw their upkeep with the rest, and dig as hard as the rest's energy
         // is covered. Materials are not known yet (the mines make it), so what is put first is
         // taken to spend all the energy it asks for: never more than it does.
@@ -431,6 +446,13 @@ impl World {
             spent[p].1 += got;
             self.flows[row].used[1] += got;
             self.state.units.warp[row].charge += got;
+        }
+        for &(row, want) in &reloads {
+            let p = self.state.units.owner[row] as usize;
+            let e = paid_energy[p][REST];
+            spent[p].1 += want * e;
+            self.flows[row].used[1] += want * e;
+            self.feed_reload(row, e);
         }
 
         // Upkeep is paid with the rest, as far as its energy goes.

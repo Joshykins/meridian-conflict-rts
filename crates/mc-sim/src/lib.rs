@@ -45,6 +45,7 @@ mod destruct;
 mod dogfight;
 pub mod economy;
 pub mod elevator;
+pub mod fed_reload;
 mod flak;
 pub mod focus;
 pub mod fog;

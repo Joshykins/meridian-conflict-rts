@@ -43,6 +43,7 @@ mod factions;
 mod factory;
 mod factory_batch;
 mod factory_orders;
+mod fed_reload;
 mod fog;
 mod formation_terrain;
 mod formations;

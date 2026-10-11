@@ -133,6 +133,9 @@ pub struct Units {
     /// Which of its carrier's `drone_sockets` a drone rides on: its own for life.
     pub drone_socket: Vec<u8>,
     pub intercept_cooldown: Vec<u16>,
+    /// The part of a tick its fed reloads have been paid for and not yet counted down
+    /// (`fed_reload.rs`); zero while none is running.
+    pub reload_carry: Vec<Fx>,
     pub burn_ticks: Vec<u16>,
     pub burn_owner: Vec<u8>,
     pub burn_source: Vec<UnitId>,
@@ -292,6 +295,7 @@ impl Units {
             drone_parent: Vec::new(),
             drone_socket: Vec::new(),
             intercept_cooldown: Vec::new(),
+            reload_carry: Vec::new(),
             burn_ticks: Vec::new(),
             burn_owner: Vec::new(),
             burn_source: Vec::new(),
@@ -375,6 +379,7 @@ impl Units {
         put(&mut self.drone_parent, row, Handle::NONE);
         put(&mut self.drone_socket, row, 0);
         put(&mut self.intercept_cooldown, row, 0);
+        put(&mut self.reload_carry, row, Fx::ZERO);
         put(&mut self.burn_ticks, row, 0);
         put(&mut self.burn_owner, row, 0);
         put(&mut self.burn_source, row, Handle::NONE);
@@ -492,6 +497,7 @@ impl Units {
             h.write_u32(self.drone_parent[row].0);
             h.write_u32(self.drone_socket[row] as u32);
             h.write_u32(self.intercept_cooldown[row] as u32);
+            h.write_i64(self.reload_carry[row].0);
             h.write_u32(self.burn_ticks[row] as u32);
             h.write_u32(self.burn_owner[row] as u32);
             h.write_u32(self.burn_source[row].0);

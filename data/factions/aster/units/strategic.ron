@@ -91,6 +91,10 @@
             // everything, 4.5 km up and 30 s on its way to a base 12 km off.
             damage: 5200, splash: 45, range_min: 1500, range: 22000, reload: 9.0, speed: 800,
             trajectory: Ballistic, loft: 15,
+            // Each reload draws 2500 energy a second, more than a Reactor III makes, and
+            // runs only as fast as it is paid; reactors built against it cut the draw and
+            // speed it up (`fed_reload.rs`).
+            reload_energy: 2500,
             // One degree: about 200 m either way at 12 km, short or long as much as wide.
             spread: 1.0,
             turret_turn: 8, pivot: (0, 0, 18), muzzle: (74, 0, 18),

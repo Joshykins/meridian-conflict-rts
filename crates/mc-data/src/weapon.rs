@@ -31,6 +31,9 @@ pub struct Weapon {
     pub range_min: Fx,
     pub range_max: Fx,
     pub reload_ticks: u16,
+    /// Energy a second its reload draws while it runs (`RawWeapon::reload_energy`); zero
+    /// for a free reload.
+    pub reload_energy: Fx,
     /// Shots per reload cycle and the gap between them. A delay of zero dumps the volley together.
     pub salvo: u8,
     /// Number released simultaneously at each salvo step.

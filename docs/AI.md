@@ -98,7 +98,7 @@ says it can do (`commander/profile.rs`).
 - Adjacency (`ai/adjacent.rs`, the rules in `mc-sim/src/adjacency.rs`): a power plant
   or a fabricator takes the free lot flush against the side's buildings where it saves
   the most a second: what it saves the neighbours that use what it provides (a
-  factory's build energy and materials at full speed, upkeep) and what they save it,
+  factory's build energy and materials at full speed, upkeep, a gun's fed reload) and what they save it,
   materials counted at 6 energy. From the corners of a side in, so a side takes as
   many as fit. Only where it would save nothing does it go to a farm. Two buildings
   where one's blast would destroy the other and the other is worth as much (a

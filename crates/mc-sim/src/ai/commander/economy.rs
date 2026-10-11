@@ -168,8 +168,9 @@ impl World {
         let stalling = !floating && speed < STALL_SPEED;
 
         // Power for spending the whole income (nearly everything costs energy and
-        // materials in about one ratio) and the upkeep of all that stands or
-        // goes up, with room to spare. Judged by builders' draw it read 900 a second
+        // materials in about one ratio), the upkeep of all that stands or
+        // goes up and its guns' fed reloads (`fed_reload.rs`), with room to spare.
+        // Judged by builders' draw it read 900 a second
         // short of a side spending 110 materials, and the mines dug at half pay.
         let upkeep: Fx = self
             .state
@@ -177,7 +178,10 @@ impl World {
             .slots
             .iter()
             .filter(|&r| self.state.units.owner[r] == player)
-            .map(|r| self.bp(r).economy.energy_upkeep)
+            .map(|r| {
+                let bp = self.bp(r);
+                bp.economy.energy_upkeep + crate::fed_reload::full_draw(bp)
+            })
             .sum();
         // Spent, not earned, while the store pays for more: the opening spends its
         // starting materials, and reading income alone it ran its energy dry.

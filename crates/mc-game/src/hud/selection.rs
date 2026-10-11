@@ -11,6 +11,7 @@ use crate::game::{Mode, Targeting};
 use crate::rings::{projections, Reach};
 use crate::ui::{id, ink, palette, rgb, type_scale, Rect, Style, Ui};
 use glam::Vec2;
+use mc_core::Fx;
 use mc_data::{cat, MoveLayer, Trajectory, UnitBlueprint, Weapon};
 use mc_sim::mirror::UnitInstance;
 use mc_sim::tables::{flag, OrderKind};
@@ -75,6 +76,12 @@ pub fn weapon_rows(w: &Weapon) -> (String, Vec<(&'static str, String)>) {
         ),
         ("Reload", format!("{:.1} s", w.reload_ticks as f32 * 0.1)),
     ];
+    if w.reload_energy > Fx::ZERO {
+        rows.push((
+            "Reload Power",
+            format!("{:.0} energy / s", w.reload_energy.to_f32()),
+        ));
+    }
     if w.star_beam {
         rows.push(("Full burn", whole(w.damage.to_f32() * shots as f32)));
         rows.push((

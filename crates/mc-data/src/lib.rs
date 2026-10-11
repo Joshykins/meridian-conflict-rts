@@ -1918,6 +1918,7 @@ impl Blueprints {
                 h.write_i64(w.skim.0);
                 h.write_i64(w.apogee.0);
                 h.write_i64(w.intercept_hp.0);
+                h.write_i64(w.reload_energy.0);
                 h.write_u64(
                     w.cold_launch_ticks as u64
                         | (w.boost_ticks as u64) << 16

@@ -49,7 +49,11 @@ fn world(fog: bool) -> World {
         fog,
         spawn_commanders: false,
     };
-    World::with_terrain(terrain, map, blueprints, Arc::new(Pool::new(1)), &config).unwrap()
+    let mut w =
+        World::with_terrain(terrain, map, blueprints, Arc::new(Pool::new(1)), &config).unwrap();
+    // These measure the gun, not the grid: its fed reload (`fed_reload.rs`) is paid.
+    w.state.players[0].free_build = true;
+    w
 }
 
 fn spawn(w: &mut World, key: &str, owner: u8, (x, y): (i32, i32)) -> UnitId {

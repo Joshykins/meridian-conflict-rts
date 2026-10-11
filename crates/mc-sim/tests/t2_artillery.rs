@@ -63,7 +63,12 @@ fn world(sea: bool) -> World {
         fog: false,
         spawn_commanders: false,
     };
-    World::with_terrain(terrain, map, blueprints, Arc::new(Pool::new(1)), &config).unwrap()
+    let mut w =
+        World::with_terrain(terrain, map, blueprints, Arc::new(Pool::new(1)), &config).unwrap();
+    // These measure the gun, not the grid: its fed reload (`fed_reload.rs`) is paid. The
+    // attacker's side stays as it was, its shields unpowered.
+    w.state.players[0].free_build = true;
+    w
 }
 
 fn add(w: &mut World, key: &str, owner: u8, x: i32, y: i32, heading: i32) -> UnitId {

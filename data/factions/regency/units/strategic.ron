@@ -92,6 +92,8 @@
             name: "Triune Pinch-fusion Howitzer",
             damage: 5600, splash: 40, range_min: 1500, range: 22000, reload: 10.0, speed: 800,
             trajectory: Ballistic, loft: 15,
+            // Each reload draws 2500 energy a second, as the Culverin's does.
+            reload_energy: 2500,
             spread: 0.8,
             turret_turn: 8, pivot: (0, 0, 18), muzzle: (36.77, 0, 54.77),
             targets: ["Structure", "Land", "Naval"], keeps_aim: true,

@@ -16,7 +16,7 @@ use std::sync::Arc;
 // Lots are 12 m cells: a 2x2 fabricator at (792, 792) stands on 780..804, so an 8x8
 // reactor (96 m) against its east side stands at x 852, a 4x4 (48 m) at x 828.
 
-fn world() -> World {
+pub(crate) fn world() -> World {
     let blueprints = Arc::new(
         Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
     );
@@ -53,7 +53,7 @@ fn world() -> World {
 }
 
 /// One `key` of `owner`'s at (x, y), `build` permille done; its id.
-fn spawn(w: &mut World, owner: u8, key: &str, x: i32, y: i32, build: u16) -> UnitId {
+pub(crate) fn spawn(w: &mut World, owner: u8, key: &str, x: i32, y: i32, build: u16) -> UnitId {
     let blueprint = w.blueprints.id_of(key).unwrap();
     let at = FxVec2::from_ints(x, y);
     w.tick(&[PlayerCommand {
@@ -79,7 +79,7 @@ fn spawn(w: &mut World, owner: u8, key: &str, x: i32, y: i32, build: u16) -> Uni
     u.id(row)
 }
 
-fn row(w: &World, id: UnitId) -> usize {
+pub(crate) fn row(w: &World, id: UnitId) -> usize {
     w.state.units.row(id).expect("alive")
 }
 

@@ -6,8 +6,9 @@
 //! provider's (a corner is not enough) is its neighbour, and a neighbour that uses
 //! what the provider saves gets the saving:
 //!
-//! - energy: its standing upkeep (a fabricator, mine, shield or radar), and the energy
-//!   a factory spends on what it builds;
+//! - energy: its standing upkeep (a fabricator, mine, shield or radar), the energy
+//!   a factory spends on what it builds, and a gun's fed reload (`fed_reload.rs`), which
+//!   also runs faster by the same share;
 //! - materials: the materials a factory spends on what it builds.
 //!
 //! A provider's `mc_data::Adjacency` figure is what it saves a building it rings all the
@@ -111,12 +112,14 @@ pub fn edge_share(full: Fx, edge: (FxVec2, FxVec2), consumer: Lot) -> Fx {
 }
 
 /// Whether a building of `bp` spends `resource` in a way a neighbour can save:
-/// energy upkeep, or a factory's building.
+/// energy upkeep, a factory's building, or a gun's fed reload.
 pub fn uses(bp: &UnitBlueprint, resource: Resource) -> bool {
     let factory = bp.is_structure() && bp.builder.is_some();
     match resource {
         Resource::Materials => factory,
-        Resource::Energy => factory || bp.economy.energy_upkeep > Fx::ZERO,
+        Resource::Energy => {
+            factory || bp.economy.energy_upkeep > Fx::ZERO || crate::fed_reload::feeds(bp)
+        }
     }
 }
 

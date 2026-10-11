@@ -1011,6 +1011,11 @@ pub struct RawWeapon {
     pub range: f64,
     /// Seconds between salvos.
     pub reload: f64,
+    /// Energy a second the reload draws from the grid while it runs: the reload goes only
+    /// as fast as it is paid, and faster and cheaper by what neighbouring power plants
+    /// save it (`mc_sim::fed_reload`). Zero (the default): the reload is free.
+    #[serde(default)]
+    pub reload_energy: f64,
     #[serde(default = "one")]
     pub salvo: u8,
     /// Projectiles released together at each step of a salvo.
@@ -2068,6 +2073,7 @@ impl Unit {
                 range_min: fx(w.range_min),
                 range_max: fx(w.range),
                 reload_ticks: ticks(w.reload).clamp(1, u16::MAX as u32) as u16,
+                reload_energy: fx(w.reload_energy.clamp(0.0, 1.0e6)),
                 salvo: w.salvo.max(1),
                 salvo_batch: w.salvo_batch.clamp(1, w.salvo.max(1)),
                 salvo_delay_ticks: ticks(w.salvo_delay).clamp(0, 255) as u8,

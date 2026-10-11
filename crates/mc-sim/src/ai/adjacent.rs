@@ -61,8 +61,8 @@ fn worth_of(resource: Resource) -> Fx {
 
 impl World {
     /// What a building of `bp` uses a second of `resource` that a neighbour can
-    /// save: its energy upkeep, and what a factory spends at full speed (its build
-    /// power at the average rate of what it makes).
+    /// save: its energy upkeep and its guns' fed reloads, and what a factory spends at
+    /// full speed (its build power at the average rate of what it makes).
     fn adjacency_use(&self, bp: &UnitBlueprint, resource: Resource) -> Fx {
         let building = bp
             .builder
@@ -89,7 +89,9 @@ impl World {
             });
         match resource {
             Resource::Materials => building,
-            Resource::Energy => building + bp.economy.energy_upkeep,
+            Resource::Energy => {
+                building + bp.economy.energy_upkeep + crate::fed_reload::full_draw(bp)
+            }
         }
     }
 

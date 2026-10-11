@@ -16,6 +16,7 @@ use glam::Vec2;
 use mc_core::{Fx, FxVec2};
 use mc_data::{BlueprintId, Blueprints, UnitBlueprint};
 use mc_sim::adjacency::{self, Resource};
+use mc_sim::fed_reload;
 use mc_sim::mirror::{LinkView, UnitInstance, KIND_GHOST, KIND_PROP, KIND_WRECK};
 
 /// Rows of neighbours the band lists before it sums up the rest.
@@ -262,6 +263,7 @@ pub fn card_rows(blueprints: &Blueprints, bp: &UnitBlueprint) -> Vec<(String, St
         }
         if let Some((lo, hi, name)) = providers(blueprints, bp, r) {
             let what = match (r, bp.builder.is_some()) {
+                (Resource::Energy, false) if fed_reload::feeds(bp) => "reload power, faster reload",
                 (Resource::Energy, false) => "upkeep",
                 (Resource::Energy, true) => "energy per build",
                 (Resource::Materials, _) => "materials per build",
@@ -280,7 +282,7 @@ pub fn card_rows(blueprints: &Blueprints, bp: &UnitBlueprint) -> Vec<(String, St
         ] {
             if share > Fx::ZERO {
                 let whom = match r {
-                    Resource::Energy => "upkeep and factory builds",
+                    Resource::Energy => "upkeep, factory builds and gun reloads",
                     Resource::Materials => "a factory's builds",
                 };
                 rows.push((
@@ -338,6 +340,9 @@ fn per_second(s: &Scene, u: &UnitInstance, bp: &UnitBlueprint, saved: [f32; 2]) 
             build(materials.wanted, saved[0]),
             build(energy.wanted, saved[1]),
         ]
+    } else if fed_reload::feeds(bp) {
+        // A fed reload asks for its draw already less the saving, as a factory does.
+        [0.0, build(energy.wanted, saved[1])]
     } else {
         [0.0, upkeep * saved[1]]
     }
