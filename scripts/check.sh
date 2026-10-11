@@ -15,6 +15,9 @@
 # end (its time budgets need a quiet machine). A new checkout's third-party
 # crates come ready-built from scripts/target-seed.sh. The Linux build has no
 # audio device, so sound is left out (`--features alsa` is opt-in).
+#
+# A test binary still running after MERIDIAN_TEST_LIMIT seconds (default 300)
+# fails the check as hung; MERIDIAN_TEST_JOBS (default 6) binaries run at once.
 set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
 
@@ -75,13 +78,25 @@ jq -r 'select(.reason == "compiler-artifact" and .profile.test and .executable !
        | "\(.executable)\t\(.manifest_path | rtrimstr("/Cargo.toml"))\t\(.target.name)"' \
     "$logs/build.json" | sort -u > "$logs/binaries"
 
+# A test binary still running after this long has a hung test: it is stopped
+# and the check fails naming it (cargo prints "running for over 60 seconds" for
+# each test still going), well inside a session's 10-minute command limit. The
+# slowest binaries take 90 s, up to about 240 s on a loaded machine.
+TEST_LIMIT=${MERIDIAN_TEST_LIMIT:-300}
+
 # Runs one test binary; its output is kept, and printed only if it fails.
 run_one() {
     local exe=$1 dir=$2 name=$3
     local log
     log="$logs/$(basename "$exe").log"
     local began=$SECONDS
-    if (cd "$dir" && CARGO_MANIFEST_DIR=$dir "$exe" --quiet) > "$log" 2>&1; then
+    local status=0
+    (cd "$dir" && CARGO_MANIFEST_DIR=$dir timeout "$TEST_LIMIT" "$exe" --quiet) > "$log" 2>&1 || status=$?
+    if [ "$status" = 124 ]; then
+        echo "FAIL $name ($(basename "$dir")): still running after $TEST_LIMIT s, a test hangs"
+        grep -a 'running for over' "$log" | sed 's/^/     /'
+        touch "$log.failed"
+    elif [ "$status" = 0 ]; then
         echo "ok   $name: $(grep -Eo '[0-9]+ passed.*finished in [0-9.]+s' "$log" | tail -1)"
         echo "$((SECONDS - began)) $dir $name" >> "$logs/times"
     else
