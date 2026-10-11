@@ -894,7 +894,8 @@ mod tests {
         }
     }
 
-    /// The unit file's size, pivots and muzzles are the model's.
+    /// The unit file's size, pivots and muzzles are the model's (an aft house's muzzles as
+    /// the sim reads them: given as if the house faced forward, mirrored).
     #[test]
     fn the_unit_files_weapons_are_the_models() {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
@@ -907,7 +908,14 @@ mod tests {
         let close = |a: Vec3, b: Vec3| a.distance(b) < 0.02;
         let w = &bp.weapons;
         let all = |i: usize, want: &[Vec3]| {
-            let got: Vec<Vec3> = w[i].muzzles.iter().map(|&p| v(p)).collect();
+            let aft = |p: Vec3| {
+                if w[i].rear {
+                    Vec3::new(-p.x, -p.y, p.z)
+                } else {
+                    p
+                }
+            };
+            let got: Vec<Vec3> = w[i].muzzles.iter().map(|&p| aft(v(p))).collect();
             assert_eq!(got.len(), want.len(), "weapon {i}");
             for (a, b) in got.iter().zip(want) {
                 assert!(close(*a, *b), "weapon {i}: unit file {a}, model {b}");
@@ -916,6 +924,7 @@ mod tests {
         all(0, &TUBES.map(Vec3::from));
         all(1, &INTERCEPT.map(Vec3::from));
         all(2, &bores(FORE));
+        assert!(w[3].rear, "the aft repeater rests turned round");
         all(3, &bores(AFT));
         all(5, &SEEKERS.map(Vec3::from));
         assert!(close(v(w[2].pivot.unwrap()), FORE));

@@ -322,12 +322,14 @@ struct Skin {
     lights: vec4<f32>,
 }
 
-// Mirrors mc_sim::mirror::HousePose (192 bytes): per weapon yaw off the hull last tick and
-// this, pitch last tick and this; then each weapon's kick-back last tick and this, two per weapon.
+// Mirrors mc_sim::mirror::HousePose (256 bytes): per weapon yaw off the hull last tick and
+// this, pitch last tick and this; then each weapon's kick-back last tick and this, two per weapon;
+// then each charge gun's charge, two per weapon (`house_charge`).
 //!rust mc_sim::mirror::HousePose
 struct HousePose {
     pose: array<vec4<f32>, 8>,
     kick: array<vec4<f32>, 4>,
+    charge: array<vec4<f32>, 4>,
 }
 
 const KIND_WRECK: u32 = 0x80000000u;

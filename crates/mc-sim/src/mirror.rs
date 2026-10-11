@@ -1750,15 +1750,20 @@ pub const STRATEGIC_INTERCEPTOR: u32 = 1;
 /// The pose of each weapon on a unit whose guns turn on houses of their own, for the
 /// entity shader's `rig::HOUSE` limbs: per weapon its yaw off the hull last tick and
 /// this, then its pitch last tick and this (radians); then each weapon's kick-back
-/// last tick and this (1 the instant it fires), two per weapon.
+/// last tick and this (1 the instant it fires), two per weapon; then each charge gun's
+/// charge, two per weapon, which the sim leaves zero and the renderer fills from the
+/// events (`renderer/titan_charge.rs`), so a house's working gear moves with its own gun.
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable, Debug, Default)]
 pub struct HousePose {
     pub pose: [[f32; 4]; mc_data::MAX_HOUSES],
     pub kick: [f32; 2 * mc_data::MAX_HOUSES],
+    /// Per weapon, on the renderer's clock: when its charge began, then when it fired
+    /// (positive) or, still charging, minus when it is due. A start below -9000: none.
+    pub charge: [f32; 2 * mc_data::MAX_HOUSES],
 }
 
-const _: () = assert!(std::mem::size_of::<HousePose>() == 192);
+const _: () = assert!(std::mem::size_of::<HousePose>() == 256);
 
 /// `UnitInstance::status[1]`: bits 8.. hold the unit's index into `RenderFrame::houses` plus one.
 pub const UNIT_HOUSE_SHIFT: u32 = 8;

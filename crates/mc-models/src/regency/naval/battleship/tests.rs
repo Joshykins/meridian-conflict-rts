@@ -156,7 +156,8 @@ fn it_holds_its_weapons() {
     }
 }
 
-/// The unit file's weapon points are the model's.
+/// The unit file's weapon points are the model's (an aft house's muzzles as the sim reads
+/// them: given as if the house faced forward, mirrored).
 #[test]
 fn the_unit_files_weapons_are_the_models() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
@@ -167,9 +168,17 @@ fn the_unit_files_weapons_are_the_models() {
     let close = |a: Vec3, b: Vec3| a.distance(b) < 0.02;
     let w = &bp.weapons;
     for i in 0..3 {
+        let aft = |p: Vec3| {
+            if w[i].rear {
+                Vec3::new(-p.x, -p.y, p.z)
+            } else {
+                p
+            }
+        };
+        assert_eq!(w[i].rear, i == 2, "only the aft house rests turned round");
         assert!(close(v(w[i].pivot.unwrap()), MAIN[i]), "main {i} pivot");
-        assert!(close(v(w[i].muzzle), charge(i)), "main {i} muzzle");
-        let m: Vec<Vec3> = w[i].muzzles.iter().map(|&p| v(p)).collect();
+        assert!(close(aft(v(w[i].muzzle)), charge(i)), "main {i} muzzle");
+        let m: Vec<Vec3> = w[i].muzzles.iter().map(|&p| aft(v(p))).collect();
         assert_eq!(m.len(), 2);
         assert!(
             m.iter().zip(charges(i)).all(|(a, b)| close(*a, b)),

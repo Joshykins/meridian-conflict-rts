@@ -9,13 +9,15 @@
 //! which a model with charge coils has no other use for (its weapons turn on gun houses
 //! or on the turret's own arm, never a `rig::MOUNT`):
 //! `[charge start, charge due, last shot, CHARGE_RECORD]`, seconds on the renderer's clock
-//! (`FrameInput::time`, the shader's `globals.camera.w`).
+//! (`FrameInput::time`, the shader's `globals.camera.w`). A unit whose guns turn on houses
+//! of their own (the Flamberge's) also carries each gun's own charge in its `HousePose`
+//! (`patch_houses`), so each house's gear opens on its own charge, not the last one heard.
 
 use std::borrow::Cow;
 use std::collections::HashMap;
 
-use mc_data::Blueprints;
-use mc_sim::mirror::{SimEvent, UnitInstance};
+use mc_data::{Blueprints, MAX_HOUSES};
+use mc_sim::mirror::{HousePose, SimEvent, UnitInstance, UNIT_HOUSE_SHIFT};
 
 /// `UnitInstance::mount.w` on a unit whose mount carries its charge (`entity.wgsl`).
 pub(super) const CHARGE_RECORD: f32 = -1000.0;
@@ -38,7 +40,10 @@ struct Charge {
 pub(super) struct TitanCharge {
     /// Per model slot (`UnitInstance::blueprint`): whether its mesh carries charge coils.
     coils: Vec<bool>,
+    /// Each unit's last charge begun, whichever gun.
     units: HashMap<u32, Charge>,
+    /// Each gun's own (unit, weapon), for guns on houses of their own.
+    guns: HashMap<(u32, u8), Charge>,
     /// Seen since the last upload: charges begun (unit, seconds, blueprint, weapon), and
     /// shots fired by a weapon that charges (blueprint, weapon, where).
     charges: Vec<(u32, f32, u32, u8)>,
@@ -50,6 +55,7 @@ impl TitanCharge {
         Self {
             coils,
             units: HashMap::new(),
+            guns: HashMap::new(),
             charges: Vec::new(),
             shots: Vec::new(),
         }
@@ -106,7 +112,7 @@ impl TitanCharge {
             } => {
                 let (bp, w) = (blueprint.0 as u32, *weapon);
                 if self
-                    .units
+                    .guns
                     .values()
                     .any(|c| c.blueprint == bp && c.weapon == w)
                     || self.charges.iter().any(|c| c.2 == bp && c.3 == w)
@@ -134,36 +140,39 @@ impl TitanCharge {
         };
         if !units.iter().any(coil) {
             self.units.clear();
+            self.guns.clear();
             self.charges.clear();
             self.shots.clear();
             return Cow::Borrowed(units);
         }
         for (id, seconds, blueprint, weapon) in self.charges.drain(..) {
-            let entry = self.units.entry(id).or_insert(Charge {
+            let gun = self.guns.entry((id, weapon)).or_insert(Charge {
                 start: NEVER,
                 due: NEVER,
                 shot: NEVER,
                 blueprint,
                 weapon,
             });
-            *entry = Charge {
+            *gun = Charge {
                 start: time,
                 due: time + seconds.max(0.1),
                 blueprint,
                 weapon,
-                ..*entry
+                ..*gun
             };
+            // The unit's own record follows the last charge begun, keeping its last shot.
+            let shot = self.units.get(&id).map_or(NEVER, |c| c.shot);
+            self.units.insert(id, Charge { shot, ..*gun });
         }
         for (blueprint, weapon, at) in self.shots.drain(..) {
             // The nearest unit charging that weapon, or still burning it, fired it.
             let mut best: Option<(u32, f32)> = None;
             for u in units.iter().filter(|u| coil(u)) {
-                let Some(c) = self.units.get(&u.unit_id) else {
+                let Some(c) = self.guns.get(&(u.unit_id, weapon)) else {
                     continue;
                 };
                 let burning = c.start <= c.shot && time - c.shot < HOLD_GAP;
-                if c.blueprint != blueprint || c.weapon != weapon || !(c.start > c.shot || burning)
-                {
+                if c.blueprint != blueprint || !(c.start > c.shot || burning) {
                     continue;
                 }
                 let d = (u.pos[0] - at[0]).hypot(u.pos[1] - at[1]);
@@ -171,7 +180,13 @@ impl TitanCharge {
                     best = Some((u.unit_id, d));
                 }
             }
-            if let Some(c) = best.and_then(|(id, _)| self.units.get_mut(&id)) {
+            let Some((id, _)) = best else {
+                continue;
+            };
+            if let Some(c) = self.guns.get_mut(&(id, weapon)) {
+                c.shot = time;
+            }
+            if let Some(c) = self.units.get_mut(&id).filter(|c| c.weapon == weapon) {
                 c.shot = time;
             }
         }
@@ -192,6 +207,43 @@ impl TitanCharge {
         if self.units.len() > 64 {
             let live: std::collections::HashSet<u32> = units.iter().map(|u| u.unit_id).collect();
             self.units.retain(|id, _| live.contains(id));
+            self.guns.retain(|(id, _), _| live.contains(id));
+        }
+        Cow::Owned(out)
+    }
+
+    /// The gun-house poses as the GPU should have them (after `patch`): each house of a
+    /// unit whose model has charge coils carries its own gun's charge
+    /// (`HousePose::charge`). Borrowed as they are when there are none.
+    pub(super) fn patch_houses<'a>(
+        &self,
+        units: &[UnitInstance],
+        houses: &'a [HousePose],
+    ) -> Cow<'a, [HousePose]> {
+        if self.guns.is_empty() {
+            return Cow::Borrowed(houses);
+        }
+        let mut out = houses.to_vec();
+        for u in units {
+            let Some(pose) = (u.status[1] >> UNIT_HOUSE_SHIFT)
+                .checked_sub(1)
+                .and_then(|i| out.get_mut(i as usize))
+            else {
+                continue;
+            };
+            for w in 0..MAX_HOUSES {
+                let record = self
+                    .guns
+                    .get(&(u.unit_id, w as u8))
+                    .map_or([NEVER, 0.0], |c| {
+                        if c.shot >= c.start {
+                            [c.start, c.shot]
+                        } else {
+                            [c.start, -c.due]
+                        }
+                    });
+                pose.charge[2 * w..2 * w + 2].copy_from_slice(&record);
+            }
         }
         Cow::Owned(out)
     }
@@ -225,5 +277,34 @@ mod tests {
         tc.shots.push((1, 1, [120.0, 40.0]));
         let m = tc.patch(&[u], 12.0)[0].mount;
         assert_eq!(m[2], 8.2);
+    }
+
+    #[test]
+    fn each_house_carries_its_own_guns_charge() {
+        let mut tc = TitanCharge::new(vec![false, true]);
+        let mut u: UnitInstance = bytemuck::Zeroable::zeroed();
+        u.blueprint = 1;
+        u.unit_id = 7;
+        u.status[1] = 1 << UNIT_HOUSE_SHIFT;
+        let houses = [HousePose::default()];
+        // Houses 0 and 2 charge a second apart; house 0 fires.
+        tc.charges.push((7, 2.0, 1, 0));
+        tc.patch(&[u], 1.0);
+        tc.charges.push((7, 2.0, 1, 2));
+        tc.patch(&[u], 2.0);
+        tc.shots.push((1, 0, [0.0, 0.0]));
+        tc.patch(&[u], 3.0);
+        let c = tc.patch_houses(&[u], &houses)[0].charge;
+        assert_eq!((c[0], c[1]), (1.0, 3.0), "house 0 fired at 3");
+        assert_eq!(
+            (c[4], c[5]),
+            (2.0, -4.0),
+            "house 2 still charging, due at 4"
+        );
+        assert!(c[2] < -9000.0, "house 1 never charged");
+        // The unit's own record is the last charge begun, and its shot is not house 0's.
+        let m = tc.patch(&[u], 3.1)[0].mount;
+        assert_eq!((m[0], m[1]), (2.0, 4.0));
+        assert!(m[2] < 0.0);
     }
 }

@@ -27,12 +27,12 @@
 //! shares of its length and radii of `HowitzerLook::radius`, is the model's
 //! (models `siege_howitzer`).
 
-use super::hull_frame::DrawnHull;
+use super::hull_frame::GunFrame;
 use super::water_fx::PUFF_STEAM;
 use super::{Renderer, PUFF_BOLT, PUFF_PLASMA, PUFF_SPARK};
 use glam::Vec3;
 use mc_data::{BlueprintId, HowitzerLook, Weapon};
-use mc_sim::mirror::{HousePose, SimEvent, UnitInstance, KIND_GHOST, KIND_WRECK, UNIT_HOUSE_SHIFT};
+use mc_sim::mirror::{HousePose, SimEvent, UnitInstance, KIND_GHOST, KIND_WRECK};
 use std::f32::consts::{PI, TAU};
 
 /// Guns (a weapon on a hull) in their sequence at once. A deliberate cosmetic cap: a
@@ -143,10 +143,6 @@ fn blade(k: usize) -> f32 {
     (k % 6) as f32 * TAU / 6.0 + TAU / 12.0
 }
 
-fn lerp_angle(a: f32, b: f32, f: f32) -> f32 {
-    a + ((b - a + PI).rem_euclid(TAU) - PI) * f
-}
-
 impl Renderer {
     fn arc_howitzer(&self, blueprint: BlueprintId, weapon: u8) -> Option<(&Weapon, HowitzerLook)> {
         let w = self
@@ -255,65 +251,22 @@ impl Renderer {
         let Some(look) = w.howitzer else {
             return Vec::new();
         };
-        let hull = DrawnHull::of(u, &bp.visual.mesh, f);
-        let rot_z = |v: Vec3, a: f32| {
-            let (s, c) = a.sin_cos();
-            Vec3::new(v.x * c - v.y * s, v.x * s + v.y * c, v.z)
-        };
-        let rot_xz = |v: Vec3, a: f32| {
-            let (s, c) = a.sin_cos();
-            Vec3::new(v.x * c - v.z * s, v.y, v.x * s + v.z * c)
-        };
         // A gun on a house of its own (a warship's turret) has its pose in the houses list;
         // a turret gun (the Trebuchet's) turns with the unit's turret and pitches with its
         // arm; anything else lies fixed in the hull.
-        let house = (u.status[1] >> UNIT_HOUSE_SHIFT)
-            .checked_sub(1)
-            .and_then(|i| self.bore_fx.howitzers.houses.get(i as usize))
-            .filter(|_| w.mount)
-            .and_then(|h| h.pose.get(weapon as usize));
-        let turret = house.is_none() && weapon == 0 && w.turret_turn > 0 && w.pivot.is_some();
-        let (yaw, pitch) = match house {
-            Some(p) => (lerp_angle(p[0], p[1], f), p[2] + (p[3] - p[2]) * f),
-            None if turret => (
-                lerp_angle(u.prev_turret_yaw, u.turret_yaw, f),
-                u.arm_pitch[0] + (u.arm_pitch[1] - u.arm_pitch[0]) * f,
-            ),
-            None => (0.0, 0.0),
-        };
-        let pivot = w.pivot.map(|p| Vec3::from(p.to_f32()));
-        let place = |local: Vec3| {
-            let on_hull = match pivot {
-                // A house turns about its pivot; what is in it pitches there too.
-                Some(p) if house.is_some() => p + rot_z(rot_xz(local - p, pitch), yaw),
-                // The turret turns about the unit's middle, the gun about its trunnion.
-                Some(p) if turret => rot_z(p + rot_xz(local - p, pitch), yaw),
-                _ => local,
-            };
-            hull.place(on_hull)
-        };
-        let mouths: Vec<Vec3> = if w.muzzles.is_empty() {
-            vec![Vec3::from(w.muzzle.to_f32())]
-        } else {
-            w.muzzles.iter().map(|m| Vec3::from(m.to_f32())).collect()
-        };
-        mouths
+        let gun = GunFrame::of(
+            u,
+            w,
+            weapon,
+            &self.bore_fx.howitzers.houses,
+            &bp.visual.mesh,
+            weapon == 0 && w.turret_turn > 0,
+            f,
+        );
+        gun.mouths(w)
             .into_iter()
             .take(MAX_TUBES)
-            .map(|m| {
-                // An aft house's muzzles are given as if it faced forward, mirrored (as the sim does).
-                let local = if w.rear {
-                    Vec3::new(-m.x, -m.y, m.z)
-                } else {
-                    m
-                };
-                // Down the bore: from the trunnion out to the muzzle, level across.
-                let bore = pivot.map_or(Vec3::X, |p| {
-                    let d = local - p;
-                    Vec3::new(d.x, 0.0, d.z).normalize_or(Vec3::X)
-                });
-                let muzzle = place(local);
-                let dir = (place(local + bore) - muzzle).normalize_or(Vec3::X);
+            .map(|(muzzle, dir)| {
                 let left = Vec3::Z.cross(dir).normalize_or(Vec3::Y);
                 Tube {
                     muzzle,

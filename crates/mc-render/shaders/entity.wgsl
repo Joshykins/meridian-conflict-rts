@@ -388,11 +388,35 @@ const PAT_COIL: u32 = 19u;
 const PAT_COIL_TURN: u32 = 27u;
 const CHARGE_RECORD: f32 = -1000.0;
 
-// x how full the charge is (0..1), y seconds since the shot (large: none since it began).
-fn coil_state(e: Entity, time: f32) -> vec2<f32> {
-    let start = e.mount.x;
-    let due = e.mount.y;
-    let shot = e.mount.z;
+// The charge a vertex's gear and coils move with, as `mount` carries it (x start, y due,
+// z last shot, w CHARGE_RECORD): its own gun's for a piece of a gun house of its own whose
+// gun has charged (`HousePose::charge`, filled by the renderer: start, then the shot's
+// time, or minus the due time while it charges), else the unit's (`mount`).
+fn charge_of(e: Entity, model: ModelInfo, rig: u32) -> vec4<f32> {
+    let limb = rig & 0xFu;
+    if limb < LIMB_HOUSE || limb >= LIMB_HOUSE + 4u || (e.status[1] >> UNIT_HOUSE_SHIFT) == 0u {
+        return e.mount;
+    }
+    let w1 = house_weapon_of(model, limb - LIMB_HOUSE + select(0u, 4u, (rig & RIG_HOUSE_HIGH) != 0u));
+    if w1 < 0.5 {
+        return e.mount;
+    }
+    let w = u32(w1 + 0.5) - 1u;
+    let pair = house_pose(e).charge[w / 2u];
+    let c = select(pair.xy, pair.zw, (w & 1u) == 1u);
+    if c.x < -9000.0 {
+        return e.mount;
+    }
+    let fired = c.y > 0.0;
+    return vec4<f32>(c.x, select(-c.y, c.y, fired), select(-1.0e4, c.y, fired), CHARGE_RECORD);
+}
+
+// x how full the charge `rec` is (0..1), y seconds since the shot (large: none since it
+// began). `rec` is a charge as `charge_of` gives it.
+fn coil_state(rec: vec4<f32>, time: f32) -> vec2<f32> {
+    let start = rec.x;
+    let due = rec.y;
+    let shot = rec.z;
     var charge = 0.0;
     if start > shot && time >= start {
         let full = clamp((time - start) / max(due - start, 0.1), 0.0, 1.0);
@@ -406,8 +430,8 @@ fn coil_state(e: Entity, time: f32) -> vec2<f32> {
 // A charge gun's working gear (`CHARGE_GEAR_*`): x how far it stands open (through the
 // charge, held a moment after the shot, closing as the gun cools), y how hot it is (lit
 // by the shot, cooling over some seconds).
-fn charge_gear_state(e: Entity, time: f32) -> vec2<f32> {
-    let c = coil_state(e, time);
+fn charge_gear_state(rec: vec4<f32>, time: f32) -> vec2<f32> {
+    let c = coil_state(rec, time);
     let opening = smoothstep(0.0, 0.8, c.x);
     let after = 1.0 - smoothstep(0.4, 3.4, c.y);
     let heat = smoothstep(0.0, 0.15, c.y) * (1.0 - smoothstep(1.4, 5.2, c.y));
@@ -418,11 +442,11 @@ fn charge_gear_state(e: Entity, time: f32) -> vec2<f32> {
 // the charge and runs down quickly after the shot (or when the charge is due and nothing
 // fired). A run-down always adds a whole number of half turns (the gimbal cage looks the
 // same half a turn round), so the next charge takes up from where it left off.
-fn charge_gear_turn(e: Entity, time: f32) -> f32 {
+fn charge_gear_turn(rec: vec4<f32>, time: f32) -> f32 {
     let idle = time * 0.15;
-    let start = e.mount.x;
-    let due = e.mount.y;
-    let shot = e.mount.z;
+    let start = rec.x;
+    let due = rec.y;
+    let shot = rec.z;
     if start < -9000.0 {
         return idle;
     }
@@ -444,10 +468,10 @@ fn charge_gear_turn(e: Entity, time: f32) -> f32 {
 // cage spins about `rig.xyz`. Travels are `rig.w` times their authored metres.
 // `bore` is the model's rest-space barrel axis (`ModelInfo::recoil`), zero if it has none:
 // a gun authored laid up runs its gear out along it, not along the level +x.
-fn charge_gear_pose(p0: vec3<f32>, n0: vec3<f32>, gear: u32, rig: vec4<f32>, bore: vec3<f32>, e: Entity, time: f32) -> array<vec3<f32>, 2> {
+fn charge_gear_pose(p0: vec3<f32>, n0: vec3<f32>, gear: u32, rig: vec4<f32>, bore: vec3<f32>, rec: vec4<f32>, time: f32) -> array<vec3<f32>, 2> {
     var p = p0;
     var n = n0;
-    let s = charge_gear_state(e, time);
+    let s = charge_gear_state(rec, time);
     if gear == CHARGE_GEAR_SPREAD || gear == CHARGE_GEAR_REACH {
         p.y += sign(p.y) * CHARGE_GEAR_SPREAD_M * rig.w * s.x;
     }
@@ -466,7 +490,7 @@ fn charge_gear_pose(p0: vec3<f32>, n0: vec3<f32>, gear: u32, rig: vec4<f32>, bor
         let off = p - rig.xyz;
         let up = normalize(cross(along, vec3<f32>(0.0, 1.0, 0.0)));
         let side = sign(dot(off - along * dot(off, along), up));
-        let c = coil_state(e, time);
+        let c = coil_state(rec, time);
         let open = max(smoothstep(0.0, 0.9, c.x), 1.0 - smoothstep(CHARGE_GEAR_PART_SHUT_FROM, CHARGE_GEAR_PART_SHUT_TO, c.y));
         p += up * side * CHARGE_GEAR_PART_M * rig.w * open;
     }
@@ -480,7 +504,7 @@ fn charge_gear_pose(p0: vec3<f32>, n0: vec3<f32>, gear: u32, rig: vec4<f32>, bor
         p += normalize(out + vec3<f32>(0.0, 0.0, 1e-4)) * CHARGE_GEAR_FLARE_M * rig.w * open;
     }
     if gear == CHARGE_GEAR_SPIN {
-        let turn = charge_gear_turn(e, time);
+        let turn = charge_gear_turn(rec, time);
         p = rot_z(p - rig.xyz, turn) + rig.xyz;
         n = rot_z(n, turn);
     }
@@ -1516,7 +1540,7 @@ fn vs_main(in: VsIn) -> VsOut {
         // A charge gun's working gear moves with its charge, before the gun pitches.
         let gear = (in.rig >> CHARGE_GEAR_SHIFT) & CHARGE_GEAR_MASK;
         if gear != 0u && model.charge_gear.w > 0.0 && e.mount.w == CHARGE_RECORD {
-            let posed = charge_gear_pose(p, n, gear, model.charge_gear, model.recoil.xyz, e, time);
+            let posed = charge_gear_pose(p, n, gear, model.charge_gear, model.recoil.xyz, charge_of(e, model, in.rig), time);
             p = posed[0];
             n = posed[1];
         }
@@ -2524,7 +2548,7 @@ fn vs_main(in: VsIn) -> VsOut {
     if coil_pat >= PAT_COIL && coil_pat < PAT_COIL_TURN
         && (in.material == MAT_GLOW || in.material == MAT_GLOW_LASER || in.material == PRISM_GLOW_MATERIAL)
         && e.mount.w == CHARGE_RECORD {
-        let c = coil_state(e, time);
+        let c = coil_state(charge_of(e, model, in.rig), time);
         out.drive = vec4<f32>(c.x, c.y, 0.0, 0.0);
         out.drive_at = vec4<f32>(f32(coil_pat - PAT_COIL), 0.0, 0.0, 3.0);
     }
@@ -2532,7 +2556,7 @@ fn vs_main(in: VsIn) -> VsOut {
     // (`CHARGE_GEAR_SLOT_TAG`).
     if coil_pat == EMBER_PLATE_SLOT && ((in.rig >> CHARGE_GEAR_SHIFT) & CHARGE_GEAR_MASK) != 0u
         && model.charge_gear.w > 0.0 && e.mount.w == CHARGE_RECORD {
-        let c = coil_state(e, time);
+        let c = coil_state(charge_of(e, model, in.rig), time);
         let bore = select(vec3<f32>(1.0, 0.0, 0.0), normalize(model.recoil.xyz), dot(model.recoil.xyz, model.recoil.xyz) > 0.25);
         let along = abs(dot(in.pos - model.charge_gear.xyz, bore));
         out.drive = vec4<f32>(c.x, c.y, along, 0.0);

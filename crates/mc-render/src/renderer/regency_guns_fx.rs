@@ -42,7 +42,8 @@
 //!   faint lavender streamers. The shot is a jet of fusion pinched out, long and fast: a
 //!   white-hot core in a broad sheath of the prism, strobing, and behind it a white-hot
 //!   trail that takes the prism and cools to violet, breaking up, shedding sparks. Where
-//!   it lands it goes off as a small supernova (`fusion.rs`).
+//!   it lands it goes off as a small supernova (`fusion.rs`). A gun whose bores each fire a
+//!   round of the salvo together (a twin house's pair) gathers a star in front of each.
 //! - **Surge** (a plasma gun with a `Weapon::surge`, the Saker's Surge Mortar): crimson and
 //!   bent violet air, the ground drawn in and driven out, a solid shell (`surge.rs`).
 //! - **Knotted** (a Pinch-fusion gun with `Weapon::knots`, the Springald's Triune
@@ -59,13 +60,14 @@
 //! ball, the bursts, the globs, the thrown clumps), warp_puffs.wgsl's (motes, filaments,
 //! arcs, flash), which take any colour, and sprites.wgsl's (the trails).
 
+use super::hull_frame::GunFrame;
 use super::star_core_fx::{LAVENDER, ROSE, STAR};
 use super::{Puff, Renderer, PUFF_RING};
 use crate::gpu_consts::{fade_beam, plasma_look, puff};
 use glam::Vec3;
 use mc_data::{BlueprintId, PlasmaGrade, Trajectory, Weapon};
 use mc_sim::mirror::{
-    ProjectileInstance, UnitInstance, KIND_GHOST, KIND_WRECK, PROJECTILE_ENDS_SHIFT,
+    HousePose, ProjectileInstance, UnitInstance, KIND_GHOST, KIND_WRECK, PROJECTILE_ENDS_SHIFT,
     PROJECTILE_FADE_BEAM, PROJECTILE_MISSILE, PROJECTILE_STARTS_SHIFT,
 };
 use std::mem::size_of;
@@ -101,6 +103,9 @@ pub(super) const WHITE: Vec3 = Vec3::new(1.0, 0.96, 1.0);
 /// (warp_puffs.wgsl: drag 1.8), so one aimed at the ball arrives as it dies.
 const MOTE_LIFE: f32 = 0.5;
 const MOTE_REACH: f32 = 0.329;
+/// Stars a charge gathers at most: one in front of each bore of a gun that fires them
+/// together (`Charge::stars`).
+const MAX_STARS: usize = 4;
 /// Seconds between the steps a charge is laid in, each on the barrel as it is then.
 const STEP: f32 = 0.05;
 /// Seconds a knot of fusion burns over its pool after a Pinch-fusion strike.
@@ -178,6 +183,17 @@ pub(super) fn grade(w: &Weapon) -> Option<Grade> {
     (!w.missile || grade == Grade::Flak).then_some(grade)
 }
 
+/// The stars a gun's charge gathers: one in front of each bore when each bore fires a
+/// round of the salvo together (a twin house's pair), else one at the middle of them.
+fn stars(w: &Weapon) -> u8 {
+    let n = w.muzzles.len();
+    if n > 1 && n <= MAX_STARS && n == w.salvo.max(1) as usize && w.salvo_delay_ticks == 0 {
+        n as u8
+    } else {
+        1
+    }
+}
+
 /// A squeezed gun's ball, `0..1` of its size: across, in metres, at full charge.
 fn ball(w: &Weapon) -> f32 {
     (1.0 + w.damage.to_f32().max(1.0).sqrt() * 0.1) * w.flash.max(0.5)
@@ -195,8 +211,12 @@ struct Charge {
     laid: f32,
     /// Bolts of the salvo still to leave it; it collapses after the last.
     left: u8,
-    /// Where it was last laid.
-    at: Vec3,
+    /// Where each of its stars was last laid: one in front of each bore when every bore
+    /// fires a round of the salvo (a twin house's pair), else one.
+    at: [Vec3; MAX_STARS],
+    stars: u8,
+    /// The stars whose round has left (bit per star): a spent star is not laid again.
+    spent: u8,
 }
 
 /// A light the guns throw: from `start` for `life` seconds, fading out, pulsing `pulse`
@@ -290,46 +310,29 @@ fn trail_kind(t: &Trail) -> f32 {
     }
 }
 
-/// `v` turned `a` radians about the upright.
-fn rot_z(v: Vec3, a: f32) -> Vec3 {
-    let (s, c) = a.sin_cos();
-    Vec3::new(v.x * c - v.y * s, v.x * s + v.y * c, v.z)
-}
-
-/// `v` pitched `a` radians up about the sideways axis.
-fn rot_xz(v: Vec3, a: f32) -> Vec3 {
-    let (s, c) = a.sin_cos();
-    Vec3::new(v.x * c - v.z * s, v.y, v.x * s + v.z * c)
-}
-
-/// An angle `f` of the way from `a` to `b` the short way round.
-fn lerp_angle(a: f32, b: f32, f: f32) -> f32 {
-    a + ((b - a + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI)
-        * f
-}
-
 impl Renderer {
-    /// Where `w`'s muzzle (the middle of its charge) is drawn on `u`, `f` of the way through
-    /// the tick, and the way its bore points: the turret's yaw and the gun's pitch about its
-    /// trunnion, as entity.wgsl draws them.
-    fn regency_muzzle(&self, u: &UnitInstance, w: &Weapon, f: f32) -> (Vec3, Vec3) {
-        let pos = Vec3::from(u.prev_pos).lerp(Vec3::from(u.pos), f);
-        let heading = lerp_angle(u.prev_heading, u.heading, f);
-        let muzzle = Vec3::from(w.muzzle.to_f32());
-        let (local, dir) = match w.pivot {
-            Some(p) if w.turret_turn > 0 => {
-                let pivot = Vec3::from(p.to_f32());
-                let yaw = lerp_angle(u.prev_turret_yaw, u.turret_yaw, f);
-                let pitch = u.arm_pitch[0] + (u.arm_pitch[1] - u.arm_pitch[0]) * f;
-                let bore = (muzzle - pivot).normalize_or(Vec3::X);
-                (
-                    rot_z(pivot + rot_xz(muzzle - pivot, pitch), yaw),
-                    rot_z(rot_xz(bore, pitch), yaw),
-                )
-            }
-            _ => (muzzle, Vec3::X),
-        };
-        (pos + rot_z(local, heading), rot_z(dir, heading))
+    /// Where `w`'s charges (`weapon` of `u`) are drawn `f` of the way through the tick, one
+    /// per star (`stars`), and the way the bore points at each: on its house, or turned
+    /// with the turret and pitched about its trunnion, on the hull as it is drawn.
+    fn regency_mouths(
+        &self,
+        u: &UnitInstance,
+        w: &Weapon,
+        weapon: u8,
+        houses: &[HousePose],
+        f: f32,
+    ) -> Vec<(Vec3, Vec3)> {
+        let mesh = &self
+            .blueprints
+            .unit(BlueprintId(u.blueprint as u16))
+            .visual
+            .mesh;
+        let gun = GunFrame::of(u, w, weapon, houses, mesh, w.turret_turn > 0, f);
+        if stars(w) > 1 {
+            return gun.mouths(w);
+        }
+        // One star at the middle of the bores.
+        vec![gun.mouth(w, Vec3::from(w.muzzle.to_f32()))]
     }
 
     /// A gun began charging (`WeaponCharging`). True when it is a squeezed plasma gun,
@@ -362,14 +365,22 @@ impl Renderer {
                 due,
                 laid: time,
                 left,
-                at,
+                at: [at; MAX_STARS],
+                stars: stars(w),
+                spent: 0,
             });
         }
         true
     }
 
-    /// The next tick of every charge, on its barrel as it is drawn (from `upload_sim`).
-    pub(super) fn regency_guns_tick(&mut self, units: &[UnitInstance], time: f32) {
+    /// The next tick of every charge, on its barrel as it is drawn (from `upload_sim`);
+    /// `houses` is this tick's `RenderFrame::houses`.
+    pub(super) fn regency_guns_tick(
+        &mut self,
+        units: &[UnitInstance],
+        houses: &[HousePose],
+        time: f32,
+    ) {
         let tick = self.tick_seconds.max(0.02);
         // A charge whose salvo never came (the target died) goes out a little after it was due.
         self.plasma_fx
@@ -396,27 +407,40 @@ impl Renderer {
             let steps = ((until - from) / STEP).ceil().max(1.0) as usize;
             for k in 0..steps {
                 let when = from + (until - from) * k as f32 / steps as f32;
-                let (at, dir) = self.regency_muzzle(&u, &w, ((when - time) / tick).clamp(0.0, 1.0));
+                let mouths = self.regency_mouths(
+                    &u,
+                    &w,
+                    weapon,
+                    houses,
+                    ((when - time) / tick).clamp(0.0, 1.0),
+                );
                 let c = &self.plasma_fx.guns.charges[i];
                 let f = ((when - c.start) / (due - c.start).max(0.01)).clamp(0.0, 1.0);
-                let (grade, span) = (c.grade, (until - from) / steps as f32);
-                if grade == Grade::Surge {
-                    let foot = Vec3::from(u.pos);
-                    self.surge_charge_step(at, dir, &w, f, foot, when, span);
-                } else if grade == Grade::Knotted {
-                    self.knotted_charge_step(at, dir, &w, f, when, span);
-                } else {
-                    let fusion = grade == Grade::Fusion;
-                    self.regency_charge_step(at, dir, &w, f, fusion, when, span);
+                let (grade, spent, span) = (c.grade, c.spent, (until - from) / steps as f32);
+                for (j, &(at, dir)) in mouths.iter().enumerate().take(MAX_STARS) {
+                    if spent & (1 << j) != 0 {
+                        continue;
+                    }
+                    if grade == Grade::Surge {
+                        let foot = Vec3::from(u.pos);
+                        self.surge_charge_step(at, dir, &w, f, foot, when, span);
+                    } else if grade == Grade::Knotted {
+                        self.knotted_charge_step(at, dir, &w, f, when, span);
+                    } else {
+                        let fusion = grade == Grade::Fusion;
+                        // A pair of stars, each smaller: together as bright as one.
+                        let share = (mouths.len() as f32).sqrt().recip();
+                        self.regency_charge_step(at, dir, &w, f, fusion, share, when, span);
+                    }
+                    self.plasma_fx.guns.charges[i].at[j] = at;
                 }
-                self.plasma_fx.guns.charges[i].at = at;
             }
             self.plasma_fx.guns.charges[i].laid = until;
             // The surge gun's last tick before its shot: the shell slides out along the rails.
             let grade = self.plasma_fx.guns.charges[i].grade;
             if grade == Grade::Surge && (due - until).abs() < tick * 0.5 {
-                let (from, _) = self.regency_muzzle(&u, &w, 0.0);
-                let (to, dir) = self.regency_muzzle(&u, &w, 1.0);
+                let (from, _) = self.regency_mouths(&u, &w, weapon, houses, 0.0)[0];
+                let (to, dir) = self.regency_mouths(&u, &w, weapon, houses, 1.0)[0];
                 self.surge_shunt(&w, from, to, dir);
             }
         }
@@ -591,7 +615,12 @@ impl Renderer {
         self.push_projectiles(&out);
     }
 
-    /// `span` seconds of a charge `f` of the way done, at `at`.
+    /// `span` seconds of a charge `f` of the way done, at `at`, `share` of a whole charge's
+    /// size (one of a pair of stars is smaller).
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "presentation: one step of one star of a charge"
+    )]
     fn regency_charge_step(
         &mut self,
         at: Vec3,
@@ -599,10 +628,11 @@ impl Renderer {
         w: &Weapon,
         f: f32,
         fusion: bool,
+        share: f32,
         when: f32,
         span: f32,
     ) {
-        let size = ball(w) * if fusion { 1.5 } else { 1.0 };
+        let size = ball(w) * if fusion { 1.5 } else { 1.0 } * share;
         let life = span * 2.0;
         // Fusion takes over the last part of it, burning whiter and harder.
         let over = if fusion { smooth(0.35, 0.92, f) } else { 0.0 };
@@ -997,24 +1027,36 @@ impl Renderer {
         time: f32,
     ) {
         let fx = &mut self.plasma_fx.guns;
+        // The nearest unspent star of a charge of this gun's: its round has left it.
         let mine = fx
             .charges
             .iter()
             .enumerate()
             .filter(|(_, c)| c.blueprint == blueprint && c.weapon == weapon)
-            .map(|(i, c)| (i, c.at.distance(at)))
-            .filter(|(_, d)| *d < 30.0)
-            .min_by(|a, b| a.1.total_cmp(&b.1));
-        let Some((i, _)) = mine else {
+            .flat_map(|(i, c)| {
+                (0..c.stars as usize)
+                    .filter(|j| c.spent & (1 << j) == 0)
+                    .map(move |j| (i, j, c.at[j].distance(at)))
+            })
+            .filter(|(_, _, d)| *d < 30.0)
+            .min_by(|a, b| a.2.total_cmp(&b.2));
+        let Some((i, j, _)) = mine else {
             return;
         };
         let c = &mut fx.charges[i];
         c.left = c.left.saturating_sub(1);
-        if c.left > 0 {
+        let (grade, at) = (c.grade, c.at[j]);
+        if c.stars > 1 {
+            // Each bore's star lets go with its own round.
+            c.spent |= 1 << j;
+            if c.left == 0 {
+                fx.charges.swap_remove(i);
+            }
+        } else if c.left > 0 {
             return;
+        } else {
+            fx.charges.swap_remove(i);
         }
-        let (grade, at) = (c.grade, c.at);
-        fx.charges.swap_remove(i);
         let w = &self.blueprints.unit(blueprint).weapons[weapon as usize];
         let fusion = grade == Grade::Fusion;
         let size = ball(w) * if fusion { 1.5 } else { 1.0 };

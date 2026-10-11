@@ -3306,7 +3306,8 @@ impl Renderer {
         // One per unit at most (`MAX_HOUSES`): never cut.
         let houses = &frame.houses[..frame.houses.len().min(MAX_HOUSES)];
         if !houses.is_empty() {
-            self.houses.write(0, bytemuck::cast_slice(houses));
+            let charged = self.titan_charge.patch_houses(units, houses);
+            self.houses.write(0, bytemuck::cast_slice(&charged));
         }
         drop(part);
         let part = mc_core::perf_span!("cpu.upload.lists");
@@ -3454,7 +3455,7 @@ impl Renderer {
         self.rail_wakes(projectiles, time, camera);
         self.write_fade_beams(time);
         self.write_plasma_fx(units, time);
-        self.regency_guns_tick(units, time);
+        self.regency_guns_tick(units, &frame.houses, time);
         self.regency_trails(projectiles, time);
         self.gravitic_tick(projectiles, time);
         self.excavation_tick(units, time, camera);
