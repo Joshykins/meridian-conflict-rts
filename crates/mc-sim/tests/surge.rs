@@ -111,9 +111,10 @@ fn let_go(w: &mut World, source: UnitId, x: i32, y: i32) {
 fn the_shell_strikes_hard_and_its_wake_burns_round_it() {
     let mut w = world();
     let saker = add(&mut w, SAKER, 0, 200, 1000);
-    let target = add(&mut w, "aster_t3_assault_bot", 1, 1700, 1000);
-    let wide = add(&mut w, "aster_t3_assault_bot", 1, 1700, 1140);
-    let friend = add(&mut w, "regency_t1_tank", 0, 1600, 1100);
+    // 700 m off, where the Surge Mortar's spread keeps the shell within its splash.
+    let target = add(&mut w, "aster_t3_assault_bot", 1, 900, 1000);
+    let wide = add(&mut w, "aster_t3_assault_bot", 1, 900, 1140);
+    let friend = add(&mut w, "regency_t1_tank", 0, 800, 1100);
     for (player, id) in [(1, target), (1, wide), (0, friend)] {
         hold(&mut w, player, id);
     }

@@ -1365,8 +1365,8 @@ fn vs_missile(@builtin(vertex_index) vertex: u32, @builtin(instance_index) insta
     var half_length = missile_half_length(p);
     var radius = half_length * 0.14;
     if shell {
-        // Stubby: a fifth of its plume across, a third as thick as it is long.
-        half_length = clamp(p.size * 0.22, 1.2, 4.0);
+        // Stubby: a tenth of its plume across, a third as thick as it is long.
+        half_length = clamp(p.size * 0.11, 0.6, 2.0);
         radius = half_length * 0.34;
     }
     let cased = cased_seeker(p);

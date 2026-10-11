@@ -24,6 +24,9 @@
 
 use glam::Vec3;
 use mc_data::Weapon;
+use mc_sim::mirror::ProjectileInstance;
+
+use crate::gpu_consts::plasma_look;
 
 use super::super::Renderer;
 use super::{ball, smooth, Glow, ARC, BURST, GLOW, HOT, MOTE, MOTE_LIFE, MOTE_REACH, ORB, RED};
@@ -40,6 +43,9 @@ const DRAW_REACH: f32 = 46.0;
 /// The gun's own wake into the ground as it fires: metres out, metres a second, seconds it
 /// burns after.
 const KICK: (f32, f32, f32) = (64.0, 120.0, 0.4);
+/// Metres back down the bore the shell sits at the start of the charge's last tick, before
+/// the rails shunt it out to the muzzle for the shot (`surge_shunt`).
+const SHUNT: f32 = 24.0;
 /// Pressure pulses a second running back down a shell's plume, each beading its trail.
 const PULSE_RATE: f32 = 5.0;
 
@@ -349,6 +355,28 @@ impl Renderer {
                 );
             }
         }
+    }
+
+    /// The shell shunted out along the rails over the last tick of the charge, from `SHUNT`
+    /// metres back down the bore to the muzzle (`from` and `to`, where the muzzle is drawn
+    /// at that tick's start and end, `dir` down the bore), arriving as it fires: drawn as the
+    /// shell in flight is (`plasma_look::SURGE_SHELL`), its plume glowing in the parted gap.
+    pub(super) fn surge_shunt(&mut self, w: &Weapon, from: Vec3, to: Vec3, dir: Vec3) {
+        // The shot's size as the mirror draws it (`mc_sim::mirror`, a shell's `size`).
+        let power = w.damage.to_f32().sqrt();
+        let size = (0.3 + power * 0.045 + w.splash.to_f32() * 0.07) * w.tracer;
+        let look = (1.0 + w.red + 2.0 * plasma_look::SURGE_SHELL as f32, 0.0);
+        self.plasma_fx.guns.shunts.push(ProjectileInstance {
+            prev_pos: (from - dir * SHUNT).to_array(),
+            color: w.color as u32,
+            pos: (to - dir * 0.5).to_array(),
+            size,
+            wake: 0.0,
+            plasma: 0.0,
+            _pad: [look.0, look.1],
+            aim: [0.0; 4],
+            prev_aim: [0.0; 4],
+        });
     }
 
     /// The knot of a surge gun's charge let go at `at`: a crimson flash where it hung.

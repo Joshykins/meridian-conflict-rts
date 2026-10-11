@@ -8,12 +8,16 @@
 //! lightning go into the ground round it while lavender sparkles drift off it. No reds or
 //! oranges: it is a star's light, not fire. Sized by the strike: the Sunspear's shell is
 //! about a supernova's at tech 1, a bomber's held to [`REACH_MAX`].
+//!
+//! A surge shell's strike (`red`, the Saker's) is the same supernova all in crimson: the
+//! star's light recoloured red by its brightness (plasma_puffs.wgsl `nova_light`), its
+//! lightning, sparks and light red, the hottest a hot red-pink, never white.
 
 use std::f32::consts::TAU;
 
 use glam::{Vec2, Vec3};
 
-use super::{Glow, ARC, GLOW, KNOT, LAVENDER, MOTE, ROSE, STAR, VIOLET, WHITE, WISP};
+use super::{Glow, ARC, GLOW, HOT, KNOT, LAVENDER, MOTE, RED, ROSE, STAR, VIOLET, WHITE, WISP};
 use crate::gpu_consts::puff;
 use crate::renderer::Renderer;
 
@@ -24,9 +28,29 @@ const REACH_MAX: f32 = 60.0;
 /// would only overlap): the Sunspear's.
 const REACH_FULL: f32 = 30.0;
 
+/// A supernova piece's brightness `x` (plasma_puffs.wgsl `nova_light`): grey keeps the
+/// star's colours; pure red recolours it crimson.
+fn star_light(x: f32, red: bool) -> Vec3 {
+    if red {
+        Vec3::new(x, 0.0, 0.0)
+    } else {
+        Vec3::splat(x)
+    }
+}
+
+/// `star` for a fusion strike, `crimson` for a red one.
+fn pick(red: bool, star: Vec3, crimson: Vec3) -> Vec3 {
+    if red {
+        crimson
+    } else {
+        star
+    }
+}
+
 impl Renderer {
     /// A Pinch-fusion shot of ball `size` striking at `at`: the strike's size from its
-    /// splash and `impact`; `ground` when it lands on or near the ground (the pool).
+    /// splash and `impact`; `ground` when it lands on or near the ground (the pool); `red`
+    /// for a surge shell's crimson one.
     pub(in crate::renderer) fn fusion_nova(
         &mut self,
         at: Vec3,
@@ -34,6 +58,7 @@ impl Renderer {
         size: f32,
         splash: f32,
         ground: bool,
+        red: bool,
         start: f32,
     ) {
         // The pool and its knot grow with the shell, and stop where it stops.
@@ -47,8 +72,9 @@ impl Renderer {
         let centre = at + Vec3::Z * face * 0.6;
         let seed = self.scatter.unit() * 97.0;
         // The flash: white beyond the screen, then a broader, slower one.
-        self.push_effect(centre.to_array(), start, face * 5.0, 0.3, 9.0, 0.0);
-        self.push_effect(centre.to_array(), start + 0.04, face * 3.5, 0.6, 9.0, 0.0);
+        let flash = if red { 8.0 } else { 9.0 };
+        self.push_effect(centre.to_array(), start, face * 5.0, 0.3, flash, 0.0);
+        self.push_effect(centre.to_array(), start + 0.04, face * 3.5, 0.6, flash, 0.0);
         self.push_lit(
             GLOW,
             centre,
@@ -56,18 +82,25 @@ impl Renderer {
             start,
             0.22,
             (face * 3.0, face * 4.5),
-            WHITE * 14.0,
+            pick(red, WHITE * 14.0, HOT * 9.0),
             0.0,
         );
         // The shell and a slower one inside it; a big strike leaves a faint one lingering.
         let life = 1.4 + 2.2 * k;
-        self.nova_shell(centre, start, life, (face, reach), 1.7, seed);
+        self.nova_shell(
+            centre,
+            start,
+            life,
+            (face, reach),
+            star_light(1.7, red),
+            seed,
+        );
         self.nova_shell(
             centre,
             start + 0.08,
             life * 1.25,
             (face * 0.8, reach * 0.62),
-            1.0,
+            star_light(1.0, red),
             seed + 3.7,
         );
         if k > 0.5 {
@@ -76,12 +109,12 @@ impl Renderer {
                 start + 0.25,
                 life * 1.8,
                 (face, reach * 0.85),
-                0.5,
+                star_light(0.5, red),
                 seed + 6.1,
             );
         }
-        self.fusion_streamers(centre, face, reach, k, start);
-        self.fusion_spray(at, centre, face, reach, k, start);
+        self.fusion_streamers(centre, face, reach, k, red, start);
+        self.fusion_spray(at, centre, face, reach, (k, red), start);
         if ground {
             self.ground_melt
                 .melt(at.truncate(), pool * 0.65, 0.7, start, 18.0);
@@ -89,7 +122,7 @@ impl Renderer {
         // Its light on everything round: white, then lavender as the shell spreads.
         self.plasma_fx.guns.light(Glow {
             pos: centre + Vec3::Z * face * 2.0,
-            color: WHITE * 4000.0 * impact,
+            color: pick(red, WHITE, RED) * 4000.0 * impact,
             range: reach * 3.0,
             start,
             life: 0.9,
@@ -97,18 +130,26 @@ impl Renderer {
         });
         self.plasma_fx.guns.light(Glow {
             pos: centre + Vec3::Z * reach * 0.3,
-            color: LAVENDER * 500.0 * impact,
+            color: pick(red, LAVENDER, RED) * 500.0 * impact,
             range: reach * 2.2,
             start: start + 0.25,
             life,
             pulse: 0.0,
         });
-        self.fusion_knot(at, pool * 0.7, impact, start);
+        self.fusion_knot(at, pool * 0.7, impact, red, start);
     }
 
     /// The streamers a fusion strike throws (`nova_wisp`): a loose band round its waist,
     /// tilted its own way, a jet up from it, and thinner ones flung every way.
-    fn fusion_streamers(&mut self, centre: Vec3, face: f32, reach: f32, k: f32, start: f32) {
+    fn fusion_streamers(
+        &mut self,
+        centre: Vec3,
+        face: f32,
+        reach: f32,
+        k: f32,
+        red: bool,
+        start: f32,
+    ) {
         let tilt = 0.35 * self.scatter.signed();
         let (ts, tc) = tilt.sin_cos();
         let yaw = self.scatter.unit() * TAU;
@@ -128,7 +169,7 @@ impl Renderer {
                 start + 0.03 * roll0,
                 1.4 + 1.4 * k + 0.4 * roll1,
                 (size, size * 3.2),
-                Vec3::splat(1.4),
+                star_light(1.4, red),
                 0.0,
             );
         }
@@ -147,7 +188,7 @@ impl Renderer {
                 start + 0.25 * f,
                 1.3 + 1.2 * k,
                 (size, size * 2.6),
-                Vec3::splat(2.4),
+                star_light(2.4, red),
                 0.0,
             );
         }
@@ -167,7 +208,7 @@ impl Renderer {
                 start,
                 0.9 + 0.9 * k,
                 (size, size * 2.4),
-                Vec3::splat(2.8),
+                star_light(2.8, red),
                 0.0,
             );
         }
@@ -175,14 +216,27 @@ impl Renderer {
 
     /// What a fusion strike throws out of itself besides its streamers: white lightning
     /// into the ground round it as it opens, and sparks, white going rose and lavender.
-    fn fusion_spray(&mut self, at: Vec3, centre: Vec3, face: f32, reach: f32, k: f32, start: f32) {
+    fn fusion_spray(
+        &mut self,
+        at: Vec3,
+        centre: Vec3,
+        face: f32,
+        reach: f32,
+        (k, red): (f32, bool),
+        start: f32,
+    ) {
         for _ in 0..(6.0 + 8.0 * k) as usize {
             let a = self.scatter.unit() * TAU;
             let r = reach * (0.3 + 0.5 * self.scatter.unit());
             let to = at + Vec3::new(a.cos() * r, a.sin() * r, 0.0);
             let to = to.with_z(self.ground_height(to.truncate()) + 0.2);
             let when = start + self.scatter.unit() * 0.25;
-            let tint = WHITE.lerp(LAVENDER, self.scatter.unit() * 0.6);
+            let roll = self.scatter.unit();
+            let tint = pick(
+                red,
+                WHITE.lerp(LAVENDER, roll * 0.6),
+                RED.lerp(HOT, roll * 0.25) * 0.45,
+            );
             self.push_lit(
                 ARC,
                 centre,
@@ -204,7 +258,9 @@ impl Renderer {
             let speed = reach * (1.2 + 2.4 * self.scatter.unit());
             let life = 0.9 + self.scatter.unit() * 1.2;
             let roll = self.scatter.unit();
-            let tint = if roll < 0.5 {
+            let tint = if red {
+                HOT.lerp(RED, roll)
+            } else if roll < 0.5 {
                 WHITE.lerp(ROSE, roll * 2.0)
             } else {
                 ROSE.lerp(LAVENDER, roll * 2.0 - 1.0)
@@ -226,7 +282,7 @@ impl Renderer {
     /// for `KNOT` seconds (plasma_puffs.wgsl `star_core`, as a power generator's):
     /// shrinking as it slowly lets white lightning go into the ground round it, lavender
     /// sparkles drifting up off its edges.
-    fn fusion_knot(&mut self, at: Vec3, s: f32, impact: f32, start: f32) {
+    fn fusion_knot(&mut self, at: Vec3, s: f32, impact: f32, red: bool, start: f32) {
         let knot = at + Vec3::Z * (1.0 + s * 0.12);
         let seed = self.scatter.unit() * 61.0;
         // Laid every half second, each lasting a second, so their tents add up to a
@@ -243,7 +299,7 @@ impl Renderer {
                 start + 0.2 + i as f32 * 0.5,
                 1.0,
                 (across, across),
-                Vec3::splat(2.2 * (1.0 - 0.6 * f)),
+                star_light(2.2 * (1.0 - 0.6 * f), red),
                 seed,
             );
         }
@@ -255,7 +311,12 @@ impl Renderer {
             let to = at + Vec3::new(a.cos() * r, a.sin() * r, 0.0);
             let to = to.with_z(self.ground_height(to.truncate()) + 0.2);
             let life = 0.14 + 0.1 * self.scatter.unit();
-            let tint = WHITE.lerp(LAVENDER, self.scatter.unit());
+            let roll = self.scatter.unit();
+            let tint = pick(
+                red,
+                WHITE.lerp(LAVENDER, roll),
+                RED.lerp(HOT, roll * 0.25) * 0.45,
+            );
             self.push_lit(
                 ARC,
                 knot,
@@ -276,7 +337,8 @@ impl Renderer {
             let when = start + 0.3 + self.scatter.unit() * KNOT;
             let dot = 0.45 + 0.45 * self.scatter.unit();
             let life = 1.2 + self.scatter.unit();
-            let tint = LAVENDER.lerp(VIOLET, self.scatter.unit());
+            let roll = self.scatter.unit();
+            let tint = pick(red, LAVENDER.lerp(VIOLET, roll), RED.lerp(HOT, roll * 0.4));
             self.push_lit(
                 MOTE,
                 from,
@@ -290,7 +352,7 @@ impl Renderer {
         }
         self.plasma_fx.guns.light(Glow {
             pos: knot,
-            color: ROSE.lerp(WHITE, 0.4) * 150.0 * impact,
+            color: pick(red, ROSE.lerp(WHITE, 0.4), RED) * 150.0 * impact,
             range: s * 3.0,
             start: start + 0.3,
             life: KNOT,

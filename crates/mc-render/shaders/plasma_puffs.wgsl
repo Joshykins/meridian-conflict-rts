@@ -10,6 +10,19 @@
 // drifting over it. Nothing here is wound or turned about its middle: the plasma churns
 // in cells and lumps, and no shape runs round the centre in arms.
 
+// A star's light `c` in a supernova piece's `appearance.rgb` (`star_core`, `supernova`,
+// `nova_wisp`): grey keeps the star's own colours, at that brightness; pure red (green and
+// blue zero, a surge shell's strike, renderer/regency_guns_fx/fusion.rs) recolours it
+// crimson by how bright it is, the hottest a hot red-pink, never white or the prism.
+fn nova_light(c: vec3<f32>, a: vec3<f32>) -> vec3<f32> {
+    if a.g > a.r * 0.001 || a.r <= 0.0 {
+        return c * a;
+    }
+    let lum = dot(c, vec3<f32>(0.3, 0.59, 0.11));
+    let hot = mix(vec3<f32>(1.0, 0.035, 0.03), vec3<f32>(1.0, 0.3, 0.26), smoothstep(0.9, 2.2, lum));
+    return hot * lum * a.r;
+}
+
 fn is_plasma_puff(kind: u32) -> bool {
     return kind == PUFF_PLASMA_ORB || kind == PUFF_PLASMA_BURST || kind == PUFF_PLASMA_GLOB
         || kind == PUFF_PLASMA_WAKE || kind == PUFF_STAR_CORE || kind == PUFF_SUPERNOVA
@@ -358,7 +371,7 @@ fn star_core(in: PuffOut, d: f32) -> vec4<f32> {
     let halo = mix(glow_hue, glow_hue * glow_hue * glow_hue, 0.7) * corona * flicker * 0.9
         * (1.0 - smoothstep(0.7, 1.0, d));
     let light = (face * on_face + halo * (1.0 - on_face)) * (1.0 + flare * 0.5);
-    return vec4<f32>(light * in.appearance.rgb * tent, 0.0);
+    return vec4<f32>(nova_light(light, in.appearance.rgb) * tent, 0.0);
 }
 
 // A supernova's shell is a real ball of plasma `size` metres across its outer face, drawn in
@@ -480,7 +493,7 @@ fn supernova(in: PuffOut, d: f32) -> vec4<f32> {
         light += white * exp(-3.0 * miss / (r * r)) * pow(1.0 - age, 14.0) * 2.5;
     }
     let fade = pow(1.0 - age, 1.3) * smoothstep(0.0, 0.02, age);
-    return vec4<f32>(light * in.appearance.rgb * fade, 0.0);
+    return vec4<f32>(nova_light(light, in.appearance.rgb) * fade, 0.0);
 }
 
 // A streamer of a supernova's plasma (renderer/supernova_fx.rs), drawn out along its flight
@@ -504,5 +517,5 @@ fn nova_wisp(in: PuffOut, d: f32) -> vec4<f32> {
     c = mix(c, violet, smoothstep(0.35, 0.9, age));
     let heart = pow(field, 4.0) * (1.0 - smoothstep(0.0, 0.25, age));
     let fade = pow(1.0 - age, 1.7) * smoothstep(0.0, 0.04, age);
-    return vec4<f32>((c * body + white * heart) * in.appearance.rgb * fade, 0.0);
+    return vec4<f32>(nova_light(c * body + white * heart, in.appearance.rgb) * fade, 0.0);
 }

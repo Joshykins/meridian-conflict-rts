@@ -225,6 +225,8 @@ pub(super) struct RegencyGunFx {
     charges: Vec<Charge>,
     glows: Vec<Glow>,
     trails: Vec<Trail>,
+    /// Surge shells being shunted out along their guns' rails this tick (`surge`).
+    shunts: Vec<ProjectileInstance>,
 }
 
 impl RegencyGunFx {
@@ -395,6 +397,13 @@ impl Renderer {
                 self.plasma_fx.guns.charges[i].at = at;
             }
             self.plasma_fx.guns.charges[i].laid = until;
+            // The surge gun's last tick before its shot: the shell slides out along the rails.
+            let grade = self.plasma_fx.guns.charges[i].grade;
+            if grade == Grade::Surge && (due - until).abs() < tick * 0.5 {
+                let (from, _) = self.regency_muzzle(&u, &w, 0.0);
+                let (to, dir) = self.regency_muzzle(&u, &w, 1.0);
+                self.surge_shunt(&w, from, to, dir);
+            }
         }
     }
 
@@ -532,6 +541,8 @@ impl Renderer {
     /// (`upload_sim`), the nova streak (`nuke_fx::nova`) last. A streak laid after the write
     /// went up a tick late, behind the missile and then leaping to it every tick.
     pub(super) fn write_regency_trails(&mut self, time: f32) {
+        let shunts = std::mem::take(&mut self.plasma_fx.guns.shunts);
+        self.push_projectiles(&shunts);
         let fx = &mut self.plasma_fx.guns;
         fx.trails.retain(|t| time < t.start + t.life);
         if fx.trails.len() > MAX_TRAILS {

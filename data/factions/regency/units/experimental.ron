@@ -271,7 +271,7 @@
         weapons: [(
             name: "Surge Mortar",
             damage: 7000, splash: 32, range_min: 250, range: 2600, reload: 14.0, speed: 520,
-            trajectory: Ballistic, loft: 3, spread: 1.2,
+            trajectory: Ballistic, loft: 3, spread: 2.0,
             surge: (radius: 180, speed: 60, damage: 40, linger: 6),
             turret_turn: 20, muzzle: (30.427, 0, 11.093), pivot: (0.5, 0, 9.0),
             targets: ["Structure", "Land", "Naval"], color: Orange, red: 1.0,

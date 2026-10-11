@@ -460,12 +460,14 @@ fn charge_gear_pose(p0: vec3<f32>, n0: vec3<f32>, gear: u32, rig: vec4<f32>, bor
     }
     if gear == CHARGE_GEAR_PART {
         // Off the bore's line through the hub, up or down off it by its side of the line:
-        // open through the charge, shut the instant it fires (the charge reads empty).
+        // open through the charge, held open while the shell is shunted out along them,
+        // then slammed shut.
         let along = select(vec3<f32>(1.0, 0.0, 0.0), normalize(bore), dot(bore, bore) > 0.25);
         let off = p - rig.xyz;
         let up = normalize(cross(along, vec3<f32>(0.0, 1.0, 0.0)));
         let side = sign(dot(off - along * dot(off, along), up));
-        let open = smoothstep(0.0, 0.9, coil_state(e, time).x);
+        let c = coil_state(e, time);
+        let open = max(smoothstep(0.0, 0.9, c.x), 1.0 - smoothstep(CHARGE_GEAR_PART_SHUT_FROM, CHARGE_GEAR_PART_SHUT_TO, c.y));
         p += up * side * CHARGE_GEAR_PART_M * rig.w * open;
     }
     if gear == CHARGE_GEAR_SPIN {

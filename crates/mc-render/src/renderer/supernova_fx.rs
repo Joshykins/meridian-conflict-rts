@@ -204,20 +204,11 @@ impl Renderer {
         start: f32,
         life: f32,
         radius: (f32, f32),
-        glow: f32,
+        glow: Vec3,
         seed: f32,
     ) {
         for half in [Vec3::ZERO, Vec3::X] {
-            self.push_lit(
-                SHELL,
-                centre,
-                half,
-                start,
-                life,
-                radius,
-                Vec3::splat(glow),
-                seed,
-            );
+            self.push_lit(SHELL, centre, half, start, life, radius, glow, seed);
         }
     }
 
@@ -262,13 +253,13 @@ impl Renderer {
         });
         // The shell, a slower one inside it, and the nebula: a faint one that lingers.
         let life = 2.8 + 3.6 * s;
-        self.nova_shell(centre, bang, life, (face, reach), 1.6, seed);
+        self.nova_shell(centre, bang, life, (face, reach), Vec3::splat(1.6), seed);
         self.nova_shell(
             centre,
             bang + 0.1,
             life * 1.3,
             (face * 0.8, reach * 0.62),
-            1.0,
+            Vec3::ONE,
             seed + 3.7,
         );
         self.nova_shell(
@@ -276,7 +267,7 @@ impl Renderer {
             bang + 0.3,
             life * 2.0,
             (face, reach * 0.85),
-            0.6,
+            Vec3::splat(0.6),
             seed + 6.1,
         );
         // Streamers thrown out round its waist, the ring tilted a little its own way.

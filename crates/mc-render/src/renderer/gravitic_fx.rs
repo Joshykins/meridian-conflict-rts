@@ -210,7 +210,7 @@ impl Renderer {
         let height = at.z - self.ground_height(at.truncate());
         if w.fusion_strike {
             let (impact, splash) = (w.impact.max(0.3), splash.to_f32());
-            self.fusion_nova(at, impact, s * 0.5, splash, height < 4.0, start);
+            self.fusion_nova(at, impact, s * 0.5, splash, height < 4.0, false, start);
             return true;
         }
         let ground = height < s * 0.5 && !on_unit;

@@ -525,6 +525,10 @@ shared! {
         pub const EXTEND_M: f32 = 1.1;
         pub const VENT_M: f32 = 0.9;
         pub const PART_M: f32 = 0.55;
+        /// Seconds after the shot `PART` gear starts to slam shut, and is shut: a surge
+        /// shell is shunted out between the halves first (renderer/regency_guns_fx/surge.rs).
+        pub const PART_SHUT_FROM: f32 = 0.1;
+        pub const PART_SHUT_TO: f32 = 0.18;
         /// `drive_at.w` on a lit slot (`pattern::EMBER_SLOT`) in a charge gun's gear: the
         /// slot knows the charge (entity.wgsl), pressure rippling out along it toward the
         /// muzzle as it fills, blinding at the shot and cooling after.

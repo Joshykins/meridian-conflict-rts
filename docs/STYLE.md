@@ -414,12 +414,15 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     halves draw apart, the slots in their flanks rippling out toward the muzzle,
     crimson motes stream down the gap into a tight dark-hearted knot between the
     tips with short red arcs across it, and motes skim in over the ground to its
-    feet. On the shot the halves slam shut, the bore kicks back, the knot lets go
-    in a crimson bloom and the gun drives a small wake into the ground under its
-    legs. The shell is solid: a stubby graphite casing with crimson seams and a
+    feet. Over the charge's last tenth of a second the shell is shunted out along
+    the rails from deep in the barrel, then the knot lets go in a crimson bloom,
+    the halves slam shut behind the shell, the bore kicks back and the gun drives
+    a small wake into the ground under its legs. The shell is solid: a stubby graphite casing with crimson seams and a
     burning base, a short violet-rimmed crimson plume with pressure pulses
     running back down it, and a crimson thread behind that beads and breaks up.
-    It lands as a Pinch-fusion shell does, then lets go a wake through the ground that is nothing like the
+    It lands as a Pinch-fusion shell does but all in crimson (the supernova
+    recoloured red by its brightness, plasma_puffs.wgsl `nova_light`), then lets
+    go a wake through the ground that is nothing like the
     Wake's wall of plasma: a low swell, a pale rose crest no taller than a man
     over bent violet air, rolling out all round the crater, and behind it the
     ground left in patches of wandering crimson cracks that pulse slowly, with
