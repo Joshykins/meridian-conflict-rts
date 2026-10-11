@@ -122,8 +122,8 @@ const BOLT_TRAIL: (f32, f32) = (12.0, 0.7);
 const FUSION_TRAIL: (f32, f32) = (10.0, 1.8);
 /// A surge shell's (`surge::surge_trail`): it glows longer, cooling to violet.
 const SURGE_TRAIL: (f32, f32) = (10.0, 2.6);
-/// A knotted shell's sheath round its hanging thread (`knotted::knotted_trail`).
-const KNOTTED_TRAIL: (f32, f32) = (10.0, 0.45);
+/// A knotted shell's red-hot thread, going out (`knotted::knotted_trail`); its smoke hangs.
+const KNOTTED_TRAIL: (f32, f32) = (10.0, 1.4);
 /// A long-hanging trail's thread across, in the shot's sizes: wider than a short one's, as
 /// it is seen from across the map.
 const HANG_WIDTH: f32 = 0.5;
@@ -433,6 +433,7 @@ impl Renderer {
     pub(super) fn regency_trails(&mut self, projectiles: &[ProjectileInstance], time: f32) {
         let tick = self.tick_seconds.max(0.02);
         let mut sparks = 0;
+        let mut smoke = 0;
         for p in projectiles {
             let look = drawn_look(p);
             // A round of a jet that leaves the muzzle part of the way through the tick
@@ -482,20 +483,15 @@ impl Renderer {
             };
             // A shot whose trail hangs long (`Weapon::wake`, a map gun's) lays its thread a
             // tick's stretch at a time: held for its whole arc, it would fill the pieces.
-            let hang = p.wake > life;
+            // A knotted shell hangs smoke instead (`knotted_trail`).
+            let hang = p.wake > life && kind != TrailKind::Knotted;
             if hang {
                 self.plasma_fx.guns.trail(Trail {
                     from,
                     to,
                     start: time + tick * span,
                     life: p.wake,
-                    // A knotted shell's thread is finer: it is drawn bright for longer.
-                    width: p.size
-                        * if kind == TrailKind::Knotted {
-                            HANG_WIDTH * 0.55
-                        } else {
-                            HANG_WIDTH
-                        },
+                    width: p.size * HANG_WIDTH,
                     kind,
                 });
             }
@@ -507,7 +503,8 @@ impl Renderer {
                 continue;
             }
             if kind == TrailKind::Knotted {
-                self.knotted_trail(from, to, p.size, (starts, span), time);
+                let hang = p.wake.max(life);
+                self.knotted_trail(from, to, p.size, (starts, span), hang, &mut smoke, time);
                 continue;
             }
             for k in 0..n {

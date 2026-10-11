@@ -2,24 +2,24 @@
 //! (`Grade::Knotted`: a gun with `Weapon::knots`, the Springald's Triune Howitzer), for
 //! `regency_guns_fx`. Where the Sunspear burns one rose-white star in front of its bore,
 //! this gun holds a knot of fusion at each of its projectors and pinches them into one:
-//! cold white light and bent indigo air, never rose or red.
+//! cold white light and bent indigo air. What it lets go is red: a red-hot shell, a red
+//! trail going out into dark smoke, a red strike.
 //!
 //! - **The charge:** a small white knot kindles at each lens in a cold lilac halo and grows,
-//!   lilac motes running up each rail from the breech into its knot, white arcs jumping knot
-//!   to knot across the bore. Over the last third the knots are drawn in to the bore's line,
+//!   lilac motes running up each rail from the breech into its knot. Over the last third the knots are drawn in to the bore's line,
 //!   bent indigo air pulled in tight round them: the pinch. They meet as one hard white
 //!   point, its light strobing faster to the shot.
 //! - **The shot:** a short hard white flash (no long white-out), fusion thrown out in three
-//!   jets between the rails as well as down the line of fire, white arcs forward; heat
-//!   rising off the three cells on the turret's back.
+//!   jets between the rails as well as down the line of fire; heat rising off the three
+//!   cells on the turret's back. No lightning anywhere.
 //! - **In flight** (sprites.wgsl `plasma_look::KNOTTED_SHELL`): a long solid graphite shell,
-//!   three white seams down it, its base burning; a short white plume sheathed in lilac;
-//!   behind it a thread that hangs over the whole arc (`Weapon::wake`), white, then lilac,
-//!   cooling to deep indigo.
-//! - **The strike:** first the pinch again, bent indigo air collapsing on the point for a
-//!   quarter of a second, streaks of light drawn in to it; then a Pinch-fusion supernova
-//!   (`fusion_nova`) out of it, a white pillar of light standing up out of the strike for a
-//!   moment, and three streamers of fusion thrown up and out of it like a tripod.
+//!   three red seams down it, its base burning; a short red plume round a white-hot core;
+//!   behind it a red-hot thread that goes out within a second or two, and dark smoke laid
+//!   down the whole arc that greys and hangs (`Weapon::wake` seconds).
+//! - **The strike** (`knotted_strike`): red light drawn in to the point for a quarter of
+//!   a second, then three red bursts round it one after another, swelling into one bloom; a
+//!   fireball climbing, plasma rolling out low, globs flung out, a melted pool, and dark
+//!   smoke climbing over it. No supernova, no lightning.
 //!
 //! Presentation only; the renderer's own clock. Hard-edged and short-lived (no mist).
 
@@ -28,9 +28,9 @@ use std::f32::consts::TAU;
 use glam::Vec3;
 use mc_data::Weapon;
 
-use super::super::Renderer;
-use super::{Glow, Trail, TrailKind, ARC, GLOW, MOTE, MOTE_LIFE, MOTE_REACH, STAR, STREAK};
-use super::{KNOTTED_TRAIL, WHITE, WISP};
+use super::super::{Renderer, PUFF_TRAIL, PUFF_TREE_SMOKE};
+use super::{Glow, Trail, TrailKind, BURST, GLOB, GLOW, MOTE, MOTE_LIFE, MOTE_REACH};
+use super::{HOT, KNOTTED_TRAIL, RED, STAR, WAKE, WHITE, WISP};
 use crate::gpu_consts::puff;
 
 /// Cold lilac: the knots' rims, the motes, the lens.
@@ -47,6 +47,11 @@ const KNOT_OUT: f32 = 3.0;
 const KNOT_BACK: f32 = 1.2;
 /// Share of the charge after which the knots are drawn in, and by which they have met.
 const DRAW: (f32, f32) = (0.6, 0.9);
+/// Metres between the pieces of a shell's smoke, the seconds after the shell passes that
+/// it is laid (as its red goes out), and the pieces laid a tick at most over every shell.
+const SMOKE_STEP: f32 = 25.0;
+const SMOKE_LATE: f32 = 0.5;
+const MAX_SMOKE: usize = 48;
 /// Seconds the strike's pinch closes before it goes off.
 const PINCH: f32 = 0.24;
 
@@ -168,22 +173,6 @@ impl Renderer {
                 );
             }
         }
-        // White arcs jumping knot to knot across the bore, more often the fuller it gets.
-        if f > 0.2 && draw < 0.9 && self.scatter.unit() < 0.15 + f * 0.8 {
-            let k = (self.scatter.unit() * n as f32) as usize % n;
-            let (a, b) = (knots[k], knots[(k + 1) % n]);
-            let roll = self.scatter.unit();
-            self.push_lit(
-                ARC,
-                a,
-                b - a,
-                when,
-                0.06 + 0.06 * roll,
-                (0.4 * s, 0.4 * s),
-                WHITE.lerp(LILAC, roll) * (3.5 + 4.0 * f),
-                0.0,
-            );
-        }
         // The pinch: bent indigo air pulled in tight round the knots as they are drawn in.
         if f > DRAW.0 - 0.1 {
             let g = (KNOT_OUT * 3.6 - KNOT_OUT * 2.0 * draw) * s;
@@ -254,25 +243,6 @@ impl Renderer {
             }
         }
         self.plasma_jet(at, dir, 3.0 * s, true, time);
-        for _ in 0..6 {
-            let spread = Vec3::new(
-                self.scatter.signed(),
-                self.scatter.signed(),
-                self.scatter.signed(),
-            ) * 0.35;
-            let long = s * (10.0 + 12.0 * self.scatter.unit());
-            let late = self.scatter.unit() * 0.08;
-            self.push_lit(
-                ARC,
-                at,
-                (dir + spread).normalize_or(dir) * long,
-                time + late,
-                0.12,
-                (0.7 * s, 0.7 * s),
-                WHITE.lerp(LILAC, 0.3) * 6.0,
-                0.0,
-            );
-        }
         // Heat rising off the three cells on the turret's back, where their caps lift.
         let flat = dir.with_z(0.0).normalize_or(Vec3::X);
         let across = flat.cross(Vec3::Z);
@@ -321,15 +291,19 @@ impl Renderer {
     }
 
     /// A knotted shell's trail over the stretch `from` to `to` it flies this tick (`size`
-    /// the shot's, `(starts, span)` the shares of the tick it flies over): a short white
-    /// sheath round the hanging thread (laid by `regency_trails`), and lilac sparks
-    /// falling away from it now and then.
+    /// the shot's, `(starts, span)` the shares of the tick it flies over, `hang` the seconds
+    /// its smoke hangs): a red-hot thread that cools and goes out within a second or two,
+    /// red sparks falling away from it, and behind it dark smoke laid down the stretch a
+    /// moment after the shell passed, greying as it hangs and lifts. `smoke` counts the
+    /// smoke laid this tick over every shell.
     pub(super) fn knotted_trail(
         &mut self,
         from: Vec3,
         to: Vec3,
         size: f32,
         (starts, span): (f32, f32),
+        hang: f32,
+        smoke: &mut usize,
         time: f32,
     ) {
         let tick = self.tick_seconds.max(0.02);
@@ -337,6 +311,7 @@ impl Renderer {
         // A deliberate cosmetic cap on one shot's stretch: a tick's flight is far under
         // this many pieces.
         let n = ((from.distance(to) / step).ceil() as usize).clamp(1, 16);
+        let dir = (to - from).normalize_or_zero();
         for k in 0..n {
             let (f0, f1) = (k as f32 / n as f32, (k + 1) as f32 / n as f32);
             let (a, b) = (from.lerp(to, f0), from.lerp(to, f1));
@@ -346,7 +321,7 @@ impl Renderer {
                 to: b,
                 start: when,
                 life,
-                width: size * 0.25,
+                width: size * 0.22,
                 kind: TrailKind::Knotted,
             });
             if self.scatter.unit() < 0.35 {
@@ -358,101 +333,225 @@ impl Renderer {
                     at,
                     drift - Vec3::Z * (2.0 + 3.0 * roll),
                     when,
-                    0.8 + 0.8 * roll,
+                    0.7 + 0.7 * roll,
                     (0.4, 0.14),
-                    LILAC.lerp(WHITE, roll * 0.6) * 4.0,
+                    RED.lerp(HOT, roll * 0.5) * 4.0,
                     0.0,
                 );
             }
         }
+        // The smoke, a piece every `SMOKE_STEP` metres, laid as the red goes out. A
+        // deliberate cosmetic cap: past `MAX_SMOKE` pieces a tick the trail is laid
+        // without it.
+        let pieces = ((from.distance(to) / SMOKE_STEP).ceil() as usize).clamp(1, 8);
+        for k in 0..pieces {
+            if *smoke >= MAX_SMOKE {
+                break;
+            }
+            *smoke += 1;
+            let f = (k as f32 + 0.5) / pieces as f32;
+            let at = from.lerp(to, f);
+            let when = time + tick * (starts + (span - starts).max(0.0) * f) + SMOKE_LATE;
+            let width = (size * 0.5).clamp(2.0, 6.0);
+            let last = hang * (0.85 + 0.3 * self.scatter.unit());
+            self.push_puff(
+                PUFF_TRAIL,
+                at,
+                dir * (from.distance(to) / pieces as f32),
+                when,
+                last,
+                (width, width * 3.5),
+            );
+        }
     }
 
-    /// A knotted shell struck at `at`: the pinch closing on the point, then a Pinch-fusion
-    /// supernova out of it, a white pillar standing up out of it and three streamers
-    /// thrown up and out like a tripod.
+    /// A knotted shell struck at `at`: the three knots it was gathered from let go again.
+    /// Red light and motes drawn in to the point for a moment, then three red bursts round it one
+    /// after another that swell into one great red bloom; a fireball climbing out of it,
+    /// red plasma thrown up and rolling out low over the ground, globs flung out, the ground
+    /// melted into a pool, and dark smoke climbing over it for seconds after. No supernova,
+    /// no lightning: it is the Springald's alone.
     pub(super) fn knotted_strike(
         &mut self,
         at: Vec3,
         w: &Weapon,
         impact: f32,
-        size: f32,
         splash: f32,
         ground: bool,
         start: f32,
     ) {
         let n = w.knots.max(2) as usize;
-        let r = splash.max(10.0) * 0.6;
-        let centre = at + Vec3::Z * r * 0.15;
-        // The pinch: bent indigo air collapsing on the point, light drawn in to it.
+        let r = splash.max(10.0) * 0.6 * impact.clamp(0.5, 2.0);
+        let centre = at + Vec3::Z * r * 0.12;
+        // The pinch: red light drawn in to the point.
         self.push_lit(
             GLOW,
             centre,
             Vec3::ZERO,
             start,
             PINCH,
-            (r, r * 0.1),
-            INDIGO.lerp(LILAC, 0.5) * 1.6,
+            (r * 0.9, r * 0.08),
+            RED.lerp(HOT, 0.3) * 1.4,
             0.0,
         );
-        for _ in 0..12 {
+        // Red motes drawn in to it from round it.
+        for _ in 0..24 {
             let out = Vec3::new(
                 self.scatter.signed(),
                 self.scatter.signed(),
                 self.scatter.unit() * 0.6,
             )
             .normalize_or(Vec3::Z);
-            let from = centre + out * r * (0.8 + 0.4 * self.scatter.unit());
+            let from = centre + out * r * (0.6 + 0.4 * self.scatter.unit());
+            let roll = self.scatter.unit();
             self.push_lit(
-                STREAK,
+                MOTE,
                 from,
-                centre - from,
-                start,
+                (centre - from) / (PINCH * 1.1),
+                start + roll * 0.05,
                 PINCH,
-                (0.5, 0.35),
-                LILAC.lerp(WHITE, 0.4) * 4.0,
+                (0.7, 0.3),
+                RED.lerp(HOT, 0.4 * roll) * 4.0,
                 0.0,
             );
         }
         let bang = start + PINCH;
-        self.fusion_nova(at, impact, size, splash, ground, false, bang);
-        // A white pillar standing up out of it for a moment, seen across the map.
-        let tall = r * 6.0;
+        // A hard red-white flash.
         self.push_lit(
-            STREAK,
+            GLOW,
             centre,
-            Vec3::Z * tall,
+            Vec3::ZERO,
             bang,
-            0.8,
-            (r * 0.35, r * 0.18),
-            WHITE.lerp(LILAC, 0.25) * 6.0,
+            0.18,
+            (r * 0.9, r * 1.6),
+            HOT * 4.0,
             0.0,
         );
-        // Three streamers thrown up and out of it like a tripod's legs.
+        // Three bursts round the point, one after another, then the bloom they swell into.
         let turn = self.scatter.unit() * TAU;
         for k in 0..n {
             let a = turn + TAU * k as f32 / n as f32;
-            let out = Vec3::new(a.cos(), a.sin(), 1.6).normalize();
-            for j in 0..4 {
-                let thick = r * (0.12 + 0.04 * j as f32);
-                let v = out * r * (2.8 + 0.8 * j as f32);
-                self.push_lit(
-                    WISP,
-                    centre,
-                    v * puff::NOVA_WISP_DRAG,
-                    bang + 0.03 * j as f32,
-                    1.8,
-                    (thick, thick * 3.0),
-                    Vec3::splat(2.4),
-                    0.0,
-                );
-            }
+            let off = Vec3::new(a.cos(), a.sin(), 0.2) * r * 0.5;
+            self.push_lingering(
+                BURST,
+                centre + off,
+                Vec3::ZERO,
+                bang + 0.07 * k as f32,
+                0.6,
+                (r * 0.35, r * 1.2),
+                RED.lerp(HOT, 0.35) * 3.4,
+                0.0,
+                2,
+            );
+        }
+        self.push_lingering(
+            BURST,
+            centre + Vec3::Z * r * 0.2,
+            Vec3::ZERO,
+            bang + 0.2,
+            1.0,
+            (r * 0.8, r * 2.4),
+            RED * 2.8,
+            0.0,
+            3,
+        );
+        // A fireball climbing out of it, cooling as it goes.
+        for k in 0..14 {
+            let f = k as f32 / 14.0;
+            let lean = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * 0.15;
+            let puff = r * (0.35 + 0.15 * self.scatter.unit());
+            let roll = self.scatter.unit();
+            self.push_lingering(
+                WAKE,
+                centre,
+                (Vec3::Z + lean) * r * (2.0 + 2.4 * f),
+                bang + 0.15 + f * 0.3,
+                1.0 + 0.5 * roll,
+                (puff, puff * 1.6),
+                RED.lerp(HOT, 0.5 - f * 0.45) * 3.0,
+                0.0,
+                2,
+            );
+        }
+        // Red plasma rolling out low over the ground, slowing to a stop.
+        for _ in 0..14 {
+            let a = self.scatter.unit() * TAU;
+            let rise = if ground {
+                0.05
+            } else {
+                self.scatter.signed() * 0.7
+            };
+            let out = Vec3::new(a.cos(), a.sin(), rise);
+            let puff = r * (0.22 + 0.1 * self.scatter.unit());
+            let roll = self.scatter.unit();
+            let when = bang + 0.12 + 0.1 * self.scatter.unit();
+            self.push_lingering(
+                WAKE,
+                centre + out * r * 0.3,
+                out * r * (1.6 + 1.6 * roll),
+                when,
+                1.0 + 0.5 * roll,
+                (puff, puff * 1.4),
+                RED.lerp(HOT, 0.25 * roll) * 2.8,
+                0.0,
+                2,
+            );
+        }
+        // Globs of plasma flung out of it.
+        for _ in 0..16 {
+            let out = Vec3::new(
+                self.scatter.signed(),
+                self.scatter.signed(),
+                0.3 + self.scatter.unit() * 0.8,
+            )
+            .normalize_or(Vec3::Z);
+            let blob = r * (0.06 + 0.04 * self.scatter.unit());
+            let roll = self.scatter.unit();
+            self.push_lit(
+                GLOB,
+                centre,
+                out * r * (1.6 + 2.2 * roll),
+                bang + 0.05 * roll,
+                1.1 + 0.6 * roll,
+                (blob, blob * 0.5),
+                RED.lerp(HOT, 0.4) * 3.0,
+                0.0,
+            );
+        }
+        if ground {
+            self.ground_melt
+                .melt(at.truncate(), r * 0.9, 0.7, bang, 14.0);
+        }
+        // Dark smoke climbing over it, drifting, for seconds after.
+        for k in 0..14 {
+            let f = k as f32 / 14.0;
+            let drift = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * r * 0.04;
+            let puff = r * (0.5 + 0.3 * self.scatter.unit());
+            let off = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * r * 0.3;
+            let last = 7.0 + 3.0 * self.scatter.unit();
+            self.push_puff(
+                PUFF_TREE_SMOKE,
+                centre + off,
+                drift + Vec3::Z * r * (0.6 + 0.9 * f),
+                bang + 0.3 + f * 1.6,
+                last,
+                (puff, puff * 2.6),
+            );
         }
         self.plasma_fx.guns.light(Glow {
             pos: centre,
-            color: LILAC * 300.0 * impact,
-            range: r * 3.0,
+            color: RED * 200.0 * impact,
+            range: r * 2.0,
             start,
             life: PINCH,
+            pulse: 0.0,
+        });
+        self.plasma_fx.guns.light(Glow {
+            pos: centre + Vec3::Z * r * 0.4,
+            color: RED.lerp(HOT, 0.3) * 3000.0 * impact,
+            range: r * 4.0,
+            start: bang,
+            life: 1.6,
             pulse: 0.0,
         });
     }

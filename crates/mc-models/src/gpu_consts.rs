@@ -914,8 +914,8 @@ shared! {
         /// A surge shell's (`plasma_look::SURGE_SHELL`): a crimson ember thread that cools
         /// to violet, beaded where the shell's pressure pulses passed.
         pub const PLASMA_TRAIL_SURGE: f32 = 3.0;
-        /// A knotted shell's (`plasma_look::KNOTTED_SHELL`, the Springald's): a thread that
-        /// starts white, takes cold lilac and cools to deep indigo, never rose or red.
+        /// A knotted shell's (`plasma_look::KNOTTED_SHELL`, the Springald's): a red-hot
+        /// thread going out to dark red as the shell's smoke takes over.
         pub const PLASMA_TRAIL_KNOTTED: f32 = 4.0;
         /// A gravity crush's tether (renderer/crush_fx.rs), the Regency's missile defence
         /// gripping a missile: a thin hard red core, lensing ripples running out from the
@@ -957,8 +957,8 @@ shared! {
         /// sparks behind it. `mc_sim::mirror::PLASMA_LOOK_AIRBURST`.
         pub const AIRBURST: u32 = 9;
         /// A knotted Pinch-fusion gun's shell (`Weapon::knots`, the Springald's Triune
-        /// Howitzer): a long solid graphite shell, white seams down it, its base burning
-        /// (sprites.wgsl `vs_missile`), a short white plume sheathed in lilac.
+        /// Howitzer): a long solid graphite shell, red seams down it, its base burning
+        /// (sprites.wgsl `vs_missile`), a short red plume round a white-hot core.
         /// `mc_sim::mirror::PLASMA_LOOK_KNOTTED_SHELL`.
         pub const KNOTTED_SHELL: u32 = 10;
     }

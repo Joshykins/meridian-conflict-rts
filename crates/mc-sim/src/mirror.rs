@@ -1212,7 +1212,7 @@ pub const PLASMA_LOOK_SURGE_SHELL: u32 = 8;
 /// a stream. `mc_models::gpu_consts::plasma_look::AIRBURST`.
 pub const PLASMA_LOOK_AIRBURST: u32 = 9;
 /// `plasma_look` of a knotted Pinch-fusion gun's shell (`Weapon::knots`, the Springald's):
-/// a solid shell trailing a white plume. `mc_models::gpu_consts::plasma_look::KNOTTED_SHELL`.
+/// a solid shell trailing a red plume. `mc_models::gpu_consts::plasma_look::KNOTTED_SHELL`.
 pub const PLASMA_LOOK_KNOTTED_SHELL: u32 = 10;
 /// Set in `ProjectileInstance::color` for a torpedo running under the water: no
 /// tracer, flame or casing in the air; a dark body, bubbles and a wake instead.

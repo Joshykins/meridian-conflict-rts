@@ -41,7 +41,7 @@ impl Renderer {
             Grade::Surge => self.fusion_nova(at, impact, size * 1.5, splash, under, true, start),
             Grade::Knotted => {
                 let w = w.clone();
-                self.knotted_strike(at, &w, impact, size * 1.5, splash, under, start)
+                self.knotted_strike(at, &w, impact, splash, under, start)
             }
         }
         true

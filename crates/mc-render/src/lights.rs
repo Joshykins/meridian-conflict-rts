@@ -1152,14 +1152,14 @@ fn glow_of(p: &ProjectileInstance) -> Option<Glow> {
             line: false,
         });
     }
-    // A knotted shell (`plasma_look::KNOTTED_SHELL`): its white plume lights what it passes.
+    // A knotted shell (`plasma_look::KNOTTED_SHELL`): its red plume lights what it passes.
     if p._pad[0] > 2.5
         && ((p._pad[0] - 1.0) * 0.5).floor() == crate::gpu_consts::plasma_look::KNOTTED_SHELL as f32
     {
         return Some(Glow {
             from,
             to,
-            color: Vec3::new(0.75, 0.65, 1.0) * 260.0,
+            color: Vec3::new(1.0, 0.07, 0.04) * 260.0,
             range: 40.0,
             line: false,
         });

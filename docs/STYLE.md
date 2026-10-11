@@ -429,23 +429,23 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     broken violet ripples running out through them, embers rising, until it
     dies down (renderer/surge_fx.rs, surge_fx.wgsl). Never an even web of
     cracks over the whole disc, never a solid plate of light.
-    The **Triune Pinch-fusion Howitzer** (the T4 Springald, `Weapon::knots`) is
-    cold white and lilac with bent indigo air, never the Sunspear's rose or the
-    Saker's crimson (renderer/regency_guns_fx/knotted.rs). Through its 4 s charge
-    the gun's three blades draw back off the bore (charge gear `FLARE`), the slots
-    in them rippling toward the muzzle, and a small white knot kindles at each
-    lens, lilac motes running up each rail into it and white arcs jumping knot to
-    knot. Over the last third the knots are drawn in, bent indigo air pulled in
-    tight round them (the pinch), and they meet as one hard white point. On the
-    shot the blades slam shut, the bore runs back 4 m into its jacket, a short hard
-    white flash throws fusion out in three jets between the rails, and heat rises
-    off the three cells on the turret's back as their caps lift. The shell is
-    solid: long and slim, graphite with three white seams and a burning base, a
-    short white plume sheathed in lilac, and a thread behind it over the whole arc
-    that is white only for a moment, lilac for a couple of seconds and then a dim
-    deep indigo. Where it lands bent indigo air collapses on the point for a quarter second
-    before it goes off as a Pinch-fusion supernova, a white pillar standing up out
-    of it for a moment and three streamers thrown up and out like a tripod's legs.
+    The **Triune Pinch-fusion Howitzer** (the T4 Springald, `Weapon::knots`) charges in
+    cold white and lilac with bent indigo air, and what it lets go is red
+    (renderer/regency_guns_fx/knotted.rs). Through its 4 s charge the gun's three
+    blades draw back off the bore (charge gear `FLARE`), the slots in them rippling
+    toward the muzzle, and a small white knot kindles at each lens, lilac motes
+    running up each rail into it. Over the last third the knots are drawn in, bent
+    indigo air pulled in tight round them (the pinch), and they meet as one hard white
+    point. On the shot the blades slam shut, the bore runs back 4 m into its jacket, a
+    short hard white flash throws fusion out in three jets between the rails, and heat
+    rises off the three cells on the turret's back as their caps lift. The shell is
+    solid: long and slim, graphite with three red seams and a burning base, a short red
+    plume round a white-hot core; behind it a red-hot thread goes out within a second or
+    two into dark smoke that hangs grey over the whole arc. Where it lands red light is
+    drawn in to the point for a quarter second, then three red bursts go off round it one
+    after another and swell into one bloom, a fireball climbs out of it, plasma rolls
+    out low, globs are flung out, the ground melts into a pool and dark smoke climbs over
+    it. No supernova, no pillar, no lightning anywhere on this gun (user calls 10-10).
   - **AA:** no flak (user call 2026-10-03). Tech 1 is a **Plasmeric
     Repeater** turned on the sky, bolts out of each tube in turn that strike
     the plane they are fired at. Tech 2 is the **Twin Pinched-plasmeric
