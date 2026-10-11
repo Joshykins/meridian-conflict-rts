@@ -632,11 +632,13 @@ impl World {
     /// Warheads: the launch rule (`projects.rs`) salvoes past interceptors it can
     /// outnumber and goes round those it cannot (`projects.rs`); the plans decide
     /// whether silos are built, and strikes go for interceptors while warheads wait.
+    /// Gravitic engines put their wells on the enemy spot worth most (`projects.rs`).
     pub(in crate::ai) fn direct_strategic(
         &mut self,
         ctx: &super::Ctx,
         out: &mut Vec<crate::command::Command>,
     ) {
         self.direct_nukes(ctx.player, out);
+        self.direct_gravitic(ctx.player, out);
     }
 }

@@ -74,7 +74,8 @@ pub(in crate::ai) mod role {
     pub(in crate::ai) const SHIELD: u32 = 1 << 12;
     pub(in crate::ai) const BUILDER: u32 = 1 << 13;
     pub(in crate::ai) const ECONOMY: u32 = 1 << 14;
-    /// A structure that shells from many kilometres.
+    /// A structure that shells from many kilometres, or holds a gravity well anywhere
+    /// (a gravitic engine, aimed by `direct_gravitic`).
     pub(in crate::ai) const MAP_GUN: u32 = 1 << 15;
     /// Raised on a lot of its own: a big commitment, judged against income.
     pub(in crate::ai) const PROJECT: u32 = 1 << 16;
@@ -322,7 +323,7 @@ fn roles(bp: &UnitBlueprint, p: &Profile) -> u32 {
         None => {}
     }
     let longest = p.reach.iter().copied().max().unwrap_or(Fx::ZERO);
-    if !mobile && longest >= MAP_GUN_RANGE {
+    if !mobile && (longest >= MAP_GUN_RANGE || bp.gravitic.is_some()) {
         r |= role::MAP_GUN | role::PROJECT;
     } else if !mobile && p.armed() && bp.builder.is_none() {
         r |= role::DEFENSE;

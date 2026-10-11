@@ -238,7 +238,7 @@ game). Fourteen plans:
 | `SeaControl` | a surface fleet | water between the sides; their ships; losses to ships |
 | `SubWar` | submarines | their ships; thin sonar |
 | `Warships` | armed spaceships by warp | income; weak anti-air; islands |
-| `Siege` | artillery and map guns | a fortified enemy; a map gun it can afford |
+| `Siege` | artillery and map guns (a gravitic engine counts as one) | a fortified enemy; a map gun it can afford |
 | `Strategic` | nukes | income; no interceptors seen at a base looked at lately |
 | `Titan` | one unit worth many minutes of income | high income; holding its own on land |
 | `Fortify` | defences, shields, interceptors | nukes believed likely; raids on the base; their air |
@@ -346,6 +346,11 @@ Ground rules learnt in the tournaments (each is a comment at its code):
   built, takes a nearer objective found on the way, and falls back only below 30%
   health and outmatched two to one; its own guns outrange what it meets (a Behemoth
   razed two shields, four tech 3 turrets and a factory from 2.4 km in ten seconds);
+- a gravitic engine (`direct_gravitic`) puts its well on the enemy spot worth most
+  inside one (their commander above all, as a warhead does; aircraft at the share of
+  the crush they take), looks again once the well has held twenty seconds, and
+  turns when what it holds is worth less than half the best spot; two engines never
+  share a spot. Unaimed, the AI's Fallen never once opened a well;
 - a side with a finished space elevator (`Ctx::cheap_army`) gets its units free, so
   its army goes as a probe does (at three fifths of the enemy army, blind), is
   never held at home, and does not break off a fight for the trade: with 50 000

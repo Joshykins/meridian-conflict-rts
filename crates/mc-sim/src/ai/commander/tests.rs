@@ -302,3 +302,58 @@ fn a_titan_razes_a_guarded_base_from_beyond_its_guns() {
         c.summary()
     );
 }
+
+#[test]
+fn gravitic_engines_put_their_wells_on_the_commander_then_the_army() {
+    let mut w = world();
+    let engine = w.blueprints.id_of("regency_t5_gravitic_engine").unwrap();
+    let engines: Vec<_> = [1000, 1800]
+        .into_iter()
+        .map(|x| {
+            let row = w
+                .spawn_unit(engine, 0, FxVec2::from_ints(x, 1600), Angle::ZERO, true)
+                .unwrap();
+            w.state.units.id(row)
+        })
+        .collect();
+    // Their army, standing off to one side; and one lone tank elsewhere.
+    let tank = w.blueprints.id_of("aster_t2_tank").unwrap();
+    let army = FxVec2::from_ints(5200, 2400);
+    for i in 0..16 {
+        w.spawn_unit(
+            tank,
+            1,
+            army + FxVec2::from_ints((i % 4) * 30, (i / 4) * 30),
+            Angle::ZERO,
+            true,
+        )
+        .unwrap();
+    }
+    w.spawn_unit(tank, 1, FxVec2::from_ints(2400, 5600), Angle::ZERO, true)
+        .unwrap();
+    run(&mut w, 300);
+    let mut marks: Vec<FxVec2> = engines
+        .iter()
+        .map(|&id| {
+            w.state
+                .wells
+                .iter()
+                .find(|g| g.source == id)
+                .unwrap_or_else(|| {
+                    panic!(
+                        "an engine was never aimed: {}",
+                        w.state.ai[0].commander.summary()
+                    )
+                })
+                .mark
+        })
+        .collect();
+    marks.sort_by_key(|m| (m.x, m.y));
+    // Their commander (it ends the game) under one, their army under the other.
+    let commander = FxVec2::from_ints(6800, 6800);
+    assert!(
+        marks[0].distance(army) < Fx::from_int(300)
+            && marks[1].distance(commander) < Fx::from_int(300),
+        "the wells went to {marks:?}, not the army at {army:?} and the commander at {commander:?}"
+    );
+}

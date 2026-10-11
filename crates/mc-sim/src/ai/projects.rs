@@ -1,6 +1,7 @@
 //! Strategic projects: which blueprints are experimental units and strategic
 //! structures (`project_kind`; the Commander's plans decide which get built),
-//! and firing the nukes (`direct_nukes`).
+//! firing the nukes (`direct_nukes`) and aiming the gravitic engines
+//! (`direct_gravitic`).
 //!
 //! Nothing here names a unit. A project is any blueprint in a builder's menu
 //! with the `Experimental`, `Strategic` or `Space` category; its kind comes from
@@ -8,6 +9,7 @@
 //! anti-air (an anti-spaceship gun), one with artillery (a map gun), or a
 //! mobile unit.
 use super::*;
+use crate::gravitic::WellPhase;
 use mc_data::strategic::StrategicKind;
 
 /// Enemy value a warhead must be able to reach, in multiples of its own
@@ -18,6 +20,12 @@ const NUKE_WORTH: i64 = 2;
 const FRESH: u32 = 100;
 /// Value put on the enemy commander under a warhead: its loss ends the game.
 const COMMANDER_WORTH: i64 = 60_000;
+/// Enemy materials a gravity well must hold to be worth tearing a rift for.
+const WELL_WORTH: i64 = 1500;
+/// Ticks a well holds before its engine looks for better ground (twenty seconds): a
+/// rift takes a gather and a run to land, and an engine that turned after every
+/// army that moved would never crush anything.
+const WELL_HOLD: u32 = 200;
 
 /// What a project is for, from its data.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -27,7 +35,7 @@ pub(super) enum Project {
     /// A structure that shoots at aircraft: answers enemy spaceships.
     SkyGun,
     Nuke,
-    /// A structure that shells from afar.
+    /// A structure that shells from afar, or holds a gravity well anywhere.
     MapGun,
     /// An experimental or a warship, built on a lot and sent with the army.
     Mobile,
@@ -57,7 +65,7 @@ pub(super) fn project_kind(bp: &UnitBlueprint) -> Option<Project> {
         Some(StrategicKind::Nuke) => Project::Nuke,
         None if bp.is_mobile() => Project::Mobile,
         None if bp.has(cat::ANTI_AIR) => Project::SkyGun,
-        None if bp.has(cat::ARTILLERY) => Project::MapGun,
+        None if bp.has(cat::ARTILLERY) || bp.gravitic.is_some() => Project::MapGun,
         None => Project::Mobile,
     })
 }
@@ -192,6 +200,77 @@ impl World {
         for _ in 0..salvo {
             out.push(Command::LaunchNuke {
                 units: ids.clone(),
+                pos: at,
+            });
+        }
+    }
+
+    /// Gravitic engines put their wells on the enemy spot worth most inside one: their
+    /// army where it stands, or what is built. An engine looks again once its well has
+    /// held `WELL_HOLD`, and turns when what it holds is worth less than half the best
+    /// spot. Engines of the side never share a spot.
+    pub(super) fn direct_gravitic(&self, player: u8, out: &mut Vec<Command>) {
+        let units = &self.state.units;
+        let tick = self.state.tick;
+        let contacts = &self.state.ai[player as usize].contacts;
+        let mut held: Vec<FxVec2> = Vec::new();
+        for r in units.slots.iter() {
+            if units.owner[r] != player || !units.is_active(r) {
+                continue;
+            }
+            let Some(g) = self.bp(r).gravitic.as_ref() else {
+                continue;
+            };
+            let id = units.id(r);
+            // Aircraft take only a share of the crush.
+            let worth = |c: &adaptive::Contact| -> i64 {
+                let bp = self.blueprints.unit(c.blueprint);
+                if bp.is_mobile() && tick.saturating_sub(c.seen) > FRESH {
+                    return 0;
+                }
+                let m = if bp.has(cat::COMMANDER) {
+                    COMMANDER_WORTH
+                } else {
+                    bp.cost_materials.floor_int() as i64
+                };
+                if bp.has(cat::AIR) {
+                    (Fx::from_int(m as i32) * g.air_damage).floor_int() as i64
+                } else {
+                    m
+                }
+            };
+            let value = |at: FxVec2| -> i64 {
+                contacts
+                    .iter()
+                    .filter(|c| c.pos.distance(at) <= g.radius)
+                    .map(worth)
+                    .sum()
+            };
+            let well = self.state.wells.iter().find(|w| w.source == id);
+            if let Some(w) = well {
+                held.push(w.mark);
+            }
+            let settled = match well.map(|w| w.phase) {
+                None => false,
+                Some(WellPhase::Holding { age }) => age < WELL_HOLD,
+                Some(_) => true,
+            };
+            if settled {
+                continue;
+            }
+            let now = well.map_or(0, |w| value(w.mark));
+            let best = contacts
+                .iter()
+                .filter(|c| worth(c) > 0)
+                .filter(|c| !held.iter().any(|h| h.distance(c.pos) <= g.radius * 2))
+                .map(|c| (value(c.pos), c.pos))
+                .max_by_key(|&(v, at)| (v, std::cmp::Reverse((at.x, at.y))));
+            let Some((_, at)) = best.filter(|&(v, _)| v >= WELL_WORTH && v > now * 2) else {
+                continue;
+            };
+            held.push(at);
+            out.push(Command::Fracture {
+                units: vec![id],
                 pos: at,
             });
         }

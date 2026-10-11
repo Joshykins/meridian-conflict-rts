@@ -20,6 +20,20 @@ fn roles_come_from_what_a_unit_can_do() {
     assert!(has("aster_t2_sensor_ship", role::SENSOR | role::WARP));
     assert!(has("aster_t4_artillery", role::MAP_GUN | role::PROJECT));
     assert!(has("regency_t4_artillery", role::MAP_GUN | role::PROJECT));
+    // Unarmed, but it holds a well anywhere on the map: built and aimed as a map gun.
+    assert!(has(
+        "regency_t5_gravitic_engine",
+        role::MAP_GUN | role::PROJECT
+    ));
+    // Titans go out on their own (`ops::titan`).
+    assert!(crate::ai::commander::ops::titan(&profile(
+        &b,
+        "aster_t5_titan"
+    )));
+    assert!(crate::ai::commander::ops::titan(&profile(
+        &b,
+        "regency_t5_seraph"
+    )));
     assert!(has("aster_t4_nuke_silo", role::STRATEGIC));
     assert!(has("aster_t3_nuke_defense", role::INTERCEPTOR));
     assert!(has("aster_t1_submarine", role::HUNTER | role::ANTI_SHIP));
