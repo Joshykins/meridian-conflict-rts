@@ -268,6 +268,17 @@ fn observed_vision() -> Option<u8> {
     std::env::var("MERIDIAN_VISION").ok()?.parse().ok()
 }
 
+/// `MERIDIAN_MIND_MAP=mind|truth` with `--observe` and `MERIDIAN_VISION`: the shot has
+/// the AI Mind card's map switch set so (`mind_map.rs`).
+fn shot_mind_map() -> crate::mind_map::MapMode {
+    use crate::mind_map::MapMode;
+    match std::env::var("MERIDIAN_MIND_MAP").as_deref() {
+        Ok("mind") => MapMode::Mind,
+        Ok("truth") => MapMode::Truth,
+        _ => MapMode::Off,
+    }
+}
+
 /// Whose eyes a match screenshot is drawn through, as the sim thread would choose.
 fn shot_eyes(opts: &Options) -> Option<u8> {
     match (opts.fog, opts.observe) {
@@ -603,6 +614,10 @@ pub fn screenshot(
     view.perspective = observed_vision().filter(|_| opts.observe);
     view.status = crate::sim_thread::status_of(&world, world.timings.total_ns);
     view.status.owns_clock = true;
+    if opts.observe && shot_mind_map() != crate::mind_map::MapMode::Off {
+        view.status.zone_map = Some(world.ai_zone_map());
+        view.status.zone_truth = world.ai_zone_truth();
+    }
     view.index_of = frame
         .units
         .iter()
@@ -827,6 +842,7 @@ pub fn screenshot(
         hud.browse_range_maps(&map);
     }
     hud.details_open = shot.details;
+    hud.mind_view.map = shot_mind_map();
     // `MERIDIAN_ISSUE_NOTE=TEXT`: the report card's note, typed.
     if let Ok(note) = std::env::var("MERIDIAN_ISSUE_NOTE") {
         hud.issues.stage_note(&note);
@@ -958,6 +974,13 @@ pub fn screenshot(
         crate::gravitic_marks::draw(&mut ui, &field, pointer);
         crate::warp_marks::draw(&mut ui, &field, 1.0, pointer);
         crate::destruct_marks::draw(&mut ui, &field, 1.0);
+        if let Some(who) = view.perspective.filter(|_| view.observing) {
+            let mode = hud.mind_view.map;
+            if let Some(z) = crate::mind_map::draw(&mut ui, &field, mode, who, pointer) {
+                let at = input.cursor / ui.s;
+                crate::mind_map::card(&mut ui, &field, mode, who, z, at);
+            }
+        }
         if let (Some(deg), Some(at)) = (formation_aim, pointer) {
             let command = mc_sim::Command::Move {
                 units: view

@@ -32,6 +32,10 @@ pub enum MapMode {
 const LIFT: f32 = 3.0;
 /// Seconds of age at which what is known of a zone is drawn at its faintest.
 const STALE: f32 = 600.0;
+/// Most nodes a fill quad spans: longer runs part from the ground on hills.
+const RUN: usize = 6;
+/// Tags its own zones are labelled with in Mind.
+const BASES: [&str; 3] = ["main base", "forward base", "firebase"];
 
 /// One zone as drawn: whose it is, how sure, and what to say over it.
 struct Shown<'a> {
@@ -166,43 +170,51 @@ pub fn draw(
     let mut above: Vec<Option<Vec2>> = (0..=w).map(|x| corner(ui, x, 0)).collect();
     let (sw, sh) = (ui.size.x, ui.size.y);
     let on_screen = |p: Vec2| p.x > -80.0 && p.y > -80.0 && p.x < sw + 80.0 && p.y < sh + 80.0;
+    let tint = |z: u16| -> Option<Color> {
+        let s = shown.get(z as usize)?;
+        match s.owner {
+            // Its own ground quietly; the enemy's by how sure it is.
+            Some(o) if o == who && mode == MapMode::Mind => Some(color(colors, o, 0.07)),
+            Some(o) => Some(color(colors, o, 0.08 + 0.22 * s.strength)),
+            None if s.unseen => Some(ink(0.34)),
+            None => None,
+        }
+    };
+    let ink_line = rgb(palette::TEXT, 0.22);
     for y in 0..h {
         let below: Vec<Option<Vec2>> = (0..=w).map(|x| corner(ui, x, y + 1)).collect();
+        // Each zone's fill, a run of nodes at a time.
+        let mut x = 0;
+        while x < w {
+            let z = at(x, y);
+            let mut end = x + 1;
+            while end < w && end - x < RUN && at(end, y) == z {
+                end += 1;
+            }
+            if let (Some(t), Some(a), Some(b), Some(c), Some(d)) =
+                (tint(z), above[x], above[end], below[end], below[x])
+            {
+                if on_screen(a) || on_screen(c) || on_screen(b) || on_screen(d) {
+                    ui.triangle(a, b, c, t);
+                    ui.triangle(a, c, d, t);
+                }
+            }
+            x = end;
+        }
+        // The borders: a fine line where two zones meet.
         for x in 0..w {
             let z = at(x, y);
-            let (Some(a), Some(b), Some(c), Some(d)) =
-                (above[x], above[x + 1], below[x + 1], below[x])
-            else {
+            let (Some(b), Some(c), Some(d)) = (above[x + 1], below[x + 1], below[x]) else {
                 continue;
             };
-            if !(on_screen(a) || on_screen(c)) {
+            if !on_screen(c) {
                 continue;
             }
-            let right = (x + 1 < w).then(|| at(x + 1, y));
-            let down = (y + 1 < h).then(|| at(x, y + 1));
-            let left = (x > 0).then(|| at(x - 1, y));
-            let up = (y > 0).then(|| at(x, y - 1));
-            // A band along each zone's edge is tinted; its middle is left clear.
-            let edge = [right, down, left, up]
-                .iter()
-                .any(|n| n.is_some_and(|n| n != z));
-            if z != NO_ZONE && edge {
-                let s = &shown[z as usize];
-                let tint = match s.owner {
-                    Some(o) => color(colors, o, 0.10 + 0.20 * s.strength),
-                    None if s.unseen => ink(0.28),
-                    None => rgb(palette::LINE, 0.04),
-                };
-                ui.triangle(a, b, c, tint);
-                ui.triangle(a, c, d, tint);
-            }
-            // The border itself: a fine line where two zones meet.
-            let line = |n: Option<u16>| n.is_some_and(|n| n != z && (z != NO_ZONE || n != NO_ZONE));
-            let ink_line = rgb(palette::TEXT, 0.30);
-            if line(right) {
+            let line = |n: u16| n != z && (z != NO_ZONE || n != NO_ZONE);
+            if x + 1 < w && line(at(x + 1, y)) {
                 ui.stroke(b, c, 1.2, ink_line);
             }
-            if line(down) {
+            if y + 1 < h && line(at(x, y + 1)) {
                 ui.stroke(d, c, 1.2, ink_line);
             }
         }
@@ -223,17 +235,12 @@ pub fn draw(
             ring(ui, field, mid, radius, sure, mode == MapMode::Mind);
         }
         let Some(c) = chief(&s.held) else {
-            if s.unseen {
-                ui.text_centred(
-                    p.x,
-                    p.y,
-                    type_scale::MICRO,
-                    rgb(palette::FAINT, 0.7),
-                    "unseen",
-                );
-            }
             continue;
         };
+        // Its own ground is labelled only where it bases; the enemy's everywhere.
+        if c.player == who && mode == MapMode::Mind && !BASES.contains(&c.tag) {
+            continue;
+        }
         let built = built_mass(c);
         let text = if built > 0 {
             format!("{}  {}", c.tag, kilo(built))

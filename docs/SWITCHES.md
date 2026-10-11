@@ -55,6 +55,7 @@ match that long is run with the built exe directly.
 | `MERIDIAN_GROUPS` | `KEY,KEY,...` | Control groups 2, 3, ... hold player 0's units whose blueprint key contains each KEY (group 1 is the selection): the groups card and the numbers by the units. |
 | `MERIDIAN_HISTORY_REPORT` | `N[:PAGE]`, 1 = the newest | With `--ui history`: match N's battle report open over Match History on PAGE (`overview`, `economy`, `military`, `battlefield`, `timeline`), fully drawn in. A replay without a kept record (`replays/<id>.mcreport`) is played through first, which the shot waits for. |
 | `MERIDIAN_VISION` | player slot | An `--observe` shot is drawn through that player's eyes, as if its vision chip were picked (and shows its AI Mind card when a Commander plays it, docs/AI_COMMANDER.md). |
+| `MERIDIAN_MIND_MAP` | `mind` or `truth` | With `MERIDIAN_VISION` on an `--observe` shot: the AI Mind card's map switch is set so, and the watched Commander's zones are drawn on the ground (`mind_map.rs`, docs/AI_COMMANDER.md). |
 
 | Switch | Values | Purpose |
 |---|---|---|
