@@ -1,13 +1,14 @@
-//! The pieces the Saker is put together from, beyond the shared kit: faceted plates
-//! gathered to a ridge, joint drums with their hubs, bays where the plates part over the
-//! machinery, and faces laid in a plate with its light or finish drawn by the surface.
+//! The pieces the Regency's heavy machines (the Saker, the Springald) are put together
+//! from, beyond the shared kit: faceted plates gathered to a ridge, joint drums with their
+//! hubs, bays where the plates part over the machinery, and faces laid in a plate with its
+//! light or finish drawn by the surface.
 
 use glam::{Vec2, Vec3};
 
 use crate::builder::MeshBuilder;
 
-use super::super::kit::{dark_plate, metal, seam};
-use super::super::machine::{hoop_on, Frame};
+use super::kit::{dark_plate, metal, seam, v3};
+use super::machine::{hoop_on, Frame};
 
 /// A faceted armour plate: `outline` (points `[s, t]` in `f`) `thick` deep out of its
 /// face, its top drawn in and gathered to a ridge at `ridge` (`[s, t]`) `rise` above it,
@@ -172,4 +173,41 @@ pub(super) fn locker(b: &mut MeshBuilder, f: &Frame, size: Vec3) {
         let c = ring(h, 0.72);
         inlay(b, &c, f.n, crate::pattern::EMBER_MACHINED);
     }
+}
+
+/// The full outline from `half` (y >= 0, front round to back), mirrored across.
+fn outline(half: &[[f32; 2]]) -> Vec<[f32; 2]> {
+    half.iter()
+        .copied()
+        .chain(
+            half.iter()
+                .rev()
+                .filter(|p| p[1] > 0.0)
+                .map(|&[x, y]| [x, -y]),
+        )
+        .collect()
+}
+
+/// A solid in plan: `half` the outline lofted through `levels` (height, and how far the
+/// outline is drawn in about its middle there), with the current brush.
+pub(super) fn plan_loft(
+    b: &mut MeshBuilder,
+    half: &[[f32; 2]],
+    levels: &[(f32, f32)],
+    bottom: bool,
+) {
+    let out = outline(half);
+    let (lo, hi) = out.iter().fold((f32::MAX, f32::MIN), |(lo, hi), p| {
+        (lo.min(p[0]), hi.max(p[0]))
+    });
+    let mid = (lo + hi) * 0.5;
+    let rings: Vec<Vec<Vec3>> = levels
+        .iter()
+        .map(|&(z, k)| {
+            out.iter()
+                .map(|&[x, y]| v3(mid + (x - mid) * k, y * k, z))
+                .collect()
+        })
+        .collect();
+    b.with_facets(|b| b.loft(&rings, bottom, true));
 }

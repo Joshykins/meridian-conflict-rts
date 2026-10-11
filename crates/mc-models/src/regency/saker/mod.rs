@@ -20,7 +20,6 @@ mod feet;
 mod gun;
 mod hull;
 mod legs;
-mod parts;
 #[cfg(test)]
 mod tests;
 mod turret;

@@ -470,6 +470,15 @@ fn charge_gear_pose(p0: vec3<f32>, n0: vec3<f32>, gear: u32, rig: vec4<f32>, bor
         let open = max(smoothstep(0.0, 0.9, c.x), 1.0 - smoothstep(CHARGE_GEAR_PART_SHUT_FROM, CHARGE_GEAR_PART_SHUT_TO, c.y));
         p += up * side * CHARGE_GEAR_PART_M * rig.w * open;
     }
+    if gear == CHARGE_GEAR_FLARE {
+        // Straight out from the bore's line through the hub, whichever way round it sits:
+        // open through the charge, shut the instant it fires.
+        let along = select(vec3<f32>(1.0, 0.0, 0.0), normalize(bore), dot(bore, bore) > 0.25);
+        let off = p - rig.xyz;
+        let out = off - along * dot(off, along);
+        let open = smoothstep(0.0, 0.9, coil_state(e, time).x);
+        p += normalize(out + vec3<f32>(0.0, 0.0, 1e-4)) * CHARGE_GEAR_FLARE_M * rig.w * open;
+    }
     if gear == CHARGE_GEAR_SPIN {
         let turn = charge_gear_turn(e, time);
         p = rot_z(p - rig.xyz, turn) + rig.xyz;

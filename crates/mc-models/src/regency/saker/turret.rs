@@ -12,8 +12,7 @@ use crate::pattern;
 
 use super::super::kit::{cable, dark_plate, metal, seam, v3};
 use super::super::machine::{armour, hoop, Course, Frame};
-use super::hull::plan_loft;
-use super::parts::{bay, inlay, locker, ridged};
+use super::super::parts::{bay, inlay, locker, plan_loft, ridged};
 use super::DECK;
 
 /// The turret roof, and the hump of plate on it that houses the fusion.

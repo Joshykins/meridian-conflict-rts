@@ -17,7 +17,7 @@ use crate::{pattern, rig};
 
 use super::super::kit::{dark_plate, metal, slab, v3};
 use super::super::machine::{armour, Course, Frame};
-use super::parts::{drum, inlay, ridged};
+use super::super::parts::{drum, inlay, ridged};
 use super::turret::CHEEK;
 
 /// The gun's line: its trunnion, how far its bore is raised at rest, and the bore's

@@ -8,7 +8,7 @@ use crate::builder::MeshBuilder;
 
 use super::super::kit::dark_plate;
 use super::super::machine::{armour, Frame};
-use super::parts::ridged;
+use super::super::parts::ridged;
 
 /// The foot under `ankle`: `out` the way the leg reaches, `across` the drum's axis.
 pub(super) fn foot(b: &mut MeshBuilder, ankle: Vec3, out: Vec3, across: Vec3) {

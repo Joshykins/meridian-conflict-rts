@@ -521,6 +521,11 @@ shared! {
         /// and slamming shut on the shot: a split bore's halves drawing apart to hold it
         /// (the Saker's).
         pub const PART: u32 = 6;
+        /// Flares straight out from the bore's line (the line through
+        /// `ModelInfo::charge_gear.xyz` along the bore), whichever way round it sits,
+        /// opening through the charge and slamming shut on the shot: rails standing round a
+        /// bore drawing back off the charge they hold (the Springald's).
+        pub const FLARE: u32 = 7;
         pub const SPREAD_M: f32 = 0.7;
         pub const EXTEND_M: f32 = 1.1;
         pub const VENT_M: f32 = 0.9;
@@ -529,6 +534,7 @@ shared! {
         /// shell is shunted out between the halves first (renderer/regency_guns_fx/surge.rs).
         pub const PART_SHUT_FROM: f32 = 0.1;
         pub const PART_SHUT_TO: f32 = 0.18;
+        pub const FLARE_M: f32 = 0.5;
         /// `drive_at.w` on a lit slot (`pattern::EMBER_SLOT`) in a charge gun's gear: the
         /// slot knows the charge (entity.wgsl), pressure rippling out along it toward the
         /// muzzle as it fills, blinding at the shot and cooling after.

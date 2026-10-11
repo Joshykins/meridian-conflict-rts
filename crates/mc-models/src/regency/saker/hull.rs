@@ -13,7 +13,7 @@ use crate::pattern;
 
 use super::super::kit::{dark_plate, seam, v3};
 use super::super::machine::{Course, Frame};
-use super::parts::{bay, inlay, ridged};
+use super::super::parts::{bay, inlay, plan_loft, ridged};
 use super::DECK;
 
 /// The hull's shape.
@@ -58,43 +58,6 @@ pub(super) const HULL: Hull = Hull {
     stern: [-9.5, -13.6, 3.4, 7.2],
     sponson: [5.0, -6.0, 8.8, 2.8, 5.8],
 };
-
-/// The full outline from `half` (y >= 0, front round to back), mirrored across.
-pub(super) fn outline(half: &[[f32; 2]]) -> Vec<[f32; 2]> {
-    half.iter()
-        .copied()
-        .chain(
-            half.iter()
-                .rev()
-                .filter(|p| p[1] > 0.0)
-                .map(|&[x, y]| [x, -y]),
-        )
-        .collect()
-}
-
-/// A solid in plan: `half` the outline lofted through `levels` (height, and how far the
-/// outline is drawn in about its middle there), with the current brush.
-pub(super) fn plan_loft(
-    b: &mut MeshBuilder,
-    half: &[[f32; 2]],
-    levels: &[(f32, f32)],
-    bottom: bool,
-) {
-    let out = outline(half);
-    let (lo, hi) = out.iter().fold((f32::MAX, f32::MIN), |(lo, hi), p| {
-        (lo.min(p[0]), hi.max(p[0]))
-    });
-    let mid = (lo + hi) * 0.5;
-    let rings: Vec<Vec<Vec3>> = levels
-        .iter()
-        .map(|&(z, k)| {
-            out.iter()
-                .map(|&[x, y]| v3(mid + (x - mid) * k, y * k, z))
-                .collect()
-        })
-        .collect();
-    b.with_facets(|b| b.loft(&rings, bottom, true));
-}
 
 fn widest(half: &[[f32; 2]]) -> f32 {
     half.iter().map(|p| p[1]).fold(0.0, f32::max)

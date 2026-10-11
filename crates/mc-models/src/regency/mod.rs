@@ -40,6 +40,7 @@ mod mattock;
 mod mobile_aa;
 pub(crate) mod naval;
 mod palisade;
+mod parts;
 mod plating;
 mod raider;
 mod reclaimer;
@@ -253,6 +254,18 @@ pub(super) const MODELS: &[ModelDef] = &[
         turrets::SPRINGALD_HEIGHT,
         turrets::springald,
     ),
+    ModelDef::new(
+        "regency_springald~outriggers",
+        turrets::SPRINGALD_RADIUS,
+        turrets::SPRINGALD_HEIGHT,
+        turrets::springald_outriggers,
+    ),
+    ModelDef::new(
+        "regency_springald~bastion",
+        turrets::SPRINGALD_RADIUS,
+        turrets::SPRINGALD_HEIGHT,
+        turrets::springald_bastion,
+    ),
     // The Carillon, the orb-battery spire (`carillon`).
     ModelDef::new(
         "regency_carillon",
@@ -390,7 +403,7 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_nuke_silo" => 9000,
         "regency_nuke_defense" => 6000,
         // A 6 x 6 map gun: plinth and pylons, a long turret, its plant, a three-rail gun.
-        "regency_springald" => 12000,
+        "regency_springald" | "regency_springald~outriggers" | "regency_springald~bastion" => 24000,
         // A plinth, a five-stage shaft, and twenty cradles of dish and prongs on arms.
         "regency_carillon" => 5000,
         _ => return None,

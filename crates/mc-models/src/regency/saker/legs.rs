@@ -17,8 +17,8 @@ use crate::{part, rig};
 use super::super::commander::form::{ring, sleeve, OCT};
 use super::super::kit::{dark_plate, metal, seam};
 use super::super::machine::{armour, collar, Frame};
+use super::super::parts::drum;
 use super::feet;
-use super::parts::drum;
 
 /// One pair of legs as the rig takes it: the left leg's hip, knee and ankle, and where in
 /// the cycle it lifts.
