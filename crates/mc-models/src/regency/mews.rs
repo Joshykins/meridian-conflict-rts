@@ -83,7 +83,7 @@ fn arm(deg: f32) -> [St; 5] {
 
 /// The cradle: a plated drum on the lot with a glazed band round it, its deck at `DECK`,
 /// and talon plates standing round it leaning in over the deck.
-fn cradle(b: &mut MeshBuilder, tech: u8) {
+fn cradle(b: &mut MeshBuilder) {
     let sides = b.sides(12);
     dark_plate(b);
     b.cylinder_between(
@@ -190,7 +190,7 @@ pub(super) fn mews(b: &mut MeshBuilder, tech: u8) {
         }
         return;
     }
-    cradle(b, tech);
+    cradle(b);
     for deg in ARMS {
         let path = arm(deg);
         body(b, &path);
