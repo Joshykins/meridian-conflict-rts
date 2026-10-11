@@ -322,6 +322,11 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   (0.10 / 0.15 / 0.19 build power per material); the commander's Engineering Suite II 30,
   Suite III 150, Auxiliary Engineering Suite 60. A late-game side buys the build power to spend
   its income with a few tier 3 engineers, not dozens of Masons.
+- **Engineering stations** (Foreman / Atelier, 3x3, upgrading in place) are static engineers:
+  build power 25 / 180 / 900 over 300 / 500 / 800 m, costing 220 / 1,000 / 3,600 materials
+  (0.11 / 0.18 / 0.25 build power per material; an upgrade pays the difference). Better per
+  material than engineers because they never move: a station builds anything its tier's
+  engineer builds within its range, and left idle it raises, mends and reclaims round it.
 - **Every factory of a tier spends at the same rate**, whatever it builds: about 4 / 20 / 60
   materials a second (tier 1 / 2 / 3, at its own power). Land and air come out there; ships
   took half the time per material and are now 5 build-power seconds per material at tier 1

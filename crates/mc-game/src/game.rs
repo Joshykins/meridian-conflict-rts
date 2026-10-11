@@ -1953,9 +1953,7 @@ impl Game {
         }
         let units = self.selected_ids();
         let queue = self.shift;
-        let builders = self
-            .selection_takers()
-            .any(|b| b.is_mobile() && b.builder.is_some());
+        let builders = self.selection_takers().any(|b| b.works_in_field());
         let armed = self.selection_takers().any(|b| !b.weapons.is_empty());
         let reclaimers = self.selected_units().any(|u| {
             self.blueprints
@@ -2768,9 +2766,7 @@ impl Game {
 
     /// Arms an order from its key, if the selection could carry it out.
     fn arm(&mut self, targeting: Targeting) {
-        let builders = self
-            .selection_takers()
-            .any(|b| b.is_mobile() && b.builder.is_some());
+        let builders = self.selection_takers().any(|b| b.works_in_field());
         let able = match targeting {
             Targeting::Move | Targeting::Attack | Targeting::Patrol => self.selection_goes(),
             Targeting::Assist => builders,

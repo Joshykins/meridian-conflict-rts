@@ -84,6 +84,8 @@ pub enum Refusal {
     MineReach,
     /// A dash by hand may not come down nearer than its least reach (`Dash::min`).
     DashTooClose,
+    /// An engineering station works only within its build range (`World::reaches_work`).
+    OutOfReach,
     /// A carrier queues at most `air_wings::MAX_WING_QUEUE` wings.
     WingQueueFull,
 }
@@ -107,6 +109,7 @@ impl Refusal {
             ),
             Refusal::MineReach => "A core mine cannot stand inside another mine's reach".to_owned(),
             Refusal::DashTooClose => "Too close to dash: pick ground farther off".to_owned(),
+            Refusal::OutOfReach => "Out of the station's build range".to_owned(),
             Refusal::WingQueueFull => format!(
                 "A carrier queues at most {} wings",
                 crate::air_wings::MAX_WING_QUEUE
@@ -2007,6 +2010,20 @@ impl World {
         self.factory_printing(t)
     }
 
+    /// Whether the builder in `row` beams onto its work from its arm: a mobile builder,
+    /// or an engineering station at work round it. A station upgrading itself prints
+    /// from its pad, as other structures do.
+    fn beams_to_work(&self, row: usize) -> bool {
+        let bp = self.bp(row);
+        bp.is_mobile()
+            || (bp.is_station()
+                && !self
+                    .state
+                    .orders
+                    .front(&self.state.units, row)
+                    .is_some_and(|o| o.kind == crate::tables::OrderKind::Upgrade))
+    }
+
     /// The factory whose current product is `product`.
     fn factory_printing(&self, product: usize) -> Option<usize> {
         let id = self.state.units.id(product);
@@ -2027,7 +2044,7 @@ impl World {
         for row in s.units.slots.iter() {
             if s.units.flags[row] & flag::BUILDING == 0
                 || s.units.flags[row] & flag::REPAIRING != 0
-                || !self.bp(row).is_mobile()
+                || !self.beams_to_work(row)
             {
                 continue;
             }
@@ -2047,7 +2064,7 @@ impl World {
                 .or_insert_with(|| self.bp(t).radius.to_f32());
         }
         for row in s.units.slots.iter() {
-            if s.units.flags[row] & flag::BUILDING == 0 || self.bp(row).is_mobile() {
+            if s.units.flags[row] & flag::BUILDING == 0 || self.beams_to_work(row) {
                 continue;
             }
             let Some(t) = s.units.row(s.units.build_target[row]) else {
@@ -2495,7 +2512,7 @@ impl World {
             let flags = s.units.flags[row];
             if flags & flag::BUILDING == 0
                 || flags & flag::REPAIRING != 0
-                || !self.bp(row).is_mobile()
+                || !self.beams_to_work(row)
             {
                 continue;
             }

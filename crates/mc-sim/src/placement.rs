@@ -35,6 +35,8 @@ pub enum Unfit {
     Taken,
     /// A core mine inside another mine's reach (`World::mine_in_the_way`).
     MineReach,
+    /// Beyond the build range of every engineering station placing it.
+    OutOfReach,
 }
 
 impl Unfit {
@@ -49,6 +51,7 @@ impl Unfit {
             Unfit::City => "City in the way",
             Unfit::Taken => "Lot taken",
             Unfit::MineReach => "Inside another mine's reach",
+            Unfit::OutOfReach => "Out of the station's build range",
         }
     }
 }

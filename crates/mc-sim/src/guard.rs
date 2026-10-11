@@ -83,7 +83,8 @@ impl World {
 
     /// `OrderKind::Guard`: see the module notes.
     pub(crate) fn run_guard(&mut self, row: usize, o: &Order) -> Result<(), SimError> {
-        if self.bp(row).motion.is_none() {
+        let bp = self.bp(row);
+        if bp.motion.is_none() && !bp.is_station() {
             // A structure has nowhere to go: its weapons look after themselves.
             return Ok(());
         }
@@ -95,6 +96,12 @@ impl World {
             .is_some()
         {
             self.finish_order(row);
+            return Ok(());
+        }
+        // An engineering station works its reach where it stands (`area_work.rs`).
+        if self.bp(row).is_station() {
+            self.state.units.flags[row] |= flag::HOLD;
+            self.area_work(row, o)?;
             return Ok(());
         }
         let centre = self

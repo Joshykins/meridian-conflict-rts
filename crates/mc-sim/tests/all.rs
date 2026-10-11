@@ -38,6 +38,7 @@ mod dreadnought;
 mod drone_port;
 mod economy;
 mod elevator;
+mod eng_station;
 mod engineer_upgrade;
 mod factions;
 mod factory;

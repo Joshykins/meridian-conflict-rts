@@ -9,6 +9,9 @@
 //! Paused units are left alone: nothing paused is raised or mended from the ring (nor a
 //! paused factory's product), and work in hand is given up when it is paused.
 //!
+//! An engineering station with nothing to do guards its own spot over its whole build
+//! range, so it works its reach the same way without ever moving.
+//!
 //! A salvager on guard (a unit whose reclaimer works on the move) works its ring the same
 //! way, wrecks only: guarding a friendly unit it follows it and takes apart what falls
 //! round it as the fight moves. An aircraft does this between circles.
@@ -161,7 +164,12 @@ impl World {
         let inside = |e: &crate::spatial::Entry| e.pos.distance(centre) <= radius + e.radius;
         let raising = self.index.nearest(pos, span, kind::UNIT, |e| {
             let t = e.row as usize;
-            self.unit_entry_is_current(e) && inside(e) && self.area_raise(owner, t)
+            // A station reaches a factory's product only as far as the product's edge.
+            let product = self.factory_product(t).unwrap_or(t);
+            self.unit_entry_is_current(e)
+                && inside(e)
+                && self.area_raise(owner, t)
+                && self.reaches_work(row, e.pos, self.bp(product).radius)
         });
         let mending = || {
             self.index.nearest(pos, span, kind::UNIT, |e| {

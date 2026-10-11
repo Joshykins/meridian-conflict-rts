@@ -126,7 +126,7 @@ impl Role {
         let has = |c: u32| bp.categories & c != 0;
         let energy_store = bp.economy.energy_storage > mc_core::Fx::ZERO
             && bp.economy.materials_storage == mc_core::Fx::ZERO;
-        if has(cat::ENGINEER) {
+        if has(cat::ENGINEER) || bp.is_station() {
             Role::Engineer
         } else if bp.is_salvager() {
             Role::Reclaimer
@@ -241,7 +241,7 @@ impl Purpose {
         let has = |c: u32| bp.categories & c != 0;
         if structures && has(cat::MOBILE) {
             Purpose::Units
-        } else if has(cat::ENGINEER | cat::FACTORY) || bp.is_salvager() {
+        } else if has(cat::ENGINEER | cat::FACTORY) || bp.is_station() || bp.is_salvager() {
             Purpose::Builders
         } else if has(cat::EXTRACTOR | cat::POWER | cat::STORAGE | cat::ECONOMY) {
             Purpose::Economy

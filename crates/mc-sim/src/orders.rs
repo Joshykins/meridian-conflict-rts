@@ -183,11 +183,12 @@ impl World {
                 // Against what it will be by then: a queued refit (an engineering suite) opens
                 // its tiers, as a factory's queued upgrade does. Only those can start it; the
                 // other builders in the selection go too and help once it stands (`run_build`).
-                let rows: Vec<usize> = self
-                    .owned(player, units, cat::MOBILE)
+                // An engineering station takes only the sites within its reach.
+                let (rows, far): (Vec<usize>, Vec<usize>) = self
+                    .owned(player, units, 0)
                     .into_iter()
-                    .filter(|&row| self.bp(row).builder.is_some())
-                    .collect();
+                    .filter(|&row| self.bp(row).works_in_field())
+                    .partition(|&row| self.reaches_work(row, site, bp.radius));
                 let can_start = |row: usize| {
                     self.blueprints
                         .unit(self.loadout_for_order(row, *queue))
@@ -196,6 +197,9 @@ impl World {
                         .is_some_and(|b| b.builds.contains(blueprint))
                 };
                 if !rows.iter().any(|&row| can_start(row)) {
+                    if far.iter().any(|&row| can_start(row)) {
+                        self.refuse(player, Refusal::OutOfReach);
+                    }
                     return Ok(());
                 }
                 // A mine inside the reach of one of the side's own or its allies'
@@ -247,10 +251,20 @@ impl World {
                 {
                     o.radius = Fx::ONE;
                 }
-                for row in self.owned(player, units, cat::MOBILE) {
-                    if row != t && self.bp(row).builder.is_some() {
-                        self.give(row, o, *queue)?;
+                let (pos, radius) = (self.state.units.pos[t], self.bp(t).radius);
+                let mut refused = false;
+                for row in self.owned(player, units, 0) {
+                    if row == t || !self.bp(row).works_in_field() {
+                        continue;
                     }
+                    if self.reaches_work(row, pos, radius) {
+                        self.give(row, o, *queue)?;
+                    } else {
+                        refused = true;
+                    }
+                }
+                if refused {
+                    self.refuse(player, Refusal::OutOfReach);
                 }
                 Ok(())
             }
@@ -263,10 +277,20 @@ impl World {
                     return Ok(());
                 };
                 let pos = self.state.wrecks.pos[w];
+                let radius = self.blueprints.unit(self.state.wrecks.blueprint[w]).radius;
+                let mut refused = false;
                 for row in self.owned(player, units, 0) {
-                    if self.bp(row).sends_reclaimers() {
-                        self.give(row, order(OrderKind::Reclaim, pos, *wreck), *queue)?;
+                    if !self.bp(row).sends_reclaimers() {
+                        continue;
                     }
+                    if self.reaches_work(row, pos, radius) {
+                        self.give(row, order(OrderKind::Reclaim, pos, *wreck), *queue)?;
+                    } else {
+                        refused = true;
+                    }
+                }
+                if refused {
+                    self.refuse(player, Refusal::OutOfReach);
                 }
                 Ok(())
             }
@@ -278,12 +302,21 @@ impl World {
                 let Some(t) = self.state.units.row(*target) else {
                     return Ok(());
                 };
-                let pos = self.state.units.pos[t];
+                let (pos, radius) = (self.state.units.pos[t], self.bp(t).radius);
+                let mut refused = false;
                 for row in self.owned(player, units, 0) {
                     let bp = self.bp(row);
-                    if bp.sends_reclaimers() && self.can_reclaim_unit(row, t) {
-                        self.give(row, order(OrderKind::ReclaimUnit, pos, *target), *queue)?;
+                    if !bp.sends_reclaimers() || !self.can_reclaim_unit(row, t) {
+                        continue;
                     }
+                    if self.reaches_work(row, pos, radius) {
+                        self.give(row, order(OrderKind::ReclaimUnit, pos, *target), *queue)?;
+                    } else {
+                        refused = true;
+                    }
+                }
+                if refused {
+                    self.refuse(player, Refusal::OutOfReach);
                 }
                 Ok(())
             }
@@ -593,11 +626,7 @@ impl World {
         units
             .slots
             .iter()
-            .filter(move |&row| {
-                units.owner[row] == player
-                    && self.bp(row).is_mobile()
-                    && self.bp(row).builder.is_some()
-            })
+            .filter(move |&row| units.owner[row] == player && self.bp(row).works_in_field())
             .flat_map(move |row| {
                 let begun = units.row(units.build_target[row]).is_some();
                 self.state
@@ -1427,6 +1456,15 @@ impl World {
                 {
                     let mut o = order(OrderKind::Guard, self.state.units.pos[row], Handle::NONE);
                     o.radius = radius;
+                    self.give(row, o, false)?;
+                    continue;
+                }
+                // An engineering station left with nothing to do works its whole reach:
+                // it guards its own spot, so raising, mending and reclaiming round it
+                // are taken up as they turn up (`area_work.rs`).
+                if self.bp(row).is_station() {
+                    let mut o = order(OrderKind::Guard, self.state.units.pos[row], Handle::NONE);
+                    o.radius = self.work_range(row);
                     self.give(row, o, false)?;
                     continue;
                 }
@@ -2830,6 +2868,15 @@ impl World {
             AssistWork::Mend => (t, true),
             AssistWork::Raise | AssistWork::Round | AssistWork::Shield => (t, false),
         });
+        // An engineering station gives up what is out of its reach: a builder it helps
+        // walked off, or took up a site too far away.
+        let w = work.map_or(t, |(w, _)| w);
+        if !self.reaches_work(row, units.pos[w], self.bp(w).radius) {
+            self.state.units.build_target[row] = Handle::NONE;
+            self.finish_order(row);
+            return Ok(());
+        }
+        let units = &self.state.units;
         // Nothing to build or mend, and the target is reclaiming: take the same thing
         // apart with it, then come back to the assist.
         if work.is_none() && self.bp(row).sends_reclaimers() {
@@ -3342,13 +3389,14 @@ impl World {
             .unwrap_or(1)
     }
 
-    /// The commander, a factory, an economy structure (mine, vault, reclaim tower),
-    /// an intel tower, a shield generator, and an air staging base (what it holds stays
+    /// The commander, a factory, an engineering station, an economy structure (mine,
+    /// vault, reclaim tower), an intel tower, a shield generator, and an air staging base (what it holds stays
     /// aboard): the next tier is built onto the same unit. Other structures are replaced
     /// by their successor.
     pub(crate) fn upgrades_in_place(&self, row: usize) -> bool {
         let bp = self.bp(row);
         bp.is_mobile()
+            || bp.is_station()
             || bp.staging.is_some()
             || bp.has(cat::FACTORY)
             || bp.has(cat::ECONOMY)

@@ -17,6 +17,7 @@ mod commander_head;
 mod culverin;
 mod drone_port;
 mod elevator;
+pub(super) mod eng_station;
 mod fabricator;
 pub(crate) use citadel::RAIL as CITADEL_RAIL;
 mod factories;
@@ -51,6 +52,9 @@ const RECLAIM_TOWER: [(f32, f32); 3] = [
     (reclaim_tower::RADIUS, reclaim_tower::HEIGHT),
     (reclaim_tower::RADIUS, reclaim_tower::HEIGHT),
 ];
+
+/// The engineering station's authored (radius, height), the same at every tier.
+const ENG_STATION: [(f32, f32); 3] = [(eng_station::RADIUS, eng_station::HEIGHT); 3];
 
 pub(super) const MODELS: &[ModelDef] = &[
     // Command and construction.
@@ -193,6 +197,9 @@ pub(super) const MODELS: &[ModelDef] = &[
     ),
     // The reclaim tower (a 3x3 lot), its head on the rig `reclaim_tower::PIVOT_Z`, `EMIT_X`.
     ModelDef::tiered("reclaim_tower", RECLAIM_TOWER, reclaim_tower::tower),
+    // The engineering station (a 3x3 lot), its arm on the rig `eng_station::ELBOW`,
+    // `EMITTER`.
+    ModelDef::tiered("eng_station", ENG_STATION, eng_station::station),
     ModelDef::tiered(
         "shield",
         [(16.5, 40.0), (16.5, 40.0), (16.5, 52.0)],

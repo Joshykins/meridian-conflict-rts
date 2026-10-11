@@ -6,6 +6,7 @@
 use super::{Game, Mode};
 use crate::audio::{Audio, Sfx};
 use crate::orders::{self, Field};
+use glam::Vec2;
 use mc_core::{Angle, FxVec2};
 use mc_data::BlueprintId;
 use mc_render::Renderer;
@@ -75,11 +76,47 @@ impl Game {
         let Some((to, _)) = orders::site(&field, blueprint, ground, heading, None) else {
             return Vec::new();
         };
-        match (drag, self.place_from) {
+        let mut sites: Vec<_> = match (drag, self.place_from) {
             (true, Some(from)) => orders::drag_sites(&field, blueprint, heading, from, to),
             _ => orders::site_verdict(&field, blueprint, ground, heading, None, &[])
                 .into_iter()
                 .collect(),
+        };
+        self.refuse_beyond_stations(blueprint, &mut sites);
+        sites
+    }
+
+    /// Placed only by engineering stations: a site beyond all their reach is refused,
+    /// as the sim refuses it (`Refusal::OutOfReach`).
+    fn refuse_beyond_stations(
+        &self,
+        blueprint: BlueprintId,
+        sites: &mut [(FxVec2, Result<(), Unfit>)],
+    ) {
+        let placers: Vec<(Vec2, &mc_data::UnitBlueprint)> = self
+            .selected_units()
+            .map(|u| (u, self.blueprints.unit(BlueprintId(u.blueprint as u16))))
+            .filter(|(_, b)| {
+                b.works_in_field()
+                    && b.builder
+                        .as_ref()
+                        .is_some_and(|b| b.builds.contains(&blueprint))
+            })
+            .map(|(u, b)| (Vec2::new(u.pos[0], u.pos[1]), b))
+            .collect();
+        if placers.is_empty() || !placers.iter().all(|(_, b)| b.is_station()) {
+            return;
+        }
+        let radius = self.blueprints.unit(blueprint).radius.to_f32();
+        let reaches = |at: Vec2| {
+            placers.iter().any(|&(s, b)| {
+                s.distance(at) <= b.builder.as_ref().map_or(0.0, |b| b.range.to_f32()) + radius
+            })
+        };
+        for (pos, verdict) in sites.iter_mut() {
+            if verdict.is_ok() && !reaches(Vec2::from(pos.to_f32())) {
+                *verdict = Err(Unfit::OutOfReach);
+            }
         }
     }
 }

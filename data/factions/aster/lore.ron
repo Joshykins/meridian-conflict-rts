@@ -525,4 +525,13 @@
     "aster_t3_mobile_reclaimer": (
         lore: "The heaviest of the line. It strips a field from over a kilometre off while the engineers build on what it brings home.",
     ),
+    "aster_t1_eng_station": (
+        lore: "A fixed engineering post: a build arm on a tower, wired to the grid, raising whatever is planned within its reach and mending what comes home hurt.",
+    ),
+    "aster_t2_eng_station": (
+        lore: "The Foreman raised a storey and re-wound its arm: it raises a base as fast as a team of engineers, and never wanders off.",
+    ),
+    "aster_t3_eng_station": (
+        lore: "A heavy engineering post that puts up a fortress in the time it takes a column to cross its reach.",
+    ),
 }

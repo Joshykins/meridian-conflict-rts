@@ -1035,16 +1035,22 @@ fn stage(
             let first = bp
                 .builder
                 .as_ref()
-                .filter(|_| bp.is_mobile())
+                .filter(|_| bp.works_in_field())
                 .and_then(|b| b.builds.first())
                 .ok_or("This Unit Builds Nothing")?;
+            // An engineering station builds well off its own lot, to show its reach.
+            let off = if bp.is_station() {
+                FxVec2::from_ints(120, 80)
+            } else {
+                FxVec2::from_ints(36, 44)
+            };
             Ok((
                 Vec::new(),
                 Some((
                     subject,
                     PendingOrder::Build {
                         blueprint: *first,
-                        pos: pad + FxVec2::from_ints(36, 44),
+                        pos: pad + off,
                     },
                 )),
             ))

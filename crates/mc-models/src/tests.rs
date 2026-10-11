@@ -328,6 +328,9 @@ const BLUEPRINTS: &[Blueprint] = &[
     structure("reclaim_tower", 16.9, 38.0, 1, 3, &[]),
     structure("reclaim_tower", 16.9, 38.0, 2, 3, &[]),
     structure("reclaim_tower", 16.9, 38.0, 3, 3, &[]),
+    structure("eng_station", 16.9, 30.0, 1, 3, &[]),
+    structure("eng_station", 16.9, 30.0, 2, 3, &[]),
+    structure("eng_station", 16.9, 30.0, 3, 3, &[]),
     structure("shield", 13.9, 40.0, 2, 3, &[]),
     structure("shield", 13.9, 52.0, 3, 3, &[]),
     structure("warp_damper", 18.0, 46.0, 2, 4, &[]),
@@ -398,6 +401,9 @@ const BLUEPRINTS: &[Blueprint] = &[
     structure("regency_crucible", 16.9, 28.0, 1, 3, &[]),
     structure("regency_crucible", 16.9, 28.0, 2, 3, &[]),
     structure("regency_crucible", 16.9, 28.0, 3, 3, &[]),
+    structure("regency_atelier", 16.9, 46.0, 1, 3, &[]),
+    structure("regency_atelier", 16.9, 46.0, 2, 3, &[]),
+    structure("regency_atelier", 16.9, 46.0, 3, 3, &[]),
     structure("regency_ward", 13.9, 26.0, 2, 3, &[]),
     structure("regency_ward", 13.9, 32.0, 3, 3, &[]),
     structure("regency_sonar", 6.0, 12.0, 1, 1, &[]),
@@ -966,6 +972,9 @@ fn lods_reduce_and_respect_budgets() {
         } else if model.key.starts_with("reclaim_tower") {
             // A 3x3 installation, a 38 m tower with the plant round its foot.
             super::aster::reclaim_tower::TRIANGLES
+        } else if model.key.starts_with("eng_station") {
+            // A 3x3 installation, a 30 m station with its build arm and works.
+            super::aster::eng_station::TRIANGLES
         } else if let Some(budget) = super::regency::triangles(&model.key) {
             budget
         } else if model.key == "light_transport" {
@@ -1359,7 +1368,10 @@ fn weapons_are_turrets_ending_at_the_muzzle() {
     for bp in BLUEPRINTS
         .iter()
         // Engineers' build arms are their turrets.
-        .filter(|bp| bp.muzzles.is_empty() && !["engineer", "regency_engineer"].contains(&bp.mesh))
+        .filter(|bp| {
+            bp.muzzles.is_empty()
+                && !["engineer", "regency_engineer", "eng_station"].contains(&bp.mesh)
+        })
     {
         assert!(
             built(bp)

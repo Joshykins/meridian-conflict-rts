@@ -13,6 +13,7 @@
 
 pub(crate) mod air;
 pub(crate) mod air_t2;
+mod atelier;
 mod battle_tank;
 mod bombard;
 mod brood;
@@ -248,6 +249,9 @@ pub(super) const MODELS: &[ModelDef] = &[
         [(crucible::RADIUS, crucible::HEIGHT); 3],
         crucible::crucible,
     ),
+    // The engineering station (`atelier`): a tower streaming nanites from the halo
+    // crown at its top, tech 1 to 3 in place, as tall at every tier.
+    ModelDef::tiered("regency_atelier", atelier::SIZES, atelier::crown::build),
     // Radar (`eye`).
     ModelDef::tiered(
         "regency_eye",
@@ -355,6 +359,7 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_heart_3" => 9000,
         "regency_eye" => 7000,
         "regency_crucible" => crucible::TRIANGLES,
+        "regency_atelier" => atelier::TRIANGLES,
         // Three tiers of bells over a raft, the plummet under it.
         "regency_sonar" => 5000,
         // Two launcher houses in a caisson of plated walls.
@@ -453,6 +458,8 @@ pub(super) fn reduced_share(key: &str) -> Option<f32> {
         "regency_nuke_silo" | "regency_nuke_defense" => Some(0.58),
         // Octagonal stages and prongs that keep their sides when reduced.
         "regency_carillon" => Some(0.7),
+        // Plated stages, lapped plates and slotted limbs that keep their sides reduced.
+        "regency_atelier" => Some(0.6),
         _ => None,
     }
 }

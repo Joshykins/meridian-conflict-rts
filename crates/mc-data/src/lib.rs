@@ -1045,6 +1045,20 @@ impl UnitBlueprint {
         self.motion.is_some()
     }
 
+    /// An engineering station: a structure that builds, mends and reclaims round it
+    /// as an engineer does, out to its builder's `range`, without moving. A factory's
+    /// builder has no range: it makes its products in its bay.
+    #[inline]
+    pub fn is_station(&self) -> bool {
+        !self.is_mobile() && self.builder.as_ref().is_some_and(|b| b.range > Fx::ZERO)
+    }
+
+    /// Takes work out in the field: a mobile builder, or an engineering station.
+    #[inline]
+    pub fn works_in_field(&self) -> bool {
+        self.builder.is_some() && (self.is_mobile() || self.is_station())
+    }
+
     /// Raised by builders on a lot of its own, as a structure is: every structure, and
     /// a mobile unit with a `footprint` (an experimental too big for any factory), which
     /// drives off its lot once it is finished.
@@ -1088,11 +1102,11 @@ impl UnitBlueprint {
     }
 
     /// `(power, range)` of what this unit reclaims with: a reclaimer, or the
-    /// tools of a builder that can walk up to its work. Factories have neither.
+    /// tools of a builder that works in the field. Factories have neither.
     pub fn reclaims(&self) -> Option<(Fx, Fx)> {
         match (&self.reclaimer, &self.builder) {
             (Some(r), _) => Some((r.power, r.range)),
-            (None, Some(b)) if self.is_mobile() => Some((b.power, b.range)),
+            (None, Some(b)) if self.works_in_field() => Some((b.power, b.range)),
             _ => None,
         }
     }

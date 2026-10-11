@@ -9,6 +9,13 @@ use crate::{SimError, World};
 use mc_core::{Fx, FxVec2};
 
 impl World {
+    /// Whether the builder in `row` can take up work at `pos` (`target_radius` across):
+    /// a mobile builder walks there, an engineering station reaches out to its range.
+    pub(crate) fn reaches_work(&self, row: usize, pos: FxVec2, target_radius: Fx) -> bool {
+        !self.bp(row).is_station()
+            || self.state.units.pos[row].distance(pos) <= self.work_range(row) + target_radius
+    }
+
     /// Walks a builder into range of `pos`. True once it is close enough to work.
     pub(crate) fn approach(
         &mut self,

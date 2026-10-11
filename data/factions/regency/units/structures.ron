@@ -902,4 +902,58 @@
         mesh: "regency_crucible", icon: Salvage,
         sounds: (death: "blast_large"),
     ),
+    // The engineering station: a static engineer on a 3x3 lot, tech 1 to 3 upgrading in place.
+    // It builds whatever its tier's engineer builds within its range (a site beyond it is
+    // refused), and left with nothing to do it raises, mends and reclaims round it by
+    // itself (`area_work.rs`), as an engineer on guard does.
+    (
+        key: "regency_t1_eng_station",
+        name: "Atelier",
+        role: "Engineering Station", title: "Build Station",
+        tech: 1,
+        categories: ["Land"],
+        health: 1500,
+        cost: (materials: 220, energy: 1800, time: 400),
+        radius: 16.9, height: 46, footprint: (3, 3),
+        vision: 400,
+        builder: (power: 25, range: 300, builds: [
+            "regency_t1_land_factory", "regency_t1_air_factory", "regency_t1_airbase", "regency_t1_naval_factory", "regency_t1_extractor", "regency_t1_power", "regency_storage", "regency_t1_point_defense", "regency_t1_aa", "regency_t1_radar", "regency_t1_sonar", "regency_t1_torpedo_defense", "regency_wall", "regency_t1_reclaimer", "regency_t1_eng_station",
+        ]),
+        upgrades_to: "regency_t2_eng_station",
+        mesh: "regency_atelier", icon: Engineer,
+        sounds: (death: "blast_large"),
+    ),
+    (
+        key: "regency_t2_eng_station",
+        name: "Atelier II",
+        role: "Engineering Station", title: "Build Station",
+        tech: 2,
+        categories: ["Land"],
+        health: 4200,
+        cost: (materials: 1000, energy: 8000, time: 1600),
+        radius: 16.9, height: 46, footprint: (3, 3),
+        vision: 550,
+        builder: (power: 180, range: 500, builds: [
+            "regency_t2_transport", "regency_t1_land_factory", "regency_t1_air_factory", "regency_t1_airbase", "regency_t1_naval_factory", "regency_t1_extractor", "regency_t1_power", "regency_storage", "regency_t1_point_defense", "regency_t1_aa", "regency_t1_radar", "regency_t1_sonar", "regency_t1_torpedo_defense", "regency_wall", "regency_t1_reclaimer", "regency_t1_eng_station", "regency_t2_land_factory", "regency_t2_air_factory", "regency_t2_airbase", "regency_t2_naval_factory", "regency_t2_extractor", "regency_storage_t2", "regency_t2_radar", "regency_t2_sonar", "regency_t2_torpedo_defense", "regency_t2_reclaimer", "regency_t2_eng_station", "regency_t2_power", "regency_t2_point_defense", "regency_t2_artillery", "regency_t2_shield", "regency_t2_aa", "regency_t2_missile_defense", "regency_t2_fabricator",
+        ]),
+        upgrades_to: "regency_t3_eng_station",
+        mesh: "regency_atelier", icon: Engineer,
+        sounds: (death: "blast_large"),
+    ),
+    (
+        key: "regency_t3_eng_station",
+        name: "Atelier III",
+        role: "Engineering Station", title: "Build Station",
+        tech: 3,
+        categories: ["Land"],
+        health: 11000,
+        cost: (materials: 3600, energy: 28000, time: 4000),
+        radius: 16.9, height: 46, footprint: (3, 3),
+        vision: 700,
+        builder: (power: 900, range: 800, builds: [
+            "regency_t2_transport", "regency_t2_space_frigate", "regency_t1_land_factory", "regency_t1_air_factory", "regency_t1_airbase", "regency_t1_naval_factory", "regency_t1_extractor", "regency_t1_power", "regency_storage", "regency_t1_point_defense", "regency_t1_aa", "regency_t1_radar", "regency_t1_sonar", "regency_t1_torpedo_defense", "regency_wall", "regency_t1_reclaimer", "regency_t1_eng_station", "regency_t2_land_factory", "regency_t2_air_factory", "regency_t2_airbase", "regency_t2_naval_factory", "regency_t2_extractor", "regency_storage_t2", "regency_t2_radar", "regency_t2_sonar", "regency_t2_torpedo_defense", "regency_t2_reclaimer", "regency_t2_eng_station", "regency_t2_power", "regency_t2_point_defense", "regency_t2_artillery", "regency_t2_shield", "regency_t2_aa", "regency_t2_missile_defense", "regency_t3_land_factory", "regency_t3_air_factory", "regency_t3_airbase", "regency_t3_naval_factory", "regency_t3_extractor", "regency_t4_extractor", "regency_storage_t3", "regency_t3_radar", "regency_t3_sonar", "regency_t3_reclaimer", "regency_t3_eng_station", "regency_t3_power", "regency_t3_point_defense", "regency_t3_shield", "regency_t3_aa", "regency_t3_missile_defense", "regency_t3_assault_transport", "regency_t3_space_cruiser", "regency_t4_space_destroyer", "regency_t4_scorpion", "regency_t4_strider", "regency_t4_colossus", "regency_t4_surge_artillery", "regency_t5_seraph", "regency_t5_gravitic_engine", "regency_t4_nuke_defense", "regency_t4_nuke_silo", "regency_t4_artillery", "regency_t4_area_defense", "regency_t2_fabricator", "regency_t3_fabricator",
+        ]),
+        mesh: "regency_atelier", icon: Engineer,
+        sounds: (death: "blast_large"),
+    ),
 ]

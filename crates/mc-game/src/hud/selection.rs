@@ -961,7 +961,7 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
             .iter()
             .any(|w| w.target_mask & (cat::LAND | cat::NAVAL | cat::STRUCTURE) != 0)
     });
-    let builders = bps.iter().any(|b| b.is_mobile() && b.builder.is_some());
+    let builders = bps.iter().any(|b| b.works_in_field());
     let reclaimers = units.iter().any(|u| s.bp(u).sends_reclaimers());
     let targeting = |t: Targeting| s.view.mode == Mode::Target(t);
     // A selection of only aircraft that orbit (the Argus) calls its guard an Orbit.

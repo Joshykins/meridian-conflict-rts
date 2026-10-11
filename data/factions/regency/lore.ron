@@ -525,4 +525,13 @@
             "Gravitic Seeker Battery": "Two blocks of eight hatched cells, a salvo of gravitic seekers spread over the aircraft in reach: a seeker silo's worth twice over.",
         },
     ),
+    "regency_t1_eng_station": (
+        lore: "A sealed workshop: its nanite arm spins out whatever the Regency plans within its reach, and mends what returns to it.",
+    ),
+    "regency_t2_eng_station": (
+        lore: "The Atelier grown a second course: more nanites in its vault, a longer reach, and a hand that never tires.",
+    ),
+    "regency_t3_eng_station": (
+        lore: "A great workshop of the Regency that weaves a fortress out of the ground round it while the line holds.",
+    ),
 }
