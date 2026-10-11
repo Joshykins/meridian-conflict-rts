@@ -20,11 +20,14 @@ use mc_sim::tables::{flag, OrderKind};
 
 pub(super) mod batch;
 mod data_card;
+mod line;
 pub(super) mod queue;
 mod strip;
 pub(super) mod tray;
 mod wings;
 pub(super) use data_card::{data_card, Pace};
+pub(crate) use line::loadout_after_queue;
+use line::{planned, successors};
 pub(super) use queue::Split;
 use strip::{Slot, ARROW_W};
 
@@ -38,6 +41,8 @@ pub(super) const QUEUE_H: f32 = 62.0;
 pub const TIERS: u8 = 5;
 /// The tab past the tiers: refits.
 pub const UPGRADE_TAB: u8 = TIERS + 1;
+/// The last tab, a mobile builder's: the player's prefabs (`hud/prefabs`).
+pub const PREFAB_TAB: u8 = TIERS + 2;
 /// How fast a structure that is not a builder puts on its own upgrade (the sim's `SELF_UPGRADE_POWER`).
 const SELF_UPGRADE_POWER: i32 = 10;
 
@@ -141,12 +146,21 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
         .collect();
     tiers.sort_unstable();
     tiers.dedup();
-    let open = |tab: u8| tiers.contains(&tab) || (tab == UPGRADE_TAB && refits);
+    // A mobile builder puts prefabs down; a factory or a structure does not.
+    let prefab_tab = builder_unit.is_some_and(|(_, b)| b.is_mobile());
+    let open = |tab: u8| {
+        tiers.contains(&tab) || (tab == UPGRADE_TAB && refits) || (tab == PREFAB_TAB && prefab_tab)
+    };
     // A refit changes the unit's blueprint to another loadout of the same unit: the panel stays put.
     let family = s.blueprints.base_of(BlueprintId(unit.blueprint as u16)).0 as u32;
     if std::mem::take(&mut hud.want_refit_tab) && refits {
         hud.tab_for = Some(family);
         hud.tab = UPGRADE_TAB;
+        rewind(hud);
+    }
+    if std::mem::take(&mut hud.prefabs.want_tab) && prefab_tab {
+        hud.tab_for = Some(family);
+        hud.tab = PREFAB_TAB;
         rewind(hud);
     }
     if hud.tab_for != Some(family) || !open(hud.tab) {
@@ -197,6 +211,7 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
             // The upgrade tab, or the tier of the next upgrade to queue.
             'U' if refits => Some(UPGRADE_TAB),
             'U' => line.get(reached).map(|b| b.tech),
+            'P' => Some(PREFAB_TAB),
             _ => None,
         };
         if let Some(tab) = tab {
@@ -211,10 +226,14 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
             }
         }
     }
-    for tab in (1..=TIERS).chain([UPGRADE_TAB]) {
+    for tab in (1..=TIERS).chain([UPGRADE_TAB, PREFAB_TAB]) {
         let upgrade = tab == UPGRADE_TAB;
         let has = open(tab);
-        if upgrade && !has {
+        if (upgrade || tab == PREFAB_TAB) && !has {
+            continue;
+        }
+        if tab == PREFAB_TAB {
+            tx += prefab_tab_button(hud, ui, tx, r.y + 10.0) + 4.0;
             continue;
         }
         let w = if upgrade { 124.0 } else { 58.0 };
@@ -296,6 +315,8 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
         r.right() - 14.0 - tx - 10.0,
         &if hud.tab == UPGRADE_TAB {
             format!("Refit  \u{b7}  {}", bp.name)
+        } else if hud.tab == PREFAB_TAB {
+            format!("Prefabs  \u{b7}  {}", bp.name)
         } else if builds.is_empty() {
             format!("Upgrades  \u{b7}  {}", bp.name)
         } else if bp.elevator.is_some() {
@@ -309,11 +330,20 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
         hud,
         ui,
         r,
-        "Tier 1\u{2013}5  \u{b7}  Shelf  \u{b7}  Item  \u{b7}  ESC",
+        "Tier 1\u{2013}5  \u{b7}  P Prefabs  \u{b7}  Shelf  \u{b7}  Item  \u{b7}  ESC",
     );
     let grid = Rect::new(x, r.y + 44.0, cw - 10.0, r.bottom() - 8.0 - (r.y + 44.0));
     let mut hovered: Option<Hover> = None;
-    if hud.tab == UPGRADE_TAB {
+    let mut prefab_hovered = None;
+    let prefab_builds = if hud.tab == PREFAB_TAB {
+        super::prefabs::selection_builds(s.view, s.blueprints)
+    } else {
+        Vec::new()
+    };
+    if hud.tab == PREFAB_TAB {
+        let grid = Rect { w: cw, ..grid };
+        prefab_hovered = super::prefabs::tab(hud, ui, s, bp.faction, &prefab_builds, grid);
+    } else if hud.tab == UPGRADE_TAB {
         if let Some((u, _)) = upgrader.filter(|_| refits) {
             let floor = if stacks.is_empty() {
                 r.y
@@ -451,6 +481,44 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
         }
         None => {}
     }
+    if let Some((prefab, tile)) = prefab_hovered {
+        super::prefabs::hover_card(ui, s, prefab, &prefab_builds, tile, floor - GAP);
+    }
+}
+
+/// The Prefabs tab's button at `x`; returns its width.
+fn prefab_tab_button(hud: &mut Hud, ui: &mut Ui, x: f32, y: f32) -> f32 {
+    let tr = Rect::new(x, y, 104.0, 26.0);
+    let lit = hud.tab == PREFAB_TAB;
+    let t = hud.tile(ui, id("tech-tab", PREFAB_TAB as usize), tr, lit, true);
+    let tone = if lit {
+        rgb(0xFFFFFF, 1.0)
+    } else {
+        rgb(palette::TEXT, 0.6 + 0.4 * t.glow)
+    };
+    key_cap(ui, tr.x + 5.0, tr.y + 5.5, 'P', hud.build_keys);
+    icons::glyph(
+        ui,
+        icons::Glyph::Prefab,
+        Vec2::new(tr.x + 33.0, tr.mid_y()),
+        6.0,
+        tone,
+    );
+    ui.text_fit_left(
+        tr.x + 44.0,
+        tr.mid_y(),
+        tr.w - 48.0,
+        type_scale::BUTTON,
+        tone,
+        "Prefabs",
+    );
+    if t.clicked && !lit {
+        ui.audio.play(Sfx::Tick);
+        hud.tab = PREFAB_TAB;
+        rewind(hud);
+        hud.shelf = None;
+    }
+    tr.w
 }
 
 /// How to drive the panel `r` from the keyboard, at its header's right end: B, and while
@@ -1009,40 +1077,6 @@ pub fn unit_face(hud: &Hud, ui: &mut Ui, item: &UnitBlueprint, tr: Rect, glow: f
         rgb(palette::TEXT, 0.85 + 0.15 * glow),
         ink(0.9),
     );
-}
-
-/// What `bp` will be once the tier upgrades and refits in the unit's queue are done.
-fn planned<'a>(s: &Scene<'a>, u: &UnitInstance, bp: &'a UnitBlueprint) -> &'a UnitBlueprint {
-    let mut at = bp;
-    for o in s.queue_of(u).iter().flat_map(|q| &q.orders) {
-        if o.kind != OrderKind::Upgrade {
-            continue;
-        }
-        if s.blueprints.kit(o.blueprint).is_some() {
-            if let Ok(next) = s.blueprints.refit_result(at.id, o.blueprint) {
-                at = s.blueprints.unit(next);
-            }
-        } else if at.upgrades_to == Some(o.blueprint) {
-            at = s.blueprints.unit(o.blueprint);
-        }
-    }
-    at
-}
-
-/// The tiers `bp` upgrades through, one after another.
-fn successors<'a>(s: &Scene<'a>, bp: &UnitBlueprint) -> Vec<&'a UnitBlueprint> {
-    let blueprints = s.blueprints;
-    let mut line: Vec<&'a UnitBlueprint> = Vec::new();
-    let mut next = bp.upgrades_to;
-    while let Some(id) = next {
-        if line.iter().any(|b| b.id == id) {
-            break;
-        }
-        let b = blueprints.unit(id);
-        line.push(b);
-        next = b.upgrades_to;
-    }
-    line
 }
 
 /// A tier upgrade on the strip, queued as a unit is: a click queues it (and the tiers

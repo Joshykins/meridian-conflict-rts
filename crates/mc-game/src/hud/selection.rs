@@ -1145,6 +1145,15 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
     work.extend(pause_order::pause_order(s, units));
     work.push(Order { glyph: Glyph::Stop, label: "Stop", key: "X",
  hint: "Drop every order. A factory clears its queue and forgets the orders it hands its units.", action: HudAction::Stop, lit: false });
+    // Structures of the player's own can be kept as a prefab, where the column has room.
+    let structures = units.iter().any(|u| {
+        (u.owner_flags & 0xFF) as u8 == s.view.local
+            && s.bp(u).built_on_site()
+            && !s.bp(u).is_mobile()
+    });
+    if structures && work.len() < 4 {
+        work.push(Order { glyph: Glyph::Prefab, label: "Save Prefab", key: "", hint: "Save Prefab (Ctrl+S): keep the layout of the selected structures, to put it all down again with an engineer from its build panel's Prefabs tab (B, then P). Engineers selected with structures planned save those plans too.", action: HudAction::OfferPrefab, lit: false });
+    }
     out.push((
         if builders || reclaimers {
             Family::Engineering

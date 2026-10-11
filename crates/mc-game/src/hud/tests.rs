@@ -117,6 +117,7 @@ impl Rig {
             placing_open: None,
             net: None,
             net_notices: &[],
+            prefabs: crate::prefabs::Library::none(),
         };
         let actions = self.hud.draw(&mut ui, &scene, 0.016);
         self.memory.end_frame(input);

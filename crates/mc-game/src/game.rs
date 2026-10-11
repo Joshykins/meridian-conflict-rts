@@ -50,6 +50,8 @@ mod mine_placing;
 mod music_notes;
 #[path = "game_orbit.rs"]
 mod orbit_input;
+#[path = "game_prefabs.rs"]
+mod prefab_desk;
 #[path = "game_reclaim.rs"]
 mod reclaim_input;
 #[path = "game_survival.rs"]
@@ -182,6 +184,8 @@ pub enum Mode {
     Spawn,
     /// Test range: the next click places the current subject.
     SpawnSubject,
+    /// A saved prefab in hand: the next click places it (`game_prefabs.rs`).
+    Prefab(crate::prefabs::PrefabId),
 }
 
 pub struct View {
@@ -429,6 +433,8 @@ pub struct Game {
     left_down: Option<Vec2>,
     /// World site of a Place-mode press, so a drag can line buildings from there.
     place_from: Option<FxVec2>,
+    /// The player's prefabs, and how the one in hand is turned (`game_prefabs.rs`).
+    prefabs: prefab_desk::Prefabs,
     /// Orders on the map: their lines, the ghosts of planned structures, the one being dragged.
     orders: OrderMap,
     /// A move held on the right button: its formation shows, a drag turns it (`formation_drag.rs`).
@@ -605,6 +611,7 @@ impl Game {
             pointer_moved: Instant::now(),
             left_down: None,
             place_from: None,
+            prefabs: prefab_desk::Prefabs::load(),
             orders: OrderMap::default(),
             formation_drag: None,
             pointer: Pointer::Arrow,
@@ -683,8 +690,10 @@ impl Game {
     }
 
     pub fn window_event(&mut self, event: &WindowEvent, r: &Renderer, audio: &Audio) {
-        // Keys typed into the issue note are not orders.
-        if self.hud.issues.typing() && matches!(event, WindowEvent::KeyboardInput { .. }) {
+        // Keys typed into the issue note or a prefab's name are not orders.
+        if (self.hud.issues.typing() || self.hud.prefabs.typing())
+            && matches!(event, WindowEvent::KeyboardInput { .. })
+        {
             self.keys.clear();
             return;
         }
@@ -1305,6 +1314,7 @@ impl Game {
                 }
                 self.place_from = None;
             }
+            Mode::Prefab(id) => self.place_prefab(id, r, audio),
             Mode::Target(Targeting::Patrol) => match self.ground_under_cursor(r) {
                 Some(g) => self.lay_patrol_post(g.truncate(), audio),
                 None => audio.play(Sfx::Deny),
@@ -2096,7 +2106,7 @@ impl Game {
             None => Pointer::Denied,
         };
         match self.view.mode {
-            Mode::Place(_) => {
+            Mode::Place(_) | Mode::Prefab(_) => {
                 if can_place {
                     Pointer::Place
                 } else {
@@ -2199,6 +2209,10 @@ impl Game {
             self.view.formation_panel = false;
         }
         match action {
+            HudAction::OfferPrefab => self.offer_prefab(audio),
+            HudAction::HoldPrefab(_) | HudAction::KeepPrefab(_) | HudAction::DropPrefab(_) => {
+                self.prefab_action(action, audio)
+            }
             HudAction::FormationPanel => self.toggle_formation_panel(audio),
             HudAction::FormationTogether(together) => {
                 self.view.formation_together = together;
@@ -2806,6 +2820,15 @@ impl Game {
         if self.hud.net.typing() {
             return;
         }
+        // A prefab in hand turns on R; Ctrl+S keeps the selection as one.
+        if code == KeyCode::KeyR && matches!(self.view.mode, Mode::Prefab(_)) {
+            self.turn_prefab(audio);
+            return;
+        }
+        if code == KeyCode::KeyS && self.ctrl {
+            self.offer_prefab(audio);
+            return;
+        }
         if self.hud.free.on && self.free_camera_key(code, r, audio) {
             return;
         }
@@ -2834,6 +2857,7 @@ impl Game {
                 KeyCode::Digit4 => Some('4'),
                 KeyCode::Digit5 => Some('5'),
                 KeyCode::KeyU => Some('U'),
+                KeyCode::KeyP => Some('P'),
                 KeyCode::KeyQ => Some('Q'),
                 KeyCode::KeyW => Some('W'),
                 KeyCode::KeyE => Some('E'),
@@ -4262,52 +4286,22 @@ impl Game {
             _ => Vec::new(),
         };
         if let Mode::Place(blueprint) = self.view.mode {
-            let heading = self
-                .blueprints
-                .unit(blueprint)
-                .build_heading()
-                .to_radians_f32();
-            let radius = self.blueprints.unit(blueprint).radius.to_f32();
+            let field = Field {
+                view: &self.view,
+                blueprints: &self.blueprints,
+                map: &self.map,
+                camera: &self.camera,
+                renderer,
+            };
             for &(pos, fit) in &sites {
-                let valid = fit.is_ok();
-                let xy = pos.to_f32();
-                let z = renderer.surface_height(Vec2::from(xy));
-                let p = [xy[0], xy[1], z];
-                ghosts.push(UnitInstance {
-                    prev_pos: p,
-                    prev_heading: heading,
-                    pos: p,
-                    heading,
-                    blueprint: blueprint.0 as u32,
-                    owner_flags: self.view.local as u32 | KIND_GHOST,
-                    health: if valid { 1.0 } else { 0.0 },
-                    build: 1.0,
-                    turret_yaw: 0.0,
-                    radius,
-                    unit_id: u32::MAX,
-                    packed: 0,
-                    gait: [0.0; 3],
-                    upgrade: 0.0,
-                    arm_pitch: [0.0; 4],
-                    prev_turret_yaw: 0.0,
-                    weld: [0.0; 3],
-                    recoil: 0.0,
-                    prev_recoil: 0.0,
-                    weld_first: 0,
-                    weld_count: 0,
-                    deploy: 0.0,
-                    prev_deploy: 0.0,
-                    _pad2: [0.0; 2],
-                    refit_modules: 0,
-                    status: [0; 3],
-                    mount: [0.0; 4],
-                    spin_recoil: [0.0; 4],
-                    fx: [0.0; 4],
-                    drive_swing: [0.0; 2],
-                    twin_spin: [0.0; 2],
-                });
+                ghosts.push(orders::placement_ghost(&field, blueprint, pos, fit.is_ok()));
             }
         }
+        let prefab_sites = match self.view.mode {
+            Mode::Prefab(id) if !over_ui => self.prefab_sites(id, renderer),
+            _ => Vec::new(),
+        };
+        self.prefab_ghosts(&prefab_sites, renderer, &mut ghosts);
 
         if let (Mode::Spawn | Mode::SpawnSubject, Some(range), false) =
             (self.view.mode, &self.view.range, over_ui)
@@ -4420,7 +4414,12 @@ impl Game {
         self.pointer = if self.hud.free.on {
             self.free_camera_pointer()
         } else {
-            self.pointer_for(renderer, over_ui, sites.iter().any(|(_, fit)| fit.is_ok()))
+            self.pointer_for(
+                renderer,
+                over_ui,
+                sites.iter().any(|(_, fit)| fit.is_ok())
+                    || prefab_sites.iter().any(|s| s.goes_down()),
+            )
         };
         // What a click would take apart is ringed in the Materials red-orange, wreck or
         // unit, in place of its selection or hover mark (its bars stay).
@@ -4571,6 +4570,7 @@ impl Game {
         let scene = hud::Scene {
             net: link.as_ref(),
             net_notices: &net_notices,
+            prefabs: &self.prefabs.library,
             view: &self.view,
             blueprints: &self.blueprints,
             map: &self.map,
@@ -4586,6 +4586,16 @@ impl Game {
         let actions = self.hud.draw(&mut ui, &scene, dt);
         if !over_ui && !self.hud.free.on {
             hud::cursor_hint(&mut ui, &self.view, &self.blueprints, &sites);
+            if let Mode::Prefab(id) = self.view.mode {
+                if let Some(prefab) = self.prefabs.library.get(id) {
+                    hud::prefabs::cursor_hint(
+                        &mut ui,
+                        prefab,
+                        &prefab_sites,
+                        self.prefabs.quarters,
+                    );
+                }
+            }
             let field = Field {
                 view: &self.view,
                 blueprints: &self.blueprints,
@@ -4670,7 +4680,8 @@ impl Game {
             _ => Vec::new(),
         };
         renderer.set_link_focus(&lit, &planned);
-        let build_grid = matches!(self.view.mode, Mode::Place(_)) || self.orders.dragging_plan();
+        let build_grid = matches!(self.view.mode, Mode::Place(_) | Mode::Prefab(_))
+            || self.orders.dragging_plan();
         if build_grid {
             let field = Field {
                 view: &self.view,

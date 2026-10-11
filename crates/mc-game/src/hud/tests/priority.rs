@@ -41,6 +41,7 @@ fn last_col(rig: &Rig) -> usize {
         placing_open: None,
         net: None,
         net_notices: &[],
+        prefabs: crate::prefabs::Library::none(),
     };
     selection::order_families(&s, &[&rig.view.frame.units[0]]) - 1
 }
@@ -127,6 +128,7 @@ fn on_auto_a_unit_inherits_what_the_row_gives_its_current_work() {
             placing_open: None,
             net: None,
             net_notices: &[],
+            prefabs: crate::prefabs::Library::none(),
         };
         super::super::priority::inherited(&s, &rig.view.frame.units[0]).map(|i| i.p)
     };

@@ -53,6 +53,7 @@ fn families(rig: &Rig) -> usize {
         placing_open: None,
         net: None,
         net_notices: &[],
+        prefabs: crate::prefabs::Library::none(),
     };
     let u = s.view.frame.units[0];
     selection::order_families(&s, &[&u])

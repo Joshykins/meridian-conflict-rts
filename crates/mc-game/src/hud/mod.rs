@@ -33,6 +33,7 @@ mod netplay;
 pub mod notices;
 mod observer;
 mod pause;
+pub(crate) mod prefabs;
 mod priority;
 mod profiler;
 mod range;
@@ -204,6 +205,14 @@ pub enum HudAction {
     },
     /// Leave the match for the front end, now (a network match that cannot go on).
     Leave,
+    /// Offer the selected structures' layout for saving as a prefab.
+    OfferPrefab,
+    /// Take this prefab in hand, to place it with the selected builders.
+    HoldPrefab(crate::prefabs::PrefabId),
+    /// Put this prefab, named in the save box, in the library.
+    KeepPrefab(crate::prefabs::Prefab),
+    /// Take this prefab out of the library.
+    DropPrefab(crate::prefabs::PrefabId),
 }
 
 /// What the HUD draws from. All of it is a snapshot; nothing here is the simulation.
@@ -226,6 +235,8 @@ pub struct Scene<'a> {
     pub net: Option<&'a crate::netplay::NetLink>,
     /// What the session had to say since the last frame.
     pub net_notices: &'a [crate::netplay::NetNotice],
+    /// The player's prefabs, for the construction panel's Prefabs tab.
+    pub prefabs: &'a crate::prefabs::Library,
 }
 
 impl Scene<'_> {
@@ -366,6 +377,8 @@ pub struct Hud {
     unclaimed: bool,
     /// Chat and the link's news in a network match (`netplay.rs`).
     pub net: netplay::NetHud,
+    /// The prefab save box, and a prefab delete waiting to be confirmed (`prefabs.rs`).
+    pub prefabs: prefabs::PrefabUi,
 }
 
 /// What a HUD tile reports back.
@@ -902,6 +915,7 @@ impl Hud {
         self.speed_list(ui, s, &speed_hits);
         self.fold_end(ui, fold);
         unit_picker::draw(self, ui, s);
+        self.prefab_dialog(ui, s);
         // An open dropdown's list goes over every panel, and while it is open
         // the whole screen is the HUD's: a click off the list only closes it.
         if ui.mem.popup.is_some() {
@@ -979,8 +993,9 @@ pub fn cursor_hint(
     let placing = sites.len();
     let fit = sites.iter().filter(|(_, f)| f.is_ok()).count();
     let (text, tone) = match view.mode {
-        // The warp order's card says what the jump takes (`warp_marks::cursor_card`).
-        Mode::Normal | Mode::Target(Targeting::Warp) => return,
+        // The warp order's card says what the jump takes (`warp_marks::cursor_card`);
+        // a prefab's is `prefabs::cursor_hint`.
+        Mode::Normal | Mode::Target(Targeting::Warp) | Mode::Prefab(_) => return,
         Mode::Target(t) => (
             t.label().to_owned(),
             match t {

@@ -11,6 +11,9 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
 
+#[path = "headless_prefabs.rs"]
+mod prefab_shot;
+
 pub struct Shot {
     pub path: String,
     /// Focus x, y; distance; yaw in degrees.
@@ -42,8 +45,14 @@ pub struct Shot {
     pub report: Option<String>,
     /// Range screenshots: the range panel open on this tab (unit, stage, economy, sky, range).
     pub range_tab: Option<String>,
-    /// Match screenshots: placing the structure with this blueprint key, at `cursor`.
+    /// Match screenshots: placing the structure with this blueprint key, at `cursor`;
+    /// `@NAME`, with `prefabs`, the prefab of that name.
     pub place: Option<String>,
+    /// Match screenshots: the player's prefabs from this file, the construction panel
+    /// open on its Prefabs tab.
+    pub prefabs: Option<String>,
+    /// Match screenshots: the Save Prefab box open on the selection.
+    pub save_prefab: bool,
     /// Match screenshots: the commander has structures planned and a way to walk, and shift is held.
     pub plans: bool,
     /// With `plans`: the order under `cursor` has been dragged to this pixel.
@@ -833,6 +842,7 @@ pub fn screenshot(
     if shot.refit_tab {
         hud.open_refit_tab();
     }
+    let prefab_shot = prefab_shot::PrefabShot::stage(shot, &mut hud, &mut view, &world.blueprints)?;
     let mut report = shot
         .report
         .as_deref()
@@ -879,6 +889,7 @@ pub fn screenshot(
     let place = shot
         .place
         .as_deref()
+        .filter(|key| !key.starts_with('@'))
         .map(|key| {
             world
                 .blueprints
@@ -929,47 +940,9 @@ pub fn screenshot(
             crate::orders::site_verdict(&field, bp, ground, None, &[])
         }) {
             let bp = place.expect("a site comes from a blueprint");
-            let xy = at.to_f32();
-            let p = [
-                xy[0],
-                xy[1],
-                crate::orders::surface_height(&field, glam::Vec2::from(xy)),
-            ];
-            let heading = field.blueprints.unit(bp).build_heading().to_radians_f32();
-            ghosts.push(mc_sim::mirror::UnitInstance {
-                prev_pos: p,
-                prev_heading: heading,
-                pos: p,
-                heading,
-                blueprint: bp.0 as u32,
-                owner_flags: view.local as u32 | mc_sim::mirror::KIND_GHOST,
-                health: if fit.is_ok() { 1.0 } else { 0.0 },
-                build: 1.0,
-                turret_yaw: 0.0,
-                radius: world.blueprints.unit(bp).radius.to_f32(),
-                unit_id: u32::MAX,
-                packed: 0,
-                gait: [0.0; 3],
-                upgrade: 0.0,
-                arm_pitch: [0.0; 4],
-                prev_turret_yaw: 0.0,
-                weld: [0.0; 3],
-                recoil: 0.0,
-                prev_recoil: 0.0,
-                weld_first: 0,
-                weld_count: 0,
-                deploy: 0.0,
-                prev_deploy: 0.0,
-                _pad2: [0.0; 2],
-                refit_modules: 0,
-                status: [0; 3],
-                mount: [0.0; 4],
-                spin_recoil: [0.0; 4],
-                fx: [0.0; 4],
-                drive_swing: [0.0; 2],
-                twin_spin: [0.0; 2],
-            });
+            ghosts.push(crate::orders::placement_ghost(&field, bp, at, fit.is_ok()));
         }
+        let prefab_sites = prefab_shot.ghosts(&field, input.cursor, &mut ghosts);
         let outlined = order_map.ghosts(&field, &mut ghosts);
         order_map.draw(&mut ui, &field, 1.0);
         crate::game::work::draw_tags(&mut ui, &field, 1.0, |o| o == 0);
@@ -1020,6 +993,7 @@ pub fn screenshot(
         let scene = crate::hud::Scene {
             net: link.as_ref(),
             net_notices: news,
+            prefabs: prefab_shot.library(),
             view: &view,
             blueprints: &world.blueprints,
             map: &map,
@@ -1037,6 +1011,7 @@ pub fn screenshot(
         ui.interactive = report.is_none();
         hud.draw(&mut ui, &scene, 0.016);
         crate::hud::cursor_hint(&mut ui, &view, &world.blueprints, &[]);
+        prefab_shot.hint(&mut ui, &view, &prefab_sites);
         crate::warp_marks::cursor_card(&mut ui, &field, pointer);
         if let Some(report) = &mut report {
             ui.interactive = true;

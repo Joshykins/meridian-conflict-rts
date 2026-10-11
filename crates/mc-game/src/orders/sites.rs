@@ -6,7 +6,7 @@ use super::{half_footprint, mine_reach, to_fx, Field};
 use glam::{Vec2, Vec3};
 use mc_core::FxVec2;
 use mc_data::BlueprintId;
-use mc_sim::mirror::KIND_WRECK;
+use mc_sim::mirror::{UnitInstance, KIND_GHOST, KIND_WRECK};
 use mc_sim::placement::Unfit;
 
 /// Where `blueprint` would stand with the pointer on `ground`, and whether it looks
@@ -27,7 +27,7 @@ pub fn site_verdict(
     blueprint: BlueprintId,
     ground: Vec3,
     moving: Option<FxVec2>,
-    taken: &[FxVec2],
+    taken: &[(FxVec2, BlueprintId)],
 ) -> Option<(FxVec2, Result<(), Unfit>)> {
     let bp = field.blueprints.unit(blueprint);
     let pos = mc_sim::world::snap_to_build_grid(bp, to_fx(ground.truncate()));
@@ -57,14 +57,14 @@ pub fn site_verdict(
 }
 
 /// `site`, treating `taken` as structures already spoken for (the earlier
-/// buildings of a place-drag). The ground itself is `site_verdict`'s, when
+/// buildings of a place-drag, or of a prefab). The ground itself is `site_verdict`'s, when
 /// the map's sites are known.
 fn site_among(
     field: &Field,
     blueprint: BlueprintId,
     ground: Vec3,
     moving: Option<FxVec2>,
-    taken: &[FxVec2],
+    taken: &[(FxVec2, BlueprintId)],
 ) -> Option<(FxVec2, bool)> {
     let Field {
         view,
@@ -108,8 +108,8 @@ fn site_among(
             valid = false;
         }
     }
-    for &centre in taken {
-        if overlaps(Vec2::from(centre.to_f32()), blueprint) {
+    for &(centre, other) in taken {
+        if overlaps(Vec2::from(centre.to_f32()), other) {
             valid = false;
         }
     }
@@ -137,4 +137,65 @@ fn site_among(
         }
     }
     Some((pos, valid))
+}
+
+/// The hologram of `blueprint` on its lot at `at`, for a placement preview: whole,
+/// facing as it will be built, and lit as buildable there or not (`health`, which
+/// `ghost_footprints` reads too).
+pub fn placement_ghost(
+    field: &Field,
+    blueprint: BlueprintId,
+    at: FxVec2,
+    valid: bool,
+) -> UnitInstance {
+    let bp = field.blueprints.unit(blueprint);
+    let heading = bp.build_heading().to_radians_f32();
+    let xy = at.to_f32();
+    let p = [xy[0], xy[1], field.renderer.surface_height(Vec2::from(xy))];
+    UnitInstance {
+        prev_pos: p,
+        prev_heading: heading,
+        pos: p,
+        heading,
+        blueprint: blueprint.0 as u32,
+        owner_flags: field.view.local as u32 | KIND_GHOST,
+        health: if valid { 1.0 } else { 0.0 },
+        build: 1.0,
+        radius: bp.radius.to_f32(),
+        unit_id: u32::MAX,
+        ..bytemuck::Zeroable::zeroed()
+    }
+}
+
+/// Where each structure of `prefab` would go with its middle on `ground`, turned
+/// `quarters` quarter turns, and whether it can: the ground and the lots (each also
+/// against the prefab's own structures before it), and whether `builds` holds it.
+pub fn prefab_sites(
+    field: &Field,
+    prefab: &crate::prefabs::Prefab,
+    ground: Vec3,
+    quarters: u8,
+    builds: &[BlueprintId],
+) -> Vec<crate::prefabs::PrefabSite> {
+    let (members, _) = prefab.resolve(field.blueprints);
+    let anchor = to_fx(ground.truncate());
+    let mut taken: Vec<(FxVec2, BlueprintId)> = Vec::new();
+    let mut out = Vec::with_capacity(members.len());
+    for (blueprint, at) in crate::prefabs::layout(field.blueprints, &members, anchor, quarters) {
+        let xy = Vec2::from(at.to_f32());
+        let ground = xy.extend(super::surface_height(field, xy));
+        let fit = site_verdict(field, blueprint, ground, None, &taken)
+            .map_or(Err(Unfit::OffMap), |(_, fit)| fit);
+        let buildable = builds.contains(&blueprint);
+        if fit.is_ok() && buildable {
+            taken.push((at, blueprint));
+        }
+        out.push(crate::prefabs::PrefabSite {
+            blueprint,
+            at,
+            fit,
+            buildable,
+        });
+    }
+    out
 }

@@ -827,6 +827,8 @@ pub enum Glyph {
     Warp,
     /// A factory's batch: a block of units held behind a gate.
     Batch,
+    /// A prefab: lots of three sizes laid out together, seen from above.
+    Prefab,
 }
 
 /// Two strokes meeting at `tip`, opening away from `dir`.
@@ -979,6 +981,19 @@ pub fn glyph(ui: &mut Ui, glyph: Glyph, c: Vec2, r: f32, color: Color) {
                 t,
                 color,
             );
+        }
+        Glyph::Prefab => {
+            // A big lot, a small one beside it and a long one under both, outlined.
+            let lots = [
+                (-1.0, -1.0, 0.25, 0.25),
+                (0.45, -1.0, 1.0, -0.2),
+                (-1.0, 0.45, 1.0, 1.0),
+            ];
+            for (x0, y0, x1, y1) in lots {
+                let (a, b) = (c + Vec2::new(x0, y0) * r, c + Vec2::new(x1, y1) * r);
+                let pts = [a, Vec2::new(b.x, a.y), b, Vec2::new(a.x, b.y)];
+                ui.polyline(&pts, t, color, true);
+            }
         }
         Glyph::Formation => {
             for (dx, dy) in [

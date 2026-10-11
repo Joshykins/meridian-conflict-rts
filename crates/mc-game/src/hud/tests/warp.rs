@@ -20,6 +20,7 @@ fn scene<'a>(rig: &'a Rig, stats: &'a FrameStats) -> Scene<'a> {
         placing_open: None,
         net: None,
         net_notices: &[],
+        prefabs: crate::prefabs::Library::none(),
     }
 }
 

@@ -50,6 +50,13 @@ impl Ui<'_> {
         changed
     }
 
+    /// Gives a field the keyboard with its whole text selected, so the first key typed
+    /// replaces a suggestion and Enter keeps it.
+    pub fn focus_field_selected(&mut self, id: Id) {
+        self.mem.editing = Some(id);
+        self.mem.selected = Some(id);
+    }
+
     /// Applies this frame's keys to the field that has the keyboard: typing,
     /// Backspace, and Ctrl+A/C/X/V. Returns true when the text changed.
     fn edit_text(&mut self, id: Id, text: &mut String, max: usize) -> bool {

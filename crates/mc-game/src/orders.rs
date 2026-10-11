@@ -30,7 +30,7 @@ mod sites;
 mod wall_line;
 
 pub(crate) use reclaim_rings::reclaim_radius;
-pub use sites::{site, site_verdict};
+pub use sites::{placement_ghost, prefab_sites, site, site_verdict};
 
 use guard_rings::{guard_look, guard_ring, orbit_ring, selection_guard_look, GuardLook};
 
@@ -414,7 +414,7 @@ pub fn drag_sites(
         }
         out.push((pos, fit));
         if fit.is_ok() {
-            taken.push(pos);
+            taken.push((pos, blueprint));
         }
     }
     out
@@ -973,7 +973,9 @@ impl OrderMap {
         let Field {
             view, blueprints, ..
         } = field;
-        let everyone = view.shift || self.drag.is_some() || matches!(view.mode, Mode::Place(_));
+        let everyone = view.shift
+            || self.drag.is_some()
+            || matches!(view.mode, Mode::Place(_) | Mode::Prefab(_));
         let in_focus = |plan: &mc_sim::mirror::PlannedBuild| {
             everyone || view.selection.contains(&plan.unit_id)
         };

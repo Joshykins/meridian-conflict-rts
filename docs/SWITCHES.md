@@ -56,6 +56,12 @@ match that long is run with the built exe directly.
 | `MERIDIAN_HISTORY_REPORT` | `N[:PAGE]`, 1 = the newest | With `--ui history`: match N's battle report open over Match History on PAGE (`overview`, `economy`, `military`, `battlefield`, `timeline`), fully drawn in. A replay without a kept record (`replays/<id>.mcreport`) is played through first, which the shot waits for. |
 | `MERIDIAN_VISION` | player slot | An `--observe` shot is drawn through that player's eyes, as if its vision chip were picked (and shows its AI Mind card when a Commander plays it, docs/AI_COMMANDER.md). |
 
+| Switch | Values | Purpose |
+|---|---|---|
+| `--prefabs FILE` | a `prefabs.ron` | The player's prefabs read from FILE instead of beside the settings, the selected builder's construction panel open on its Prefabs tab (`hud/prefabs`). |
+| `--place @NAME` | a prefab's name | With `--prefabs`: that prefab in hand at `--cursor`, its holograms and the card by the pointer (`--place KEY` places one structure). |
+| `--save-prefab` | | The Save Prefab box open on the selection: its structures, and with `--plans` the commander's planned ones. |
+
 ## Crash reports
 
 Whatever ends the game badly is written beside the settings file (`%APPDATA%\meridian-conflict`
