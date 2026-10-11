@@ -62,12 +62,22 @@ impl IssueMark {
         self.fresh.take()
     }
 
+    /// A screenshot is asked for and not yet back: no one else may ask the renderer.
+    pub fn capturing(&self) -> bool {
+        self.shot.is_some()
+    }
+
     /// Asks the renderer for the frame being marked and saves it off the UI
     /// thread when it comes back. Call every frame, before rendering.
     pub fn pump_capture(&mut self, renderer: &mut mc_render::Renderer) {
-        if let Some((_, asked @ false)) = &mut self.shot {
-            renderer.capture_next_frame();
-            *asked = true;
+        match &mut self.shot {
+            Some((_, asked @ false)) => {
+                renderer.capture_next_frame();
+                *asked = true;
+            }
+            Some(_) => {}
+            // Another asker's frame (the live desk's) is not ours to take.
+            None => return,
         }
         let Some(result) = renderer.take_capture() else {
             return;

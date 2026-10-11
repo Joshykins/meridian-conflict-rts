@@ -41,6 +41,8 @@ mod cine_input;
 mod game_nuke_sounds;
 #[path = "game_groups.rs"]
 pub(crate) mod groups;
+#[path = "game_live.rs"]
+mod live_desk;
 #[path = "game_menu.rs"]
 mod menu_screens;
 #[path = "game_mind_map.rs"]
@@ -438,6 +440,8 @@ pub struct Game {
     place_from: Option<FxVec2>,
     /// The player's prefabs, and how the one in hand is turned (`game_prefabs.rs`).
     prefabs: prefab_desk::Prefabs,
+    /// The test range's live desk: requests from outside the game (`game_live.rs`).
+    live: live_desk::Live,
     /// Orders on the map: their lines, the ghosts of planned structures, the one being dragged.
     orders: OrderMap,
     /// A move held on the right button: its formation shows, a drag turns it (`formation_drag.rs`).
@@ -615,6 +619,7 @@ impl Game {
             left_down: None,
             place_from: None,
             prefabs: prefab_desk::Prefabs::load(),
+            live: live_desk::Live::default(),
             orders: OrderMap::default(),
             formation_drag: None,
             pointer: Pointer::Arrow,
@@ -4175,6 +4180,7 @@ impl Game {
                 self.send(command);
             }
         }
+        self.live_frame(renderer, fresh);
 
         self.answer_selection(audio, now);
 

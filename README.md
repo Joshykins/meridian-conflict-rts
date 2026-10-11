@@ -261,6 +261,20 @@ or an engineer (building is free on the range unless FREE BUILD is switched off)
 
 Slow motion is the ordinary game speed control: `-` goes down to 0.1x.
 
+### The live desk
+
+While the range is open, a tool outside the game can work it: `scripts/live.sh` (from WSL)
+drops requests in `%APPDATA%\meridian-conflict\live` and the game answers each between frames.
+It lays structures and prefabs (finished, as unbuilt sites, or built by spawned engineers in the
+prefab's order), checks each site with the player's placement rules, reads back every structure
+and the selection, captures the selection as a prefab, keeps one in the player's library, moves
+the camera and saves a screenshot. It is for designing base layouts with an agent while you
+play. `scripts/live.sh --help` lists the requests.
+
+```bash
+scripts/live.sh lay '{"structures":[{"key":"aster_t1_power","x":0,"y":0},{"key":"aster_t1_power","x":24,"y":0}],"at":"cursor","how":"build"}'
+```
+
 ## Layout
 
 | path | what |

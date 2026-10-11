@@ -1910,6 +1910,7 @@ dependencies = [
  "png",
  "ron",
  "serde",
+ "serde_json",
  "tiny-skia",
  "ttf-parser",
  "winit",

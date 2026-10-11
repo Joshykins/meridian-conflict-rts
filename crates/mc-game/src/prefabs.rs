@@ -192,6 +192,24 @@ impl Resolved {
 }
 
 impl Prefab {
+    /// Whether it is one a save could have made, with at most `most` members: not
+    /// empty, and no member thrown across the map. Says why not.
+    pub fn check(&self, most: usize) -> Result<(), &'static str> {
+        if self.members.is_empty() {
+            Err("it is empty")
+        } else if self.members.len() > most {
+            Err("it has too many structures")
+        } else if self
+            .members
+            .iter()
+            .any(|m| m.x.abs() > MAX_OFFSET || m.y.abs() > MAX_OFFSET)
+        {
+            Err("a structure stands too far out")
+        } else {
+            Ok(())
+        }
+    }
+
     /// Its members whose blueprints this build has (one retired since it was saved is
     /// left out), and how many were left out.
     pub fn resolve(&self, blueprints: &Blueprints) -> (Vec<Resolved>, usize) {
@@ -649,16 +667,8 @@ impl Library {
     fn push_back(&mut self, mut p: Prefab) {
         p.name = clean_name(&p.name);
         // A hand-edited file is held to what a save would have let through.
-        let why = if p.members.is_empty() {
-            Some("it is empty")
-        } else if p.members.len() > MAX_MEMBERS {
-            Some("it has too many structures")
-        } else if p
-            .members
-            .iter()
-            .any(|m| m.x.abs() > MAX_OFFSET || m.y.abs() > MAX_OFFSET)
-        {
-            Some("a structure stands too far out")
+        let why = if let Err(why) = p.check(MAX_MEMBERS) {
+            Some(why)
         } else if self.prefabs.len() >= MAX_PREFABS {
             Some("the library is full")
         } else if self.by_name(&p.name).is_some() {

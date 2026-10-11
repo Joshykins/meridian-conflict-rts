@@ -27,6 +27,7 @@ mod headless;
 mod hud;
 mod issues;
 mod line_of_fire;
+mod live;
 mod loading;
 mod match_options;
 mod mind_map;
