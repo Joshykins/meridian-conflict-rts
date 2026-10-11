@@ -213,15 +213,16 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   everywhere (`MineState::before`). A growing mine draws `grow_upkeep` 4 / 40 / 150 / 300
   energy a second on top of its upkeep (about 100 s on a lone mine), and grows only as fast as
   its side pays its energy: a stall slows the growth, as it slows an upgrade in FAF. The
-  Regency Excavators draw it too, though they have no upkeep once grown.
+  Regency Excavators are the same.
 - **Mines build fast** (2026-10-10): a tier 1 mine is 60 build time (12 s for a tier 1
   engineer), and a mine upgrades itself at `upgrade_power` 15 / 40 / 60, so tier 2 takes
   about 73 s, tier 3 150 s and the Deep Core 250 s (110 / 600 / 1,500 s before). Engineers
   assisting add their power.
 - Prices (mass / energy): 45 / 270, 750 / 4,500, 4,000 / 24,000, Deep Core 11,000 / 66,000.
   A new mine on a field pays back in under a minute; an upgrade pays only the difference
-  between the tiers, about 2, 5 and 7 minutes on a duel field. The Regency Excavators dig
-  as much for a little more mass, less energy and no upkeep (55 / 770 / 4,080 / 11,200).
+  between the tiers, about 2, 5 and 7 minutes on a duel field. The Regency's Excavators,
+  Power Generators and Condensers are ARC's Core Mines, Reactors and Fabricators number
+  for number: price, build time, health, upkeep and output (the user, 2026-10-10).
 - **A mine climbs one tier past its side's tech** (`Blueprints::upgrade_needs`): tier 2 at
   tech 1, tier 3 at tech 2, the Deep Core at tech 3. Growing the economy, building the army
   and buying the next tier are three choices, not one: a side can raise its mines before it
@@ -286,8 +287,7 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   T2 (350/s) 39%, T3 60%; materials 40% at 5/s, so T2 (1.5/s) 30%, T3 40%. Mixed rings add
   up side by side. Standing close is a risk, and the blasts make it so, not a rule:
   a fabricator's blast (T2 3500 to 50 m, T3 12500 to 80 m) destroys a power plant of its
-  tech against any side of it (Reactor II 2200 / Generator II 3200, Reactor III 9720 /
-  Generator III 12000) but not a factory of its tech, and a reactor's blast takes the
+  tech against any side of it (tier 2 2200 health, tier 3 9720) but not a factory of its tech, and a reactor's blast takes the
   fabricators against it (a Regency Power Generator's blast is a Reactor's of its tech,
   drawn as its supernova). The interface shows each link: a conduit on the ground, the unit panel's
   Adjacency band, tags on the selection's links, and the placing site's would-be links.

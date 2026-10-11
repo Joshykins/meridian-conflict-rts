@@ -186,9 +186,9 @@
         sounds: (death: "blast_large"),
     ),
     // ---- Economy ------------------------------------------------------------------------
-    // Works the same ore as a Core Mine, and as well at every tier, but it digs with a beam
-    // and lifts the ore on its own gravity pinch: no energy upkeep once grown, only its
-    // `grow_upkeep` while it (or an upgrade) grows out. It pays for that up front, and
+    // Works the same ore as a Core Mine, digging with a beam and lifting the ore on its own
+    // gravity pinch. Its economy is the Core Mine's, number for number (the user,
+    // 2026-10-10: the factions' mines, power and fabricators are equivalent), and it
     // upgrades in place through the same four tiers (`models::regency::taproot`); the fourth,
     // like the Deep Core, opens with tech 3. Land only, as the Core Mine.
     (
@@ -197,11 +197,11 @@
         role: "Materials Mine",
         tech: 1,
         categories: ["Land", "Economy", "Extractor"],
-        health: 480,
-        cost: (mass: 55, energy: 300, time: 75),
+        health: 600,
+        cost: (mass: 45, energy: 270, time: 60),
         radius: 12.8, height: 11, footprint: (3, 3),
         vision: 300,
-        economy: (mass_storage: 100),
+        economy: (mass_storage: 100, energy_upkeep: 2),
         // The beam lifts the ore with no hammer: no blows to show or hear.
         mine: (
             reach: 1000,
@@ -218,11 +218,11 @@
         role: "Materials Mine",
         tech: 2,
         categories: ["Land", "Economy", "Extractor"],
-        health: 3840,
-        cost: (mass: 770, energy: 2800, time: 1130),
+        health: 2000,
+        cost: (mass: 750, energy: 4500, time: 1100),
         radius: 12.8, height: 15, footprint: (3, 3),
         vision: 360,
-        economy: (mass_storage: 200),
+        economy: (mass_storage: 200, energy_upkeep: 8),
         mine: (
             reach: 1000,
             ground: 0.00486, per_hectare: 2.7, base: 0.9, grow_upkeep: 40, hammer: false,
@@ -238,11 +238,11 @@
         role: "Materials Mine",
         tech: 3,
         categories: ["Land", "Economy", "Extractor"],
-        health: 10240,
-        cost: (mass: 4080, energy: 14900, time: 6100),
+        health: 5000,
+        cost: (mass: 4000, energy: 24000, time: 6000),
         radius: 12.8, height: 19, footprint: (3, 3),
         vision: 420,
-        economy: (mass_storage: 400),
+        economy: (mass_storage: 400, energy_upkeep: 30),
         mine: (
             reach: 1000,
             ground: 0.01134, per_hectare: 6.3, base: 2.1, grow_upkeep: 150, hammer: false,
@@ -258,11 +258,11 @@
         role: "Materials Mine",
         tech: 4,
         categories: ["Land", "Economy", "Extractor"],
-        health: 19200,
-        cost: (mass: 11200, energy: 41000, time: 15200),
+        health: 10000,
+        cost: (mass: 11000, energy: 66000, time: 15000),
         radius: 12.8, height: 19, footprint: (3, 3),
         vision: 480,
-        economy: (mass_storage: 800),
+        economy: (mass_storage: 800, energy_upkeep: 60),
         mine: (
             reach: 1000,
             ground: 0.01944, per_hectare: 10.8, base: 3.6, grow_upkeep: 300, hammer: false,
@@ -271,8 +271,8 @@
         mesh: "regency_taproot", icon: Extractor,
     ),
     // Gravity compresses plasma to the pressure inside a star until it fuses: it gives what
-    // a Reactor gives, and a breached field frees the star to go supernova with a Reactor's
-    // blast (the renderer draws the nova, not the Reactor's discharge). Tougher, dearer. The death sound is sized to the
+    // a Reactor gives, at a Reactor's price and toughness, and a breached field frees the star
+    // to go supernova with a Reactor's blast (the renderer draws the nova, not the Reactor's discharge). Tougher, dearer. The death sound is sized to the
     // star (renderer supernova_fx.rs): tech 3's at size 1, the smaller stars `like` it.
     (
         key: "regency_t1_power",
@@ -280,8 +280,8 @@
         role: "Power Generator",
         tech: 1,
         categories: ["Land", "Economy", "Power"],
-        health: 1100,
-        cost: (mass: 150, energy: 700, time: 235),
+        health: 760,
+        cost: (mass: 125, energy: 750, time: 210),
         radius: 6.9, height: 7.5, footprint: (2, 2),
         vision: 120,
         economy: (energy_income: 25),
@@ -291,16 +291,15 @@
         sounds: (death: "regency_supernova_small"),
     ),
     // The tech 2 and 3 generators: bigger cores in more rings, on lots of their own (like
-    // Reactor II and III, built new, not upgraded). The same trade as the tech 1 generator:
-    // tougher and dearer than the Reactor of their tier, with its blast.
+    // Reactor II and III, built new, not upgraded), equal to the Reactor of their tier.
     (
         key: "regency_t2_power",
         name: "Power Generator II",
         role: "Power Generator",
         tech: 2,
         categories: ["Land", "Economy", "Power"],
-        health: 3200,
-        cost: (mass: 840, energy: 3900, time: 1570),
+        health: 2200,
+        cost: (mass: 700, energy: 4200, time: 1400),
         radius: 18.75, height: 18, footprint: (4, 4),
         vision: 160,
         economy: (energy_income: 350),
@@ -315,8 +314,8 @@
         role: "Power Generator",
         tech: 3,
         categories: ["Land", "Economy", "Power"],
-        health: 12000,
-        cost: (mass: 3360, energy: 15600, time: 5700),
+        health: 9720,
+        cost: (mass: 2800, energy: 16800, time: 4800),
         radius: 42.5, height: 35, footprint: (8, 8),
         vision: 200,
         economy: (energy_income: 2000),
