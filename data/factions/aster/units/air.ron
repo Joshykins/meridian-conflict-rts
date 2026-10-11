@@ -3,9 +3,9 @@
     (
         key: "aster_t2_lift_ship", name: "Courier", role: "Light Transport", title: "Transport",
         tech: 2, categories: ["Air"],
-        health: 400, cost: (mass: 280, energy: 4200, time: 1400),
+        health: 1400, cost: (mass: 280, energy: 4200, time: 1400),
         radius: 58, height: 38, footprint: (10, 6), hull: (59, 36), vision: 320,
-        motion: (layer: Air, size: 0, speed: 150, accel: 42, turn: 90, altitude: 140, hover: true, deploy: 0.9),
+        motion: (layer: Air, size: 0, speed: 150, accel: 42, turn: 90, altitude: 280, hover: true, deploy: 0.9),
         transport: (capacity: 8, descent: 120, hold: (-16, 0), ramp: (-36, -42), width: 28, floor: 0, clearance: 26, unload: 0.25),
         // Warp: a light drive, quick to charge and quick to recharge. A jump costs
         // `per_km` energy for each kilometre it reaches (at least one), drained off the
