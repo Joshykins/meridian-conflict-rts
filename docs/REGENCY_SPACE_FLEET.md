@@ -8,7 +8,7 @@ dimensions; weapon mounts and cargo apertures use the same metre coordinates.
 | --- | --- | --- | --- |
 | Coffer | 2 | Artificer II/III; Exarch Engineering Suite II/III | Unarmed light transport; eight slots, enough for one commander |
 | Ark | 3 | Artificer III; Exarch Engineering Suite III | Heavy transport; 96 slots, 44 m bay width and 36 m clearance |
-| Vassal | 2 | Artificer II/III; Exarch Engineering Suite II/III | Economical frigate with two independently aiming plasma cannons |
+| Vassal | 3 | Artificer III; Exarch Engineering Suite III | Escort frigate, the Valiant's peer: a Pinch-plasma Lance under the keel and three Twin Escort Plasma Repeaters |
 | Suzerain | 3 | Artificer III; Exarch Engineering Suite III | Monitor with two anti-ship guns and six area suppression batteries |
 | Scourge | 4 | Artificer III; Exarch Engineering Suite III | Capital destroyer, the Dominion's peer: a Heavy Pinch-fusion Lance from the energy core through its middle, six Pinch-plasma Batteries, sixteen hatched seeker cells |
 
@@ -34,7 +34,15 @@ and takes the unit through the stern lane. Move or unload it at another location
 to check departure, approach and disembarkation. The hold and ramp are above the
 ground by one metre, matching the mesh and animation rig.
 
-Vassal can engage ships, aircraft and surface targets. Suzerain's two heavy guns
+Vassal is the fleet's escort and the Valiant's peer, a small faceted hull (about 110 m)
+dressed as the Suzerain, its bow cut short at a split prow whose two blades run out
+over the lance (`crates/mc-models/src/regency/space/vassal/`). The Pinch-plasma Lance
+hangs under the forward keel on a pylon and turns right round: it lays onto armies,
+buildings and ships, gathering its plasma for a second and pinching it out as one red
+jet (the Pinched grade's look). Three Twin Escort Plasma Repeaters keep the sky, one
+on the foredeck, one on a barbette amidships firing over it and one hung under the
+stern; they reach 200 m past the Valiant's rotary. A small hull shield stands in for the
+Valiant's heavier hull. Suzerain's two heavy guns
 engage ships, aircraft and naval hulls; its six splash batteries also bombard land
 units and structures. Each gun uses its own weapon slot and pivot, so barrels
 pitch and traverse with the weapon they represent.

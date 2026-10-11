@@ -370,7 +370,7 @@ drive (`warp:` in their unit entries; any aircraft may be given one). `Command::
 | Bastion (3)  | 8 000 E  | 4 s   | 8 000 E, 4.4 s   | 80 000 E, 8 s      | 60 s     | 3 500 m/s |
 | Resolute (4) | 20 000 E | 5 s   | 20 000 E, 5.5 s  | 200 000 E, 10 s    | 75 s     | 4 000 m/s |
 | Dominion (4) | 45 000 E | 7 s   | 45 000 E, 7.7 s  | 450 000 E, 14 s    | 110 s    | 4 000 m/s |
-| Vassal (2, Regency)    | 4 000 E  | 3 s | 4 000 E, 3.3 s  | 40 000 E, 6 s   | 50 s  | 3 200 m/s |
+| Vassal (3, Regency)    | 4 000 E  | 3 s | 4 000 E, 3.3 s  | 40 000 E, 6 s   | 50 s  | 3 200 m/s |
 | Ark (3, Regency)       | 8 000 E  | 4 s | 8 000 E, 4.4 s  | 80 000 E, 8 s   | 60 s  | 3 500 m/s |
 | Suzerain (3, Regency)  | 20 000 E | 5 s | 20 000 E, 5.5 s | 200 000 E, 10 s | 75 s  | 4 000 m/s |
 | Scourge (4, Regency)   | 45 000 E | 7 s | 45 000 E, 7.7 s | 450 000 E, 14 s | 110 s | 4 000 m/s |

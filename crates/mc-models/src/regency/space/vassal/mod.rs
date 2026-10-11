@@ -1,7 +1,8 @@
 //! Vassal: the Regency's tech 3 escort frigate (`regency_t2_space_frigate`, mesh
 //! `regency_space_frigate`), the Valiant's peer. A small faceted gun hull (`body.rs`)
-//! dressed as the Suzerain is (`style.rs`): swept shards in courses, a horned bridge
-//! astern, canted fins, cowled drives and slung lifts.
+//! cut short at a split prow, two blades run out ahead over the lance, dressed as the
+//! Suzerain is (`style.rs`): swept shards in courses, a horned bridge astern, canted
+//! fins, cowled drives and slung lifts.
 //!
 //! One Pinch-plasma Lance hangs under the forward keel on a pylon and turns right round,
 //! laying down onto the ground or across at a ship. Three Twin Escort Plasma Repeaters
@@ -20,7 +21,7 @@ use crate::builder::MeshBuilder;
 use super::super::kit::{dark_plate, v3};
 use super::body::{st, Body, Station, BILGE, CHINE, DECK_EDGE, SPINE};
 use super::dress::mark;
-use super::style::{bridge, course, drives, fin, lifts, prow, ridge, slab, teeth, Finish};
+use super::style::{bridge, course, drives, fin, lifts, ridge, slab, teeth, Finish};
 use guns::{lance, pylon, twin};
 
 /// The lance's pivot under the keel, its bore's reach ahead and its house's half-width.
@@ -37,69 +38,16 @@ const TWIN_REACH: f32 = 8.0;
 const TWIN_GAP: f32 = 1.8;
 const TWIN_S: f32 = 2.8;
 
-/// A hull to pick from: its stations, stern first, and its dress.
-struct Form {
-    stations: &'static [Station],
-    /// Mandible blades run out past the bow either side of the keel.
-    prongs: bool,
-    /// The fins' length and depth.
-    fin: (f32, f32),
-}
-
-/// A: the lancet, a narrow deep gun hull, the Suzerain's line at a third its size.
-const LANCET: Form = Form {
-    stations: &[
-        st(-50.0, 10.0, 4.0, 8.0, 11.5, 6.0, 15.0, 16.0),
-        st(-36.0, 15.0, 5.5, 6.5, 11.0, 8.5, 15.5, 16.5),
-        st(-10.0, 16.0, 6.0, 6.0, 11.0, 9.0, 15.5, 17.0),
-        st(14.0, 14.0, 5.5, 6.0, 11.0, 8.0, 15.0, 16.5),
-        st(34.0, 10.0, 3.5, 7.0, 11.0, 5.5, 14.0, 15.5),
-        st(52.0, 3.0, 1.0, 9.0, 11.0, 1.5, 12.5, 13.0),
-        st(60.0, 0.8, 0.3, 10.5, 11.0, 0.4, 11.5, 11.5),
-    ],
-    prongs: false,
-    fin: (18.0, 3.0),
-};
-
-/// B: the kite, broad swept shoulders aft drawn to a short sharp bow.
-const KITE: Form = Form {
-    stations: &[
-        st(-48.0, 19.0, 4.0, 8.0, 11.0, 6.0, 14.5, 15.5),
-        st(-32.0, 24.0, 5.0, 6.5, 10.5, 8.0, 15.0, 16.5),
-        st(-8.0, 19.0, 6.0, 6.0, 10.5, 9.0, 15.5, 17.0),
-        st(18.0, 12.0, 5.0, 6.0, 11.0, 7.0, 15.0, 16.5),
-        st(40.0, 6.0, 2.5, 8.0, 11.0, 3.5, 13.5, 14.5),
-        st(60.0, 0.8, 0.3, 10.5, 11.0, 0.4, 11.5, 11.5),
-    ],
-    prongs: false,
-    fin: (21.0, 3.6),
-};
-
-/// C: the split prow, the lancet cut short with two mandible blades run out ahead.
-const PRONGED: Form = Form {
-    stations: &[
-        st(-50.0, 10.0, 4.0, 8.0, 11.5, 6.0, 15.0, 16.0),
-        st(-36.0, 15.0, 5.5, 6.5, 11.0, 8.5, 15.5, 16.5),
-        st(-10.0, 16.0, 6.0, 6.0, 11.0, 9.0, 15.5, 17.0),
-        st(16.0, 13.0, 5.5, 6.0, 11.0, 7.5, 15.0, 16.5),
-        st(32.0, 8.0, 3.0, 7.5, 11.0, 4.0, 14.0, 15.0),
-        st(40.0, 1.0, 0.4, 10.0, 11.0, 0.5, 12.0, 12.0),
-    ],
-    prongs: true,
-    fin: (18.0, 3.0),
-};
-
-pub(super) fn build(b: &mut MeshBuilder, _tech: u8) {
-    hull(b, &LANCET);
-}
-
-pub(super) fn build_kite(b: &mut MeshBuilder, _tech: u8) {
-    hull(b, &KITE);
-}
-
-pub(super) fn build_pronged(b: &mut MeshBuilder, _tech: u8) {
-    hull(b, &PRONGED);
-}
+/// The hull's stations, stern first: cut short at the bow, where the prow's blades run
+/// out ahead of it.
+const STATIONS: [Station; 6] = [
+    st(-50.0, 10.0, 4.0, 8.0, 11.5, 6.0, 15.0, 16.0),
+    st(-36.0, 15.0, 5.5, 6.5, 11.0, 8.5, 15.5, 16.5),
+    st(-10.0, 16.0, 6.0, 6.0, 11.0, 9.0, 15.5, 17.0),
+    st(16.0, 13.0, 5.5, 6.0, 11.0, 7.5, 15.0, 16.5),
+    st(32.0, 8.0, 3.0, 7.5, 11.0, 4.0, 14.0, 15.0),
+    st(40.0, 1.0, 0.4, 10.0, 11.0, 0.5, 12.0, 12.0),
+];
 
 /// Every gun's pivot and bores in weapon order (`space.ron`'s `pivot`, `muzzle` and
 /// `muzzles`; the lance has one bore).
@@ -115,9 +63,9 @@ pub(crate) fn gun_mounts() -> Vec<(Vec3, Vec<Vec3>)> {
     std::iter::once(lance).chain(twins).collect()
 }
 
-fn hull(b: &mut MeshBuilder, form: &Form) {
+pub(super) fn build(b: &mut MeshBuilder, _tech: u8) {
     let body = Body {
-        stations: form.stations.to_vec(),
+        stations: STATIONS.to_vec(),
     };
     let (stern, bow) = body.span();
     if b.coarse() {
@@ -142,12 +90,7 @@ fn hull(b: &mut MeshBuilder, form: &Form) {
         armour(b, &body, (bow - 2.0, stern + 2.0));
         teeth(b, &body, stern + 4.0, &[2.5, 6.0], 1.6, 6.0);
         ridge(b, &body, (-22.0, stern + 6.0), 3.2, 2.0);
-        fin(
-            b,
-            deck(&body, stern + 14.0) + v3(0.0, 5.0, -3.0),
-            form.fin.0,
-            form.fin.1,
-        );
+        fin(b, deck(&body, stern + 14.0) + v3(0.0, 5.0, -3.0), 18.0, 3.0);
         let half = body.at(stern).w * 0.45;
         drives(b, &[(v3(stern, half, 11.5), 2.6, 7.0)]);
         lifts(
@@ -158,11 +101,7 @@ fn hull(b: &mut MeshBuilder, form: &Form) {
             ],
         );
     });
-    if form.prongs {
-        prongs(b, bow);
-    } else {
-        prow(b, (bow - 26.0, bow + 4.0), (5.5, 10.0));
-    }
+    prongs(b, bow);
     bridge(b, &body, (stern + 4.0, -28.0), 5.0, 3.6);
     mark(b, deck(&body, 4.0) + Vec3::Z * 1.0, 5.0);
     // The lance's pylon out of the keel.
