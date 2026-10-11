@@ -12,10 +12,10 @@ use crate::builder::MeshBuilder;
 use crate::material::GLOW_VIOLET;
 use crate::pattern;
 
-use super::super::super::kit::{dark_plate, metal, seam, v3};
-use super::super::super::lift::bell;
-use super::super::super::machine::{armour, collar, swept, Frame};
-use super::super::body::{Body, SPINE};
+use super::super::kit::{dark_plate, metal, seam, v3};
+use super::super::lift::bell;
+use super::super::machine::{armour, collar, swept, Frame};
+use super::body::{Body, SPINE};
 
 /// What a shard is painted: charcoal, or charcoal with a red optic let into it.
 #[derive(Clone, Copy, PartialEq)]
@@ -381,4 +381,17 @@ pub(super) fn lifts(b: &mut MeshBuilder, lifts: &[(Vec3, f32, f32)]) {
         }
         bell(b, mouth, r, r * 0.6);
     }
+}
+
+/// A plan slab: `half` the port half from bow to stern, mirrored, from `low` to `high`.
+pub(super) fn slab(b: &mut MeshBuilder, half: &[[f32; 2]], low: f32, high: f32) {
+    let mut outline = half.to_vec();
+    outline.extend(
+        half.iter()
+            .rev()
+            .filter(|p| p[1] > 0.0)
+            .map(|&[x, y]| [x, -y]),
+    );
+    dark_plate(b);
+    b.extrude_z(&outline, low, high);
 }

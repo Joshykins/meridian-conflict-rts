@@ -12,7 +12,7 @@ use crate::pattern;
 
 use super::super::super::kit::{dark_plate, metal, v3};
 use super::super::super::machine::Frame;
-use super::style::{shard, Finish};
+use super::super::style::{shard, Finish};
 
 /// A heavy gun bound to `weapon`: its house turning about `pivot`, the barrel's bore
 /// `reach` ahead of it, `size` the house's half-width.
@@ -116,7 +116,7 @@ fn house(b: &mut MeshBuilder, s: f32) {
 /// A pinch barrel from the house forward to its bore at `reach`: a graphite breech,
 /// two faceted blades over and under the bore line, closing in toward the tip, and the
 /// bore's violet between their tips. `w` is a blade's half-width at its root.
-fn pinch_barrel(b: &mut MeshBuilder, reach: f32, w: f32) {
+pub(in crate::regency::space) fn pinch_barrel(b: &mut MeshBuilder, reach: f32, w: f32) {
     let root = reach * 0.3;
     metal(b);
     b.beam(

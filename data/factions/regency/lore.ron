@@ -495,8 +495,11 @@
         lore: "A feathered arrowhead the length of a Bastion. It never touches the ground: it hangs on its gravity lifts and lets its ramp down through its belly, and an armoured force walks up into the hold.", weapons: {},
     ),
     "regency_t2_space_frigate": (
-        lore: "An economical two-gun escort, its narrow split bow carrying only the plasma cannons it needs to guard the fleet.",
-        weapons: {"Escort Plasma Cannon": "A compact cannon firing contained plasma against ships, aircraft and surface targets."},
+        lore: "A retainer's ship. It flies at the shoulder of the Regency's heavy hulls and keeps the sky clear over them, and when it is not needed there it lays its lance on whatever the fleet is hunting, on the ground or in the air beside it.",
+        weapons: {
+            "Pinch-plasma Lance": "Hung under the keel and turning right round: plasma gathered in front of the bore for a second, then pinched out as one long red jet that reaches past anything else its size carries, onto armies, buildings and ships.",
+            "Twin Escort Plasma Repeater": "Three twin repeaters on deck and under the stern, a pair of plasmeric bolts out of each in turn: the fleet's umbrella against aircraft, reaching further than an enemy escort's guns.",
+        },
     ),
     "regency_t3_space_cruiser": (
         lore: "A crescent of overlapping armour around a heavy spine, built to suppress armies, bombard bases and break enemy ships.",

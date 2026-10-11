@@ -3,7 +3,7 @@ use super::super::kit::{dark_plate, metal, seam, segment, shell, v3};
 use super::super::lift::bell;
 use crate::builder::MeshBuilder;
 use crate::material::{GLOW_LASER, GLOW_VIOLET, TEAM};
-use glam::{Vec2, Vec3};
+use glam::Vec3;
 
 /// A swept hull lobe; its armour follows the curve as individual overlapping plates.
 pub(super) fn lobe(b: &mut MeshBuilder, points: &[(Vec3, f32, f32)]) {
@@ -84,48 +84,4 @@ pub(super) fn drive(b: &mut MeshBuilder, at: Vec3, radius: f32) {
         radius * 0.7,
         b.sides(8),
     );
-}
-
-/// An independently aiming compact plasma casemate, attached to its actual weapon slot.
-pub(super) fn gun(b: &mut MeshBuilder, weapon: usize, pivot: Vec3, muzzle: Vec3, width: f32) {
-    b.with_house(weapon, pivot, 0.25, |b| {
-        if b.coarse() {
-            b.paint(GLOW_VIOLET);
-            b.face(&[
-                muzzle,
-                muzzle + v3(-1.0, -width, 0.0),
-                muzzle + v3(-1.0, width, 0.0),
-            ]);
-            return;
-        }
-        dark_plate(b);
-        b.cuboid(pivot, v3(width * 2.2, width * 2.2, width));
-        b.with_recoil(|b| {
-            dark_plate(b);
-            b.beam(
-                pivot,
-                muzzle - Vec3::X * 0.5,
-                Vec2::new(width, width * 0.7),
-                Vec2::new(width * 0.75, width * 0.6),
-            );
-            if b.fine() {
-                seam(b);
-                b.cylinder_between(
-                    muzzle - Vec3::X * 1.8,
-                    muzzle,
-                    width * 0.65,
-                    width * 0.65,
-                    b.sides(8),
-                );
-            }
-            b.paint(GLOW_VIOLET);
-            b.cylinder_between(
-                muzzle - Vec3::X * 0.1,
-                muzzle,
-                width * 0.43,
-                width * 0.43,
-                b.sides(8),
-            );
-        });
-    });
 }

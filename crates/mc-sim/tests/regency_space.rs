@@ -80,7 +80,7 @@ fn engineers_can_build_the_fleet_on_site_and_cargo_sizes_fit_their_roles() {
     let bp = &w.blueprints;
     for (key, builder) in [
         ("regency_t2_transport", "regency_t2_engineer"),
-        ("regency_t2_space_frigate", "regency_t2_engineer"),
+        ("regency_t2_space_frigate", "regency_t3_engineer"),
         ("regency_t3_assault_transport", "regency_t3_engineer"),
         ("regency_t3_space_cruiser", "regency_t3_engineer"),
         ("regency_t4_space_destroyer", "regency_t3_engineer"),
@@ -124,7 +124,7 @@ fn engineers_can_build_the_fleet_on_site_and_cargo_sizes_fit_their_roles() {
         bp.unit(bp.id_of("regency_t2_space_frigate").unwrap())
             .weapons
             .len(),
-        2
+        4
     );
     assert_eq!(
         bp.unit(bp.id_of("regency_t3_space_cruiser").unwrap())
@@ -204,7 +204,7 @@ fn ark_carries_a_commander_and_a_heavy_ground_unit_together() {
 #[test]
 fn frigate_and_cruiser_fire_their_independent_casemates_at_cruise_height() {
     for (key, enemy, expected) in [
-        ("regency_t2_space_frigate", "regency_t2_space_frigate", 2),
+        ("regency_t2_space_frigate", "regency_t3_space_cruiser", 4),
         ("regency_t3_space_cruiser", "regency_t2_space_frigate", 8),
     ] {
         let mut w = world();

@@ -13,8 +13,7 @@
 //!
 //! Contracts (tests.rs): the gun houses' pivots and bores are `space.ron`'s.
 
-mod guns;
-mod style;
+pub(super) mod guns;
 
 use std::sync::LazyLock;
 
@@ -27,8 +26,10 @@ use super::super::kit::{dark_plate, v3};
 use super::super::machine::Frame;
 use super::body::{st, Body, Station, BILGE, CHINE, DECK_EDGE, SPINE};
 use super::dress::mark;
+use super::style::{
+    bridge, course, drives, fin, lifts, on, prow, ridge, shard, slab, teeth, Finish,
+};
 use guns::{ball, heavy};
-use style::{bridge, course, drives, fin, lifts, on, prow, ridge, shard, teeth, Finish};
 
 /// The heavy guns' bores ahead of their pivots, and the batteries'.
 const HEAVY_REACH: f32 = 15.0;
@@ -262,19 +263,6 @@ fn armour(b: &mut MeshBuilder, body: &Body, (bow, stern): (f32, f32)) {
         Finish::Dark,
         0,
     );
-}
-
-/// A plan slab: `half` the port half from bow to stern, mirrored, from `low` to `high`.
-fn slab(b: &mut MeshBuilder, half: &[[f32; 2]], low: f32, high: f32) {
-    let mut outline = half.to_vec();
-    outline.extend(
-        half.iter()
-            .rev()
-            .filter(|p| p[1] > 0.0)
-            .map(|&[x, y]| [x, -y]),
-    );
-    dark_plate(b);
-    b.extrude_z(&outline, low, high);
 }
 
 /// A stack of faceted blocks in `plan` (about its own middle `at`): each level `(z,

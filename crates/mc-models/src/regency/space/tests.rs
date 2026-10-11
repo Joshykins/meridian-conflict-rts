@@ -1,5 +1,6 @@
 use super::destroyer::{battery_mounts, lance_muzzle, seeker_muzzles};
 use super::suzerain::gun_mounts;
+use super::vassal::gun_mounts as vassal_mounts;
 use crate::{build_model, build_model_scaled, material};
 use glam::Vec3;
 
@@ -38,7 +39,11 @@ fn the_hulls_fit_their_blueprints_and_keep_their_identity_at_each_lod() {
                 .fold(0.0f32, f32::max);
             assert!(
                 top >= unit.height.to_f32() * 0.8 && top <= unit.height.to_f32() * 1.25,
-                "{key}: top {top}"
+                "{key}: top {top} at {:?}",
+                mesh.vertices
+                    .iter()
+                    .find(|v| v.pos[2] == top)
+                    .map(|v| v.pos)
             );
             assert!(mesh
                 .vertices
@@ -137,6 +142,46 @@ fn the_suzerains_guns_turn_in_its_wells_and_pockets() {
             show(pivot),
             show(muzzle)
         );
+    }
+}
+
+#[test]
+fn the_vassals_guns_are_the_models_and_every_twin_bore_is_lit() {
+    let bp = blueprints();
+    let unit = bp.unit(bp.id_of("regency_t2_space_frigate").unwrap());
+    let model = build_model(&unit.visual.mesh).unwrap();
+    let at = |p: mc_core::FxVec3| Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
+    let show = |p: Vec3| format!("({}, {}, {})", p.x, p.y, p.z);
+    let mounts = vassal_mounts();
+    assert_eq!(unit.weapons.len(), mounts.len());
+    for (k, (weapon, (pivot, bores))) in unit.weapons.iter().zip(mounts).enumerate() {
+        let have: Vec<Vec3> = if weapon.muzzles.is_empty() {
+            vec![at(weapon.muzzle)]
+        } else {
+            weapon.muzzles.iter().map(|&p| at(p)).collect()
+        };
+        assert!(
+            weapon.pivot.map(at) == Some(pivot)
+                && have.len() == bores.len()
+                && have.iter().zip(&bores).all(|(h, w)| h.distance(*w) < 0.01)
+                && at(weapon.muzzle).distance(bores[0]) < 0.01,
+            "gun {k}: pivot {} bores [{}]",
+            show(pivot),
+            bores
+                .iter()
+                .map(|&p| show(p))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        for bore in bores {
+            let near = model.lods[0]
+                .vertices
+                .iter()
+                .filter(|v| v.material == material::GLOW_VIOLET)
+                .map(|v| Vec3::from(v.pos).distance(bore))
+                .fold(f32::MAX, f32::min);
+            assert!(near < 1.2, "gun {k}: no bore at {}", show(bore));
+        }
     }
 }
 
