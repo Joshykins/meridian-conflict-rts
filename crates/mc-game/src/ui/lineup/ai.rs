@@ -62,13 +62,16 @@ pub(super) fn seat_line(ui: &mut Ui, seat: &mut Seat, r: Rect, host: bool, ai_se
         ),
         ("Forces", &forces, force_at.unwrap_or(FORCE_LABELS.len())),
         ("Income", &incomes, income_at.unwrap_or(INCOMES.len())),
-        ("Build", &builds, build_at.unwrap_or(BUILDS.len())),
+        ("Build Rate", &builds, build_at.unwrap_or(BUILDS.len())),
     ];
     // A person has no doctrine or forces to pick: only the income and build
     // rate, as wide as an AI's would be.
     let fields = if ai_seat { &all[..] } else { &all[2..] };
-    // Each as wide as its label and longest option; the labels go when the
-    // line is too narrow for them, and the choices share what is left over.
+    // Each as wide as its label and longest option. When the line is too
+    // narrow, the doctrine's and forces' labels go (their options say what
+    // they are), but never the income's or build rate's: both are said as
+    // "1x", and only the label tells them apart. The choices share what is
+    // left over.
     let gap = 6.0;
     let natural = |ui: &mut Ui, label: &str, options: &[&str], labelled: bool| {
         let value = options
@@ -92,7 +95,8 @@ pub(super) fn seat_line(ui: &mut Ui, seat: &mut Seat, r: Rect, host: bool, ai_se
         labelled = false;
         widths = all
             .iter()
-            .map(|(l, o, _)| natural(ui, l, o, false))
+            .enumerate()
+            .map(|(n, (l, o, _))| natural(ui, l, o, n >= 2))
             .collect();
     }
     let k = room / widths.iter().sum::<f32>();
@@ -101,7 +105,7 @@ pub(super) fn seat_line(ui: &mut Ui, seat: &mut Seat, r: Rect, host: bool, ai_se
     for (n, ((label, options, at), w)) in all.iter().zip(widths).enumerate().skip(first) {
         let w = w * k;
         let cell = Rect::new(x, r.y, w, r.h);
-        let label = if labelled { *label } else { "" };
+        let label = if labelled || n >= 2 { *label } else { "" };
         if let Some(pick) = ui.choice(id("ai-line", key * 4 + n), cell, label, options, *at, host) {
             match n {
                 0 => ai.doctrine = DOCTRINES[pick],
@@ -155,7 +159,7 @@ pub(super) fn settings_toggle(
 }
 
 /// An AI's settings in short: "Adaptive \u{b7} Balanced", and its income and
-/// build rate when they are not normal: "\u{b7} 2x Income \u{b7} 3x Build".
+/// build rate when they are not normal: "\u{b7} 2x Income \u{b7} 3x Build Rate".
 pub(super) fn summary(ai: &mc_sim::AiConfig) -> String {
     let mut s = format!(
         "{}  \u{b7}  {}",
@@ -168,10 +172,10 @@ pub(super) fn summary(ai: &mc_sim::AiConfig) -> String {
     s
 }
 
-/// "2x Income", "3x Build" or both, when a seat's income or build rate is not
+/// "2x Income", "3x Build Rate" or both, when a seat's income or build rate is not
 /// normal.
 pub(super) fn dial_note(ai: &mc_sim::AiConfig) -> Option<String> {
-    let notes: Vec<String> = [(ai.income, "Income"), (ai.build, "Build")]
+    let notes: Vec<String> = [(ai.income, "Income"), (ai.build, "Build Rate")]
         .into_iter()
         .filter(|(v, _)| *v != 1000)
         .map(|(v, name)| format!("{} {name}", income_label(v)))
@@ -179,12 +183,12 @@ pub(super) fn dial_note(ai: &mc_sim::AiConfig) -> Option<String> {
     (!notes.is_empty()).then(|| notes.join("  \u{b7}  "))
 }
 
-/// "1x Income", "2x Income \u{b7} 3x Build": a seat's income, said always, and
+/// "1x Income", "2x Income \u{b7} 3x Build Rate": a seat's income, said always, and
 /// its build rate when it is not normal.
 pub(super) fn income_summary(ai: &mc_sim::AiConfig) -> String {
     let mut s = format!("{} Income", income_label(ai.income));
     if ai.build != 1000 {
-        s += &format!("  \u{b7}  {} Build", income_label(ai.build));
+        s += &format!("  \u{b7}  {} Build Rate", income_label(ai.build));
     }
     s
 }
