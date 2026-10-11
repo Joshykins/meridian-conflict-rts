@@ -12,6 +12,9 @@ pub(in crate::ai) struct Scratch {
     pub work: u32,
     /// Its fronts at the last think, as read then: for the overlay.
     pub fronts: Vec<super::fronts::Front>,
+    /// What it believed of the enemy at the last think: income a second, materials
+    /// unaccounted for, army and fortifications (`beliefs.rs`), for the overlay.
+    pub belief: [i32; 4],
 }
 
 // Derived data is never part of what two states compare.

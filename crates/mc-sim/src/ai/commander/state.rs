@@ -433,6 +433,14 @@ pub(in crate::ai) struct CommanderState {
     /// (`commander.rs`). Zero reads as one.
     #[serde(default)]
     pub think_scale: u8,
+    /// Materials the enemy is believed to have earned over the match, and the tick it was
+    /// last added to; materials of theirs the side has killed (`beliefs.rs`).
+    #[serde(default)]
+    pub earned: Fx,
+    #[serde(default)]
+    pub earned_at: u32,
+    #[serde(default)]
+    pub killed: Fx,
     /// Its fronts at the last think, and the id the next new one takes (`fronts.rs`).
     #[serde(default)]
     pub fronts: Vec<super::fronts::FrontRecord>,
@@ -545,6 +553,9 @@ impl CommanderState {
         for x in &self.hurt {
             h.write_i64(x.0);
         }
+        h.write_i64(self.earned.0);
+        h.write_i64(self.killed.0);
+        h.write_u64(u64::from(self.earned_at));
         h.write_u64(self.fronts.len() as u64 | u64::from(self.next_front) << 32);
         for f in &self.fronts {
             f.hash(h);

@@ -98,6 +98,9 @@ pub struct AiMind {
     pub known: Vec<super::mind_zones::MindZone>,
     /// Its fronts (`fronts.rs`).
     pub fronts: Vec<super::mind_zones::MindFront>,
+    /// What it believes of the enemy: income a second, materials their income bought that
+    /// it has not seen, their army, their fortifications (`beliefs.rs`).
+    pub enemy: [i32; 4],
 }
 
 const HURT_NAMES: [&str; 6] = ["land", "artillery", "air", "space", "sea", "turrets"];
@@ -233,6 +236,7 @@ impl World {
             need: c.role_need.map(i32::from),
             known: self.mind_zones(&c.knowledge),
             fronts: self.mind_fronts(player),
+            enemy: c.scratch.belief,
         })
     }
 }

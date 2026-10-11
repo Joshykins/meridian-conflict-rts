@@ -102,6 +102,7 @@ impl World {
         if ai.commander.kills.len() < MOST_KILLS {
             ai.commander.kills.push((killer, materials));
         }
+        ai.commander.killed += materials;
     }
 
     /// A unit of `player` of blueprint `lost`, worth `materials`, was killed by a unit of
@@ -172,7 +173,7 @@ impl World {
             (1 + owned / UNITS_PER_SLOWDOWN).min(MOST_SLOWDOWN) as u8;
         let wm = self.world_model(player, &profiles);
         let zv = self.zone_view(player, &zones, &wm);
-        let beliefs = self.beliefs(player, &profiles);
+        let beliefs = self.beliefs(player, &profiles, &zones);
         let span = mc_core::perf_span!("ai.fronts");
         self.find_fronts(player, &zones, &zv, &profiles);
         drop(span);
@@ -208,7 +209,9 @@ impl World {
         c.rally_back = (c.rally_back - Fx::from_int(30)).max(Fx::ZERO);
         // The rally point holds still unless the front moves half a kilometre or
         // fire reaches it: moving it every think kept the wave walking after it.
-        let front = self.front_line(player, start, enemy_start, census, &reach, &wm);
+        let front = self
+            .front_rally(player, &zones, &reach, &wm)
+            .unwrap_or_else(|| self.front_line(player, start, enemy_start, census, &reach, &wm));
         let staging = match self.state.ai[player as usize].commander.rally {
             Some(r)
                 if r.distance(front) < Fx::from_int(500)
@@ -298,6 +301,32 @@ impl World {
             .map(|k| start + dir * (t - Fx::from_int(200 * k)).max(Fx::from_int(260)))
             .find(safe)
             .unwrap_or(home)
+    }
+
+    /// Where the army gathers when the side has fronts: behind the land front with most
+    /// at stake (what it holds there, and half what it could take), in our zone at its
+    /// back, when the army can walk there and no enemy fire reaches it. Gathered on the
+    /// line between the two starts, an army stood far from the border its mines were
+    /// lost along.
+    fn front_rally(
+        &self,
+        player: u8,
+        zones: &Zones,
+        reach: &reach::Reach,
+        wm: &WorldModel,
+    ) -> Option<FxVec2> {
+        let c = &self.state.ai[player as usize].commander;
+        c.scratch
+            .fronts
+            .iter()
+            .filter(|f| !f.water)
+            .filter_map(|f| {
+                let at = zones.zones.get(f.rear? as usize)?.centre;
+                (reach.reaches(at) && wm.threat_at(at, profile::Target::Land) == Fx::ZERO)
+                    .then_some((f.stake_us + f.stake_them / 2, f.id, at))
+            })
+            .max_by_key(|&(stake, id, _)| (stake, std::cmp::Reverse(id)))
+            .map(|(.., at)| at)
     }
 
     /// Each operation's orders, the most urgent first, while the side's attention

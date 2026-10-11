@@ -89,6 +89,7 @@ Read by the ignored probe tests in mc-sim, never by the game (docs/AI_COMMANDER.
 | Variable | Values | Purpose |
 |---|---|---|
 | `TOURNEY` | `map:players:minutes:seed:A:B[:difficulty]` | One tournament match (`zz_ai_tournament`); A and B are doctrines (`adaptive`, `aggressive`, `economic`, `defensive`). |
+| `TOURNEY_INCOME` | thousandths | Every seat's share of normal income (`AiConfig::income`, as the set-up's AI income): the sim earns more, unlike `TOURNEY_RESOURCES`. Default 1000. |
 | `TOURNEY_EVERY` | minutes | Print each side's economy, build speed, mines, worth and plans every N minutes. |
 | `TOURNEY_ROSTER` | any | Print each player's units and where its materials stand at the end. |
 | `TOURNEY_DEATHS` | any | Print every unit that dies: when, how far from home, the nearest enemy. |

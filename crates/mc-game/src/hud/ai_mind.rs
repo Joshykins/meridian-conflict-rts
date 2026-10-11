@@ -59,8 +59,10 @@ impl Hud {
         let Some(m) = &p.mind else { return };
         let w = 340.0;
         let (plans, ops) = lines(m);
-        let want =
-            HEAD * 6.0 + LINE * (plans + ops + 6 + NOTES.min(m.notes.len().max(1))) as f32 + 22.0;
+        let want = HEAD * 6.0
+            + LINE * 2.0
+            + LINE * (plans + ops + 6 + NOTES.min(m.notes.len().max(1))) as f32
+            + 22.0;
         let h = want.min(bottom - top);
         if h < HEAD * 3.0 {
             return;
@@ -330,6 +332,22 @@ impl Hud {
                     .join("  ")
             };
             ui.text(x, y, type_scale::MICRO, dim, &format!("HURT BY  {hurt}"));
+            y += LINE;
+        }
+        if fits(y) {
+            let [income, unseen, army, forts] = m.enemy;
+            ui.text(
+                x,
+                y,
+                type_scale::MICRO,
+                dim,
+                &format!(
+                    "THEM  income ~{income}/s  \u{b7}  army {}  \u{b7}  guns {}  \u{b7}  unaccounted {}",
+                    kilo(army),
+                    kilo(forts),
+                    kilo(unseen)
+                ),
+            );
             y += LINE + 6.0;
         }
 

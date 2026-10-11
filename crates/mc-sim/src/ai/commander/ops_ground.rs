@@ -107,6 +107,7 @@ impl World {
                     (score, c.pos)
                 })
             })
+            .chain(self.remembered_objectives(ctx, from, materials, soft, &fire))
             .max_by_key(|&(s, p)| (s, std::cmp::Reverse((p.x, p.y))))
             .map(|(_, p)| p)
             .or_else(|| {
@@ -115,6 +116,61 @@ impl World {
                     .flatten()
                     .filter(|s| self.army_reaches(ctx, *s))
             })
+    }
+
+    /// Targets from the side's long memory (`knowledge.rs`): every zone where it knows
+    /// the enemy has structures (mines and power only, for a raid), long after the
+    /// contacts have forgotten them, scored as `land_objective` scores a contact. An
+    /// expansion scouted five minutes ago was out of every wave's reckoning.
+    fn remembered_objectives(
+        &self,
+        ctx: &Ctx,
+        from: FxVec2,
+        materials: Fx,
+        soft: bool,
+        fire: &[Fx],
+    ) -> Vec<(i64, FxVec2)> {
+        use super::knowledge::Built;
+        let tick = self.state.tick;
+        let ashore = !ctx.can_walk(from);
+        let known = &self.state.ai[ctx.player as usize].commander.knowledge;
+        let mut out = Vec::new();
+        for (z, k) in known.iter().enumerate() {
+            let Some(zone) = ctx.zones.zones.get(z) else {
+                continue;
+            };
+            let at = zone.centre;
+            if !(ashore || self.army_reaches(ctx, at)) {
+                continue;
+            }
+            let (mut value, mut guarded) = (Fx::ZERO, Fx::ZERO);
+            for h in &k.held {
+                let sure = h.built_sure(tick);
+                let b = |x: Built| h.built[x as usize] * sure / 100;
+                value += if soft {
+                    b(Built::Mine) + b(Built::Power)
+                } else {
+                    h.built_materials() * sure / 100
+                };
+                guarded += b(Built::Guns) + b(Built::Artillery) + h.army_now(tick);
+            }
+            if value == Fx::ZERO {
+                continue;
+            }
+            let threat = self
+                .enemy_strength_at(ctx, at, Fx::from_int(700), Target::Land)
+                .max(guarded);
+            if threat * OUTMATCHED > materials * 2 {
+                continue;
+            }
+            let along = fire.get(z).copied().unwrap_or(Fx::ZERO);
+            let walk = at.distance(from).floor_int() as i64 / 100 + 15;
+            let score = (value - threat / 2 - along * THREAT_MATERIALS / 4).floor_int() as i64
+                * 10_000
+                / (walk * walk);
+            out.push((score, at));
+        }
+        out
     }
 
     /// One think of a land operation (`Army`, `Raid`, `Siege`, `Defend`, and a landing

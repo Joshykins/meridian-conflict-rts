@@ -77,6 +77,9 @@ pub(in crate::ai) struct Front {
     pub theirs: i32,
     /// Hops from it to their nearest held zone of most value: how far a push gets.
     pub depth: u16,
+    /// Our zone just behind it that holds the most of ours: where an army stands to
+    /// hold it. `None` when no zone of ours touches it.
+    pub rear: Option<u16>,
 }
 
 /// What each side holds in each zone, as claims.
@@ -282,6 +285,11 @@ pub(in crate::ai) fn find(
                         continue;
                     }
                     let depth = depth_to(zones, &run, &their_side, theirs);
+                    let rear = near_us
+                        .iter()
+                        .copied()
+                        .filter(|z| !run.contains(z))
+                        .max_by_key(|&z| (claims.ours[z as usize], Reverse(z)));
                     found.push(Front {
                         id: 0,
                         enemy: p as u8,
@@ -293,6 +301,7 @@ pub(in crate::ai) fn find(
                         ours,
                         theirs: theirs_near,
                         depth,
+                        rear,
                     });
                 }
             }

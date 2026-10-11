@@ -198,14 +198,27 @@ each side; the AI Mind card lists the four with most at stake.
 What the side thinks of the enemy, each a guess from what it has seen, where it has
 looked and seen nothing, and what time and income make likely:
 
-- `income` and `tech`; `army` by domain, a fifth over what was seen and never less
-  than forty seconds of their income;
-- `fortified` (turrets, map guns, artillery), `anti_air`;
+- `income`: their mines known (from knowledge) at the yield the side's own mines
+  give for their materials (so a higher tier counts for more), and never less than the
+  time says; `tech`;
+- `army` by domain: the most of what the contacts saw lately and what knowledge
+  believes is standing now, a fifth over that and never less than forty seconds
+  of their income;
+- `fortified` (turrets, map guns, artillery: contacts, or the guns knowledge keeps,
+  whichever says more), `anti_air`;
 - confidences 0..=100 that they field `air`, `navy`, `subs`, `space`, and `nukes`
   (seen: certain; unseen: rising with time, income and tech and with how quiet
   they have been, falling as their base is scouted without one);
 - `interceptors` seen and where, `sonar` cover, `army_at` (last sighting),
-  `base_unseen`, `quiet`.
+  `base_unseen` (their start's zone looked at counts), `silos` (contacts or
+  knowledge);
+- `unaccounted`: what their income is believed to have bought over the match
+  (`commander.earned`, a running sum) less everything known of theirs standing and
+  everything the side has killed (`commander.killed`): what they may be building
+  out of sight. `quiet` is ten minutes in with four minutes of their income
+  unaccounted for.
+
+The AI Mind card's THEM line shows income, army, guns and unaccounted materials.
 
 `Sticky` facts never fade: the highest tier seen and when each kind of force was
 last seen.
@@ -246,8 +259,16 @@ taste, plus `HOLD` if held, plus its record. A stake is taken past its mark
 - **commit**: a stake taken in the last three minutes is not dropped on a dip in
   appeal, only on failure or an answer;
 - **budget**: one plan all in at most, and the stakes' points (probe 1, invest 3,
-  all-in 6) within the side's budget (Easy 4, Normal 7, Hard 9): the least
-  appealing give way. Several plans at once is the normal state.
+  all-in 6) within the side's budget: 9 at 50 materials a second and under, a point
+  more for every 20 above that, 40 at most (`budget_for`). The least appealing give
+  way. Several plans at once is the normal state, and a richer side runs more: held
+  to a fixed number, one earning 300 a second ran the same three plans as one
+  earning 40. (Difficulty no longer sets it.)
+- **more at once when rich**: the raids, landings and sieges a stake opens, and the
+  silos, map guns, titans and warships it keeps, are multiplied by `scale`: one at 60
+  a second and under, a half more for each 60 above, five at most. The groups stay
+  the same size: groups waiting for five times the materials set out too late and
+  traded worse at three times the income.
 
 Hedges are just plans held low: `Fortify` at a probe builds an interceptor slowly
 while `nukes` confidence is middling; `AirDefense` answers aircraft seen or felt.
@@ -301,6 +322,13 @@ Ground rules learnt in the tournaments (each is a comment at its code):
   places with none: sent at cell centres on mountains, a side's scouts never left
   home in a 19-minute match;
 - never into a turret belt it cannot take; a probe goes only at soft targets;
+- targets come from the long memory as well as the contacts: a zone where enemy
+  structures are known (mines and power, for a raid) is a target long after its
+  contacts are forgotten, scored the same way (`remembered_objectives`);
+- the waves gather behind the land front with most at stake (what it holds there
+  and half what it could take), in our zone at its back (`front_rally`), when the
+  army can walk there and no fire reaches it; with no fronts yet, on the line
+  between the starts as before;
 - shelled while gathering: helpless against aircraft, it goes home; against
   ground guns it charges them or steps the rally back;
 - a group that has lost half and is losing the trade, or is helpless, withdraws as

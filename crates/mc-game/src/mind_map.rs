@@ -11,7 +11,7 @@
 //! the zone under the pointer gets a card: everything known of it, and in Mind, what
 //! is really there beside it.
 
-use crate::nuke_marks::{project, surface, tag};
+use crate::nuke_marks::{dashed, project, surface, tag};
 use crate::orders::Field;
 use crate::ui::{ink, palette, rgb, type_scale, Color, Rect, Ui};
 use glam::{Vec2, Vec3};
@@ -251,6 +251,52 @@ pub fn draw(
             }
         }
         above = below;
+    }
+    // Its operations in Mind: each group's way from where it stands to its target,
+    // bright while it goes, dim while it gathers; and where its waves gather.
+    if mode == MapMode::Mind {
+        if let Some(m) = status
+            .players
+            .get(who as usize)
+            .and_then(|p| p.mind.as_ref())
+        {
+            let ground = |ui: &Ui, (x, y): (i32, i32)| {
+                let p = Vec2::new(x as f32, y as f32);
+                project(ui, field, p.extend(surface(field, p) + LIFT))
+            };
+            for op in &m.ops {
+                let (Some(at), Some(to)) =
+                    (op.at.and_then(|a| ground(ui, a)), ground(ui, op.target))
+                else {
+                    continue;
+                };
+                if !(on_screen(at) || on_screen(to)) {
+                    continue;
+                }
+                let tone = if op.engaged {
+                    rgb(palette::ACCENT, 0.95)
+                } else {
+                    rgb(palette::TEXT, 0.35)
+                };
+                if op.engaged {
+                    dashed(ui, at, to, 2.2, tone, 30.0);
+                    ui.disc(to, 4.0, tone);
+                }
+                if on_screen(at) {
+                    ui.disc(at, 3.0, tone);
+                    let label = format!("{} {}", op.kind, kilo(op.materials));
+                    ui.text_centred(at.x, at.y + 14.0, type_scale::MICRO, tone, &label);
+                }
+            }
+            if let Some(r) = m
+                .rally
+                .and_then(|r| ground(ui, r))
+                .filter(|r| on_screen(*r))
+            {
+                tag(ui, r - Vec2::new(0.0, 18.0), "RALLY", palette::TEXT);
+                ui.disc(r, 4.0, rgb(palette::TEXT, 0.9));
+            }
+        }
     }
     // Each front's name and balance, over its middle.
     for f in fronts {

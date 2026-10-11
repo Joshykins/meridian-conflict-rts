@@ -7,7 +7,7 @@ use super::profile::{role, Domain, Profile};
 use super::state::{Note, OpKind, Phase, Plan, PlanKind, Stake, Why, NOTES, PLANS};
 use super::Ctx;
 use crate::ai::Census;
-use crate::{Difficulty, Doctrine, World};
+use crate::{Doctrine, World};
 use mc_core::{Fx, FxVec2};
 use mc_data::BlueprintId;
 
@@ -93,13 +93,18 @@ fn points(s: Stake) -> i32 {
     }
 }
 
-/// How many stake points a side spreads over its plans.
-fn budget(d: Difficulty) -> i32 {
-    match d {
-        Difficulty::Easy => 4,
-        Difficulty::Normal => 7,
-        Difficulty::Hard => 9,
-    }
+/// How many stake points a side spreads over its plans: more the more it earns, so
+/// a rich side runs more plans at once and each at a higher stake. Held to a fixed
+/// number, a side earning 300 a second ran the same three plans as one earning 40.
+fn budget_for(income: Fx) -> i32 {
+    (9 + (income.floor_int() - 50) / 20).clamp(9, 40)
+}
+
+/// How many times over its plain size an operation or project a rich side runs: one
+/// at 60 a second and under, a half more for each 60 above that, five at most.
+/// (In tenths.)
+pub(in crate::ai) fn scale(income: Fx) -> i32 {
+    (10 + (income.floor_int() - 60).max(0) * 5 / 60).min(50)
 }
 
 /// What the side can build: the profiles of everything in its builders' and
@@ -464,7 +469,7 @@ impl World {
         for &i in all_in.iter().skip(1) {
             scored[i].2 = Stake::Invest;
         }
-        let cap = budget(config.difficulty);
+        let cap = budget_for(self.state.players[player].materials_income);
         loop {
             let total: i32 = scored.iter().map(|s| points(s.2)).sum();
             if total <= cap {
@@ -625,8 +630,12 @@ impl World {
             Stake::Invest => n[1],
             Stake::AllIn => n[2],
         };
+        // A rich side runs more of them at once (not bigger ones: groups waiting for
+        // five times the materials set out too late and traded worse at three times the income).
+        let x = scale(income);
+        let more = |n: usize| (n * x as usize).div_ceil(10);
         let raid = stake(self, PlanKind::Raid);
-        for _ in count(self, OpKind::Raid)..by_stake(raid, [1, 2, 3]) {
+        for _ in count(self, OpKind::Raid)..more(by_stake(raid, [1, 2, 3])) {
             let want = Fx::from_int(by_stake(raid, [300, 600, 900]) as i32);
             self.open_op(
                 ctx.player,
@@ -638,7 +647,7 @@ impl World {
             );
         }
         let landing = stake(self, PlanKind::Landing);
-        for _ in count(self, OpKind::Landing)..by_stake(landing, [1, 1, 2]) {
+        for _ in count(self, OpKind::Landing)..more(by_stake(landing, [1, 1, 2])) {
             let want = Fx::from_int(by_stake(landing, [4, 12, 30]) as i32);
             self.open_op(
                 ctx.player,
@@ -650,7 +659,7 @@ impl World {
             );
         }
         let siege = stake(self, PlanKind::Siege);
-        for _ in count(self, OpKind::Siege)..by_stake(siege, [1, 1, 2]) {
+        for _ in count(self, OpKind::Siege)..more(by_stake(siege, [1, 1, 2])) {
             self.open_op(
                 ctx.player,
                 OpKind::Siege,
@@ -816,6 +825,9 @@ impl World {
                 fits.min_by_key(|p| (p.materials, p.id.0)).map(|p| p.id)
             }
         };
+        // A rich side keeps more of each project.
+        let x = scale(income);
+        let more = |n: usize| (n * x as usize).div_ceil(10);
         let mut wants: Vec<BlueprintId> = Vec::new();
         // Answers to a threat the side is under now (warheads seen, warships out of
         // its anti-air's reach, raids on its mines): builders take these before
@@ -899,12 +911,12 @@ impl World {
         let silo = |p: &Profile| p.has(role::STRATEGIC);
         // A probe builds one only when it is cheap: `pick` finds none dearer than two
         // minutes of income.
-        if held(&silo) < [0, 1, 1, 2][strategic as usize] {
+        if held(&silo) < more([0, 1, 1, 2][strategic as usize]) {
             want(pick(&silo, minutes(strategic), false));
         }
         let siege = stake(PlanKind::Siege);
         let gun = |p: &Profile| p.has(role::MAP_GUN);
-        if held(&gun) < [0, 1, 1, 3][siege as usize] {
+        if held(&gun) < more([0, 1, 1, 3][siege as usize]) {
             want(pick(&gun, minutes(siege), siege >= Stake::Invest));
         }
         let titan = stake(PlanKind::Titan);
@@ -915,7 +927,7 @@ impl World {
                 && !p.has(role::TRANSPORT)
                 && p.domain != Some(Domain::Space)
         };
-        if held(&big) < [0, 1, 1, 2][titan as usize] {
+        if held(&big) < more([0, 1, 1, 2][titan as usize]) {
             want(pick(&big, minutes(titan) + 2, true));
         }
         let warships = stake(PlanKind::Warships);
@@ -925,7 +937,7 @@ impl World {
                 && !p.has(role::TRANSPORT)
                 && p.has(role::PROJECT)
         };
-        if held(&warship) < [0, 1, 3, 6][warships as usize] {
+        if held(&warship) < more([0, 1, 3, 6][warships as usize]) {
             want(pick(&warship, minutes(warships), warships >= Stake::Invest));
         }
         let shield = |p: &Profile| p.has(role::SHIELD) && !p.mobile();

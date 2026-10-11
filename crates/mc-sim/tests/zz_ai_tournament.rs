@@ -11,6 +11,9 @@
 //! `TOURNEY_SNAP=tick` each side's armed mobile units at that tick,
 //! `TOURNEY_DEATHS=1` every unit that dies, where and when, `TOURNEY_OPS=N` slot N's
 //! operations whenever one changes (every 10 s).
+//! `TOURNEY_INCOME=N` (thousandths, default 1000) sets every seat's share of normal
+//! income (`AiConfig::income`, the set-up's AI income): the sim itself earns more,
+//! so the AI reads the higher income as it would in a match.
 //! `TOURNEY_RESOURCES=N` (a whole number, default 1) multiplies every player's materials and
 //! energy income by N: the harness tops the stores up each tick with the extra, so the
 //! sim itself is untouched.
@@ -77,6 +80,10 @@ fn match_up() {
         .ok()
         .and_then(|p| p.parse().ok());
     let mut last_ops: Vec<String> = Vec::new();
+    let income: u16 = std::env::var("TOURNEY_INCOME")
+        .ok()
+        .and_then(|n| n.parse().ok())
+        .unwrap_or(1000);
     let every: u32 = std::env::var("TOURNEY_EVERY")
         .ok()
         .and_then(|n| n.parse().ok())
@@ -107,6 +114,7 @@ fn match_up() {
                     ai: AiConfig {
                         doctrine,
                         difficulty,
+                        income,
                         ..AiConfig::default()
                     },
                     team: team_of(i),
