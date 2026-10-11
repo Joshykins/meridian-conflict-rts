@@ -237,13 +237,7 @@ struct CloudSample {
     flat: f32,
 }
 
-// The cloud at `p`, given the weather there (`weather_at(p.xy)`). `detail` 0
-// skips the fine erosion (light rays); otherwise it is how many times its
-// usual size the erosion is drawn, so seen from far off it stays a few march
-// texels across instead of shimmering or being dropped (which left the whole
-// strategic view soft, rounded blobs). The clearing is applied by the
-// caller, to how opaque the cloud is, never to its shape.
-// The storm round about last looked up (`cloud_at`): where (xy) and the sum
+// The storm round about last looked up (`cloud_column`): where (xy) and the sum
 // of its four taps (z, negative before the first). Rays from the strategic
 // view fall almost straight down and looked up the same four spots at every
 // step, milliseconds of the march over a stormy overcast. `storm_reuse` is how far
@@ -252,13 +246,46 @@ struct CloudSample {
 var<private> storm_near: vec3<f32> = vec3<f32>(0.0, 0.0, -1.0);
 var<private> storm_reuse: f32 = 0.0;
 
+// What the air holds over one spot (`cloud_column`): the weather, the day's base
+// and how tall the cloud there grows. All of it changes over hundreds of metres
+// or more, so a sample a few metres off (the light's short tap in `march`) takes
+// its shape from the same column: looked up again, it doubled the march's cost.
+struct CloudColumn {
+    // The point, turned with a wheeling storm (`vortex_warp_in`).
+    p: vec3<f32>,
+    // Where the wind has carried the air mass's fields from.
+    air: vec2<f32>,
+    cover: f32,
+    storm: f32,
+    // A Nimbus's seeded cloud, 0 to 1.
+    seeded: f32,
+    churn: f32,
+    // The weather's mass size (`SkyValues::scale`).
+    scale: f32,
+    firm: f32,
+    sheet: f32,
+    deck_closed: f32,
+    base: f32,
+    // How tall the column grows; 0 where there is no cloud.
+    reach: f32,
+}
+
+// The cloud at `p`, given the weather there (`weather_at(p.xy)`); see `cloud_shape`.
 fn cloud_at(at: vec3<f32>, w: vec4<f32>, detail: f32) -> CloudSample {
-    var out: CloudSample;
+    let col = cloud_column(at, w, detail);
+    return cloud_shape(col.p, col, detail, true);
+}
+
+// The column over `at` (`CloudColumn`); `detail` 0 for the light's coarse taps,
+// which skip the storm's four taps round about.
+fn cloud_column(at: vec3<f32>, w: vec4<f32>, detail: f32) -> CloudColumn {
+    var col: CloudColumn;
     // Round a wheeling storm the billows turn with the weather (`weather_at`).
     let p = vec3<f32>(vortex_warp_in(atmos.vortex, at.xy), at.z);
+    col.p = p;
     let cover = w.x;
     if cover < 0.015 {
-        return out;
+        return col;
     }
     let storm = clamp(w.y, 0.0, 1.0);
     // A Nimbus's seeded cloud (storm below zero, clouds_sim.wgsl `cs_force`): a firm
@@ -319,14 +346,43 @@ fn cloud_at(at: vec3<f32>, w: vec4<f32>, detail: f32) -> CloudSample {
         }
         tall_storm = (storm * 2.0 + storm_near.z) / 6.0;
     }
-    let reach = mix(mix(fair_depth, storm_depth, pow(tall_storm, 1.3)), DISTURBER_SEED_DEPTH, seeded);
-    if p.z <= base || p.z >= base + reach * (1.0 + TOP_LUMP * 0.5) {
+    col.air = air;
+    col.cover = cover;
+    col.storm = storm;
+    col.seeded = seeded;
+    col.churn = clamp(w.z, 0.0, 1.0);
+    col.scale = sky.scale;
+    col.firm = firm;
+    col.sheet = sheet;
+    col.deck_closed = deck_closed;
+    col.base = base;
+    col.reach = mix(mix(fair_depth, storm_depth, pow(tall_storm, 1.3)), DISTURBER_SEED_DEPTH, seeded);
+    return col;
+}
+
+// The cloud at `p` in column `col`. `detail` 0 skips the fine erosion (light
+// rays); otherwise it is how many times its usual size the erosion is drawn, so
+// seen from far off it stays a few march texels across instead of shimmering or
+// being dropped (which left the whole strategic view soft, rounded blobs).
+// `grey` looks up how grey the cloud is (only the drawn sample needs it). The
+// clearing is applied by the caller, to how opaque the cloud is, never to its shape.
+fn cloud_shape(p: vec3<f32>, col: CloudColumn, detail: f32, grey: bool) -> CloudSample {
+    var out: CloudSample;
+    let base = col.base;
+    let reach = col.reach;
+    if reach <= 0.0 || p.z <= base || p.z >= base + reach * (1.0 + TOP_LUMP * 0.5) {
         return out;
     }
+    let cover = col.cover;
+    let storm = col.storm;
+    let seeded = col.seeded;
+    let churn = col.churn;
+    let firm = col.firm;
+    let sheet = col.sheet;
+    let deck_closed = col.deck_closed;
     out.storm = storm;
     // The billows drift with the wind; churned air twists them about.
     let drift = vec3<f32>(atmos.wind.xy, 0.0);
-    let churn = clamp(w.z, 0.0, 1.0);
     // Aircraft wakes: the flow they stirred bends the billows about (the
     // vortices twist them), and a fresh streak thins the cloud in a narrow
     // tube at the height the aircraft flew.
@@ -346,7 +402,7 @@ fn cloud_at(at: vec3<f32>, w: vec4<f32>, detail: f32) -> CloudSample {
         streak *= smoothstep(0.3, 0.75, grad_noise2(q.xy + vec2<f32>(q.z * 0.7, 0.0), 140.0));
     }
     // Bigger weather, bigger billows.
-    let period = SHAPE_PERIOD * mix(1.0, max(sky.scale, 0.5), 0.6);
+    let period = SHAPE_PERIOD * mix(1.0, max(col.scale, 0.5), 0.6);
     // Two lookups of the billows at unrelated sizes and angles. One alone
     // repeated every period across the map, the same lumps over and over, and
     // where cover was thin (the tops) only its cells' ridges were left: the
@@ -420,9 +476,9 @@ fn cloud_at(at: vec3<f32>, w: vec4<f32>, detail: f32) -> CloudSample {
     out.firm = firm;
     out.above = (1.0 - h) * reach;
     out.flat = max(deck_closed, sheet);
-    if detail > 0.0 {
+    if detail > 0.0 && grey {
         // Older, wetter cloud is greyer: patches of it, more in heavy weather.
-        let age = grad_noise2(air - vec2<f32>(1409.0, 2203.0), 1400.0);
+        let age = grad_noise2(col.air - vec2<f32>(1409.0, 2203.0), 1400.0);
         out.grey = (smoothstep(0.42, 0.62, age) * 0.45 + storm * 0.25 + deck_closed * 0.15 + sheet * 0.2) * (0.4 + 0.6 * firm);
     }
     return out;
@@ -861,7 +917,8 @@ fn march(in: FullOut) -> vec4<f32> {
             t += stride;
             continue;
         }
-        var c = cloud_at(p, w, detail);
+        let col = cloud_column(p, w, detail);
+        var c = cloud_shape(col.p, col, detail, true);
         if c.sigma > 0.0 && fine == 0 {
             fine = 8;
             t = max(t - dt * 0.75, t0);
@@ -890,7 +947,7 @@ fn march(in: FullOut) -> vec4<f32> {
                 // Not on a deck's or a sheet's flat top, which it turned into
                 // one even fleece from edge to edge.
                 let short = DETAIL_PERIOD * detail * 0.06;
-                tau = cloud_at(p + sun * short, w, detail).sigma * short * 2.0 * (1.0 - 0.8 * c.flat);
+                tau = cloud_shape(col.p + sun * short, col, detail, false).sigma * short * 2.0 * (1.0 - 0.8 * c.flat);
                 var reach = short * 2.0;
                 for (var k = 0; k < 4; k++) {
                     let seg = 70.0 * exp2(f32(k));
