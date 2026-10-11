@@ -2,9 +2,9 @@
 //! - tech 1, the cell: a solid armoured column on a round cradle, two segmented rings
 //!   turning round it the opposite ways, arcs jumping from the column to the inner ring
 //!   and across to the outer one (`Model::discharge`, renderer `reactor_fx.rs`);
-//! - tech 2, the dome: a faceted, squared-off dome over the whole lot, windows in its
-//!   facets onto the fusion inside (`pattern::FUSION`), buttresses on the diagonals, a
-//!   ring turning round its crown;
+//! - tech 2, the toroid: a stepped armoured hall, a segmented toroid turning round its
+//!   core sunk to its middle in the roof, eight field coils for ribs climbing from the
+//!   plinth over the toroid into the core, arcs leaping coil to coil round the ring;
 //! - tech 3, the star: the heaviest foundation, heat sinks on splayed feet, their fins
 //!   lifting in a wave (`part::REACTOR_FIN`), capacitor bastions; the star held over the
 //!   body on four panels (`pattern::CORE`), arcs to their electrodes; four short blades
@@ -118,7 +118,7 @@ const PLANT: Plant = Plant {
 pub(super) fn power(b: &mut MeshBuilder, tech: u8) {
     match tech {
         0 | 1 => cell(b),
-        2 => dome(b),
+        2 => toroid(b),
         _ => plant(b, &PLANT),
     }
 }
@@ -292,107 +292,11 @@ fn column(b: &mut MeshBuilder) {
 
 // ---- tech 2 ----------------------------------------------------------------------
 
-const DOME_DECK: f32 = 2.0;
-/// The dome's plan (a squared-off octagon, scaled by its sections) and its sections,
-/// wall to crown: (up, scale).
-const DOME_CHAMFER: f32 = 0.5;
-const DOME: [(f32, f32); 5] = [
-    (3.0, 19.6),
-    (8.0, 19.2),
-    (13.5, 16.2),
-    (18.5, 11.6),
-    (21.5, 7.0),
-];
-/// The crown: its collar's top, the neck's top, and the ring turning round it.
-const CROWN: f32 = 22.3;
-const NECK: f32 = 24.4;
-const CROWN_RING: (f32, f32, f32, f32) = (5.0, 6.4, 22.6, 23.6);
+/// Tech 2's deck, the top of its plinth.
+const DECK_T2: f32 = 2.0;
 
-/// Tech 2, the dome: a faceted, squared-off dome over the whole lot, windows in its
-/// sloped facets onto the fusion inside, buttresses on the diagonals, power trunks out
-/// along the axes, a ring turning round its crown and a glass oculus on top.
-fn dome(b: &mut MeshBuilder) {
-    b.set_spinner_pivot(v3(0.0, 0.0, CROWN));
-    if b.coarse() {
-        b.paint(PLATING);
-        b.block(v3(-23.0, -23.0, 0.0), v3(23.0, 23.0, DOME_DECK));
-        b.paint(ACCENT);
-        b.prism(v3(0.0, 0.0, DOME_DECK), 8, 21.0, 7.4, CROWN - DOME_DECK);
-        team_panel(b, v3(0.0, 21.6, DOME_DECK), v2(7.0, 1.6));
-        return;
-    }
-    let plan = chamfered_rect(v2(23.0, 23.0), 5.0);
-    b.paint(ACCENT);
-    b.loft_z(
-        &plan,
-        &[Section::new(0.0, 1.02), Section::new(DOME_DECK * 0.4, 1.0)],
-    );
-    b.paint(PLATING);
-    b.loft_z(
-        &plan,
-        &[
-            Section::new(DOME_DECK * 0.4, 0.99),
-            Section::new(DOME_DECK, 0.97),
-        ],
-    );
-    // The dome: a dark footing, the wall and the facets, a dark collar at the crown.
-    let unit = chamfered_rect(v2(1.0, 1.0), DOME_CHAMFER);
-    b.paint(ACCENT);
-    b.loft_z(
-        &unit,
-        &[Section::new(DOME_DECK, 20.0), Section::new(DOME[0].0, 19.8)],
-    );
-    b.paint(PLATING);
-    let sections: Vec<Section> = DOME.iter().map(|&(z, s)| Section::new(z, s)).collect();
-    b.loft_z(&unit, &sections);
-    b.paint(ACCENT);
-    let top = DOME[DOME.len() - 1];
-    b.loft_z(
-        &unit,
-        &[
-            Section::new(top.0, top.1 * 1.03),
-            Section::new(CROWN, top.1 * 0.97),
-        ],
-    );
-    // Windows in the two sloped bands, every facet.
-    for band in [1, 2] {
-        for i in 0..unit.len() {
-            window(b, &unit, i, DOME[band], DOME[band + 1]);
-        }
-    }
-    // The crown: the neck, the oculus on it, the ring turning round it.
-    let sides = round(b, 16);
-    let circle = ngon_plan(round(b, 8), 1.0);
-    b.paint(ACCENT);
-    b.loft_z(
-        &circle,
-        &[Section::new(CROWN, 4.8), Section::new(NECK, 4.3)],
-    );
-    b.paint(GLOW).pattern(pattern::FUSION);
-    b.loft_z(
-        &circle,
-        &[Section::new(NECK, 3.4), Section::new(NECK + 0.3, 3.0)],
-    );
-    b.paint(GLOW).pattern(pattern::CHARGE);
-    annulus(b, sides, 4.2, 4.45, NECK - 0.6, NECK - 0.35);
-    b.with_part(part::REACTOR_COLLAR_FIRST, |b| ring(b, CROWN_RING, 6));
-    // Buttresses on the diagonals, from a footing at the plinth's corner up to the wall.
-    b.yawed(Vec3::ZERO, FRAC_PI_4, |b| {
-        b.radial(4, |b| {
-            b.paint(ACCENT);
-            b.chamfered_box(v3(26.0, 0.0, DOME_DECK + 0.9), v3(4.0, 4.6, 1.8), 0.6);
-            b.beam(
-                v3(25.8, 0.0, DOME_DECK + 1.6),
-                v3(20.6, 0.0, DOME[1].0 + 0.4),
-                v2(3.2, 1.8),
-                v2(2.4, 1.0),
-            );
-            if b.fine() {
-                glow_strip(b, v3(26.0, 0.0, DOME_DECK + 1.8), v2(2.4, 0.4), GLOW);
-            }
-        })
-    });
-    // Power trunks out along the axes, team colour beside them.
+/// Power trunks out along the axes, team colour beside them.
+fn trunks(b: &mut MeshBuilder) {
     b.radial(4, |b| {
         b.paint(ACCENT);
         wedge(b, 19.0, 23.2, v2(5.0, 4.4), v2(3.6, 2.6));
@@ -403,60 +307,172 @@ fn dome(b: &mut MeshBuilder) {
             v2(1.6, 0.14),
             v2(1.6, 0.14),
         );
-        b.mirror_y(|b| team_panel(b, v3(21.6, 9.0, DOME_DECK), v2(1.6, 6.0)));
+        b.mirror_y(|b| team_panel(b, v3(21.6, 9.0, DECK_T2), v2(1.6, 6.0)));
     });
 }
 
-/// A window in facet `i` of `plan` between two of the dome's sections: a pane onto the
-/// fusion, standing just off the facet, split by dark mullions.
-fn window(b: &mut MeshBuilder, plan: &[[f32; 2]], i: usize, lo: (f32, f32), hi: (f32, f32)) {
-    let corner = |k: usize, (z, s): (f32, f32)| {
-        let q = plan[k % plan.len()];
-        v3(q[0] * s, q[1] * s, z)
-    };
-    let (p00, p10) = (corner(i, lo), corner(i + 1, lo));
-    let (p01, p11) = (corner(i, hi), corner(i + 1, hi));
-    let mut out = (p10 - p00).cross(p01 - p00).normalize();
-    let mid = (p00 + p11) * 0.5;
-    if out.dot(v3(mid.x, mid.y, 0.0)) < 0.0 {
-        out = -out;
-    }
-    let at = |u: f32, v: f32, off: f32| {
-        let lo = p00.lerp(p10, u);
-        let hi = p01.lerp(p11, u);
-        lo.lerp(hi, v) + out * off
-    };
-    let (u0, u1, v0, v1) = (0.1, 0.9, 0.18, 0.82);
-    // Panes about four metres across, a mullion between each two; one pane further off.
-    let width = p00.distance(p10) * (u1 - u0);
-    let panes = if b.fine() {
-        (width / 4.0).round().max(1.0) as usize
-    } else {
-        1
-    };
-    let du = (u1 - u0) / panes as f32;
-    let gap = 0.5 / p00.distance(p10);
-    b.paint(GLOW).pattern(pattern::FUSION);
-    for k in 0..panes {
-        let (a, c) = (u0 + du * k as f32 + gap, u0 + du * (k + 1) as f32 - gap);
-        let pane = |off: f32| {
-            vec![
-                at(a, v0, off),
-                at(c, v0, off),
-                at(c, v1, off),
-                at(a, v1, off),
-            ]
-        };
-        b.loft(&[pane(0.02), pane(0.1)], true, true);
-    }
+/// Tech 2's plinth, out to the lot's edge.
+fn plinth_t2(b: &mut MeshBuilder) {
+    let plan = chamfered_rect(v2(23.0, 23.0), 5.0);
     b.paint(ACCENT);
-    for k in 1..panes {
-        let u = u0 + du * k as f32;
-        b.beam(at(u, v0, 0.1), at(u, v1, 0.1), v2(0.5, 0.3), v2(0.5, 0.3));
-    }
+    b.loft_z(
+        &plan,
+        &[Section::new(0.0, 1.02), Section::new(DECK_T2 * 0.4, 1.0)],
+    );
+    b.paint(PLATING);
+    b.loft_z(
+        &plan,
+        &[
+            Section::new(DECK_T2 * 0.4, 0.99),
+            Section::new(DECK_T2, 0.97),
+        ],
+    );
+}
+
+/// Tech 2 far off: the plinth, the hall stepping up to the core.
+fn coarse_t2(b: &mut MeshBuilder) {
+    b.paint(PLATING);
+    b.block(v3(-23.0, -23.0, 0.0), v3(23.0, 23.0, DECK_T2));
+    b.paint(ACCENT);
+    b.prism(v3(0.0, 0.0, DECK_T2), 4, 26.0, 7.0, 22.0 - DECK_T2);
+    team_panel(b, v3(0.0, 21.6, DECK_T2), v2(7.0, 1.6));
+}
+
+/// Tech 2's hall: the lower tier every variant stands its machine in, battered walls
+/// up to `HALL_TOP` (`HALL_EAVE` where the walls turn to roof).
+const HALL_EAVE: f32 = 7.5;
+const HALL_TOP: f32 = 9.5;
+
+/// Tech 2's plinth and hall, its trunks out along the axes.
+fn hall(b: &mut MeshBuilder) {
+    plinth_t2(b);
+    let plan = chamfered_rect(v2(1.0, 1.0), 0.28);
+    b.paint(ACCENT);
+    b.loft_z(
+        &plan,
+        &[Section::new(DECK_T2, 19.6), Section::new(3.0, 19.4)],
+    );
+    b.paint(PLATING);
+    b.loft_z(
+        &plan,
+        &[
+            Section::new(3.0, 19.0),
+            Section::new(HALL_EAVE, 18.4),
+            Section::new(HALL_TOP, 15.6),
+        ],
+    );
     if b.fine() {
-        b.beam(at(u0, v0, 0.1), at(u1, v0, 0.1), v2(0.6, 0.3), v2(0.6, 0.3));
+        b.radial(4, |b| {
+            b.paint(PLATING);
+            for y in [-8.0, 8.0] {
+                b.chamfered_box(v3(18.7, y, 5.0), v3(0.5, 9.0, 3.6), 0.15);
+            }
+        });
     }
+    trunks(b);
+}
+
+fn at_angle(r: f32, a: f32, z: f32) -> Vec3 {
+    v3(r * a.cos(), r * a.sin(), z)
+}
+
+/// The toroid: its major and minor radius and the height of its middle.
+const TORUS: (f32, f32, f32) = (12.6, 3.0, 12.6);
+
+/// Tech 2, the toroid: the hall wrapped by a segmented toroid turning round its core,
+/// sunk to its middle in the roof; eight field coils are the building's ribs, climbing
+/// from the plinth over the toroid into the core. Arcs leap from coil to coil round the
+/// ring and in to the core's head.
+fn toroid(b: &mut MeshBuilder) {
+    let (major, minor, z) = TORUS;
+    b.set_spinner_pivot(v3(0.0, 0.0, z));
+    if b.coarse() {
+        return coarse_t2(b);
+    }
+    hall(b);
+    // The core the ribs run into, and its head.
+    let oct = ngon_plan(8, 1.0);
+    b.paint(PLATING);
+    b.loft_z(
+        &oct,
+        &[
+            Section::new(HALL_TOP, 8.4),
+            Section::new(19.0, 7.6),
+            Section::new(20.6, 5.4),
+        ],
+    );
+    b.paint(ACCENT);
+    b.loft_z(&oct, &[Section::new(20.6, 4.4), Section::new(22.0, 3.6)]);
+    b.paint(METAL);
+    b.prism(v3(0.0, 0.0, 22.0), round(b, 8), 1.0, 0.3, 2.0);
+    // The trench it rides in.
+    b.paint(ACCENT);
+    annulus(
+        b,
+        round(b, 32),
+        major - minor - 0.4,
+        major + minor + 0.4,
+        HALL_TOP - 0.1,
+        HALL_TOP + 0.3,
+    );
+    // The torus: an octagonal section turned round, in segments with gaps, a band of
+    // charge round each segment's inner face.
+    let sides = if b.fine() { 8 } else { 6 };
+    let section: Vec<Vec2> = (0..sides)
+        .map(|i| {
+            let a = TAU / sides as f32 * (i as f32 + 0.5);
+            v2(major + minor * a.cos(), z + minor * a.sin())
+        })
+        .collect();
+    let segments = 16;
+    let each = TAU / segments as f32;
+    let steps = if b.fine() { 4 } else { 1 };
+    let inner = major - minor * (TAU / 16.0).cos();
+    b.with_part(part::REACTOR_COLLAR_FIRST, |b| {
+        for k in 0..segments {
+            let a = each * k as f32;
+            b.paint(if k % 2 == 0 { PLATING } else { PLATING_DARK });
+            shell(b, &section, a + 0.02, a + each - 0.02, steps, true);
+            if b.fine() {
+                b.paint(GLOW).pattern(pattern::CHARGE);
+                let band = [
+                    v2(inner - 0.05, z - 0.3),
+                    v2(inner, z - 0.3),
+                    v2(inner, z + 0.3),
+                    v2(inner - 0.05, z + 0.3),
+                ];
+                shell(b, &band, a + 0.05, a + each - 0.05, steps, true);
+            }
+        }
+    });
+    // The ribs: from the plinth up the hall, over the toroid, into the core.
+    let rib = [
+        v3(22.4, 0.0, DECK_T2),
+        v3(19.8, 0.0, HALL_EAVE),
+        v3(major + minor + 1.0, 0.0, z),
+        v3(major + 1.6, 0.0, z + minor + 1.0),
+        v3(major - 1.6, 0.0, z + minor + 1.0),
+        v3(major - minor - 0.6, 0.0, z + 1.6),
+        v3(7.4, 0.0, 17.6),
+    ];
+    let tip = |a: f32| at_angle(major, a, z + minor + 2.3);
+    b.yawed(Vec3::ZERO, TAU / 16.0, |b| {
+        b.radial(8, |b| {
+            b.paint(PLATING);
+            sweep(b, &rib, v2(2.2, 1.6), false);
+            b.paint(ACCENT).pattern(pattern::FLUX);
+            if b.fine() {
+                let crest: Vec<Vec3> = rib.iter().map(|p| *p + v3(0.4, 0.0, 0.85)).collect();
+                sweep(b, &crest[1..6], v2(0.8, 0.2), false);
+            }
+            electrode(b, tip(0.0), Vec3::Z, 0.6);
+        })
+    });
+    let tips: Vec<Vec3> = (0..8)
+        .map(|i| tip(TAU / 16.0 + TAU / 8.0 * i as f32))
+        .collect();
+    let bridges: Vec<(Vec3, Vec3)> = (0..8).map(|i| (tips[i], tips[(i + 1) % 8])).collect();
+    b.set_discharge(v3(0.0, 0.0, 21.2), 3.6, &tips, &bridges);
 }
 
 // ---- tech 3 ----------------------------------------------------------------------
@@ -1050,8 +1066,7 @@ mod tests {
                         .any(|v| v.part == part::REACTOR_COLLAR_FIRST),
                     "{key} T{tech}: a ring turns"
                 );
-                // The dome holds its fusion behind glass; the cell and the star arc.
-                assert_eq!(model.discharge.is_some(), tech != 2, "{key} T{tech}: arcs");
+                assert!(model.discharge.is_some(), "{key} T{tech}: arcs");
             }
         }
     }

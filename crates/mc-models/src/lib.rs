@@ -164,9 +164,6 @@ pub mod pattern {
     /// A heat sink's hot core (`GLOW_ORANGE` faces): its heat rippling along it in waves
     /// (`gpu_consts::reactor`).
     pub const HEAT: u32 = crate::gpu_consts::reactor::PATTERN_HEAT;
-    /// A window onto a fusion plant's plasma (`GLOW` faces): blue streaming round the
-    /// model's z axis, bright threads in it (`gpu_consts::reactor`).
-    pub const FUSION: u32 = crate::gpu_consts::reactor::PATTERN_FUSION;
     /// A capital warship's armour, on plated faces of any shade: strakes of uneven depth
     /// cut into plates of uneven length, the odd hatch, grille or stencil, rows of lit
     /// orange ports along the walls, running lamps at the seams (`gpu_consts::warship`).

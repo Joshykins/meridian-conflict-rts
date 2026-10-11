@@ -1055,8 +1055,8 @@ shared! {
     }
 
     /// An ARC fusion plant's held charge (models/aster/reactor.rs, entity.wgsl): the star
-    /// it holds, the charge running round its lit bands, the fusion behind its windows,
-    /// and the rings and blades that turn round it.
+    /// it holds, the charge running round its lit bands, and the rings and blades that
+    /// turn round it.
     pub mod reactor as "REACTOR_" {
         /// `pattern::CORE` (`GLOW` faces): the star, white-hot through its middle, a blue
         /// limb, fine threads of plasma streaming over it, breathing.
@@ -1067,9 +1067,7 @@ shared! {
         /// `pattern::HEAT` (`GLOW_ORANGE` faces): a heat sink's hot core, its heat
         /// rippling along it in waves and flickering, banked low while the plant is down.
         pub const PATTERN_HEAT: u32 = 34;
-        /// `pattern::FUSION` (`GLOW` faces): a window onto the fusion inside, blue plasma
-        /// streaming round the model's z axis with bright threads in it, surging.
-        pub const PATTERN_FUSION: u32 = 35;
+        // retired: 35 (PATTERN_FUSION, the tech 2 dome's windows)
         /// Pulses of charge round a band, and how many times round a second they run.
         pub const PULSES: f32 = 3.0;
         pub const PULSE_RATE: f32 = 0.9;

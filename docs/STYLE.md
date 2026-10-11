@@ -518,9 +518,12 @@ ARC's power plants (`models/aster/reactor.rs`) fill their lot and read four-fold
 the middle. Only tech 3 holds an orb. Tech 1, the cell, is a solid armoured column on a
 round cradle with two segmented rings turning the opposite ways round it, stepping down
 outward so the column shows; arcs jump from the column to the inner ring and across to the
-outer one. Tech 2 is a faceted, squared-off dome over the whole lot, windows in its sloped
-facets onto blue fusion streaming inside (`pattern::FUSION`), buttresses on the diagonals,
-a ring turning round its crown. Tech 3 is a white-hot star with a blue limb held up on four
+outer one. Tech 2 is one machine from the plinth up: a stepped armoured hall, a segmented
+toroid turning round its core sunk to its middle in the roof, and eight field coils that
+are the building's ribs, climbing from the plinth over the toroid into the core, power
+running along their crests; lightning leaps coil to coil round the ring. Its machine is
+built into the hall, never set on its roof (the user, 2026-10-10, after turning down a
+dome with lit windows as too sci-fi and machines standing on a plain casemate). Tech 3 is a white-hot star with a blue limb held up on four
 panels that arc to it, over the heaviest foundation (heat sinks on splayed feet, their fins
 lifting in a wave; capacitor bastions), with two blade sets round the body's head on rings
 of their own: four short blades inside, two tall ones outside, turning the opposite ways.

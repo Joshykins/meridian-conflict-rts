@@ -3719,7 +3719,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     }
     let held = (in.model_class >> 16u) & 0xFFu;
     if in.material == MAT_GLOW
-        && (held == REACTOR_PATTERN_CORE || held == REACTOR_PATTERN_CHARGE || held == REACTOR_PATTERN_FUSION)
+        && (held == REACTOR_PATTERN_CORE || held == REACTOR_PATTERN_CHARGE)
         && (flags & (KIND_WRECK | KIND_GHOST)) == 0u {
         // A fusion plant's held charge (`gpu_consts::reactor`). Banked to an ember while the
         // plant is going up or has no power.
@@ -3742,23 +3742,6 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             m.emissive = (col * (0.7 + 2.0 * heart * heart) * (1.0 - threads * 0.5) + blue * rim * 2.6
                 + vec3<f32>(0.9, 0.97, 1.0) * threads * 3.0) * breath * live;
             m.albedo = vec3<f32>(0.6, 0.75, 1.0) * 0.3;
-        } else if held == REACTOR_PATTERN_FUSION {
-            // Fusion behind glass: blue plasma streaming round the plant's axis, bright
-            // threads running through it, the whole of it surging.
-            let around = atan2(in.local.y, in.local.x);
-            let z = in.local.z;
-            let flow = surf_noise3(vec3<f32>(around * 3.0 - time * 0.9, z * 0.35, seed + time * 0.15));
-            let fine = surf_noise3(vec3<f32>(around * 7.0 - time * 1.7, z * 0.8 + time * 0.3, seed * 1.7));
-            let thread = pow(1.0 - abs(sin(z * 1.3 + flow * 4.0 + around * 2.0 - time * 1.1)), 12.0);
-            let surge = 0.8 + 0.2 * sin(time * 1.4 + around * 2.0 + seed);
-            let deep = vec3<f32>(0.02, 0.12, 0.65);
-            let cyan = vec3<f32>(0.25, 0.75, 1.0);
-            let glow = saturate(flow * 0.8 + fine * 0.4 - 0.2);
-            let col = mix(deep, cyan, glow * glow) * (0.35 + 1.1 * glow)
-                + vec3<f32>(0.6, 0.88, 1.0) * thread * 1.8 + cyan * pow(fine, 4.0) * 0.8;
-            m.emissive = col * surge * live;
-            m.albedo = vec3<f32>(0.01, 0.02, 0.05);
-            m.roughness = 0.9;
         } else {
             // A band of charge: pulses chasing round it, white at their heads.
             let around = atan2(in.local.y, in.local.x) / 6.2831853;
