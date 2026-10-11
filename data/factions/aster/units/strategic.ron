@@ -54,8 +54,11 @@
         economy: (energy_upkeep: 25),
         strategic: (
             kind: Interceptor,
+            // Five minutes a round alone, like the silo's warhead. Its own power is low so
+            // engineers assisting count: a defence can be rushed once a silo is seen, a
+            // nuke cannot (user, 2026-10-11).
             missile: (materials: 1500, energy: 30000, time: 180000),
-            power: 1800,
+            power: 600,
             stock: 4,
             speed: 900,
             apogee: 0,

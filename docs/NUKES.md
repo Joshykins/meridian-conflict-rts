@@ -13,8 +13,10 @@ under the player's control; and the commander's death a nuke too.
 - **Launchers assemble their own rounds** (`strategic` on the blueprint,
   `crates/mc-data/src/strategic.rs`), paid out of income like a build: a warhead is 6000
   materials / 120000 energy over about 5 minutes at the silo's own power (2400); an interceptor
-  1500 / 30000 over about 100 s (power 1800). The launcher's own power is high on purpose, so
-  engineers assisting add little and a nuke or its defence is hard to rush. A silo holds 2, an array 4.
+  1500 / 30000 over about 5 minutes too, at the array's own power (600). The silo's power is
+  high on purpose, so engineers assisting add little and a nuke is hard to rush; the array's is
+  low, so assisting it counts (a T3 station's 900 makes a round 2 minutes) and a defence can be
+  rushed once a silo is seen. A silo holds 2, an array 4.
 - **Auto-build is on by default**: a launcher starts assembling the moment it is finished
   and stops when full. Off, it assembles only rounds queued by hand
   (`Command::SetAutoBuild`, `Command::QueueRounds`); turning it off mid-round keeps that
