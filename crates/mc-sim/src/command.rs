@@ -423,6 +423,12 @@ pub enum Command {
         units: Vec<UnitId>,
         pos: FxVec2,
     },
+    /// Test range: `player`'s builders work at these thousandths of their build power
+    /// (`Player::build_permille`; 1000 is normal).
+    DebugBuildRate {
+        player: u8,
+        permille: u16,
+    },
 }
 
 impl Command {
@@ -502,6 +508,7 @@ impl Command {
             | Command::DebugFreeBuild { .. }
             | Command::DebugStock { .. }
             | Command::DebugIncome { .. }
+            | Command::DebugBuildRate { .. }
             | Command::DebugStorage { .. }
             | Command::DebugWrecks { .. }
             | Command::SetFocus { .. } => 0,

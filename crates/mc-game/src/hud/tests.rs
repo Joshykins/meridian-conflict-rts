@@ -656,7 +656,7 @@ fn the_range_map_browser_picks_another_map_and_gives_the_pictures_back() {
 
 #[test]
 fn the_range_economy_tab_fills_starves_and_scatters_wrecks() {
-    use crate::range::{Range, RangeAction, BLUE, INCOME_NORMAL, RED};
+    use crate::range::{Range, RangeAction, BLUE, BUILD_NORMAL, INCOME_NORMAL, RED};
     let mut rig = Rig::new("aster_t1_tank");
     let tank = rig.blueprints.id_of("aster_t1_tank").unwrap();
     rig.view.range = Some(Range::new(mc_core::FxVec2::from_ints(4000, 4000), tank));
@@ -726,9 +726,23 @@ fn the_range_economy_tab_fills_starves_and_scatters_wrecks() {
         resource: 1,
         index: INCOME_NORMAL
     })));
+    assert!(
+        normal.contains(&HudAction::Range(RangeAction::SetBuildRate {
+            player: RED,
+            index: BUILD_NORMAL
+        }))
+    );
     assert_eq!(
         rig.click(Vec2::new(100.0, 500.0 + focus::FOCUS_H)),
         range(RangeAction::Wrecks)
+    );
+    assert_eq!(
+        rig.click(Vec2::new(200.0, 534.0 + focus::FOCUS_H)),
+        range(RangeAction::BuildRate {
+            player: RED,
+            step: 1
+        }),
+        "speed red's builders up"
     );
 }
 

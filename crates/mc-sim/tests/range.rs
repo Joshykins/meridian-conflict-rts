@@ -186,6 +186,51 @@ fn a_build_state_holds_until_someone_finishes_it() {
 }
 
 #[test]
+fn the_build_rate_dial_speeds_builders_up() {
+    // Build time an engineer puts into a tank site over the same ticks, at `permille`.
+    let gained = |permille: u16| {
+        let mut w = world(true);
+        w.tick(&[
+            spawn(&w, 0, "aster_t1_tank", 500, 0, 100),
+            spawn(&w, 0, "aster_t1_engineer", 470, 0, 1000),
+            cmd(Command::DebugFreeBuild {
+                player: 0,
+                on: true,
+            }),
+            cmd(Command::DebugBuildRate {
+                player: 0,
+                permille,
+            }),
+        ])
+        .unwrap();
+        assert_eq!(w.state.players[0].build_permille, permille);
+        let tank_bp = w.blueprints.id_of("aster_t1_tank").unwrap();
+        let u = &w.state.units;
+        let site = u.slots.iter().find(|&r| u.blueprint[r] == tank_bp).unwrap();
+        let site_id = u.id(site);
+        let engineer: Vec<UnitId> = ids(&w, 0).into_iter().filter(|id| *id != site_id).collect();
+        let start = w.state.units.build_progress[site];
+        w.tick(&[cmd(Command::Assist {
+            units: engineer,
+            target: site_id,
+            queue: false,
+        })])
+        .unwrap();
+        for _ in 0..20 {
+            w.tick(&[]).unwrap();
+        }
+        w.state.units.build_progress[site] - start
+    };
+    let normal = gained(1000);
+    assert!(normal > Fx::ZERO, "the engineer never started");
+    let fast = gained(3000);
+    assert!(
+        fast >= normal * 29 / 10 && fast <= normal * 3,
+        "three times the build rate: {fast:?} vs {normal:?}"
+    );
+}
+
+#[test]
 fn the_other_side_can_be_steered_and_the_range_cleared() {
     let mut w = world(true);
     let setup = [

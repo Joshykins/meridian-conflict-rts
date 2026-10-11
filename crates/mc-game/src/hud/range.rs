@@ -50,7 +50,7 @@ impl Tab {
         match self {
             Tab::Unit => 16.0 + ROW + 4.0 + ROW + 8.0 + ROW,
             Tab::Stage => 4.0 * (ROW + 4.0) + 3.0 * 4.0,
-            Tab::Economy => 26.0 + 2.0 * (22.0 + ROW + 10.0) + ROW + 6.0 + ROW,
+            Tab::Economy => 26.0 + 2.0 * (22.0 + ROW + 10.0) + ROW + 6.0 + ROW + 6.0 + ROW,
             Tab::Sky => sky_rows as f32 * (ROW + 4.0) + ROW,
             Tab::Range => 16.0 + ROW + 8.0 + 16.0 + ROW + 8.0 + ROW,
         }
@@ -472,8 +472,9 @@ fn stage_page(hud: &mut Hud, ui: &mut Ui, r: Rect, asked: &mut Vec<RangeAction>)
     }
 }
 
-/// One side's stores and income: fill or empty them, turn the income up or down,
-/// stage a shortage in one click, and leave wrecks about to reclaim.
+/// One side's stores, income and build rate: fill or empty them, turn the income
+/// and build rate up or down, stage a shortage in one click, and leave wrecks
+/// about to reclaim.
 fn economy_page(
     hud: &mut Hud,
     ui: &mut Ui,
@@ -645,7 +646,9 @@ fn economy_page(
 
     // One click to a common state.
     let low = |n: usize| !free && range.income[side as usize][n] < rng::INCOME_NORMAL;
-    let normal = !free && range.income[side as usize] == [rng::INCOME_NORMAL; 2];
+    let normal = !free
+        && range.income[side as usize] == [rng::INCOME_NORMAL; 2]
+        && range.build[side as usize] == rng::BUILD_NORMAL;
     let mut row = split(Rect::new(x, y, w, ROW), 4, 4.0);
     if word_tile(
         hud,
@@ -709,6 +712,10 @@ fn economy_page(
                 index: rng::INCOME_NORMAL,
             });
         }
+        asked.push(RangeAction::SetBuildRate {
+            player: side,
+            index: rng::BUILD_NORMAL,
+        });
         asked.push(RangeAction::Stock {
             player: side,
             mass: Some(1000),
@@ -745,6 +752,25 @@ fn economy_page(
     );
     if step != 0 {
         asked.push(RangeAction::Storage { player: side, step });
+    }
+    y += ROW + 6.0;
+
+    // How fast the side's builders work (and spend), free build or not.
+    let at = range.build[side as usize];
+    let colour = match at.cmp(&rng::BUILD_NORMAL) {
+        std::cmp::Ordering::Less => palette::WARN,
+        std::cmp::Ordering::Equal => palette::TEXT,
+        std::cmp::Ordering::Greater => palette::ACCENT,
+    };
+    let step = ui.stepper(
+        id("range-build", 0),
+        Rect::new(x, y, w, ROW),
+        &format!("Build Rate  {}", rng::build_label(at)),
+        rgb(colour, 1.0),
+        true,
+    );
+    if step != 0 {
+        asked.push(RangeAction::BuildRate { player: side, step });
     }
 }
 

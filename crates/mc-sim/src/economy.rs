@@ -47,7 +47,8 @@ fn ratio(have: Fx, want: Fx) -> Fx {
     }
 }
 
-/// `v` turned by an income dial (`Player::income_permille`, thousandths).
+/// `v` turned by an income or build dial (`Player::income_permille`, `build_permille`;
+/// thousandths).
 pub(crate) fn dialed(v: Fx, permille: u16) -> Fx {
     if permille == 1000 {
         v
@@ -183,9 +184,11 @@ impl World {
                 None if constructing => focus.priority(tbp, &self.blueprints).tier(),
                 None => REST,
             };
-            let rate = power / DT;
-            let progress = rate.min(remaining);
             let p = self.state.units.owner[row] as usize;
+            // The side's build dial (`Player::build_permille`) speeds or slows every
+            // builder's work, and its spending with it.
+            let rate = dialed(power, self.state.players[p].build_permille) / DT;
+            let progress = rate.min(remaining);
             let want = if shield {
                 [Fx::ZERO, tbp.cost_energy * progress / tbp.build_time]
             } else {

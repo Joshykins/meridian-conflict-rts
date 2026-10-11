@@ -1741,6 +1741,15 @@ impl Game {
                     index.min(range::INCOME_STEPS.len() - 1);
                 commands.push(range.income_command(player));
             }
+            RangeAction::BuildRate { player, step } => {
+                let at = &mut range.build[player.min(1) as usize];
+                *at = (*at as i32 + step).clamp(0, range::BUILD_STEPS.len() as i32 - 1) as usize;
+                commands.push(range.build_command(player));
+            }
+            RangeAction::SetBuildRate { player, index } => {
+                range.build[player.min(1) as usize] = index.min(range::BUILD_STEPS.len() - 1);
+                commands.push(range.build_command(player));
+            }
             RangeAction::Storage { player, step } => {
                 let at = &mut range.storage[player.min(1) as usize];
                 *at = (*at as i32 + step).clamp(0, range::STORAGE_STEPS.len() as i32 - 1) as usize;

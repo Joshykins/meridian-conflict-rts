@@ -149,6 +149,9 @@ pub struct Options {
     /// Your own seat's income, thousandths of a fair share (`AiConfig::income`);
     /// `ai.income` is the AI seats'.
     pub income: u16,
+    /// Your own seat's build rate, thousandths of its builders' power
+    /// (`AiConfig::build`); `ai.build` is the AI seats'.
+    pub build: u16,
     /// The range's subject, a blueprint key, and the scenario it opens with.
     pub subject: String,
     pub scenario: Option<crate::range::Scenario>,
@@ -167,13 +170,14 @@ pub struct Options {
 }
 
 impl Options {
-    /// A seat's settings: the AI tuning, and the income the seat's side gets (an
-    /// AI's `ai.income`, a person's `income`).
+    /// A seat's settings: the AI tuning, and the income and build rate the seat's
+    /// side gets (an AI's `ai.income` and `ai.build`, a person's `income` and `build`).
     pub(crate) fn seat_ai(&self, controller: Controller) -> mc_sim::AiConfig {
         match controller {
             Controller::Ai => self.ai,
             _ => mc_sim::AiConfig {
                 income: self.income,
+                build: self.build,
                 ..self.ai
             },
         }
@@ -192,6 +196,7 @@ impl Default for Options {
             observe: false,
             ai: Default::default(),
             income: 1000,
+            build: 1000,
             subject: crate::range::DEFAULT_SUBJECT.into(),
             scenario: None,
             hurt: 0,

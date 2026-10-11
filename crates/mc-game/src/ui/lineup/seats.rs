@@ -12,7 +12,7 @@
 //! the plan and each person picks their own race; an open seat shows who sits
 //! there, or a Sit Here for everyone else.
 
-use super::ai::{caret, income_note, seat_line, settings_toggle, summary, SEAT_LINE};
+use super::ai::{caret, dial_note, seat_line, settings_toggle, summary, SEAT_LINE};
 use super::roster::{Control, Seat};
 use super::{Ask, Catalog, Lineup, Mode, Occupant, Table};
 use crate::audio::Sfx;
@@ -869,13 +869,13 @@ fn name_cell(
             None if seat.control == Control::Person => ("You Command".to_owned(), palette::ACCENT),
             None => (String::new(), palette::DIM),
         };
-        // A person's income said beside them while their line is shut.
+        // A person's income and build rate said beside them while their line is shut.
         if !ai && !cols.lines {
-            if let Some(income) = income_note(&seat.ai) {
+            if let Some(dials) = dial_note(&seat.ai) {
                 if !line.is_empty() {
                     line += "  \u{b7}  ";
                 }
-                line += &income;
+                line += &dials;
             }
         }
         ui.text_fit_left(

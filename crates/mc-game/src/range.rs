@@ -27,6 +27,12 @@ pub const INCOME_STEPS: [u16; 8] = [0, 100, 250, 500, 1000, 2000, 5000, 20000];
 /// Where `INCOME_STEPS` is normal.
 pub const INCOME_NORMAL: usize = 4;
 
+/// The build rates a side can be given, thousandths of its builders' power
+/// (`Player::build_permille`): slower, normal, faster.
+pub const BUILD_STEPS: [u16; 7] = [250, 500, 1000, 2000, 3000, 5000, 10_000];
+/// Where `BUILD_STEPS` is normal.
+pub const BUILD_NORMAL: usize = 2;
+
 /// Stores a range side gets on top of its units', as multiples of a commander's
 /// (`BASE_STORAGE`), so the stock controls work whatever the subject is.
 pub const STORAGE_STEPS: [u32; 4] = [0, 1, 5, 25];
@@ -41,6 +47,15 @@ pub fn income_label(i: usize) -> String {
         format!("\u{d7}{}", permille / 1000)
     } else {
         format!("{}%", permille / 10)
+    }
+}
+
+/// `BUILD_STEPS[i]` as the panel shows it.
+pub fn build_label(i: usize) -> String {
+    let permille = BUILD_STEPS[i.min(BUILD_STEPS.len() - 1)];
+    match permille % 1000 {
+        0 => format!("\u{d7}{}", permille / 1000),
+        _ => format!("{}%", permille / 10),
     }
 }
 
@@ -252,6 +267,16 @@ pub enum RangeAction {
         resource: usize,
         index: usize,
     },
+    /// Step a side's build rate through `BUILD_STEPS`.
+    BuildRate {
+        player: u8,
+        step: i32,
+    },
+    /// Put a side's build rate at `BUILD_STEPS[index]` outright.
+    SetBuildRate {
+        player: u8,
+        index: usize,
+    },
     /// Step a side's extra stores through `STORAGE_STEPS`.
     Storage {
         player: u8,
@@ -410,6 +435,8 @@ pub struct Range {
     pub income: [[usize; 2]; 2],
     /// Each side's extra stores, as indices into `STORAGE_STEPS`.
     pub storage: [usize; 2],
+    /// Each side's build rate, as indices into `BUILD_STEPS`.
+    pub build: [usize; 2],
     pending: Option<Pending>,
     /// The range's weather and whether a storm is parked over the pad; none
     /// until the game has first put the default up.
@@ -455,6 +482,7 @@ impl Range {
             free_build: true,
             income: [[INCOME_NORMAL; 2]; 2],
             storage: [STORAGE_DEFAULT; 2],
+            build: [BUILD_NORMAL; 2],
             pending: None,
             sky: None,
             map_config: Default::default(),
@@ -515,7 +543,16 @@ impl Range {
         );
         out.extend([BLUE, RED].map(|player| self.income_command(player)));
         out.extend([BLUE, RED].map(|player| self.storage_command(player)));
+        out.extend([BLUE, RED].map(|player| self.build_command(player)));
         out
+    }
+
+    /// What `player`'s build rate is set to, as a command.
+    pub fn build_command(&self, player: u8) -> Command {
+        Command::DebugBuildRate {
+            player,
+            permille: BUILD_STEPS[self.build[player.min(1) as usize]],
+        }
     }
 
     /// What `player`'s extra stores are set to, as a command.

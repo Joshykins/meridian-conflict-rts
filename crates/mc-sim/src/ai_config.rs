@@ -34,10 +34,17 @@ pub struct AiConfig {
     /// one, a person's as well as an AI's: the set-up's way to make an AI harder
     /// than its difficulty alone, or to give a person a head start or a handicap.
     pub income: u16,
+    /// How fast this seat's builders (engineers, factories, its commander) work, in
+    /// thousandths of their build power: 1000 is a fair match, 2000 builds twice as
+    /// fast (and spends twice as fast). Set up like `income`, for any seat.
+    pub build: u16,
 }
 
 /// The least and most `AiConfig::income` may be: a quarter and ten times.
 pub const INCOME_RANGE: std::ops::RangeInclusive<u16> = 250..=10_000;
+
+/// The least and most `AiConfig::build` may be: a quarter and ten times.
+pub const BUILD_RANGE: std::ops::RangeInclusive<u16> = 250..=10_000;
 
 /// The decisions a difficulty level changes; see [`AiConfig::skill`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -72,6 +79,7 @@ impl Default for AiConfig {
             doctrine: Doctrine::Adaptive,
             domain_weights: [100, 100, 100],
             income: 1000,
+            build: 1000,
         }
     }
 }
@@ -82,6 +90,7 @@ impl AiConfig {
         self.income = self
             .income
             .clamp(*INCOME_RANGE.start(), *INCOME_RANGE.end());
+        self.build = self.build.clamp(*BUILD_RANGE.start(), *BUILD_RANGE.end());
         self
     }
 
@@ -149,6 +158,6 @@ impl AiConfig {
         for w in self.domain_weights {
             h.write_u64(w as u64);
         }
-        h.write_u64(self.income as u64);
+        h.write_u64(self.income as u64 | (self.build as u64) << 16);
     }
 }

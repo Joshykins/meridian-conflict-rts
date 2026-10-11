@@ -111,6 +111,8 @@ straight into a match instead.
   --ai-domains L,A,N    land, air, naval production preferences, 0-200 each
   --ai-income X         times a fair income the AI gets, 0.25-10 (e.g. 1.5, 2, 3, 5)
   --income X             times a fair income your own seat gets, 0.25-10 (default 1)
+  --ai-build-rate X     times the normal build rate the AI's builders work at, 0.25-10
+  --build-rate X         times the normal build rate your own builders work at, 0.25-10 (default 1)
   --army N               units per player in the stress scene (default 500)
   --seed N               match seed
   --no-fog               reveal the map
@@ -323,6 +325,8 @@ fn run() -> Result<(), String> {
                 | "--ai-domains"
                 | "--ai-income"
                 | "--income"
+                | "--ai-build-rate"
+                | "--build-rate"
         );
         match arg.as_str() {
             "--map" => map_name = Some(value("--map")?),
@@ -348,8 +352,10 @@ fn run() -> Result<(), String> {
                 }
                 opts.ai.domain_weights.copy_from_slice(&weights);
             },
-            "--ai-income" => opts.ai.income = income_flag("--ai-income", &value("--ai-income")?)?,
-            "--income" => opts.income = income_flag("--income", &value("--income")?)?,
+            "--ai-income" => opts.ai.income = income_flag("--ai-income", &value("--ai-income")?, mc_sim::INCOME_RANGE)?,
+            "--income" => opts.income = income_flag("--income", &value("--income")?, mc_sim::INCOME_RANGE)?,
+            "--ai-build-rate" => opts.ai.build = income_flag("--ai-build-rate", &value("--ai-build-rate")?, mc_sim::BUILD_RANGE)?,
+            "--build-rate" => opts.build = income_flag("--build-rate", &value("--build-rate")?, mc_sim::BUILD_RANGE)?,
             "--unit" => opts.subject = value("--unit")?,
             "--unit-shot" => unit_shot_key = Some(value("--unit-shot")?),
             "--shot-server" => shot_server = Some(value("--shot-server")?.into()),
@@ -737,13 +743,17 @@ fn loading_times(v: &str) -> Option<Vec<f32>> {
     }
 }
 
-/// `--income`'s and `--ai-income`'s multiple, as thousandths of a fair share.
-fn income_flag(flag: &str, v: &str) -> Result<u16, String> {
-    let range = mc_sim::INCOME_RANGE;
+/// `--income`'s, `--ai-income`'s, `--build-rate`'s and `--ai-build-rate`'s multiple,
+/// as thousandths of normal, within `range`.
+fn income_flag(flag: &str, v: &str, range: std::ops::RangeInclusive<u16>) -> Result<u16, String> {
     v.parse::<f64>()
         .ok()
         .map(|x| (x * 1000.0).round())
         .filter(|p| (*range.start() as f64..=*range.end() as f64).contains(p))
         .map(|p| p as u16)
-        .ok_or(format!("{flag} takes a multiple from 0.25 to 10"))
+        .ok_or(format!(
+            "{flag} takes a multiple from {} to {}",
+            *range.start() as f64 / 1000.0,
+            *range.end() as f64 / 1000.0
+        ))
 }

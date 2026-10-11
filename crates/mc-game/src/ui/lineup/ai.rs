@@ -1,5 +1,6 @@
 //! A seat's settings in the line-up: an AI commander's doctrine, the forces it
-//! favours and the income it is given, and a person's income. They sit in a line
+//! favours and the income and build rate it is given, and a person's income and
+//! build rate. They sit in a line
 //! of choices under the seat's row (`seats`), and are said in short wherever a
 //! line will not fit.
 
@@ -16,6 +17,9 @@ const FORCE_LABELS: [&str; 4] = ["Balanced", "Land", "Air", "Naval"];
 /// The incomes a seat may be given, in thousandths of a fair share (`AiConfig::income`).
 const INCOMES: [u16; 7] = [500, 750, 1000, 1500, 2000, 3000, 5000];
 const INCOME_LABELS: [&str; 7] = ["0.5x", "0.75x", "1x", "1.5x", "2x", "3x", "5x"];
+/// The build rates a seat may be given, in thousandths of its builders' power
+/// (`AiConfig::build`); said with the incomes' labels.
+const BUILDS: [u16; 7] = INCOMES;
 
 const DOCTRINES: [Doctrine; 4] = [
     Doctrine::Adaptive,
@@ -25,7 +29,7 @@ const DOCTRINES: [Doctrine; 4] = [
 ];
 
 /// A seat's settings as a line of choices in `r`: an AI's doctrine, the forces
-/// it favours and its income; a person's income alone. Whoever may plan changes
+/// it favours, its income and its build rate; a person's income and build rate. Whoever may plan changes
 /// them; everyone else reads them.
 pub(super) fn seat_line(ui: &mut Ui, seat: &mut Seat, r: Rect, host: bool, ai_seat: bool) {
     let key = seat.key as usize;
@@ -42,7 +46,12 @@ pub(super) fn seat_line(ui: &mut Ui, seat: &mut Seat, r: Rect, host: bool, ai_se
     if income_at.is_none() {
         incomes.push("Custom");
     }
-    let all: [(&str, &[&str], usize); 3] = [
+    let build_at = BUILDS.iter().position(|b| *b == ai.build);
+    let mut builds = INCOME_LABELS.to_vec();
+    if build_at.is_none() {
+        builds.push("Custom");
+    }
+    let all: [(&str, &[&str], usize); 4] = [
         (
             "Doctrine",
             &doctrines,
@@ -53,9 +62,10 @@ pub(super) fn seat_line(ui: &mut Ui, seat: &mut Seat, r: Rect, host: bool, ai_se
         ),
         ("Forces", &forces, force_at.unwrap_or(FORCE_LABELS.len())),
         ("Income", &incomes, income_at.unwrap_or(INCOMES.len())),
+        ("Build", &builds, build_at.unwrap_or(BUILDS.len())),
     ];
-    // A person has no doctrine or forces to pick: only the income, as wide as
-    // an AI's income choice would be.
+    // A person has no doctrine or forces to pick: only the income and build
+    // rate, as wide as an AI's would be.
     let fields = if ai_seat { &all[..] } else { &all[2..] };
     // Each as wide as its label and longest option; the labels go when the
     // line is too narrow for them, and the choices share what is left over.
@@ -100,9 +110,14 @@ pub(super) fn seat_line(ui: &mut Ui, seat: &mut Seat, r: Rect, host: bool, ai_se
                         ai.domain_weights = *w;
                     }
                 }
-                _ => {
+                2 => {
                     if let Some(i) = INCOMES.get(pick) {
                         ai.income = *i;
+                    }
+                }
+                _ => {
+                    if let Some(b) = BUILDS.get(pick) {
+                        ai.build = *b;
                     }
                 }
             }
@@ -139,31 +154,42 @@ pub(super) fn settings_toggle(
     res.clicked
 }
 
-/// An AI's settings in short: "Adaptive \u{b7} Balanced", and its income
-/// when it is not a fair share: "\u{b7} 2x Income".
+/// An AI's settings in short: "Adaptive \u{b7} Balanced", and its income and
+/// build rate when they are not normal: "\u{b7} 2x Income \u{b7} 3x Build".
 pub(super) fn summary(ai: &mc_sim::AiConfig) -> String {
     let mut s = format!(
         "{}  \u{b7}  {}",
         doctrine_label(ai.doctrine),
         force_label(ai.domain_weights)
     );
-    if let Some(income) = income_note(ai) {
-        s += &format!("  \u{b7}  {income}");
+    if let Some(dials) = dial_note(ai) {
+        s += &format!("  \u{b7}  {dials}");
     }
     s
 }
 
-/// "2x Income" when a seat's income is not a fair share.
-pub(super) fn income_note(ai: &mc_sim::AiConfig) -> Option<String> {
-    (ai.income != 1000).then(|| format!("{} Income", income_label(ai.income)))
+/// "2x Income", "3x Build" or both, when a seat's income or build rate is not
+/// normal.
+pub(super) fn dial_note(ai: &mc_sim::AiConfig) -> Option<String> {
+    let notes: Vec<String> = [(ai.income, "Income"), (ai.build, "Build")]
+        .into_iter()
+        .filter(|(v, _)| *v != 1000)
+        .map(|(v, name)| format!("{} {name}", income_label(v)))
+        .collect();
+    (!notes.is_empty()).then(|| notes.join("  \u{b7}  "))
 }
 
-/// "1x Income", "2x Income": a seat's income, said always.
+/// "1x Income", "2x Income \u{b7} 3x Build": a seat's income, said always, and
+/// its build rate when it is not normal.
 pub(super) fn income_summary(ai: &mc_sim::AiConfig) -> String {
-    format!("{} Income", income_label(ai.income))
+    let mut s = format!("{} Income", income_label(ai.income));
+    if ai.build != 1000 {
+        s += &format!("  \u{b7}  {} Build", income_label(ai.build));
+    }
+    s
 }
 
-/// "2x", "1.5x", "0.25x": an income in thousandths as a multiple.
+/// "2x", "1.5x", "0.25x": an income or build rate in thousandths as a multiple.
 fn income_label(permille: u16) -> String {
     let whole = permille / 1000;
     match permille % 1000 {

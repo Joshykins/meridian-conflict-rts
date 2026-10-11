@@ -405,6 +405,7 @@ impl World {
                 // Any seat, AI or person, may be set up to earn more (or less)
                 // than a fair share.
                 income_permille: [p.ai.normalized().income; 2],
+                build_permille: p.ai.normalized().build,
                 bonus_storage: [Fx::ZERO; 2],
             });
         }

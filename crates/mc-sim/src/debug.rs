@@ -24,6 +24,7 @@ impl World {
                 | Command::DebugFreeBuild { .. }
                 | Command::DebugStock { .. }
                 | Command::DebugIncome { .. }
+                | Command::DebugBuildRate { .. }
                 | Command::DebugStorage { .. }
                 | Command::DebugWrecks { .. }
         );
@@ -157,6 +158,14 @@ impl World {
             } => {
                 if let Some(p) = self.state.players.get_mut(*player as usize) {
                     p.income_permille = [*mass, *energy];
+                }
+            }
+            Command::DebugBuildRate { player, permille } => {
+                if let Some(p) = self.state.players.get_mut(*player as usize) {
+                    p.build_permille = (*permille).clamp(
+                        *crate::ai_config::BUILD_RANGE.start(),
+                        *crate::ai_config::BUILD_RANGE.end(),
+                    );
                 }
             }
             Command::DebugStorage {

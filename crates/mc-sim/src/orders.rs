@@ -563,6 +563,7 @@ impl World {
             | Command::DebugFreeBuild { .. }
             | Command::DebugStock { .. }
             | Command::DebugIncome { .. }
+            | Command::DebugBuildRate { .. }
             | Command::DebugStorage { .. }
             | Command::DebugWrecks { .. } => Ok(()),
         }

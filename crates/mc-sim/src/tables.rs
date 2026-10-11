@@ -941,6 +941,10 @@ pub struct Player {
     /// seat's set-up multiplier (`AiConfig::income`), or the test range's dial.
     #[serde(default = "full_income")]
     pub income_permille: [u16; 2],
+    /// How fast this player's builders work, thousandths of their build power: the
+    /// seat's set-up multiplier (`AiConfig::build`), or the test range's dial.
+    #[serde(default = "full_build")]
+    pub build_permille: u16,
     /// Test range: mass and energy storage on top of what this player's units hold.
     #[serde(default)]
     pub bonus_storage: [Fx; 2],
@@ -948,6 +952,10 @@ pub struct Player {
 
 fn full_income() -> [u16; 2] {
     [1000, 1000]
+}
+
+fn full_build() -> u16 {
+    1000
 }
 
 fn fx_one() -> Fx {
@@ -979,7 +987,11 @@ impl Player {
         h.write_u64(
             self.units_killed as u64 | (self.acts_as as u64) << 32 | (self.free_build as u64) << 40,
         );
-        h.write_u64(self.income_permille[0] as u64 | (self.income_permille[1] as u64) << 16);
+        h.write_u64(
+            self.income_permille[0] as u64
+                | (self.income_permille[1] as u64) << 16
+                | (self.build_permille as u64) << 32,
+        );
         h.write_i64(self.bonus_storage[0].0);
         h.write_i64(self.bonus_storage[1].0);
     }

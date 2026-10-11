@@ -34,6 +34,11 @@ survive map changes for shared slots. Observer slots have the same controls.
   built. A person's seat carries the same setting (the line-up's Income choice on
   every seat, `--income` from the command line), so a person can be given a head
   start or a handicap the same way.
+- `build` is the seat's build rate the same way, in thousandths of its builders'
+  power (1000 normal, 2000 builds and spends twice as fast; 250-10000). It becomes
+  the player's `build_permille` (the test range's Build Rate dial). The line-up's
+  Build choice sets it on every seat; `--ai-build-rate` and `--build-rate` set it
+  from the command line.
 
 From WSL, build and play on Windows:
 
@@ -42,6 +47,7 @@ From WSL, build and play on Windows:
 ./play.sh --map crosswater --observe --ai-doctrine aggressive --ai-domains 100,140,80
 ./play.sh --map crosswater --ai-difficulty hard --ai-income 2
 ./play.sh --map crosswater --ai-difficulty hard --ai-income 2 --income 1.5
+./play.sh --map crosswater --ai-build-rate 2 --build-rate 1.5
 ```
 
 CLI tuning applies to every AI in the launched match (`--income` to your own seat);

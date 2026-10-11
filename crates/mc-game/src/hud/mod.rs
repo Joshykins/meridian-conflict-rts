@@ -263,6 +263,15 @@ impl Scene<'_> {
             .map_or([1.0; 2], |p| p.income_dial)
     }
 
+    /// How fast `owner`'s builders work, as a factor (`PlayerStatus::build_dial`).
+    fn build_dial(&self, owner: u8) -> f32 {
+        self.view
+            .status
+            .players
+            .get(owner as usize)
+            .map_or(1.0, |p| p.build_dial)
+    }
+
     fn team_color(&self, owner: u8) -> Color {
         let c = self.view.colors[owner as usize % mc_core::MAX_PLAYERS];
         [c[0], c[1], c[2], 1.0]

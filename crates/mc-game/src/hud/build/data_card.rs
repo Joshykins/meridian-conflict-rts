@@ -223,7 +223,8 @@ pub(in crate::hud) fn data_card(
         ]
     };
     let costs = match pace {
-        Pace::Build(power) => built(power, 1.0),
+        // The side's build dial speeds every builder alike (`Player::build_permille`).
+        Pace::Build(power) => built(power * s.build_dial(s.view.local), 1.0),
         Pace::Wing { power, count, .. } => built(power, count as f32),
         Pace::Platform(payload) => [
             (
