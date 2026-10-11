@@ -3,7 +3,7 @@
 
 use super::World;
 use crate::gravitic::WellPhase;
-use mc_core::{FxVec2, TICKS_PER_SECOND};
+use mc_core::{Fx, FxVec2, TICKS_PER_SECOND};
 use mc_data::BlueprintId;
 
 /// Where an engine's work is.
@@ -43,7 +43,7 @@ pub struct WellView {
 
 impl World {
     /// Every engine's work the viewer may see: its own side's always, an enemy's where the
-    /// viewer sees the engine or the ground the rift's front or the well is on.
+    /// viewer sees the engine, the ground the rift's front is on, or any of the well's.
     pub(super) fn write_wells(&self, viewer: Option<u8>, out: &mut Vec<WellView>) {
         out.clear();
         let s = &self.state;
@@ -58,9 +58,28 @@ impl World {
             let front = w.front();
             if let Some(v) = viewer.filter(|&v| self.are_enemies(v, w.owner)) {
                 let mask = self.team_mask(v);
+                // A holding well is seen from anywhere over it, not only its middle: a
+                // viewer at its edge watches their units crushed.
+                let over_well = |r: Fx| {
+                    let d = r * 7 / 10;
+                    [
+                        FxVec2::new(r, Fx::ZERO),
+                        FxVec2::new(-r, Fx::ZERO),
+                        FxVec2::new(Fx::ZERO, r),
+                        FxVec2::new(Fx::ZERO, -r),
+                        FxVec2::new(d, d),
+                        FxVec2::new(-d, d),
+                        FxVec2::new(d, -d),
+                        FxVec2::new(-d, -d),
+                    ]
+                    .into_iter()
+                    .any(|o| self.fog.is_detected(w.mark + o, mask))
+                };
+                let holding = matches!(w.phase, WellPhase::Holding { .. });
                 let seen = !s.fog_enabled
                     || self.fog.is_detected(front, mask)
-                    || self.detects_for_team(v, row);
+                    || self.detects_for_team(v, row)
+                    || (holding && (over_well(g.radius / 2) || over_well(g.radius * 9 / 10)));
                 if !seen {
                     continue;
                 }

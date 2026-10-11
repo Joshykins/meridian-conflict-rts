@@ -8,6 +8,7 @@ use mc_data::Blueprints;
 use mc_jobs::Pool;
 use mc_map::Heightfield;
 use mc_sim::gravitic::WellPhase;
+use mc_sim::mirror::RenderFrame;
 use mc_sim::tables::{flag, Controller, UnitId};
 use mc_sim::world::MapData;
 use mc_sim::{Command, MatchConfig, PlayerCommand, PlayerSetup, SimEvent, World};
@@ -27,6 +28,10 @@ const AT: (i32, i32) = (500, 500);
 const MARK: (i32, i32) = (2900, 500);
 
 fn world() -> World {
+    world_with(false)
+}
+
+fn world_with(fog: bool) -> World {
     let blueprints = Arc::new(
         Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
     );
@@ -52,7 +57,7 @@ fn world() -> World {
         seed: 7,
         players: vec![player("Regency", 0), player("Aster", 1)],
         cheats: true,
-        fog: false,
+        fog,
         spawn_commanders: false,
     };
     let mut w =
@@ -352,4 +357,23 @@ fn it_draws_energy_only_at_work() {
     run(&mut w, &[]);
     let busy = w.state.players[0].energy_demand;
     assert!(busy > idle, "idle {idle}, at work {busy}");
+}
+
+/// Under fog, an enemy who sees only the near side of the well (not its middle, nor the engine
+/// far off) still has it drawn: its purple light shows over the units it crushes.
+#[test]
+fn an_enemy_seeing_part_of_the_well_sees_it() {
+    let mut w = world_with(true);
+    let engine = add(&mut w, ENGINE, 0, AT.0, AT.1);
+    // Outside the well: it sees the near side of it, not its middle.
+    add(&mut w, TANK, 1, MARK.0 + 500, MARK.1);
+    aim(&mut w, engine, MARK);
+    assert!(struck(&mut w));
+    let mut frame = RenderFrame::default();
+    w.write_render_frame(Some(1), &mut frame);
+    assert!(
+        frame.units.iter().all(|u| u.unit_id != engine.0),
+        "the engine is out of the enemy's sight"
+    );
+    assert_eq!(frame.wells.len(), 1, "the well is in the enemy's frame");
 }

@@ -78,6 +78,9 @@ struct Engine {
     /// How far its rift had run last tick, metres.
     run: f32,
     seen: bool,
+    /// The engine itself is drawn this tick. An enemy's well or rift can be in sight while
+    /// the engine is not: then only that is drawn, from its `WellView`.
+    shown: bool,
 }
 
 impl Engine {
@@ -200,7 +203,7 @@ impl GraviticEngineFx {
         for e in &mut self.engines {
             e.seen = false;
         }
-        if !units.iter().any(|u| self.holds_gravity(u).is_some()) {
+        if wells.is_empty() && !units.iter().any(|u| self.holds_gravity(u).is_some()) {
             self.engines.clear();
             return units;
         }
@@ -237,6 +240,7 @@ impl GraviticEngineFx {
                         charge: 0.0,
                         run: 0.0,
                         seen: true,
+                        shown: true,
                     });
                     let last = self.engines.len() - 1;
                     &mut self.engines[last]
@@ -247,6 +251,7 @@ impl GraviticEngineFx {
             e.base = base;
             e.core = at;
             e.seen = true;
+            e.shown = true;
             let (rate, light) = e.goal();
             e.rate += (rate - e.rate) * (1.0 - (-dt / SPIN_INERTIA).exp());
             // Light comes quickly and dies more slowly.
@@ -265,6 +270,40 @@ impl GraviticEngineFx {
             } else {
                 e.phase
             };
+        }
+        for v in wells {
+            if self.engines.iter().any(|e| e.seen && e.id == v.unit_id) {
+                continue;
+            }
+            let (radius, height) = radii(u32::from(v.blueprint.0));
+            let core = Vec3::from(v.core);
+            let base = core.truncate().extend(v.from[2]);
+            match self.engines.iter_mut().find(|e| e.id == v.unit_id) {
+                Some(e) => {
+                    e.was = e.stage();
+                    e.view = Some(*v);
+                    e.base = base;
+                    e.core = core;
+                    e.seen = true;
+                    e.shown = false;
+                }
+                None => self.engines.push(Engine {
+                    id: v.unit_id,
+                    owner: v.owner,
+                    base,
+                    core,
+                    radius,
+                    height,
+                    view: Some(*v),
+                    was: None,
+                    rate: SPIN_IDLE,
+                    phase: (v.unit_id % 97) as f32,
+                    charge: 0.0,
+                    run: 0.0,
+                    seen: true,
+                    shown: false,
+                }),
+            }
         }
         self.engines.retain(|e| e.seen);
         units
@@ -288,7 +327,9 @@ impl Renderer {
                     Vec2::from_slice(&v.mark[..2]).distance(camera.focus.truncate())
                         < camera.distance * 2.5 + 2000.0
                 });
-            self.engine_charge(e, time, near);
+            if e.shown {
+                self.engine_charge(e, time, near);
+            }
             let Some(v) = e.view else {
                 continue;
             };
@@ -371,7 +412,7 @@ impl Renderer {
         let eye = camera.eye();
         let mut lenses: Vec<(f32, GpuHeatPlume)> = Vec::new();
         for e in &fx.engines {
-            if e.charge > 0.02 {
+            if e.shown && e.charge > 0.02 {
                 let c = e.charge;
                 let (foot, tall) = engine::column(e);
                 lenses.push((

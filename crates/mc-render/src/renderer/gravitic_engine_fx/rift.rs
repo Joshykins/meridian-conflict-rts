@@ -34,10 +34,10 @@ impl Renderer {
             .gravitic_engine_fx
             .engines
             .iter()
-            .find(|e| e.id == unit)
+            .find(|e| e.id == unit && e.shown)
             .copied()
         else {
-            // Not drawn (out of sight): the ground still breaks.
+            // The engine not drawn (out of sight): the ground still breaks.
             self.gravitic_engine_fx.ground.line(
                 unit,
                 from.truncate(),
