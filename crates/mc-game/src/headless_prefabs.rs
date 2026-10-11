@@ -1,5 +1,5 @@
-//! Prefabs in a headless match screenshot: `--prefabs FILE` reads a library and opens
-//! the construction panel on its Prefabs tab, `--place @NAME` holds that prefab at the
+//! Prefabs in a headless match screenshot: `--prefabs FILE` reads a library and turns
+//! the construction panel to prefabs, `--place @NAME` holds that prefab at the
 //! pointer, and `--save-prefab` opens the Save Prefab box on the selection.
 
 use super::Shot;
@@ -41,7 +41,10 @@ impl PrefabShot {
             view.mode = Mode::Prefab(prefab.id);
         }
         if shot.save_prefab {
-            let structures = crate::hud::prefabs::selection_structures(view);
+            // Begun in the order the frame lists them: a staged scene has no history.
+            let mut order = crate::prefabs::BuildOrder::default();
+            order.observe(&view.frame.units, view.local, blueprints);
+            let structures = crate::hud::prefabs::selection_structures(view, &order);
             let draft = crate::prefabs::capture(blueprints, &structures)
                 .map_err(|why| format!("--save-prefab: {}", why.label()))?;
             hud.prefabs.offer(draft);

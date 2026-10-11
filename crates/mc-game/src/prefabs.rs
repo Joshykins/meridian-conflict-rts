@@ -7,9 +7,11 @@
 //! same `Command::Build` orders as placing its structures one by one would.
 
 use mc_core::{Angle, Fx, FxVec2};
-use mc_data::{BlueprintId, Blueprints, FactionId};
+use mc_data::{BlueprintId, Blueprints, FactionId, IconKind};
+use mc_sim::mirror::UnitInstance;
 use mc_sim::placement::Unfit;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// Most prefabs the library holds; saving one more is refused, with a notice.
@@ -41,13 +43,131 @@ fn is_unturned(turn: &u8) -> bool {
     *turn == 0
 }
 
+/// A prefab's members are kept in the order they were built (`BuildOrder`), and placed
+/// in that order.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Prefab {
     pub name: String,
     pub members: Vec<Member>,
+    /// The shelf the player put it on; `None`: the one its structures make (`Category::of`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<Category>,
+    /// The icon the player gave it; `None`: the one its structures make (`Badge::of`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<Badge>,
     /// Not saved: which prefab placement is about, steady while the library changes.
     #[serde(skip)]
     pub id: PrefabId,
+}
+
+/// The shelf a prefab sits on in the Prefabs panel: the construction panel's shelves
+/// for structures. Saved by name.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum Category {
+    Factories,
+    Economy,
+    Defense,
+    AntiAir,
+    Artillery,
+    Intel,
+}
+
+impl Category {
+    pub const ALL: [Category; 6] = [
+        Category::Factories,
+        Category::Economy,
+        Category::Defense,
+        Category::AntiAir,
+        Category::Artillery,
+        Category::Intel,
+    ];
+
+    /// The shelf a structure of `bp` sits on in the construction panel.
+    pub fn of(bp: &mc_data::UnitBlueprint) -> Category {
+        use crate::hud::style::Purpose;
+        match Purpose::of(bp, true) {
+            Purpose::Builders | Purpose::Units => Category::Factories,
+            Purpose::Economy => Category::Economy,
+            Purpose::Combat => Category::Defense,
+            Purpose::AntiAir => Category::AntiAir,
+            Purpose::Artillery => Category::Artillery,
+            Purpose::Support => Category::Intel,
+        }
+    }
+}
+
+/// The icon on a prefab's card: a structure's strategic icon. Saved by name.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Badge {
+    Factory,
+    Engineer,
+    Extractor,
+    Power,
+    Storage,
+    Defense,
+    AntiAir,
+    Artillery,
+    Intel,
+    Shield,
+    Wall,
+    Silo,
+    AntiNuke,
+    Salvage,
+}
+
+impl Badge {
+    /// The icons a player picks from, in the picker's order.
+    pub const ALL: [Badge; 14] = [
+        Badge::Factory,
+        Badge::Engineer,
+        Badge::Extractor,
+        Badge::Power,
+        Badge::Storage,
+        Badge::Defense,
+        Badge::AntiAir,
+        Badge::Artillery,
+        Badge::Intel,
+        Badge::Shield,
+        Badge::Wall,
+        Badge::Silo,
+        Badge::AntiNuke,
+        Badge::Salvage,
+    ];
+
+    pub fn icon(self) -> IconKind {
+        match self {
+            Badge::Factory => IconKind::Factory,
+            Badge::Engineer => IconKind::Engineer,
+            Badge::Extractor => IconKind::Extractor,
+            Badge::Power => IconKind::Power,
+            Badge::Storage => IconKind::Storage,
+            Badge::Defense => IconKind::Defense,
+            Badge::AntiAir => IconKind::AntiAir,
+            Badge::Artillery => IconKind::Artillery,
+            Badge::Intel => IconKind::Intel,
+            Badge::Shield => IconKind::Shield,
+            Badge::Wall => IconKind::Wall,
+            Badge::Silo => IconKind::Silo,
+            Badge::AntiNuke => IconKind::AntiNuke,
+            Badge::Salvage => IconKind::Salvage,
+        }
+    }
+
+    /// The badge for a structure of `bp`: its own icon, or its shelf's when its icon
+    /// is not one a prefab can wear.
+    pub fn of(bp: &mc_data::UnitBlueprint) -> Badge {
+        Badge::ALL
+            .into_iter()
+            .find(|b| b.icon() == bp.visual.icon)
+            .unwrap_or(match Category::of(bp) {
+                Category::Factories => Badge::Factory,
+                Category::Economy => Badge::Power,
+                Category::Defense => Badge::Defense,
+                Category::AntiAir => Badge::AntiAir,
+                Category::Artillery => Badge::Artillery,
+                Category::Intel => Badge::Intel,
+            })
+    }
 }
 
 /// A prefab in the library while the game runs.
@@ -115,6 +235,48 @@ impl Prefab {
             let bp = blueprints.unit(r.blueprint);
             (m + bp.cost_materials.to_f32(), e + bp.cost_energy.to_f32())
         })
+    }
+
+    /// Its tech: the highest of its structures'. The Prefabs panel shows it on that
+    /// tier's tab.
+    pub fn tech(&self, blueprints: &Blueprints) -> u8 {
+        let (members, _) = self.resolve(blueprints);
+        members
+            .iter()
+            .map(|m| blueprints.unit(m.blueprint).tech)
+            .max()
+            .unwrap_or(1)
+    }
+
+    /// The shelf it sits on: the player's pick, or its costliest structure's (a factory
+    /// with its generators is a factory prefab, however many generators).
+    pub fn category(&self, blueprints: &Blueprints) -> Category {
+        self.category
+            .unwrap_or_else(|| self.costliest(blueprints, Category::of, Category::Factories))
+    }
+
+    /// Its icon: the player's pick, or its costliest structure's.
+    pub fn badge(&self, blueprints: &Blueprints) -> Badge {
+        self.icon
+            .unwrap_or_else(|| self.costliest(blueprints, Badge::of, Badge::Factory))
+    }
+
+    /// `key` of its costliest structure, in materials; the first built wins a tie.
+    /// `none` for a prefab with nothing left in the game.
+    fn costliest<K>(
+        &self,
+        blueprints: &Blueprints,
+        key: impl Fn(&mc_data::UnitBlueprint) -> K,
+        none: K,
+    ) -> K {
+        let (members, _) = self.resolve(blueprints);
+        // `max_by_key` keeps the last of equals: reversed, the first built wins.
+        members
+            .iter()
+            .rev()
+            .map(|m| blueprints.unit(m.blueprint))
+            .max_by_key(|bp| bp.cost_materials)
+            .map_or(none, key)
     }
 
     /// Its structures counted by kind, most first, then in the order first saved.
@@ -280,7 +442,8 @@ impl Uncaptured {
 /// A prefab of these structures (standing or planned, each where it stands and the
 /// way it faces), with its middle on the build-cell corner nearest the middle of their
 /// lots, and a name made from what is in it. Repeats of the same structure on the same
-/// lot count once.
+/// lot count once. The members keep the order of `structures`, the order they were
+/// built in (`BuildOrder::rank`), and are placed in it.
 pub fn capture(blueprints: &Blueprints, structures: &[Laid]) -> Result<Prefab, Uncaptured> {
     let mut sites: Vec<Laid> = Vec::new();
     for s in structures {
@@ -313,9 +476,6 @@ pub fn capture(blueprints: &Blueprints, structures: &[Laid]) -> Result<Prefab, U
         Fx::from_f32((lo[1] + hi[1]) * 0.5),
     );
     let anchor = snap_anchor(middle);
-    // Rows from the north-west, as a page is read: the order it is built in when the
-    // builders stand nowhere in particular, and the order of its census.
-    sites.sort_by_key(|s| (std::cmp::Reverse(s.at.y), s.at.x));
     let members = sites
         .iter()
         .map(|s| {
@@ -331,6 +491,8 @@ pub fn capture(blueprints: &Blueprints, structures: &[Laid]) -> Result<Prefab, U
     let mut prefab = Prefab {
         name: String::new(),
         members,
+        category: None,
+        icon: None,
         id: PrefabId::default(),
     };
     prefab.name = default_name(blueprints, &prefab);
@@ -540,6 +702,24 @@ impl Library {
         Some(kept)
     }
 
+    /// Puts `prefab` in place of the one with its id, where that one stands (a prefab
+    /// edited: its name, shelf or icon). Refused, returning false, when it is gone or
+    /// another prefab has the new name.
+    pub fn update(&mut self, mut prefab: Prefab) -> bool {
+        prefab.name = clean_name(&prefab.name);
+        let taken = self
+            .prefabs
+            .iter()
+            .any(|p| p.id != prefab.id && p.name.eq_ignore_ascii_case(&prefab.name));
+        match self.prefabs.iter_mut().find(|p| p.id == prefab.id) {
+            Some(p) if !taken => {
+                *p = prefab;
+                true
+            }
+            _ => false,
+        }
+    }
+
     /// Takes a prefab out; returns it.
     pub fn remove(&mut self, id: PrefabId) -> Option<Prefab> {
         let i = self.prefabs.iter().position(|p| p.id == id)?;
@@ -575,6 +755,47 @@ impl Library {
         let aside = path.with_extension("ron.new");
         std::fs::write(&aside, text).map_err(SaveError::Io)?;
         std::fs::rename(&aside, path).map_err(SaveError::Io)
+    }
+}
+
+/// The order the local player's structures were begun in, as this client saw each come
+/// onto the map: the order a prefab saved from them is built in. Unit ids cannot tell
+/// it, since a new unit takes the slot (and an id near that) of one that is gone.
+#[derive(Default)]
+pub struct BuildOrder {
+    /// Unit id -> when first seen, and the frame it was last seen.
+    seen: HashMap<u32, (u64, u32)>,
+    next: u64,
+    frame: u32,
+}
+
+impl BuildOrder {
+    /// Notes the structures of `local` in `units` not seen before, and forgets those gone.
+    pub fn observe(&mut self, units: &[UnitInstance], local: u8, blueprints: &Blueprints) {
+        use mc_sim::mirror::{KIND_GHOST, KIND_PROP, KIND_WRECK};
+        self.frame = self.frame.wrapping_add(1);
+        for u in units {
+            if (u.owner_flags & 0xFF) as u8 != local
+                || u.owner_flags & (KIND_WRECK | KIND_GHOST | KIND_PROP) != 0
+                || blueprints.unit(BlueprintId(u.blueprint as u16)).is_mobile()
+            {
+                continue;
+            }
+            let next = &mut self.next;
+            let entry = self.seen.entry(u.unit_id).or_insert_with(|| {
+                *next += 1;
+                (*next, 0)
+            });
+            entry.1 = self.frame;
+        }
+        let frame = self.frame;
+        self.seen.retain(|_, (_, at)| *at == frame);
+    }
+
+    /// When unit `id` was begun, against the others: earlier ranks lower. One never seen
+    /// ranks after all that were.
+    pub fn rank(&self, id: u32) -> u64 {
+        self.seen.get(&id).map_or(u64::MAX, |(n, _)| *n)
     }
 }
 

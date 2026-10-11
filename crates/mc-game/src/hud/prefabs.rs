@@ -1,42 +1,54 @@
-//! Prefabs on the HUD (`crate::prefabs`): the construction panel's Prefabs tab, the
-//! card for the prefab hovered, the box that names a prefab being saved, and the
-//! card by the pointer while one is in hand.
+//! Prefabs on the HUD (`crate::prefabs`): the construction panel turned to prefabs
+//! (P), the card for the prefab hovered, the box that names a prefab being saved or
+//! edited, and the card by the pointer while one is in hand.
 
 use super::style::Role;
 use super::{Hud, Scene};
 use crate::game::View;
-use crate::prefabs::{Prefab, PrefabId, PrefabSite, Turn};
+use crate::prefabs::{Category, Prefab, PrefabId, PrefabSite, Turn};
 use crate::ui::{palette, rgb, type_scale, Rect, Ui};
 use glam::Vec2;
-use mc_data::{BlueprintId, Blueprints};
+use mc_data::{BlueprintId, Blueprints, FactionId};
 
 mod dialog;
 mod tab;
-pub(super) use tab::{hover_card, tab};
+pub(super) use tab::{hover_card, tab, toggle_button};
 
-/// The prefabs' share of the HUD: the save box, and a delete waiting to be confirmed.
+/// The prefabs' share of the HUD: whether the construction panel shows prefabs, the
+/// save box, and a delete waiting to be confirmed.
 #[derive(Default)]
 pub struct PrefabUi {
-    /// The prefab being named, before it is kept.
+    /// The construction panel shows the player's prefabs in place of what the builder
+    /// raises (P): the same tiers and shelves. Kept until P is pressed again.
+    pub(super) on: bool,
+    /// The prefab being named (or edited), before it is kept.
     saving: Option<dialog::Draft>,
     /// A prefab right-clicked once, and when (UI time): a second right-click soon
     /// after deletes it.
     doomed: Option<(PrefabId, f32)>,
-    /// The first prefab card shown on the tab, when they do not all fit.
+    /// The first prefab card shown, when they do not all fit.
     first: usize,
-    /// Open the construction panel on its Prefabs tab next frame.
-    pub(super) want_tab: bool,
+    /// The shelf the item keys pick from, once a shelf key picked it.
+    shelf: Option<Category>,
+    /// Turn the construction panel to prefabs next frame.
+    pub(super) want_on: bool,
 }
 
 impl PrefabUi {
     /// Opens the save box on `draft`, its suggested name ready to type over.
     pub fn offer(&mut self, draft: Prefab) {
-        self.saving = Some(dialog::Draft::new(draft));
+        self.saving = Some(dialog::Draft::new(draft, false));
     }
 
-    /// Opens the construction panel on its Prefabs tab, when the selection has one.
+    /// Opens the box on a prefab of the library, to rename it, shelve it or give it
+    /// another icon.
+    pub(super) fn edit(&mut self, prefab: Prefab) {
+        self.saving = Some(dialog::Draft::new(prefab, true));
+    }
+
+    /// Turns the construction panel to prefabs, when the selection places them.
     pub fn open_tab(&mut self) {
-        self.want_tab = true;
+        self.want_on = true;
     }
 
     /// The save box is up: it has the keyboard, and keys are not orders.
@@ -45,8 +57,9 @@ impl PrefabUi {
     }
 }
 
-/// What the selected builders (the local player's mobile ones) can start, counting
-/// the tiers and refits they have queued, as the sim does for a queued order.
+/// What the selected builders (the local player's engineers and engineering stations)
+/// can start, counting the tiers and refits they have queued, as the sim does for a
+/// queued order.
 pub fn selection_builds(view: &View, blueprints: &Blueprints) -> Vec<BlueprintId> {
     let mut out: Vec<BlueprintId> = Vec::new();
     for id in view.selection.iter() {
@@ -58,7 +71,7 @@ pub fn selection_builds(view: &View, blueprints: &Blueprints) -> Vec<BlueprintId
             continue;
         }
         let bp = blueprints.unit(BlueprintId(u.blueprint as u16));
-        if !bp.is_mobile() {
+        if !bp.works_in_field() {
             continue;
         }
         let queue = crate::sim_thread::queue_of(&view.status.queues, u.unit_id);
@@ -74,14 +87,44 @@ pub fn selection_builds(view: &View, blueprints: &Blueprints) -> Vec<BlueprintId
     out
 }
 
+/// The tiers `faction`'s prefabs are on, lowest first.
+pub(super) fn tiers(s: &Scene, faction: FactionId) -> Vec<u8> {
+    let mut out: Vec<u8> = s
+        .prefabs
+        .iter()
+        .filter(|p| p.faction(s.blueprints) == Some(faction))
+        .map(|p| p.tech(s.blueprints))
+        .collect();
+    out.sort_unstable();
+    out.dedup();
+    out
+}
+
+/// The construction panel's shelf a prefab category is: its name and key.
+pub(super) fn shelf(c: Category) -> super::style::Purpose {
+    use super::style::Purpose;
+    match c {
+        Category::Factories => Purpose::Builders,
+        Category::Economy => Purpose::Economy,
+        Category::Defense => Purpose::Combat,
+        Category::AntiAir => Purpose::AntiAir,
+        Category::Artillery => Purpose::Artillery,
+        Category::Intel => Purpose::Support,
+    }
+}
+
 /// What the selection would save as a prefab: the local player's selected units (the
-/// structures among them count, `prefabs::capture`) and the structures the selected
-/// builders have planned, each where it stands and the way it faces.
-pub fn selection_structures(view: &View) -> Vec<crate::prefabs::Laid> {
+/// structures among them count, `prefabs::capture`) in the order they were begun
+/// (`order`), then the structures the selected builders have planned, in the order
+/// they will be built; each where it stands and the way it faces.
+pub fn selection_structures(
+    view: &View,
+    order: &crate::prefabs::BuildOrder,
+) -> Vec<crate::prefabs::Laid> {
     use crate::prefabs::Laid;
     use mc_core::{Angle, Fx, FxVec2};
     use mc_sim::mirror::{KIND_GHOST, KIND_PROP, KIND_WRECK};
-    let mut out: Vec<Laid> = view
+    let mut standing: Vec<&mc_sim::mirror::UnitInstance> = view
         .selection
         .iter()
         .filter_map(|id| view.index_of.get(id))
@@ -90,6 +133,10 @@ pub fn selection_structures(view: &View) -> Vec<crate::prefabs::Laid> {
             (u.owner_flags & 0xFF) as u8 == view.local
                 && u.owner_flags & (KIND_WRECK | KIND_GHOST | KIND_PROP) == 0
         })
+        .collect();
+    standing.sort_by_key(|u| (order.rank(u.unit_id), u.unit_id));
+    let mut out: Vec<Laid> = standing
+        .into_iter()
         .map(|u| Laid {
             blueprint: BlueprintId(u.blueprint as u16),
             at: FxVec2::new(Fx::from_f32(u.pos[0]), Fx::from_f32(u.pos[1])),

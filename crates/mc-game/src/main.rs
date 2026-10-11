@@ -159,7 +159,7 @@ straight into a match instead.
   --drag X,Y             with --plans: the order under --cursor has been dragged to this pixel
   --build-grid           match screenshot: draw the build grid, as while placing a structure
   --prefabs FILE         match screenshot: the player's prefabs read from FILE (a prefabs.ron),
-                         the selected builder's construction panel open on its Prefabs tab
+                         the selected builder's construction panel turned to prefabs
   --place @NAME          with --prefabs: that prefab in hand at --cursor (KEY, not @NAME:
                          that structure being placed)
   --place-turn Q[m]      with --place: what is in hand turned Q quarter turns anticlockwise

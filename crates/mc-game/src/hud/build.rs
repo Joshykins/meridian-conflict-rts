@@ -41,8 +41,6 @@ pub(super) const QUEUE_H: f32 = 62.0;
 pub const TIERS: u8 = 5;
 /// The tab past the tiers: refits.
 pub const UPGRADE_TAB: u8 = TIERS + 1;
-/// The last tab, a mobile builder's: the player's prefabs (`hud/prefabs`).
-pub const PREFAB_TAB: u8 = TIERS + 2;
 /// How fast a structure that is not a builder puts on its own upgrade (the sim's `SELF_UPGRADE_POWER`).
 const SELF_UPGRADE_POWER: i32 = 10;
 
@@ -137,8 +135,35 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
     }
     let is_factory = bp.has(cat::FACTORY);
 
-    // Tech tabs: the tiers this builder has anything in. A new kind of builder
-    // opens on its own tier, which is what it was most likely selected for.
+    // A refit changes the unit's blueprint to another loadout of the same unit: the panel stays put.
+    let family = s.blueprints.base_of(BlueprintId(unit.blueprint as u16)).0 as u32;
+    // An engineer or an engineering station puts prefabs down; a factory does not. P
+    // turns the panel to them, and back: the tiers they are on, each on its shelf.
+    let places_prefabs = builder_unit.is_some_and(|(_, b)| b.works_in_field());
+    let mut toggle = std::mem::take(&mut hud.prefabs.want_on) && !hud.prefabs.on;
+    if hud.build_key == Some('P') {
+        hud.build_key = None;
+        toggle = places_prefabs;
+        if !places_prefabs {
+            ui.audio.play(Sfx::Deny);
+        }
+    }
+    if std::mem::take(&mut hud.want_refit_tab) && refits {
+        hud.tab_for = Some(family);
+        hud.tab = UPGRADE_TAB;
+        hud.prefabs.on = false;
+        rewind(hud);
+    }
+    if toggle && places_prefabs {
+        ui.audio.play(Sfx::Tick);
+        hud.prefabs.on = !hud.prefabs.on;
+        hud.shelf = None;
+        rewind(hud);
+    }
+    let prefab_mode = places_prefabs && hud.prefabs.on;
+    // Tech tabs: the tiers this builder has anything in, or turned to prefabs, the
+    // tiers its faction's prefabs are on. A new kind of builder opens on its own tier,
+    // which is what it was most likely selected for.
     let mut tiers: Vec<u8> = builds
         .iter()
         .map(|b| s.blueprints.unit(*b).tech)
@@ -146,23 +171,13 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
         .collect();
     tiers.sort_unstable();
     tiers.dedup();
-    // A mobile builder puts prefabs down; a factory or a structure does not.
-    let prefab_tab = builder_unit.is_some_and(|(_, b)| b.is_mobile());
-    let open = |tab: u8| {
-        tiers.contains(&tab) || (tab == UPGRADE_TAB && refits) || (tab == PREFAB_TAB && prefab_tab)
-    };
-    // A refit changes the unit's blueprint to another loadout of the same unit: the panel stays put.
-    let family = s.blueprints.base_of(BlueprintId(unit.blueprint as u16)).0 as u32;
-    if std::mem::take(&mut hud.want_refit_tab) && refits {
-        hud.tab_for = Some(family);
-        hud.tab = UPGRADE_TAB;
-        rewind(hud);
+    if prefab_mode {
+        let prefab_tiers = super::prefabs::tiers(s, bp.faction);
+        if !prefab_tiers.is_empty() {
+            tiers = prefab_tiers;
+        }
     }
-    if std::mem::take(&mut hud.prefabs.want_tab) && prefab_tab {
-        hud.tab_for = Some(family);
-        hud.tab = PREFAB_TAB;
-        rewind(hud);
-    }
+    let open = |tab: u8| tiers.contains(&tab) || (tab == UPGRADE_TAB && refits && !prefab_mode);
     if hud.tab_for != Some(family) || !open(hud.tab) {
         hud.tab_for = Some(family);
         hud.tab = if tiers.contains(&bp.tech) {
@@ -211,7 +226,6 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
             // The upgrade tab, or the tier of the next upgrade to queue.
             'U' if refits => Some(UPGRADE_TAB),
             'U' => line.get(reached).map(|b| b.tech),
-            'P' => Some(PREFAB_TAB),
             _ => None,
         };
         if let Some(tab) = tab {
@@ -226,14 +240,10 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
             }
         }
     }
-    for tab in (1..=TIERS).chain([UPGRADE_TAB, PREFAB_TAB]) {
+    for tab in (1..=TIERS).chain([UPGRADE_TAB]) {
         let upgrade = tab == UPGRADE_TAB;
         let has = open(tab);
-        if (upgrade || tab == PREFAB_TAB) && !has {
-            continue;
-        }
-        if tab == PREFAB_TAB {
-            tx += prefab_tab_button(hud, ui, tx, r.y + 10.0) + 4.0;
+        if upgrade && !has {
             continue;
         }
         let w = if upgrade { 124.0 } else { 58.0 };
@@ -309,13 +319,23 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
         }
         tx += w + 4.0;
     }
+    if places_prefabs {
+        let (w, clicked) = super::prefabs::toggle_button(hud, ui, tx, r.y + 10.0, prefab_mode);
+        if clicked {
+            hud.prefabs.want_on = false;
+            hud.prefabs.on = !prefab_mode;
+            hud.shelf = None;
+            rewind(hud);
+        }
+        tx += w + 4.0;
+    }
     ui.section(
         tx + 10.0,
         r.y + 23.0,
         r.right() - 14.0 - tx - 10.0,
         &if hud.tab == UPGRADE_TAB {
             format!("Refit  \u{b7}  {}", bp.name)
-        } else if hud.tab == PREFAB_TAB {
+        } else if prefab_mode {
             format!("Prefabs  \u{b7}  {}", bp.name)
         } else if builds.is_empty() {
             format!("Upgrades  \u{b7}  {}", bp.name)
@@ -330,17 +350,23 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
         hud,
         ui,
         r,
-        "Tier 1\u{2013}5  \u{b7}  P Prefabs  \u{b7}  Shelf  \u{b7}  Item  \u{b7}  ESC",
+        if prefab_mode {
+            "Tier 1\u{2013}5  \u{b7}  P Structures  \u{b7}  Shelf  \u{b7}  Prefab  \u{b7}  ESC"
+        } else if places_prefabs {
+            "Tier 1\u{2013}5  \u{b7}  P Prefabs  \u{b7}  Shelf  \u{b7}  Item  \u{b7}  ESC"
+        } else {
+            "Tier 1\u{2013}5  \u{b7}  Shelf  \u{b7}  Item  \u{b7}  ESC"
+        },
     );
     let grid = Rect::new(x, r.y + 44.0, cw - 10.0, r.bottom() - 8.0 - (r.y + 44.0));
     let mut hovered: Option<Hover> = None;
     let mut prefab_hovered = None;
-    let prefab_builds = if hud.tab == PREFAB_TAB {
+    let prefab_builds = if prefab_mode {
         super::prefabs::selection_builds(s.view, s.blueprints)
     } else {
         Vec::new()
     };
-    if hud.tab == PREFAB_TAB {
+    if prefab_mode {
         let grid = Rect { w: cw, ..grid };
         prefab_hovered = super::prefabs::tab(hud, ui, s, bp.faction, &prefab_builds, grid);
     } else if hud.tab == UPGRADE_TAB {
@@ -486,41 +512,6 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
     }
 }
 
-/// The Prefabs tab's button at `x`; returns its width.
-fn prefab_tab_button(hud: &mut Hud, ui: &mut Ui, x: f32, y: f32) -> f32 {
-    let tr = Rect::new(x, y, 104.0, 26.0);
-    let lit = hud.tab == PREFAB_TAB;
-    let t = hud.tile(ui, id("tech-tab", PREFAB_TAB as usize), tr, lit, true);
-    let tone = if lit {
-        rgb(0xFFFFFF, 1.0)
-    } else {
-        rgb(palette::TEXT, 0.6 + 0.4 * t.glow)
-    };
-    key_cap(ui, tr.x + 5.0, tr.y + 5.5, 'P', hud.build_keys);
-    icons::glyph(
-        ui,
-        icons::Glyph::Prefab,
-        Vec2::new(tr.x + 33.0, tr.mid_y()),
-        6.0,
-        tone,
-    );
-    ui.text_fit_left(
-        tr.x + 44.0,
-        tr.mid_y(),
-        tr.w - 48.0,
-        type_scale::BUTTON,
-        tone,
-        "Prefabs",
-    );
-    if t.clicked && !lit {
-        ui.audio.play(Sfx::Tick);
-        hud.tab = PREFAB_TAB;
-        rewind(hud);
-        hud.shelf = None;
-    }
-    tr.w
-}
-
 /// How to drive the panel `r` from the keyboard, at its header's right end: B, and while
 /// the keys are live, what they pick (`live`).
 fn keys_hint(hud: &Hud, ui: &mut Ui, r: Rect, live: &str) {
@@ -578,7 +569,7 @@ pub fn key_cap(ui: &mut Ui, x: f32, y: f32, key: char, live: bool) {
 }
 
 /// The shelf buttons over the strip.
-const SHELF_H: f32 = 24.0;
+pub(super) const SHELF_H: f32 = 24.0;
 /// From the shelf buttons' top to the strip's: room under them for the bar of the
 /// shelf in view and the bracket over its tiles.
 pub(super) const STRIP_DROP: f32 = SHELF_H + 12.0;

@@ -88,7 +88,7 @@ impl Game {
 
     /// Placed only by engineering stations: a site beyond all their reach is refused,
     /// as the sim refuses it (`Refusal::OutOfReach`).
-    fn refuse_beyond_stations(
+    pub(super) fn refuse_beyond_stations(
         &self,
         blueprint: BlueprintId,
         sites: &mut [(FxVec2, Result<(), Unfit>)],

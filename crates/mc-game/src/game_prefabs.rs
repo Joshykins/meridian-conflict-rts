@@ -2,36 +2,38 @@
 //! selected structures' layout, and the construction panel's Prefabs tab puts one
 //! down with the selected builders, turned with R and mirrored with F.
 //!
-//! Placing one sends a `Command::Build` for each structure that can go down, nearest
-//! the builders first, exactly as placing them one by one would.
+//! Placing one sends a `Command::Build` for each structure that can go down, in the
+//! order they were built when it was saved, exactly as placing them one by one would.
+//! An engineering station places one too, as far as its reach goes.
 
 use super::{Game, Mode};
 use crate::audio::{Audio, Sfx};
 use crate::hud::{self, HudAction};
 use crate::orders::{self, Field};
-use crate::prefabs::{self, Kept, Library, Prefab, PrefabId, PrefabSite, Turn};
+use crate::prefabs::{self, BuildOrder, Kept, Library, Prefab, PrefabId, PrefabSite, Turn};
 use crate::ui::palette;
-use glam::Vec2;
-use mc_core::{Angle, Fx, FxVec2};
+use mc_core::FxVec2;
 use mc_data::BlueprintId;
 use mc_render::Renderer;
 use mc_sim::mirror::UnitInstance;
 use mc_sim::Command;
 
-/// The library, and how what is in hand (a prefab, or a structure being placed) is
-/// turned. The turn stays as it was set, for the next prefab or structure picked up
-/// too, until it is turned again: the hologram always shows it.
+/// The library, how what is in hand (a prefab, or a structure being placed) is
+/// turned, and the order the player's structures were begun in, for saving. The turn
+/// stays as it was set, for the next prefab or structure picked up too, until it is
+/// turned again: the hologram always shows it.
 #[derive(Default)]
 pub struct Prefabs {
     pub library: Library,
     pub turn: Turn,
+    pub order: BuildOrder,
 }
 
 impl Prefabs {
     pub fn load() -> Prefabs {
         Prefabs {
             library: Library::load(),
-            turn: Turn::default(),
+            ..Prefabs::default()
         }
     }
 }
@@ -59,7 +61,14 @@ impl Game {
             return Vec::new();
         };
         let builds = self.prefab_builds();
-        orders::prefab_sites(&field, prefab, ground, self.prefabs.turn, &builds)
+        let mut sites = orders::prefab_sites(&field, prefab, ground, self.prefabs.turn, &builds);
+        // Stations alone take only what is in their reach, as the sim does.
+        for s in sites.iter_mut().filter(|s| s.buildable) {
+            let mut one = [(s.at, s.fit)];
+            self.refuse_beyond_stations(s.blueprint, &mut one);
+            s.fit = one[0].1;
+        }
+        sites
     }
 
     /// The prefab in hand's holograms, and their lots outlined.
@@ -88,34 +97,20 @@ impl Game {
     }
 
     /// A click with a prefab in hand: every structure of it that can go down is
-    /// ordered, nearest the builders first; Shift queues them after what the builders
-    /// have, and keeps the prefab in hand.
+    /// ordered, in the order they were built when it was saved; Shift queues them after
+    /// what the builders have, and keeps the prefab in hand.
     pub(super) fn place_prefab(&mut self, id: PrefabId, r: &Renderer, audio: &Audio) {
         let sites = self.prefab_sites(id, r);
-        let mut going: Vec<(BlueprintId, FxVec2, Angle)> = sites
+        let ordered: Vec<_> = sites
             .iter()
             .filter(|s| s.goes_down())
             .map(|s| (s.blueprint, s.at, s.heading))
             .collect();
-        if going.is_empty() {
+        if ordered.is_empty() {
             audio.play(Sfx::Deny);
             return;
         }
         audio.play(Sfx::Order);
-        // Nearest the builders' middle first, then each next nearest the last: one walk
-        // through the layout rather than back and forth across it.
-        let mut from = self.builders_middle();
-        let mut ordered = Vec::with_capacity(going.len());
-        while !going.is_empty() {
-            let (i, _) = going
-                .iter()
-                .enumerate()
-                .min_by_key(|(_, (_, at, _))| (*at - from).length_sq())
-                .expect("not empty");
-            let next = going.remove(i);
-            from = next.1;
-            ordered.push(next);
-        }
         let mines: Vec<(BlueprintId, FxVec2)> = ordered
             .iter()
             .copied()
@@ -152,21 +147,6 @@ impl Game {
         if !self.shift {
             self.view.mode = Mode::Normal;
         }
-    }
-
-    fn builders_middle(&self) -> FxVec2 {
-        let (sum, n) = self
-            .selected_units()
-            .filter(|u| {
-                self.blueprints
-                    .unit(BlueprintId(u.blueprint as u16))
-                    .is_mobile()
-            })
-            .fold((Vec2::ZERO, 0.0), |(s, n), u| {
-                (s + Vec2::new(u.pos[0], u.pos[1]), n + 1.0)
-            });
-        let m = if n > 0.0 { sum / n } else { sum };
-        FxVec2::new(Fx::from_f32(m.x), Fx::from_f32(m.y))
     }
 
     /// F with a prefab in hand: mirrored left to right (again: back as it was).
@@ -212,7 +192,7 @@ impl Game {
         if self.view.observing {
             return;
         }
-        let structures = hud::prefabs::selection_structures(&self.view);
+        let structures = hud::prefabs::selection_structures(&self.view, &self.prefabs.order);
         match prefabs::capture(&self.blueprints, &structures) {
             Ok(draft) => {
                 audio.play(Sfx::Select);
@@ -229,6 +209,18 @@ impl Game {
         match action {
             HudAction::HoldPrefab(id) => self.hold_prefab(id, audio),
             HudAction::KeepPrefab(prefab) => self.keep_prefab(prefab),
+            HudAction::EditPrefab(prefab) => {
+                let name = prefab.name.clone();
+                if self.prefabs.library.update(prefab) {
+                    if self.save_prefabs() {
+                        self.hud.toast(format!("Saved prefab {name}"), hud::HEALTHY);
+                    }
+                } else {
+                    audio.play(Sfx::Deny);
+                    self.hud
+                        .toast(format!("Another prefab is called {name}"), palette::BAD);
+                }
+            }
             HudAction::DropPrefab(id) => {
                 if let Some(gone) = self.prefabs.library.remove(id) {
                     if self.view.mode == Mode::Prefab(id) {

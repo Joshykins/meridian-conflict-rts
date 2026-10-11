@@ -1,31 +1,39 @@
-//! The box that names a prefab being saved: its plan, what is in it and what it
-//! costs, a name to type (the suggestion selected, so typing replaces it), and Save.
-//! Enter saves, Escape or Cancel puts it away. While it is up it has the keyboard
-//! and the screen.
+//! The box that names a prefab being saved, or edits one of the library: its plan,
+//! what is in it and what it costs, the shelf it goes on and its icon (each lit on
+//! the one its structures make until the player picks another), a name to type (the
+//! suggestion selected, so typing replaces it), and Save. Enter saves, Escape or
+//! Cancel puts it away. While it is up it has the keyboard and the screen.
 
-use super::plan;
+use super::{plan, shelf};
 use crate::audio::Sfx;
+use crate::hud::icons;
 use crate::hud::{whole, Hud, HudAction, Scene, ENERGY, MATERIALS};
-use crate::prefabs::{self, Prefab};
+use crate::prefabs::{self, Badge, Category, Prefab};
 use crate::ui::{id, ink, palette, rgb, type_scale, ButtonKind, Key, Rect, Ui};
+use glam::Vec2;
 
 const W: f32 = 520.0;
-const H: f32 = 330.0;
+const H: f32 = 410.0;
 /// Most kinds of structure listed; the rest are counted on one line.
 const LISTED: usize = 5;
+/// The pickers' rows: where their labels end and their chips begin.
+const PICK_X: f32 = 56.0;
 
 pub(super) struct Draft {
     prefab: Prefab,
     name: String,
+    /// It is in the library already: saving puts it back in its place.
+    editing: bool,
     /// The field has not had the keyboard yet: it takes it, the name selected.
     fresh: bool,
 }
 
 impl Draft {
-    pub(super) fn new(prefab: Prefab) -> Draft {
+    pub(super) fn new(prefab: Prefab, editing: bool) -> Draft {
         Draft {
             name: prefab.name.clone(),
             prefab,
+            editing,
             fresh: true,
         }
     }
@@ -41,7 +49,16 @@ pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene) {
     ui.fill(screen, ink(0.35));
     let r = Rect::new(((sw - W) * 0.5).round(), ((sh - H) * 0.42).round(), W, H);
     ui.panel(r);
-    ui.section(r.x + 18.0, r.y + 22.0, W - 36.0, "Save Prefab");
+    ui.section(
+        r.x + 18.0,
+        r.y + 22.0,
+        W - 36.0,
+        if draft.editing {
+            "Edit Prefab"
+        } else {
+            "Save Prefab"
+        },
+    );
 
     // The plan, left.
     let well = Rect::new(r.x + 18.0, r.y + 44.0, 170.0, 170.0);
@@ -130,6 +147,8 @@ pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene) {
         );
     }
 
+    pickers(hud, ui, s, &mut draft.prefab, r);
+
     // The name, and what saving it under that name will do.
     let field_id = id("prefab-name", 0);
     if std::mem::take(&mut draft.fresh) {
@@ -150,9 +169,21 @@ pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene) {
         ui.mem.editing = Some(field_id);
     }
     let name = prefabs::clean_name(&draft.name);
-    let replaces = s.prefabs.by_name(&name).is_some();
-    let full = !replaces && s.prefabs.len() >= prefabs::MAX_PREFABS;
-    let (note, tone) = if full {
+    let namesake = s.prefabs.by_name(&name).filter(|p| p.id != draft.prefab.id);
+    let replaces = !draft.editing && namesake.is_some();
+    let clash = draft.editing && namesake.is_some();
+    let full = !draft.editing && !replaces && s.prefabs.len() >= prefabs::MAX_PREFABS;
+    let (note, tone) = if clash {
+        (
+            format!("Another prefab is called {name}: name this one otherwise"),
+            palette::BAD,
+        )
+    } else if draft.editing {
+        (
+            "Its structures stay as saved  \u{b7}  Ctrl+S a new layout to change them".to_owned(),
+            palette::FAINT,
+        )
+    } else if full {
         (
             format!(
                 "The library is full ({}): delete a prefab first",
@@ -188,19 +219,19 @@ pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene) {
         true,
     ) || ui.input.key(Key::Escape);
     let label = if replaces { "Replace" } else { "Save" };
-    let saved = ui.button(
-        id("prefab-save", 0),
-        save,
-        label,
-        ButtonKind::Primary,
-        !full,
-    ) || (!full && ui.input.key(Key::Enter));
+    let can = !full && !clash;
+    let saved = ui.button(id("prefab-save", 0), save, label, ButtonKind::Primary, can)
+        || (can && ui.input.key(Key::Enter));
     hud.claim(ui, screen);
     if saved {
         ui.audio.play(Sfx::Select);
         let mut prefab = draft.prefab.clone();
         prefab.name = name;
-        hud.actions.push(HudAction::KeepPrefab(prefab));
+        hud.actions.push(if draft.editing {
+            HudAction::EditPrefab(prefab)
+        } else {
+            HudAction::KeepPrefab(prefab)
+        });
     } else if cancelled {
         ui.audio.play(Sfx::Back);
     }
@@ -208,6 +239,71 @@ pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene) {
         ui.mem.editing = None;
     } else {
         hud.prefabs.saving = Some(draft);
+    }
+}
+
+/// The shelf and icon rows: a chip for each, the one the prefab has lit. A pick is
+/// kept only when it differs from what its structures make, so `None` stays "its own".
+fn pickers(hud: &mut Hud, ui: &mut Ui, s: &Scene, prefab: &mut Prefab, r: Rect) {
+    let (x, y) = (r.x + 18.0, r.y + 246.0);
+    let row_w = W - 36.0 - PICK_X;
+    let own = Prefab {
+        category: None,
+        icon: None,
+        ..prefab.clone()
+    };
+    for (i, label) in ["Shelf", "Icon"].into_iter().enumerate() {
+        ui.text(
+            x,
+            y + 13.0 + i as f32 * 44.0,
+            type_scale::MICRO,
+            rgb(palette::DIM, 1.0),
+            label,
+        );
+    }
+    let now = prefab.category(s.blueprints);
+    let n = Category::ALL.len() as f32;
+    let cw = (row_w - (n - 1.0) * 4.0) / n;
+    for (i, c) in Category::ALL.into_iter().enumerate() {
+        let cr = Rect::new(x + PICK_X + i as f32 * (cw + 4.0), y, cw, 26.0);
+        let t = hud.tile(ui, id("prefab-pick-shelf", i), cr, c == now, true);
+        ui.text_centred(
+            cr.x + cr.w * 0.5,
+            cr.mid_y(),
+            type_scale::MICRO,
+            rgb(
+                if c == now { 0xFFFFFF } else { palette::TEXT },
+                if c == now { 1.0 } else { 0.65 + 0.35 * t.glow },
+            ),
+            shelf(c).label(true),
+        );
+        if t.clicked {
+            ui.audio.play(Sfx::Tick);
+            prefab.category = (c != own.category(s.blueprints)).then_some(c);
+        }
+    }
+    let now = prefab.badge(s.blueprints);
+    let n = Badge::ALL.len() as f32;
+    let bw = ((row_w - (n - 1.0) * 4.0) / n).min(30.0);
+    for (i, b) in Badge::ALL.into_iter().enumerate() {
+        let br = Rect::new(x + PICK_X + i as f32 * (bw + 4.0), y + 44.0, bw, 28.0);
+        let t = hud.tile(ui, id("prefab-pick-icon", i), br, b == now, true);
+        icons::strategic(
+            ui,
+            b.icon(),
+            0,
+            Vec2::new(br.x + br.w * 0.5, br.mid_y()),
+            8.0,
+            rgb(
+                if b == now { 0xFFFFFF } else { palette::TEXT },
+                if b == now { 1.0 } else { 0.6 + 0.4 * t.glow },
+            ),
+            ink(0.62),
+        );
+        if t.clicked {
+            ui.audio.play(Sfx::Tick);
+            prefab.icon = (b != own.badge(s.blueprints)).then_some(b);
+        }
     }
 }
 

@@ -2220,9 +2220,10 @@ impl Game {
         }
         match action {
             HudAction::OfferPrefab => self.offer_prefab(audio),
-            HudAction::HoldPrefab(_) | HudAction::KeepPrefab(_) | HudAction::DropPrefab(_) => {
-                self.prefab_action(action, audio)
-            }
+            HudAction::HoldPrefab(_)
+            | HudAction::KeepPrefab(_)
+            | HudAction::EditPrefab(_)
+            | HudAction::DropPrefab(_) => self.prefab_action(action, audio),
             HudAction::FormationPanel => self.toggle_formation_panel(audio),
             HudAction::FormationTogether(together) => {
                 self.view.formation_together = together;
@@ -3109,6 +3110,9 @@ impl Game {
         }
         crate::hud::silo::settle_sent(&mut self.view);
         crate::titan_marks::observe(&mut self.view, &self.blueprints);
+        self.prefabs
+            .order
+            .observe(&self.view.frame.units, self.view.local, &self.blueprints);
         self.view.index_of.clear();
         for (i, u) in self.view.frame.units.iter().enumerate() {
             if u.owner_flags & KIND_WRECK == 0 {

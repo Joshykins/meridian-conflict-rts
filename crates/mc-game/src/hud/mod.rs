@@ -211,6 +211,9 @@ pub enum HudAction {
     HoldPrefab(crate::prefabs::PrefabId),
     /// Put this prefab, named in the save box, in the library.
     KeepPrefab(crate::prefabs::Prefab),
+    /// Put this prefab, renamed, reshelved or given a new icon in the edit box, in place
+    /// of the one with its id.
+    EditPrefab(crate::prefabs::Prefab),
     /// Take this prefab out of the library.
     DropPrefab(crate::prefabs::PrefabId),
 }

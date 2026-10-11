@@ -222,6 +222,8 @@ fn the_file_reads_back_what_was_written_and_survives_a_bad_one() {
             y: 0,
             turn: 0,
         }],
+        category: None,
+        icon: None,
         id: PrefabId::default(),
     };
     let mut lib = Library::default();
@@ -360,4 +362,131 @@ fn place_turn_reads_quarters_and_a_mirror() {
     );
     assert_eq!(Turn::parse("4"), None);
     assert_eq!(Turn::parse("m"), None);
+}
+
+#[test]
+fn members_keep_the_order_they_were_built_in() {
+    let b = blueprints();
+    // Built storage first, factory last: not the order a page reads them in.
+    let mut sites = base(&b);
+    sites.reverse();
+    let p = capture(&b, &sites).unwrap();
+    let keys: Vec<&str> = p.members.iter().map(|m| m.key.as_str()).collect();
+    assert_eq!(
+        keys,
+        [
+            "aster_materials_storage",
+            "aster_t1_power",
+            "aster_t1_power",
+            "aster_t1_land_factory"
+        ]
+    );
+    // Laid out, they come in the same order.
+    let (members, _) = p.resolve(&b);
+    let laid = layout(&b, &members, at(1000, 1000), Turn::default());
+    let ids: Vec<BlueprintId> = laid.iter().map(|l| l.blueprint).collect();
+    let want: Vec<BlueprintId> = sites.iter().map(|s| s.blueprint).collect();
+    assert_eq!(ids, want);
+}
+
+#[test]
+fn build_order_ranks_by_first_seen_and_a_reused_id_is_new() {
+    use mc_sim::mirror::UnitInstance;
+    let b = blueprints();
+    let power = b.id_of("aster_t1_power").unwrap();
+    let unit = |id: u32| UnitInstance {
+        unit_id: id,
+        blueprint: power.0 as u32,
+        ..bytemuck::Zeroable::zeroed()
+    };
+    let mut order = BuildOrder::default();
+    // Slot 9 first, then slot 2: ids alone would rank 2 first.
+    order.observe(&[unit(9)], 0, &b);
+    order.observe(&[unit(9), unit(2)], 0, &b);
+    assert!(order.rank(9) < order.rank(2));
+    // Another player's, and one never seen, rank after.
+    let mut theirs = unit(5);
+    theirs.owner_flags = 1;
+    order.observe(&[unit(9), unit(2), theirs], 0, &b);
+    assert_eq!(order.rank(5), u64::MAX);
+    // Gone and back (a new unit in the slot): begun after the others.
+    order.observe(&[unit(2)], 0, &b);
+    order.observe(&[unit(2), unit(9)], 0, &b);
+    assert!(order.rank(2) < order.rank(9));
+}
+
+#[test]
+fn shelf_icon_and_tier_come_from_the_costliest_structure_unless_picked() {
+    let b = blueprints();
+    let p = capture(&b, &base(&b)[..1]).unwrap();
+    assert_eq!(p.category(&b), Category::Factories);
+    assert_eq!(p.badge(&b), Badge::Factory);
+    assert_eq!(p.tech(&b), 1);
+    // The base's generators and storage together cost more than its factory, but the
+    // factory is its costliest structure: a factory prefab.
+    let whole = capture(&b, &base(&b)).unwrap();
+    assert_eq!(whole.category(&b), Category::Factories);
+    assert_eq!(whole.badge(&b), Badge::Factory);
+    let mut picked = p.clone();
+    picked.category = Some(Category::Economy);
+    picked.icon = Some(Badge::Power);
+    assert_eq!(picked.category(&b), Category::Economy);
+    assert_eq!(picked.badge(&b), Badge::Power);
+    // Power alone goes on the economy shelf.
+    let power = capture(&b, &[laid(&b, "aster_t1_power", at(600, 600))]).unwrap();
+    assert_eq!(power.category(&b), Category::Economy);
+    assert_eq!(power.badge(&b), Badge::Power);
+}
+
+#[test]
+fn a_shelf_and_icon_picked_are_saved_and_old_files_still_read() {
+    let b = blueprints();
+    let dir = std::env::temp_dir().join(format!("mc-prefab-shelf-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("prefabs.ron");
+    let mut lib = Library {
+        path: Some(path.clone()),
+        ..Library::default()
+    };
+    let mut p = capture(&b, &base(&b)).unwrap();
+    p.category = Some(Category::Defense);
+    p.icon = Some(Badge::Shield);
+    lib.keep(p);
+    lib.save().unwrap();
+    let read = read_file(&path).unwrap().unwrap();
+    assert_eq!(read[0].category, Some(Category::Defense));
+    assert_eq!(read[0].icon, Some(Badge::Shield));
+    // A file from before shelves and icons: its prefabs take their own.
+    std::fs::write(
+        &path,
+        "(prefabs: [(name: \"Old\", members: [(key: \"aster_t1_power\", x: 0, y: 0)])])",
+    )
+    .unwrap();
+    let read = read_file(&path).unwrap().unwrap();
+    assert_eq!((read[0].category, read[0].icon), (None, None));
+    assert_eq!(read[0].category(&b), Category::Economy);
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn an_edit_keeps_its_place_and_refuses_another_prefabs_name() {
+    let b = blueprints();
+    let mut lib = Library::default();
+    let mut a = capture(&b, &base(&b)).unwrap();
+    a.name = "A".into();
+    let mut c = a.clone();
+    c.name = "C".into();
+    let Some(Kept::Added(a_id)) = lib.keep(a) else {
+        panic!("kept")
+    };
+    lib.keep(c);
+    let mut edit = lib.get(a_id).unwrap().clone();
+    edit.name = "c".into();
+    assert!(!lib.update(edit.clone()), "C is taken");
+    edit.name = "Base".into();
+    edit.category = Some(Category::Intel);
+    assert!(lib.update(edit));
+    let names: Vec<&str> = lib.iter().map(|p| p.name.as_str()).collect();
+    assert_eq!(names, ["C", "Base"]);
+    assert_eq!(lib.get(a_id).unwrap().category, Some(Category::Intel));
 }
