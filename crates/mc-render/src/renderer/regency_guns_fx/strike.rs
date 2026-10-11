@@ -39,6 +39,10 @@ impl Renderer {
             // A surge shell lands as a Pinch-fusion one does, all in crimson; its wake is
             // `surge_fx`'s.
             Grade::Surge => self.fusion_nova(at, impact, size * 1.5, splash, under, true, start),
+            Grade::Knotted => {
+                let w = w.clone();
+                self.knotted_strike(at, &w, impact, size * 1.5, splash, under, start)
+            }
         }
         true
     }

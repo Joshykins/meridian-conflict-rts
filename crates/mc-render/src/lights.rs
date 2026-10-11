@@ -1152,6 +1152,18 @@ fn glow_of(p: &ProjectileInstance) -> Option<Glow> {
             line: false,
         });
     }
+    // A knotted shell (`plasma_look::KNOTTED_SHELL`): its white plume lights what it passes.
+    if p._pad[0] > 2.5
+        && ((p._pad[0] - 1.0) * 0.5).floor() == crate::gpu_consts::plasma_look::KNOTTED_SHELL as f32
+    {
+        return Some(Glow {
+            from,
+            to,
+            color: Vec3::new(0.75, 0.65, 1.0) * 260.0,
+            range: 40.0,
+            line: false,
+        });
+    }
     // Tracers: small, but a stream of them lights a night battle.
     let color = match flags & 0xF {
         0 => Vec3::new(0.35, 0.66, 1.0),

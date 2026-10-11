@@ -151,6 +151,12 @@ fn surge_shell(p: Projectile) -> bool {
     return plasma_look(p) == PLASMA_LOOK_SURGE_SHELL;
 }
 
+// A knotted Pinch-fusion gun's shell (`PLASMA_LOOK_KNOTTED_SHELL`, the Springald's): a long
+// solid shell drawn by `vs_missile`, its plume by `vs_projectile`.
+fn knotted_shell(p: Projectile) -> bool {
+    return plasma_look(p) == PLASMA_LOOK_KNOTTED_SHELL;
+}
+
 // A cased seeker's charge and line work, as the strategic warhead's (nova.wgsl `NOVA_VIOLET`).
 const SEEKER_RED: vec3<f32> = vec3<f32>(1.0, 0.035, 0.012);
 
@@ -328,6 +334,9 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     } else if look == PLASMA_LOOK_AIRBURST {
         // An airburst round: a short bead and the few sparks it sheds, never a stream.
         trace = min(length(stride) * 0.5, max(p.size, 0.5) * 9.0);
+    } else if look == PLASMA_LOOK_KNOTTED_SHELL {
+        // A knotted shell's plume: short and hard behind its long body.
+        trace = min(length(stride) * 0.6, max(p.size, 1.0) * 1.6);
     }
     if (p.color & 0x200u) != 0u {
         trace = min(trace, distance(head, shot_muzzle(p)));
@@ -386,7 +395,8 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     // containment is wider than the core it holds.
     width_px *= select(1.0, 0.8, look == 1u) * select(1.0, 1.35, look == 3u) * select(1.0, 2.6, look == 4u)
         * select(1.0, 1.9, look == 2u) * select(1.0, 0.45, look == PLASMA_LOOK_SURGE_SHELL)
-        * select(1.0, 1.6, look == PLASMA_LOOK_AIRBURST);
+        * select(1.0, 1.6, look == PLASMA_LOOK_AIRBURST)
+        * select(1.0, 0.4, look == PLASMA_LOOK_KNOTTED_SHELL);
     let plasma_m = p.extras.y;
     var core_frac = 0.0;
     if plasma_m > 0.0 && !beam && !fade_beam {
@@ -480,8 +490,8 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         // 1.25: a tracer with an orange-hot core; 1.4: a red round, red-hot right through.
         out.shape.y = select(1.25, 1.4, red > 0.5);
         if look > 0u {
-            // 7.6, 8.6, 9.6, 10.6, 14.6 (a surge shell), 15.6 (an airburst round): the Regency
-            // plasma shots (`fs_sprite`).
+            // 7.6, 8.6, 9.6, 10.6, 14.6 (a surge shell), 15.6 (an airburst round), 16.6 (a
+            // knotted shell): the Regency plasma shots (`fs_sprite`).
             out.color = vec3<f32>(1.0);
             out.shape.y = 6.6 + f32(look);
         }
@@ -567,11 +577,32 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
             if surge {
                 red = mix(vec3<f32>(0.2, 0.05, 0.45), vec3<f32>(0.9, 0.03, 0.06), smoothstep(0.1, 0.6, heat));
             }
+            // A knotted shell's: white, taking cold lilac, cooling to deep indigo; no prism,
+            // no rose.
+            let knotted = abs(p.aim.w - FADE_BEAM_PLASMA_TRAIL_KNOTTED) < 0.5;
+            if knotted {
+                red = mix(vec3<f32>(0.1, 0.05, 0.42), vec3<f32>(0.62, 0.5, 1.0), smoothstep(0.05, 0.55, heat));
+            }
             let hue = prism(f32(instance) * 0.137 + globals.camera.w * PRISM_RATE * 3.0);
-            let pink = select(vec3<f32>(1.0, 0.45, 0.42), vec3<f32>(1.0, 0.08, 0.1), surge);
+            var pink = select(vec3<f32>(1.0, 0.45, 0.42), vec3<f32>(1.0, 0.08, 0.1), surge);
+            if knotted {
+                pink = vec3<f32>(0.82, 0.76, 1.0);
+            }
             var warm = mix(red, mix(pink, hue, select(0.0, 0.8, fusion)), smoothstep(0.45, 0.8, heat));
             warm = mix(warm, vec3<f32>(1.0, 0.9, 0.92), smoothstep(select(0.88, 0.8, fusion), 1.0, heat) * select(1.0, 0.0, surge));
             out.color = warm * select(select(7.0, 9.0, fusion), 3.2, surge) * pow(heat, 0.8);
+            if knotted {
+                // By the seconds since the shell passed, not the share of its life, so a
+                // thread that hangs 30 s is white only for a moment: white, cold lilac for a
+                // couple of seconds, then a deep indigo thread for the rest, still seen
+                // across the map.
+                let secs = globals.camera.w - p.extras.x;
+                let white = exp(-secs / 0.35);
+                let lilac = exp(-secs / 2.5);
+                let cold = mix(vec3<f32>(0.16, 0.08, 0.6), vec3<f32>(0.62, 0.5, 1.0), lilac);
+                out.color = mix(cold, vec3<f32>(1.0, 0.97, 1.0), white)
+                    * (3.0 + 2.6 * lilac + 1.5 * white) * pow(heat, 0.5);
+            }
             out.shape = vec2<f32>(-distance(head, tail), 6.6 + 0.4 * clamp(age, 0.0, 1.0));
         } else if (p.color & 0xFu) == 6u {
             // A capital rail's ionised channel (renderer/heavy_rail_fx.rs): white-hot,
@@ -638,8 +669,8 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
         hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
         return hidden;
     }
-    // A surge shell's head is its solid body (`vs_missile`), not a glowing bead.
-    if surge_shell(p) {
+    // A surge or knotted shell's head is its solid body (`vs_missile`), not a glowing bead.
+    if surge_shell(p) || knotted_shell(p) {
         var hidden: SpriteOut;
         hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
         return hidden;
@@ -791,6 +822,9 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     } else if look == PLASMA_LOOK_AIRBURST {
         // An airburst round's pearl: white-hot, rose.
         out.color = vec3<f32>(1.35, 0.62, 0.66);
+    } else if look == PLASMA_LOOK_KNOTTED_SHELL {
+        // A knotted shell's plume seen from afar: white going lilac.
+        out.color = vec3<f32>(1.1, 1.0, 1.4);
     }
     if (p.color & 0x100u) != 0u {
         out.color = SHOT_YELLOW;
@@ -982,6 +1016,27 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
             let time = globals.camera.w;
             let red = vec3<f32>(1.0, 0.045, 0.02);
             let white = vec3<f32>(1.0, 0.86, 0.8);
+            if in.shape.y > 16.1 {
+                // A knotted shell's plume (`PLASMA_LOOK_KNOTTED_SHELL`; its solid body is
+                // `vs_missile`'s): a short hard white core right behind the base, sheathed
+                // in cold lilac that thins to indigo at its rim and its tail. Three faint
+                // bright threads run back down it from the shell's seams. Hard-edged.
+                let prof = (0.45 + 0.55 * smoothstep(0.0, 0.7, u)) * (1.0 - smoothstep(0.9, 1.0, u));
+                let y = abs(in.uv.y) / max(prof, 0.01);
+                if y >= 1.0 {
+                    discard;
+                }
+                let lilac = vec3<f32>(0.72, 0.6, 1.0);
+                let indigo = vec3<f32>(0.3, 0.16, 1.0);
+                let body = pow(1.0 - y, 1.4);
+                let rim = smoothstep(0.55, 0.9, y) * (1.0 - smoothstep(0.9, 1.0, y));
+                let core = pow(max(1.0 - y * 2.2, 0.0), 2.0) * smoothstep(0.35, 0.95, u);
+                let threads = pow(0.5 + 0.5 * cos(y * 9.42), 24.0) * smoothstep(0.2, 0.8, u);
+                let rgb = mix(indigo, lilac, smoothstep(0.1, 0.8, u)) * body * (0.5 + 1.2 * u)
+                    + indigo * rim * 0.9
+                    + vec3<f32>(1.0, 0.97, 1.0) * (core * 2.4 + threads * 0.6);
+                return vec4<f32>(rgb * smoothstep(0.0, 0.3, u) * in.color.r, 1.0);
+            }
             if in.shape.y > 15.1 {
                 // An airburst round (`PLASMA_LOOK_AIRBURST`, the Gorget's): a small hard bead
                 // of squeezed plasma on a timed fuse, nothing like a repeater's boiling bolt or
@@ -1355,7 +1410,8 @@ fn vs_missile(@builtin(vertex_index) vertex: u32, @builtin(instance_index) insta
     let p = projectiles[instance];
     var out: MissileOut;
     let at = shot_head(p);
-    let shell = surge_shell(p);
+    let knotted = knotted_shell(p);
+    let shell = surge_shell(p) || knotted;
     // A shell has no fins or wings.
     if ((p.color & 0x100u) == 0u && !shell) || at.w < 0.0 || (shell && vertex >= 96u) {
         out.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
@@ -1368,6 +1424,11 @@ fn vs_missile(@builtin(vertex_index) vertex: u32, @builtin(instance_index) insta
         // Stubby: a tenth of its plume across, a third as thick as it is long.
         half_length = clamp(p.size * 0.11, 0.6, 2.0);
         radius = half_length * 0.34;
+    }
+    if knotted {
+        // Long and slim: a map gun's shell.
+        half_length = clamp(p.size * 0.4, 2.0, 6.0);
+        radius = half_length * 0.2;
     }
     let cased = cased_seeker(p);
     // Where the body meets the prow: a cased seeker's faceted prow is longer, a shell's
@@ -1446,7 +1507,7 @@ fn vs_missile(@builtin(vertex_index) vertex: u32, @builtin(instance_index) insta
     out.clip = globals.view_proj * vec4<f32>(at.xyz + axis * local.x + side * local.y + up * local.z, 1.0);
     out.normal = axis * normal.x + side * normal.y + up * normal.z;
     out.surface = surface;
-    out.cased = select(select(0u, 1u, cased), 2u, shell);
+    out.cased = select(select(select(0u, 1u, cased), 2u, shell), 3u, knotted);
     return out;
 }
 fn fs_missile_lit(in: MissileOut) -> vec4<f32> {
@@ -1457,6 +1518,9 @@ fn fs_missile_lit(in: MissileOut) -> vec4<f32> {
     var look = cased_seeker_color(in.surface);
     if in.cased == 2u {
         look = surge_shell_color(in.surface);
+    }
+    if in.cased == 3u {
+        look = knotted_shell_color(in.surface);
     }
     return vec4<f32>(look[0] * light + look[1], 1.0);
 }
@@ -1531,6 +1595,31 @@ fn surge_shell_color(s: vec3<f32>) -> array<vec3<f32>, 2> {
         line = max(line, step(0.46, d) * step(-0.6, s.x) * step(s.x, 0.22) * select(0.0, 1.0, edge));
     }
     return array<vec3<f32>, 2>(base, crimson * line * 5.0 * beat);
+}
+
+// A knotted shell's surface at `s` (`MissileOut::surface`), its base colour and light:
+// graphite, a steel point and driving band, three white seams down it a third of a turn
+// apart (the three knots it was gathered from), and its base burning white-lilac with the
+// fusion it carries, beating fast.
+fn knotted_shell_color(s: vec3<f32>) -> array<vec3<f32>, 2> {
+    let graphite = vec3<f32>(0.028, 0.028, 0.034);
+    let steel = vec3<f32>(0.22, 0.22, 0.25);
+    let white = vec3<f32>(0.85, 0.8, 1.0);
+    let beat = 0.8 + 0.2 * sin(globals.camera.w * 40.0);
+    let piece = u32(s.z + 0.5);
+    if piece == 2u {
+        return array<vec3<f32>, 2>(graphite, white * 8.0 * beat);
+    }
+    var base = graphite;
+    if (piece == 1u && s.x > 0.8) || s.x < -0.93 || (s.x > -0.62 && s.x < -0.55) {
+        base = steel;
+    }
+    var line = 0.0;
+    if piece == 0u {
+        let d = abs(fract(s.y * 3.0 + 0.04) - 0.5);
+        line = step(0.47, d) * step(-0.9, s.x);
+    }
+    return array<vec3<f32>, 2>(base, white * line * 3.5 * beat);
 }
 
 // How much of a shot or effect shows past the clouds (bindings.wgsl `past_clouds_at`):

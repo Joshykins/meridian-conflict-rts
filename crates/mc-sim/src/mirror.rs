@@ -1211,6 +1211,9 @@ pub const PLASMA_LOOK_SURGE_SHELL: u32 = 8;
 /// `plasma_look` of an airburst round (`Weapon::airburst`, the Gorget's): a fused bead, not
 /// a stream. `mc_models::gpu_consts::plasma_look::AIRBURST`.
 pub const PLASMA_LOOK_AIRBURST: u32 = 9;
+/// `plasma_look` of a knotted Pinch-fusion gun's shell (`Weapon::knots`, the Springald's):
+/// a solid shell trailing a white plume. `mc_models::gpu_consts::plasma_look::KNOTTED_SHELL`.
+pub const PLASMA_LOOK_KNOTTED_SHELL: u32 = 10;
 /// Set in `ProjectileInstance::color` for a torpedo running under the water: no
 /// tracer, flame or casing in the air; a dark body, bubbles and a wake instead.
 pub const PROJECTILE_TORPEDO: u32 = 1 << 4;
@@ -1392,7 +1395,8 @@ const _: () = assert!(std::mem::size_of::<ProjectileInstance>() == 80);
 /// plasma `missile` (`Weapon::seeker`, `PLASMA_LOOK_GRAVITIC_SEEKER`; 7 one carrying pinch
 /// fusion, `PLASMA_LOOK_FUSION_SEEKER`), 8 a surge shell (any plasma gun with a
 /// `Weapon::surge`, `PLASMA_LOOK_SURGE_SHELL`), 9 an airburst round (`Weapon::airburst`,
-/// `PLASMA_LOOK_AIRBURST`), 5 and 7 beside
+/// `PLASMA_LOOK_AIRBURST`), 10 a knotted Pinch-fusion gun's shell (`Weapon::knots`,
+/// `PLASMA_LOOK_KNOTTED_SHELL`), 5 and 7 beside
 /// `PROJECTILE_MISSILE`: its faceted body is drawn in the Regency's look, violet at the
 /// tail, so every Regency missile reads as one a missile defence can take. Zero for
 /// anything else.
@@ -1404,6 +1408,7 @@ pub fn plasma_look(weapon: &mc_data::Weapon) -> u32 {
         Some(_) if weapon.curve.0 > 0 => 3,
         Some(_) if weapon.surge.is_some() => PLASMA_LOOK_SURGE_SHELL,
         Some(_) if weapon.airburst => PLASMA_LOOK_AIRBURST,
+        Some(PlasmaGrade::PinchFusion) if weapon.knots > 1 => PLASMA_LOOK_KNOTTED_SHELL,
         Some(PlasmaGrade::Pinched) => 1,
         Some(PlasmaGrade::PinchFusion) => 2,
         Some(PlasmaGrade::Plasmeric) => 4,

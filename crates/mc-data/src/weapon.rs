@@ -253,6 +253,9 @@ pub struct Weapon {
     /// A surge shell (`RawWeapon::surge`): where it lands, a wake rolls out all round and
     /// burns lightly over a wide disc for a while (mc-sim `surge.rs`).
     pub surge: Option<crate::surge::Surge>,
+    /// Knots a Pinch-fusion gun gathers its charge as (`RawWeapon::knots`), two to six;
+    /// zero for one ball. Cosmetic: not in the content hash.
+    pub knots: u8,
     /// A strafing beam (`RawWeapon::strafe`): fixed in the hull, it rakes a line over the
     /// ground through its mark as the aircraft flies its run (`strafe.rs`).
     pub strafe: Option<Strafe>,

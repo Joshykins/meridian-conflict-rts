@@ -1387,6 +1387,13 @@ pub struct RawWeapon {
     /// A surge shell: where it lands a wake rolls out all round (`crate::surge`).
     #[serde(default)]
     pub surge: Option<crate::surge::RawSurge>,
+    /// A Pinch-fusion gun that gathers its charge as this many knots, one at each of its
+    /// projectors round the bore, drawn into one where the shot leaves: two to six, zero
+    /// for one ball. It is drawn as a knotted gun throughout: its charge, a solid shell, its
+    /// trail and its strike (renderer `regency_guns_fx::knotted`, the Springald's).
+    /// Cosmetic.
+    #[serde(default)]
+    pub knots: u8,
     /// A strafing beam (`RawStrafe`).
     #[serde(default)]
     pub strafe: Option<RawStrafe>,
@@ -2011,6 +2018,16 @@ impl Unit {
                      lens, cloud or cluster"
                 )));
             }
+            if w.knots > 0
+                && (!(2..=6).contains(&w.knots)
+                    || w.missile
+                    || w.surge.is_some()
+                    || w.plasma_grade != Some(PlasmaGrade::PinchFusion))
+            {
+                return Err(DataError::Invalid(format!(
+                    "{ctx}: knots are two to six, on a Pinch-fusion gun firing a shell"
+                )));
+            }
             if w.dash_only && w.cone.is_none() {
                 return Err(DataError::Invalid(format!(
                     "{ctx}: a dash_only weapon is a cone, let go at the unit's feet as it lands"
@@ -2199,6 +2216,7 @@ impl Unit {
                     radius: fx(l.radius),
                     slow: fx(l.slow),
                 }),
+                knots: w.knots,
                 surge: match &w.surge {
                     Some(s) => Some(s.compile(key, fx, TICKS_PER_SECOND)?),
                     None => None,

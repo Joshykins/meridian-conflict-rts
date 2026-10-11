@@ -2354,11 +2354,99 @@
                 Roll(at: 0.9, from: 200, to: 50, glide: 3.5, attack: 0.6, decay: 1.6, gain: 0.6, swell: 1.8, depth: 0.7, pan: 0.3, seed: 9604),
             ],
         ),
-            // The Springald's Triune Pinch-fusion Howitzer: the Sunspear's charge, fire and
-        // strike made for a gun three times its size, lower and longer.
-        "regency_triune_charge": (like: "regency_sunspear_charge", size: 1.5),
-        "regency_triune_fire": (like: "regency_sunspear_fire", size: 1.7, peak: 0.95),
-        "regency_triune_hit": (like: "regency_sunspear_hit", size: 1.6, peak: 0.9),
+        // The Springald's Triune Pinch-fusion Howitzer, heard 4 s before its shot: three
+        // knots of fusion pinched into one. Three heavy clunks, left, middle and right, as
+        // its blades unlock and draw back off the bore, grinding; then three rough low hums,
+        // one from each lens, a little apart in pitch so they beat against each other in a
+        // slow thrum. Over the last second and a half the pinch takes them: the three glide
+        // together onto one note and the beating slows to stillness, air is drawn in down
+        // the bore, its band falling, and a deep swell gathers under it. Crackle between the
+        // knots comes and goes. Nothing climbs to a whine. It stops dead for the shot.
+        "regency_triune_charge": (
+            length: 4.2, peak: 0.55, room: 0.45,
+            layers: [
+                // The blades unlocking, one after another.
+                Burst(low: 50, high: 420, attack: 0.001, decay: 0.05, gain: 4, pan: -0.5),
+                Fm(from: 300, to: 230, glide: 0.08, ratio: 3.5, index: 1.3, fade: 0.06, attack: 0.001, decay: 0.08, gain: 0.3, pan: -0.5),
+                Burst(at: 0.14, low: 50, high: 420, attack: 0.001, decay: 0.05, gain: 4),
+                Fm(at: 0.14, from: 285, to: 220, glide: 0.08, ratio: 3.5, index: 1.3, fade: 0.06, attack: 0.001, decay: 0.08, gain: 0.3),
+                Burst(at: 0.28, low: 50, high: 420, attack: 0.001, decay: 0.05, gain: 4, pan: 0.5),
+                Fm(at: 0.28, from: 270, to: 210, glide: 0.08, ratio: 3.5, index: 1.3, fade: 0.06, attack: 0.001, decay: 0.08, gain: 0.3, pan: 0.5),
+                // The blades grinding back on their saddles.
+                Roll(at: 0.05, from: 560, to: 380, glide: 0.5, attack: 0.08, decay: 0.3, gain: 0.45, swell: 20, depth: 0.8, seed: 8301),
+                // Three knots humming, a little apart, beating; the pinch draws them onto
+                // one note as the last second begins.
+                Fm(at: 0.4, from: 98, to: 104, glide: 2.6, ratio: 0.5, index: 2.0, fade: 8.0, attack: 3.55, decay: 0.04, gain: 0.55, pan: -0.45),
+                Fm(at: 0.45, from: 110, to: 104, glide: 2.55, ratio: 0.5, index: 2.0, fade: 8.0, attack: 3.5, decay: 0.04, gain: 0.55),
+                Fm(at: 0.5, from: 117, to: 104, glide: 2.5, ratio: 0.5, index: 2.0, fade: 8.0, attack: 3.45, decay: 0.04, gain: 0.55, pan: 0.45),
+                Drive(1.4),
+                // The deep swell gathering under the pinch.
+                Tone(at: 2.4, from: 46, to: 40, glide: 1.6, attack: 1.55, decay: 0.03, gain: 0.7),
+                Roll(at: 2.3, from: 420, to: 260, glide: 1.6, attack: 1.6, decay: 0.035, gain: 0.7, swell: 5, depth: 0.8, seed: 8302),
+                // Air drawn in down the bore, its band falling.
+                Sweep(at: 2.5, from: 2400, to: 380, glide: 1.4, q: 0.9, attack: 1.35, decay: 0.035, gain: 0.55, seed: 8303),
+                // Crackle between the knots.
+                Roll(at: 1.0, from: 1500, to: 1100, glide: 2.0, attack: 1.2, decay: 0.6, gain: 0.3, swell: 100, depth: 1.0, pan: -0.3, seed: 8304),
+                Roll(at: 1.3, from: 1400, to: 1000, glide: 2.0, attack: 1.2, decay: 0.6, gain: 0.3, swell: 110, depth: 1.0, pan: 0.3, seed: 8305),
+            ],
+        ),
+        // The Springald letting its shell go, the biggest gun the Regency has: the three blades
+        // slamming shut on the charge at once, then a held, driven pressure blast, a deep boom
+        // that holds; the bore running back into its jacket, a long metal groan, and seating
+        // with a heavy knock; the shell tearing up and away, its roar falling; and the cells'
+        // caps lifting off with the heat, three clunks and a hiss of venting.
+        "regency_triune_fire": (
+            length: 3.6, peak: 0.95, room: 0.6,
+            layers: [
+                // The blades slamming shut.
+                Burst(low: 700, high: 2600, attack: 0.0002, decay: 0.006, gain: 3, pan: -0.3),
+                Burst(at: 0.004, low: 700, high: 2600, attack: 0.0002, decay: 0.006, gain: 3, pan: 0.3),
+                Fm(from: 380, to: 270, glide: 0.06, ratio: 3.5, index: 1.5, fade: 0.05, attack: 0.0005, decay: 0.06, gain: 0.3),
+                // The pressure blast and the boom that holds.
+                Burst(at: 0.006, low: 60, high: 600, attack: 0.001, decay: 0.09, gain: 14),
+                Burst(at: 0.008, low: 22, high: 170, attack: 0.004, decay: 0.5, gain: 14),
+                Tone(at: 0.006, from: 76, to: 30, glide: 0.35, attack: 0.002, decay: 0.55, gain: 1.4),
+                Tone(at: 0.008, from: 42, to: 24, glide: 1.0, attack: 0.006, decay: 0.8, gain: 0.6),
+                Fm(at: 0.006, from: 140, to: 88, glide: 0.6, ratio: 0.5, index: 2.4, fade: 0.5, attack: 0.003, decay: 0.7, gain: 0.85),
+                Drive(1.7),
+                // The shell tearing away, its roar falling.
+                Roll(at: 0.01, from: 1300, to: 240, glide: 1.8, attack: 0.03, decay: 0.9, gain: 0.75, swell: 9, depth: 0.6, seed: 8311),
+                Sweep(at: 0.05, from: 1600, to: 300, glide: 1.6, q: 0.8, attack: 0.05, decay: 0.7, gain: 0.35, seed: 8312),
+                // The bore running back into its jacket, and seating.
+                Fm(at: 0.04, from: 210, to: 150, glide: 0.45, ratio: 1.41, index: 1.1, fade: 0.4, attack: 0.03, decay: 0.3, gain: 0.3),
+                Burst(at: 0.5, low: 55, high: 520, attack: 0.003, decay: 0.06, gain: 2.2, seed: 8313),
+                // The cells' caps lifting with the heat, and the venting.
+                Burst(at: 0.62, low: 90, high: 900, attack: 0.002, decay: 0.03, gain: 1.0, pan: -0.3, seed: 8314),
+                Burst(at: 0.7, low: 90, high: 900, attack: 0.002, decay: 0.03, gain: 1.0, seed: 8315),
+                Burst(at: 0.78, low: 90, high: 900, attack: 0.002, decay: 0.03, gain: 1.0, pan: 0.3, seed: 8316),
+                Hiss(at: 0.65, freq: 1400, q: 0.7, attack: 0.15, decay: 0.7, gain: 0.25, seed: 8317),
+            ],
+        ),
+        // A Triune shell landing: the pinch closing on the point first, a quarter-second
+        // inward suck of air that cuts off, then the strike: a crack, a great whump and a
+        // deep boom that holds, a growl, the ground roaring as it melts and a low roll going
+        // out; the air left ringing low and rough for a moment. No held noise above 2 kHz.
+        "regency_triune_hit": (
+            length: 3.6, peak: 0.9, room: 0.5,
+            layers: [
+                // The pinch: air drawn in, its band falling, cut off as it goes.
+                Sweep(from: 1800, to: 300, glide: 0.24, q: 1.1, attack: 0.2, decay: 0.03, gain: 0.8, seed: 8321),
+                Tone(from: 70, to: 110, glide: 0.24, attack: 0.2, decay: 0.03, gain: 0.35),
+                // The strike.
+                Burst(at: 0.24, low: 500, high: 2000, attack: 0.0003, decay: 0.008, gain: 9),
+                Burst(at: 0.24, low: 60, high: 600, attack: 0.001, decay: 0.09, gain: 18),
+                Burst(at: 0.242, low: 25, high: 190, attack: 0.004, decay: 0.45, gain: 14),
+                Tone(at: 0.24, from: 100, to: 34, glide: 0.3, attack: 0.002, decay: 0.4, gain: 1.4),
+                Tone(at: 0.245, from: 50, to: 24, glide: 1.1, attack: 0.006, decay: 0.9, gain: 0.9),
+                Fm(at: 0.24, from: 88, to: 48, glide: 0.35, ratio: 0.5, index: 2.4, fade: 0.25, attack: 0.002, decay: 0.5, gain: 0.6),
+                Drive(1.6),
+                // The ground roaring as it melts, and a low roll going out.
+                Roll(at: 0.25, from: 1300, to: 160, glide: 1.3, attack: 0.02, decay: 0.7, gain: 0.55, swell: 12, depth: 0.6, seed: 8322),
+                Roll(at: 0.34, from: 300, to: 50, glide: 2.0, attack: 0.1, decay: 1.1, gain: 0.35, swell: 3, depth: 0.5, seed: 8323),
+                // The air ringing, low and rough.
+                Fm(at: 0.26, from: 124, to: 116, glide: 1.4, ratio: 0.5, index: 1.4, fade: 1.2, attack: 0.05, decay: 0.7, gain: 0.25),
+            ],
+        ),
         // The Carillon making a batch of orbs: a great low bell struck once, its metal ring
         // (an inharmonic FM) blooming and dying over a couple of seconds, plasma swelling
         // out of the air round it in a soft rough roll, and dull thumps, one for each

@@ -45,6 +45,10 @@
 //!   it lands it goes off as a small supernova (`fusion.rs`).
 //! - **Surge** (a plasma gun with a `Weapon::surge`, the Saker's Surge Mortar): crimson and
 //!   bent violet air, the ground drawn in and driven out, a solid shell (`surge.rs`).
+//! - **Knotted** (a Pinch-fusion gun with `Weapon::knots`, the Springald's Triune
+//!   Howitzer): a white knot at each projector pinched into one point, cold white and lilac
+//!   with bent indigo air, a solid shell, a thread hanging over its arc, and a pinch before
+//!   its supernova (`knotted.rs`).
 //!
 //! Nothing is wound round a middle (no spiral arms, no rings; a fusion strike's streamers
 //! are thrown out in a loose band round its waist, as a supernova's), and nothing hangs as
@@ -69,6 +73,7 @@ use std::mem::size_of;
 mod airburst;
 mod burning;
 mod fusion;
+mod knotted;
 mod plasmeric;
 mod strike;
 mod surge;
@@ -117,6 +122,8 @@ const BOLT_TRAIL: (f32, f32) = (12.0, 0.7);
 const FUSION_TRAIL: (f32, f32) = (10.0, 1.8);
 /// A surge shell's (`surge::surge_trail`): it glows longer, cooling to violet.
 const SURGE_TRAIL: (f32, f32) = (10.0, 2.6);
+/// A knotted shell's sheath round its hanging thread (`knotted::knotted_trail`).
+const KNOTTED_TRAIL: (f32, f32) = (10.0, 0.45);
 /// A long-hanging trail's thread across, in the shot's sizes: wider than a short one's, as
 /// it is seen from across the map.
 const HANG_WIDTH: f32 = 0.5;
@@ -136,6 +143,8 @@ pub(super) enum Grade {
     Surge,
     /// A plasma gun on a timed fuse (`Weapon::airburst`), whatever its grade (`airburst`).
     Airburst,
+    /// A Pinch-fusion gun that gathers its charge as knots (`Weapon::knots`, `knotted`).
+    Knotted,
 }
 
 /// The grade a weapon is drawn as: a plasma gun firing straight, laid flat with its shot
@@ -154,6 +163,9 @@ pub(super) fn grade(w: &Weapon) -> Option<Grade> {
     }
     if w.airburst && !w.missile {
         return w.plasma_shot().map(|_| Grade::Airburst);
+    }
+    if w.knots > 1 && !w.missile && w.plasma_shot() == Some(PlasmaGrade::PinchFusion) {
+        return Some(Grade::Knotted);
     }
     let grade = match w.plasma_shot()? {
         PlasmaGrade::Plasmeric if lobbed && !w.missile => Grade::Mortar,
@@ -210,13 +222,14 @@ struct Trail {
     kind: TrailKind,
 }
 
-/// What a trail piece is drawn as: a Pinched bolt's red, a Pinch-fusion round's prism, or a
-/// surge shell's crimson cooling to violet.
+/// What a trail piece is drawn as: a Pinched bolt's red, a Pinch-fusion round's prism, a
+/// surge shell's crimson cooling to violet, or a knotted shell's white cooling to indigo.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum TrailKind {
     Bolt,
     Fusion,
     Surge,
+    Knotted,
 }
 
 #[derive(Default)]
@@ -273,6 +286,7 @@ fn trail_kind(t: &Trail) -> f32 {
         TrailKind::Bolt => 0.0,
         TrailKind::Fusion => fade_beam::PLASMA_TRAIL_FUSION,
         TrailKind::Surge => fade_beam::PLASMA_TRAIL_SURGE,
+        TrailKind::Knotted => fade_beam::PLASMA_TRAIL_KNOTTED,
     }
 }
 
@@ -330,7 +344,7 @@ impl Renderer {
     ) -> bool {
         let w = &self.blueprints.unit(blueprint).weapons[weapon as usize];
         let grade = match grade(w) {
-            Some(g @ (Grade::Pinched | Grade::Fusion | Grade::Surge)) => g,
+            Some(g @ (Grade::Pinched | Grade::Fusion | Grade::Surge | Grade::Knotted)) => g,
             _ => return false,
         };
         let due = time + w.charge_ticks as f32 * self.tick_seconds;
@@ -389,6 +403,8 @@ impl Renderer {
                 if grade == Grade::Surge {
                     let foot = Vec3::from(u.pos);
                     self.surge_charge_step(at, dir, &w, f, foot, when, span);
+                } else if grade == Grade::Knotted {
+                    self.knotted_charge_step(at, dir, &w, f, when, span);
                 } else {
                     let fusion = grade == Grade::Fusion;
                     self.regency_charge_step(at, dir, &w, f, fusion, when, span);
@@ -432,6 +448,7 @@ impl Renderer {
                 2 => (TrailKind::Fusion, false),
                 4 => (TrailKind::Bolt, true),
                 plasma_look::SURGE_SHELL => (TrailKind::Surge, false),
+                plasma_look::KNOTTED_SHELL => (TrailKind::Knotted, false),
                 plasma_look::AIRBURST => {
                     // No trail: the sparks it sheds.
                     self.airburst_flight(from, to, p.size, time, &mut sparks);
@@ -461,6 +478,7 @@ impl Renderer {
                 TrailKind::Bolt => BOLT_TRAIL,
                 TrailKind::Fusion => FUSION_TRAIL,
                 TrailKind::Surge => SURGE_TRAIL,
+                TrailKind::Knotted => KNOTTED_TRAIL,
             };
             // A shot whose trail hangs long (`Weapon::wake`, a map gun's) lays its thread a
             // tick's stretch at a time: held for its whole arc, it would fill the pieces.
@@ -471,7 +489,13 @@ impl Renderer {
                     to,
                     start: time + tick * span,
                     life: p.wake,
-                    width: p.size * HANG_WIDTH,
+                    // A knotted shell's thread is finer: it is drawn bright for longer.
+                    width: p.size
+                        * if kind == TrailKind::Knotted {
+                            HANG_WIDTH * 0.55
+                        } else {
+                            HANG_WIDTH
+                        },
                     kind,
                 });
             }
@@ -480,6 +504,10 @@ impl Renderer {
             let n = ((from.distance(to) / step).ceil() as usize).clamp(1, 16);
             if kind == TrailKind::Surge {
                 self.surge_trail(from, to, p.size, (starts, span), time);
+                continue;
+            }
+            if kind == TrailKind::Knotted {
+                self.knotted_trail(from, to, p.size, (starts, span), time);
                 continue;
             }
             for k in 0..n {
@@ -768,6 +796,11 @@ impl Renderer {
                 self.charge_spent(blueprint, weapon, at, 0.15, time);
                 self.surge_fired(&w, at, dir, reach, time);
             }
+            Grade::Knotted => {
+                let w = w.clone();
+                self.charge_spent(blueprint, weapon, at, 0.12, time);
+                self.knotted_fired(&w, at, dir, reach, time);
+            }
             Grade::Pinched => {
                 // The ball pinches its plasma out as one jet (`Weapon::round_span`): a hard
                 // red flash where it hangs, a pulse at the mouth as each round of the jet
@@ -991,6 +1024,11 @@ impl Renderer {
         if grade == Grade::Surge {
             let w = w.clone();
             self.surge_spent(at, &w, life, time);
+            return;
+        }
+        if grade == Grade::Knotted {
+            let w = w.clone();
+            self.knotted_spent(at, &w, life, time);
             return;
         }
         if fusion {

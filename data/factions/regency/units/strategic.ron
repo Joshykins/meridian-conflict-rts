@@ -61,11 +61,13 @@
     ),
     (
         // The Regency's map gun, the Culverin's answer: a Pinch-fusion Howitzer on a
-        // turntable, its bore made for three charges at once. It gathers three knots of
-        // fusion in front of its bore into one shell and lobs it high over everything,
-        // leaving a white-hot thread that hangs over the whole arc (`wake`, 30 s), and it
-        // lands as a supernova. Like the Culverin it shells the nearest enemy its side can
-        // see or has on radar anywhere in reach, building, army or fleet.
+        // turret over a drum on four outriggers, its bore made for three charges at once.
+        // It gathers a knot of fusion at each of its three lenses (`knots: 3`), pinches them
+        // into one solid shell and lobs it high over everything, leaving a thread that
+        // hangs over the whole arc (`wake`, 30 s), white cooling to indigo; where it lands
+        // the pinch closes on the point before it goes off as a supernova. Like the
+        // Culverin it shells the nearest enemy its side can see or has on radar anywhere
+        // in reach, building, army or fleet.
         //
         // Balance: the Culverin's (10000 mass, 30000 HP, 5200 every 9 s, 45 m splash, 1
         // degree of spread, 22 km), bent the Regency way as the Kiln is bent from the
@@ -95,7 +97,7 @@
             targets: ["Structure", "Land", "Naval"], keeps_aim: true,
             bombard: 2000,
             color: Orange, red: 1.0,
-            plasma_grade: Some(PinchFusion), wake: 30,
+            plasma_grade: Some(PinchFusion), wake: 30, knots: 3,
             flash: 1.6, impact: 1.6, tracer: 2.4,
             sounds: (
                 fire: "regency_triune_fire", charge: "regency_triune_charge", charge_time: 4.0,
