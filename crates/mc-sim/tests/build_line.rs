@@ -267,7 +267,7 @@ fn lower_tiers_help_what_only_a_higher_tier_can_start() {
     let ids = spawn(
         &mut w2,
         &[
-            ("aster_t2_engineer", 1200, 516, 1000),
+            ("aster_t2_engineer", 1300, 516, 1000),
             ("aster_t1_engineer", 580, 470, 1000),
         ],
     );

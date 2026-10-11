@@ -218,8 +218,10 @@ fn an_upgraded_mine_keeps_its_reach_but_yields_more_and_climbs_one_tier_past_the
         },
     )])
     .unwrap();
+    dig_out(&mut w);
     let before = w.state.mines.by_unit[&id].clone();
     for _ in 0..3000 {
+        w.state.players[0].energy = Fx::from_int(1_000_000);
         w.tick(&[]).unwrap();
         if w.state
             .units
@@ -299,9 +301,15 @@ fn ore_pays_only_once_the_drift_reaches_it() {
     // At first it works next to nothing but its shaft: its land spreads out from it.
     let land = m.rate(&spec, None) - spec.base;
     assert!(land < (m.full_rate(&spec) - spec.base) / 100, "{land:?}");
-    while w.state.mines.by_unit[&id].grown < Fx::from_int(vein.reached_at as i32) {
+    // Growth draws energy: keep the side paid, and give up rather than spin.
+    for _ in 0..=vein.reached_at {
+        if w.state.mines.by_unit[&id].grown >= Fx::from_int(vein.reached_at as i32) {
+            break;
+        }
+        w.state.players[0].energy = Fx::from_int(1_000_000);
         w.tick(&[]).unwrap();
     }
+    assert!(w.state.mines.by_unit[&id].grown >= Fx::from_int(vein.reached_at as i32));
     let m = w.state.mines.by_unit[&id].clone();
     // Now the ore counts, on top of the land it has spread over so far.
     assert_eq!(
@@ -321,6 +329,7 @@ fn a_new_mine_spreads_over_its_land_from_nothing() {
     assert!(start.worked_ground() < start.land.ground / 300);
     // A minute on it works a circle of SPREAD_SPEED metres a second.
     for _ in 0..600 {
+        w.state.players[0].energy = Fx::from_int(1_000_000);
         w.tick(&[]).unwrap();
     }
     let m = w.state.mines.by_unit[&id].clone();
@@ -462,7 +471,10 @@ fn an_upgrade_grows_out_from_the_shaft_while_the_old_tier_keeps_paying() {
     let t1 = spec(&w);
     let old = made(&w, id);
     let row = w.state.units.row(id).unwrap();
-    let upkeep = |w: &World| w.state.players[0].energy_demand;
+    // Demand is summed per tick and scaled back up to a second, so it can
+    // come out a few ulps under the blueprint's figure: round it to 1/1000.
+    let upkeep =
+        |w: &World| Fx::milli((w.state.players[0].energy_demand * 1000).round_int().into());
     assert_eq!(
         upkeep(&w),
         w.bp(row).economy.energy_upkeep,
