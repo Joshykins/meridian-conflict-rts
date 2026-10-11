@@ -67,8 +67,8 @@ fn an_elevator_shows_its_crates_and_queues_from_its_build_menu() {
     let heavy = builds
         .iter()
         .copied()
-        .find(|&b| rig.blueprints.unit(b).tech >= 4)
-        .expect("it brings down a tech 4");
+        .max_by_key(|&b| rig.blueprints.unit(b).cost_materials)
+        .expect("it brings something down");
     let materials = rig.blueprints.unit(heavy).cost_materials.to_f32();
     rig.view.status.queues = vec![UnitOrders {
         unit_id: 7,

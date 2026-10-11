@@ -8,8 +8,8 @@ use mc_sim::Command;
 use super::{PendingOrder, Staged, BLUE, DEFAULT_SUBJECT, RED};
 
 /// `Scenario::Elevator`: from what the elevator brings down, a line of its heaviest tanks,
-/// a flight of gunships (or whatever armed aircraft it has), and tech-4 machines, enough to
-/// fill most of one platform, rallying east down the range.
+/// a flight of gunships (or whatever armed aircraft it has), and its dearest land units,
+/// enough to fill most of one platform, rallying east down the range.
 pub(super) fn elevator_batch(
     blueprints: &Blueprints,
     bp: &UnitBlueprint,
@@ -40,10 +40,10 @@ pub(super) fn elevator_batch(
         })
         .ok_or("It Brings Down No Aircraft")?;
     let heavy = builds
-        .filter(|b| b.tech >= 4)
-        .min_by_key(|b| b.cost_materials)
-        .ok_or("It Brings Down No Experimentals")?;
-    // As many tech 4s as leave a little of the payload over, so some materials come
+        .filter(|b| layer(b) == Some(mc_data::MoveLayer::Land) && !b.weapons.is_empty())
+        .max_by_key(|b| b.cost_materials)
+        .ok_or("It Brings Down No Land Units")?;
+    // As many of the dearest as leave a little of the payload over, so some materials come
     // down too: at least one, at most four.
     let payload = bp.elevator.map_or(Fx::ZERO, |e| e.payload);
     let room = payload * 9 / 10 - tank.cost_materials * 6 - air.cost_materials * 4;

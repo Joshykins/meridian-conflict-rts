@@ -196,8 +196,8 @@ fn the_elevator_scenario_queues_a_mixed_batch() {
             bp.key
         );
         assert!(
-            batch.iter().any(|&(id, _)| b.unit(id).tech >= 4),
-            "a tech-4 machine is in it"
+            batch.iter().any(|&(id, _)| b.unit(id).tech >= 3),
+            "a tech-3 machine is in it"
         );
     }
 }
