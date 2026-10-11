@@ -8,7 +8,7 @@
 //!
 //! - energy: its standing upkeep (a fabricator, mine, shield or radar), the energy
 //!   a factory spends on what it builds, and a gun's fed reload (`fed_reload.rs`), which
-//!   also runs faster by the same share;
+//!   also runs faster by twice the share;
 //! - materials: the materials a factory spends on what it builds.
 //!
 //! A provider's `mc_data::Adjacency` figure is what it saves a building it rings all the

@@ -1377,7 +1377,9 @@ impl World {
                 .lenses
                 .iter()
                 .any(|t| t.source == units.id(row) && t.weapon as usize == w);
+        // A fed reload is heard charging from the economy (`fed_reload.rs`).
         if weapon.charge_ticks > 0
+            && weapon.reload_energy <= Fx::ZERO
             && cooling
             && !lens_out
             && units.weapon_cooldown[row][w] == weapon.charge_ticks
@@ -1978,10 +1980,13 @@ impl World {
         // On target and ready, but it has not just finished a countdown: charge first.
         // A twin waits its turn and is seen charging at the end of the wait (`twins.rs`).
         if weapon.charge_ticks > 0 && !cooling && units.weapon_salvo_left[row][w] == 0 {
-            let countdown = self.twin_charge(row, w, weapon);
+            // A fed charge runs at its reload's pace, set out so it takes as long as it is
+            // heard (`fed_reload.rs`).
+            let charge_at = self.charge_mark(row, weapon);
+            let countdown = self.twin_charge(row, w, weapon) - weapon.charge_ticks + charge_at;
             let units = &mut self.state.units;
             units.weapon_cooldown[row][w] = countdown;
-            if countdown > weapon.charge_ticks {
+            if countdown > charge_at {
                 return Ok(());
             }
             let at = units.pos[row].extend(units.z[row] + weapon.muzzle.z);

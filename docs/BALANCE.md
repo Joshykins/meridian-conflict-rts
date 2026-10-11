@@ -279,7 +279,7 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
 - **Adjacency** (`adjacency: Energy | Materials`, mc-sim `adjacency.rs`): a provider saves each
   finished building of its owner's whose lot shares an edge with its own (a corner is not
   enough). Power plants save energy: upkeep (fabricators, mines, shields, radar), what a
-  factory builds, and a gun's fed reload, which also runs faster by the same share. Fabricators and mines save a factory's materials (a mine's rated output is its shaft, `base`: T1 0.3/s 20%, T4 3.6/s 35%). A provider's saving is what it
+  factory builds, and a gun's fed reload, which also runs faster by twice the share. Fabricators and mines save a factory's materials (a mine's rated output is its shaft, `base`: T1 0.3/s 20%, T4 3.6/s 35%). A provider's saving is what it
   would save a building it rings all the way round, times the share of that building's
   perimeter the two share, so every side covered adds more until the building is ringed;
   there is no other cap. The full-ring saving scales with the fourth root of what the
@@ -292,12 +292,13 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   drawn as its supernova). The interface shows each link: a conduit on the ground, the unit panel's
   Adjacency band, tags on the selection's links, and the placing site's would-be links.
 - Fed reloads (`reload_energy`, mc-sim `fed_reload.rs`): the artillery installations
-  (Onager, Basilisk) draw 100 energy a second while they reload, the map guns (Culverin,
-  Springald) 2500, more than a Reactor III makes. A reload runs only as fast as it is paid,
-  with the rest of the energy-only spending (upkeep), so an unpowered gun stops reloading.
-  Power plants against it save their share of the draw and speed the reload by as much:
-  ringed by Reactor IIIs (60%) a gun reloads 1.6 times as fast on 40% of the power, a
-  quarter of the energy a shot. The AI counts a gun's full draw as standing upkeep when it
+  (Onager, Basilisk) draw 100 energy a second while they reload, charge included, the map
+  guns (Culverin, Springald) 2500, more than a Reactor III makes. A reload runs only as fast
+  as it is paid, with the rest of the energy-only spending (upkeep), so an unpowered gun
+  stops reloading. Power plants against it save their share `s` of the draw and run the
+  whole cycle, charge and all, `1 + 2s` times as fast, so every faction's guns gain alike:
+  ringed by Reactor Is (20%) 1.4x, Reactor IIs (39%) 1.8x, Reactor IIIs (60%) 2.2x on 40%
+  of the power, under a fifth of the energy a shot. The AI counts a gun's full draw as standing upkeep when it
   plans power, and as a use when it places plants against buildings.
 - Stalls (`economy.rs`): short of materials or energy, everything slows by the same share:
   factories, builders, upkeep and the mines alike. The one exception is the side's focus

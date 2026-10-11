@@ -1,6 +1,7 @@
 //! Fed reloads (`mc_sim::fed_reload`): an artillery installation's reload draws energy
 //! while it runs and goes only as fast as it is paid, and power plants built against it
-//! cut the draw and speed it up by the same share.
+//! cut the draw by their share and run the whole cycle, charge and all, faster by twice
+//! that share.
 
 use super::adjacency::{row, spawn, world};
 use mc_core::Fx;
@@ -77,15 +78,23 @@ fn power_plants_against_it_speed_the_reload_and_cut_its_draw() {
     w.tick(&[]).unwrap();
     reload(&mut w, gun, 50_000);
     let (ticks, drew) = time_it(&mut w, gun, 200);
-    // 54 ticks at 1.6 times the pace.
-    assert_eq!(ticks, 34, "ringed reload");
+    // 54 ticks at 2.2 times the pace.
+    assert_eq!(ticks, 25, "ringed reload");
     assert!((drew - 40.0).abs() < 1.0, "draws {drew} a second");
 }
 
+/// Charging events the gun was heard making this tick.
+fn charges(w: &World) -> usize {
+    w.events
+        .iter()
+        .filter(|e| matches!(e, mc_sim::mirror::SimEvent::WeaponCharging { .. }))
+        .count()
+}
+
 #[test]
-fn a_charged_gun_is_fed_down_to_its_charge() {
+fn a_charged_gun_is_fed_through_its_charge_and_heard_once() {
     let mut w = world();
-    let gun = spawn(&mut w, 0, "aster_t4_artillery", 792, 792, 1000);
+    let gun = spawn(&mut w, 0, "aster_t4_artillery", AT.0, AT.1, 1000);
     let r = row(&w, gun);
     let weapon = &w.blueprints.unit(w.state.units.blueprint[r]).weapons[0];
     let (reload_ticks, charge) = (weapon.reload_ticks, weapon.charge_ticks);
@@ -95,21 +104,43 @@ fn a_charged_gun_is_fed_down_to_its_charge() {
         w.tick(&[]).unwrap();
     }
     assert_eq!(w.state.units.weapon_cooldown[r][0], reload_ticks, "unpaid");
-    // Fed to a tick above the charge; combat counts on from there without power.
-    w.state.units.weapon_cooldown[r][0] = charge + 3;
+    // Alone it paces at one: heard as the countdown reaches its charge, and no more while
+    // a stall holds it there.
+    w.state.units.weapon_cooldown[r][0] = charge + 1;
     w.state.players[0].energy = Fx::from_int(50_000);
     w.tick(&[]).unwrap();
-    assert_eq!(w.state.units.weapon_cooldown[r][0], charge + 2);
+    assert_eq!(w.state.units.weapon_cooldown[r][0], charge);
+    assert_eq!(charges(&w), 1);
     w.state.players[0].energy = Fx::ZERO;
-    w.tick(&[]).unwrap();
-    assert_eq!(w.state.units.weapon_cooldown[r][0], charge + 2, "unpaid");
-    w.state.players[0].energy = Fx::from_int(50_000);
     w.tick(&[]).unwrap();
     assert_eq!(
         w.state.units.weapon_cooldown[r][0], charge,
-        "fed to charge + 1, then counted"
+        "the charge is fed too"
     );
-    w.state.players[0].energy = Fx::ZERO;
+    assert_eq!(charges(&w), 0);
+}
+
+#[test]
+fn a_ringed_map_gun_fires_twice_as_often_and_more() {
+    let mut w = world();
+    // A 6x6 lot, 756..828 both ways, and a Reactor III pinwheeled along each side.
+    let gun = spawn(&mut w, 0, "aster_t4_artillery", AT.0, AT.1, 1000);
+    for (x, y) in [(876, 804), (780, 876), (708, 780), (804, 708)] {
+        spawn(&mut w, 0, "aster_t3_power", x, y, 1000);
+    }
     w.tick(&[]).unwrap();
-    assert_eq!(w.state.units.weapon_cooldown[r][0], charge - 1);
+    let saved = w
+        .adjacency
+        .saving(row(&w, gun), mc_sim::adjacency::Resource::Energy);
+    assert!((saved.to_f32() - 0.6).abs() < 1e-3, "{}", saved.to_f32());
+    reload(&mut w, gun, 50_000);
+    let (mut ticks, mut heard) = (0, 0);
+    while w.state.units.weapon_cooldown[row(&w, gun)][0] > 0 && ticks < 200 {
+        w.tick(&[]).unwrap();
+        heard += charges(&w);
+        ticks += 1;
+    }
+    // A 9 s cycle, 3.4 s of it the charge, at 2.2 times the pace.
+    assert!((40..=43).contains(&ticks), "{ticks} ticks");
+    assert_eq!(heard, 1);
 }
