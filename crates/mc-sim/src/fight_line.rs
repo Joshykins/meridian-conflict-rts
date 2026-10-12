@@ -6,14 +6,15 @@
 //! no weapon for the fight never has one, so it used to walk on to the goal, and
 //! the block's anchor, kept by the members still marching, went with it. Now each
 //! tick the firing members of every ground block are found first: how near the
-//! goal the foremost of them stands, and what they are shooting at. A member that
-//! could hit none of those targets holds once it is level with that line; one
-//! that could (it is only short of range) walks on into the fight.
+//! goal the foremost of them stands, and what they are shooting at. A member with
+//! no weapon for ground or sea (unarmed, anti-air, interceptors only) that could
+//! hit none of those targets holds once it is level with that line. Every other
+//! member walks on into the fight: it is only short of range, or after other prey.
 
 use crate::tables::*;
 use crate::World;
 use mc_core::Fx;
-use mc_data::BlueprintId;
+use mc_data::{cat, BlueprintId};
 use std::collections::BTreeMap;
 
 /// How far behind the foremost firing member, beyond its own radius, a member
@@ -73,10 +74,17 @@ impl World {
             return false;
         };
         let bp = self.bp(row);
-        if line
-            .targets
+        // A fighter goes on to the fight, even one whose prey is not what the
+        // others are shooting (a submarine, say, behind ships firing on the shore).
+        let fights_surface = bp
+            .weapons
             .iter()
-            .any(|&t| bp.can_attack(self.blueprints.unit(t)))
+            .any(|w| !w.intercepts && w.target_mask & !cat::AIR != 0);
+        if fights_surface
+            || line
+                .targets
+                .iter()
+                .any(|&t| bp.can_attack(self.blueprints.unit(t)))
         {
             return false;
         }

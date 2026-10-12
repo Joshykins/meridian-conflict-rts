@@ -26,7 +26,7 @@ use std::sync::Arc;
 /// 4 km square: land in the west, sea (20 m deep) in the east.
 const CELLS: u32 = 512;
 const SHORE_CELL: usize = 200;
-const TICKS: u32 = 500;
+const TICKS: u32 = 550;
 const SNAPSHOT_AT: u32 = 250;
 
 fn terrain() -> Heightfield {
@@ -711,7 +711,8 @@ fn reference() -> Vec<u64> {
         stunned_at_snapshot,
         "the Courier was not stunned across the snapshot"
     );
-    // The seabed installation's interceptors met the submarines' torpedoes.
+    // Interceptors met torpedoes: the Atoll's, as the fleets close late in the match (the
+    // Atoll keeps behind its fleet's firing line, `fight_line.rs`, so it is late to them).
     assert!(intercepted > 0, "no torpedo was intercepted in the match");
     // The experimental submarine's strike missiles went up on their high arc.
     assert!(struck > 0, "no strike missile was launched in the match");
