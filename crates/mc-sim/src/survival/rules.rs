@@ -1,13 +1,18 @@
 //! What the player chooses on the set-up screen (`SurvivalRules`) and the
 //! schedule it sets: the tech each round prints at, what the round is worth,
-//! its heavy wave, the Shapers raised, and how a Shaper grows. All of it is a
-//! pure function of the rules and the round, so the set-up screen draws the
-//! same forecast the match plays.
+//! its heavy wave, the Shapers raised, and how a Shaper grows (its levels, the
+//! catch-up of a reseeded one, its height and visual tier). All of it is a
+//! pure function of the rules, the round and the level, so the set-up screen
+//! draws the same forecast the match plays. What a level is worth in hit
+//! points, shield, Lance and interceptors is the Shaper blueprint's `growth`
+//! block (data).
 //!
 //! Nothing here reacts to the defenders. The engine spends what the schedule
 //! says, and what it spends is most of what the defenders can reclaim from
 //! the wrecks, so a defender who reclaims well grows with it.
 
+use super::HZ;
+use mc_core::Fx;
 use mc_data::survival::Domain;
 use serde::{Deserialize, Serialize};
 
@@ -183,6 +188,53 @@ impl SurvivalRules {
         let age = round.saturating_sub(born);
         age > 0 && (round >= 20 || age.is_multiple_of(2))
     }
+
+    /// The level a Shaper that has stood since the first round has reached as
+    /// `round` begins.
+    pub fn round_level(&self, round: u16) -> u16 {
+        (2..=round).fold(1u16, |l, r| {
+            l.saturating_add(self.shaper_levels_up(r, 1) as u16)
+        })
+    }
+
+    /// The level a Shaper raised as `round` begins quickly evolves to
+    /// (`CATCH_UP_TICKS` a level): three quarters of one that stood from the
+    /// start, so a reseeded Shaper is a match for the round, and one that was
+    /// never killed is still the bigger.
+    pub fn catch_up_level(&self, round: u16) -> u16 {
+        let l = self.round_level(round);
+        (l - l / 4).max(1)
+    }
+}
+
+/// Ticks between levels while a newly raised Shaper evolves to its catch-up level.
+pub(super) const CATCH_UP_TICKS: u32 = 15 * HZ;
+
+/// The first round a site whose Shaper died in round `died` may be reseeded in:
+/// it stands empty for the rest of that round and the next.
+pub(super) fn reseed_round(died: u16) -> u16 {
+    died.saturating_add(2)
+}
+
+/// Metres a Shaper of `level` stands when fully grown: 60 at level 1, about
+/// 700 by level 10 and 1000 by 20, toward 1160.
+/// `60 + 1100 * (1 - 0.9^(level - 1))`.
+pub fn shaper_height(level: u16) -> Fx {
+    let mut left = Fx::ONE;
+    // 0.9^200 is below what Fx resolves: a deliberate bound, not a ceiling on the level.
+    for _ in 1..level.clamp(1, 200) {
+        left *= Fx::ratio(9, 10);
+    }
+    Fx::from_int(60) + Fx::from_int(1100) * (Fx::ONE - left)
+}
+
+/// Metres a Shaper's built height climbs a tick toward its level's height:
+/// 3 m/s, so it is seen to build.
+pub(super) const CLIMB_PER_TICK: Fx = Fx(3 * Fx::ONE.0 / HZ as i64);
+
+/// A Shaper's visual tier: one every four levels, each a stage, collar or ring more.
+pub fn shaper_tier(level: u16) -> u8 {
+    (1 + level.saturating_sub(1) / 4).min(u8::MAX as u16) as u8
 }
 
 /// What a Shaper of `level` prints in one go: light units (T1-T3), then heavies.

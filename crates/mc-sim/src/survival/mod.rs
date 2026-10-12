@@ -46,7 +46,7 @@ use mc_core::{Angle, Fx, FxVec2, FxVec3, Rng, StateHasher};
 use mc_data::survival::{Domain, SiteKind};
 use mc_data::{BlueprintId, MoveLayer};
 use plan::Formation;
-pub use rules::{HeavyWave, SurvivalRules};
+pub use rules::{shaper_height, shaper_tier, HeavyWave, SurvivalRules};
 use serde::{Deserialize, Serialize};
 
 /// Ticks per second.
@@ -59,10 +59,6 @@ pub const BEAM_PRINT: u32 = 5;
 pub const NODE_PRINT_REACH: i32 = 50;
 /// The node's print emitter height.
 pub const NODE_EMITTER: i32 = 40;
-/// Shapers one node site holds, side by side across the way they face.
-pub const SHAPERS_PER_SITE: usize = 3;
-/// Between neighbouring Shapers of one site, centre to centre (a lot is 60 m).
-const SHAPER_SPACING: i32 = 72;
 /// How long the ray takes to raise a node.
 const RAISE_TICKS: u32 = 20 * HZ;
 /// The engine stops printing while it has this many units in the field, so a
@@ -195,7 +191,7 @@ struct Muster {
 struct Node {
     unit: UnitId,
     site: u8,
-    /// Where it stands; one site holds up to `SHAPERS_PER_SITE`.
+    /// Where it stands: on its site, one Shaper to a site.
     pos: FxVec2,
     /// What it prints for: its products are all of this domain.
     domain: Domain,
@@ -209,6 +205,15 @@ struct Node {
     raised: bool,
     next_print: u32,
     printed: u32,
+    /// Metres it is built up to now, climbing toward its level's height
+    /// (`rules::shaper_height`).
+    height: Fx,
+    /// The level it evolves to quickly after it comes online
+    /// (`SurvivalRules::catch_up_level` of the round it was raised in), a level
+    /// every `CATCH_UP_TICKS`, on top of the levels the rounds give it.
+    catch_up: u16,
+    /// Tick of its next catch-up level.
+    next_level_at: u32,
 }
 
 /// Survival's part of the game state.
@@ -227,6 +232,9 @@ pub struct Survival {
     /// Every unit sent in a round and not yet dead.
     waves: Vec<UnitId>,
     nodes: Vec<Node>,
+    /// Per site: the first round its ray may raise a Shaper there again; a
+    /// site whose Shaper was destroyed stands empty for a while.
+    reseed_from: Vec<u16>,
     rng: Rng,
     pub nodes_destroyed: u16,
     /// The last formation number handed out.
@@ -322,6 +330,9 @@ impl Survival {
             h.write_u64(m.unit.0 as u64 | (m.front as u64) << 32 | (m.formation as u64) << 40);
         }
         h.write_u64(self.waves.len() as u64);
+        for r in &self.reseed_from {
+            h.write_u64(*r as u64);
+        }
         for n in &self.nodes {
             h.write_u64(
                 n.unit.0 as u64
@@ -331,6 +342,8 @@ impl Survival {
             );
             h.write_u64(n.pos.x.raw() as u32 as u64 | (n.pos.y.raw() as u32 as u64) << 32);
             h.write_u64(n.next_print as u64 | (n.printed as u64) << 32);
+            h.write_i64(n.height.0);
+            h.write_u64(n.catch_up as u64 | (n.next_level_at as u64) << 16);
             for b in &n.products {
                 h.write_u64(b.0 as u64);
             }
@@ -381,6 +394,7 @@ impl crate::World {
 
         let first = config.rules.grace_secs as u32 * HZ;
         let seed = self.state.rng.state() ^ 0x5EED_5A1A;
+        let sites = config.node_sites.len();
         self.state.survival = Some(Survival {
             config,
             round: 0,
@@ -390,6 +404,7 @@ impl crate::World {
             printing: Vec::new(),
             mustered: Vec::new(),
             waves: Vec::new(),
+            reseed_from: vec![0; sites],
             nodes: Vec::new(),
             rng: Rng::new(seed),
             nodes_destroyed: 0,
@@ -449,6 +464,7 @@ impl crate::World {
         self.survival_nodes_lost();
         self.survival_prints(now)?;
         self.survival_raise(now)?;
+        self.survival_grow(now);
         self.survival_node_prints(now)?;
 
         let s = self.state.survival.as_ref().unwrap();

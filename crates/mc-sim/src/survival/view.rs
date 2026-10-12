@@ -38,7 +38,7 @@ impl crate::World {
             let Some(row) = st.units.row(n.unit) else {
                 continue;
             };
-            let top = st.units.pos[row].extend(st.units.z[row] + self.bp(row).height);
+            let top = st.units.pos[row].extend(st.units.z[row] + n.height);
             let t = ((now - n.started) as f32 / RAISE_TICKS as f32).min(1.0);
             sources.push(n.unit.0 | 1 << 30);
             out.push(BeamInstance {
@@ -59,7 +59,13 @@ impl crate::World {
                 let Some(src) = st.units.row(p.source) else {
                     continue;
                 };
-                st.units.pos[src].extend(st.units.z[src] + mc_core::Fx::from_int(NODE_EMITTER))
+                // From half way up the Shaper as it stands built.
+                let built = s
+                    .nodes
+                    .iter()
+                    .find(|n| n.unit == p.source)
+                    .map_or(mc_core::Fx::from_int(NODE_EMITTER), |n| n.height / 2);
+                st.units.pos[src].extend(st.units.z[src] + built)
             } else {
                 let Some(bay) = s.config.bays.get(p.bay as usize) else {
                     continue;
@@ -120,6 +126,15 @@ impl crate::World {
                     .map(|r| self.state.units.pos[r])
             })
             .collect()
+    }
+
+    /// The Shaper standing (or rising) on site `site`, if one is.
+    pub fn shaper_unit(&self, site: u8) -> Option<crate::UnitId> {
+        let s = self.state.survival.as_ref()?;
+        s.nodes
+            .iter()
+            .find(|n| n.site == site && self.state.units.row(n.unit).is_some())
+            .map(|n| n.unit)
     }
 
     /// Ids of units a replicator is printing right now (sorted), for the mirror's violet fill.

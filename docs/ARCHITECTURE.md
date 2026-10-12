@@ -471,13 +471,19 @@ invulnerable unit, and the mirror marks it `SHIELD_VEIL` so it is drawn apart fr
   the defenders win once none of the rounds' units are left.
 - **Nodes.** The facility wakes as the rounds climb (`survival/shapers.rs`): at each round's start it raises
   `nodes_raised(round)` Shapers at once (more as the rounds go, up to `node_limit`), each by its own ray (`kind` 4)
-  from the heart's Lens for 20 s, building up a `replication_node` in a free cradle slot (three to a cradle, 72 m
-  apart across its facing). A Shaper is of one domain (land or naval by its cradle, or air) and prints formations of
-  its products straight in, on a beat. It grows with no ceiling: a level every second round it stands (every round
-  from round 20); each level prints one more unit at a time (`shaper_batch`), every other level from 3 adds another
-  kind of its domain at the current tier (or swaps its oldest kind for a newer), and from level 8 heavies of its
-  domain join it, one more every four levels. A node can be destroyed even while it rises; once up, it dies into a
-  rich wreck. `survival_activity()` (0.15..1, from the round and the Shapers online) goes to the renderer as
+  from the heart's Lens for 20 s, building up a `replication_node` on a free Printer site, **one Shaper to a site**.
+  A Shaper is of one domain (land or naval by its site, or air) and prints formations of its products straight in,
+  on a beat, and sends them down its site's `path` (aircraft fly straight). It grows with no ceiling: a level every
+  second round it stands (every round from round 20); each level prints one more unit at a time (`shaper_batch`),
+  every other level from 3 adds another kind of its domain at the current tier (or swaps its oldest kind for a
+  newer), and from level 8 heavies of its domain join it, one more every four levels. It builds up taller as it
+  levels: its built height climbs 3 m/s toward `shaper_height(level)` (`60 + 1100 (1 - 0.9^(L-1))` m: about 730 m
+  at level 10, 1010 m at 20), and `shaper_tier(level)` (one every four levels) is its visual tier. A node can be
+  destroyed even while it rises; once up, it dies into a rich wreck, and its site stands empty for the rest of that
+  round and the next (`reseed_round`) until the ray reseeds it. Every Shaper raised quickly evolves, a level every
+  15 s (`CATCH_UP_TICKS`), to `catch_up_level(round)`: three quarters of the level one standing since the first
+  round has reached (`round_level`), so a reseeded Shaper fits the round. All of it is in `survival/rules.rs`.
+  `survival_activity()` (0.15..1, from the round and the Shapers online) goes to the renderer as
   `RenderFrame::precursor_activity` and brightens the facility's light (`globals.tree_wind.w` in entity.wgsl).
   Events: `RoundPrinting`, `RoundLaunched`, `TierReached`, `HeavyWave`, `NodeRaising`, `NodeOnline`,
   `ShaperLevelled`, `NodeDestroyed`, `SurvivalWon`.

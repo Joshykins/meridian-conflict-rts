@@ -24,6 +24,8 @@ const HOME: (i32, i32) = (1000, 1000);
 const ALLY: (i32, i32) = (1000, 3200);
 /// The print bays: a row across the facility's face, looking south-west.
 const BAYS: [(i32, i32); 4] = [(4300, 4700), (4400, 4600), (4500, 4500), (4600, 4400)];
+/// The Shaper sites, one Shaper to each.
+const SITES: [(i32, i32); 3] = [(3000, 3300), (3600, 2700), (2400, 3900)];
 
 fn world(rules: SurvivalRules) -> World {
     world_with(rules, 1)
@@ -107,14 +109,17 @@ fn world_with(rules: SurvivalRules, defenders: u8) -> World {
                 path: vec![FxVec2::from_ints(4300, 4700), FxVec2::from_ints(2400, 2000)],
             },
         ],
-        node_sites: vec![NodeSite {
-            at: FxVec2::from_ints(3000, 3300),
-            domain: Domain::Land,
-            facing: Some(mc_core::Angle::from_degrees(225)),
-            kind: SiteKind::Printer,
-            room: Fx::from_int(450),
-            path: vec![FxVec2::from_ints(2600, 2900)],
-        }],
+        node_sites: SITES
+            .iter()
+            .map(|&(x, y)| NodeSite {
+                at: FxVec2::from_ints(x, y),
+                domain: Domain::Land,
+                facing: Some(mc_core::Angle::from_degrees(225)),
+                kind: SiteKind::Printer,
+                room: Fx::from_int(450),
+                path: vec![FxVec2::from_ints(x - 400, y - 400)],
+            })
+            .collect(),
         rules,
     })
     .unwrap();
@@ -498,12 +503,9 @@ fn the_facility_wakes_as_the_rounds_climb() {
     }
 }
 
-#[test]
-fn one_site_holds_a_row_of_shapers_printing_in_batches() {
-    let mut w = world(SurvivalRules {
-        rounds: 8,
-        ..rules()
-    });
+/// A world in its first round with the defender's commander made invulnerable.
+fn guarded(rules: SurvivalRules) -> (World, Vec<SimEvent>) {
+    let mut w = world(rules);
     let mut events = Vec::new();
     let acu = w.state.players[0].commander;
     let guard = PlayerCommand {
@@ -515,31 +517,44 @@ fn one_site_holds_a_row_of_shapers_printing_in_batches() {
         },
     };
     run(&mut w, 1, &[guard], &mut events);
+    (w, events)
+}
+
+fn online(w: &World) -> usize {
+    w.survival_status()
+        .unwrap()
+        .nodes
+        .iter()
+        .filter(|n| n.raised >= 1.0)
+        .count()
+}
+
+#[test]
+fn one_shaper_stands_on_each_site_printing_in_batches() {
+    let (mut w, mut events) = guarded(SurvivalRules {
+        rounds: 8,
+        ..rules()
+    });
     let mut t = 0;
-    while t < 4000
-        && w.survival_status()
-            .unwrap()
-            .nodes
-            .iter()
-            .filter(|n| n.raised >= 1.0)
-            .count()
-            < 3
-    {
+    while t < 4000 && online(&w) < 3 {
         run(&mut w, 10, &[], &mut events);
         t += 10;
     }
     let status = w.survival_status().unwrap();
-    // The map has one site: every Shaper stands on it, side by side, lots apart.
-    assert!(status.nodes.len() >= 3, "{} shapers", status.nodes.len());
-    assert!(status.nodes.iter().all(|n| n.site == 0));
-    for (i, a) in status.nodes.iter().enumerate() {
-        for b in &status.nodes[i + 1..] {
-            let d = (a.pos[0] - b.pos[0]).hypot(a.pos[1] - b.pos[1]);
-            assert!(d >= 60.0, "shapers {d} m apart");
-        }
+    // Three sites, three Shapers: one on each, where the site is.
+    assert_eq!(status.nodes.len(), 3, "{:?}", status.nodes);
+    let mut sites: Vec<u8> = status.nodes.iter().map(|n| n.site).collect();
+    sites.sort_unstable();
+    assert_eq!(sites, vec![0, 1, 2]);
+    for n in &status.nodes {
+        let (x, y) = SITES[n.site as usize];
+        let d = (n.pos[0] - x as f32).hypot(n.pos[1] - y as f32);
+        assert!(d < 12.0, "a Shaper {d} m off its site");
     }
+    // No more rise while every site holds one.
+    run(&mut w, 1200, &[], &mut events);
+    assert_eq!(w.survival_status().unwrap().nodes.len(), 3);
     // Each prints a formation at a time: at level 1, four T1s.
-    run(&mut w, 400, &[], &mut events);
     let status = w.survival_status().unwrap();
     assert!(status.nodes.iter().any(|n| n.printed >= 4));
     assert!(
@@ -550,6 +565,100 @@ fn one_site_holds_a_row_of_shapers_printing_in_batches() {
         "{:?}",
         status.nodes
     );
+}
+
+#[test]
+fn levels_have_no_ceiling_and_heights_climb_toward_them() {
+    let r = SurvivalRules {
+        rounds: 0,
+        ..SurvivalRules::default()
+    };
+    let levels: Vec<u16> = [10, 20, 40, 80, 160].map(|k| r.round_level(k)).to_vec();
+    assert!(levels.windows(2).all(|l| l[1] > l[0]), "{levels:?}");
+    assert!(r.round_level(300) > 250);
+    // A reseeded Shaper evolves to most of what one that stood all along has.
+    assert_eq!(r.catch_up_level(1), 1);
+    assert!(r.catch_up_level(30) * 4 >= r.round_level(30) * 3 - 3);
+    assert!(r.catch_up_level(30) < r.round_level(30));
+    // The spec's heights: 60 m at level 1, about 700 by 10 and 1000 by 20, rising for ever.
+    let h = |l: u16| mc_sim::survival::shaper_height(l).to_f32();
+    assert_eq!(h(1), 60.0);
+    assert!((h(10) - 734.0).abs() < 2.0, "{}", h(10));
+    assert!((h(20) - 1011.0).abs() < 2.0, "{}", h(20));
+    assert!((2..400).all(|l| h(l) >= h(l - 1)));
+    assert!(h(400) < 1161.0);
+    assert_eq!(mc_sim::survival::shaper_tier(1), 1);
+    assert!(mc_sim::survival::shaper_tier(9) > mc_sim::survival::shaper_tier(4));
+}
+
+#[test]
+fn a_destroyed_shaper_leaves_its_site_empty_then_a_reseeded_one_catches_up() {
+    let (mut w, mut events) = guarded(SurvivalRules {
+        rounds: 0,
+        interval_secs: 20,
+        ..rules()
+    });
+    // Up to round 8, every site raised.
+    let mut t = 0;
+    while w.survival_status().unwrap().round < 8 && t < 40_000 {
+        run(&mut w, 10, &[], &mut events);
+        t += 10;
+    }
+    let status = w.survival_status().unwrap();
+    assert_eq!(status.nodes.len(), 3);
+    let old = status.nodes.iter().map(|n| n.level).max().unwrap();
+    assert!(old >= 3, "{:?}", status.nodes);
+    // Kill the one on site 0.
+    let doomed = w.shaper_unit(0).expect("a Shaper on site 0");
+    let kill = PlayerCommand {
+        player: 0,
+        command: Command::DebugDamage {
+            units: vec![doomed],
+            permille: 1000,
+        },
+    };
+    let round = w.survival_status().unwrap().round;
+    events.clear();
+    run(&mut w, 30, &[kill], &mut events);
+    assert!(events
+        .iter()
+        .any(|e| matches!(e, SimEvent::NodeDestroyed { site: 0, .. })));
+    // The rest of this round and the next it stands empty.
+    while w.survival_status().unwrap().round < round + 2 {
+        run(&mut w, 10, &[], &mut events);
+        let s = w.survival_status().unwrap();
+        assert!(
+            s.round >= round + 2 || s.nodes.iter().all(|n| n.site != 0),
+            "reseeded too soon: round {} (killed in {round}) {:?}",
+            s.round,
+            s.nodes
+        );
+    }
+    // Then the ray reseeds it, and the new Shaper evolves fast to a level that fits the round.
+    let mut t = 0;
+    let level0 = |w: &World| {
+        w.survival_status()
+            .unwrap()
+            .nodes
+            .iter()
+            .find(|n| n.site == 0 && n.raised >= 1.0)
+            .map(|n| n.level)
+    };
+    while level0(&w).is_none() && t < 6000 {
+        run(&mut w, 10, &[], &mut events);
+        t += 10;
+    }
+    assert_eq!(level0(&w), Some(1), "reseeded at level 1");
+    // Three minutes on it has caught up most of the way.
+    run(&mut w, 1800, &[], &mut events);
+    let s = w.survival_status().unwrap();
+    let want = SurvivalRules {
+        rounds: 0,
+        ..rules()
+    }
+    .catch_up_level(s.round);
+    let now = level0(&w).unwrap();
+    assert!(now >= want.min(10), "level {now}, catch-up {want}");
 }
 
 #[test]
