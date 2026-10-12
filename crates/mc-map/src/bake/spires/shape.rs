@@ -525,8 +525,10 @@ impl Terrain {
             (q.1 / TOWER_CELL).floor() as i64,
         );
         let mut h = saddle;
-        for dj in -1..=1 {
-            for di in -1..=1 {
+        // (Two cells round: a tower's foot reaches past its own cell's
+        // neighbours, and one cut off there stands as a sheer straight wall.)
+        for dj in -2..=2 {
+            for di in -2..=2 {
                 let hash = hash2(self.seed ^ 0x746F_7772, ci + di, cj + dj);
                 // Fewer towers where the massif thins, none past its edge.
                 if unit(hash, 40) > 0.25 + 0.95 * mask {

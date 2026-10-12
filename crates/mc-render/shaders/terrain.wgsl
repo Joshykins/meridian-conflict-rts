@@ -977,7 +977,7 @@ fn shade_ground(world: vec3<f32>, crag: vec4<f32>, pixel: vec2<f32>, dpx: vec3<f
     // has snow: on ledges, and down the gullies between the ribs.
     let ledge = smoothstep(0.6, 0.85, facet.z);
     let gully = 1.0 - smoothstep(-8.0, 1.0, crag_depth_here + (fine - 0.5) * 4.0);
-    let lying_here = max(mix(smoothstep(350.0, 450.0, alt + (broad - 0.5) * 95.0),
+    let lying_here = max(mix(smoothstep(350.0, 450.0, alt + (broad - 0.5) * 95.0) * (1.0 - hab.autumn),
         smoothstep(0.3, 0.7, layer.y + (patchy - 0.5) * 0.55), layer.z), snow_w);
     let crag_snow = lying_here * max(ledge, gully * 0.9) * (1.0 - arid);
     let snow_here = mix(snow_w, crag_snow, crag_w);

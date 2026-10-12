@@ -89,7 +89,7 @@ fn cliff_rock(p: vec3<f32>, n: vec3<f32>, px: f32, dz: f32, dpx: vec3<f32>, dpy:
         out.roughness = mix(out.roughness, mix(0.9, 0.62, v * riser), arid);
     }
     // Snow lies on the ledges wherever the ground round it has snow.
-    let by_height = smoothstep(350.0, 450.0, alt + (fields.w - 0.5) * 95.0);
+    let by_height = smoothstep(350.0, 450.0, alt + (fields.w - 0.5) * 95.0) * (1.0 - autumn_at(xy, px));
     let snow = mix(by_height, smoothstep(0.3, 0.7, layer.y + (fields.z - 0.5) * 0.55), layer.z)
         * smoothstep(0.6, 0.85, face.z) * (1.0 - arid);
     rgb = mix(rgb, vec3<f32>(0.65, 0.69, 0.74), snow);
@@ -186,12 +186,13 @@ fn crag_depth(p: vec3<f32>) -> f32 {
 // stretched far up it), fluted between, the beds stepping out a little at
 // the top of each course and the courses wavering. The walls of Wulingyuan:
 // sheer and vertical in everything. (The beds are the facets' own, small:
-// stepped beds this large draw chevrons down every wall.)
+// stepped beds this large draw chevrons down every wall.) Never above zero: the
+// relief only cuts into a tower's wall, so nothing stands proud of its crown.
 fn karst_mass(p: vec3<f32>) -> f32 {
     let column = crag_ridged(p / vec3<f32>(24.0, 24.0, 700.0));
     let flute = crag_ridged(p / vec3<f32>(7.0, 7.0, 260.0) + 3.0);
     let joint = 1.0 - smoothstep(-0.12, 0.12, crag_noise3(p / vec3<f32>(40.0, 40.0, 900.0) + 11.0) - 0.42);
-    return (column - 0.4) * 14.0 + (flute - 0.4) * 4.0 - joint * 3.5;
+    return (column - 1.0) * 10.0 + (flute - 1.0) * 3.0 - joint * 3.5;
 }
 
 // Quartz sandstone's joint blocks (autumn karst): `crag_depth`'s facets cut on
@@ -216,7 +217,8 @@ fn karst_depth(p: vec3<f32>) -> f32 {
     }
     let facets = 2.0 + k * log(max(sum, 1e-6));
     let skin = crag_noise3(p / 2.2) - 0.5;
-    return clamp(facets, -2.5, 2.5) + skin * 0.5;
+    // (Into the wall only, as `karst_mass`.)
+    return clamp(facets, -2.5, 2.5) - 2.5 + (skin - 0.5) * 0.5;
 }
 
 // A ridged field, 0-1: crests where the noise crosses its middle, broad troughs
@@ -271,7 +273,9 @@ fn crag_relief(p: vec3<f32>, dist: f32, fade: f32) -> Crag {
     }
     let n = terrain_normal(p.xy, 12.0);
     let grade = length(n.xy) / max(n.z, 0.05);
-    c.weight *= smoothstep(0.5, 1.0, grade);
+    // (Karst towers' crowns are domes: the relief keeps to their walls, off the
+    // shoulders, so a crown's edge is never cut into teeth.)
+    c.weight *= select(smoothstep(0.5, 1.0, grade), smoothstep(1.0, 2.0, grade), autumn());
     if fade > 0.0 {
         c.fine = c.weight * (1.0 - smoothstep(fade * 0.65, fade, dist));
     }

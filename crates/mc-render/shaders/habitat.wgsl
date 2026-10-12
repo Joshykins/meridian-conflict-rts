@@ -175,7 +175,10 @@ fn habitat(xy: vec2<f32>, z: f32, base_n: vec3<f32>, px: f32) -> Habitat {
         sand_w = side_mix(sand_w, arid, h.desert);
     }
     h.sand_w = sand_w;
-    let rock_face = smoothstep(0.10, 0.27, slope + (patchy - 0.5) * 0.12) * (1.0 - canyon_trail_floor(h.way) * 0.8);
+    // (In autumn karst the woods and the litter climb the towers' shoulders: bare
+    // rock only on the walls.)
+    let bare = mix(vec2<f32>(0.10, 0.27), vec2<f32>(0.32, 0.55), h.autumn);
+    let rock_face = smoothstep(bare.x, bare.y, slope + (patchy - 0.5) * 0.12) * (1.0 - canyon_trail_floor(h.way) * 0.8);
     h.rock_face = rock_face;
     // Snow on the heights, and whatever the map's snow layer lays: its 16 m
     // samples get a ragged edge from the ground's own patchiness, and it
@@ -185,8 +188,10 @@ fn habitat(xy: vec2<f32>, z: f32, base_n: vec3<f32>, px: f32) -> Habitat {
     h.lying = smoothstep(0.3, 0.7, layer.y + (patchy - 0.5) * 0.55 + (fine - 0.5) * 0.25)
         * (1.0 - smoothstep(0.5, 0.85, slope + (fine - 0.5) * 0.15));
     h.ice_w = smoothstep(0.3, 0.7, layer.x + (patchy - 0.5) * 0.35);
+    // (No snow by height in autumn: the karst towers stand high but it has not
+    // snowed yet.)
     let by_height = smoothstep(350.0, 450.0, alt + (broad - 0.5) * 95.0)
-        * (1.0 - smoothstep(0.25, 0.45, slope));
+        * (1.0 - smoothstep(0.25, 0.45, slope)) * (1.0 - h.autumn);
     h.snow_w = mix(by_height, h.lying, layer.z) * (1.0 - h.ice_w);
     if h.desert > 0.0 {
         // The canyon's rim is high desert, not snowfield (and no glacier reaches it).
