@@ -1604,7 +1604,22 @@ fn fs_composite(in: FullOut) -> @location(0) vec4<f32> {
     var cover = 1.0 - cloud.a;
 
     let ray = screen_ray(in.uv);
-    let holo = cloud_holo(in.uv, ray);
+    var holo = cloud_holo(in.uv, ray);
+    // The hologram sees through the cloud deck between the eye and the battle,
+    // not the mist lying on the ground under it: where what the march met lies
+    // low over the land, well under the deck's base, it is mist, and the
+    // hologram leaves it be (else every tower standing out of it, and the
+    // edge of every bank, was drawn in its cyan rim).
+    if holo > 0.0 {
+        let at_texel = clamp(vec2<i32>(in.uv * vec2<f32>(textureDimensions(cloud_march))), vec2<i32>(0),
+            vec2<i32>(textureDimensions(cloud_march)) - vec2<i32>(1));
+        let met = bitcast<f32>(textureLoad(cloud_march, at_texel, 0).z);
+        if met > 0.0 {
+            let at = globals.camera.xyz + ray * met;
+            let over = at.z - cloud_floor(at.xy);
+            holo *= smoothstep(0.35 * atmos.layer.x, 0.7 * atmos.layer.x, over);
+        }
+    }
     let e = texel * 3.0;
     let ax = textureSampleLevel(cloud_now, clamp_sampler, in.uv + vec2<f32>(e.x, 0.0), 0.0).a
         - textureSampleLevel(cloud_now, clamp_sampler, in.uv - vec2<f32>(e.x, 0.0), 0.0).a;

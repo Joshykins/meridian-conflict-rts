@@ -201,13 +201,25 @@ impl Terrain {
         ((across - swing).abs(), t)
     }
 
+    /// Metres from a (warped) design point to the middle line of its third's
+    /// ford over the lake: out from the island along the gate's line, swinging
+    /// this way and that between its ends (each its own way).
+    fn sp_lake_ford(&self, w: (f64, f64)) -> f64 {
+        let n = north(w);
+        let r = w.0.hypot(w.1);
+        let along =
+            smoothstep(250.0, 650.0, r) * (1.0 - smoothstep(LAKE_R - 150.0, LAKE_R + 150.0, r));
+        let k = third(w) as f64;
+        let swing = 130.0 * along * self.lake.fbm(r / 420.0 + 11.0 * k, 3.7 + k, 2, 0.5);
+        (n.0 - swing).abs()
+    }
+
     /// Metres from a (warped) design point to the nearest ford: over the
     /// lake to the island, or across a river.
     pub(super) fn sp_ford(&self, w: (f64, f64)) -> f64 {
-        let p = half(w);
         let r = w.0.hypot(w.1);
         let lake = if (250.0..LAKE_R + 250.0).contains(&r) {
-            p.0
+            self.sp_lake_ford(w)
         } else {
             f64::INFINITY
         };
@@ -465,12 +477,13 @@ impl Terrain {
                 h = h.max(-LAKE_DEEP + (ISLAND.1 + LAKE_DEEP) * island.powf(0.6));
             }
             // The fords out to the island, one from each gate.
+            // A gravel bar, wandering, its sides falling soon into the water.
             if (200.0..LAKE_R + 500.0).contains(&r) {
-                let d = p.0 + 10.0 * self.detail.fbm(x / 90.0, y / 90.0, 2, 0.5);
-                if d < LAKE_FORD_HALF + 80.0 {
+                let d = self.sp_lake_ford(w) + 10.0 * self.detail.fbm(x / 90.0, y / 90.0, 2, 0.5);
+                if d < LAKE_FORD_HALF + 40.0 {
                     let crest = 1.4
                         - (1.4 + LAKE_DEEP)
-                            * smoothstep(LAKE_FORD_HALF - 15.0, LAKE_FORD_HALF + 80.0, d);
+                            * smoothstep(LAKE_FORD_HALF - 20.0, LAKE_FORD_HALF + 35.0, d);
                     h = h.max(crest.min(SHORE));
                 }
             }
@@ -616,7 +629,8 @@ impl Terrain {
         let coast = self.sp_coast(off_axis(p));
         let (chance, size, tall) = if at.0.hypot(at.1) < LAKE_R - 150.0 {
             // Out of the lake, round the island, clear of the fords.
-            if at.0.hypot(at.1) < ISLAND.0 + 220.0 || p.0 < LAKE_FORD_HALF + 130.0 {
+            if at.0.hypot(at.1) < ISLAND.0 + 220.0 || self.sp_lake_ford(w) < LAKE_FORD_HALF + 130.0
+            {
                 NONE
             } else {
                 (0.32, 1.0, (150.0, 320.0))
