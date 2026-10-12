@@ -13,11 +13,12 @@
 //! `flight` (a winged flier's rig) and `crawl` (a many-legged walker's legs).
 
 /// Files put in front of shaders, never compiled on their own.
-pub(crate) const PRELUDES: [&str; 26] = [
+pub(crate) const PRELUDES: [&str; 27] = [
     "common",
     "bindings",
     "regions",
     "shore",
+    "sea",
     "surface",
     "greebles",
     "metal",
@@ -48,6 +49,7 @@ pub(crate) struct Preludes {
     bindings: String,
     regions: String,
     shore: String,
+    sea: String,
     surface: String,
     metal: String,
     regency: String,
@@ -85,6 +87,7 @@ impl Preludes {
             ),
             regions: read("regions"),
             shore: read("shore"),
+            sea: read("sea"),
             // The texture detail drawn inside a unit's plates rides with the surface.
             surface: format!("{}\n{}", read("surface"), read("greebles")),
             metal: read("metal"),
@@ -124,6 +127,11 @@ impl Preludes {
         // Waves on the shore (needs bindings).
         if uses("shore") {
             prelude = format!("{prelude}\n{}", self.shore);
+        }
+        // The open sea's waves, weather and whitecaps, and each climate's water
+        // (water.wgsl; needs bindings).
+        if uses("sea") {
+            prelude = format!("{prelude}\n{}", self.sea);
         }
         // Where things grow and the air near the ground (needs bindings).
         if uses("habitat") {
