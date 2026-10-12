@@ -56,6 +56,10 @@
             "Gravitic Well Projector": "A link of held gravity thrown onto one target; where it lands a small well opens and stays on the target until it dies, crushing what stands round it and slowing it more the longer it is held.",
         },
     ),
+    "regency_t3_field_mender": (
+        lore: "A hover hull that carries no gun, only a nanite emitter; the haze it lets out drifts over the line behind it and every friendly hull in it is mended a plate at a time, under fire or not.",
+        weapons: {},
+    ),
     "regency_t3_wake_tank": (
         lore: "A heavy hover tank built round one wide projector; when it lets go, a fan of plasma rolls out over the ground ahead and nothing standing in it is spared.",
         weapons: {

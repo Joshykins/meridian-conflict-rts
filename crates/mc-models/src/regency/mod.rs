@@ -18,6 +18,7 @@ mod battle_tank;
 mod bombard;
 mod brood;
 mod carillon;
+mod censer;
 mod chassis;
 mod colossus;
 mod commander;
@@ -146,6 +147,13 @@ pub(super) const MODELS: &[ModelDef] = &[
     // The tech 3 wake tank: a hover hull, a wide flat projector in front of its turret
     // (`wake_tank`).
     ModelDef::new("regency_wake_tank", 7.6, 4.6, wake_tank::wake_tank),
+    // The tech 3 field mender: a hover hull, a nanite spire over its middle (`censer`).
+    ModelDef::new(
+        "regency_censer",
+        censer::RADIUS,
+        censer::HEIGHT,
+        censer::censer,
+    ),
     // The tech 4 assault tripod: a keeled head high on three legs (`strider`).
     ModelDef::new(
         "regency_strider",
@@ -455,6 +463,8 @@ pub(super) fn reduced_share(key: &str) -> Option<f32> {
         "regency_skyspear" | "regency_fusion_howitzer" => Some(0.52),
         // Faceted shards and a plated body that keep their sides when reduced.
         "regency_gravitic_lens" => Some(0.55),
+        // A faceted hull and slotted emitter plates that keep their sides when reduced.
+        "regency_censer" => Some(0.6),
         // Plated hulls, heads and legs: faceted solids that keep their sides when reduced.
         "regency_strider" | "regency_wake_tank" | "regency_colossus" | "regency_seraph"
         | "regency_saker" => Some(0.5),

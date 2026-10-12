@@ -180,6 +180,36 @@
         mesh: "regency_gravitic_lens", icon: Artillery,
         sounds: (death: "blast_large", moving: "tracks_heavy"),
     ),
+    // Field mender: a hover hull carrying no gun, only a nanite emitter that keeps a repair
+    // field round it (`repair_field`, mc-sim `repair_field.rs`), the Exarch's Nanite
+    // Repair Field on its own hull. Every finished friend in reach, ground or air, not
+    // itself, gets the same health back a second whatever its size, under fire or not, so
+    // it does most for a crowd of light units and little for one big one. Two fields over
+    // the same unit both mend it.
+    //
+    // Balance: the Exarch's field (180 m, 40 a second) is a 3000-materials refit. This is a
+    // smaller one (140 m, 30 a second) for 900, on a hull about a Wake's: twelve Wakes in
+    // its reach get back 360 a second between them, a Wake's own damage a second. It has
+    // nothing to fight with, so it lives behind the line it mends. Hover, so it keeps up
+    // with the Wake over water.
+    //
+    // Model: `regency_censer` (`models::regency::censer`), authored at this size.
+    (
+        key: "regency_t3_field_mender",
+        name: "Censer",
+        role: "Mobile Nanite Repair Field", title: "Field Mender",
+        tech: 3,
+        categories: ["Land"],
+        health: 3600,
+        cost: (materials: 900, energy: 9000, time: 5000),
+        radius: 6.0, height: 7.0,
+        vision: 400,
+        motion: (layer: Hover, size: 1, speed: 25, accel: 18, turn: 80),
+        repair_field: (radius: 140, heal: 30),
+        weapons: [],
+        mesh: "regency_censer", icon: Shield,
+        sounds: (death: "blast_large", moving: "aster_hover"),
+    ),
     // Executioner: Paladin-class assault tank. 11,400 combined hull/shield versus
     // 10,787; 475 precise DPS plus up to 90 rocket DPS, paid for with 13% more materials
     // and slower movement. Rocket scatter makes the extra damage situational.
