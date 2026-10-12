@@ -72,6 +72,14 @@ mod spires;
 mod threshold;
 mod tripoint;
 
+/// Every wreck key the layouts that plan their own wreckage can lay.
+pub(crate) fn planned_wreck_keys() -> impl Iterator<Item = &'static str> {
+    siege::wrecks::ASSAULT
+        .iter()
+        .chain(&threshold::wrecks::KINDS)
+        .map(|k| k.0)
+}
+
 pub use params::{BakeParams, Layout};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -202,6 +210,24 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
     if terrain.layout == Layout::Siege {
         terrain.siege_props(&mut props);
     }
+    // The siege and the survival map lay their own wreckage, with their plans
+    // (`siege/wrecks.rs`, `threshold/wrecks.rs`); the trees and small rocks
+    // under a wreck are gone.
+    let wrecks = match terrain.layout {
+        Layout::Siege => terrain.siege_wrecks(),
+        Layout::Threshold => terrain.threshold_wrecks(),
+        _ => Vec::new(),
+    };
+    if !wrecks.is_empty() {
+        let reach = mc_core::Fx::from_int(20);
+        props.retain(|p| {
+            !(p.kind.is_tree() || p.kind == PropKind::RockSmall)
+                || wrecks.iter().all(|w| {
+                    let d = w.pos - p.pos;
+                    d.x.abs() > reach || d.y.abs() > reach || d.length() > reach
+                })
+        });
+    }
     let count = |family: fn(PropKind) -> bool| props.iter().filter(|p| family(p.kind)).count();
     let (trees, rocks, buildings) = (
         count(PropKind::is_tree),
@@ -226,9 +252,8 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
     if !streets.is_empty() {
         writer.set_streets(streets)?;
     }
-    // The siege lays its own wreckage, with its plan (`siege/wrecks.rs`).
-    if terrain.layout == Layout::Siege {
-        writer.set_wrecks(terrain.siege_wrecks())?;
+    if !wrecks.is_empty() {
+        writer.set_wrecks(wrecks)?;
     }
     let content_id = writer.finish(props, &starts, &ore)?;
 

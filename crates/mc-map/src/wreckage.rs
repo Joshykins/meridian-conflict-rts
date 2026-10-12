@@ -49,7 +49,7 @@ pub enum Symmetry {
 
 impl Symmetry {
     /// The symmetry a layout was baked with, for `players` starts. None for
-    /// the survival layouts: their economy is the waves' wreckage.
+    /// the survival and siege layouts, which lay their own with their plans.
     pub fn of(layout: Layout, players: u32) -> Option<Symmetry> {
         match layout {
             Layout::Basin | Layout::Islands => Some(Symmetry::Wedges {
@@ -63,7 +63,7 @@ impl Symmetry {
             Layout::Canyon => Some(Symmetry::MirrorSides),
             Layout::Crosswater => Some(Symmetry::QuarterTurn),
             Layout::Tripoint | Layout::Spires => Some(Symmetry::Thirds),
-            // The siege lays its own wreckage with its plan.
+            // These lay their own wreckage with their plans (`bake.rs`).
             Layout::Threshold | Layout::Siege => None,
         }
     }
@@ -235,7 +235,8 @@ const T2_SEA: [Kind; 3] = [
     kind("aster_t2_missile_ship", 20.0, 4, Ground::Sea),
 ];
 
-/// Every key the fields can name, for checking against the blueprints.
+/// Every key the fields (and the layouts that plan their own) can name, for
+/// checking against the blueprints.
 pub fn wreck_keys() -> Vec<&'static str> {
     let mut keys: Vec<&str> = [
         &SCRAP[..],
@@ -248,6 +249,7 @@ pub fn wreck_keys() -> Vec<&'static str> {
     ]
     .iter()
     .flat_map(|list| list.iter().map(|k| k.key))
+    .chain(crate::bake::planned_wreck_keys())
     .collect();
     keys.sort_unstable();
     keys.dedup();

@@ -12,7 +12,7 @@ use crate::noise::hash2;
 /// T2 4, T3 16, as `wreckage.rs` counts it).
 type Kind = (&'static str, f64, u32);
 
-const ASSAULT: [Kind; 8] = [
+pub(in crate::bake) const ASSAULT: [Kind; 8] = [
     ("aster_t1_tank", 5.0, 1),
     ("aster_t1_bot", 3.0, 1),
     ("aster_t1_artillery", 5.0, 1),

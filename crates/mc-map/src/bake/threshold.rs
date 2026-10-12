@@ -34,6 +34,8 @@ use crate::noise::{bump, smoothstep};
 use crate::BUILD_CELL_M;
 use std::f64::consts::{FRAC_PI_2, PI};
 
+pub(super) mod wrecks;
+
 /// The size the design coordinates below are written for.
 const DESIGN_M: f64 = 16_384.0;
 
@@ -244,8 +246,24 @@ const LINKS: [((f64, f64), (f64, f64)); 25] = [
     ((12_830.0, 6_388.0), (13_140.0, 6_620.0)),
 ];
 
-/// Ore: small fields at each start, a few more out along the road.
-const CONTESTED_ORE: [(f64, f64); 3] = [(4_900.0, 7_700.0), (6_400.0, 8_300.0), (8_750.0, 8_000.0)];
+/// Ore: three fields at each start, and broad ones across the lowland and out
+/// along the road (design metres, radius). Survival lives on a long economy.
+const CONTESTED_ORE: [(f64, f64, f64); 10] = [
+    // The west, behind the starts.
+    (900.0, 6_900.0, 110.0),
+    (1_100.0, 8_400.0, 110.0),
+    // Between the starts.
+    (3_300.0, 8_550.0, 120.0),
+    (2_950.0, 6_650.0, 110.0),
+    // The lowland, toward the pass.
+    (4_200.0, 7_350.0, 130.0),
+    (4_900.0, 8_800.0, 120.0),
+    (5_500.0, 6_350.0, 115.0),
+    (6_350.0, 8_250.0, 130.0),
+    (7_150.0, 8_650.0, 110.0),
+    // Past the pass, on the forecourt under the Rampart.
+    (8_650.0, 7_600.0, 120.0),
+];
 
 impl Terrain {
     fn tv(&self, (x, y): (f64, f64)) -> (f64, f64) {
@@ -297,19 +315,19 @@ impl Terrain {
         }
         self.starts.push(snap(self, HEART));
 
-        let small = (0.18 * start_core).max(55.0);
+        let home = (0.27 * start_core).max(70.0);
         let mut sites = Vec::new();
         for &(sx, sy) in &self.starts[..SPAWNS.len()] {
-            // Behind the start, away from the road east.
-            for turn in [PI - 0.95, PI + 0.95] {
+            // Behind the start and on its flanks, away from the road east.
+            for turn in [PI - 1.2, PI, PI + 1.2] {
                 let (s, c) = turn.sin_cos();
-                let d = 0.8 * start_core;
-                sites.push((sx + c * d, sy + s * d, small));
+                let d = 0.85 * start_core;
+                sites.push((sx + c * d, sy + s * d, home));
             }
         }
-        for &p in &CONTESTED_ORE {
-            let at = snap(self, p);
-            sites.push((at.0, at.1, small * 1.1));
+        for &(x, y, r) in &CONTESTED_ORE {
+            let at = snap(self, (x, y));
+            sites.push((at.0, at.1, self.tl(r)));
         }
         self.pads = pads;
         self.ore = sites
@@ -372,7 +390,8 @@ impl Terrain {
         let roll = self.lake.fbm(x / 1_500.0, y / 1_500.0, 3, 0.5);
         let knolls = self.crag.ridged(x / 900.0 + 3.7, y / 900.0 - 1.3, 2, 0.5);
         let mut calm: f64 = 1.0;
-        for &s in SPAWNS.iter().chain(CONTESTED_ORE.iter()) {
+        let ore = CONTESTED_ORE.iter().map(|&(x, y, _)| (x, y));
+        for s in SPAWNS.iter().copied().chain(ore) {
             calm = calm.min(smoothstep(
                 self.tl(260.0),
                 self.tl(800.0),

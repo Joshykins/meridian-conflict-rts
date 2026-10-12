@@ -17,7 +17,7 @@
 //! mc-bake --layout spires --size-km 24 --seed 17 --name "Thousand Spires" -o maps/thousand_spires.mcmap
 //! ```
 //!
-//! Every layout but the survival and siege ones (the siege lays its own) is then
+//! Every layout but the survival and siege ones (each lays its own with its plan) is then
 //! stamped with starting wreckage
 //! (`mc_map::wreckage`). `--wreckage-only` lays it afresh on a map already baked,
 //! terrain untouched: give it the layout and seed the map was baked with.

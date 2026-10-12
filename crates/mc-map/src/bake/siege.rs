@@ -48,7 +48,7 @@ mod plan;
 mod shape;
 #[cfg(test)]
 mod tests;
-mod wrecks;
+pub(super) mod wrecks;
 
 /// The map's edge, metres: the design is for exactly this.
 pub(super) const SIZE: f64 = 6_144.0;

@@ -479,7 +479,8 @@ invulnerable unit, and the mirror marks it `SHIELD_VEIL` so it is drawn apart fr
   Events: `RoundPrinting`, `RoundLaunched`, `TierReached`, `HeavyWave`, `NodeRaising`, `NodeOnline`,
   `ShaperLevelled`, `NodeDestroyed`, `SurvivalWon`.
 - **Economy.** Nothing is handed out. The engine's rounds are the defenders' materials: every unit it prints dies into a
-  wreck worth most of its cost, so a survival map has little ore and reclaim is the economy. The heart, the print bays and the Shapers are always revealed to the defenders
+  wreck worth most of its cost, so reclaim is the economy. The Threshold still carries ore at every spawn and across the
+  lowland, and the wreckage of earlier assaults along the road from the Rampart to the spawns (`bake/threshold/wrecks.rs`). The heart, the print bays and the Shapers are always revealed to the defenders
   (`survival_reveal`). The skirmish AI skips the engine side; an AI *defender* only attacks nodes.
 - **Interface.** `SimStatus::survival` (`World::survival_status`) feeds the HUD's survival card under the minimap
   (`hud/survival.rs`, `SurvivalHud`: round, what the engine is doing, the tier chip, what is coming per domain, the
