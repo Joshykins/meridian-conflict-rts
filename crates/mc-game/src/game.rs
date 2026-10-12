@@ -4490,6 +4490,10 @@ impl Game {
             camera: &shaken,
             renderer,
         };
+        // Marks on the ground grow with the side (every plan's lot, every order's line):
+        // half the overlay is kept back for the HUD after them, so a big base cannot
+        // crowd the panels off the screen.
+        ui.o.hold_back(mc_render::overlay::MAX_OVERLAY_VERTICES / 2);
         // The free camera's picture is clean: no orders, marks or reticles over it.
         if !self.hud.free.on {
             self.orders.draw(&mut ui, &field, alpha);
@@ -4575,6 +4579,7 @@ impl Game {
                 .filter(|&i| self.can_inspect(&self.view.frame.units[i]))
                 .map(|i| self.view.frame.units[i].unit_id),
         };
+        ui.o.release();
         let actions = self.hud.draw(&mut ui, &scene, dt);
         if !over_ui && !self.hud.free.on {
             hud::cursor_hint(&mut ui, &self.view, &self.blueprints, &sites);

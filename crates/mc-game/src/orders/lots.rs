@@ -79,10 +79,37 @@ pub fn ghost_footprints(ui: &mut Ui, field: &Field, ghosts: &[UnitInstance]) {
         };
         let half = half_lot(field.blueprints, blueprint, g.heading);
         let c = Vec2::new(g.pos[0], g.pos[1]);
+        // A lot off the screen draws nothing: a big base's plans would otherwise
+        // spend the overlay on grids no one sees.
+        if !on_screen(&project, c, half, field.camera.viewport / scale) {
+            continue;
+        }
         if !lot_marker(ui, &project, c, half, g.health > 0.0, tone) {
             footprint_grid(ui, &project, c, half, tone);
         }
     }
+}
+
+/// Whether any of the lot at `c` shows in a screen `size` points across.
+fn on_screen(project: &dyn Fn(Vec2) -> Option<Vec2>, c: Vec2, half: Vec2, size: Vec2) -> bool {
+    let corners: Vec<Vec2> = [
+        Vec2::new(-1.0, -1.0),
+        Vec2::new(1.0, -1.0),
+        Vec2::new(1.0, 1.0),
+        Vec2::new(-1.0, 1.0),
+    ]
+    .iter()
+    .filter_map(|&k| project(c + half * k))
+    .collect();
+    let Some(&first) = corners.first() else {
+        return false;
+    };
+    let (lo, hi) = corners
+        .iter()
+        .fold((first, first), |(lo, hi), &p| (lo.min(p), hi.max(p)));
+    // The far-off mark is drawn at least this big round the centre.
+    let pad = Vec2::splat(16.0);
+    (hi + pad).cmpge(Vec2::ZERO).all() && (lo - pad).cmple(size).all()
 }
 
 /// Seen from far off a lot is a few pixels across, and its grid says nothing:

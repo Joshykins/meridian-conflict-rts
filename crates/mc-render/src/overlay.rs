@@ -108,8 +108,11 @@ impl Fonts {
 
 pub struct Overlay {
     pub vertices: Vec<OverlayVertex>,
-    /// Set when a frame wanted more than `MAX_OVERLAY_VERTICES`; shown by the profiler.
+    /// Set when a frame wanted more than its ceiling; shown by the profiler.
     pub overflowed: bool,
+    /// The most vertices drawing may reach for now: `MAX_OVERLAY_VERTICES`, or less
+    /// while marks on the ground are drawn, so the panels after them always fit.
+    ceiling: usize,
     /// Set by `blur_rect`: the renderer blurs the scene for this frame.
     glass: bool,
     /// RGBA8, `FONT_ATLAS_W` x `FONT_ATLAS_H`.
@@ -130,6 +133,7 @@ impl Default for Overlay {
         Overlay {
             vertices: Vec::new(),
             overflowed: false,
+            ceiling: MAX_OVERLAY_VERTICES,
             glass: false,
             atlas: textures::font_atlas(),
             dirty: Cell::new((0, 0)),
@@ -149,7 +153,20 @@ impl Overlay {
     pub fn clear(&mut self) {
         self.vertices.clear();
         self.overflowed = false;
+        self.ceiling = MAX_OVERLAY_VERTICES;
         self.glass = false;
+    }
+
+    /// Keeps `reserve` vertices back from what is drawn until `release`: whatever
+    /// is drawn first (marks on the ground, which grow with the side) cannot crowd
+    /// out what comes after (the HUD).
+    pub fn hold_back(&mut self, reserve: usize) {
+        self.ceiling = MAX_OVERLAY_VERTICES.saturating_sub(reserve);
+    }
+
+    /// The whole budget again, after `hold_back`.
+    pub fn release(&mut self) {
+        self.ceiling = MAX_OVERLAY_VERTICES;
     }
 
     /// Whether this frame has glass, so the renderer has to blur the scene.
@@ -384,7 +401,7 @@ impl Overlay {
     // -- primitives -------------------------------------------------------------
 
     fn quad(&mut self, corners: [[f32; 2]; 4], uvs: [[f32; 2]; 4], colors: [[f32; 4]; 4]) {
-        if self.vertices.len() + 6 > MAX_OVERLAY_VERTICES {
+        if self.vertices.len() + 6 > self.ceiling {
             self.overflowed = true;
             return;
         }
@@ -839,6 +856,32 @@ mod tests {
         assert!(o.take_dirty_rows().is_none());
         let cap = o.cap_height(style);
         assert!((10.0..16.0).contains(&cap), "cap height {cap}");
+    }
+
+    #[test]
+    fn what_is_held_back_is_left_for_what_comes_after() {
+        let mut o = Overlay::default();
+        o.hold_back(MAX_OVERLAY_VERTICES - 12);
+        for _ in 0..10 {
+            o.rect(0.0, 0.0, 1.0, 1.0, [1.0; 4]);
+        }
+        assert_eq!(o.vertices.len(), 12, "only two quads fit under the ceiling");
+        assert!(o.overflowed);
+        o.release();
+        o.rect(0.0, 0.0, 1.0, 1.0, [1.0; 4]);
+        assert_eq!(
+            o.vertices.len(),
+            18,
+            "the rest of the budget is there again"
+        );
+        o.hold_back(MAX_OVERLAY_VERTICES);
+        o.clear();
+        o.rect(0.0, 0.0, 1.0, 1.0, [1.0; 4]);
+        assert_eq!(
+            o.vertices.len(),
+            6,
+            "a new frame starts with the whole budget"
+        );
     }
 
     #[test]
