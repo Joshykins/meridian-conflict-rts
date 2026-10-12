@@ -26,6 +26,7 @@ mod lots;
 pub(crate) mod mine_reach;
 mod muster;
 mod reclaim_rings;
+mod settling;
 mod sites;
 mod wall_line;
 
@@ -46,9 +47,6 @@ const MAX_LINES: usize = 900;
 const MAX_NODES: usize = 120;
 const MAX_GHOSTS: usize = 256;
 const MAX_AIR_GUIDES: usize = 256;
-/// A dropped order is shown where it was dropped for this many ticks, while the
-/// sim has yet to say so itself. Longer than any command delay; after it, the sim refused.
-const SETTLE_TICKS: u32 = 10;
 
 /// What the orders are read from and projected with.
 pub struct Field<'a> {
@@ -93,8 +91,8 @@ pub struct OrderMap {
     aim: Option<(FxVec2, bool)>,
     /// The order a press would pick up, and where it is drawn.
     hover: Option<(Key, Vec2)>,
-    /// Orders dropped a moment ago: (order, where to, the tick it was dropped in).
-    settling: Vec<(Key, FxVec2, u32)>,
+    /// Orders dropped a moment ago, shown where they went until the sim has them there.
+    settling: settling::Settling,
     /// Pixels per interface point, as last drawn: badges are sized in points.
     scale: f32,
     /// Command groups as the player made them: formation -> members. A group outlives
@@ -519,6 +517,11 @@ impl OrderMap {
         self.aim = None;
     }
 
+    /// The sim refused to put a structure down: plans dropped a moment ago show where they still are.
+    pub fn build_refused(&mut self) {
+        self.settling.build_refused();
+    }
+
     /// Where an order is drawn: in hand, where it was just dropped, or where the sim has it.
     fn shown(&self, key: Key, pos: [f32; 2]) -> Vec2 {
         if let (Some(grip), Some((aim, _))) = (&self.drag, self.aim) {
@@ -526,8 +529,8 @@ impl OrderMap {
                 return Vec2::from(aim.to_f32());
             }
         }
-        match self.settling.iter().find(|(k, ..)| k.names(key)) {
-            Some((_, to, _)) => Vec2::from(to.to_f32()),
+        match self.settling.to(key) {
+            Some(to) => Vec2::from(to.to_f32()),
             None => Vec2::from(pos),
         }
     }
@@ -644,15 +647,15 @@ impl OrderMap {
     }
 
     /// The left button came up. `None` when nothing was in hand. `still` is how far the
-    /// pointer may have strayed for the press to have been a click and not a drag.
-    pub fn release(&mut self, tick: u32, cursor: Vec2, still: f32) -> Option<Dropped> {
+    /// pointer may have strayed for the press to have been a click and not a drag;
+    /// `delay`, how many ticks a command takes to reach the sim (a network match's input delay).
+    pub fn release(&mut self, tick: u32, delay: u32, cursor: Vec2, still: f32) -> Option<Dropped> {
         let grip = self.drag.take()?;
         Some(match self.aim.take() {
             _ if grip.pressed_at.distance(cursor) < still => Dropped::Stayed,
             Some((to, true)) if to == grip.key.at => Dropped::Stayed,
             Some((to, true)) => {
-                self.settling.retain(|(k, ..)| *k != grip.key);
-                self.settling.push((grip.key, to, tick));
+                self.settling.dropped(grip.key, to, tick, delay);
                 Dropped::Moved(Command::RelocateOrder {
                     units: grip.units.into_iter().map(Handle).collect(),
                     kind: grip.key.kind,
@@ -701,8 +704,7 @@ impl OrderMap {
                 .flat_map(|q| q.route())
                 .any(|o| key.names(key_of(o)))
         };
-        self.settling
-            .retain(|(key, _, tick)| status.tick <= tick + SETTLE_TICKS && held(key));
+        self.settling.keep(status.tick, held);
         // The order in hand was carried out, or cancelled, under the pointer.
         if self.drag.as_ref().is_some_and(|grip| !held(&grip.key)) {
             self.cancel();

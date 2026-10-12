@@ -1210,9 +1210,10 @@ impl Game {
                 }
             }
             (MouseButton::Left, false) => {
+                let delay = self.sim.net.as_ref().map_or(0, |n| n.link().input_delay);
                 match self
                     .orders
-                    .release(self.view.status.tick, self.cursor, DRAG_THRESHOLD)
+                    .release(self.view.status.tick, delay, self.cursor, DRAG_THRESHOLD)
                 {
                     Some(Dropped::Moved(command)) => {
                         audio.play(Sfx::Order);
@@ -4046,12 +4047,16 @@ impl Game {
         for event in &self.view.frame.events {
             match event {
                 mc_sim::SimEvent::BuildRejected { player } if *player == self.view.local => {
+                    self.orders.build_refused();
                     audio.play(Sfx::Deny);
                     self.hud.toast("Cannot Build There", palette::BAD);
                 }
                 mc_sim::SimEvent::CommandRefused { player, reason }
                     if *player == self.view.local =>
                 {
+                    if *reason == mc_sim::mirror::Refusal::MineReach {
+                        self.orders.build_refused();
+                    }
                     audio.play(Sfx::Deny);
                     self.hud.toast(reason.message(), palette::BAD);
                 }
