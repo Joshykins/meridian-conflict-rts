@@ -19,6 +19,13 @@
 //! black ground round a flooded caldera whose one gap lets ships in, a cone
 //! standing on the ring. Tabular icebergs lie aground here and there.
 //!
+//! Thick sea ice, flat and a metre over the water, reaches out from each
+//! coast, a kilometre or more in places and held back in front of the starts
+//! to keep their harbours open; each island has a fringe of its own, its
+//! caldera and gap kept open. Units walk and build on it. Open water always
+//! parts the coast's ice from the islands' and runs the length of the strait
+//! between the two coasts' ice, so the teams never meet on foot.
+//!
 //! Fairness: the map is the same under a half turn about its middle. The
 //! designed pieces are listed once, for the west coast and the islands' first
 //! one, and evaluated at a point and at its turned image
@@ -264,6 +271,23 @@ const BERGS: &[(f64, f64, f64, f64)] = &[
     (5_900.0, 5_000.0, 110.0, 18.0),
 ];
 
+/// The sea ice: its top over the water (m: dry, flat, walkable), how far it
+/// reaches out from the coast at the least and the most (m), how far in front
+/// of a start it is held back to keep the start's harbour open (the reach
+/// there, m, within the radius, m), how wide a fringe it lays round the
+/// islands (m), and the open lead it always leaves down the strait (m either
+/// side of the middle line): the teams never meet on the ice.
+const SEA_ICE_H: f64 = 1.3;
+/// The sea bed under the edges of the sea ice and round the bergs' feet,
+/// metres: deep enough for ships (6 m).
+const UNDER_EDGE: f64 = -9.0;
+const SEA_ICE_REACH: (f64, f64) = (250.0, 1_150.0);
+const HARBOUR: (f64, f64) = (180.0, 1_900.0);
+const ISLAND_ICE: f64 = 210.0;
+const LEAD: f64 = 380.0;
+/// Open water kept between the coast's ice and an island's, metres.
+const ISLAND_WATER: f64 = 380.0;
+
 /// Ore away from the starts: centre and radius, metres.
 const ORE: &[(f64, f64, f64)] = &[
     // The south start's lowland, and the shore under the south massif.
@@ -327,6 +351,16 @@ fn outlines() -> &'static Outlines {
         glacier: smooth_open(GLACIER, 4),
         ridges: RIDGES.iter().map(|r| smooth_open(r.line, 4)).collect(),
     })
+}
+
+/// The bearing of the caldera's gap of the island at `c`: the first
+/// island's, or its turned twin's.
+fn gap_bearing(c: (f64, f64)) -> f64 {
+    if c == ISLAND {
+        GAP_BEARING
+    } else {
+        GAP_BEARING + PI
+    }
 }
 
 /// A point at `bearing` and `out` metres from `c`.
@@ -560,8 +594,67 @@ impl Terrain {
         h += self.an_max(x, y, |q| crags(NUNATAKS, q, crag, rough, 1.6)) * ice.sheet;
         let shelf_top = SHELF_H + 1.2 * n(&|x, y| self.detail.fbm(x / 220.0, y / 220.0, 2, 0.5));
         h += (shelf_top - h) * ice.shelf;
-        let h = h.max(self.an_island(x, y, crag, rough));
-        h.max(self.an_bergs(x, y))
+        let h = h
+            .max(self.an_island(x, y, crag, rough))
+            .max(self.an_bergs(x, y));
+        if h >= SEA_ICE_H {
+            return h;
+        }
+        // The sea ice: a flat pan a little over the water, a sheer edge.
+        let top = SEA_ICE_H + 0.35 * n(&|x, y| self.detail.fbm(x / 90.0 - 5.0, y / 90.0, 2, 0.5));
+        // Under its edge the floor stands only a ship's draught and a little
+        // deep: the edge shows a couple of metres of ice over the water, not
+        // a cliff dropping to the sea bed.
+        let si = self.an_sea_ice(x, y, s);
+        let floor = h.max(UNDER_EDGE - 1.2 * (-si - 4.0).max(0.0));
+        floor + (top - floor) * smoothstep(-3.5, 3.5, si)
+    }
+
+    /// Metres inside the sea ice (negative outside): out from each coast to a
+    /// reach that wanders along it, held back in front of the starts and away
+    /// from the islands' own fringes, never across the lead down the middle;
+    /// a fringe round each island, its caldera and gap left open; open pools
+    /// here and there. `s` is metres in from the coast.
+    fn an_sea_ice(&self, x: f64, y: f64, s: f64) -> f64 {
+        let tame = self.an_tame(x, y);
+        let n = |f: &dyn Fn(f64, f64) -> f64| self.an_wild(x, y, tame, f);
+        let broad = n(&|x, y| self.lake.fbm(x / 1_700.0 + 50.0, y / 1_700.0, 3, 0.5));
+        let edge = n(&|x, y| self.lake_shore.fbm(x / 260.0 - 30.0, y / 260.0, 3, 0.55)) * 120.0
+            + n(&|x, y| self.coast_warp.fbm(x / 70.0 + 2.0, y / 70.0, 2, 0.5)) * 25.0;
+        let pools = n(&|x, y| self.lake.fbm(x / 380.0 - 70.0, y / 380.0 + 20.0, 3, 0.5));
+        // In the frame of the side it lies on.
+        let q = if x < MID { (x, y) } else { turn((x, y)) };
+        let islands = [ISLAND, turn(ISLAND)];
+        let harbour = STARTS
+            .iter()
+            .map(|&a| smoothstep(HARBOUR.1, 0.6 * HARBOUR.1, dist(q, a)))
+            .fold(0.0, f64::max);
+        let (lo, hi) = SEA_ICE_REACH;
+        let reach = lo + (hi - lo) * smoothstep(-0.35, 0.35, broad);
+        let reach = reach + (HARBOUR.0 - reach) * harbour;
+        // The lead wanders, as does the water kept round the islands.
+        let lead = (MID - LEAD) - q.0 + 250.0 * (broad + 0.35).min(0.0) + 0.5 * edge;
+        let mut coast = (reach + s + edge).min(30.0 - s).min(lead);
+        for c in islands {
+            let lobes = 0.25 * ragged_of(ISLAND_R, q, c);
+            coast = coast.min(dist(q, c) - (ISLAND_R + ISLAND_ICE + ISLAND_WATER) + edge + lobes);
+        }
+        let fringe = islands
+            .into_iter()
+            .map(|c| {
+                let d = dist(q, c);
+                let gap = segment(
+                    q,
+                    polar(c, gap_bearing(c), 0.6 * CALDERA_R),
+                    polar(c, gap_bearing(c), ISLAND_R + 500.0),
+                )
+                .0;
+                (ISLAND_R + ISLAND_ICE + 1.5 * edge + 0.5 * ragged_of(ISLAND_R, q, c) - d)
+                    .min(d - (CREST_R + 60.0))
+                    .min(gap - (GAP_HALF + 70.0))
+            })
+            .fold(f64::MIN, f64::max);
+        coast.max(fringe).min(380.0 * (0.42 - pools))
     }
 
     /// The lowland's knolls at `(x, y)`, 0 between them to about 1 on their
@@ -683,9 +776,12 @@ impl Terrain {
                 .iter()
                 .map(|&(bx, by, r, tall)| {
                     let d = dist(q, (bx, by)) + 0.3 * r * fray + 0.3 * ragged_of(r, q, (bx, by));
+                    // The berg's foot spreads under the water, so its sides
+                    // stand out of the sea, not up from the bed.
                     let body = smoothstep(r + 8.0, r - 8.0, d);
-                    if body > 0.0 {
-                        -DEEP + (tall + 1.5 * top + DEEP) * body
+                    let foot = smoothstep(r + 50.0, r + 8.0, d);
+                    if foot > 0.0 {
+                        -DEEP + (DEEP + UNDER_EDGE) * foot + (tall + 1.5 * top - UNDER_EDGE) * body
                     } else {
                         f64::MIN
                     }
@@ -708,8 +804,19 @@ impl Terrain {
                 .map(|&(lx, ly, r, _)| smoothstep(r + 6.0, r - 6.0, dist(q, (lx, ly))))
                 .fold(0.0, f64::max)
         });
-        let cover = ice.sheet.max(glacier).max(ice.shelf).max(berg).max(lake);
-        let snowed = ice.sheet.max(ice.shelf).max(berg) * (1.0 - glacier) * (1.0 - lake);
+        let sea = smoothstep(-2.0, 2.0, self.an_sea_ice(x, y, self.an_land(x, y)))
+            * (1.0 - ice.sheet.max(ice.shelf).max(glacier).max(berg));
+        let cover = ice
+            .sheet
+            .max(glacier)
+            .max(ice.shelf)
+            .max(berg)
+            .max(lake)
+            .max(sea);
+        // Sea ice lies under a patchy skin of snow, swept bare in places.
+        let swept = 0.35 + 0.5 * smoothstep(-0.2, 0.3, self.tilt.fbm(x / 400.0, y / 400.0, 3, 0.5));
+        let snowed =
+            ice.sheet.max(ice.shelf).max(berg) * (1.0 - glacier) * (1.0 - lake) + sea * swept;
         let moraine = smoothstep(-160.0, -90.0, ice.glacier_in)
             * (1.0 - smoothstep(-60.0, 0.0, ice.glacier_in))
             * (1.0 - ice.sheet);
@@ -773,7 +880,7 @@ impl Terrain {
         }
         let within = self.an_ice(x, y).within;
         let bare = smoothstep(-40.0, -160.0, within);
-        let e = self.erosion.at(x, y) * self.an_keep(x, y) * bare * smoothstep(0.5, 6.0, h);
+        let e = self.erosion.at(x, y) * self.an_keep(x, y) * bare * smoothstep(2.0, 6.0, h);
         (h + e).max(h.min(2.5))
     }
 

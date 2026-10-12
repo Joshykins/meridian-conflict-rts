@@ -68,7 +68,8 @@ pub enum Layout {
     /// "Erebus Strait": two against two across a polar sea, each team on
     /// one coast of Antarctica under its ice sheet, a glacier between each
     /// team's starts floating out as an ice shelf, two volcanic caldera
-    /// islands in the strait (see `antarctic.rs`). No trees. Fair by a half
+    /// islands in the strait, thick sea ice along the coasts and round the
+    /// islands, an open lead between (see `antarctic.rs`). No trees. Fair by a half
     /// turn; the west team's starts first, each followed by its image.
     /// Exactly 12 km.
     Antarctic,
