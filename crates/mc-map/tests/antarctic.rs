@@ -5,7 +5,7 @@
 //! * the starts come in pairs, each the one before it turned half round, so
 //!   the teams (slot % 2) hold one coast each;
 //! * allies can walk to each other two ways, along the shore strip and over
-//!   the glacier's mouth, or behind the mountains over the ice sheet; the
+//!   the valley's foot, or behind the mountains over the ice sheet; the
 //!   teams cannot walk to each other at all;
 //! * each start's walk to every ore field on its coast is as long as the
 //!   turned start's to the turned field;
@@ -131,7 +131,7 @@ fn erebus_strait_plays_the_same_for_both_teams() {
         problems.push("the teams can walk to each other".into());
     }
     // Two ways between allies: with the ice sheet's top closed (60 m up),
-    // the shore and the glacier's mouth; with all the low ground east of the
+    // the shore across the valley's foot; with all the low ground east of the
     // starts closed, over the sheet behind the mountains.
     for (name, open) in [
         (

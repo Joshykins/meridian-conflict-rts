@@ -66,8 +66,8 @@ usage: mc-bake -o <file.mcmap> [options]
                    the city north of its wall, the outskirts south, the
                    city's start first; destructible buildings; exactly 6 km
                    antarctic: \"Erebus Strait\", 2v2 across a polar sea: each
-                   team on a coast under its ice sheet, a glacier and ice
-                   shelf between its starts, two caldera islands in the
+                   team on a coast under its ice sheet, mountains between
+                   its starts, sea ice along it, two caldera islands in the
                    strait; no trees; exactly 12 km
   --players <n>    start positions, 1-32 (default: 2 up to 8 km, 4 up to 24 km,
                    else 8; islands and alpine: always 2; the 8-player layouts
