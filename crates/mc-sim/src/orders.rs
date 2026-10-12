@@ -1297,7 +1297,9 @@ impl World {
             .is_some_and(|o| o.kind == OrderKind::Upgrade);
         self.state.orders.clear(&mut self.state.units, row);
         self.stop_moving(row);
-        if self.bp(row).is_structure() || refitting {
+        // A station's `build_target` is the work it helps with (another's upgrade, a
+        // factory's product): only its own upgrade is called off.
+        if (self.bp(row).is_structure() && !self.bp(row).is_station()) || refitting {
             self.abort_product(row)?;
         }
         self.state.units.build_target[row] = Handle::NONE;
@@ -2838,14 +2840,17 @@ impl World {
             }),
             Some((w, _)) => w != t && self.work_paused(t),
         };
+        // A station waits on nothing: it goes back to working its reach (`area_work.rs`),
+        // which takes the target up again when it has work.
         if waiting
             && !self.work_paused(row)
-            && self
-                .state
-                .orders
-                .iter(&self.state.units, row)
-                .nth(1)
-                .is_some()
+            && (self.bp(row).is_station()
+                || self
+                    .state
+                    .orders
+                    .iter(&self.state.units, row)
+                    .nth(1)
+                    .is_some())
         {
             self.state.units.build_target[row] = Handle::NONE;
             self.finish_order(row);

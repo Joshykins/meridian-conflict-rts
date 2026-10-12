@@ -262,6 +262,98 @@ fn a_station_upgrades_in_place() {
     );
 }
 
+fn front(w: &World, id: UnitId) -> Option<mc_sim::tables::OrderKind> {
+    let r = w.state.units.row(id)?;
+    w.state.orders.front(&w.state.units, r).map(|o| o.kind)
+}
+
+/// Stopping a station that helps another's upgrade leaves that upgrade as it was: only
+/// the helper stops.
+#[test]
+fn stopping_a_helping_station_keeps_the_upgrade_it_helped() {
+    let mut w = world();
+    let ids = spawn(
+        &mut w,
+        &[
+            ("aster_t1_eng_station", 600, 600, 1000),
+            ("aster_t1_eng_station", 640, 600, 1000),
+            // Opens tech 2 for the side.
+            ("aster_t2_engineer", 900, 900, 1000),
+        ],
+    );
+    let (upgrading, helper) = (ids[0], ids[1]);
+    w.tick(&[cmd(Command::Upgrade {
+        units: vec![upgrading],
+    })])
+    .unwrap();
+    w.tick(&[cmd(Command::Assist {
+        units: vec![helper],
+        target: upgrading,
+        queue: false,
+    })])
+    .unwrap();
+    for _ in 0..40 {
+        w.tick(&[]).unwrap();
+    }
+    let units = &w.state.units;
+    let product = units.build_target[units.row(upgrading).unwrap()];
+    assert!(units.row(product).is_some(), "the upgrade is under way");
+    assert_eq!(
+        units.build_target[units.row(helper).unwrap()],
+        product,
+        "the helper works on it"
+    );
+    w.tick(&[cmd(Command::Stop {
+        units: vec![helper],
+    })])
+    .unwrap();
+    let units = &w.state.units;
+    assert!(
+        units.row(product).is_some(),
+        "the upgrade was not called off"
+    );
+    assert_eq!(units.build_target[units.row(upgrading).unwrap()], product);
+}
+
+/// A station told to help raise a structure lets go once it stands, and goes back to
+/// working its reach rather than waiting on it.
+#[test]
+fn a_station_lets_go_of_a_site_it_helped_finish() {
+    let mut w = world();
+    let ids = spawn(
+        &mut w,
+        &[
+            ("aster_t1_eng_station", 600, 600, 1000),
+            ("aster_t1_land_factory", 700, 600, 1),
+        ],
+    );
+    let (station, site) = (ids[0], ids[1]);
+    w.tick(&[cmd(Command::Assist {
+        units: vec![station],
+        target: site,
+        queue: false,
+    })])
+    .unwrap();
+    let mut raised = false;
+    for _ in 0..6000 {
+        w.tick(&[]).unwrap();
+        let units = &w.state.units;
+        if !units.has_flag(units.row(site).unwrap(), flag::UNDER_CONSTRUCTION) {
+            raised = true;
+            break;
+        }
+    }
+    assert!(raised, "the site is finished");
+    for _ in 0..20 {
+        w.tick(&[]).unwrap();
+    }
+    assert_ne!(
+        front(&w, station),
+        Some(mc_sim::tables::OrderKind::Assist),
+        "the station is not left waiting on the finished factory"
+    );
+}
+
 /// A reactor or fabricator against a station saves it nothing: the station builds out in
 /// the field at full price, so it is no consumer and draws no links. A factory is one.
 #[test]
