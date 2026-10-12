@@ -552,15 +552,6 @@ const POLAR_SCATTER_DEPTHS: vec2<f32> = vec2<f32>(2.0, 22.0);
 
 // ---------------------------------------------------------------- ice on a polar sea
 
-// How much of the ground within about `reach` metres of `xy` is the land's ice (the
-// snow layer's), 0-1: the ground cover's mips (ground_cover.rs `mips`, on a map with a
-// snow layer), so it falls off smoothly with distance from an ice edge, at any zoom.
-fn ice_near(xy: vec2<f32>, reach: f32) -> f32 {
-    let texel = globals.map.x / f32(textureDimensions(ground_cover).x);
-    let lod = log2(max(reach / texel, 1.0));
-    return textureSampleLevel(ground_cover, clamp_sampler, xy / globals.map.xy, 0, lod).b;
-}
-
 // How much drift ice a polar sea carries at `xy`, 0-1: floes and brash broken off the
 // ice (fast ice, shelves, bergs, glacier fronts) in a band a few hundred metres off its
 // edge, thinning out to none, patchy along it. The open sea beyond is clear.

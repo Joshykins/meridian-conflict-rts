@@ -97,6 +97,43 @@ fn habitat_fields(xy: vec2<f32>) -> vec4<f32> {
     return vec4<f32>(warp, grad_noise2(xy + warp, 46.0), grad_noise2(xy + warp * 2.0, 310.0));
 }
 
+// Which way the prevailing polar wind has carved the snow (polar.wgsl). Fixed, not
+// the sky's wind of the moment: a frame that turned with it would slide the drifts
+// kilometres out.
+const POLAR_DRIFT: vec2<f32> = vec2<f32>(0.91, 0.41);
+
+// Where a polar map's snow layer (`ground_snow_at`, 16 m samples) lays snow or ice,
+// its share is thresholded at a half into an edge about a pixel wide
+// (`polar_layer_edge`), pushed about by this: tongues drawn out down the wind,
+// streaks a metre or two across up close and a fine grain closer still, each faded
+// out as it shrinks toward a pixel (`px` metres). The snow's edge and the ice's share
+// it: they are different layers, so their edges still fall apart.
+fn polar_layer_jitter(xy: vec2<f32>, patchy: f32, px: f32) -> f32 {
+    let run = POLAR_DRIFT * inverseSqrt(dot(POLAR_DRIFT, POLAR_DRIFT));
+    let a = dot(xy, run);
+    let c = dot(xy, vec2<f32>(-run.y, run.x));
+    let tongue = grad_noise2(vec2<f32>(a * 0.35, c) + vec2<f32>(517.0, -233.0), 11.0);
+    var streak = 0.5;
+    let streak_w = 1.0 - smoothstep(0.35, 1.4, px);
+    if streak_w > 0.0 {
+        streak = mix(0.5, grad_noise2(vec2<f32>(a * 0.4, c) - vec2<f32>(517.0, -233.0), 1.7), streak_w);
+    }
+    var grain = 0.5;
+    let grain_w = 1.0 - smoothstep(0.08, 0.3, px);
+    if grain_w > 0.0 {
+        grain = mix(0.5, grad_noise2(xy + vec2<f32>(51.7, -23.3), 0.4), grain_w);
+    }
+    return (patchy - 0.5) * 0.3 + (tongue - 0.5) * 0.36 + (streak - 0.5) * 0.14 + (grain - 0.5) * 0.06;
+}
+
+// The layer's share `v` with `jitter` (`polar_layer_jitter`) as an edge: the layer
+// climbs ~1/16 a metre across an edge and the noise as much again, so about a pixel
+// of blend, never less than a few centimetres.
+fn polar_layer_edge(v: f32, jitter: f32, px: f32) -> f32 {
+    let w = clamp(px * 0.035, 0.006, 0.2);
+    return smoothstep(0.5 - w, 0.5 + w, v + jitter);
+}
+
 fn habitat(xy: vec2<f32>, z: f32, base_n: vec3<f32>, px: f32) -> Habitat {
     var h: Habitat;
     let water = globals.map.z;
@@ -199,10 +236,23 @@ fn habitat(xy: vec2<f32>, z: f32, base_n: vec3<f32>, px: f32) -> Habitat {
         h.ice_w *= 1.0 - h.desert;
     }
     if h.polar > 0.0 && layer.z >= 0.5 {
-        // A polar map's ice walls (a shelf's front, an ice cliff) are faces too steep
-        // to hold snow where its layer lays ice or snow: ice, not rock
-        // (terrain.wgsl `glacier_shade` draws its faces).
-        let wall = smoothstep(0.35, 0.6, slope) * smoothstep(0.45, 0.75, max(layer.x, layer.y));
+        // The layer's 16 m samples, blended, end in a soft smudge tens of metres wide:
+        // on polar ground snow and ice end in crisp edges the wind has drawn out.
+        let jitter = polar_layer_jitter(xy, patchy, px);
+        h.lying = side_mix(h.lying, polar_layer_edge(layer.y, jitter, px)
+            * (1.0 - smoothstep(0.5, 0.85, slope + (fine - 0.5) * 0.15)), h.polar);
+        h.ice_w = side_mix(h.ice_w, polar_layer_edge(layer.x, -jitter, px), h.polar);
+        h.snow_w = side_mix(h.snow_w, h.lying * (1.0 - h.ice_w), h.polar);
+        // A polar map's ice walls (a shelf's front, an ice cliff, a berg's side) are
+        // faces too steep to hold snow where its layer lays ice or snow, or with the
+        // layer's ice round them (at a cliff's foot its samples already lie over the
+        // sea): ice all the way down, not rock (polar.wgsl `polar_ice` draws them).
+        let steep = smoothstep(0.35, 0.6, slope);
+        var wall = 0.0;
+        if steep > 0.0 {
+            let foot = smoothstep(0.03, 0.12, ice_near(xy, 48.0));
+            wall = steep * max(smoothstep(0.45, 0.75, max(layer.x, layer.y)), foot);
+        }
         h.ice_w = side_mix(h.ice_w, max(h.ice_w, wall), h.polar);
         h.snow_w *= 1.0 - wall * h.polar;
     }

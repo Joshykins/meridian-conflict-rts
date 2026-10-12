@@ -496,6 +496,15 @@ fn ground_snow_at(xy: vec2<f32>) -> vec3<f32> {
     return vec3<f32>(t.x, max(t.y - 1.0 / 255.0, 0.0) * (255.0 / 254.0), layered);
 }
 
+// How much of the ground within about `reach` metres of `xy` is the land's ice (the
+// snow layer's), 0-1: the ground cover's mips (ground_cover.rs `mips`, on a map with a
+// snow layer), so it falls off smoothly with distance from an ice edge, at any zoom.
+fn ice_near(xy: vec2<f32>, reach: f32) -> f32 {
+    let texel = globals.map.x / f32(textureDimensions(ground_cover).x);
+    let lod = log2(max(reach / texel, 1.0));
+    return textureSampleLevel(ground_cover, clamp_sampler, xy / globals.map.xy, 0, lod).b;
+}
+
 struct SurfaceDetail {
     color: vec3<f32>,
     normal: vec3<f32>,
