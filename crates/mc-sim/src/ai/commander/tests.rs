@@ -173,28 +173,11 @@ fn a_wave_that_takes_its_target_goes_on_rather_than_home() {
 #[test]
 fn bombers_seen_bring_anti_air_into_the_army() {
     let mut w = world();
-    let f = w.blueprints.id_of("aster_t1_land_factory").unwrap();
-    let row = w
-        .spawn_unit(f, 0, FxVec2::from_ints(1400, 1300), Angle::ZERO, true)
-        .unwrap();
-    let menu = w.bp(row).builder.as_ref().unwrap().builds.clone();
-    let bomber = w.blueprints.id_of("aster_t1_bomber").unwrap();
-    let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
-    let seen = w.state.tick;
-    for i in 0..12 {
-        w.state.ai[0].contacts.push(crate::ai::adaptive::Contact {
-            id: crate::tables::UnitId::new(500 + i, 0),
-            blueprint: if i < 8 { bomber } else { tank },
-            pos: FxVec2::from_ints(5000, 5000),
-            seen,
-        });
-    }
-    w.state.ai[0].commander.sticky.air_seen = seen.max(1);
-    let picks: Vec<String> = (0..6)
-        .filter_map(|n| w.solve_production(0, &menu, &Default::default(), n))
-        .map(|id| w.blueprints.unit(id).key.clone())
-        .collect();
-    assert!(picks.iter().any(|k| k.contains("mobile_aa")), "{picks:?}");
+    sight(&mut w, "aster_t1_bomber", 8);
+    sight(&mut w, "aster_t1_tank", 4);
+    w.state.ai[0].commander.sticky.air_seen = w.state.tick.max(1);
+    let side = build_out(&mut w, "aster_t1_land_factory", 6);
+    assert!(side.keys().any(|k| k.contains("mobile_aa")), "{side:?}");
 }
 
 #[test]
@@ -401,4 +384,107 @@ fn gravitic_engines_put_their_wells_on_the_commander_then_the_army() {
             && marks[1].distance(commander) < Fx::from_int(300),
         "the wells went to {marks:?}, not the army at {army:?} and the commander at {commander:?}"
     );
+}
+
+/// Picks `n` units from a land factory of `key` the way production does, each spawned
+/// beside the base before the next pick, and returns the side's units by key.
+fn build_out(w: &mut World, key: &str, n: u32) -> std::collections::BTreeMap<String, usize> {
+    let f = w.blueprints.id_of(key).unwrap();
+    let row = w
+        .spawn_unit(f, 0, FxVec2::from_ints(1400, 1300), Angle::ZERO, true)
+        .unwrap();
+    let menu = w.bp(row).builder.as_ref().unwrap().builds.clone();
+    for i in 0..n {
+        let Some(id) = w.solve_production(0, &menu, &Default::default(), i) else {
+            continue;
+        };
+        let at = FxVec2::from_ints(1300 + (i as i32 % 10) * 20, 1500 + (i as i32 / 10) * 20);
+        w.spawn_unit(id, 0, at, Angle::ZERO, true).unwrap();
+    }
+    let units = &w.state.units;
+    let mut out = std::collections::BTreeMap::new();
+    for r in units.slots.iter().filter(|&r| units.owner[r] == 0) {
+        *out.entry(w.bp(r).key.clone()).or_insert(0) += 1;
+    }
+    out
+}
+
+/// Enemy units of `key` seen by player 0 far off.
+fn sight(w: &mut World, key: &str, n: u32) {
+    let id = w.blueprints.id_of(key).unwrap();
+    let seen = w.state.tick.max(1);
+    let first = 500 + w.state.ai[0].contacts.len();
+    for i in 0..n as usize {
+        w.state.ai[0].contacts.push(crate::ai::adaptive::Contact {
+            id: crate::tables::UnitId::new(first + i, 0),
+            blueprint: id,
+            pos: FxVec2::from_ints(5000, 5000),
+            seen,
+        });
+    }
+}
+
+#[test]
+fn a_big_army_takes_shields_and_missile_defence_but_not_too_many() {
+    let mut w = world();
+    let tank = w.blueprints.id_of("aster_t2_tank").unwrap();
+    for i in 0..30 {
+        w.spawn_unit(
+            tank,
+            0,
+            FxVec2::from_ints(1300 + i * 20, 1700),
+            Angle::ZERO,
+            true,
+        )
+        .unwrap();
+    }
+    // Missile launchers seen: fire missile defence can shoot down.
+    sight(&mut w, "aster_t2_missile", 20);
+    sight(&mut w, "aster_t2_tank", 10);
+    let side = build_out(&mut w, "aster_t2_land_factory", 60);
+    let n = |k: &str| side.get(k).copied().unwrap_or(0);
+    let (domes, lasers) = (
+        n("aster_t2_mobile_shield"),
+        n("aster_t2_mobile_missile_defense"),
+    );
+    assert!(domes >= 1 && lasers >= 1, "{side:?}");
+    let profiles = w.profiles();
+    let units = &w.state.units;
+    let armed = units
+        .slots
+        .iter()
+        .filter(|&r| units.owner[r] == 0)
+        .map(|r| profiles.get(units.blueprint[r]))
+        .filter(|p| p.armed() && super::solver::force(p) == Some(0))
+        .count();
+    assert!(
+        domes <= armed / 15 + 1 && lasers <= armed / 15 + 1,
+        "{side:?}"
+    );
+}
+
+#[test]
+fn bombed_hard_the_army_stays_mostly_guns() {
+    let mut w = world();
+    sight(&mut w, "aster_t1_bomber", 30);
+    sight(&mut w, "aster_t1_tank", 4);
+    let c = &mut w.state.ai[0].commander;
+    c.sticky.air_seen = 1;
+    c.hurt[super::state::Hurt::Air as usize] = Fx::from_int(20000);
+    c.role_need[0] = 450;
+    let side = build_out(&mut w, "aster_t1_land_factory", 60);
+    let profiles = w.profiles();
+    let units = &w.state.units;
+    let (mut aa, mut all) = (Fx::ZERO, Fx::ZERO);
+    for r in units.slots.iter().filter(|&r| units.owner[r] == 0) {
+        let p = profiles.get(units.blueprint[r]);
+        if p.armed() && super::solver::force(p) == Some(0) {
+            all += p.materials;
+            if p.has(super::profile::role::ANTI_AIR) {
+                aa += p.materials;
+            }
+        }
+    }
+    assert!(aa > Fx::ZERO, "{side:?}");
+    assert!(aa * 2 < all, "anti-air {aa} of {all}: {side:?}");
 }

@@ -82,7 +82,11 @@ health, speed, radius, movement domain (land, hover, amphibious, naval, sub, air
 space); lift room; and **roles** derived from the above: `LINE`, `RAIDER`,
 `ARTILLERY`, `ANTI_AIR`, `ANTI_NAVAL`, `HUNTER`, `TRANSPORT`, `SCOUT`, `STRIKE`,
 `DEFENSE`, `MAP_GUN`, `STRATEGIC`, `PROJECT` (costs many minutes of income),
-`ELEVATOR` (a space elevator, from its `elevator:` data), `BUILDER`. `profile_tests.rs` fails when an armed unit of any race has no role.
+`ELEVATOR` (a space elevator, from its `elevator:` data), `BUILDER`, `SHIELD`,
+`ANTI_MISSILE` (lases missiles and shells, from `anti_missile:`). A ground unit with
+a shield or missile defence and no gun is **support** (`Profile::support`): it goes
+with the army and counts at half its materials, never more than the armed units it
+covers, so a group of support alone never sets out. `profile_tests.rs` fails when an armed unit of any race has no role.
 
 ### 2. Matchups (`matchup.rs`)
 
@@ -292,7 +296,7 @@ An operation is a group with one goal, owned by a plan:
 |---|---|
 | `Army` | the main land force: gather at the rally, go when strong enough, take objectives |
 | `Guard` | a small fast home guard that answers raids first |
-| `Defend` | answer an incursion, sized to beat it |
+| `Defend` | answer an incursion, sized to beat it; aircraft away from the base only with fighters and ground units within 800 m |
 | `Raid` | fast units on soft targets away from their guns |
 | `Landing` | load lift ships, jump (warp) beside a weak spot, unload, fight |
 | `Strike` | aircraft at a target as one wing; interceptors stripped first when nukes are planned |
@@ -390,7 +394,13 @@ Ground rules learnt in the tournaments (each is a comment at its code):
 units from the stakes of the plans that use it, plus what has been hurting the side
 (losses to aircraft raise air defence). **Role shares** within a force: anti-air by
 enemy air and by losses from above, artillery by `Siege` and by losses to guns,
-raiders by `Raid`, the line for the rest. Each idle factory builds for the force
+raiders by `Raid`, mobile shields against turrets and shelling, missile defence by
+the share of the enemy's ground fire it can shoot down (`Profile::catchable`), the
+line for the rest. Shields and missile defence come once the land army holds 1500
+materials, one of each for every 15 armed land units. Anti-air holds at most two
+fifths of the land roles, whatever asks for more; past that the air force and
+turrets answer the air. The commander is not counted in the land force: its
+materials made every role's share nil and line units won every pick. Each idle factory builds for the force
 and role furthest under its share, choosing among its menu by `fight` against the
 believed enemy composition, per cost. Nothing names a unit.
 
@@ -529,7 +539,7 @@ TOURNEY=serac_divide:2:25:7:adaptive:aggressive:hard cargo test --profile gate -
 ```
 
 The switches (`TOURNEY_EVERY`, `TOURNEY_ROSTER`, `TOURNEY_DEATHS`, `TOURNEY_OPS`,
-`TOURNEY_ARMY`, `TOURNEY_SNAP`) are listed in `docs/SWITCHES.md`; the script's
+`TOURNEY_ARMY`, `TOURNEY_FACTIONS`, `TOURNEY_FORCES_B`, `TOURNEY_SNAP`) are listed in `docs/SWITCHES.md`; the script's
 own in its header. Notes on reading the results:
 
 - **The match seed does not vary games**: the same map, seats and doctrines play the

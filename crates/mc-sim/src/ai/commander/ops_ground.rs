@@ -21,10 +21,28 @@ const PREY_REACH: i32 = 2500;
 const SMALL_FRY: i32 = 120;
 /// Enemies this close to what the side holds are in its ground.
 const NEAR_HOLD: Fx = Fx::from_int(1200);
+/// Ground units this close to aircraft raiding away from the base answer them.
+const AIR_ANSWER_NEAR: i32 = 800;
 /// An engineer seen within this many ticks is still near where it was seen.
 const FRESH: u32 = 300;
 
 impl World {
+    /// The fighting strength, in materials, of the units in `rows`: the armed ones, and
+    /// shields and missile defence (`Profile::support`) at half, up to as much as the
+    /// armed. Counted in full, a group of shields left over from a wave set out alone.
+    fn strength(&self, ctx: &Ctx, rows: impl Iterator<Item = usize>) -> Fx {
+        let (mut armed, mut support) = (Fx::ZERO, Fx::ZERO);
+        for r in rows {
+            let p = ctx.profiles.get(self.state.units.blueprint[r]);
+            if p.support() {
+                support += p.materials;
+            } else {
+                armed += p.materials;
+            }
+        }
+        armed + support.min(armed) / 2
+    }
+
     /// Enemy strength (in materials) around `at`: what we remember standing there, or the
     /// fire that reaches it, whichever says more.
     pub(in crate::ai) fn enemy_strength_at(&self, ctx: &Ctx, at: FxVec2, r: Fx, t: Target) -> Fx {
@@ -190,7 +208,7 @@ impl World {
             return 0;
         }
         let centre = self.centre_of(&rows).unwrap_or(op.rally);
-        let materials: Fx = rows.iter().map(|&r| self.bp(r).cost_materials).sum();
+        let materials = self.strength(ctx, rows.iter().copied());
         let tick = self.state.tick;
         let ids = |rows: &[usize]| self.ids_of(rows);
         let mut orders = 0;
@@ -296,11 +314,12 @@ impl World {
                     });
                     orders += 1;
                 }
-                let gathered: Fx = rows
-                    .iter()
-                    .filter(|&&row| self.state.units.pos[row].distance(op.rally) <= r * 3)
-                    .map(|&row| self.bp(row).cost_materials)
-                    .sum();
+                let gathered = self.strength(
+                    ctx,
+                    rows.iter()
+                        .copied()
+                        .filter(|&row| self.state.units.pos[row].distance(op.rally) <= r * 3),
+                );
                 // An enemy group in reach that it outnumbers: a wave in the field takes
                 // it on, the way a player's army keeps the map clear around it.
                 if op.kind == OpKind::Army && gathered > Fx::ZERO && gathered * 2 >= op.want {
@@ -441,11 +460,12 @@ impl World {
                 // What it faces against what of it stands there: a straggler far
                 // behind does not fight.
                 let facing = self.enemy_strength_at(ctx, centre, Fx::from_int(900), Target::Land);
-                let here: Fx = rows
-                    .iter()
-                    .filter(|&&r| self.state.units.pos[r].distance(centre) < Fx::from_int(700))
-                    .map(|&r| self.bp(r).cost_materials)
-                    .sum();
+                let here = self.strength(
+                    ctx,
+                    rows.iter()
+                        .copied()
+                        .filter(|&r| self.state.units.pos[r].distance(centre) < Fx::from_int(700)),
+                );
                 let ashore = op.kind == OpKind::Landing && !ctx.land_route;
                 // Half of what set out lost, and losing the trade: an even fight is
                 // fought out. Breaking off one on the move (units on a move order do not
@@ -876,11 +896,17 @@ impl World {
                             if air && !p.hits(Target::Air) && !p.hits(Target::Space) {
                                 continue;
                             }
-                            if guard
-                                || base
-                                || far
-                                || units.pos[r].distance(enemy) < Fx::from_int(2500)
-                            {
+                            let near = units.pos[r].distance(enemy);
+                            // Aircraft away from the base are the fighters' and the
+                            // turrets': ground anti-air sent after bombers at an
+                            // outlying mine walked off as a wave of nothing but
+                            // anti-air tanks, minutes behind them.
+                            let ground = p.domain != Some(super::profile::Domain::Air);
+                            if air && !base && ground {
+                                if near < Fx::from_int(AIR_ANSWER_NEAR) {
+                                    cands.push((oi, ui, *u, *cost));
+                                }
+                            } else if guard || base || far || near < Fx::from_int(2500) {
                                 cands.push((oi, ui, *u, *cost));
                             }
                         }

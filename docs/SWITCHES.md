@@ -103,6 +103,8 @@ Read by the ignored probe tests in mc-sim, never by the game (docs/AI_COMMANDER.
 | `TOURNEY_ROSTER` | any | Print each player's units and where its materials stand at the end. |
 | `TOURNEY_DEATHS` | any | Print every unit that dies: when, how far from home, the nearest enemy. |
 | `TOURNEY_OPS` | player slot | Print that Commander's operations whenever one changes. |
+| `TOURNEY_FACTIONS` | `A,B` | Each team's faction (`Aster`, `Regency`); Aster by default. |
+| `TOURNEY_FORCES_B` | `land,air,naval` | Team B's force weights (0..=200, 100 even), e.g. `40,200,100` for an air-heavy side. |
 | `TOURNEY_ARMY` | `key*n,key*n` | Give every side the same army at its start (a mirror of fighting alone). |
 | `TOURNEY_RESOURCES` | whole number | Multiply every player's materials and energy income (the harness tops the stores up; default 1). |
 | `TOURNEY_SNAP` | tick | Print each side's armed mobile units at that tick. |

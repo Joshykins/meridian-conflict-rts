@@ -37,7 +37,12 @@ pub(in crate::ai) fn fits(kind: OpKind, p: &Profile, land_route: bool) -> bool {
             ground
                 && (land_route || crosses)
                 && p.roles
-                    & (role::LINE | role::ARTILLERY | role::ANTI_AIR | role::SHIELD | role::SENSOR)
+                    & (role::LINE
+                        | role::ARTILLERY
+                        | role::ANTI_AIR
+                        | role::SHIELD
+                        | role::ANTI_MISSILE
+                        | role::SENSOR)
                     != 0
                 && !p.has(role::SCOUT)
         }
@@ -177,8 +182,8 @@ impl World {
                     && !bp.is_salvager()
                     && p.mobile()
                     && (p.armed()
-                        || p.roles & (role::TRANSPORT | role::SCOUT | role::SENSOR | role::SHIELD)
-                            != 0)
+                        || p.support()
+                        || p.roles & (role::TRANSPORT | role::SCOUT | role::SENSOR) != 0)
                     && !held(units.id(r))
             })
             .collect()

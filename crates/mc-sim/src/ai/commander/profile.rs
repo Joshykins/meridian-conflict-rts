@@ -90,6 +90,8 @@ pub(in crate::ai) mod role {
     pub(in crate::ai) const ANTI_SPACE: u32 = 1 << 21;
     /// Brings units and materials down from orbit, free (a space elevator).
     pub(in crate::ai) const ELEVATOR: u32 = 1 << 22;
+    /// Lases missiles and shells out of the air round it.
+    pub(in crate::ai) const ANTI_MISSILE: u32 = 1 << 23;
 }
 
 /// A shot farther than this many times an ordinary defence's reach is a map gun's.
@@ -126,6 +128,9 @@ pub(in crate::ai) struct Profile {
     pub reach: [Fx; TARGETS],
     /// Share of its damage that splashes (0..1): good against crowds.
     pub splash: Fx,
+    /// Damage a second it puts on land targets with rounds missile defence can shoot
+    /// down (`Weapon::interceptable`).
+    pub catchable: Fx,
     /// Health plus shield.
     pub ehp: Fx,
     pub speed: Fx,
@@ -167,6 +172,14 @@ impl Profile {
 
     pub(in crate::ai) fn mobile(&self) -> bool {
         !matches!(self.domain, None | Some(Domain::Static))
+    }
+
+    /// An unarmed ground unit that goes with the army to cover it: a mobile shield or
+    /// missile defence.
+    pub(in crate::ai) fn support(&self) -> bool {
+        !self.armed()
+            && self.roles & (role::SHIELD | role::ANTI_MISSILE) != 0
+            && matches!(self.domain, Some(Domain::Land | Domain::Hover))
     }
 }
 
@@ -259,6 +272,9 @@ impl Profile {
                     spread: w.splash.max(w.proximity),
                 });
             }
+            if weapon_reaches(w, Target::Land) && w.interceptable() {
+                p.catchable += dps;
+            }
             total += dps;
             if w.splash > Fx::from_int(4) || w.flak {
                 splash_dps += dps;
@@ -316,6 +332,9 @@ fn roles(bp: &UnitBlueprint, p: &Profile) -> u32 {
     }
     if bp.shield.is_some() {
         r |= role::SHIELD;
+    }
+    if bp.anti_missile > Fx::ZERO {
+        r |= role::ANTI_MISSILE;
     }
     match bp.strategic.as_ref().map(|s| s.kind) {
         Some(StrategicKind::Nuke) => r |= role::STRATEGIC | role::PROJECT,

@@ -4,7 +4,7 @@
 //! plans want (`wants`); and the economy code is steered by the plans.
 use super::economy::BLOCKED_FOR;
 use super::matchup::edge;
-use super::profile::{role, Domain, Profile, Profiles};
+use super::profile::{role, Domain, Profile, Profiles, Target};
 use super::state::{Hurt, PlanKind, Stake};
 use crate::ai::{Job, Place};
 use crate::World;
@@ -14,6 +14,12 @@ use std::collections::BTreeMap;
 
 /// Enemy types, the heaviest by materials seen, a unit is judged against.
 const MATCHED_AGAINST: usize = 8;
+/// Armed land units one mobile shield, or one missile defence, goes with.
+const COVERS: usize = 15;
+/// The line units' weight among the land roles (`solve_production`).
+const LINE_SHARE: i64 = 300;
+/// Materials of armed land units before shields and missile defence go with them.
+const SUPPORTED_ARMY: i32 = 1500;
 
 /// How the Commander steers the builders, factories and upgrades: its
 /// economy's reading (`economy.rs`).
@@ -173,6 +179,8 @@ impl World {
         let landing = stake(PlanKind::Landing);
         // The enemy seen, by materials: air (and warships), defences, all.
         let (mut air, mut forts, mut all) = (Fx::ZERO, Fx::ZERO, Fx::ZERO);
+        // And of it, the materials whose fire on the ground missile defence can shoot down.
+        let mut missiles = Fx::ZERO;
         let mut enemy: BTreeMap<BlueprintId, Fx> = BTreeMap::new();
         for contact in &self.state.ai[player as usize].contacts {
             let p = profiles.get(contact.blueprint);
@@ -186,6 +194,10 @@ impl World {
             }
             if p.has(role::DEFENSE) {
                 forts += p.materials;
+            }
+            let ground = p.dps[Target::Land as usize];
+            if ground > Fx::ZERO {
+                missiles += p.materials * p.catchable.min(ground) / ground;
             }
         }
         let share = |m: Fx| (m * 1000 / all.max(Fx::ONE)).floor_int() as i64;
@@ -255,22 +267,39 @@ impl World {
             .commander
             .role_need
             .map(i64::from);
+        let shelled = (hurt_by(Hurt::Artillery) + hurt_by(Hurt::Static)).min(400);
+        let (shields, anti_missile) =
+            self.support_shares(player, &profiles, fort_share, shelled, share(missiles));
+        let artillery =
+            (120 + 100 * stake(PlanKind::Siege) + (fort_share * 3 / 10).min(200)).max(need[1]);
+        let raid = stake(PlanKind::Raid);
+        let raiders = (100 * raid).max(need[2]);
+        // Anti-air at most two fifths of the army, whatever asks for more: each
+        // reading above stacked on the others, and a side bombed a few times sent
+        // waves of nothing but anti-air tanks. Past that, fighters and turrets answer
+        // the air (`force_shares`, the air-defence plan).
+        let aa_cap = (artillery + raiders + LINE_SHARE + shields + anti_missile) * 2 / 3;
+        let aa_land = aa_land.max(need[0]).min(aa_cap);
         let roles: [Vec<(Fits, i64)>; FORCES] = [
             vec![
+                (Box::new(|p: &Profile| p.has(role::ANTI_AIR)), aa_land),
+                (Box::new(|p: &Profile| p.has(role::ARTILLERY)), artillery),
+                // Raiders count here while a raid is planned or a raid hurt it. Every
+                // raider is a line unit as well, so a slot for those that were not
+                // was never filled.
                 (
-                    Box::new(|p: &Profile| p.has(role::ANTI_AIR)),
-                    aa_land.max(need[0]),
+                    Box::new(move |p: &Profile| raiders > 0 && p.has(role::RAIDER)),
+                    raiders,
                 ),
                 (
-                    Box::new(|p: &Profile| p.has(role::ARTILLERY)),
-                    (120 + 100 * stake(PlanKind::Siege) + (fort_share * 3 / 10).min(200))
-                        .max(need[1]),
+                    Box::new(|p: &Profile| p.support() && p.has(role::SHIELD)),
+                    shields,
                 ),
                 (
-                    Box::new(|p: &Profile| p.has(role::RAIDER) && !p.has(role::LINE)),
-                    (100 * stake(PlanKind::Raid)).max(need[2]),
+                    Box::new(|p: &Profile| p.support() && p.has(role::ANTI_MISSILE)),
+                    anti_missile,
                 ),
-                (Box::new(|p: &Profile| p.has(role::LINE)), 300),
+                (Box::new(|p: &Profile| p.has(role::LINE)), LINE_SHARE),
             ],
             vec![
                 (
@@ -299,7 +328,7 @@ impl World {
         ];
         let usable = |p: &Profile| {
             force(p).is_some()
-                && p.armed()
+                && (p.armed() || p.support())
                 && (land_route || landing > 0 || !matches!(p.domain, Some(Domain::Land)))
         };
         // Which force: the furthest under its share of the plans' stakes.
@@ -313,7 +342,10 @@ impl World {
                 continue;
             }
             let p = profiles.get(units.blueprint[r]);
-            let Some(f) = force(p).filter(|_| p.armed()) else {
+            // Not the commander (a builder, armed): its 18 000 materials in the land
+            // force made every role's share of it nil, so line units won every pick.
+            let fights = (p.armed() && !p.has(role::BUILDER)) || p.support();
+            let Some(f) = force(p).filter(|_| fights) else {
                 continue;
             };
             have[f] += p.materials;
@@ -407,6 +439,52 @@ impl World {
             })
             .max_by_key(|&(id, score)| (score, std::cmp::Reverse(id.0)))
             .map(|(id, _)| id)
+    }
+
+    /// The land roles' weights (`solve_production`) for mobile shields and missile
+    /// defence: none until the army is big enough to cover (a shield over a few tanks
+    /// is materials not shooting), and one of each for every `COVERS` armed land units.
+    /// Shields against turrets (`fort_share`) and shelling (`shelled`, per mille of
+    /// losses); missile defence by the share of the enemy's ground fire it can shoot
+    /// down (`missile_share`).
+    fn support_shares(
+        &self,
+        player: u8,
+        profiles: &Profiles,
+        fort_share: i64,
+        shelled: i64,
+        missile_share: i64,
+    ) -> (i64, i64) {
+        let (mut land_army, mut armed, mut domes, mut lasers) = (Fx::ZERO, 0, 0, 0);
+        let units = &self.state.units;
+        for r in units.slots.iter() {
+            let p = profiles.get(units.blueprint[r]);
+            if units.owner[r] != player || force(p) != Some(0) {
+                continue;
+            }
+            if p.armed() && !p.has(role::BUILDER) {
+                land_army += p.materials;
+                armed += 1;
+            } else if p.support() && p.has(role::SHIELD) {
+                domes += 1;
+            } else if p.support() && p.has(role::ANTI_MISSILE) {
+                lasers += 1;
+            }
+        }
+        if land_army < Fx::from_int(SUPPORTED_ARMY) {
+            return (0, 0);
+        }
+        let shields = if domes * COVERS < armed {
+            60 + (fort_share / 4).min(80) + shelled / 5
+        } else {
+            0
+        };
+        let anti_missile = if missile_share >= 80 && lasers * COVERS < armed {
+            (missile_share * 3 / 10).min(180)
+        } else {
+            0
+        };
+        (shields, anti_missile)
     }
 
     /// The first structure or site-built unit the plans want (`wants`) that the

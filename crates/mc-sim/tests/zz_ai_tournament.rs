@@ -103,6 +103,20 @@ fn match_up() {
             (starts[i].x > mid) as u8
         }
     };
+    // Each team's faction, `A,B` (default Aster for both).
+    let factions: Vec<String> = std::env::var("TOURNEY_FACTIONS")
+        .map(|f| f.split(',').map(str::to_owned).collect())
+        .unwrap_or_default();
+    let faction_of = |team: u8| {
+        factions
+            .get(team as usize)
+            .cloned()
+            .unwrap_or_else(|| "Aster".into())
+    };
+    // Team B's force weights, `land,air,naval` (`AiConfig::domain_weights`).
+    let forces_b: Option<Vec<u8>> = std::env::var("TOURNEY_FORCES_B")
+        .ok()
+        .map(|f| f.split(',').map(|w| w.parse().unwrap()).collect());
     let config = MatchConfig {
         seed,
         players: (0..players as usize)
@@ -110,11 +124,15 @@ fn match_up() {
                 let doctrine = if team_of(i) == 0 { a } else { b };
                 PlayerSetup {
                     name: format!("AI {i}"),
-                    faction: "Aster".into(),
+                    faction: faction_of(team_of(i)),
                     ai: AiConfig {
                         doctrine,
                         difficulty,
                         income,
+                        domain_weights: match &forces_b {
+                            Some(w) if team_of(i) == 1 => [w[0], w[1], w[2]],
+                            _ => AiConfig::default().domain_weights,
+                        },
                         ..AiConfig::default()
                     },
                     team: team_of(i),

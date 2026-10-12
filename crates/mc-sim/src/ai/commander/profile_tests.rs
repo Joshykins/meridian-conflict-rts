@@ -41,6 +41,19 @@ fn roles_come_from_what_a_unit_can_do() {
     assert!(has("aster_t3_nuke_defense", role::INTERCEPTOR));
     assert!(has("aster_t1_submarine", role::HUNTER | role::ANTI_SHIP));
     assert!(has("aster_t1_bomber", role::STRIKE));
+    // Unarmed ground cover: goes with the army.
+    for key in [
+        "aster_t2_mobile_shield",
+        "regency_t2_mobile_shield",
+        "aster_t2_mobile_missile_defense",
+        "regency_t2_mobile_missile_defense",
+    ] {
+        assert!(profile(&b, key).support(), "{key}");
+    }
+    assert!(has("aster_t2_mobile_missile_defense", role::ANTI_MISSILE));
+    // Missiles are fire missile defence can shoot down; a tank's shells are not.
+    assert!(profile(&b, "aster_t2_missile").catchable > Fx::ZERO);
+    assert_eq!(profile(&b, "aster_t1_tank").catchable, Fx::ZERO);
     // The Regency's gunships: a drone carrier whose Wicks are its shells, and a beam craft.
     assert!(has("regency_t2_drone_carrier", role::STRIKE));
     assert!(has("regency_t3_assault_aircraft", role::STRIKE));
