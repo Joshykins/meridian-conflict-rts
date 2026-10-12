@@ -93,7 +93,7 @@
                             turret_turn: 36, muzzle: (11.6, -5.2, 14.6), pivot: (-0.5, -5.2, 14.6), sweep: 20,
                             targets: ["Land", "Naval"], color: Orange, flash: 1.6, impact: 2.0, tracer: 1.6,
                             plasma_grade: Some(PinchFusion),
-                            sounds: (fire: "regency_sunspear_fire", impact: "regency_sunspear_hit", ground: "regency_sunspear_hit"),
+                            sounds: (fire: "regency_fusion_fire", impact: "regency_fusion_hit", ground: "regency_fusion_hit"),
                         )],
                     ),
                 ],

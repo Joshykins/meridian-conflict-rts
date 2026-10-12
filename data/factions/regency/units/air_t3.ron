@@ -63,7 +63,7 @@
             targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
             plasma_grade: Some(PinchFusion),
             impact: 3.5,
-            sounds: (fire: "bomb_release", impact: "regency_sunspear_hit", ground: "regency_sunspear_hit"),
+            sounds: (fire: "bomb_release", impact: "regency_fusion_hit", ground: "regency_fusion_hit"),
         )],
         mesh: "regency_maul", icon: Bomber,
         sounds: (death: "blast_small", moving: "aster_heavy_jet"),

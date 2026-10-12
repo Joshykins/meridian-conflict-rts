@@ -509,11 +509,13 @@
             ],
         ),
 
-        // The Sunspear's Pinch-fusion Cannon, heard 2.2 s before its one shot: the plasma
-        // squeezed until it fuses. It starts low and quiet so the end can be big: a deep
-        // field clunk, the air drawn in, a gravity heave throbbing slowly under a growl
-        // that fills and only leans up, then the core going white: an overload growl an octave up, until the pinch slams shut on the launch.
-        "regency_sunspear_charge": (
+        // The shared Pinch-fusion charge (the Regency's fusion guns and titans that have no
+        // charge of their own), heard about 2.2 s before the shot: the plasma squeezed until
+        // it fuses. It starts low and quiet so the end can be big: a deep field clunk, the
+        // air drawn in, a gravity heave throbbing slowly under a growl that fills and only
+        // leans up, then the core going white: an overload growl an octave up, until the
+        // pinch slams shut on the launch.
+        "regency_fusion_charge": (
             length: 2.4, peak: 0.48, room: 0.3,
             layers: [
                 // The field engaging, deep.
@@ -534,11 +536,11 @@
                 Burst(at: 2.15, low: 90, high: 1100, attack: 0.04, decay: 0.012, gain: 4, seed: 39),
             ],
         ),
-        // The Sunspear launching its one fusion bolt: thunderous, but a roar, not a
-        // cannon's boom. A hard crack and a blast, a deep boom that holds, a rough growl
+        // The shared Pinch-fusion launch, a fusion bolt leaving the bore: thunderous, but a
+        // roar, not a cannon's boom. A hard crack and a blast, a deep boom that holds, a rough growl
         // that stays rough for a long beat, and the plasma roaring off as a smooth falling rush
         // and the air rolling away low.
-        "regency_sunspear_fire": (
+        "regency_fusion_fire": (
             length: 2.6, peak: 0.8, room: 0.45,
             layers: [
                 Burst(low: 600, high: 2500, attack: 0.0002, decay: 0.006, gain: 12),
@@ -556,10 +558,10 @@
                 Roll(at: 0.05, from: 320, to: 60, glide: 1.6, attack: 0.06, decay: 0.75, gain: 0.32, swell: 4, depth: 0.5, seed: 43),
             ],
         ),
-        // A Sunspear bolt detonating: the fusion lets go. A white crack, a huge whump,
+        // The shared Pinch-fusion strike, a fusion bolt detonating: the fusion lets go. A white crack, a huge whump,
         // a deep boom and growl, then the ground roaring as it melts and the air rolling
         // away low; nothing snaps or crackles.
-        "regency_sunspear_hit": (
+        "regency_fusion_hit": (
             length: 3.0, peak: 0.85, room: 0.45,
             layers: [
                 Burst(low: 500, high: 2800, attack: 0.0003, decay: 0.008, gain: 14),
@@ -572,6 +574,111 @@
                 // The ground roaring as it melts.
                 Roll(at: 0.01, from: 1400, to: 150, glide: 1.2, attack: 0.02, decay: 0.65, gain: 0.55, swell: 14, depth: 0.6, seed: 51),
                 Roll(at: 0.1, from: 300, to: 50, glide: 2.0, attack: 0.1, decay: 1.1, gain: 0.3, swell: 3, depth: 0.5, seed: 52),
+            ],
+        ),
+        // The Sunspear's own Pinch-fusion Cannon (`regency_t3_point_defense`), heard 2.2 s
+        // before its one shot; nothing else shares this set. Not a star filling up but a
+        // heavy gun pulling the air into its bore: the breech unlatching with a deep thunk
+        // and a metal clank, the split bore parting with a pneumatic gasp and a sliding
+        // groan; then a vortex closing in (one band coming down, one coming up, a roar
+        // spinning faster) over a deep heave whose throbs come sooner and harder, unevenly;
+        // the pinch locking with two heavy clunks, and the gun holding its breath for the
+        // last tenth of a second before the shot (`regency_sunspear_fire`). Nothing climbs
+        // to a whine and no tone is held.
+        "regency_sunspear_charge": (
+            length: 2.2, peak: 0.5, room: 0.15,
+            layers: [
+                // The breech unlatching: a deep thunk and a metal clank.
+                Burst(low: 40, high: 360, attack: 0.001, decay: 0.04, gain: 4, seed: 6601),
+                Fm(from: 265, to: 215, glide: 0.07, ratio: 2.76, index: 1.3, fade: 0.05, attack: 0.001, decay: 0.07, gain: 0.3, pan: -0.15),
+                Burst(at: 0.07, low: 260, high: 1500, attack: 0.0005, decay: 0.012, gain: 1.4, pan: 0.2, seed: 6602),
+                Fm(at: 0.07, from: 240, to: 196, glide: 0.07, ratio: 2.76, index: 1.3, fade: 0.05, attack: 0.001, decay: 0.06, gain: 0.22, pan: 0.2),
+                // The bore parting: a pneumatic gasp and the halves sliding apart, groaning down.
+                Sweep(at: 0.1, from: 1500, to: 380, glide: 0.25, q: 1.1, attack: 0.008, decay: 0.12, gain: 0.55, seed: 6603),
+                Fm(at: 0.12, from: 165, to: 128, glide: 0.45, ratio: 1.41, index: 1.0, fade: 0.4, attack: 0.08, decay: 0.22, gain: 0.2),
+                Roll(at: 0.12, from: 600, to: 380, glide: 0.45, attack: 0.08, decay: 0.22, gain: 0.3, swell: 26, depth: 0.8, seed: 6604),
+                // A deep rough bed under the whole charge, leaning only a little.
+                Fm(at: 0.25, from: 46, to: 50, glide: 1.75, ratio: 0.5, index: 2.4, fade: 6.0, attack: 1.73, decay: 0.03, gain: 0.35),
+                // The heave: throbs that come sooner and harder, unevenly, each a rough swell
+                // that sags a little in pitch, the mid body small speakers carry.
+                Fm(at: 0.36, from: 124, to: 112, glide: 0.2, ratio: 0.5, index: 2.4, fade: 0.3, attack: 0.07, decay: 0.12, gain: 0.35),
+                Fm(at: 0.75, from: 118, to: 108, glide: 0.2, ratio: 0.5, index: 2.4, fade: 0.3, attack: 0.06, decay: 0.11, gain: 0.42),
+                Fm(at: 1.04, from: 128, to: 115, glide: 0.18, ratio: 0.5, index: 2.4, fade: 0.3, attack: 0.055, decay: 0.1, gain: 0.5, pan: -0.1),
+                Fm(at: 1.31, from: 121, to: 110, glide: 0.16, ratio: 0.5, index: 2.5, fade: 0.3, attack: 0.05, decay: 0.09, gain: 0.58, pan: 0.1),
+                Fm(at: 1.5, from: 130, to: 117, glide: 0.14, ratio: 0.5, index: 2.5, fade: 0.3, attack: 0.045, decay: 0.08, gain: 0.66),
+                Fm(at: 1.67, from: 125, to: 113, glide: 0.12, ratio: 0.5, index: 2.6, fade: 0.3, attack: 0.04, decay: 0.07, gain: 0.74, pan: -0.1),
+                Fm(at: 1.8, from: 132, to: 119, glide: 0.1, ratio: 0.5, index: 2.6, fade: 0.3, attack: 0.035, decay: 0.06, gain: 0.82, pan: 0.1),
+                Drive(1.4),
+                // The vortex closing in: one band coming down, one coming up, either side.
+                Sweep(at: 0.3, from: 2200, to: 820, glide: 1.6, q: 1.3, attack: 1.62, decay: 0.03, gain: 0.32, pan: -0.35, seed: 6605),
+                Sweep(at: 0.4, from: 240, to: 640, glide: 1.5, q: 1.3, attack: 1.52, decay: 0.03, gain: 0.38, pan: 0.35, seed: 6606),
+                // Its roar, spinning faster as it tightens: slow swells, then quick ones.
+                Roll(at: 0.3, from: 260, to: 520, glide: 1.0, attack: 0.9, decay: 0.35, gain: 0.45, swell: 3, depth: 0.85, seed: 6607),
+                Roll(at: 1.0, from: 420, to: 900, glide: 0.95, attack: 0.92, decay: 0.03, gain: 0.5, swell: 9, depth: 0.85, seed: 6608),
+                Roll(at: 1.55, from: 700, to: 1200, glide: 0.4, attack: 0.37, decay: 0.03, gain: 0.32, swell: 22, depth: 0.8, seed: 6609),
+                // The pinch locking: two heavy contactor clunks, then nothing until the shot.
+                Burst(at: 1.9, low: 50, high: 520, attack: 0.001, decay: 0.03, gain: 3.4, pan: -0.15, seed: 6610),
+                Fm(at: 1.9, from: 230, to: 185, glide: 0.06, ratio: 2.76, index: 1.4, fade: 0.04, attack: 0.001, decay: 0.05, gain: 0.3, pan: -0.15),
+                Burst(at: 2.0, low: 45, high: 480, attack: 0.001, decay: 0.026, gain: 3.8, pan: 0.15, seed: 6611),
+                Fm(at: 2.0, from: 215, to: 172, glide: 0.06, ratio: 2.76, index: 1.4, fade: 0.04, attack: 0.001, decay: 0.045, gain: 0.32, pan: 0.15),
+            ],
+        ),
+        // The Sunspear's shot, the fastest gun the Regency has (4500 m/s): the bore
+        // slamming shut on the knot, then the bolt cracking the air like a whip, not a
+        // blast; a hard ripping tear that is gone down range in half a second; a deep slam
+        // and a short rough growl; and thunder rolling slowly away, low, long under the
+        // next charge.
+        "regency_sunspear_fire": (
+            length: 2.8, peak: 0.85, room: 0.4,
+            layers: [
+                // The bore slamming shut: a hard metal clack.
+                Burst(low: 900, high: 2800, attack: 0.0002, decay: 0.004, gain: 3.5, seed: 6701),
+                Fm(from: 360, to: 285, glide: 0.05, ratio: 2.76, index: 1.5, fade: 0.035, attack: 0.0005, decay: 0.045, gain: 0.3),
+                // The crack: a short hard snap with a mid body.
+                Burst(at: 0.003, low: 700, high: 3000, attack: 0.0001, decay: 0.003, gain: 8, seed: 6702),
+                Burst(at: 0.003, low: 220, high: 1300, attack: 0.0002, decay: 0.012, gain: 10, seed: 6703),
+                // The slam: a punch small speakers carry and the weight under it.
+                Burst(at: 0.004, low: 70, high: 520, attack: 0.0006, decay: 0.05, gain: 15, seed: 6704),
+                Burst(at: 0.006, low: 25, high: 170, attack: 0.003, decay: 0.26, gain: 12, seed: 6705),
+                Tone(at: 0.004, from: 104, to: 42, glide: 0.14, attack: 0.001, decay: 0.26, gain: 1.5),
+                Tone(at: 0.006, from: 54, to: 30, glide: 0.45, attack: 0.004, decay: 0.5, gain: 0.7),
+                // The growl, short: the knot is gone already.
+                Fm(at: 0.004, from: 138, to: 84, glide: 0.18, ratio: 0.5, index: 2.2, fade: 0.1, attack: 0.002, decay: 0.16, gain: 0.6),
+                Drive(1.5),
+                // The tear: the bolt ripping the air away down range, rough and falling fast.
+                Roll(at: 0.006, from: 1800, to: 260, glide: 0.42, attack: 0.004, decay: 0.16, gain: 0.6, swell: 48, depth: 0.75, seed: 6706),
+                Sweep(at: 0.01, from: 2000, to: 300, glide: 0.38, q: 1.0, attack: 0.006, decay: 0.15, gain: 0.65, pan: 0.15, seed: 6707),
+                Roll(at: 0.03, from: 1200, to: 200, glide: 0.5, attack: 0.02, decay: 0.2, gain: 0.45, swell: 30, depth: 0.85, pan: 0.3, seed: 6708),
+                // The thunder rolling away: slow, uneven swells, low, long.
+                Roll(at: 0.12, from: 420, to: 70, glide: 2.0, attack: 0.25, decay: 0.75, gain: 0.42, swell: 2.5, depth: 0.8, pan: -0.25, seed: 6709),
+                Roll(at: 0.2, from: 360, to: 60, glide: 2.0, attack: 0.3, decay: 0.75, gain: 0.36, swell: 2, depth: 0.8, pan: 0.3, seed: 6710),
+            ],
+        ),
+        // A Sunspear bolt striking: the air sucked in to the knot for a breath, then a sharp
+        // detonation, a deep boom and a short growl; then the ground melting under the
+        // burning knot, a low seething roar that swells and settles, and the blast rolling
+        // away low. Nothing high is held.
+        "regency_sunspear_hit": (
+            length: 3.2, peak: 0.88, room: 0.45,
+            layers: [
+                // The suck-in: air rushing in to the knot, cut off by the blast.
+                Sweep(from: 260, to: 1100, glide: 0.065, q: 1.0, attack: 0.065, decay: 0.006, gain: 2.0, seed: 6801),
+                Roll(from: 200, to: 600, glide: 0.065, attack: 0.065, decay: 0.006, gain: 1.3, swell: 30, depth: 0.6, seed: 6802),
+                // The detonation.
+                Burst(at: 0.065, low: 500, high: 2200, attack: 0.0002, decay: 0.006, gain: 9, seed: 6803),
+                Burst(at: 0.065, low: 90, high: 700, attack: 0.0006, decay: 0.07, gain: 20, seed: 6804),
+                Burst(at: 0.067, low: 25, high: 180, attack: 0.004, decay: 0.38, gain: 14, seed: 6805),
+                Tone(at: 0.065, from: 124, to: 42, glide: 0.2, attack: 0.001, decay: 0.3, gain: 1.4),
+                Tone(at: 0.067, from: 58, to: 27, glide: 0.9, attack: 0.005, decay: 0.8, gain: 1.0),
+                Fm(at: 0.065, from: 108, to: 60, glide: 0.25, ratio: 0.5, index: 2.4, fade: 0.15, attack: 0.002, decay: 0.3, gain: 0.6),
+                Drive(1.6),
+                // The ground melting: a low roar that swells and settles, its groan under it.
+                Roll(at: 0.14, from: 700, to: 200, glide: 1.6, attack: 0.25, decay: 0.85, gain: 0.42, swell: 4, depth: 0.55, seed: 6806),
+                Fm(at: 0.15, from: 72, to: 52, glide: 1.6, ratio: 0.5, index: 2.0, fade: 1.2, attack: 0.3, decay: 0.7, gain: 0.25),
+                // The burning knot seething in the melt, low.
+                Roll(at: 0.2, from: 650, to: 420, glide: 1.2, attack: 0.3, decay: 0.6, gain: 0.25, swell: 18, depth: 0.75, pan: 0.2, seed: 6807),
+                // The blast rolling away low.
+                Roll(at: 0.15, from: 300, to: 50, glide: 2.0, attack: 0.1, decay: 1.0, gain: 0.3, swell: 3, depth: 0.5, pan: -0.2, seed: 6808),
             ],
         ),
         // The Flamberge's main battery (a twin Pinch-fusion Cannon per gun house), heard
@@ -620,7 +727,7 @@
             ],
         ),
         // The Flamberge's twin Pinch-fusion Cannon launching: a battleship's main battery,
-        // heavier than the Sunspear and nothing like a powder gun. The two bores crack a few
+        // heavier than the shared fusion launch and nothing like a powder gun. The two bores crack a few
         // milliseconds apart, a little apart in space; a huge compressive whump and a deep
         // boom that holds; the fusion growl, rough for a long beat; the twin jets roaring away
         // as a rough band falling; the ship's hull answering with a low metal shudder; and the
@@ -722,7 +829,7 @@
                 Burst(at: 0.9, low: 60, high: 600, attack: 0.004, decay: 0.05, gain: 1.4, seed: 8214),
             ],
         ),
-        // A Surge Mortar shell landing (the Saker): the Sunspear's strike, heavier. A
+        // A Surge Mortar shell landing (the Saker): the shared Pinch-fusion strike, heavier. A
         // crack and a great whump, a deep boom and growl; then the wake rolling out all
         // round through the ground, a low groaning rumble that swells for a second and
         // a half and recedes, the earth heaving and settling under it; then the seared

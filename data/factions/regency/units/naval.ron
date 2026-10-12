@@ -273,7 +273,7 @@
                 flash: 0.9, impact: 2.6, tracer: 2.4,
                 sounds: (
                     fire: "regency_flamberge_fire", charge: "regency_flamberge_charge", charge_time: 2.2,
-                    charge_volume: 1.6, impact: "regency_sunspear_hit", ground: "regency_sunspear_hit",
+                    charge_volume: 1.6, impact: "regency_fusion_hit", ground: "regency_fusion_hit",
                 ),
             ),
             (
@@ -287,7 +287,7 @@
                 flash: 0.9, impact: 2.6, tracer: 2.4,
                 sounds: (
                     fire: "regency_flamberge_fire", charge: "regency_flamberge_charge", charge_time: 2.2,
-                    charge_volume: 1.6, impact: "regency_sunspear_hit", ground: "regency_sunspear_hit",
+                    charge_volume: 1.6, impact: "regency_fusion_hit", ground: "regency_fusion_hit",
                 ),
             ),
             (
@@ -302,7 +302,7 @@
                 flash: 0.9, impact: 2.6, tracer: 2.4,
                 sounds: (
                     fire: "regency_flamberge_fire", charge: "regency_flamberge_charge", charge_time: 2.2,
-                    charge_volume: 1.6, impact: "regency_sunspear_hit", ground: "regency_sunspear_hit",
+                    charge_volume: 1.6, impact: "regency_fusion_hit", ground: "regency_fusion_hit",
                 ),
             ),
             (

@@ -578,7 +578,8 @@
     // there. The Citadel's reach (1500); a shot is lighter than the Citadel's (3000 to
     // 3800) but bursts 14 m wide where the Citadel's is 3. The shot is laid a little up and
     // arcs onto its mark (`flat_fire`: a direct-fire gun, not artillery), so it reaches
-    // over a low rise in the ground. Model:
+    // over a low rise in the ground. It crosses its whole reach in 0.6 s (4500 m/s, and
+    // the loft only 0.2 s so the arc stays as flat as it was at 1500 m/s). Model:
     // `regency_fusion_cannon` (`models::regency::turrets::sunspear`), the Citadel's size.
     (
         key: "regency_t3_point_defense",
@@ -592,8 +593,8 @@
         vision: 360,
         weapons: [(
             name: "Pinch-fusion Cannon",
-            damage: 3000, splash: 14, range: 1500, reload: 7.5, speed: 1500, trajectory: Ballistic,
-            loft: 0.6, flat_fire: true,
+            damage: 3000, splash: 14, range: 1500, reload: 7.5, speed: 4500, trajectory: Ballistic,
+            loft: 0.2, flat_fire: true,
             turret_turn: 18, muzzle: (35, 0, 19.04), pivot: (0, 0, 19.04),
             targets: ["Land", "Naval"], color: Orange, red: 1.0,
             plasma_grade: Some(PinchFusion),
