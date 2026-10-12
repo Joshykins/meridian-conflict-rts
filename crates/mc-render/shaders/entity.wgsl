@@ -1551,7 +1551,8 @@ fn vs_main(in: VsIn) -> VsOut {
             if (in.rig & RIG_RECOIL) != 0u {
                 p.x -= model.mount.w * mix(e.spin_recoil.z, e.spin_recoil.w, t);
             }
-            let pitch = mix(e.mount.z, e.mount.w, t);
+            // The yoke turns with the gun but does not pitch.
+            let pitch = select(mix(e.mount.z, e.mount.w, t), 0.0, (in.rig & YOKE_RIG) != 0u);
             p = rot_xz(p - pivot, pitch) + pivot;
             n = rot_xz(n, pitch);
             let yaw = lerp_angle(e.mount.x, e.mount.y, t);
@@ -1850,7 +1851,8 @@ fn vs_main(in: VsIn) -> VsOut {
         if (in.rig & RIG_RECOIL) != 0u {
             p.x -= model.mount.w * mix(e.spin_recoil.z, e.spin_recoil.w, t);
         }
-        let pitch = mix(e.mount.z, e.mount.w, t);
+        // The yoke turns with the gun but does not pitch.
+        let pitch = select(mix(e.mount.z, e.mount.w, t), 0.0, (in.rig & YOKE_RIG) != 0u);
         p = rot_xz(p - pivot, pitch) + pivot;
         n = rot_xz(n, pitch);
         let yaw = lerp_angle(e.mount.x + e.prev_turret_yaw, e.mount.y + e.turret_yaw, t);

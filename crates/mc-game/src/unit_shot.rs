@@ -437,14 +437,14 @@ fn fresh_age(u: &UnitInstance) -> f32 {
 }
 
 /// The unit to frame; once it is destroyed (`--scenario destruct`), its settled wreck,
-/// every piece of it when it broke up.
+/// every piece of it when it broke up. A refitted unit (`--scenario upgrade`) is its
+/// set's base unit with a loadout of its own blueprint.
 fn find_subject(world: &World, frame: &RenderFrame, key: &str) -> Result<UnitInstance, String> {
     let is_key = |u: &UnitInstance| {
-        world
-            .blueprints
-            .unit(mc_data::BlueprintId(u.blueprint as u16))
-            .key
-            == key
+        let bps = &world.blueprints;
+        let id = mc_data::BlueprintId(u.blueprint as u16);
+        let base = bps.loadout(id).map_or(id, |(set, _)| set.base);
+        bps.unit(base).key == key
     };
     if let Some(u) = frame
         .units

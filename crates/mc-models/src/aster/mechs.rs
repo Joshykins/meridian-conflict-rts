@@ -7,6 +7,7 @@
 use glam::{Affine3A, Vec2, Vec3};
 
 use super::bolt_rifle::{bolt_rifle, rifle_shoulder};
+use super::commander_flak::{self, MUZZLE as AA_MUZZLE, TRUNNION};
 use super::commander_head;
 use super::parts::*;
 use crate::builder::{chamfered_rect, MeshBuilder, Section};
@@ -156,13 +157,9 @@ const RAIL_SLOT: f32 = 0.22;
 const GUN_ELBOW: Vec3 = Vec3::new(-0.3, -3.0, 9.8);
 const SLUNG_AXIS: Vec3 = Vec3::new(0.9, -4.15, 9.35);
 const SLUNG_MUZZLE: Vec3 = Vec3::new(3.9, -4.15, 9.35);
-/// The right shoulder's turrets: (muzzle, trunnion), authored level and facing forward.
-const SHOULDER_AA: (Vec3, Vec3) = (Vec3::new(3.1, -3.1, 14.55), Vec3::new(0.0, -3.1, 14.55));
-/// The AA gun's two barrels, either side of the trunnion's centre (the unit file's
-/// muzzles, over 1.6).
-const SHOULDER_AA_GAP: f32 = 0.3;
-/// Both stand on the same trunnion: the model has one mount.
-const SHOULDER_HOWITZER: (Vec3, Vec3) = (Vec3::new(4.9, -3.1, 14.55), Vec3::new(0.0, -3.1, 14.55));
+/// Where the howitzer's tube ends, ahead of the trunnion it shares with the flak cannon
+/// (`commander_flak::TRUNNION`): the model has one mount.
+const HOWITZER_MUZZLE: Vec3 = Vec3::new(TRUNNION.x + 4.9, TRUNNION.y, TRUNNION.z);
 /// The auxiliary suite: a robot arm on the back behind the left shoulder. `AUX_HINGE` is its
 /// base knuckle, `AUX_WRIST` where the head bends (the unit file's `hinge`), `AUX_EMITTER`
 /// the head's tip (its `emitters`). All authored out: the arm up and forward over the
@@ -456,19 +453,27 @@ pub(super) fn commander(b: &mut MeshBuilder, _tech: u8) {
                 b.block(v3(-3.1, -1.4, 15.8), v3(-2.7, 1.4, 16.2));
             });
             b.module("aa", 0.3, |b| {
-                b.with_mount(SHOULDER_AA.1, 0.0, |b| {
-                    b.paint(ACCENT);
-                    b.block(v3(-0.9, -3.8, 13.7), v3(0.9, -2.4, 15.2));
+                b.with_mount(TRUNNION, 0.0, |b| {
+                    b.paint(PLATING);
+                    b.block(
+                        TRUNNION + v3(-0.6, -0.75, -0.55),
+                        TRUNNION + v3(0.8, 0.75, 0.5),
+                    );
                     b.paint(METAL);
-                    b.beam(SHOULDER_AA.1, SHOULDER_AA.0, v2(1.1, 0.9), v2(1.1, 0.9));
+                    b.beam(
+                        TRUNNION + Vec3::X * 0.8,
+                        v3(AA_MUZZLE, TRUNNION.y, TRUNNION.z),
+                        v2(0.8, 0.3),
+                        v2(0.8, 0.3),
+                    );
                 })
             });
             b.module("artillery", 0.3, |b| {
-                b.with_mount(SHOULDER_HOWITZER.1, 0.0, |b| {
+                b.with_mount(TRUNNION, 0.0, |b| {
                     b.paint(PLATING);
                     b.beam(
-                        SHOULDER_HOWITZER.1 - Vec3::X * 1.2,
-                        SHOULDER_HOWITZER.0,
+                        TRUNNION - Vec3::X * 1.2,
+                        HOWITZER_MUZZLE,
                         v2(1.2, 1.2),
                         v2(0.55, 0.55),
                     );
@@ -1292,134 +1297,45 @@ fn commander_back(b: &mut MeshBuilder) {
 }
 
 /// The shoulders' refits. On the right, a turret of its own that aims at what it shoots,
-/// whatever the torso is doing: the AA flak cannon, a faceted house with two long
-/// barrels side by side, or the howitzer, one long tube over the shoulder. On the
+/// whatever the torso is doing: the AA flak cannon (`commander_flak`), an open mount with
+/// a gun shield and two slim barrels, or the howitzer, one long tube over the shoulder. On the
 /// left, a second projector that lies back behind the shoulder and folds out over it
 /// to build.
 fn commander_shoulders(b: &mut MeshBuilder) {
-    // Both right-shoulder turrets stand on the same pylon.
-    let pylon = |b: &mut MeshBuilder| {
-        b.paint(ACCENT);
-        b.cylinder_between(
-            v3(-0.2, -3.1, 13.25),
-            v3(-0.2, -3.1, 13.75),
-            0.72,
-            0.62,
-            b.sides(10),
-        );
-    };
-    let (aa_muzzle, aa_trunnion) = SHOULDER_AA;
-    b.module("aa", 0.0, |b| {
-        pylon(b);
-        b.with_mount(aa_trunnion, 0.35, |b| {
-            // The trunnion: a dark axle through the house's cheeks.
-            b.paint(ACCENT);
-            b.cylinder_between(
-                aa_trunnion - Vec3::Y * 0.8,
-                aa_trunnion + Vec3::Y * 0.8,
-                0.34,
-                0.34,
-                b.sides(10),
-            );
-            // The house: white, a sloped glacis the barrels come out of, a flat back.
-            b.paint(PLATING);
-            b.at(v3(0.0, aa_trunnion.y, 0.0), |b| {
-                b.extrude_y_chamfered(
-                    &[
-                        [-1.05, 13.9],
-                        [0.5, 13.9],
-                        [0.85, 14.3],
-                        [0.65, 14.95],
-                        [-0.2, 15.2],
-                        [-1.05, 15.05],
-                    ],
-                    0.62,
-                    0.12,
-                )
-            });
-            // Dark cheek plates over both sides.
-            b.paint(ACCENT);
-            // Mirrored about the trunnion, not the body's centreline.
-            b.at(v3(0.0, aa_trunnion.y, 0.0), |b| {
-                b.mirror_y(|b| b.block(v3(-0.9, 0.6, 14.0), v3(0.45, 0.68, 14.85)))
-            });
-            // The feed: a drum across the back of the house, banded in metal.
-            b.cylinder_between(
-                v3(-1.2, aa_trunnion.y - 0.5, 14.35),
-                v3(-1.2, aa_trunnion.y + 0.5, 14.35),
-                0.42,
-                0.42,
-                b.sides(10),
-            );
-            if b.fine() {
-                b.paint(METAL);
-                b.cylinder_between(
-                    v3(-1.2, aa_trunnion.y - 0.06, 14.35),
-                    v3(-1.2, aa_trunnion.y + 0.06, 14.35),
-                    0.44,
-                    0.44,
-                    b.sides(10),
-                );
-                // The sight on the outer cheek: a dark box with a lens looking along the guns.
-                b.paint(PLATING_DARK);
-                b.block(
-                    aa_trunnion + v3(-0.3, -0.92, 0.25),
-                    aa_trunnion + v3(0.35, -0.68, 0.6),
-                );
-                b.paint(GLASS);
-                b.block(
-                    aa_trunnion + v3(0.35, -0.88, 0.3),
-                    aa_trunnion + v3(0.38, -0.72, 0.55),
-                );
-            }
-        });
-    });
-    b.module("aa", 0.4, |b| {
-        b.with_mount(aa_trunnion, 0.35, |b| {
-            // Two long barrels side by side, kicking back together, a yoke across them.
-            b.with_recoil(|b| {
-                for dy in [-SHOULDER_AA_GAP, SHOULDER_AA_GAP] {
-                    let off = Vec3::Y * dy;
-                    cannon(
-                        b,
-                        aa_trunnion + off + Vec3::X * 0.6,
-                        aa_muzzle + off,
-                        0.1,
-                        Emitter::Unlit,
-                    );
-                }
-                b.paint(ACCENT);
-                b.block(
-                    aa_trunnion + v3(1.55, -SHOULDER_AA_GAP - 0.12, -0.1),
-                    aa_trunnion + v3(1.75, SHOULDER_AA_GAP + 0.12, 0.1),
-                );
-            });
-        });
-    });
+    b.module("aa", 0.0, commander_flak::house);
+    b.module("aa", 0.4, commander_flak::guns);
 
-    let (how_muzzle, how_trunnion) = SHOULDER_HOWITZER;
+    let t = TRUNNION;
     b.module("artillery", 0.0, |b| {
-        pylon(b);
-        b.with_mount(how_trunnion, 0.7, |b| {
-            // Cradle: two white cheeks the tube swings between, a black counterweight behind.
+        commander_flak::turntable(b, t);
+        b.with_mount(t, 0.7, |b| {
+            // Cradle: two white cheeks the tube swings between, standing still on the ring
+            // as it pitches, and a black counterweight behind that pitches with it.
             // Mirrored about the trunnion, not the body's centreline, or one cheek would sit
-            // on the other shoulder and swing with the gun.
-            b.paint(PLATING);
-            b.at(v3(0.0, how_trunnion.y, 0.0), |b| {
-                b.mirror_y(|b| {
-                    b.extrude_y(
-                        &[[-1.3, 13.8], [0.5, 13.8], [0.3, 14.95], [-1.0, 15.1]],
-                        0.36,
-                        0.52,
-                    )
-                })
+            // on the other shoulder.
+            b.with_yoke(|b| {
+                b.paint(PLATING);
+                b.at(v3(0.0, t.y, 0.0), |b| {
+                    b.mirror_y(|b| {
+                        b.extrude_y(
+                            &[
+                                [t.x - 1.3, t.z - 0.75],
+                                [t.x + 0.5, t.z - 0.75],
+                                [t.x + 0.3, t.z + 0.4],
+                                [t.x - 1.0, t.z + 0.55],
+                            ],
+                            0.36,
+                            0.52,
+                        )
+                    })
+                });
             });
             b.paint(ACCENT);
-            b.chamfered_box(how_trunnion + v3(-1.6, 0.0, 0.0), v3(1.1, 0.8, 0.9), 0.2);
+            b.chamfered_box(t + v3(-1.6, 0.0, 0.0), v3(1.1, 0.8, 0.9), 0.2);
             b.paint(METAL);
             b.cylinder_between(
-                how_trunnion - Vec3::Y * 0.56,
-                how_trunnion + Vec3::Y * 0.56,
+                t - Vec3::Y * 0.56,
+                t + Vec3::Y * 0.56,
                 0.24,
                 0.24,
                 b.sides(8),
@@ -1427,22 +1343,19 @@ fn commander_shoulders(b: &mut MeshBuilder) {
         });
     });
     b.module("artillery", 0.4, |b| {
-        b.with_mount(how_trunnion, 0.7, |b| {
-            b.with_recoil(|b| howitzer(b, how_trunnion - Vec3::X * 1.1, how_muzzle, 0.3));
+        b.with_mount(t, 0.7, |b| {
+            b.with_recoil(|b| howitzer(b, t - Vec3::X * 1.1, HOWITZER_MUZZLE, 0.3));
             if b.fine() {
                 b.paint(METAL);
                 b.cylinder_between(
-                    how_trunnion + v3(0.1, 0.0, -0.32),
-                    how_trunnion + v3(1.8, 0.0, -0.32),
+                    t + v3(0.1, 0.0, -0.32),
+                    t + v3(1.8, 0.0, -0.32),
                     0.1,
                     0.1,
                     6,
                 );
                 b.paint(GLOW_ORANGE);
-                b.block(
-                    how_trunnion + v3(-2.1, -0.3, 0.1),
-                    how_trunnion + v3(-2.14, 0.3, 0.3),
-                );
+                b.block(t + v3(-2.1, -0.3, 0.1), t + v3(-2.14, 0.3, 0.3));
             }
         });
     });

@@ -349,6 +349,8 @@ pub mod rig {
     pub const LIMB_MASK: u32 = 0xF;
     /// Slides back along the barrel when the gun fires (`Model::recoil`).
     pub const RECOIL: u32 = 1 << 4;
+    /// A shoulder mount's yoke, on the `MOUNT` limb: turns with the mount, never pitches.
+    pub const YOKE: u32 = crate::gpu_consts::yoke::RIG;
     /// A breech door on the `ARM_GUN` limb: swings open about `Model::breech` as the gun
     /// fires and shuts as it runs out (`gpu_consts::breech`).
     pub const BREECH: u32 = crate::gpu_consts::breech::RIG;

@@ -498,6 +498,14 @@ shared! {
         pub const RIG: u32 = 0x10000;
     }
 
+    /// A shoulder mount's yoke (`rig::YOKE`, `MeshBuilder::with_yoke`): it turns with the
+    /// mount but does not pitch, so the gun cradle elevates between its arms.
+    pub mod yoke as "YOKE_" {
+        /// The rig bit. Like `breech::RIG` it borrows the lowest `UPGRADE_AT` bit: on a
+        /// refit piece that only moves when it goes up by 1/255 of the refit.
+        pub const RIG: u32 = 0x10000;
+    }
+
     /// A charge gun's working gear (`rig::CHARGE_GEAR`, `Model::charge_gear`), posed by
     /// entity.wgsl `charge_gear_pose` from the unit's charge (`renderer/titan_charge.rs`):
     /// through the charge the gear opens, after the shot it holds open a moment and closes

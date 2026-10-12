@@ -13,6 +13,7 @@ mod bolt_rifle;
 mod bore_tank;
 pub(super) mod breacher;
 mod citadel;
+mod commander_flak;
 mod commander_head;
 mod culverin;
 mod drone_port;

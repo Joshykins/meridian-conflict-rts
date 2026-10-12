@@ -149,8 +149,10 @@
                             // so each shot lays two bursts apart across the flight.
                             name: "AA Flak Cannon", mount: true,
                             damage: 120, range: 640, reload: 1.1, speed: 340, trajectory: Direct,
-                            turret_turn: 240, muzzle: (4.96, -5.44, 23.28), pivot: (0, -4.96, 23.28),
-                            muzzles: [(4.96, -5.44, 23.28), (4.96, -4.48, 23.28)],
+                            // At rest it waits pointed up at the sky (the ground AA guns rest at 60).
+                            turret_turn: 240, rest_pitch: 45,
+                            muzzle: (3.68, -5.44, 22.32), pivot: (-1.2, -4.96, 22.32),
+                            muzzles: [(3.68, -5.44, 22.32), (3.68, -4.48, 22.32)],
                             salvo: 2, salvo_batch: 2, spread: 3,
                             targets: ["Air"], color: Orange, flak: true, proximity: 12, splash: 40,
                             flash: 1.6, impact: 1.4,
@@ -165,7 +167,7 @@
                         weapons: [(
                             name: "Shoulder Howitzer", mount: true,
                             damage: 420, splash: 14, range_min: 120, range: 1900, reload: 8.0, speed: 200, trajectory: Ballistic, loft: 3,
-                            turret_turn: 60, muzzle: (7.84, -4.96, 23.28), pivot: (0, -4.96, 23.28), spread: 1.5,
+                            turret_turn: 60, muzzle: (6.64, -4.96, 22.32), pivot: (-1.2, -4.96, 22.32), spread: 1.5,
                             targets: ["Structure", "Land", "Naval"], color: Orange, shockwave: 0.7,
                             sounds: (fire: "howitzer", impact: "shell_heavy", ground: "shell_heavy"),
                         )],

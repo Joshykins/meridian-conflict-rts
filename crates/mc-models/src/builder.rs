@@ -351,6 +351,15 @@ impl MeshBuilder {
         self.rig = previous;
     }
 
+    /// Runs `f` as the yoke of a `with_mount` gun: it turns with the mount but does not
+    /// pitch, so the cradle inside it elevates between its arms.
+    pub fn with_yoke(&mut self, f: impl FnOnce(&mut Self)) {
+        let previous = self.rig;
+        self.rig |= rig::YOKE;
+        f(self);
+        self.rig = previous;
+    }
+
     /// Runs `f` as a hover skirt: dropped on water, tucked up on land.
     pub fn with_float(&mut self, f: impl FnOnce(&mut Self)) {
         let previous = self.rig;
