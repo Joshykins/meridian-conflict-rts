@@ -11,13 +11,16 @@ use mc_sim::SimEvent;
 
 /// Good news: a node down.
 const GOOD: u32 = crate::hud::HEALTHY;
+/// Heavy waves and the experimental tiers: pale gold, as on the survival card.
+const HEAVY: u32 = 0xFFD27A;
 
 impl Game {
     /// Toasts and stingers for survival's events; ignores everything else.
     pub(super) fn note_survival(&mut self, event: &SimEvent, audio: &Audio) {
         let site = |s: u8| {
             self.hud
-                .survival_sites
+                .survival
+                .sites
                 .get(s as usize)
                 .cloned()
                 .unwrap_or_else(|| format!("Site {}", s + 1))
@@ -76,6 +79,40 @@ impl Game {
                 },
                 GOOD,
                 "survival_node_down",
+            ),
+            SimEvent::TierReached { tier, .. } => {
+                self.hud.survival.announce_tier(*tier);
+                (
+                    format!("Tier {tier} Reached  \u{b7}  The Progenitor Prints Tech {tier}"),
+                    if *tier >= 4 { HEAVY } else { VIOLET },
+                    "survival_tier",
+                )
+            }
+            SimEvent::HeavyWave { squads, .. } => {
+                let parts: Vec<String> = squads
+                    .iter()
+                    .map(|(b, n)| format!("{n} \u{d7} {}", name(*b)))
+                    .collect();
+                (
+                    format!("Heavy Wave Forging  \u{b7}  {}", parts.join(", ")),
+                    HEAVY,
+                    "survival_heavy",
+                )
+            }
+            // A level that brings another kind of unit is news; the others show on the card.
+            SimEvent::ShaperLevelled {
+                site: s,
+                level,
+                added: Some(added),
+                ..
+            } => (
+                format!(
+                    "Shaper at {} Reached Level {level}  \u{b7}  Now Prints {}",
+                    site(*s),
+                    name(*added)
+                ),
+                VIOLET,
+                "survival_shaper_level",
             ),
             SimEvent::SurvivalWon { rounds } => {
                 audio.play(Sfx::Victory);

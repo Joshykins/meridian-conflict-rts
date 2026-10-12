@@ -241,6 +241,25 @@ pub fn log_tick(world: &mc_sim::World, tick: u32) {
             SimEvent::NodeDestroyed { site, wreck, .. } => {
                 println!("[{min:5.1} min] node at site {site} destroyed, wreck {wreck}")
             }
+            SimEvent::TierReached { round, tier } => {
+                println!("[{min:5.1} min] round {round} reaches T{tier}")
+            }
+            SimEvent::HeavyWave { round, squads } => {
+                let parts: Vec<String> = squads
+                    .iter()
+                    .map(|(b, n)| format!("{n} x {}", name(*b)))
+                    .collect();
+                println!(
+                    "[{min:5.1} min] round {round} heavy wave: {}",
+                    parts.join(", ")
+                )
+            }
+            SimEvent::ShaperLevelled {
+                site, level, added, ..
+            } => println!(
+                "[{min:5.1} min] shaper at site {site} level {level}{}",
+                added.map_or(String::new(), |b| format!(", now prints {}", name(b)))
+            ),
             SimEvent::SurvivalWon { rounds } => {
                 println!("[{min:5.1} min] defenders won after {rounds} rounds")
             }
@@ -304,10 +323,11 @@ pub fn log_tick(world: &mc_sim::World, tick: u32) {
                             .front(u, r)
                             .map(|o| (o.kind, o.pos.to_f32()));
                         println!(
-                            "      {} at {:?} moving {} order {:?}",
+                            "      {} at {:?} moving {} printing {} order {:?}",
                             bp.key,
                             u.pos[r].to_f32(),
                             u.has_flag(r, mc_sim::tables::flag::MOVING),
+                            u.has_flag(r, mc_sim::tables::flag::UNDER_CONSTRUCTION),
                             o
                         );
                     }

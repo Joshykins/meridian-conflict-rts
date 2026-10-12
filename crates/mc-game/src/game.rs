@@ -4036,6 +4036,9 @@ impl Game {
                         | mc_sim::SimEvent::NodeRaising { .. }
                         | mc_sim::SimEvent::NodeOnline { .. }
                         | mc_sim::SimEvent::NodeDestroyed { .. }
+                        | mc_sim::SimEvent::TierReached { .. }
+                        | mc_sim::SimEvent::HeavyWave { .. }
+                        | mc_sim::SimEvent::ShaperLevelled { .. }
                         | mc_sim::SimEvent::SurvivalWon { .. }
                 )
             })

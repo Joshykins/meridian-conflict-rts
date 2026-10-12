@@ -83,6 +83,14 @@ reports and never wait on a window.
 | `--crash-screen FILE` | a report's path, then `--crash-title T`, `--crash-message M`, `--crash-hint H` | The crash screen for a saved report, as a crashed run starts it. With `--screenshot OUT.png` it is drawn headless (at `--size`, `--cursor` hovering), and `OUT-copied.png` just after Copy details. |
 | `--crash-test` | `panic`, `sim`, `native`, `error` | Fail on purpose 8 s after start, to check the crash window over the running game: a panic on the main thread, a panic on a thread the game needs (as the sim thread is), an access violation (Windows), an error that ends the game (raised as a failed Vulkan call is, so its report lists it under "errors raised" with its stack). |
 
+## Survival
+
+| Variable | Values | Purpose |
+|---|---|---|
+| `MERIDIAN_SURVIVAL` | `rounds:grace:interval:intensity:fronts:tier:nodes` | The rules a `--scene survival` run plays (rounds 0 is endless; seconds; intensity in thousandths; fronts as land 1 + air 2 + naval 4; tech ceiling; nodes 0-3). |
+| `MERIDIAN_SURVIVAL_SPAWN` | defender spawn index | Which of the map's spawns the defender takes. |
+| `MERIDIAN_SURVIVAL_WHY` | `1`, or `pos` | Headless runs list where the hostiles are each minute; `pos` prints every hostile's position, motion, printing and order. |
+
 ## AI probes and tournaments
 
 Read by the ignored probe tests in mc-sim, never by the game (docs/AI_COMMANDER.md).

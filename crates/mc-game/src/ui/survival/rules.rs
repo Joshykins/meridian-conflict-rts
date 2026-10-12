@@ -512,9 +512,13 @@ fn forecast(ui: &mut Ui, rules: &SurvivalRules, counts: [usize; 3], area: Rect) 
         // The rounds this bar stands for (more than one when the rounds are sampled).
         let from = if i == 0 { 1 } else { round_of(i - 1) + 1 };
         let span = from..=round;
-        // A heavy (T4/T5) in these rounds: a hexagon over the bar, bigger for a T5.
+        // A heavy wave (T4/T5) in these rounds: a hexagon over the bar, bigger with T5s.
         let mut top = y - 4.0;
-        if let Some(heavy) = span.clone().filter_map(|r| rules.heavy_at(r)).max() {
+        if let Some(heavy) = span
+            .clone()
+            .filter_map(|r| rules.heavy_wave(r).map(|w| w.top))
+            .max()
+        {
             let s = (bw * 0.45).clamp(3.5, 6.0) * if heavy >= 5 { 1.3 } else { 1.0 };
             let c = Vec2::new(x + bw * 0.5, top - s);
             fill_hex(
@@ -591,7 +595,8 @@ fn forecast(ui: &mut Ui, rules: &SurvivalRules, counts: [usize; 3], area: Rect) 
         Some(i) => {
             let round = round_of(i);
             let budget = rules.budget(round);
-            let parts: Vec<String> = attacking.iter().map(|d| format!("{} {}", d.label(), materials(budget * weight(*d) / wsum))).collect();
+            let ranks = rules.formation_budget(round);
+            let parts: Vec<String> = attacking.iter().map(|d| format!("{} {}", d.label(), materials(ranks * weight(*d) / wsum))).collect();
             format!(
                 "Round {round}  \u{b7}  T{}  \u{b7}  {} materials  \u{b7}  {}{}{}",
                 rules.tier_at(round),
@@ -602,26 +607,34 @@ fn forecast(ui: &mut Ui, rules: &SurvivalRules, counts: [usize; 3], area: Rect) 
                     1 => "  \u{b7}  a Shaper rises".to_string(),
                     k => format!("  \u{b7}  {k} Shapers rise"),
                 },
-                rules.heavy_at(round).map_or(String::new(), |t| format!("  \u{b7}  a T{t} heavy"))
+                rules.heavy_wave(round).map_or(String::new(), |w| format!(
+                    "  \u{b7}  heavy wave T{}  {} (at least {})",
+                    w.top,
+                    materials(w.value),
+                    w.floor
+                ))
             )
         }
         None if endless => format!(
-            "Endless  \u{b7}  a tier every 6 rounds  \u{b7}  T{} by round {}  \u{b7}  {} Shapers in 30 rounds",
+            "Endless  \u{b7}  a tier every 6 rounds  \u{b7}  T{} by round {}  \u{b7}  {} Shapers in 30 rounds{}",
             rules.tier_cap.clamp(1, 5),
             1 + 6 * (rules.tier_cap.clamp(1, 5) as u32 - 1),
-            nodes
+            nodes,
+            rules
+                .first_round_of(4)
+                .map_or(String::new(), |r| format!("  \u{b7}  heavy waves from round {r}, growing"))
         ),
         None => {
             let secs = rules.grace_secs as u32 + total as u32 * rules.interval_secs as u32;
-            let heavies = (1..=total).filter(|r| rules.heavy_at(*r).is_some()).count();
+            let heavies = (1..=total).filter(|r| rules.heavy_wave(*r).is_some()).count();
             format!(
                 "{total} rounds  \u{b7}  ~{} min  \u{b7}  tops out at T{max_tier}  \u{b7}  {nodes} Shaper{}{}  \u{b7}  last wave {} materials",
                 (secs + 30) / 60,
                 if nodes == 1 { "" } else { "s" },
                 match heavies {
                     0 => String::new(),
-                    1 => "  \u{b7}  1 heavy".to_owned(),
-                    k => format!("  \u{b7}  {k} heavies"),
+                    1 => "  \u{b7}  1 heavy wave".to_owned(),
+                    k => format!("  \u{b7}  {k} heavy waves"),
                 },
                 materials(rules.budget(total))
             )

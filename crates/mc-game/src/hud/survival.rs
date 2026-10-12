@@ -1,26 +1,109 @@
 //! Survival's card, in the right column under the minimap: which round it is
 //! and how many are left, what the Progenitor is doing (counting down,
-//! forging, sending the round), what is coming by domain and tier, and the
-//! Shapers standing, the bonus objectives, one row per site that takes the
-//! camera to it.
+//! forging, sending the round), what is coming by domain and tier, its heavy
+//! wave or the next tier, and the Shapers standing, the bonus objectives, one
+//! row per site that takes the camera to it. A new tier also gets a banner
+//! across the middle of the screen.
 
 use super::icons;
 use super::style::{AIR, LAND, NAVY};
 use super::{Hud, HudAction, Scene};
 use crate::audio::Sfx;
-use crate::ui::{id, ink, palette, rgb, type_scale, Rect, Ui};
+use crate::ui::{id, ink, palette, rgb, style, type_scale, Rect, Style, Ui};
 use glam::Vec2;
 use mc_data::BlueprintId;
 use mc_sim::survival::{NodeStatus, Phase};
 
 /// Replication violet: the engine, its ray, its nodes.
 pub const VIOLET: u32 = 0xA070FF;
+/// Heavy waves (T4/T5): pale gold, as on the set-up screen's forecast.
+const HEAVY: u32 = 0xFFD27A;
 const PAD: f32 = 14.0;
 const HEAD_H: f32 = 74.0;
-const FORECAST_H: f32 = 50.0;
+const FORECAST_H: f32 = 66.0;
+/// The tier banner's title.
+const BANNER: Style = style(mc_render::Face::Light, 64.0, 10.0);
+/// Seconds the banner shows, and the T chip pulses after a change.
+const BANNER_SECS: f32 = 5.5;
+const CHIP_SECS: f32 = 10.0;
 const ROW_H: f32 = 38.0;
 const ROW_GAP: f32 = 4.0;
 const DOMAINS: [u32; 3] = [LAND, AIR, NAVY];
+
+/// Survival's part of the HUD: what it read from the map, its card this
+/// frame, and the tier banner while it shows.
+#[derive(Default)]
+pub struct SurvivalHud {
+    /// Names of the map's node sites, by site index.
+    pub sites: Vec<String>,
+    /// The map's fronts (domain, path), read once with the sites.
+    fronts: Vec<(mc_data::survival::Domain, Vec<Vec2>)>,
+    read: bool,
+    /// The card this frame, which the range key keeps left of.
+    pub(super) card: Option<Rect>,
+    /// The tier the banner announces, and when it started (`Ui::time`; None until first drawn).
+    banner: Option<(u8, Option<f32>)>,
+    /// The tier the chip shows and when it changed, for its pulse.
+    chip: (u8, f32),
+}
+
+impl SurvivalHud {
+    /// Puts the banner up for a tier the engine has just reached.
+    pub fn announce_tier(&mut self, tier: u8) {
+        self.banner = Some((tier, None));
+    }
+}
+
+/// What a new tier means, under its banner.
+fn tier_line(tier: u8) -> &'static str {
+    match tier {
+        1 => "The Progenitor prints tech 1",
+        2 => "The Progenitor prints tech 2",
+        3 => "The Progenitor prints tech 3",
+        4 => "Experimentals  \u{b7}  heavy waves from now on",
+        _ => "Tech 5  \u{b7}  titans join the heavy waves",
+    }
+}
+
+/// The tier banner across the middle of the screen: fades in, holds, fades out.
+fn banner(hud: &mut Hud, ui: &mut Ui) {
+    let Some((tier, start)) = hud.survival.banner else {
+        return;
+    };
+    let t = ui.time;
+    let start = start.unwrap_or(t);
+    hud.survival.banner = Some((tier, Some(start)));
+    let age = t - start;
+    if age > BANNER_SECS {
+        hud.survival.banner = None;
+        return;
+    }
+    // It comes in already part-lit, so it is there on its first frame.
+    let a = (0.3 + age / 0.35).min(1.0) * ((BANNER_SECS - age) / 1.2).min(1.0);
+    let cx = ui.size.x * 0.5;
+    let y = ui.size.y * 0.27;
+    let title = format!("TIER {tier}");
+    let tone = if tier >= 4 { HEAVY } else { VIOLET };
+    // The rule either side opens out from the middle as it comes in.
+    let half = ui.text_width(BANNER, &title) * 0.5 + 28.0;
+    let reach = 220.0 * (age / 0.6).min(1.0);
+    ui.fill(
+        Rect::new(cx - half - reach, y - 1.0, reach, 2.0),
+        rgb(tone, 0.8 * a),
+    );
+    ui.fill(
+        Rect::new(cx + half, y - 1.0, reach, 2.0),
+        rgb(tone, 0.8 * a),
+    );
+    ui.text_centred(cx, y + 1.0, BANNER, rgb(tone, a), &title);
+    ui.text_centred(
+        cx,
+        y + 46.0,
+        type_scale::OVERLINE,
+        rgb(palette::TEXT, 0.9 * a),
+        tier_line(tier),
+    );
+}
 
 fn clock(secs: f32) -> String {
     let s = secs.max(0.0).ceil() as u32;
@@ -54,11 +137,12 @@ pub fn draw(
     bottom: f32,
 ) -> Option<Rect> {
     let status = s.view.status.survival.as_ref()?;
-    if !hud.survival_read {
-        hud.survival_read = true;
+    banner(hud, ui);
+    if !hud.survival.read {
+        hud.survival.read = true;
         if let Some(layout) = crate::survival::layout(s.map) {
-            hud.survival_sites = layout.node_sites.iter().map(|n| n.name.clone()).collect();
-            hud.survival_fronts = layout
+            hud.survival.sites = layout.node_sites.iter().map(|n| n.name.clone()).collect();
+            hud.survival.fronts = layout
                 .fronts
                 .iter()
                 .map(|f| {
@@ -72,10 +156,13 @@ pub fn draw(
     }
     let t = ui.time;
 
-    // The Shapers by site, in the order they rose.
+    // The Shapers by site and domain, in the order they rose.
     let mut sites: Vec<(u8, Vec<&NodeStatus>)> = Vec::new();
     for n in &status.nodes {
-        match sites.iter_mut().find(|(k, _)| *k == n.site) {
+        match sites
+            .iter_mut()
+            .find(|(k, v)| *k == n.site && v[0].domain == n.domain)
+        {
             Some((_, v)) => v.push(n),
             None => sites.push((n.site, vec![n])),
         }
@@ -155,13 +242,30 @@ pub fn draw(
         Phase::Won => ("Held", "The Line Stands".to_string(), None, super::HEALTHY),
     };
     let rx = x + cw;
+    // The tier chip: it lights up and pulses for a while after the tier changes.
+    if hud.survival.chip.0 != status.tier {
+        hud.survival.chip = (
+            status.tier,
+            if hud.survival.chip.0 == 0 {
+                -CHIP_SECS
+            } else {
+                t
+            },
+        );
+    }
+    let fresh = (1.0 - (t - hud.survival.chip.1) / CHIP_SECS).clamp(0.0, 1.0);
+    let chip_tone = if status.tier >= 4 { HEAVY } else { VIOLET };
     let chip = Rect::new(rx - 26.0, y - 8.0, 26.0, 16.0);
-    ui.frame(chip, rgb(VIOLET, 0.6));
+    if fresh > 0.0 {
+        let beat = 0.5 + 0.5 * (t * 5.0).sin().abs();
+        ui.fill(chip, rgb(chip_tone, 0.35 * fresh * beat));
+    }
+    ui.frame(chip, rgb(chip_tone, 0.6 + 0.4 * fresh));
     ui.text_centred(
         chip.x + chip.w * 0.5,
         chip.mid_y(),
         type_scale::MICRO,
-        rgb(VIOLET, 1.0),
+        rgb(chip_tone, 1.0),
         &format!("T{}", status.tier),
     );
     ui.text_right(
@@ -276,13 +380,25 @@ pub fn draw(
     } else {
         palette::DIM
     };
-    ui.text_right(
-        rx,
-        y - 6.0,
-        type_scale::MICRO,
-        rgb(palette::DIM, 1.0),
-        &format!("{} in the field", status.hostile),
-    );
+    if status.held {
+        // The field cap holds the printing: say so, not just slow down.
+        let pulse = 0.6 + 0.4 * (t * 3.0).sin().abs();
+        ui.text_right(
+            rx,
+            y - 6.0,
+            type_scale::MICRO,
+            rgb(palette::WARN, pulse),
+            &format!("Field full ({}): printing waits", status.hostile),
+        );
+    } else {
+        ui.text_right(
+            rx,
+            y - 6.0,
+            type_scale::MICRO,
+            rgb(palette::DIM, 1.0),
+            &format!("{} in the field", status.hostile),
+        );
+    }
     ui.text_right(
         rx,
         y + 8.0,
@@ -290,6 +406,44 @@ pub fn draw(
         rgb(reclaim_tone, 0.9),
         &format!("+{:.0}/s reclaim", status.reclaim),
     );
+    // Under it: the round's heavy wave, squad by squad, else when the next tier comes.
+    let y = y + 18.0;
+    if !status.heavy.is_empty() {
+        let squads: Vec<String> = status
+            .heavy
+            .iter()
+            .map(|(b, n)| format!("{n} \u{d7} {}", s.blueprints.unit(*b).name))
+            .collect();
+        let end = ui.text(x, y, type_scale::MICRO, rgb(HEAVY, 1.0), "Heavy wave");
+        ui.text_fit_left(
+            end + 8.0,
+            y,
+            rx - end - 8.0,
+            type_scale::MICRO,
+            rgb(palette::TEXT, 0.9),
+            &squads.join("  \u{b7}  "),
+        );
+    } else if let Some((tier, round)) = status.next_tier {
+        let next = if status.phase == Phase::Printing {
+            status.round
+        } else {
+            status.round + 1
+        };
+        let k = round.saturating_sub(next);
+        let when = match k {
+            0 => "next round".to_string(),
+            1 => "in 1 round".to_string(),
+            k => format!("in {k} rounds"),
+        };
+        let tone = if tier >= 4 { HEAVY } else { VIOLET };
+        ui.text(
+            x,
+            y,
+            type_scale::MICRO,
+            rgb(tone, if k == 0 { 1.0 } else { 0.75 }),
+            &format!("T{tier} {when}  \u{b7}  round {round}"),
+        );
+    }
 
     // The Shapers: bonus objectives, one row per site.
     if show_shapers {
@@ -328,7 +482,8 @@ pub fn draw(
                 );
                 break;
             }
-            let tile = hud.tile(ui, id("survival-site", *site as usize), tr, false, true);
+            let key = *site as usize * 4 + nodes[0].domain as usize;
+            let tile = hud.tile(ui, id("survival-site", key), tr, false, true);
             let raised = nodes.iter().map(|n| n.raised).sum::<f32>() / nodes.len() as f32;
             let raising = raised < 1.0;
             let a = if raising {
@@ -336,17 +491,25 @@ pub fn draw(
             } else {
                 1.0
             };
-            diamond(ui, Vec2::new(tr.x + 13.0, tr.y + 13.0), 5.0, rgb(VIOLET, a));
+            // Its diamond in the colour of the domain it prints for.
+            let kind = match nodes[0].domain {
+                mc_data::survival::Domain::Land => LAND,
+                mc_data::survival::Domain::Air => AIR,
+                mc_data::survival::Domain::Naval => NAVY,
+            };
+            diamond(ui, Vec2::new(tr.x + 13.0, tr.y + 13.0), 5.0, rgb(kind, a));
             // What each Shaper here prints, as icons on the right.
             let mut products: Vec<(BlueprintId, usize)> = Vec::new();
-            for n in nodes {
-                match products.iter_mut().find(|(p, _)| *p == n.product) {
+            for p in nodes.iter().flat_map(|n| n.products.iter()) {
+                match products.iter_mut().find(|(q, _)| q == p) {
                     Some((_, c)) => *c += 1,
-                    None => products.push((n.product, 1)),
+                    None => products.push((*p, 1)),
                 }
             }
+            let level = nodes.iter().map(|n| n.level).max().unwrap_or(1);
             let mut ix = tr.right() - 14.0;
-            for (p, _) in products.iter().rev() {
+            // The newest kinds it prints; the line under the name counts them all.
+            for (p, _) in products.iter().rev().take(4) {
                 let bp = s.blueprints.unit(BlueprintId(p.0));
                 let tone = match super::style::Domain::of(bp) {
                     super::style::Domain::Air => AIR,
@@ -365,7 +528,8 @@ pub fn draw(
                 ix -= 18.0;
             }
             let name = hud
-                .survival_sites
+                .survival
+                .sites
                 .get(*site as usize)
                 .cloned()
                 .unwrap_or_else(|| format!("Site {}", site + 1));
@@ -379,6 +543,12 @@ pub fn draw(
             );
             let line = if raising {
                 format!("Rising  {:.0}%", raised * 100.0)
+            } else if level > 1 {
+                let printed: u32 = nodes.iter().map(|n| n.printed).sum();
+                format!(
+                    "Level {level}  \u{b7}  {} kinds  \u{b7}  {printed} printed",
+                    products.len()
+                )
             } else {
                 let names: Vec<String> = products
                     .iter()
@@ -410,9 +580,8 @@ pub fn draw(
             }
             if tile.clicked {
                 ui.audio.play(Sfx::Select);
-                let n = nodes[nodes.len() / 2];
-                hud.actions
-                    .push(HudAction::LookAt(Vec2::new(n.pos[0], n.pos[1])));
+                let at = nodes[nodes.len() / 2].pos;
+                hud.actions.push(HudAction::LookAt(Vec2::new(at[0], at[1])));
             }
         }
     }
@@ -426,7 +595,7 @@ pub fn minimap(hud: &mut Hud, ui: &mut Ui, s: &Scene, at: &dyn Fn(Vec2) -> Vec2)
         return;
     };
     let t = ui.time;
-    for (domain, path) in &hud.survival_fronts {
+    for (domain, path) in &hud.survival.fronts {
         let tone = match domain {
             mc_data::survival::Domain::Land => LAND,
             mc_data::survival::Domain::Air => AIR,

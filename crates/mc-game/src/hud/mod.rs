@@ -287,13 +287,8 @@ pub fn has_flag(u: &UnitInstance, f: u16) -> bool {
 
 #[derive(Default)]
 pub struct Hud {
-    /// Survival: names of the map's node sites, by site index.
-    pub survival_sites: Vec<String>,
-    /// Survival: the map's fronts (domain, path), read once with the sites.
-    survival_fronts: Vec<(mc_data::survival::Domain, Vec<Vec2>)>,
-    survival_read: bool,
-    /// Survival's card this frame, which the range key keeps left of.
-    survival_card: Option<Rect>,
+    /// Survival's card, banner and what they read from the map.
+    pub survival: survival::SurvivalHud,
     /// Where toasts start: under survival's panel when there is one.
     toast_top: f32,
     /// Tech tab of the construction panel, and the builder blueprint it was chosen for.
@@ -701,7 +696,7 @@ impl Hud {
             (ui.fade, ui.shift, ui.interactive) = (fade, shift, live);
         }
         // Survival's rounds and Shapers, under the map.
-        self.survival_card = survival::draw(
+        self.survival.card = survival::draw(
             self,
             ui,
             s,
@@ -715,7 +710,7 @@ impl Hud {
         let (mind_right, mind_top) = if right_top > under_map && self.issues.column.h > 0.0 {
             (self.issues.column.x - GAP, under_map)
         } else {
-            let top = self.survival_card.map_or(right_top, |c| c.bottom() + GAP);
+            let top = self.survival.card.map_or(right_top, |c| c.bottom() + GAP);
             (w - EDGE, top)
         };
         self.ai_mind(ui, s, mind_right, mind_top, h - EDGE - DECK_H - GAP);
@@ -959,7 +954,7 @@ impl Hud {
     fn reach_key(&mut self, ui: &mut Ui, s: &Scene, y: f32) {
         let mut right = ui.size.x - EDGE;
         // Beside survival's card when it reaches down this far.
-        if let Some(card) = self.survival_card.filter(|c| c.bottom() > y) {
+        if let Some(card) = self.survival.card.filter(|c| c.bottom() > y) {
             right = right.min(card.x - GAP);
         }
         for &(reach, rank, dead, far) in s.view.reaches.iter().rev() {

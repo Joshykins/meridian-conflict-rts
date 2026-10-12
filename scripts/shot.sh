@@ -147,6 +147,11 @@ no_overlays=(DISABLE_VULKAN_OW_OVERLAY_LAYER DISABLE_VULKAN_OW_OBS_CAPTURE
     EOS_OVERLAY_DISABLE_VULKAN_WIN64)
 cmd_env=$(printf 'set %s=1\r\n' "${no_overlays[@]}")
 ps_env=$(printf '$env:%s=1; ' "${no_overlays[@]}")
+# The game's own switches (docs/SWITCHES.md) set in this shell reach a run-mode
+# shot on the Windows side too: MERIDIAN_SURVIVAL=... scripts/shot.sh run ...
+while IFS='=' read -r k v; do
+    ps_env+="\$env:$k='${v//\'/\'\'}'; "
+done < <(env | grep '^MERIDIAN_[A-Z0-9_]*=')
 
 server_alive() {
     local beat

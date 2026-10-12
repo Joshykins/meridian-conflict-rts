@@ -407,7 +407,7 @@ A scenario that needs a builder (BUILD IT) spawns it and keeps the order it owes
 event (`GameEvent::ReloadRange`): `app.rs` loads the blueprints again and enters a fresh range
 through the usual loading card, so the renderer and the sim both get the new tables.
 
-## Survival (mc-sim `survival.rs`; mc-game `survival.rs`, `game_survival.rs`, `hud/survival.rs`; mc-data `survival.rs`)
+## Survival (mc-sim `survival/`; mc-game `survival.rs`, `game_survival.rs`, `hud/survival.rs`; mc-data `survival.rs`)
 
 One side holds out against round after round from the **Replication Engine**, an indestructible foundry
 (`replication_engine`, `flag::INVULNERABLE`, its dome the **veil**: `damage_shield` ignores hits on an
@@ -446,30 +446,47 @@ invulnerable unit, and the mirror marks it `SHIELD_VEIL` so it is drawn apart fr
   `MatchConfig` is unchanged and replays and every peer carry it. `World::begin_survival` runs right after
   `World::new`: it removes the facility side's commander, sets it to free build, raises the guns the map lists, and
   puts `State::survival` in place (hashed). There is no engine unit: the facility is the map's.
-- **Rounds.** `run_survival` (after the AI each tick): at `next_at` a round is planned from its budget
-  (`SurvivalRules::budget_against`: 800 materials at the first round and a quarter more each round, or 15%, rising 6
-  points a round, of what the defenders take in from mines and reclaim over one gap, whichever is more) over
-  the enabled domains (land 60 / air 25 / naval 20), mostly at `tier_at(round)` with some lower tiers, from every
-  listed fighting unit of any faction (so new tiers and factions join by data alone). Nothing appears: each unit is
-  spawned as a construction site in one of the facility's print bays (ships on the sea gate's slips) and built up over
-  `(3 + 2·tech)` s under a print beam (`BeamInstance::kind` 5), then walks to the head of its front. When the last is
-  out, the round goes down its front together (`AttackMove` along the path, then at the defenders). Idle hostiles are
-  re-sent every 5 s. After the last round, the defenders win once none of the rounds' units are left.
-- **Nodes.** The facility wakes as the rounds climb: at each round's start it raises `nodes_raised(round)` Shapers at
-  once (more as the rounds go, up to `node_limit`), each by its own ray (`kind` 4) from the heart's Lens for 20 s,
-  building up a `replication_node` in a free cradle slot (three to a cradle, 72 m apart across its facing); online,
-  it prints one unit type (chosen by site domain and the current tier) on a beat and sends each straight in. A node
-  can be destroyed even while it rises; once up, it dies into a rich wreck. `survival_activity()` (0.15..1, from the
-  round and the Shapers online) goes to the renderer as `RenderFrame::precursor_activity` and brightens the
-  facility's light (`globals.tree_wind.w` in entity.wgsl).
-  Events: `RoundPrinting`, `RoundLaunched`, `NodeRaising`, `NodeOnline`, `NodeDestroyed`, `SurvivalWon`.
+- **Rounds.** `run_survival` (after the AI each tick): at `next_at` a round is planned (`survival/plan.rs`) from the
+  schedule in `survival/rules.rs`: `budget(round)` is 800 materials at the first round and a quarter more each round,
+  times the intensity, with no ceiling, and nothing reacts to what the defenders take in (what the engine spends is
+  what they can reclaim). A round is **formations**: per enabled domain (land 60 / air 25 / naval 20), blocks of
+  `formation_size(round)` units (6, one more every other round, up to 24) of a core kind at `tier_at(round)` and up to
+  two more, most of them one faction's and one in four mixed, from every listed fighting unit of any faction but
+  transports (so new tiers and factions join by data alone). From the first T4 round it also has a **heavy wave**
+  (`heavy_wave`): every third round, every other from six rounds on, every round from twelve (six rounds sooner at
+  Onslaught and up), worth 25% of the budget rising 2 points a round to 50%, with a floor of heavies by intensity
+  (1/2/3/4/6). The wave splits at random into one or more squads, each one kind of T4 or T5 (T5 at a share that grows
+  from the first T5 round); a heavy is counted at no less than the median T4's price. Nothing appears: a bay takes a
+  whole formation and prints it at once, its units laid out in their block on the apron and out past the doors as
+  construction sites built up together under the bay's beams (`BeamInstance::kind` 5) over the slowest unit's
+  `(3 + 2·tech)` s plus a quarter of that per extra unit; the formation then musters near the head of its front. When
+  the last is out, the round goes, each formation as one block (`FormationMove`, attack-move, together) down its front
+  and on at the defenders. Ships go down the nearest sea front and on to open water by the nearest defender they can
+  reach. Idle hostiles are re-sent every 5 s. The only hard limit is `FIELD_CAP` (900 hostiles in the field), which
+  holds the printing back and shows on the HUD; a plan never holds more than that many units. After the last round,
+  the defenders win once none of the rounds' units are left.
+- **Nodes.** The facility wakes as the rounds climb (`survival/shapers.rs`): at each round's start it raises
+  `nodes_raised(round)` Shapers at once (more as the rounds go, up to `node_limit`), each by its own ray (`kind` 4)
+  from the heart's Lens for 20 s, building up a `replication_node` in a free cradle slot (three to a cradle, 72 m
+  apart across its facing). A Shaper is of one domain (land or naval by its cradle, or air) and prints formations of
+  its products straight in, on a beat. It grows with no ceiling: a level every second round it stands (every round
+  from round 20); each level prints one more unit at a time (`shaper_batch`), every other level from 3 adds another
+  kind of its domain at the current tier (or swaps its oldest kind for a newer), and from level 8 heavies of its
+  domain join it, one more every four levels. A node can be destroyed even while it rises; once up, it dies into a
+  rich wreck. `survival_activity()` (0.15..1, from the round and the Shapers online) goes to the renderer as
+  `RenderFrame::precursor_activity` and brightens the facility's light (`globals.tree_wind.w` in entity.wgsl).
+  Events: `RoundPrinting`, `RoundLaunched`, `TierReached`, `HeavyWave`, `NodeRaising`, `NodeOnline`,
+  `ShaperLevelled`, `NodeDestroyed`, `SurvivalWon`.
 - **Economy.** Nothing is handed out. The engine's rounds are the defenders' materials: every unit it prints dies into a
   wreck worth most of its cost, so a survival map has little ore and reclaim is the economy. The heart, the print bays and the Shapers are always revealed to the defenders
   (`survival_reveal`). The skirmish AI skips the engine side; an AI *defender* only attacks nodes.
-- **Interface.** `SimStatus::survival` (`World::survival_status`) feeds the HUD's top-centre panel (round, what the
-  engine is doing, what is coming per domain, reclaim income) and the node objective tiles (click to look); the minimap draws
-  the fronts, the engine and the nodes; toasts and stingers (`data/sounds/survival.ron`) announce rounds and nodes; the
-  ray and print beams are loops.
+- **Interface.** `SimStatus::survival` (`World::survival_status`) feeds the HUD's survival card under the minimap
+  (`hud/survival.rs`, `SurvivalHud`: round, what the engine is doing, the tier chip, what is coming per domain, the
+  heavy wave squad by squad or when the next tier comes, the field cap when it holds, reclaim income) and one Shaper
+  row per cradle and domain (level, kinds, click to look); a new tier puts a banner across the screen and makes the
+  chip pulse. The minimap draws the fronts, the engine and the nodes; toasts and stingers
+  (`data/sounds/survival.ron`) announce rounds, tiers, heavy waves, nodes and the Shaper levels that bring a new kind;
+  the ray and print beams are loops.
 - **Headless.** `--scene survival --map maps/threshold.mcmap [--observe] --bench N` prints rounds and node events and a
   line a minute (`MERIDIAN_SURVIVAL=rounds:grace:interval:intensity:fronts:tier:nodes`,
   `MERIDIAN_SURVIVAL_SPAWN=i`, `MERIDIAN_SURVIVAL_WHY=1` lists where the hostiles are). Tests: `mc-sim/tests/survival.rs`.

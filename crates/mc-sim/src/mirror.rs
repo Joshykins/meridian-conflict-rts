@@ -347,6 +347,24 @@ pub enum SimEvent {
         wreck: u32,
         raised: bool,
     },
+    /// Survival: round `round` is the first the engine prints at `tier`.
+    TierReached {
+        round: u16,
+        tier: u8,
+    },
+    /// Survival: round `round` brings a heavy wave: each squad's kind and size.
+    HeavyWave {
+        round: u16,
+        squads: Vec<(BlueprintId, u16)>,
+    },
+    /// Survival: the Shaper at `pos` (site `site`) grew to `level`, taking on
+    /// `added` when the level brings another kind of unit.
+    ShaperLevelled {
+        site: u8,
+        pos: mc_core::FxVec2,
+        level: u16,
+        added: Option<BlueprintId>,
+    },
     /// Survival: the defenders held out through the last round.
     SurvivalWon {
         rounds: u16,
@@ -3447,11 +3465,16 @@ impl Deck {
 }
 
 /// A Shaper node as the survival HUD shows it (`survival::SurvivalStatus::nodes`).
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct NodeStatus {
     pub site: u8,
     pub pos: [f32; 2],
-    pub product: BlueprintId,
+    /// What it prints for.
+    pub domain: mc_data::survival::Domain,
+    /// What it prints, the first kind first.
+    pub products: Vec<BlueprintId>,
+    /// Its level: it grows the longer it stands.
+    pub level: u16,
     /// 0..1 while the ray raises it; 1 online.
     pub raised: f32,
     pub printed: u32,

@@ -172,14 +172,23 @@ fn the_facility_prints_rounds_in_its_bays_and_raises_shapers() {
                 .has(mc_data::cat::REPLICATOR)
         })
         .collect();
-    assert!(!printing.is_empty(), "units are being printed");
+    // Whole formations at once: more units printing than there are bays.
+    assert!(
+        printing.len() > BAYS.len(),
+        "{} units printing on {} bays",
+        printing.len(),
+        BAYS.len()
+    );
     for &r in &printing {
         let d = BAYS
             .iter()
             .map(|&(x, y)| u.pos[r].distance(FxVec2::from_ints(x, y)).to_f32())
             .fold(f32::MAX, f32::min);
-        assert!(d < 30.0, "printed in a bay ({d} m off)");
+        assert!(d < 240.0, "printed on a bay's apron or past it ({d} m off)");
     }
+    // A formation prints together: every unit on one bay started at once.
+    let progress: Vec<Fx> = printing.iter().map(|&r| u.build_progress[r]).collect();
+    assert!(progress.iter().any(|p| *p > Fx::ZERO));
     assert!(!w.survival_printing().is_empty());
     // The first round wakes the facility: its ray starts raising a Shaper at once.
     assert!(events
@@ -306,43 +315,47 @@ fn rounds_climb_the_tiers_and_grow() {
 }
 
 #[test]
-fn heavies_come_one_at_a_time_and_rarely() {
+fn heavy_waves_grow_without_a_ceiling() {
     let r = SurvivalRules {
         rounds: 30,
         tier_cap: 5,
         ..SurvivalRules::default()
     };
-    let heavies: Vec<(u16, u8)> = (1..=30)
-        .filter_map(|k| r.heavy_at(k).map(|t| (k, t)))
+    let waves: Vec<(u16, mc_sim::survival::HeavyWave)> = (1..=30)
+        .filter_map(|k| r.heavy_wave(k).map(|w| (k, w)))
         .collect();
-    // Only once the rounds reach T4, never two rounds running, T5 no more than T4.
+    // Only once the rounds reach T4, never above the round's tier, T5 squads only at T5.
+    assert!(waves
+        .iter()
+        .all(|(k, w)| r.tier_at(*k) >= 4 && w.top == r.tier_at(*k)));
+    assert!(waves
+        .iter()
+        .all(|(k, w)| (w.t5_share > 0) == (r.tier_at(*k) >= 5)));
+    // They come more often as the rounds climb, and each is worth more than the last.
+    let gaps: Vec<u16> = waves.windows(2).map(|w| w[1].0 - w[0].0).collect();
+    assert!(gaps.windows(2).all(|g| g[1] <= g[0]), "{gaps:?}");
     assert!(
-        heavies.iter().all(|(k, _)| r.tier_at(*k) >= 4),
-        "{heavies:?}"
+        waves.windows(2).all(|w| w[1].1.value > w[0].1.value),
+        "{waves:?}"
     );
-    assert!(
-        heavies.windows(2).all(|w| w[1].0 - w[0].0 >= 3),
-        "{heavies:?}"
-    );
-    let t5 = heavies.iter().filter(|h| h.1 == 5).count();
-    assert!(t5 >= 1 && t5 <= heavies.len() - t5, "{heavies:?}");
-    assert!(
-        heavies.iter().all(|(k, t)| *t <= r.tier_at(*k)),
-        "{heavies:?}"
-    );
-    // A T3 ceiling never sends one; a harder engine sends them more often.
+    // A T3 ceiling never sends one; a harder engine sends them more often, more of them.
     let t3 = SurvivalRules { tier_cap: 3, ..r };
-    assert!((1..=30).all(|k| t3.heavy_at(k).is_none()));
+    assert!((1..=30).all(|k| t3.heavy_wave(k).is_none()));
     let hard = SurvivalRules {
-        intensity: 2200,
+        intensity: 3200,
         ..r
     };
-    assert!((1..=30).filter(|k| hard.heavy_at(*k).is_some()).count() > heavies.len());
+    assert!((1..=30).filter(|k| hard.heavy_wave(*k).is_some()).count() > waves.len());
+    assert!(hard.heavy_wave(waves[0].0).unwrap().floor > waves[0].1.floor);
+    // Endless keeps growing: a wave every round late on, ever bigger.
+    let endless = SurvivalRules { rounds: 0, ..r };
+    assert!((40..60).all(|k| endless.heavy_wave(k).is_some()));
+    assert!(endless.heavy_wave(50).unwrap().value > 8 * endless.heavy_wave(40).unwrap().value);
 }
 
 #[test]
-fn a_t4_and_then_a_t5_come_in_their_rounds() {
-    // Ten rounds to T5: T4 from round 7 (a heavy), T5 from round 9, the next heavy (round 10) a T5.
+fn a_heavy_wave_comes_in_squads_of_one_kind() {
+    // Ten rounds to T5: T4 from round 7 (a wave), T5 from round 9, the next wave (round 10) with T5s open.
     let rules = SurvivalRules {
         rounds: 10,
         grace_secs: 10,
@@ -351,10 +364,11 @@ fn a_t4_and_then_a_t5_come_in_their_rounds() {
         nodes: 0,
         ..rules()
     };
-    assert_eq!(
-        (rules.heavy_at(7), rules.heavy_at(8), rules.heavy_at(10)),
-        (Some(4), None, Some(5))
-    );
+    assert!(rules.heavy_wave(7).is_some_and(|w| w.top == 4));
+    assert!(rules.heavy_wave(8).is_none());
+    assert!(rules
+        .heavy_wave(10)
+        .is_some_and(|w| w.top == 5 && w.t5_share > 0));
     let mut w = world(rules);
     let mut events = Vec::new();
     let acu = w.state.players[0].commander;
@@ -367,30 +381,95 @@ fn a_t4_and_then_a_t5_come_in_their_rounds() {
         },
     };
     run(&mut w, 1, &[guard], &mut events);
-    // Units per tech (T4, T5) of the round being printed, as each round starts.
+    // Heavies (T4 + T5) of the round being printed, as each round starts.
     let mut heavies = std::collections::BTreeMap::new();
     let mut t = 0;
-    while heavies.len() < 10 && t < 20_000 {
+    while heavies.len() < 10 && t < 30_000 {
         run(&mut w, 1, &[], &mut events);
         t += 1;
         let s = w.survival_status().unwrap();
         if s.phase == Phase::Printing && !heavies.contains_key(&s.round) {
             let tech = |k: usize| s.incoming.iter().map(|d| d[k]).sum::<u16>();
-            heavies.insert(s.round, (tech(3), tech(4)));
+            heavies.insert(s.round, (tech(3) + tech(4), s.heavy.clone()));
         }
     }
     for round in 1..=10u16 {
-        let want = match round {
-            7 => (1, 0),
-            10 => (0, 1),
-            _ => (0, 0),
-        };
+        let (count, squads) = heavies.get(&round).cloned().unwrap_or_default();
+        let wave = rules.heavy_wave(round);
+        assert_eq!(count > 0, wave.is_some(), "round {round}: {heavies:?}");
         assert_eq!(
-            heavies.get(&round),
-            Some(&want),
-            "round {round}: {heavies:?}"
+            count,
+            squads.iter().map(|q| q.1).sum::<u16>(),
+            "round {round}: every heavy is in a squad"
         );
+        if let Some(wave) = wave {
+            // At least the floor of heavies (a T5 squad counts for two).
+            let worth: u16 = squads
+                .iter()
+                .map(|(b, n)| {
+                    n * if w.blueprints.unit(*b).tech >= 5 {
+                        2
+                    } else {
+                        1
+                    }
+                })
+                .sum();
+            assert!(worth >= wave.floor, "round {round}: {squads:?}");
+            assert!(squads
+                .iter()
+                .all(|(b, _)| w.blueprints.unit(*b).tech <= wave.top));
+        }
     }
+    assert!(events
+        .iter()
+        .any(|e| matches!(e, SimEvent::HeavyWave { round: 7, .. })));
+    // The tier changes are announced as they come.
+    let tiers: Vec<(u16, u8)> = events
+        .iter()
+        .filter_map(|e| match e {
+            SimEvent::TierReached { round, tier } => Some((*round, *tier)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        tiers.iter().map(|t| t.1).collect::<Vec<_>>(),
+        vec![2, 3, 4, 5]
+    );
+    assert!(tiers
+        .iter()
+        .all(|(r, t)| rules.tier_at(*r) == *t && rules.tier_at(r - 1) < *t));
+}
+
+#[test]
+fn the_engine_never_sends_a_transport() {
+    let mut w = world(SurvivalRules {
+        rounds: 6,
+        tier_cap: 3,
+        interval_secs: 20,
+        ..rules()
+    });
+    let mut events = Vec::new();
+    let acu = w.state.players[0].commander;
+    let guard = PlayerCommand {
+        player: 0,
+        command: Command::DebugSetFlags {
+            units: vec![acu],
+            set: flag::INVULNERABLE,
+            clear: 0,
+        },
+    };
+    run(&mut w, 1, &[guard], &mut events);
+    let mut seen = 0;
+    for _ in 0..300 {
+        run(&mut w, 10, &[], &mut events);
+        let u = &w.state.units;
+        for r in u.slots.iter().filter(|&r| u.owner[r] == 1) {
+            let bp = w.blueprints.unit(u.blueprint[r]);
+            assert!(bp.transport.is_none(), "the engine sent a {}", bp.key);
+            seen += bp.is_mobile() as usize;
+        }
+    }
+    assert!(seen > 0);
 }
 
 #[test]
@@ -456,15 +535,65 @@ fn one_site_holds_a_row_of_shapers_printing_in_batches() {
             assert!(d >= 60.0, "shapers {d} m apart");
         }
     }
-    // Light units come three at a time.
+    // Each prints a formation at a time: at level 1, four T1s.
     run(&mut w, 400, &[], &mut events);
     let status = w.survival_status().unwrap();
-    assert!(status.nodes.iter().any(|n| n.printed >= 3));
+    assert!(status.nodes.iter().any(|n| n.printed >= 4));
     assert!(
-        status.nodes.iter().all(|n| n.printed % 3 == 0),
+        status
+            .nodes
+            .iter()
+            .all(|n| n.level > 1 || n.printed % 4 == 0),
         "{:?}",
         status.nodes
     );
+}
+
+#[test]
+fn shapers_grow_the_longer_they_stand() {
+    let mut w = world(SurvivalRules {
+        rounds: 12,
+        interval_secs: 30,
+        ..rules()
+    });
+    let mut events = Vec::new();
+    let acu = w.state.players[0].commander;
+    let guard = PlayerCommand {
+        player: 0,
+        command: Command::DebugSetFlags {
+            units: vec![acu],
+            set: flag::INVULNERABLE,
+            clear: 0,
+        },
+    };
+    run(&mut w, 1, &[guard], &mut events);
+    let mut t = 0;
+    while w.survival_status().unwrap().round < 9 && t < 20_000 {
+        run(&mut w, 10, &[], &mut events);
+        t += 10;
+    }
+    let status = w.survival_status().unwrap();
+    let top = status.nodes.iter().map(|n| n.level).max().unwrap_or(0);
+    assert!(top >= 3, "{:?}", status.nodes);
+    // Every level is announced; at level 3 it takes on another kind of unit.
+    let levels: Vec<(u16, bool)> = events
+        .iter()
+        .filter_map(|e| match e {
+            SimEvent::ShaperLevelled { level, added, .. } => Some((*level, added.is_some())),
+            _ => None,
+        })
+        .collect();
+    assert!(levels.iter().any(|l| l.0 == 3 && l.1), "{levels:?}");
+    let grown = status.nodes.iter().find(|n| n.level >= 3).unwrap();
+    assert!(grown.products.len() >= 2, "{grown:?}");
+    // A Shaper prints for one domain: all its products are of it.
+    for n in &status.nodes {
+        for p in &n.products {
+            let layer = w.blueprints.unit(*p).motion.unwrap().layer;
+            let air = layer == mc_data::MoveLayer::Air;
+            assert_eq!(air, n.domain == Domain::Air, "{n:?}");
+        }
+    }
 }
 
 #[test]
