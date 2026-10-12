@@ -150,38 +150,65 @@ fn shield_yoke(b: &mut MeshBuilder, t: Vec3) {
         b.mirror_y(|b| {
             b.extrude_y(
                 &[
-                    [-0.45, t.z - 0.4],
+                    [-1.1, t.z - 0.4],
                     [0.35, t.z - 0.4],
-                    [0.18, t.z + 0.1],
-                    [-0.22, t.z + 0.1],
+                    [0.24, t.z + 0.22],
+                    [-0.3, t.z + 0.26],
+                    [-1.1, t.z - 0.02],
                 ],
-                0.62,
+                0.6,
                 0.76,
             )
         })
     });
+    // The trunnion hubs on the arms' outer faces.
     b.paint(ACCENT);
     b.cylinder_between(
-        t - Vec3::Y * 0.82,
-        t + Vec3::Y * 0.82,
-        0.16,
-        0.16,
+        t - Vec3::Y * 0.84,
+        t + Vec3::Y * 0.84,
+        0.2,
+        0.2,
         b.sides(10),
     );
+    // The ready magazine between the arms behind the cradle, standing on the floor.
+    b.paint(PLATING_DARK);
+    b.chamfered_box(t + v3(-0.82, 0.0, -0.17), v3(0.5, 1.2, 0.42), 0.06);
     if !b.fine() {
         return;
     }
+    b.paint(METAL);
+    for s in [-1.0, 1.0] {
+        b.cylinder_between(
+            t + Vec3::Y * s * 0.84,
+            t + Vec3::Y * s * 0.88,
+            0.13,
+            0.13,
+            b.sides(10),
+        );
+    }
     b.paint(PLATING);
     for s in [-1.0, 1.0] {
-        side_plate(b, t + v3(-0.05, s * 0.76, -0.2), s, v2(0.5, 0.3), 0.04);
+        side_plate(b, t + v3(-0.55, s * 0.76, -0.18), s, v2(0.6, 0.3), 0.04);
     }
-    b.paint(PLATING_DARK);
-    b.chamfered_box(t + v3(-0.85, 0.0, -0.18), v3(0.5, 0.9, 0.42), 0.06);
 }
 
-/// The cradle: a sloped white shield across the front with raised plates and a
-/// sight on its top, the guns through it.
+/// The cradle: a dark body round the trunnion and a sloped white shield across its
+/// front with raised plates and a sight on its top, the guns through it.
 fn shield_cradle(b: &mut MeshBuilder, t: Vec3) {
+    // The cradle body round the trunnion between the yoke's arms, carrying the shield.
+    b.paint(ACCENT);
+    b.at(v3(0.0, t.y, 0.0), |b| {
+        b.extrude_y(
+            &[
+                [-0.3, t.z - 0.26],
+                [0.55, t.z - 0.34],
+                [0.55, t.z + 0.3],
+                [-0.18, t.z + 0.24],
+            ],
+            -0.58,
+            0.58,
+        )
+    });
     b.paint(PLATING);
     b.at(v3(0.0, t.y, 0.0), |b| {
         b.extrude_y_chamfered(
