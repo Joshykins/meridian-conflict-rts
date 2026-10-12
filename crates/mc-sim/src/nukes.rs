@@ -1247,7 +1247,7 @@ impl World {
             if self.state.strategic.detonations[i].hit.contains(&id) {
                 continue;
             }
-            let radius = self.bp(row).radius;
+            let radius = self.hull_radius(row);
             let height = self.bp(row).height;
             let reach = (self.state.units.pos[row].distance(center) - radius).max(Fx::ZERO);
             if reach > front {

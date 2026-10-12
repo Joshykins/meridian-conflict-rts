@@ -1799,7 +1799,7 @@ impl World {
             .map(|weapon| weapon.range_max)
             .max()
             .unwrap_or(Fx::ZERO)
-            + self.bp(target).radius;
+            + self.hull_radius(target);
         let at = self.state.units.pos[target];
         self.capital_close_in(row, at, reach)
     }

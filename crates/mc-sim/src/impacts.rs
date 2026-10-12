@@ -691,7 +691,7 @@ impl World {
         let mut charged = Vec::new();
         for row in victims {
             let bp = self.bp(row);
-            let (radius, height) = (bp.radius, bp.height);
+            let (radius, height) = (self.hull_radius(row), bp.height);
             let reach = (self.state.units.pos[row].distance(center) - radius).max(Fx::ZERO);
             if reach > db.radius {
                 continue;

@@ -116,6 +116,7 @@ impl crate::World {
             next_piece_at: 0,
             next_fire: 0,
             held: false,
+            foot: Fx::ZERO,
         });
         self.events.push(SimEvent::NodeRaising {
             site: site_i as u8,
@@ -398,8 +399,9 @@ impl crate::World {
             }
         });
         for n in lost {
-            // Its base unravels with it.
+            // Its base unravels with it, and its foot opens.
             self.survival_unravel(&n)?;
+            self.survival_release_foot(n.pos, n.foot);
             let s = self.state.survival.as_ref().unwrap();
             let kind = s.site_kind(n.site);
             let bp = self.blueprints.unit(s.kit.shaper(kind));

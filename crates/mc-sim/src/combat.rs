@@ -560,7 +560,7 @@ impl World {
             return false;
         }
         let gap =
-            self.gun_origin(shooter, weapon).distance(units.pos[target]) - self.bp(target).radius;
+            self.gun_origin(shooter, weapon).distance(units.pos[target]) - self.hull_radius(target);
         let bp = self.bp(shooter);
         if weapon.depression.0 > 0 {
             let to = units.pos[target].extend(units.z[target] + self.bp(target).height / 2);
@@ -600,7 +600,7 @@ impl World {
             weapon,
             units.z[target] + self.bp(target).height / 2,
             units.speed[target].abs() / DT,
-        ) && gap >= weapon.range_min - self.bp(target).radius * 2
+        ) && gap >= weapon.range_min - self.hull_radius(target) * 2
             && self.slant_reaches(shooter, target, weapon, gap)
             && self.in_arc(shooter, target, weapon)
             && self.detects(owner, target)

@@ -264,6 +264,19 @@ pub(super) fn pylon_feed(regen: Fx, pylons: usize) -> Fx {
     regen * pylons as i32 / 4
 }
 
+/// Metres from its middle to the edge of a Shaper's foot when it stands `height`
+/// metres tall: `16 + 84 * grown`, grown = `(height - 60) / 1100` (0 at level 1, about
+/// 0.61 at level 10 and 0.86 at 20), so 16 m at level 1, 67 m at 10, 88 m at 20, and
+/// never past 96 m: its base's pylons stand from 120 m, its platforms from 150 m and
+/// its silos from 200 m, all clear of it. The model is drawn to match.
+pub fn shaper_foot(height: Fx) -> Fx {
+    let grown = ((height - Fx::from_int(60)) / 1100).clamp(Fx::ZERO, Fx::ONE);
+    (Fx::from_int(16) + grown * 84).min(Fx::from_int(FOOT_MOST))
+}
+
+/// The widest a Shaper's foot reaches (`shaper_foot`), metres.
+pub const FOOT_MOST: i32 = 96;
+
 /// A Shaper's visual tier: one every four levels, each a stage, collar or ring more.
 pub fn shaper_tier(level: u16) -> u8 {
     (1 + level.saturating_sub(1) / 4).min(u8::MAX as u16) as u8

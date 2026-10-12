@@ -126,8 +126,9 @@ fn slot_at(
     let (ring, centre, spread) = match kind {
         PieceKind::Platform => (ring(150 + half / 2, 190), 0u16, 0x3555u16),
         PieceKind::GreatPlatform => (ring(260, 340), 0, 0x3555),
-        PieceKind::Pylon => (ring(80, 110), 0x8000, 0x4800),
-        PieceKind::Silo => (ring(150 + half / 2, 200), 0x8000, 0x3000),
+        // Pylons and silos stand clear of the widest foot (`rules::FOOT_MOST`).
+        PieceKind::Pylon => (ring(120 + half / 2, 140), 0x8000, 0x4800),
+        PieceKind::Silo => (ring(200 + half / 2, 240), 0x8000, 0x3000),
     };
     let step = ((side + GAP) as i64 * PER_RADIAN / ring.max(1) as i64).min(0x4000) as i32;
     let out = (k as i32 + 1) / 2 * if k % 2 == 1 { 1 } else { -1 };

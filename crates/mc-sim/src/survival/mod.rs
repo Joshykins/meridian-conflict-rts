@@ -35,6 +35,7 @@
 mod artillery;
 mod base;
 mod card;
+mod foot;
 mod plan;
 mod print;
 mod rules;
@@ -58,9 +59,9 @@ use mc_data::{BlueprintId, MoveLayer};
 use plan::Formation;
 use print::Route;
 pub use rules::{
-    aux_first_round, launch_gap_ticks, shaper_height, shaper_platforms, shaper_pylons,
+    aux_first_round, launch_gap_ticks, shaper_foot, shaper_height, shaper_platforms, shaper_pylons,
     shaper_silos, shaper_tier, shell_apex, shell_blast, shell_flight_ticks, shell_squad,
-    shells_per_volley, volley_ticks, HeavyWave, SurvivalRules,
+    shells_per_volley, volley_ticks, HeavyWave, SurvivalRules, FOOT_MOST,
 };
 use serde::{Deserialize, Serialize};
 
@@ -255,6 +256,8 @@ struct Node {
     next_fire: u32,
     /// Its last volley was held back by the field cap (`FIELD_CAP`).
     held: bool,
+    /// Metres out its foot is blocked now (`foot.rs`), growing with its height.
+    foot: Fx,
 }
 
 /// Survival's part of the game state.
@@ -411,6 +414,7 @@ impl Survival {
             h.write_u64(n.next_level_at as u64);
             h.write_u64(n.next_piece_at as u64 | (n.pieces.len() as u64) << 32);
             h.write_u64(n.next_fire as u64 | (n.held as u64) << 32);
+            h.write_i64(n.foot.0);
             for p in &n.pieces {
                 h.write_u64(
                     p.unit.0 as u64
@@ -559,6 +563,7 @@ impl crate::World {
         self.survival_prints(now)?;
         self.survival_raise(now)?;
         self.survival_grow(now);
+        self.survival_feet();
         self.survival_base(now)?;
         self.survival_node_prints(now)?;
         self.survival_artillery(now)?;

@@ -56,7 +56,7 @@ impl World {
         self.are_enemies(area.owner, self.state.units.owner[row])
             && !bp.has(cat::SPACE)
             && !(air && area.aircraft == Aircraft::Spared)
-            && pos.distance(area.mark) - bp.radius <= area.radius
+            && pos.distance(area.mark) - self.hull_radius(row) <= area.radius
     }
 
     /// One tick's crush over `area`: shields first, then everything of the enemy's they do

@@ -133,7 +133,7 @@ impl World {
             && units.is_active(target)
             && self.are_enemies(owner, units.owner[target])
             && self.hittable(target, spec.target_mask)
-            && units.pos[row].distance(units.pos[target]) - self.bp(target).radius <= spec.range
+            && units.pos[row].distance(units.pos[target]) - self.hull_radius(target) <= spec.range
             && self.detects(owner, target)
     }
 

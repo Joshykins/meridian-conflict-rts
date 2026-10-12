@@ -42,6 +42,10 @@ pub struct ShaperInstance {
     /// An auxiliary Shaper: 0..1 through the beat to its next volley (a Seedcaster) or
     /// launch (an Unmaker), for a charge-up look; 0 for a printer.
     pub fire_charge: f32,
+    /// Metres from its middle to the edge of its foot, as the sim blocks it now
+    /// (`rules::shaper_foot` of its built height, whole path cells; it waits on a
+    /// structure in the way). The model's footprint matches it.
+    pub foot: f32,
 }
 
 /// A piece of a Shaper's base, for the card and the interface.
@@ -158,6 +162,8 @@ pub struct ShaperCard {
     /// Metres it is built up to now, and its level's height.
     pub height: f32,
     pub full_height: f32,
+    /// Metres from its middle to the edge of its foot now (`ShaperInstance::foot`).
+    pub foot: f32,
     /// 0..1 while the ray raises it; 1 online.
     pub raised: f32,
     /// What it builds, the first kind first.
@@ -256,6 +262,7 @@ impl crate::World {
                 lance_target: target,
                 shield_tier: tier,
                 fire_charge: self.fire_charge(n, kind),
+                foot: n.foot.to_f32(),
             });
         }
     }
@@ -337,6 +344,7 @@ impl crate::World {
             catch_up: s.config.rules.catch_up_level(s.round.max(1)),
             height: n.height.to_f32(),
             full_height: shaper_height(n.level).to_f32(),
+            foot: n.foot.to_f32(),
             raised: self.raised_share(n),
             products: n.products.clone(),
             batch: (

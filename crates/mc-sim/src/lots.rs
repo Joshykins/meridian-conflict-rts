@@ -9,6 +9,9 @@ use mc_core::{Angle, Fx, FxVec2, FxVec3};
 use mc_data::{cat, BlueprintId, UnitBlueprint};
 use mc_map::Prop;
 
+/// An inclusive rectangle of path cells: (min, max).
+pub(crate) type CellRect = ((u32, u32), (u32, u32));
+
 /// Snaps a structure centre to the build grid, facing `build_heading`: odd
 /// footprints centre on a cell, even footprints on a cell corner.
 pub fn snap_to_build_grid(bp: &UnitBlueprint, pos: FxVec2) -> FxVec2 {
@@ -212,6 +215,19 @@ impl World {
         }
         let lot = place_cells_of(bp.footprint_at(heading), pos);
         self.nav.set_lot(lot.0, lot.1, false);
+        self.restore_blockers(except, &released, Some(lot));
+    }
+
+    /// After `released` cells were unblocked: puts back the blockers a structure other
+    /// than `except` or a solid map prop still needs there, then works out the pockets
+    /// round them. `lot`: the lot given back with them, whose neighbours' lots are
+    /// marked taken again (a successor assembled inside it keeps it).
+    pub(crate) fn restore_blockers(
+        &mut self,
+        except: usize,
+        released: &[CellRect],
+        lot: Option<CellRect>,
+    ) {
         let restore = {
             let units = &self.state.units;
             let mut restore = Vec::new();
@@ -226,11 +242,11 @@ impl World {
                     continue;
                 }
                 let other_lot = place_cells_of(bp.footprint_at(units.heading[row]), units.pos[row]);
-                if !cells_overlap(lot, other_lot) {
-                    continue;
+                match lot {
+                    Some(lot) if !cells_overlap(lot, other_lot) => continue,
+                    Some(_) => self.nav.set_lot(other_lot.0, other_lot.1, true),
+                    None => {}
                 }
-                // A successor assembled inside this lot keeps it.
-                self.nav.set_lot(other_lot.0, other_lot.1, true);
                 for other in hull_cells(bp, units.pos[row], units.heading[row]) {
                     if released.iter().any(|&r| cells_overlap(r, other)) {
                         restore.push(other);
@@ -256,7 +272,7 @@ impl World {
         for (min, max) in restore {
             self.nav.block_cells(min, max);
         }
-        for (min, max) in released {
+        for &(min, max) in released {
             self.nav.reseal(min, max);
         }
     }

@@ -361,3 +361,53 @@ fn auxiliary_shapers_hash_the_same_at_any_worker_count_and_after_a_restore() {
     let first = tail.iter().zip(&after).position(|(a, b)| a != b);
     assert_eq!(first, None, "diverged {first:?} ticks after the snapshot");
 }
+
+/// A Shaper's foot spreads as it builds up: its cells blocked, a unit standing there
+/// shoved out, and the ground open again once it dies.
+#[test]
+fn a_shapers_foot_spreads_as_it_grows_and_opens_when_it_dies() {
+    use mc_data::MoveLayer;
+    let (mut w, mut events) = aux_world(&[SiteKind::Artillery], 1);
+    assert!(until(&mut w, &mut events, 20_000, |e| matches!(
+        e,
+        SimEvent::NodeOnline { .. }
+    )));
+    let unit = |w: &World| frame(w).shapers[0].unit;
+    let shaper = mc_sim::Handle(unit(&w));
+    let row = w.state.units.row(shaper).unwrap();
+    let at = w.state.units.pos[row];
+    // A tank of the defenders' parked against it, kept alive through its Lance.
+    let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
+    let parked = at + FxVec2::from_ints(22, 0);
+    let t = w
+        .spawn_unit(tank, 0, parked, mc_core::Angle::ZERO, true)
+        .unwrap();
+    w.state.units.flags[t] |= flag::INVULNERABLE;
+    let tank_id = w.state.units.id(t);
+    let mut foot = 0.0;
+    for _ in 0..400 {
+        run(&mut w, 10, &[], &mut events);
+        foot = frame(&w).shapers[0].foot;
+        if foot >= 24.0 {
+            break;
+        }
+    }
+    assert!(foot >= 24.0, "the foot spread to {foot} m");
+    let card = w.shaper_card(shaper).unwrap();
+    assert_eq!(card.foot, foot);
+    let inside = at + FxVec2::new(Fx::from_f32(foot - 6.0), Fx::ZERO);
+    assert!(
+        !w.nav.passable(MoveLayer::Land, 0, inside),
+        "its foot is blocked"
+    );
+    let t = w.state.units.row(tank_id).unwrap();
+    assert!(
+        w.state.units.pos[t].distance(at) > Fx::from_f32(foot),
+        "the tank was shoved out"
+    );
+    // Down, its foot opens.
+    w.state.units.health[row] = Fx::ZERO;
+    run(&mut w, 3, &[], &mut events);
+    assert!(w.state.units.row(shaper).is_none());
+    assert!(w.nav.passable(MoveLayer::Land, 0, inside), "open again");
+}
