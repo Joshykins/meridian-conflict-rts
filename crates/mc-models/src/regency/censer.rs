@@ -377,9 +377,7 @@ mod tests {
 
     #[test]
     fn fits_the_librarys_checks() {
-        for key in ["regency_censer"] {
-            super::super::check(key, RADIUS, HEIGHT, None, &[]);
-        }
+        super::super::check("regency_censer", RADIUS, HEIGHT, None, &[]);
     }
 
     #[test]
