@@ -171,6 +171,8 @@ pub struct ShaperCard {
     /// Units a formation of its holds: light (T1-T3), heavies.
     pub batch: (u16, u16),
     pub printed: u32,
+    /// Seconds until it prints its next formation (0: as soon as it has one).
+    pub next_print: f32,
     /// Its base: platforms, great platforms and pylons, standing or being printed.
     pub pieces: Vec<PieceView>,
     pub shield: Option<ShieldCard>,
@@ -352,6 +354,7 @@ impl crate::World {
                 nh.min(u16::MAX as usize) as u16,
             ),
             printed: n.printed,
+            next_print: n.next_print.saturating_sub(self.state.tick) as f32 / tps,
             pieces: n
                 .pieces
                 .iter()

@@ -328,6 +328,11 @@ pub struct SurvivalStatus {
     /// Shapers online. The renderer brightens the Precursor light with it.
     pub activity: f32,
     pub nodes: Vec<NodeStatus>,
+    /// Sites whose Shaper was destroyed, standing empty: (site, the first round
+    /// the ray may reseed it in).
+    pub reseeding: Vec<(u8, u16)>,
+    /// The level a Shaper raised now evolves to (`SurvivalRules::catch_up_level`).
+    pub catch_up: u16,
     pub nodes_destroyed: u16,
     /// Shapers the facility starts raising with the next round (or this one,
     /// while it is being printed).

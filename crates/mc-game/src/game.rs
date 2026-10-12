@@ -4431,6 +4431,9 @@ impl Game {
             .filter_map(|id| self.view.index_of.get(id))
             .map(|&i| &self.view.frame.units[i])
             .filter(|u| !u.stored());
+        // A survival Shaper's rings are its level's, not its blueprint's.
+        let shaper = crate::rings::shaper(&self.view, self.hud.survival.shaper_focus);
+        let selected = selected.filter(|u| shaper.as_ref().is_none_or(|s| s.0 != u.unit_id));
         self.rings.focus = self.hud.reach_focus.take();
         let (mut ranges, mut ranges_drawn) = self.rings.collect(
             ghosts[..placing]
@@ -4441,6 +4444,9 @@ impl Game {
             fresh,
             &|p| renderer.ground_height(Vec2::from(p)),
         );
+        if let Some((_, rings)) = shaper {
+            crate::rings::prepend(&mut ranges, &mut ranges_drawn, rings);
+        }
         // Placing a radar, sonar or missile defence post: our standing posts' rings too,
         // merged with the new one's.
         if let Mode::Place(bp) = self.view.mode {

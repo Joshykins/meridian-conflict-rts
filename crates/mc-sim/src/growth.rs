@@ -16,7 +16,7 @@ use std::collections::BTreeMap;
 use mc_core::{Fx, StateHasher};
 use mc_data::lance::Lance;
 use mc_data::strategic::{NuclearBlast, Strategic, StrategicKind};
-use mc_data::Shield;
+use mc_data::{Shield, UnitBlueprint};
 use serde::{Deserialize, Serialize};
 
 use crate::tables::UnitId;
@@ -109,81 +109,18 @@ impl World {
 
     /// The unit's shield at its level.
     pub(crate) fn shield_spec(&self, row: usize) -> Option<Shield> {
-        let bp = self.bp(row);
-        let base = bp.shield?;
-        let Some(g) = &bp.growth else {
-            return Some(base);
-        };
-        let level = self.unit_level(row);
-        Some(Shield {
-            radius: g.shield_radius.at(base.radius, level),
-            health: g.shield_health.at(base.health, level),
-            regen: g.shield_regen.at(base.regen, level),
-            recharge: g.shield_regen.at(base.recharge, level),
-            ..base
-        })
+        grown_shield(self.bp(row), self.unit_level(row))
     }
 
     /// The unit's Lance at its level.
     pub(crate) fn lance_spec(&self, row: usize) -> Option<Lance> {
-        let bp = self.bp(row);
-        let base = bp.lance?;
-        let Some(g) = &bp.growth else {
-            return Some(base);
-        };
-        let level = self.unit_level(row);
-        let ticks = |grow: mc_data::growth::Grow, t: u32| {
-            grow.at(Fx::from_int(t as i32), level).round_int().max(1) as u32
-        };
-        Some(Lance {
-            charge_ticks: ticks(g.lance_charge, base.charge_ticks),
-            reload_ticks: ticks(g.lance_reload, base.reload_ticks),
-            damage: g.lance_damage.at(base.damage, level),
-            splash: g.lance_splash.at(base.splash, level),
-            range: g.lance_range.at(base.range, level),
-            ..base
-        })
+        grown_lance(self.bp(row), self.unit_level(row))
     }
 
     /// The unit's strategic launcher at its level: an interceptor array's stock,
     /// coverage and round time grow; a silo's stock, round time and blast.
     pub(crate) fn launcher_spec(&self, row: usize) -> Option<Cow<'_, Strategic>> {
-        let bp = self.bp(row);
-        let base = bp.strategic.as_ref()?;
-        let Some(g) = &bp.growth else {
-            return Some(Cow::Borrowed(base));
-        };
-        let level = self.unit_level(row);
-        if level == 1 {
-            return Some(Cow::Borrowed(base));
-        }
-        let (stock, round) = match base.kind {
-            StrategicKind::Interceptor => (g.interceptor_stock, g.interceptor_round),
-            StrategicKind::Nuke => (g.warhead_stock, g.warhead_round),
-        };
-        let stock = stock
-            .at(Fx::from_int(base.stock as i32), level)
-            .floor_int()
-            .clamp(1, u8::MAX as i32) as u8;
-        let blast = base.blast.map(|b| {
-            let radius = g.blast_radius.at(b.radius, level).max(Fx::ONE);
-            let damage = g.blast_damage.at(b.damage, level);
-            NuclearBlast {
-                radius,
-                // The core and the edge keep their share of the radius and the damage.
-                core: b.core * radius / b.radius.max(Fx::ONE),
-                edge: b.edge * damage / b.damage.max(Fx::ONE),
-                damage,
-                ..b
-            }
-        });
-        Some(Cow::Owned(Strategic {
-            stock,
-            coverage: g.interceptor_coverage.at(base.coverage, level),
-            round_time: round.at(base.round_time, level).max(Fx::ONE),
-            blast,
-            ..base.clone()
-        }))
+        grown_launcher(self.bp(row), self.unit_level(row))
     }
 
     /// Everything the unit in `row`'s level makes of it, for the interface.
@@ -215,4 +152,77 @@ impl World {
             .by_unit
             .retain(|id, _| units.row(*id).is_some());
     }
+}
+
+/// `bp`'s shield at `level` (its own at level 1, or with no growth block).
+pub fn grown_shield(bp: &UnitBlueprint, level: u16) -> Option<Shield> {
+    let base = bp.shield?;
+    let Some(g) = &bp.growth else {
+        return Some(base);
+    };
+    Some(Shield {
+        radius: g.shield_radius.at(base.radius, level),
+        health: g.shield_health.at(base.health, level),
+        regen: g.shield_regen.at(base.regen, level),
+        recharge: g.shield_regen.at(base.recharge, level),
+        ..base
+    })
+}
+
+/// `bp`'s Lance at `level`.
+pub fn grown_lance(bp: &UnitBlueprint, level: u16) -> Option<Lance> {
+    let base = bp.lance?;
+    let Some(g) = &bp.growth else {
+        return Some(base);
+    };
+    let ticks = |grow: mc_data::growth::Grow, t: u32| {
+        grow.at(Fx::from_int(t as i32), level).round_int().max(1) as u32
+    };
+    Some(Lance {
+        charge_ticks: ticks(g.lance_charge, base.charge_ticks),
+        reload_ticks: ticks(g.lance_reload, base.reload_ticks),
+        damage: g.lance_damage.at(base.damage, level),
+        splash: g.lance_splash.at(base.splash, level),
+        range: g.lance_range.at(base.range, level),
+        ..base
+    })
+}
+
+/// `bp`'s strategic launcher at `level`: an interceptor array's stock, coverage
+/// and round time grow; a silo's stock, round time and blast.
+pub fn grown_launcher(bp: &UnitBlueprint, level: u16) -> Option<Cow<'_, Strategic>> {
+    let base = bp.strategic.as_ref()?;
+    let Some(g) = &bp.growth else {
+        return Some(Cow::Borrowed(base));
+    };
+    if level <= 1 {
+        return Some(Cow::Borrowed(base));
+    }
+    let (stock, round) = match base.kind {
+        StrategicKind::Interceptor => (g.interceptor_stock, g.interceptor_round),
+        StrategicKind::Nuke => (g.warhead_stock, g.warhead_round),
+    };
+    let stock = stock
+        .at(Fx::from_int(base.stock as i32), level)
+        .floor_int()
+        .clamp(1, u8::MAX as i32) as u8;
+    let blast = base.blast.map(|b| {
+        let radius = g.blast_radius.at(b.radius, level).max(Fx::ONE);
+        let damage = g.blast_damage.at(b.damage, level);
+        NuclearBlast {
+            radius,
+            // The core and the edge keep their share of the radius and the damage.
+            core: b.core * radius / b.radius.max(Fx::ONE),
+            edge: b.edge * damage / b.damage.max(Fx::ONE),
+            damage,
+            ..b
+        }
+    });
+    Some(Cow::Owned(Strategic {
+        stock,
+        coverage: g.interceptor_coverage.at(base.coverage, level),
+        round_time: round.at(base.round_time, level).max(Fx::ONE),
+        blast,
+        ..base.clone()
+    }))
 }

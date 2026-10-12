@@ -146,7 +146,9 @@ straight into a match instead.
   --quality PRESET       screenshot: draw at that graphics preset, low | medium | high |
                          ultra (default: high, whatever the card)
   --select KEY           match screenshot: select player 0's first unit whose blueprint key
-                         contains KEY (all of them with a trailing *), not the commander
+                         contains KEY (all of them with a trailing *), not the commander;
+                         any side's when player 0 has none (a survival Shaper; the
+                         camera looks at it unless --camera is given)
   --unit-picker          range screenshot: show the unit browser
   --range-maps           range screenshot: show the map browser
   --paused               match screenshot: show the match paused

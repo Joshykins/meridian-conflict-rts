@@ -486,6 +486,67 @@ pub fn prepend(rings: &mut Vec<RangeRing>, drawn: &mut usize, extra: Vec<RangeRi
     rings.splice(0..0, extra);
 }
 
+/// A survival Shaper's rings in focus (`hud::survival::SurvivalHud::shaper_focus`), as bits.
+pub const SHAPER_LANCE: u8 = 1;
+pub const SHAPER_COVER: u8 = 2;
+pub const SHAPER_SHIELD: u8 = 4;
+
+/// The rings of the survival Shaper the selection shows (`SimStatus::shaper`), at its
+/// level: its blueprint's rings are level 1's, so the caller leaves the Shaper out of
+/// `Rings::collect`. The Lance's reach, the anti-nuke's coverage and the shield's dome,
+/// centred on the Shaper (a piece of its base selected shows its Shaper's); `focus`
+/// lights the ones its bits name and dims the rest. Returns the Shaper's unit id and
+/// its rings; None unless one unit is selected and it is a Shaper or part of one.
+pub fn shaper(view: &crate::game::View, focus: u8) -> Option<(u32, Vec<RangeRing>)> {
+    let pick = view.status.shaper.as_ref()?;
+    if view.selection.len() != 1 || view.selection[0] != pick.picked {
+        return None;
+    }
+    let card = &pick.card;
+    let at = view.frame.units.get(*view.index_of.get(&card.unit.0)?)?.pos;
+    let rings = [
+        (
+            SHAPER_LANCE,
+            Reach::Direct,
+            card.lance.as_ref().map(|l| l.range),
+        ),
+        (
+            SHAPER_COVER,
+            Reach::AntiMissile,
+            card.anti_nuke.as_ref().map(|a| a.coverage),
+        ),
+        (
+            SHAPER_SHIELD,
+            Reach::Shield,
+            card.shield.as_ref().map(|s| s.radius),
+        ),
+    ];
+    let out = rings
+        .into_iter()
+        .filter_map(|(bit, reach, outer)| {
+            let lit = focus & bit != 0;
+            Some(RangeRing {
+                center: [at[0], at[1]],
+                inner: 0.0,
+                outer: outer.filter(|r| *r > 0.0)?,
+                color: reach.linear(),
+                group: reach as u32 | if lit { FOCUS } else { 0 },
+                facing: 0.0,
+                half_arc: FULL_ARC,
+                _pad: [
+                    0.0,
+                    match (lit, focus) {
+                        (true, _) => 1.0,
+                        (false, 0) => 0.0,
+                        _ => -1.0,
+                    },
+                ],
+            })
+        })
+        .collect();
+    Some((card.unit.0, out))
+}
+
 pub struct Rings {
     /// By blueprint id.
     spans: Vec<Vec<Span>>,

@@ -207,6 +207,22 @@ impl crate::World {
         (0.15 + 0.55 * (s.round as f32 / rounds).min(1.0) + 0.04 * online).min(1.0)
     }
 
+    /// The Shaper `unit` is, or whose base it is part of, and which piece of it
+    /// (None: the Shaper itself). None for any other unit.
+    pub fn shaper_of(
+        &self,
+        unit: crate::UnitId,
+    ) -> Option<(crate::UnitId, Option<super::PieceKind>)> {
+        let s = self.state.survival.as_ref()?;
+        s.nodes.iter().find_map(|n| {
+            if n.unit == unit {
+                return Some((n.unit, None));
+            }
+            let p = n.pieces.iter().find(|p| p.unit == unit)?;
+            Some((n.unit, Some(p.kind)))
+        })
+    }
+
     /// What the HUD shows. None outside survival.
     #[expect(
         clippy::float_arithmetic,
@@ -291,6 +307,14 @@ impl crate::World {
             engine: s.config.engine.to_f32(),
             activity: self.survival_activity(),
             nodes,
+            reseeding: s
+                .reseed_from
+                .iter()
+                .enumerate()
+                .filter(|(i, r)| **r > s.round && !s.nodes.iter().any(|n| n.site as usize == *i))
+                .map(|(i, r)| (i.min(u8::MAX as usize) as u8, *r))
+                .collect(),
+            catch_up: rules.catch_up_level(now_round),
             nodes_destroyed: s.nodes_destroyed,
             shapers_next: match s.phase {
                 Phase::Grace | Phase::Launched => rules.nodes_raised(s.round + 1),

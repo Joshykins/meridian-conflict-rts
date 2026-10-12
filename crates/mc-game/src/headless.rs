@@ -675,9 +675,37 @@ pub fn screenshot(
         .filter(|u| u.owner_flags & mc_sim::mirror::KIND_WRECK == 0 && wanted(u))
         .map(|u| u.unit_id)
         .collect();
+    if view.selection.is_empty() {
+        // None of player 0's: any side's (a survival Shaper, to read its card),
+        // the camera on it unless `--camera` says otherwise.
+        if let Some(key) = &shot.select {
+            view.selection = frame
+                .units
+                .iter()
+                .filter(|u| {
+                    u.owner_flags & mc_sim::mirror::KIND_WRECK == 0
+                        && world
+                            .blueprints
+                            .unit(mc_data::BlueprintId(u.blueprint as u16))
+                            .key
+                            .contains(key.trim_end_matches('*'))
+                })
+                .map(|u| u.unit_id)
+                .collect();
+            if let (None, Some(id)) = (shot.camera, view.selection.first()) {
+                camera.focus = glam::Vec3::from(frame.units[view.index_of[id]].pos);
+                camera.distance = 1600.0;
+                camera.yaw = -0.6;
+            }
+        }
+    }
     if shot.select.as_deref().is_some_and(|k| !k.ends_with('*')) {
         view.selection.truncate(1);
     }
+    view.status.shaper = view
+        .selection
+        .first()
+        .and_then(|&id| crate::sim_thread::shaper_pick(&world, id));
     view.groups.set(1, &view.selection);
     // `MERIDIAN_GROUPS=KEY,KEY,...`: control groups 2, 3, ... hold player 0's
     // units whose blueprint key contains each KEY.
@@ -819,15 +847,22 @@ pub fn screenshot(
         }
     }
     let mut rings = crate::rings::Rings::new(&world.blueprints);
+    // A survival Shaper's rings are its level's (`rings::shaper`), drawn in place of its
+    // blueprint's.
+    let shaper = crate::rings::shaper(&view, 0);
     let (mut ranges, mut ranges_drawn) = rings.collect(
         view.selection
             .iter()
+            .filter(|id| shaper.as_ref().is_none_or(|s| s.0 != **id))
             .filter_map(|id| view.index_of.get(id))
             .map(|&i| &frame.units[i]),
         1.0,
         true,
         &|p| renderer.ground_height(glam::Vec2::from(p)),
     );
+    if let Some((_, extra)) = shaper {
+        crate::rings::prepend(&mut ranges, &mut ranges_drawn, extra);
+    }
     view.reaches = crate::rings::Rings::key(&ranges);
     let mut cover_network = false;
     // Titan strikes and storms under way, read off the world (`titan_marks::seed`).
@@ -1063,17 +1098,23 @@ pub fn screenshot(
         memory.end_frame(&input);
         // A weapon card under `--cursor` lights its ring on the ground, as in a match.
         let focus = hud.reach_focus.take();
-        if focus != rings.focus {
+        let shaper_focus = hud.survival.shaper_focus;
+        if focus != rings.focus || shaper_focus != 0 {
             rings.focus = focus;
+            let shaper = crate::rings::shaper(&view, shaper_focus);
             (ranges, ranges_drawn) = rings.collect(
                 view.selection
                     .iter()
+                    .filter(|id| shaper.as_ref().is_none_or(|s| s.0 != **id))
                     .filter_map(|id| view.index_of.get(id))
                     .map(|&i| &frame.units[i]),
                 1.0,
                 true,
                 &|p| renderer.ground_height(glam::Vec2::from(p)),
             );
+            if let Some((_, extra)) = shaper {
+                crate::rings::prepend(&mut ranges, &mut ranges_drawn, extra);
+            }
             cover_network = false;
         }
         // Placing a post: our posts' rings and the site's, merged (no ghost draws its ring here).

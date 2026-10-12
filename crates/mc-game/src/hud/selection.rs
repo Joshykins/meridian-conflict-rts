@@ -20,6 +20,7 @@ use mc_sim::{veterancy_health, FireState, VETERANCY_MAX};
 mod details;
 mod formation;
 mod pause_order;
+mod shaper;
 mod status;
 
 use details::details_card;
@@ -662,8 +663,27 @@ fn single(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect, stri
     let bp = s.bp(u);
     let details = Rect::new(r.right() - 16.0 - 26.0, r.y + 14.0, 26.0, 24.0);
     title(hud, ui, s, u, r, details.x - 8.0);
-    // Details (I) opens lore, figures and every weapon in a card of their own.
-    let t = hud.tile(ui, id("unit-details", 0), details, hud.details_open, true);
+    // Details (I) opens lore, figures and every weapon in a card of their own; a
+    // survival Shaper's (or a piece of its base's) is its Shaper's card, open
+    // until closed.
+    let pick = s
+        .view
+        .status
+        .shaper
+        .as_ref()
+        .filter(|p| p.picked == u.unit_id);
+    if pick.is_none_or(|p| {
+        hud.survival
+            .shaper_closed
+            .is_some_and(|c| c != p.card.unit.0)
+    }) {
+        hud.survival.shaper_closed = None;
+    }
+    let open = match pick {
+        Some(p) => hud.survival.shaper_closed != Some(p.card.unit.0),
+        None => hud.details_open,
+    };
+    let t = hud.tile(ui, id("unit-details", 0), details, open, true);
     let c = Vec2::new(details.x + details.w * 0.5, details.mid_y());
     let ink_tone = rgb(palette::TEXT, 0.7 + 0.3 * t.glow);
     ui.arc(c, 7.0, 0.0, std::f32::consts::TAU, 1.2, ink_tone);
@@ -674,7 +694,12 @@ fn single(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect, stri
     }
     if t.clicked {
         ui.audio.play(Sfx::Tick);
-        hud.details_open = !hud.details_open;
+        match pick {
+            Some(p) => {
+                hud.survival.shaper_closed = open.then_some(p.card.unit.0);
+            }
+            None => hud.details_open = !hud.details_open,
+        }
     }
 
     // A lift ship's hold has a panel of its own, right of the order card (`hud/cargo.rs`).
@@ -690,18 +715,22 @@ fn single(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect, stri
     // The card rises and fades in over the panel, and sinks away when closed.
     let k = ui.ease(
         id("unit-details-card", 0),
-        if hud.details_open { 1.0 } else { 0.0 },
+        if open { 1.0 } else { 0.0 },
         16.0,
     );
     if k > 0.01 {
         let (fade, shift, live) = (ui.fade, ui.shift, ui.interactive);
         ui.fade *= k;
         ui.shift.y += (1.0 - k) * 20.0;
-        ui.interactive &= hud.details_open;
-        details_card(ui, hud, bp, s.build_dial((u.owner_flags & 0xFF) as u8), r);
+        ui.interactive &= open;
+        match pick {
+            Some(p) => shaper::card(ui, hud, s, p, r),
+            None => details_card(ui, hud, bp, s.build_dial((u.owner_flags & 0xFF) as u8), r),
+        }
         (ui.fade, ui.shift, ui.interactive) = (fade, shift, live);
     } else {
         hud.details_focus = 0;
+        hud.survival.shaper_focus = 0;
     }
 }
 

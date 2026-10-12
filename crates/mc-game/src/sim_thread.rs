@@ -110,12 +110,24 @@ pub struct SimStatus {
     pub error: Option<String>,
     /// Survival's rounds and nodes; None in any other match.
     pub survival: Option<mc_sim::SurvivalStatus>,
+    /// The Shaper the first watched unit is, or is a piece of: its selection card.
+    pub shaper: Option<ShaperPick>,
     /// A replay being watched: its length, and the tick a seek is running to.
     pub replay: Option<ReplayStatus>,
     /// The match's zones and what each player really holds in each, while an observer
     /// draws the AI's map (`Watch::zones`; `mind_map.rs`).
     pub zone_map: Option<Arc<mc_sim::ai::ZoneMapView>>,
     pub zone_truth: Vec<Vec<mc_sim::ai::MindHolding>>,
+}
+
+/// A survival Shaper the selection shows (`hud::selection::shaper`).
+#[derive(Clone, Debug)]
+pub struct ShaperPick {
+    /// The unit watched: the Shaper, or a piece of its base.
+    pub picked: u32,
+    /// Which piece of the base `picked` is; None for the Shaper itself.
+    pub piece: Option<mc_sim::survival::PieceKind>,
+    pub card: mc_sim::survival::ShaperCard,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -318,6 +330,7 @@ pub fn status_of(world: &World, worst: u64) -> SimStatus {
         ally_mine_plans: Vec::new(),
         error: None,
         survival: world.survival_status(),
+        shaper: None,
         replay: None,
         zone_map: None,
         zone_truth: Vec::new(),
@@ -391,6 +404,7 @@ fn write_watched(world: &World, local: Option<u8>, watch: &Watch, status: &mut S
         world.write_plans(side, &mut status.plans);
     }
     write_ally_mine_plans(world, local.and(side), &mut status.ally_mine_plans);
+    status.shaper = watch.units.first().and_then(|&id| shaper_pick(world, id));
     if local.is_none() && watch.zones {
         status.zone_map = Some(world.ai_zone_map());
         status.zone_truth = world.ai_zone_truth();
@@ -398,6 +412,16 @@ fn write_watched(world: &World, local: Option<u8>, watch: &Watch, status: &mut S
         status.zone_map = None;
         status.zone_truth.clear();
     }
+}
+
+/// The selection card of the Shaper unit `id` is, or is a piece of.
+pub fn shaper_pick(world: &World, id: u32) -> Option<ShaperPick> {
+    let (shaper, piece) = world.shaper_of(mc_sim::Handle(id))?;
+    Some(ShaperPick {
+        picked: id,
+        piece,
+        card: world.shaper_card(shaper)?,
+    })
 }
 
 /// The core mines `side`'s allies have planned, for the warning when the side places one

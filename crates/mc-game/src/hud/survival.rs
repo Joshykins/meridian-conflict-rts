@@ -1,8 +1,9 @@
 //! Survival's card, in the right column under the minimap: which round it is
 //! and how many are left, what the Progenitor is doing (counting down,
 //! forging, sending the round), what is coming by domain and tier, its heavy
-//! wave or the next tier, and the Shapers standing, the bonus objectives, one
-//! row per site that takes the camera to it. A new tier also gets a banner
+//! wave or the next tier, and the Shapers, the bonus objectives: one row per
+//! site, its Shaper's level, tier and kind (a click selects it and looks at it),
+//! or the round an empty site is reseeded in. A new tier also gets a banner
 //! across the middle of the screen.
 
 use super::icons;
@@ -11,6 +12,7 @@ use super::{Hud, HudAction, Scene};
 use crate::audio::Sfx;
 use crate::ui::{id, ink, palette, rgb, style, type_scale, Rect, Style, Ui};
 use glam::Vec2;
+use mc_data::survival::SiteKind;
 use mc_data::BlueprintId;
 use mc_sim::survival::{NodeStatus, Phase};
 
@@ -36,6 +38,8 @@ const DOMAINS: [u32; 3] = [LAND, AIR, NAVY];
 pub struct SurvivalHud {
     /// Names of the map's node sites, by site index.
     pub sites: Vec<String>,
+    /// Where each site's Shaper stands, by site index.
+    site_at: Vec<Vec2>,
     /// The map's fronts (domain, path), read once with the sites.
     fronts: Vec<(mc_data::survival::Domain, Vec<Vec2>)>,
     read: bool,
@@ -45,6 +49,11 @@ pub struct SurvivalHud {
     banner: Option<(u8, Option<f32>)>,
     /// The tier the chip shows and when it changed, for its pulse.
     chip: (u8, f32),
+    /// The Shaper whose selection card the player closed: it stays closed until
+    /// another is selected (`selection::shaper`).
+    pub(super) shaper_closed: Option<u32>,
+    /// The Shaper's rings the card points at (`rings::SHAPER_*` bits), last frame's.
+    pub(crate) shaper_focus: u8,
 }
 
 impl SurvivalHud {
@@ -142,6 +151,11 @@ pub fn draw(
         hud.survival.read = true;
         if let Some(layout) = crate::survival::layout(s.map) {
             hud.survival.sites = layout.node_sites.iter().map(|n| n.name.clone()).collect();
+            hud.survival.site_at = layout
+                .node_sites
+                .iter()
+                .map(|n| Vec2::new(n.at.0, n.at.1))
+                .collect();
             hud.survival.fronts = layout
                 .fronts
                 .iter()
@@ -156,17 +170,19 @@ pub fn draw(
     }
     let t = ui.time;
 
-    // The Shapers by site and domain, in the order they rose.
-    let mut sites: Vec<(u8, Vec<&NodeStatus>)> = Vec::new();
-    for n in &status.nodes {
-        match sites
-            .iter_mut()
-            .find(|(k, v)| *k == n.site && v[0].domain == n.domain)
-        {
-            Some((_, v)) => v.push(n),
-            None => sites.push((n.site, vec![n])),
-        }
-    }
+    // One row per site: its Shaper, in the order they rose, then the sites
+    // standing empty until the ray reseeds them.
+    let sites: Vec<Site> = status
+        .nodes
+        .iter()
+        .map(Site::Standing)
+        .chain(
+            status
+                .reseeding
+                .iter()
+                .map(|&(site, round)| Site::Empty { site, round }),
+        )
+        .collect();
     let show_shapers = !status.nodes.is_empty() || status.nodes_destroyed > 0;
     let fixed = HEAD_H + FORECAST_H + if show_shapers { 30.0 } else { 0.0 } + PAD;
     let room = ((bottom - top - fixed) / (ROW_H + ROW_GAP))
@@ -467,7 +483,7 @@ pub fn draw(
             );
         }
         let hidden = sites.len().saturating_sub(rows);
-        for (i, (site, nodes)) in sites.iter().take(rows).enumerate() {
+        for (i, site) in sites.iter().take(rows).enumerate() {
             let tr = Rect::new(x - 4.0, ry, cw + 8.0, ROW_H);
             ry += ROW_H + ROW_GAP;
             if hidden > 0 && i + 1 == rows {
@@ -482,110 +498,171 @@ pub fn draw(
                 );
                 break;
             }
-            let key = *site as usize * 4 + nodes[0].domain as usize;
-            let tile = hud.tile(ui, id("survival-site", key), tr, false, true);
-            let raised = nodes.iter().map(|n| n.raised).sum::<f32>() / nodes.len() as f32;
-            let raising = raised < 1.0;
-            let a = if raising {
-                0.55 + 0.45 * (t * 4.0).sin().abs()
-            } else {
-                1.0
-            };
-            // Its diamond in the colour of the domain it prints for.
-            let kind = match nodes[0].domain {
-                mc_data::survival::Domain::Land => LAND,
-                mc_data::survival::Domain::Air => AIR,
-                mc_data::survival::Domain::Naval => NAVY,
-            };
-            diamond(ui, Vec2::new(tr.x + 13.0, tr.y + 13.0), 5.0, rgb(kind, a));
-            // What each Shaper here prints, as icons on the right.
-            let mut products: Vec<(BlueprintId, usize)> = Vec::new();
-            for p in nodes.iter().flat_map(|n| n.products.iter()) {
-                match products.iter_mut().find(|(q, _)| q == p) {
-                    Some((_, c)) => *c += 1,
-                    None => products.push((*p, 1)),
-                }
-            }
-            let level = nodes.iter().map(|n| n.level).max().unwrap_or(1);
-            let mut ix = tr.right() - 14.0;
-            // The newest kinds it prints; the line under the name counts them all.
-            for (p, _) in products.iter().rev().take(4) {
-                let bp = s.blueprints.unit(BlueprintId(p.0));
-                let tone = match super::style::Domain::of(bp) {
-                    super::style::Domain::Air => AIR,
-                    super::style::Domain::Navy => NAVY,
-                    _ => LAND,
-                };
-                icons::strategic(
-                    ui,
-                    bp.visual.icon,
-                    bp.tech,
-                    Vec2::new(ix, tr.y + 13.0),
-                    6.0,
-                    rgb(tone, 1.0),
-                    ink(0.9),
-                );
-                ix -= 18.0;
-            }
-            let name = hud
-                .survival
-                .sites
-                .get(*site as usize)
-                .cloned()
-                .unwrap_or_else(|| format!("Site {}", site + 1));
-            ui.text_fit_left(
-                tr.x + 26.0,
-                tr.y + 13.0,
-                ix - tr.x - 30.0,
-                type_scale::CAPTION,
-                rgb(palette::TEXT, 0.9 + 0.1 * tile.glow),
-                &name,
-            );
-            let line = if raising {
-                format!("Rising  {:.0}%", raised * 100.0)
-            } else if level > 1 {
-                let printed: u32 = nodes.iter().map(|n| n.printed).sum();
-                format!(
-                    "Level {level}  \u{b7}  {} kinds  \u{b7}  {printed} printed",
-                    products.len()
-                )
-            } else {
-                let names: Vec<String> = products
-                    .iter()
-                    .map(|(p, c)| {
-                        let n = &s.blueprints.unit(BlueprintId(p.0)).name;
-                        if *c > 1 {
-                            format!("{n} \u{d7}{c}")
-                        } else {
-                            n.clone()
-                        }
-                    })
-                    .collect();
-                let printed: u32 = nodes.iter().map(|n| n.printed).sum();
-                format!("{}  \u{b7}  {printed} printed", names.join(", "))
-            };
-            ui.text_fit_left(
-                tr.x + 26.0,
-                tr.y + 28.0,
-                tr.w - 36.0,
-                type_scale::MICRO,
-                rgb(palette::DIM, 1.0),
-                &line,
-            );
-            if raising {
-                ui.fill(
-                    Rect::new(tr.x + 6.0, tr.bottom() - 4.0, (tr.w - 12.0) * raised, 2.0),
-                    rgb(VIOLET, 0.9),
-                );
-            }
-            if tile.clicked {
-                ui.audio.play(Sfx::Select);
-                let at = nodes[nodes.len() / 2].pos;
-                hud.actions.push(HudAction::LookAt(Vec2::new(at[0], at[1])));
-            }
+            site_row(hud, ui, s, site, status.catch_up, tr);
         }
     }
     Some(r)
+}
+
+/// A row of the Shapers section: a site's Shaper, or a site standing empty.
+enum Site<'a> {
+    Standing(&'a NodeStatus),
+    /// Its Shaper was destroyed: empty until the ray reseeds it in `round`.
+    Empty {
+        site: u8,
+        round: u16,
+    },
+}
+
+/// What a site kind's Shaper does, short.
+fn kind_word(kind: SiteKind) -> &'static str {
+    match kind {
+        SiteKind::Printer => "Printer",
+        SiteKind::Artillery => "Artillery",
+        SiteKind::Nuke => "Nuke",
+    }
+}
+
+/// The line under a site's name: rising, its level (and the level it is evolving
+/// to), tier and kind, and what it has printed; or when an empty site is reseeded.
+fn site_line(site: &Site, catch_up: u16) -> String {
+    match site {
+        Site::Standing(n) if n.raised < 1.0 => format!("Rising  {:.0}%", n.raised * 100.0),
+        Site::Standing(n) => {
+            let level = if n.level < catch_up {
+                format!("Level {} \u{2192} {catch_up}", n.level)
+            } else {
+                format!("Level {}", n.level)
+            };
+            let mut line = format!(
+                "{level}  \u{b7}  T{}  \u{b7}  {}",
+                n.tier,
+                kind_word(n.kind)
+            );
+            if n.kind == SiteKind::Printer {
+                line.push_str(&format!("  \u{b7}  {} printed", n.printed));
+            }
+            line
+        }
+        Site::Empty { round, .. } => format!("Empty  \u{b7}  reseeds round {round}"),
+    }
+}
+
+/// One site's row in `tr`: its mark, its name, what it prints, its state. A
+/// Shaper's row selects it and looks at it; an empty site's looks at the site.
+fn site_row(hud: &mut Hud, ui: &mut Ui, s: &Scene, site: &Site, catch_up: u16, tr: Rect) {
+    let t = ui.time;
+    let (index, node) = match site {
+        Site::Standing(n) => (n.site, Some(*n)),
+        Site::Empty { site, .. } => (*site, None),
+    };
+    let tile = hud.tile(ui, id("survival-site", index as usize), tr, false, true);
+    let raising = node.is_some_and(|n| n.raised < 1.0);
+    let a = if raising {
+        0.55 + 0.45 * (t * 4.0).sin().abs()
+    } else if node.is_none() {
+        0.35
+    } else {
+        1.0
+    };
+    // Its mark: a printer's in the colour of the domain it prints for, an
+    // auxiliary Shaper's in the engine's violet (a nuke's in the heavy gold).
+    let tone = match node.map(|n| (n.kind, n.domain)) {
+        Some((SiteKind::Printer, mc_data::survival::Domain::Land)) => LAND,
+        Some((SiteKind::Printer, mc_data::survival::Domain::Air)) => AIR,
+        Some((SiteKind::Printer, mc_data::survival::Domain::Naval)) => NAVY,
+        Some((SiteKind::Nuke, _)) => HEAVY,
+        _ => VIOLET,
+    };
+    let c = Vec2::new(tr.x + 13.0, tr.y + 13.0);
+    if node.is_some() {
+        diamond(ui, c, 5.0, rgb(tone, a));
+    } else {
+        // An empty site: the diamond's outline.
+        for (p, q) in [
+            (0.0, -1.0),
+            (1.0, 0.0),
+            (0.0, 1.0),
+            (-1.0, 0.0),
+            (0.0, -1.0),
+        ]
+        .windows(2)
+        .map(|w| (Vec2::from(w[0]), Vec2::from(w[1])))
+        {
+            ui.stroke(c + p * 5.0, c + q * 5.0, 1.2, rgb(VIOLET, 0.6));
+        }
+    }
+    // What it prints, the newest kinds, as icons on the right.
+    let mut ix = tr.right() - 14.0;
+    for p in node
+        .map_or(&[][..], |n| &n.products[..])
+        .iter()
+        .rev()
+        .take(4)
+    {
+        let bp = s.blueprints.unit(BlueprintId(p.0));
+        let tone = match super::style::Domain::of(bp) {
+            super::style::Domain::Air => AIR,
+            super::style::Domain::Navy => NAVY,
+            _ => LAND,
+        };
+        icons::strategic(
+            ui,
+            bp.visual.icon,
+            bp.tech,
+            Vec2::new(ix, tr.y + 13.0),
+            6.0,
+            rgb(tone, 1.0),
+            ink(0.9),
+        );
+        ix -= 18.0;
+    }
+    let name = hud
+        .survival
+        .sites
+        .get(index as usize)
+        .cloned()
+        .unwrap_or_else(|| format!("Site {}", index + 1));
+    ui.text_fit_left(
+        tr.x + 26.0,
+        tr.y + 13.0,
+        ix - tr.x - 30.0,
+        type_scale::CAPTION,
+        rgb(
+            palette::TEXT,
+            if node.is_some() { 0.9 } else { 0.5 } + 0.1 * tile.glow,
+        ),
+        &name,
+    );
+    let catching = node.is_some_and(|n| n.raised >= 1.0 && n.level < catch_up);
+    ui.text_fit_left(
+        tr.x + 26.0,
+        tr.y + 28.0,
+        tr.w - 36.0,
+        type_scale::MICRO,
+        rgb(if catching { VIOLET } else { palette::DIM }, 1.0),
+        &site_line(site, catch_up),
+    );
+    if let Some(n) = node.filter(|n| n.raised < 1.0) {
+        ui.fill(
+            Rect::new(tr.x + 6.0, tr.bottom() - 4.0, (tr.w - 12.0) * n.raised, 2.0),
+            rgb(VIOLET, 0.9),
+        );
+    }
+    if tile.clicked {
+        ui.audio.play(Sfx::Select);
+        match node {
+            Some(n) => hud.actions.push(HudAction::Select {
+                units: vec![n.unit.0],
+                focus: true,
+            }),
+            None => {
+                if let Some(at) = hud.survival.site_at.get(index as usize) {
+                    hud.actions.push(HudAction::LookAt(*at));
+                }
+            }
+        }
+    }
 }
 
 /// On the minimap: the fronts as flowing dashes toward the defenders, the
@@ -664,5 +741,46 @@ pub fn minimap(hud: &mut Hud, ui: &mut Ui, s: &Scene, at: &dyn Fn(Vec2) -> Vec2)
             // The ray, from the engine to the site.
             ui.stroke(e, c, 1.0, rgb(VIOLET, 0.35 + 0.3 * a));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn node(level: u16, raised: f32, kind: SiteKind) -> NodeStatus {
+        NodeStatus {
+            unit: mc_sim::Handle(7),
+            site: 2,
+            kind,
+            pos: [0.0; 2],
+            domain: mc_data::survival::Domain::Land,
+            products: Vec::new(),
+            level,
+            tier: mc_sim::survival::shaper_tier(level),
+            raised,
+            printed: 40,
+        }
+    }
+
+    #[test]
+    fn a_site_row_says_how_its_shaper_stands() {
+        let rising = node(1, 0.4, SiteKind::Printer);
+        assert_eq!(site_line(&Site::Standing(&rising), 1), "Rising  40%");
+        let up = node(9, 1.0, SiteKind::Printer);
+        assert_eq!(
+            site_line(&Site::Standing(&up), 6),
+            "Level 9  \u{b7}  T3  \u{b7}  Printer  \u{b7}  40 printed"
+        );
+        // Below the round's level it is evolving up to it.
+        let behind = node(3, 1.0, SiteKind::Artillery);
+        assert_eq!(
+            site_line(&Site::Standing(&behind), 6),
+            "Level 3 \u{2192} 6  \u{b7}  T1  \u{b7}  Artillery"
+        );
+        assert_eq!(
+            site_line(&Site::Empty { site: 1, round: 9 }, 6),
+            "Empty  \u{b7}  reseeds round 9"
+        );
     }
 }

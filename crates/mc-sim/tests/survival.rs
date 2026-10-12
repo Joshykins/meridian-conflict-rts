@@ -1041,6 +1041,12 @@ fn a_shaper_raises_platforms_in_front_prints_on_them_and_they_unravel_with_it() 
     }
     let base = base_of(&w, shaper);
     assert!(level >= 6, "level {level}");
+    // Selecting a piece of the base finds its Shaper.
+    let card = w.shaper_card(shaper).unwrap();
+    assert_eq!(w.shaper_of(shaper), Some((shaper, None)));
+    for p in &card.pieces {
+        assert_eq!(w.shaper_of(p.unit), Some((shaper, Some(p.kind))));
+    }
     assert!(count(&base, "progenitor_platform") >= 2, "{base:?}");
     assert!(count(&base, "progenitor_pylon") >= 2, "{base:?}");
     for (k, p) in &base {
@@ -1075,6 +1081,14 @@ fn a_shaper_raises_platforms_in_front_prints_on_them_and_they_unravel_with_it() 
         units.iter().all(|u| w.state.units.row(*u).is_none()),
         "the base unravelled"
     );
+    // Its site stands empty until the ray may reseed it, and the HUD says when.
+    let status = w.survival_status().unwrap();
+    assert!(
+        status.reseeding.iter().any(|(_, r)| *r > status.round),
+        "{:?}",
+        status.reseeding
+    );
+    assert!(status.catch_up >= 1);
     let wr = &w.state.wrecks;
     assert!(
         !wr.slots.iter().any(|r| w
