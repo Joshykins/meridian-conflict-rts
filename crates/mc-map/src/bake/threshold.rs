@@ -102,12 +102,15 @@ const COURSE_RUN: f64 = 14.0;
 /// The road up: its middle line, half its width, where the causeway leaves the
 /// forecourt and where the cut reaches the plateau. The Gate stands past its top.
 pub(crate) const ROAD_Y: f64 = 8_304.0;
-const RAMP_HALF: f64 = 150.0;
+const RAMP_HALF: f64 = 300.0;
 const RAMP_X0: f64 = 9_150.0;
 const RAMP_X1: f64 = 10_450.0;
 /// Where the Rampart's casing stops either side of the road.
-const RAMP_GAP: f64 = 190.0;
+const RAMP_GAP: f64 = 340.0;
 pub(crate) const GATE: (f64, f64) = (10_560.0, ROAD_Y);
+/// The Gate at this scale stands its legs clear of the road (`PrecursorGate`'s
+/// legs are 240 m off its middle line at 1.0).
+const GATE_SCALE: f64 = 1.4;
 
 /// The two print halls, facing west down the processional (heading pi), at
 /// half as big again as the model.
@@ -628,7 +631,7 @@ impl Terrain {
             }
             x += 150.0;
         }
-        put(PropKind::PrecursorGate, GATE, 0.0, 1.0);
+        put(PropKind::PrecursorGate, GATE, 0.0, GATE_SCALE);
         let mut x = GATE.0 + 260.0;
         while x < HEART.0 - 320.0 {
             for side in [-1.0, 1.0] {
@@ -779,7 +782,7 @@ impl Terrain {
         for &(_, at, _, _) in &CRADLES {
             out.push((at, 200.0));
         }
-        out.push((GATE, 420.0));
+        out.push((GATE, 420.0 * GATE_SCALE));
         out.push((SEA_GATE, 460.0));
         // The muster and the road down from it.
         for x in [10_300.0, 10_600.0, 10_900.0, 11_200.0] {

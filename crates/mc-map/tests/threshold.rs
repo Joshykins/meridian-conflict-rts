@@ -457,7 +457,7 @@ fn check(map_path: &std::path::Path) {
     let ramp_shut = map.flood(
         land_bays[0],
         |cx, cy| map.land_cell(cx, cy),
-        |x, y| (9_800.0..10_000.0).contains(&x) && (8_104.0..8_504.0).contains(&y),
+        |x, y| (9_800.0..10_000.0).contains(&x) && (7_904.0..8_704.0).contains(&y),
     );
     for (s, &at) in layout.spawns.iter().zip(&spawns) {
         if map.reached(&ramp_shut, at) {
