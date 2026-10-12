@@ -233,6 +233,43 @@ fn the_file_reads_back_what_was_written_and_survives_a_bad_one() {
 }
 
 #[test]
+fn a_full_library_of_full_prefabs_fits_the_file_limit() {
+    let dir = std::env::temp_dir().join(format!("mc-prefabs-full-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("prefabs.ron");
+    let mut lib = Library {
+        path: Some(path.clone()),
+        ..Library::default()
+    };
+    // The widest members a file can hold: long keys, far offsets, turned.
+    let members: Vec<_> = (0..MAX_MEMBERS as i32)
+        .map(|i| Member {
+            key: "regency_t3_engineering_station_x".into(),
+            x: -MAX_OFFSET + i,
+            y: -MAX_OFFSET,
+            turn: 3,
+        })
+        .collect();
+    for i in 0..MAX_PREFABS {
+        let p = Prefab {
+            name: format!("{i:0>width$}", width = MAX_NAME),
+            members: members.clone(),
+            category: None,
+            icon: None,
+            id: PrefabId::default(),
+        };
+        assert!(lib.keep(p).is_some());
+    }
+    lib.save().unwrap();
+    let bytes = std::fs::metadata(&path).unwrap().len();
+    assert!(bytes <= MAX_FILE_BYTES, "{bytes} bytes");
+    let read = read_file(&path).unwrap().unwrap();
+    assert_eq!(read.len(), MAX_PREFABS);
+    assert!(read.iter().all(|p| p.members.len() == MAX_MEMBERS));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn a_retired_blueprint_is_left_out() {
     let b = blueprints();
     let mut p = capture(&b, &base(&b)).unwrap();

@@ -17,11 +17,12 @@ use std::path::PathBuf;
 /// Most prefabs the library holds; saving one more is refused, with a notice.
 pub const MAX_PREFABS: usize = 48;
 /// Most structures in one prefab; a bigger selection is refused, with a notice.
-pub const MAX_MEMBERS: usize = 64;
+pub const MAX_MEMBERS: usize = 256;
 /// Longest name, in characters.
 pub const MAX_NAME: usize = 32;
-/// The file is read only up to this size: a prefab library is a few kilobytes.
-const MAX_FILE_BYTES: u64 = 1 << 20;
+/// The file is read only up to this size, which a full library (`MAX_PREFABS`
+/// of `MAX_MEMBERS` structures) fits inside.
+const MAX_FILE_BYTES: u64 = 4 << 20;
 /// Farthest a member may stand from the middle, metres: a hand-edited file
 /// cannot throw a structure across the map.
 const MAX_OFFSET: i32 = 2048;
