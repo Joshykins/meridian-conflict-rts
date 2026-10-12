@@ -599,6 +599,13 @@ fn levels_have_no_ceiling_and_heights_climb_toward_them() {
     assert!((2..400).all(|l| h(l) >= h(l - 1)));
     assert!(h(400) < 1161.0);
     assert_eq!(mc_sim::survival::shaper_tier(1), 1);
+    // A Shaper's base grows with it: platforms, great ones from level 8, pylons.
+    let pads = mc_sim::survival::shaper_platforms;
+    assert_eq!(pads(1), (1, 0));
+    assert_eq!(pads(8).1, 1);
+    assert!(pads(30).0 > pads(10).0 && pads(30).1 > pads(10).1);
+    assert_eq!(mc_sim::survival::shaper_pylons(1), 0);
+    assert!(mc_sim::survival::shaper_pylons(12) >= 4);
     assert!(mc_sim::survival::shaper_tier(9) > mc_sim::survival::shaper_tier(4));
 }
 
@@ -825,6 +832,27 @@ fn a_shaper_defends_itself_with_a_shield_a_lance_and_interceptors() {
         .filter(|e| matches!(e, SimEvent::LanceStrike { unit, .. } if *unit == shaper))
         .count();
     assert!(strikes >= 1, "the Lance struck");
+    // The renderer gets the Shaper, its height and its Lance's charge and mark;
+    // the card everything its selection shows.
+    let mut frame = mc_sim::RenderFrame::default();
+    w.write_render_frame(Some(0), &mut frame);
+    let inst = frame
+        .shapers
+        .iter()
+        .find(|s| s.unit == shaper.0)
+        .expect("the Shaper in the render frame");
+    assert_eq!((inst.kind, inst.level, inst.tier), (0, 1, 1));
+    assert!(inst.height >= 60.0 && inst.raised == 1.0);
+    let card = w.shaper_card(shaper).unwrap();
+    assert!(!card.products.is_empty() && card.batch.0 >= 3);
+    let l = card.lance.unwrap();
+    assert!(l.charge_secs > 0.0 && l.dps > 0.0 && l.fire_rate > 0.0 && l.range >= 800.0);
+    assert!(card.shield.unwrap().radius >= 180.0);
+    let anti = card.anti_nuke.unwrap();
+    assert_eq!(anti.capacity, 1);
+    assert!(anti.coverage > 1000.0 && anti.round_secs > 0.0);
+    let status = w.survival_status().unwrap();
+    assert!(status.nodes.iter().any(|n| n.unit == shaper && n.tier == 1));
     // It assembles its interceptors by itself.
     run(&mut w, 1200, &[], &mut events);
     let held = w
@@ -917,4 +945,127 @@ fn survival_hashes_the_same_at_any_worker_count_and_after_a_restore() {
     let tail = &reference[SNAPSHOT_AT as usize..];
     let first = tail.iter().zip(&after).position(|(a, b)| a != b);
     assert_eq!(first, None, "diverged {first:?} ticks after the snapshot");
+}
+
+/// The pieces of the Shaper's base standing round `shaper`: (blueprint key, position).
+fn base_of(w: &World, shaper: mc_sim::UnitId) -> Vec<(String, FxVec2)> {
+    let card = w.shaper_card(shaper).expect("a Shaper");
+    card.pieces
+        .iter()
+        .filter_map(|p| {
+            let r = w.state.units.row(p.unit)?;
+            Some((
+                w.blueprints.unit(w.state.units.blueprint[r]).key.clone(),
+                w.state.units.pos[r],
+            ))
+        })
+        .collect()
+}
+
+#[test]
+fn a_shaper_raises_platforms_in_front_prints_on_them_and_they_unravel_with_it() {
+    let (mut w, mut events) = guarded(SurvivalRules {
+        rounds: 0,
+        interval_secs: 20,
+        ..rules()
+    });
+    let row = first_online(&mut w, &mut events);
+    let shaper = w.state.units.id(row);
+    let at = w.state.units.pos[row];
+    // Its first platform comes up in front of it (the site faces south-west).
+    run(&mut w, 200, &[], &mut events);
+    let base = base_of(&w, shaper);
+    let pads: Vec<&FxVec2> = base
+        .iter()
+        .filter(|(k, _)| k == "progenitor_platform")
+        .map(|(_, p)| p)
+        .collect();
+    assert_eq!(pads.len(), 1, "{base:?}");
+    let off = *pads[0] - at;
+    let d = off.length().to_f32();
+    assert!((150.0..=400.0).contains(&d), "{d} m out");
+    assert!(off.x < Fx::ZERO && off.y < Fx::ZERO, "in front: {off:?}");
+    // It prints its formations on it.
+    let printed_near = |w: &World| {
+        let u = &w.state.units;
+        u.slots.iter().any(|r| {
+            u.owner[r] == 1
+                && u.has_flag(r, flag::UNDER_CONSTRUCTION)
+                && w.blueprints.unit(u.blueprint[r]).is_mobile()
+                && u.pos[r].distance(*pads[0]) < Fx::from_int(80)
+        })
+    };
+    let mut t = 0;
+    while !printed_near(&w) && t < 2000 {
+        run(&mut w, 5, &[], &mut events);
+        t += 5;
+    }
+    assert!(printed_near(&w), "a formation printed on the platform");
+    // As it levels its base grows: a platform more every third level, pylons.
+    let count =
+        |base: &[(String, FxVec2)], key: &str| base.iter().filter(|(k, _)| k == key).count();
+    let mut t = 0;
+    let mut level = 1;
+    while t < 30_000 {
+        run(&mut w, 100, &[], &mut events);
+        t += 100;
+        let Some(r) = w.state.units.row(shaper) else {
+            panic!("the Shaper died");
+        };
+        level = w.unit_level(r);
+        let base = base_of(&w, shaper);
+        let (small, great) = mc_sim::survival::shaper_platforms(level);
+        if level >= 6
+            && count(&base, "progenitor_platform") == small
+            && count(&base, "progenitor_platform_great") == great
+            && count(&base, "progenitor_pylon") == mc_sim::survival::shaper_pylons(level)
+        {
+            break;
+        }
+    }
+    let base = base_of(&w, shaper);
+    assert!(level >= 6, "level {level}");
+    assert!(count(&base, "progenitor_platform") >= 2, "{base:?}");
+    assert!(count(&base, "progenitor_pylon") >= 2, "{base:?}");
+    for (k, p) in &base {
+        if k == "progenitor_pylon" {
+            // At the sides and behind.
+            let off = *p - at;
+            assert!(
+                off.x + off.y > Fx::from_int(-60),
+                "a pylon in front: {off:?}"
+            );
+        }
+        assert!(p.distance(at) <= Fx::from_int(450), "{k} outside the room");
+    }
+    // Killed, it takes its base with it, wreckless.
+    let units: Vec<mc_sim::UnitId> = w
+        .shaper_card(shaper)
+        .unwrap()
+        .pieces
+        .iter()
+        .map(|p| p.unit)
+        .collect();
+    let kill = PlayerCommand {
+        player: 0,
+        command: Command::DebugDamage {
+            units: vec![shaper],
+            permille: 1000,
+        },
+    };
+    run(&mut w, 20, &[kill], &mut events);
+    assert!(w.state.units.row(shaper).is_none());
+    assert!(
+        units.iter().all(|u| w.state.units.row(*u).is_none()),
+        "the base unravelled"
+    );
+    let wr = &w.state.wrecks;
+    assert!(
+        !wr.slots.iter().any(|r| w
+            .blueprints
+            .unit(wr.blueprint[r])
+            .key
+            .starts_with("progenitor_")),
+        "the base left no wreck"
+    );
 }

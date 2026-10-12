@@ -3,15 +3,16 @@
 //! then the formation musters at the head of its front, and when the round's
 //! last formation is out the round goes together.
 
-use super::{domain_of, Formation, Muster, Phase, Print, HZ, NODE_PRINT};
+use super::{domain_of, Formation, Muster, Phase, Print, Spot, HZ};
 use crate::mirror::SimEvent;
 use crate::{Command, SimError, UnitId};
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::survival::Domain;
 use mc_data::BlueprintId;
+use serde::{Deserialize, Serialize};
 
 /// The way a group of the engine's units goes before it turns on the defenders.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub(super) enum Route {
     /// Down a front (index into `SurvivalConfig::fronts`).
     Front(usize),
@@ -19,6 +20,33 @@ pub(super) enum Route {
     Site(usize),
     /// Straight at them (ships: down the nearest sea front).
     Free,
+}
+
+/// A place a round's formation may be printed (`survival_spots`).
+struct PrintSpot {
+    spot: Spot,
+    /// What it prints: Land (land units and aircraft), Air (an aerie: aircraft),
+    /// Naval (ships; a naval site's platform takes aircraft too).
+    domain: Domain,
+    /// The biggest unit it takes; zero for any.
+    max_radius: Fx,
+    /// The Shaper site whose platform it is.
+    site: Option<u8>,
+    /// The Shaper printing on it; `Handle::NONE` for a bay.
+    source: UnitId,
+}
+
+impl PrintSpot {
+    /// Room for a unit of `radius`, as a sort key: the smaller, the better the fit.
+    fn room(&self, radius: Fx) -> Option<Fx> {
+        if self.max_radius == Fx::ZERO {
+            Some(Fx::from_int(1 << 20))
+        } else if radius <= self.max_radius {
+            Some(self.max_radius)
+        } else {
+            None
+        }
+    }
 }
 
 /// A ship's goal is open water no further than this from a defender (m).
@@ -67,8 +95,14 @@ pub(super) fn block(n: usize, radius: Fx, at: FxVec2, heading: Angle) -> Vec<FxV
 }
 
 impl crate::World {
-    /// Hands queued formations to free print bays: land units and aircraft to
-    /// the halls' bays, ships to the sea gate's slips.
+    /// Hands queued formations to free print spots: the facility's bays, and
+    /// the platforms of the Shapers standing. Ships go to the sea gate's slips
+    /// or a naval site's; aircraft to the aeries, else any bay or platform;
+    /// land units to the halls' bays or a land site's platforms. Of those, the
+    /// smallest free one that fits the formation's biggest unit, so the great
+    /// ones wait for the great units; a unit too big for every spot takes the
+    /// biggest. A formation printed on a bay goes down its front, one printed on
+    /// a platform down its site's path.
     pub(super) fn survival_bays(&mut self, now: u32) -> Result<(), SimError> {
         let s = self.state.survival.as_ref().unwrap();
         if s.queue.is_empty() {
@@ -78,7 +112,7 @@ impl crate::World {
         if self.hostile_count(side) >= super::FIELD_CAP {
             return Ok(());
         }
-        let bays = s.config.bays.clone();
+        let spots = self.survival_spots();
         let mut queue = std::mem::take(&mut self.state.survival.as_mut().unwrap().queue);
         let mut i = 0;
         while i < queue.len() {
@@ -90,15 +124,15 @@ impl crate::World {
                 queue.remove(i);
                 continue;
             };
-            // Ships go to the slips; aircraft to the aeries, else the halls' bays;
-            // land units to the halls' bays. Of those, the smallest free one that
-            // fits its biggest unit, so the great bays wait for the great units.
-            // A unit too big for every bay takes the biggest.
             let domain = domain_of(motion.layer);
-            let takes = |b: &super::Bay| match domain {
-                Domain::Naval => b.domain == Domain::Naval,
-                Domain::Air => b.domain != Domain::Naval,
-                Domain::Land => b.domain == Domain::Land,
+            let has_front = (queue[i].front as usize) < self.survival_front_count();
+            let takes = |p: &PrintSpot| {
+                (has_front || matches!(p.spot, Spot::Pad(_)))
+                    && match domain {
+                        Domain::Naval => p.domain == Domain::Naval,
+                        Domain::Air => p.domain != Domain::Naval || matches!(p.spot, Spot::Pad(_)),
+                        Domain::Land => p.domain == Domain::Land,
+                    }
             };
             let radius = queue[i]
                 .units
@@ -106,68 +140,118 @@ impl crate::World {
                 .map(|b| self.blueprints.unit(*b).radius)
                 .max()
                 .unwrap_or(Fx::ZERO);
-            if !bays.iter().any(takes) {
+            if !spots.iter().any(takes) {
                 queue.remove(i);
                 continue;
             }
-            let fits_any = bays.iter().any(|b| takes(b) && b.room(radius).is_some());
-            let room = |b: &super::Bay| {
+            let fits_any = spots.iter().any(|p| takes(p) && p.room(radius).is_some());
+            let room = |p: &PrintSpot| {
                 if fits_any {
-                    b.room(radius)
+                    p.room(radius)
                 } else {
                     // Too big for all of them: the biggest will do.
-                    Some(Fx::from_int(1 << 20) - b.room(Fx::ZERO).unwrap_or(Fx::ZERO))
+                    Some(Fx::from_int(1 << 20) - p.room(Fx::ZERO).unwrap_or(Fx::ZERO))
                 }
             };
-            let Some(bay) = (0..bays.len())
-                .filter(|b| takes(&bays[*b]) && !self.survival_bay_taken(*b as u8))
-                .filter_map(|b| {
-                    room(&bays[b]).map(|r| {
-                        (
-                            (domain == Domain::Air && bays[b].domain != Domain::Air, r),
-                            b,
-                        )
-                    })
+            let Some(k) = (0..spots.len())
+                .filter(|k| takes(&spots[*k]) && !self.survival_spot_taken(spots[*k].spot))
+                .filter_map(|k| {
+                    let p = &spots[k];
+                    let aerie = p.domain == Domain::Air && matches!(p.spot, Spot::Bay(_));
+                    room(p).map(|r| ((domain == Domain::Air && !aerie, r), k))
                 })
                 .min()
-                .map(|(_, b)| b)
+                .map(|(_, k)| k)
             else {
                 i += 1;
                 continue;
             };
             let f = queue.remove(i);
-            self.survival_print_formation(&f.units, bay as u8, f.front, crate::Handle::NONE, now)?;
+            let p = &spots[k];
+            let route = match p.site {
+                Some(site) => Route::Site(site as usize),
+                None => Route::Front(f.front as usize),
+            };
+            self.survival_print_formation(&f.units, p.spot, p.source, route, true, now)?;
         }
         self.state.survival.as_mut().unwrap().queue = queue;
         Ok(())
     }
 
-    /// Starts printing `units` as one block: on bay `bay` (its apron, then out
-    /// past its doors), or in front of the Shaper `source` when `bay` is
-    /// `NODE_PRINT`. All of it takes the same time and finishes together.
+    fn survival_front_count(&self) -> usize {
+        self.state
+            .survival
+            .as_ref()
+            .map_or(0, |s| s.config.fronts.len())
+    }
+
+    /// Every place a round's formation may be printed: the bays, then the
+    /// raised platforms of the Shapers standing.
+    fn survival_spots(&self) -> Vec<PrintSpot> {
+        let s = self.state.survival.as_ref().unwrap();
+        let mut out: Vec<PrintSpot> = s
+            .config
+            .bays
+            .iter()
+            .enumerate()
+            .map(|(k, b)| PrintSpot {
+                spot: Spot::Bay(k as u8),
+                domain: b.domain,
+                max_radius: b.max_radius,
+                site: None,
+                source: crate::Handle::NONE,
+            })
+            .collect();
+        for n in s.nodes.iter().filter(|n| n.raised) {
+            let Some(site) = s.config.node_sites.get(n.site as usize) else {
+                continue;
+            };
+            let domain = if site.domain == Domain::Naval {
+                Domain::Naval
+            } else {
+                Domain::Land
+            };
+            for (pad, room) in self.shaper_pads(n) {
+                out.push(PrintSpot {
+                    spot: Spot::Pad(pad),
+                    domain,
+                    max_radius: room,
+                    site: Some(n.site),
+                    source: n.unit,
+                });
+            }
+        }
+        out
+    }
+
+    /// Starts printing `units` as one block on `spot` (a bay's apron and out
+    /// past its doors, or a Shaper's platform under `source`'s beam). All of it
+    /// takes the same time and finishes together, then goes by `route`: with the
+    /// round when `round`, else at once.
     pub(super) fn survival_print_formation(
         &mut self,
         units: &[BlueprintId],
-        bay: u8,
-        front: u8,
+        spot: Spot,
         source: UnitId,
+        route: Route,
+        round: bool,
         now: u32,
     ) -> Result<(), SimError> {
         let s = self.state.survival.as_ref().unwrap();
         let side = s.config.engine_player;
-        let (at, heading) = if bay == NODE_PRINT {
-            let Some(row) = self.state.units.row(source) else {
-                return Ok(());
-            };
-            let heading = self.state.units.heading[row];
-            let ahead = FxVec2::from_angle(heading);
-            (
-                self.state.units.pos[row] + ahead * Fx::from_int(super::NODE_PRINT_REACH),
-                heading,
-            )
-        } else {
-            let b = s.config.bays[bay as usize];
-            (b.at, b.heading)
+        let (at, heading) = match spot {
+            Spot::Bay(b) => {
+                let Some(b) = s.config.bays.get(b as usize) else {
+                    return Ok(());
+                };
+                (b.at, b.heading)
+            }
+            Spot::Pad(pad) => {
+                let Some(row) = self.state.units.row(pad) else {
+                    return Ok(());
+                };
+                (self.state.units.pos[row], self.state.units.heading[row])
+            }
         };
         let radius = units
             .iter()
@@ -180,21 +264,32 @@ impl crate::World {
             s.next_formation = s.next_formation.wrapping_add(1);
             s.next_formation
         };
-        for (bp, spot) in units.iter().zip(block(units.len(), radius, at, heading)) {
+        // A platform's block is centred on it; a bay's front row is at its mark.
+        let at = match spot {
+            Spot::Pad(_) => {
+                let spots = block(units.len(), radius, FxVec2::ZERO, heading);
+                let n = spots.len().max(1) as i32;
+                let sum = spots.iter().fold(FxVec2::ZERO, |a, b| a + *b);
+                at - FxVec2::new(sum.x / n, sum.y / n)
+            }
+            Spot::Bay(_) => at,
+        };
+        for (bp, place) in units.iter().zip(block(units.len(), radius, at, heading)) {
             let Some(motion) = self.blueprints.unit(*bp).motion else {
                 continue;
             };
-            let spot = self
+            let place = self
                 .nav
-                .nearest_passable(motion.layer, motion.size_class, spot)
-                .unwrap_or(spot);
-            let row = self.spawn_unit(*bp, side, spot, heading, false)?;
+                .nearest_passable(motion.layer, motion.size_class, place)
+                .unwrap_or(place);
+            let row = self.spawn_unit(*bp, side, place, heading, false)?;
             let unit = self.state.units.id(row);
             self.state.survival.as_mut().unwrap().printing.push(Print {
                 unit,
-                bay,
+                spot,
                 source,
-                front,
+                route,
+                round,
                 formation,
                 started: now,
                 ticks,
@@ -203,10 +298,10 @@ impl crate::World {
         Ok(())
     }
 
-    /// A formation still standing on its bay keeps the bay.
-    fn survival_bay_taken(&self, bay: u8) -> bool {
+    /// A formation still standing on its spot keeps it.
+    pub(super) fn survival_spot_taken(&self, spot: Spot) -> bool {
         let s = self.state.survival.as_ref().unwrap();
-        s.printing.iter().any(|p| p.bay == bay)
+        s.printing.iter().any(|p| p.spot == spot)
     }
 
     pub(super) fn hostile_count(&self, side: u8) -> usize {
@@ -229,8 +324,8 @@ impl crate::World {
             let Some(row) = self.state.units.row(p.unit) else {
                 continue; // shot down on the bay
             };
-            if p.bay == NODE_PRINT && self.state.units.row(p.source).is_none() {
-                // Its node fell: what it was printing falls apart with it.
+            if p.source != crate::Handle::NONE && self.state.units.row(p.source).is_none() {
+                // Its Shaper fell: what it was printing falls apart with it.
                 self.state.units.health[row] = Fx::ZERO;
                 continue;
             }
@@ -257,43 +352,44 @@ impl crate::World {
         for f in formations {
             let group: Vec<&Print> = done.iter().filter(|p| p.formation == f).collect();
             let units: Vec<UnitId> = group.iter().map(|p| p.unit).collect();
-            if group[0].front == NODE_PRINT {
-                // A Shaper's formation goes down its site's path.
-                let s = self.state.survival.as_ref().unwrap();
-                let route = s
-                    .nodes
-                    .iter()
-                    .find(|n| n.unit == group[0].source)
-                    .map_or(Route::Free, |n| Route::Site(n.site as usize));
-                self.survival_send(&units, route, true)?;
+            if group[0].round {
+                self.survival_muster(&units, group[0].route, f)?;
             } else {
-                self.survival_muster(&units, group[0].front, f)?;
+                // A Shaper's own formation goes at once, down its site's path.
+                self.survival_send(&units, group[0].route, true)?;
             }
         }
         Ok(())
     }
 
-    /// Sends a printed formation to wait, in its block, near the head of its front.
+    /// Sends a printed formation to wait, in its block, near the head of its
+    /// route: a front's first point, or a Shaper site's (else the edge of its
+    /// base in front).
     fn survival_muster(
         &mut self,
         units: &[UnitId],
-        front: u8,
+        route: Route,
         formation: u16,
     ) -> Result<(), SimError> {
         let s = self.state.survival.as_ref().unwrap();
-        let Some(head) = s
-            .config
-            .fronts
-            .get(front as usize)
-            .and_then(|f| f.path.first().copied())
-        else {
+        let head = match route {
+            Route::Front(f) => s.config.fronts.get(f).and_then(|f| f.path.first().copied()),
+            Route::Site(i) => s.config.node_sites.get(i).map(|site| {
+                site.path.first().copied().unwrap_or_else(|| {
+                    let ahead = FxVec2::from_angle(self.site_heading(site));
+                    site.at + ahead * (site.room + Fx::from_int(100))
+                })
+            }),
+            Route::Free => None,
+        };
+        let Some(head) = head else {
             return self.survival_send(units, Route::Free, true);
         };
         let side = s.config.engine_player;
         let mut waiting: Vec<u16> = s
             .mustered
             .iter()
-            .filter(|m| m.front == front)
+            .filter(|m| m.route == route)
             .map(|m| m.formation)
             .collect();
         waiting.dedup();
@@ -305,7 +401,7 @@ impl crate::World {
         let s = self.state.survival.as_mut().unwrap();
         s.mustered.extend(units.iter().map(|&unit| Muster {
             unit,
-            front,
+            route,
             formation,
         }));
         for chunk in units.chunks(crate::command::MAX_COMMAND_UNITS) {
@@ -314,7 +410,7 @@ impl crate::World {
         Ok(())
     }
 
-    /// The round goes: every mustered formation down its front, then at the defenders.
+    /// The round goes: every mustered formation down its route, then at the defenders.
     pub(super) fn survival_launch(&mut self, now: u32) -> Result<(), SimError> {
         let s = self.state.survival.as_mut().unwrap();
         let mustered = std::mem::take(&mut s.mustered);
@@ -323,11 +419,11 @@ impl crate::World {
         let last = rules.rounds != 0 && round >= rules.rounds;
         s.phase = if last { Phase::Final } else { Phase::Launched };
         s.next_at = now + rules.interval_secs as u32 * HZ;
-        let mut formations: Vec<(u8, u16)> =
-            mustered.iter().map(|m| (m.front, m.formation)).collect();
+        let mut formations: Vec<(Route, u16)> =
+            mustered.iter().map(|m| (m.route, m.formation)).collect();
         formations.dedup();
         let mut sent = 0u16;
-        for (front, f) in formations {
+        for (route, f) in formations {
             let units: Vec<UnitId> = mustered
                 .iter()
                 .filter(|m| m.formation == f && self.state.units.row(m.unit).is_some())
@@ -337,7 +433,7 @@ impl crate::World {
                 continue;
             }
             sent = sent.saturating_add(units.len() as u16);
-            self.survival_send(&units, Route::Front(front as usize), true)?;
+            self.survival_send(&units, route, true)?;
         }
         let s = self.state.survival.as_mut().unwrap();
         s.waves.extend(mustered.iter().map(|m| m.unit));

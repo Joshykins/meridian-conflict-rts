@@ -232,6 +232,38 @@ pub fn shaper_height(level: u16) -> Fx {
 /// 3 m/s, so it is seen to build.
 pub(super) const CLIMB_PER_TICK: Fx = Fx(3 * Fx::ONE.0 / HZ as i64);
 
+/// Print platforms a Shaper of `level` raises in front of itself: (ordinary,
+/// great). One more every third level; great ones, for the big units, from
+/// level 8 and one more every sixth. The site's room holds the arcs: past it
+/// they stop (`base::slot_at`).
+pub fn shaper_platforms(level: u16) -> (usize, usize) {
+    let small = 1 + level.saturating_sub(1) as usize / 3;
+    let great = if level >= 8 {
+        1 + (level - 8) as usize / 6
+    } else {
+        0
+    };
+    (small, great)
+}
+
+/// Pylons a Shaper of `level` raises at its sides and behind: one every third level.
+pub fn shaper_pylons(level: u16) -> usize {
+    level as usize / 3
+}
+
+/// Ticks a piece of a Shaper's base takes to print.
+pub(super) const PIECE_RAISE_TICKS: u32 = 12 * HZ;
+/// Ticks between one piece done and the next started.
+pub(super) const PIECE_GAP_TICKS: u32 = 4 * HZ;
+/// Ticks after a piece is destroyed before the Shaper raises its next.
+pub(super) const PIECE_LOST_TICKS: u32 = 45 * HZ;
+
+/// Shield hit points a second `pylons` standing pylons feed their Shaper's dome
+/// of `regen`: a quarter of its own regen each.
+pub(super) fn pylon_feed(regen: Fx, pylons: usize) -> Fx {
+    regen * pylons as i32 / 4
+}
+
 /// A Shaper's visual tier: one every four levels, each a stage, collar or ring more.
 pub fn shaper_tier(level: u16) -> u8 {
     (1 + level.saturating_sub(1) / 4).min(u8::MAX as u16) as u8

@@ -32,6 +32,8 @@
 //! carried beside `MatchConfig` in the match options) and the tick: a replay
 //! plays it out the same.
 
+mod base;
+mod card;
 mod plan;
 mod print;
 mod rules;
@@ -42,11 +44,16 @@ pub use crate::mirror::NodeStatus;
 use crate::mirror::SimEvent;
 use crate::tables::NO_ORDER;
 use crate::{SimError, UnitId};
+pub use base::Kit;
+pub use card::{AntiNukeCard, LanceCard, PieceView, ShaperCard, ShaperInstance, ShieldCard};
 use mc_core::{Angle, Fx, FxVec2, FxVec3, Rng, StateHasher};
 use mc_data::survival::{Domain, SiteKind};
 use mc_data::{BlueprintId, MoveLayer};
 use plan::Formation;
-pub use rules::{shaper_height, shaper_tier, HeavyWave, SurvivalRules};
+use print::Route;
+pub use rules::{
+    shaper_height, shaper_platforms, shaper_pylons, shaper_tier, HeavyWave, SurvivalRules,
+};
 use serde::{Deserialize, Serialize};
 
 /// Ticks per second.
@@ -55,10 +62,6 @@ const HZ: u32 = 10;
 pub const BEAM_REPLICATION_RAY: u32 = 4;
 /// `BeamInstance::kind` of a print beam building a unit up.
 pub const BEAM_PRINT: u32 = 5;
-/// A node prints in front of itself, this far out.
-pub const NODE_PRINT_REACH: i32 = 50;
-/// The node's print emitter height.
-pub const NODE_EMITTER: i32 = 40;
 /// How long the ray takes to raise a node.
 const RAISE_TICKS: u32 = 20 * HZ;
 /// The engine stops printing while it has this many units in the field, so a
@@ -106,17 +109,6 @@ pub struct Bay {
 }
 
 impl Bay {
-    /// Room for a unit of `radius`, as a sort key: the smaller, the better the fit.
-    fn room(&self, radius: Fx) -> Option<Fx> {
-        if self.max_radius == Fx::ZERO {
-            Some(Fx::from_int(1 << 20))
-        } else if radius <= self.max_radius {
-            Some(self.max_radius)
-        } else {
-            None
-        }
-    }
-
     /// A great bay: its projector works with two more beside it.
     fn great(&self) -> bool {
         self.max_radius == Fx::ZERO || self.max_radius > Fx::from_int(100)
@@ -162,29 +154,61 @@ pub enum Phase {
     Won,
 }
 
+/// Where a unit is printed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+enum Spot {
+    /// A print bay of the facility (index into `SurvivalConfig::bays`).
+    Bay(u8),
+    /// A Shaper's print platform (the platform's unit).
+    Pad(UnitId),
+}
+
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 struct Print {
     unit: UnitId,
-    /// Index into `SurvivalConfig::bays`, or `NODE_PRINT`.
-    bay: u8,
-    /// The node doing the printing; `Handle::NONE` for a bay.
+    spot: Spot,
+    /// The Shaper whose beam prints it; `Handle::NONE` on a bay.
     source: UnitId,
-    /// Front it goes down; `NODE_PRINT` for a node's own.
-    front: u8,
+    /// The way it goes once printed.
+    route: Route,
+    /// Printed for the round: it musters and goes with it. Else a Shaper's own,
+    /// sent as soon as it is done.
+    round: bool,
     /// The formation it is printed with: they finish and go together.
     formation: u16,
     started: u32,
     ticks: u32,
 }
 
-const NODE_PRINT: u8 = u8::MAX;
-
-/// A printed unit waiting at the head of its front for the round to go.
+/// A printed unit waiting for the round to go, near the head of its route.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 struct Muster {
     unit: UnitId,
-    front: u8,
+    route: Route,
     formation: u16,
+}
+
+/// A piece of a Shaper's base (`base.rs`). The numbers are the slot order of a
+/// Shaper's base, and may reach the interface: never renumber one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PieceKind {
+    /// A print platform in front (a slip at a naval site).
+    Platform = 0,
+    /// A great print platform, further out, for the big units.
+    GreatPlatform = 1,
+    /// A pylon at the sides or behind that feeds the Shaper's shield.
+    Pylon = 2,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+struct Piece {
+    unit: UnitId,
+    kind: PieceKind,
+    /// Its place in its kind's arc (`base::slot_at`).
+    slot: u8,
+    /// Tick its printing started.
+    started: u32,
+    raised: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -208,12 +232,13 @@ struct Node {
     /// Metres it is built up to now, climbing toward its level's height
     /// (`rules::shaper_height`).
     height: Fx,
-    /// The level it evolves to quickly after it comes online
-    /// (`SurvivalRules::catch_up_level` of the round it was raised in), a level
-    /// every `CATCH_UP_TICKS`, on top of the levels the rounds give it.
-    catch_up: u16,
-    /// Tick of its next catch-up level.
+    /// Tick of its next catch-up level: while it stands below the round's
+    /// `SurvivalRules::catch_up_level` it gains one every `CATCH_UP_TICKS`.
     next_level_at: u32,
+    /// Its base: platforms and pylons, raised or being printed (`base.rs`).
+    pieces: Vec<Piece>,
+    /// Tick it may start its next piece.
+    next_piece_at: u32,
 }
 
 /// Survival's part of the game state.
@@ -235,6 +260,8 @@ pub struct Survival {
     /// Per site: the first round its ray may raise a Shaper there again; a
     /// site whose Shaper was destroyed stands empty for a while.
     reseed_from: Vec<u16>,
+    /// What a Shaper's base is made of.
+    kit: base::Kit,
     rng: Rng,
     pub nodes_destroyed: u16,
     /// The last formation number handed out.
@@ -288,6 +315,21 @@ pub struct SurvivalStatus {
     pub reclaim: f32,
 }
 
+fn spot_bits(s: Spot) -> u64 {
+    match s {
+        Spot::Bay(b) => b as u64,
+        Spot::Pad(u) => 1 << 40 | u.0 as u64,
+    }
+}
+
+fn route_bits(r: Route) -> u64 {
+    match r {
+        Route::Front(f) => f as u64,
+        Route::Site(i) => 1 << 40 | i as u64,
+        Route::Free => 2 << 40,
+    }
+}
+
 fn domain_of(layer: MoveLayer) -> Domain {
     match layer {
         MoveLayer::Air => Domain::Air,
@@ -319,15 +361,12 @@ impl Survival {
         }
         for p in &self.printing {
             h.write_u64(p.unit.0 as u64 | (p.source.0 as u64) << 32);
-            h.write_u64(
-                p.started as u64
-                    | (p.bay as u64) << 32
-                    | (p.front as u64) << 40
-                    | (p.formation as u64) << 48,
-            );
+            h.write_u64(p.started as u64 | (p.formation as u64) << 32 | (p.round as u64) << 48);
+            h.write_u64(spot_bits(p.spot) ^ route_bits(p.route).rotate_left(17));
         }
         for m in &self.mustered {
-            h.write_u64(m.unit.0 as u64 | (m.front as u64) << 32 | (m.formation as u64) << 40);
+            h.write_u64(m.unit.0 as u64 | (m.formation as u64) << 32);
+            h.write_u64(route_bits(m.route));
         }
         h.write_u64(self.waves.len() as u64);
         for r in &self.reseed_from {
@@ -343,7 +382,17 @@ impl Survival {
             h.write_u64(n.pos.x.raw() as u32 as u64 | (n.pos.y.raw() as u32 as u64) << 32);
             h.write_u64(n.next_print as u64 | (n.printed as u64) << 32);
             h.write_i64(n.height.0);
-            h.write_u64(n.catch_up as u64 | (n.next_level_at as u64) << 16);
+            h.write_u64(n.next_level_at as u64);
+            h.write_u64(n.next_piece_at as u64 | (n.pieces.len() as u64) << 32);
+            for p in &n.pieces {
+                h.write_u64(
+                    p.unit.0 as u64
+                        | (p.kind as u64) << 32
+                        | (p.slot as u64) << 40
+                        | (p.raised as u64) << 48,
+                );
+                h.write_u64(p.started as u64);
+            }
             for b in &n.products {
                 h.write_u64(b.0 as u64);
             }
@@ -393,6 +442,7 @@ impl crate::World {
         }
 
         let first = config.rules.grace_secs as u32 * HZ;
+        let kit = Kit::load(self.blueprints.as_ref())?;
         let seed = self.state.rng.state() ^ 0x5EED_5A1A;
         let sites = config.node_sites.len();
         self.state.survival = Some(Survival {
@@ -405,6 +455,7 @@ impl crate::World {
             mustered: Vec::new(),
             waves: Vec::new(),
             reseed_from: vec![0; sites],
+            kit,
             nodes: Vec::new(),
             rng: Rng::new(seed),
             nodes_destroyed: 0,
@@ -461,10 +512,11 @@ impl crate::World {
             return Ok(());
         }
         let now = self.state.tick;
-        self.survival_nodes_lost();
+        self.survival_nodes_lost()?;
         self.survival_prints(now)?;
         self.survival_raise(now)?;
         self.survival_grow(now);
+        self.survival_base(now)?;
         self.survival_node_prints(now)?;
 
         let s = self.state.survival.as_ref().unwrap();
@@ -500,7 +552,7 @@ impl crate::World {
                 }
             }
             Phase::Printing => {
-                let done = s.queue.is_empty() && !s.printing.iter().any(|p| p.front != NODE_PRINT);
+                let done = s.queue.is_empty() && !s.printing.iter().any(|p| p.round);
                 if done {
                     self.survival_launch(now)?;
                 }

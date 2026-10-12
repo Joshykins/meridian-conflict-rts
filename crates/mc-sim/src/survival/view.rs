@@ -1,9 +1,7 @@
 //! What survival shows: the ray and the print beams for the renderer, and
 //! the status the HUD reads. Presentation only: nothing here writes back.
 
-use super::{
-    Phase, SurvivalStatus, BEAM_PRINT, BEAM_REPLICATION_RAY, NODE_EMITTER, NODE_PRINT, RAISE_TICKS,
-};
+use super::{Phase, Spot, SurvivalStatus, BEAM_PRINT, BEAM_REPLICATION_RAY, RAISE_TICKS};
 use crate::mirror::NodeStatus;
 use crate::reclaim::BeamInstance;
 use mc_core::{Angle, FxVec2};
@@ -50,38 +48,58 @@ impl crate::World {
                 height: t,
             });
         }
+        // Each Shaper's beam on the piece of its base it is printing.
+        for n in &s.nodes {
+            for piece in n.pieces.iter().filter(|p| !p.raised) {
+                let (Some(row), Some(from)) =
+                    (st.units.row(piece.unit), self.shaper_emitter(n.unit))
+                else {
+                    continue;
+                };
+                let at = st.units.pos[row];
+                if !seen(at) && !seen(from.xy()) {
+                    continue;
+                }
+                let bp = self.bp(row);
+                sources.push(piece.unit.0 | 1 << 31);
+                out.push(BeamInstance {
+                    from: from.to_f32(),
+                    kind: BEAM_PRINT,
+                    to_prev: at.extend(st.units.z[row]).to_f32(),
+                    radius: bp.radius.to_f32(),
+                    to: at.extend(st.units.z[row]).to_f32(),
+                    height: bp.height.to_f32(),
+                });
+            }
+        }
         for p in &s.printing {
             let Some(row) = st.units.row(p.unit) else {
                 continue;
             };
             let at = st.units.pos[row];
-            let from = if p.bay == NODE_PRINT {
-                let Some(src) = st.units.row(p.source) else {
-                    continue;
-                };
-                // From half way up the Shaper as it stands built.
-                let built = s
-                    .nodes
-                    .iter()
-                    .find(|n| n.unit == p.source)
-                    .map_or(mc_core::Fx::from_int(NODE_EMITTER), |n| n.height / 2);
-                st.units.pos[src].extend(st.units.z[src] + built)
-            } else {
-                let Some(bay) = s.config.bays.get(p.bay as usize) else {
-                    continue;
-                };
-                let head = FxVec2::new(bay.emitter.x, bay.emitter.y);
-                head.extend(ground(bay.at) + bay.emitter.z)
+            let from = match p.spot {
+                Spot::Pad(_) => {
+                    let Some(from) = self.shaper_emitter(p.source) else {
+                        continue;
+                    };
+                    from
+                }
+                Spot::Bay(b) => {
+                    let Some(bay) = s.config.bays.get(b as usize) else {
+                        continue;
+                    };
+                    let head = FxVec2::new(bay.emitter.x, bay.emitter.y);
+                    head.extend(ground(bay.at) + bay.emitter.z)
+                }
             };
             if !seen(at) && !seen(from.xy()) {
                 continue;
             }
             // A great bay's projector works with one either side of it, across the bay.
-            let great = s
-                .config
-                .bays
-                .get(p.bay as usize)
-                .filter(|b| p.bay != NODE_PRINT && b.great());
+            let great = match p.spot {
+                Spot::Bay(b) => s.config.bays.get(b as usize).filter(|b| b.great()),
+                Spot::Pad(_) => None,
+            };
             if let Some(bay) = great {
                 let bp = self.bp(row);
                 let across =
@@ -110,6 +128,14 @@ impl crate::World {
                 height: bp.height.to_f32(),
             });
         }
+    }
+
+    /// Where a Shaper's print beams leave from: half way up it as it stands built.
+    fn shaper_emitter(&self, shaper: crate::UnitId) -> Option<mc_core::FxVec3> {
+        let s = self.state.survival.as_ref()?;
+        let row = self.state.units.row(shaper)?;
+        let built = s.nodes.iter().find(|n| n.unit == shaper)?.height;
+        Some(self.state.units.pos[row].extend(self.state.units.z[row] + built / 2))
     }
 
     /// Where the replication nodes stand, raised or rising.
@@ -147,6 +173,11 @@ impl crate::World {
             .iter()
             .map(|p| p.unit)
             .chain(s.nodes.iter().filter(|n| !n.raised).map(|n| n.unit))
+            .chain(
+                s.nodes
+                    .iter()
+                    .flat_map(|n| n.pieces.iter().filter(|p| !p.raised).map(|p| p.unit)),
+            )
             .map(|u| u.0)
             .collect();
         ids.sort_unstable();
@@ -196,7 +227,7 @@ impl crate::World {
             .iter()
             .map(|f| f.units.len())
             .sum::<usize>()
-            .saturating_add(s.printing.iter().filter(|p| p.front != NODE_PRINT).count())
+            .saturating_add(s.printing.iter().filter(|p| p.round).count())
             .min(u16::MAX as usize) as u16;
         let nodes = s
             .nodes
@@ -209,7 +240,14 @@ impl crate::World {
                     ((st.tick - n.started) as f32 / RAISE_TICKS as f32).min(0.999)
                 };
                 Some(NodeStatus {
+                    unit: n.unit,
                     site: n.site,
+                    kind: s
+                        .config
+                        .node_sites
+                        .get(n.site as usize)
+                        .map_or(mc_data::survival::SiteKind::Printer, |site| site.kind),
+                    tier: super::shaper_tier(n.level),
                     pos: st.units.pos[row].to_f32(),
                     domain: n.domain,
                     products: n.products.clone(),

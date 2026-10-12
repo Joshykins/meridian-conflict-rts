@@ -8,11 +8,12 @@
 //! is the answer: its site stands empty until the ray reseeds it, though a
 //! reseeded Shaper quickly evolves to a level that fits the round.
 
+use super::print::Route;
 use super::rules::{
     reseed_round, shaper_batch, shaper_gains_heavy, shaper_gains_product, shaper_height,
     CATCH_UP_TICKS, CLIMB_PER_TICK,
 };
-use super::{Node, NodeSite, HZ, NODE_PRINT, RAISE_TICKS};
+use super::{Node, NodeSite, Spot, HZ, RAISE_TICKS};
 use crate::mirror::SimEvent;
 use crate::SimError;
 use mc_core::{Angle, Fx};
@@ -65,7 +66,6 @@ impl crate::World {
             return Ok(());
         }
         let side = s.config.engine_player;
-        let catch_up = rules.catch_up_level(s.round.max(1));
         let domain = kinds[rng.below(kinds.len() as u32) as usize];
         let Some(product) = newest_new(&self.roster_ids(domain, tier), &[], &mut rng) else {
             return Ok(());
@@ -99,8 +99,9 @@ impl crate::World {
             next_print: 0,
             printed: 0,
             height: shaper_height(1),
-            catch_up,
             next_level_at: 0,
+            pieces: Vec::new(),
+            next_piece_at: 0,
         });
         self.events.push(SimEvent::NodeRaising {
             site: site_i as u8,
@@ -189,10 +190,11 @@ impl crate::World {
             n.height = (n.height + CLIMB_PER_TICK).min(top.max(n.height));
         }
         let tier = s.config.rules.tier_at(s.round.max(1));
+        let catch_up = s.config.rules.catch_up_level(s.round.max(1));
         let due: Vec<usize> = (0..s.nodes.len())
             .filter(|i| {
                 let n = &s.nodes[*i];
-                n.raised && n.level < n.catch_up && now >= n.next_level_at
+                n.raised && n.level < catch_up && now >= n.next_level_at
             })
             .collect();
         for i in due {
@@ -266,8 +268,10 @@ impl crate::World {
         s.rng = rng;
     }
 
-    /// Online nodes print a formation of their products at a time, on a beat
-    /// set by their tech and level.
+    /// Online Shapers print a formation of their products at a time on one of
+    /// their free platforms (the smallest the biggest unit fits, else the
+    /// biggest), on a beat set by their tech and level. Without a free platform
+    /// it waits for one.
     pub(super) fn survival_node_prints(&mut self, now: u32) -> Result<(), SimError> {
         let Some(s) = self.state.survival.as_ref() else {
             return Ok(());
@@ -280,7 +284,7 @@ impl crate::World {
             let s = self.state.survival.as_ref().unwrap();
             let n = s.nodes[i].clone();
             if self.state.units.row(n.unit).is_none()
-                || s.printing.iter().any(|p| p.source == n.unit)
+                || s.printing.iter().any(|p| p.source == n.unit && !p.round)
                 || self.hostile_count(side) >= super::FIELD_CAP
             {
                 continue;
@@ -297,8 +301,31 @@ impl crate::World {
             if batch.is_empty() {
                 continue;
             }
+            let radius = batch
+                .iter()
+                .map(|b| bps.unit(*b).radius)
+                .max()
+                .unwrap_or(Fx::ZERO);
+            let free: Vec<(crate::UnitId, Fx)> = self
+                .shaper_pads(&n)
+                .into_iter()
+                .filter(|(pad, _)| !self.survival_spot_taken(Spot::Pad(*pad)))
+                .collect();
+            let fit = free
+                .iter()
+                .filter(|(_, room)| radius <= *room)
+                .min_by_key(|(pad, room)| (*room, *pad))
+                .or_else(|| {
+                    free.iter()
+                        .max_by_key(|(pad, room)| (*room, std::cmp::Reverse(*pad)))
+                });
+            let Some(&(pad, _)) = fit else {
+                self.state.survival.as_mut().unwrap().nodes[i].next_print = now + HZ;
+                continue;
+            };
             let tech = batch.iter().map(|p| bps.unit(*p).tech).max().unwrap_or(1);
-            self.survival_print_formation(&batch, NODE_PRINT, NODE_PRINT, n.unit, now)?;
+            let route = Route::Site(n.site as usize);
+            self.survival_print_formation(&batch, Spot::Pad(pad), n.unit, route, false, now)?;
             let s = self.state.survival.as_mut().unwrap();
             s.nodes[i].printed += batch.len() as u32;
             // Slower for bigger units; faster as the rounds climb and as it grows.
@@ -313,10 +340,11 @@ impl crate::World {
         Ok(())
     }
 
-    /// Nodes that died since last tick: tell the defenders what their wreck holds.
-    pub(super) fn survival_nodes_lost(&mut self) {
+    /// Nodes that died since last tick: their bases unravel, and the defenders
+    /// are told what their wreck holds.
+    pub(super) fn survival_nodes_lost(&mut self) -> Result<(), SimError> {
         let Some(s) = self.state.survival.as_mut() else {
-            return;
+            return Ok(());
         };
         let units = &self.state.units;
         let mut lost = Vec::new();
@@ -329,6 +357,8 @@ impl crate::World {
             }
         });
         for n in lost {
+            // Its base unravels with it.
+            self.survival_unravel(&n)?;
             let node = self
                 .blueprints
                 .id_of("replication_node")
@@ -354,6 +384,7 @@ impl crate::World {
                 raised: n.raised,
             });
         }
+        Ok(())
     }
 }
 

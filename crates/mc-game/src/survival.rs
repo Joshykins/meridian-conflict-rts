@@ -275,6 +275,17 @@ pub fn log_tick(world: &mc_sim::World, tick: u32) {
     if tick.is_multiple_of(600) {
         if let Some(s) = world.survival_status() {
             let p = &world.state.players[0];
+            // Each Shaper: level, built height, and pieces of its base standing.
+            let shapers: Vec<String> = s
+                .nodes
+                .iter()
+                .filter_map(|n| world.shaper_card(n.unit))
+                .map(|c| {
+                    let up = c.pieces.iter().filter(|p| p.raised).count();
+                    format!("L{} {:.0}m {}p", c.level, c.height, up)
+                })
+                .collect();
+            println!("[{min:5.1} min] shapers [{}]", shapers.join(", "));
             println!(
                 "[{min:5.1} min] {:?} round {} | hostile {} | nodes {} | defender units {} materials {:.0}/{:.0} +{:.0}/s reclaim +{:.0}/s | tick {:.2} ms",
                 s.phase,

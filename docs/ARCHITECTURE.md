@@ -484,21 +484,33 @@ invulnerable unit, and the mirror marks it `SHIELD_VEIL` so it is drawn apart fr
 - **Nodes.** The facility wakes as the rounds climb (`survival/shapers.rs`): at each round's start it raises
   `nodes_raised(round)` Shapers at once (more as the rounds go, up to `node_limit`), each by its own ray (`kind` 4)
   from the heart's Lens for 20 s, building up a `replication_node` on a free Printer site, **one Shaper to a site**.
-  A Shaper is of one domain (land or naval by its site, or air) and prints formations of its products straight in,
-  on a beat, and sends them down its site's `path` (aircraft fly straight). It grows with no ceiling: a level every
+  A Shaper is of one domain (land or naval by its site, or air) and prints formations of its products on its print
+  platforms, on a beat, and sends them down its site's `path` (aircraft fly straight). It grows with no ceiling: a level every
   second round it stands (every round from round 20); each level prints one more unit at a time (`shaper_batch`),
   every other level from 3 adds another kind of its domain at the current tier (or swaps its oldest kind for a
   newer), and from level 8 heavies of its domain join it, one more every four levels. It builds up taller as it
   levels: its built height climbs 3 m/s toward `shaper_height(level)` (`60 + 1100 (1 - 0.9^(L-1))` m: about 730 m
   at level 10, 1010 m at 20), and `shaper_tier(level)` (one every four levels) is its visual tier. A node can be
   destroyed even while it rises; once up, it dies into a rich wreck, and its site stands empty for the rest of that
-  round and the next (`reseed_round`) until the ray reseeds it. Every Shaper raised quickly evolves, a level every
-  15 s (`CATCH_UP_TICKS`), to `catch_up_level(round)`: three quarters of the level one standing since the first
-  round has reached (`round_level`), so a reseeded Shaper fits the round. All of it is in `survival/rules.rs`.
+  round and the next (`reseed_round`) until the ray reseeds it. A Shaper below `catch_up_level(round)` (three
+  quarters of the level one standing since the first round has reached, `round_level`) quickly evolves, a level every
+  15 s (`CATCH_UP_TICKS`), up to it, so a reseeded or late Shaper fits the round. All of it is in `survival/rules.rs`.
   `survival_activity()` (0.15..1, from the round and the Shapers online) goes to the renderer as
   `RenderFrame::precursor_activity` and brightens the facility's light (`globals.tree_wind.w` in entity.wgsl).
   Events: `RoundPrinting`, `RoundLaunched`, `TierReached`, `HeavyWave`, `NodeRaising`, `NodeOnline`,
   `ShaperLevelled`, `NodeDestroyed`, `SurvivalWon`.
+- **A Shaper's base** (`survival/base.rs`). As it levels a Shaper prints progenitor structures round itself, one at
+  a time under its beam (12 s each): **print platforms** on arcs in front of it across its facing, inside the site's
+  `room` (`progenitor_platform`, from level 8 the great `progenitor_platform_great` on an outer arc for the big units;
+  at a naval site `progenitor_slip`/`_great` in the water), one more every third level (`shaper_platforms`); and
+  **pylons** (`progenitor_pylon`) at its sides and behind, one every third level (`shaper_pylons`), each feeding its
+  dome a quarter of its regen (`pylon_feed`). A slot the ground or something standing there refuses is passed over;
+  the arcs end where the room does. A piece destroyed is raised again 45 s later; when the Shaper dies its base
+  unravels with it and leaves no wreck. The Shaper prints its own formations on its free platforms (the smallest
+  the formation's biggest unit fits). A round's formations print on the facility's bays or on any standing Shaper's
+  platforms (ships on the sea gate's slips or a naval site's; aircraft anywhere), smallest fit first: one printed on a
+  platform musters at its site's first path point and goes with the round down the site's path. A round has a naval
+  share only while ships have somewhere to print (a sea front with naval bays, or a naval Shaper's slip).
 - **Defences and growth.** Every Shaper has a large shield, a **Lance** and an anti-nuke, all growing with its
   level. A level's worth is data: the `replication_node` blueprint's `growth` block (`mc_data::growth`), where each
   named stat (health, shield radius/health/regen, Lance damage/splash/range/charge/reload, interceptor
@@ -517,6 +529,15 @@ invulnerable unit, and the mirror marks it `SHIELD_VEIL` so it is drawn apart fr
   lowland, and the wreckage of earlier assaults along the ways the waves take to the spawns (`bake/planned_wrecks.rs`,
   fields in `bake/threshold/wrecks.rs` and `bake/harvest/wrecks.rs`). The heart, the print bays and the Shapers are always revealed to the defenders
   (`survival_reveal`). The skirmish AI skips the engine side; an AI *defender* only attacks nodes.
+- **To the renderer and the HUD.** `RenderFrame::shapers` lists every Shaper standing or rising
+  (`survival::ShaperInstance`: `unit` (its `UnitInstance::unit_id`), `kind` (`SiteKind` number), `level`, `tier`,
+  `height` (built, metres), `growing` (0..1 through the growth step being built), `raised` (0..1 the ray),
+  `lance_charge` (0..1), `lance_target`, `shield_tier`); the unit itself draws as any other (`replication_node`), its
+  pieces too. `World::shaper_card(unit)` is the selection card: site, kind, domain, level, tier, the round's catch-up
+  level, height and full height, products and formation size, its base (`pieces`), its shield (radius, hit points,
+  charge, regen, pylon feed), Lance (charge and reload seconds, strikes a minute, damage, DPS, splash, range, charge
+  now) and anti-nuke (stock, capacity, coverage, seconds a round). `SurvivalStatus::nodes` carries each Shaper's
+  `unit`, site `kind` and `tier` beside the old figures.
 - **Interface.** `SimStatus::survival` (`World::survival_status`) feeds the HUD's survival card under the minimap
   (`hud/survival.rs`, `SurvivalHud`: round, what the engine is doing, the tier chip, what is coming per domain, the
   heavy wave squad by squad or when the next tier comes, the field cap when it holds, reclaim income) and one Shaper

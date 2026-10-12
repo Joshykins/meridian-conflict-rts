@@ -1598,6 +1598,9 @@ pub struct RenderFrame {
     pub beam_sources: Vec<u32>,
     /// Survival: how awake the Precursor facility is, 0.15..1; zero in any other match.
     pub precursor_activity: f32,
+    /// Survival: every Shaper standing or rising, for its model and effects
+    /// (`survival::ShaperInstance`). Empty in any other match.
+    pub shapers: Vec<crate::survival::ShaperInstance>,
     /// Mobile builders whose construction beam is on this tick, and where it meets the work.
     pub build_sources: Vec<BuildSource>,
     /// Wave origins on construction sites, packed; a unit's `weld_first` /
@@ -2943,6 +2946,7 @@ impl World {
         self.write_warps(viewer, &mut frame.warps);
         self.write_dashes(viewer, &mut frame.dashes);
         self.write_lenses(viewer, &mut frame.lenses);
+        self.write_shapers(&mut frame.shapers);
         self.write_wells(viewer, &mut frame.wells);
         self.write_clouds(&mut frame.clouds);
         self.write_destructs(viewer, &mut frame.destructs);
@@ -3480,7 +3484,11 @@ impl Deck {
 /// A Shaper node as the survival HUD shows it (`survival::SurvivalStatus::nodes`).
 #[derive(Clone, Debug)]
 pub struct NodeStatus {
+    /// The Shaper's unit: `World::shaper_card` has its selection card.
+    pub unit: crate::UnitId,
     pub site: u8,
+    /// What its site is for.
+    pub kind: mc_data::survival::SiteKind,
     pub pos: [f32; 2],
     /// What it prints for.
     pub domain: mc_data::survival::Domain,
@@ -3488,6 +3496,8 @@ pub struct NodeStatus {
     pub products: Vec<BlueprintId>,
     /// Its level: it grows the longer it stands.
     pub level: u16,
+    /// Its visual tier (`survival::shaper_tier`).
+    pub tier: u8,
     /// 0..1 while the ray raises it; 1 online.
     pub raised: f32,
     pub printed: u32,

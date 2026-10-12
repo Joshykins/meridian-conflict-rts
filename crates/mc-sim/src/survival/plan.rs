@@ -16,11 +16,14 @@ use serde::{Deserialize, Serialize};
 /// 40; the HUD shows the field cap holding the printing back.
 const PLAN_CAP: usize = super::FIELD_CAP;
 
+/// `Formation::front` of one no front leads from: only a Shaper's platform takes it.
+pub(super) const NO_FRONT: u8 = u8::MAX;
+
 /// One formation: printed on one bay at once, mustered and sent as one block.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub(super) struct Formation {
     pub(super) units: Vec<BlueprintId>,
-    /// Index into `SurvivalConfig::fronts`.
+    /// Index into `SurvivalConfig::fronts`, or `NO_FRONT`.
     pub(super) front: u8,
     /// A squad of the round's heavy wave.
     pub(super) heavy: bool,
@@ -59,19 +62,39 @@ impl crate::World {
                 .map(|(i, _)| i as u8)
                 .collect()
         };
+        // Land and air formations print in the facility's bays and go down a
+        // front. Ships print on the sea gate's slips (down a sea front) or a
+        // naval Shaper's: while neither stands, a round has no naval share.
+        let naval_pads = s.nodes.iter().any(|n| {
+            s.config
+                .node_sites
+                .get(n.site as usize)
+                .is_some_and(|site| site.domain == Domain::Naval)
+                && !self.shaper_pads(n).is_empty()
+        });
+        let naval_bays = s.config.bays.iter().any(|b| b.domain == Domain::Naval);
+        let open = |d: Domain| match d {
+            Domain::Naval => rules.has(d) && ((naval_bays && !lanes(d).is_empty()) || naval_pads),
+            _ => !lanes(d).is_empty(),
+        };
+        // A formation with no front of its domain is one only a Shaper's platform takes.
+        let pick_lane = |d: Domain, rng: &mut Rng| {
+            let lane = lanes(d);
+            if lane.is_empty() {
+                NO_FRONT
+            } else {
+                lane[rng.below(lane.len() as u32) as usize]
+            }
+        };
         let domains: Vec<Domain> = Domain::ALL
             .into_iter()
-            .filter(|d| !lanes(*d).is_empty() && !self.roster(*d, tier).is_empty())
+            .filter(|d| open(*d) && !self.roster(*d, tier).is_empty())
             .collect();
         let mut out = Vec::new();
         if let Some(wave) = rules.heavy_wave(round) {
-            let open: Vec<Domain> = Domain::ALL
-                .into_iter()
-                .filter(|d| !lanes(*d).is_empty())
-                .collect();
+            let open: Vec<Domain> = Domain::ALL.into_iter().filter(|d| open(*d)).collect();
             for squad in self.plan_heavy_wave(&wave, &open, rng) {
-                let lane = lanes(domain_of_bp(self, squad.0));
-                let front = lane[rng.below(lane.len() as u32) as usize];
+                let front = pick_lane(domain_of_bp(self, squad.0), rng);
                 out.push(Formation {
                     units: vec![squad.0; squad.1],
                     front,
@@ -86,7 +109,6 @@ impl crate::World {
         for d in &domains {
             let mut left = budget * domain_weight(*d) / total.max(1);
             let roster = self.roster(*d, tier);
-            let lane = lanes(*d);
             let mut factions: Vec<FactionId> = roster.iter().map(|u| u.faction).collect();
             factions.sort_by_key(|f| f.0);
             factions.dedup();
@@ -120,7 +142,7 @@ impl crate::World {
                 planned += units.len();
                 out.push(Formation {
                     units,
-                    front: lane[rng.below(lane.len() as u32) as usize],
+                    front: pick_lane(*d, rng),
                     heavy: false,
                 });
             }
