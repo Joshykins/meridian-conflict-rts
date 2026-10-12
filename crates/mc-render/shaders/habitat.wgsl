@@ -209,7 +209,9 @@ fn habitat(xy: vec2<f32>, z: f32, base_n: vec3<f32>, px: f32) -> Habitat {
         h.snow_w = side_mix(h.snow_w, lying * (1.0 - h.ice_w), h.polar);
     }
     let open = (1.0 - sand_w) * (1.0 - canopy);
-    let highland = smoothstep(140.0, 300.0, alt + (broad - 0.5) * 140.0);
+    // (Autumn karst has no bare highland: the towers' tops are wooded like the
+    // valleys.)
+    let highland = smoothstep(140.0, 300.0, alt + (broad - 0.5) * 140.0) * (1.0 - h.autumn);
     h.open = open;
     h.highland = highland;
 

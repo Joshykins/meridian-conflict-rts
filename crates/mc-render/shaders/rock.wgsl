@@ -17,13 +17,13 @@ fn cliff_stone(xy: vec2<f32>, z: f32, slope: f32, scan: vec3<f32>, broad: f32, p
     // wall and not down it) and greened with moss low down.
     let fall = autumn_at(xy, 0.0);
     if fall > 0.0 {
-        let course = sin(z * 0.85 + grad_noise2(xy + 3.0, 60.0) * 7.0);
-        let bed = 0.9 + 0.16 * smoothstep(0.2, 0.9, course) - 0.12 * (1.0 - smoothstep(0.0, 0.12, abs(course + 0.4)));
+        let course = sin(z * (0.45 + 0.25 * grad_noise2(xy - 9.0, 300.0)) + grad_noise2(xy + 3.0, 60.0) * 9.0);
+        let bed = 0.95 + 0.07 * smoothstep(0.2, 0.9, course) - 0.06 * (1.0 - smoothstep(0.0, 0.1, abs(course + 0.4)));
         let wet = smoothstep(0.55, 0.8, grad_noise2(xy + 17.0, 3.5)) * smoothstep(0.45, 0.6, grad_noise2(xy - 41.0, 22.0));
-        let moss = smoothstep(0.55, 0.75, grad_noise2(xy * 1.3 + 9.0, 14.0)) * smoothstep(0.6, 1.0, slope);
+        let moss = smoothstep(0.45, 0.7, grad_noise2(xy * 1.3 + 9.0, 14.0)) * smoothstep(0.6, 1.0, slope);
         let grain = clamp(pow(mineral / 0.07, 0.45), 0.6, 1.4);
-        var karst = vec3<f32>(0.33, 0.31, 0.27) * grain * bed * (1.0 - 0.45 * wet);
-        karst = mix(karst, vec3<f32>(0.055, 0.07, 0.035), moss * 0.35);
+        var karst = vec3<f32>(0.25, 0.225, 0.19) * grain * bed * (1.0 - 0.5 * wet);
+        karst = mix(karst, vec3<f32>(0.05, 0.065, 0.03), moss * 0.5);
         stone = mix(stone, karst, fall);
     }
     if !mountain {
@@ -153,6 +153,9 @@ fn crag_cell_weight(d: vec3<f32>, f: vec3<f32>) -> f32 {
 // smooth least of them: flat facets that meet in creases at the joints, never a
 // step. Over them, ribs and gullies running down the face, and a rough skin.
 fn crag_depth(p: vec3<f32>) -> f32 {
+    if autumn() {
+        return karst_depth(p);
+    }
     let scale = vec3<f32>(1.0 / 10.0, 1.0 / 10.0, 1.0 / 16.0);
     let cell = floor(p * scale);
     let f = p * scale - cell;
@@ -178,6 +181,44 @@ fn crag_depth(p: vec3<f32>) -> f32 {
     return clamp(facets, -3.0, 3.0) + ribs * 2.5 + skin * 0.6;
 }
 
+// Quartz sandstone's mass (autumn karst, `autumn()`), metres out of the wall:
+// columns split by deep joints that run the whole height of a wall (cells
+// stretched far up it), fluted between, the beds stepping out a little at
+// the top of each course and the courses wavering. The walls of Wulingyuan:
+// sheer and vertical in everything. (The beds are the facets' own, small:
+// stepped beds this large draw chevrons down every wall.)
+fn karst_mass(p: vec3<f32>) -> f32 {
+    let column = crag_ridged(p / vec3<f32>(24.0, 24.0, 700.0));
+    let flute = crag_ridged(p / vec3<f32>(7.0, 7.0, 260.0) + 3.0);
+    let joint = 1.0 - smoothstep(-0.12, 0.12, crag_noise3(p / vec3<f32>(40.0, 40.0, 900.0) + 11.0) - 0.42);
+    return (column - 0.4) * 14.0 + (flute - 0.4) * 4.0 - joint * 3.5;
+}
+
+// Quartz sandstone's joint blocks (autumn karst): `crag_depth`'s facets cut on
+// the rock's own joints, vertical faces and level beds: cells narrow and tall,
+// planes barely tilted.
+fn karst_depth(p: vec3<f32>) -> f32 {
+    let scale = vec3<f32>(1.0 / 7.0, 1.0 / 7.0, 1.0 / 4.5);
+    let cell = floor(p * scale);
+    let f = p * scale - cell;
+    let side = select(vec3<f32>(1.0), vec3<f32>(-1.0), f < vec3<f32>(0.5));
+    var sum = 0.0;
+    let k = 0.8;
+    for (var n = 0u; n < 8u; n++) {
+        let d = side * vec3<f32>(f32(n & 1u), f32((n >> 1u) & 1u), f32(n >> 2u));
+        let c = cell + d;
+        let h = crag_hash3(c);
+        let site = (c + 0.15 + 0.7 * h) / scale;
+        let tilt = (crag_hash3(c + 17.0) - 0.5) * vec3<f32>(0.25, 0.25, 0.12);
+        let off = p - site;
+        let v = dot(off, tilt) + (h.z - 0.5) * 2.0 + 0.05 * dot(off * scale * 7.0, off * scale * 7.0);
+        sum += crag_cell_weight(d, f) * exp(-v / k);
+    }
+    let facets = 2.0 + k * log(max(sum, 1e-6));
+    let skin = crag_noise3(p / 2.2) - 0.5;
+    return clamp(facets, -2.5, 2.5) + skin * 0.5;
+}
+
 // A ridged field, 0-1: crests where the noise crosses its middle, broad troughs
 // between. The crest is rounded over a few percent of the noise, a metre or so:
 // a crease a pixel wide flips the light across it and draws a hairline down the
@@ -193,6 +234,9 @@ fn crag_ridged(p: vec3<f32>) -> f32 {
 // creased), from tens of metres across down to a few. Smooth enough for 8 m
 // cells at its coarsest, so it is drawn wherever the crag is.
 fn crag_mass(p: vec3<f32>) -> f32 {
+    if autumn() {
+        return karst_mass(p);
+    }
     let arete = crag_ridged(p / vec3<f32>(26.0, 26.0, 90.0));
     let rib = crag_ridged(p / vec3<f32>(9.0, 9.0, 30.0) + 7.0);
     let bulge = crag_noise3(p / 55.0 + 31.0) - 0.5;

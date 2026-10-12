@@ -10,7 +10,7 @@
 //!   every field;
 //! * each base's walk to its own team's ore is as long as its twins' in the
 //!   other teams within 8%, to the island in the middle within 12%, to the
-//!   nearest enemy base within 17%;
+//!   nearest enemy base within 14%;
 //! * the sea is one, round the map and up the three estuaries, and the lake
 //!   in the middle is too shallow for ships;
 //! * the woods are deciduous: most trees broadleaf.
@@ -22,7 +22,7 @@
 //! a cell, north up: grey where they can (lighter the nearer to start 0, or
 //! to start `SPIRES_WALK_FROM`, banded every kilometre), red where they
 //! could but cannot get to, black where they cannot, blue where ships can
-//! sail.
+//! sail; `SPIRES_WALK_TO=j` draws the shortest way from there to start j.
 
 use mc_core::{Fx, FxVec2};
 use mc_map::{Heightfield, MapFile, PropKind, CELL_SIZE_M};
@@ -203,7 +203,12 @@ fn thousand_spires_plays_the_same_for_every_team() {
             .and_then(|v| v.parse::<usize>().ok())
             .unwrap_or(0)
             .min(11);
-        write_walk(&map, &walks[from], &out);
+        // (`SPIRES_WALK_TO=j` draws the shortest way from there to start j in red.)
+        let to = std::env::var("SPIRES_WALK_TO")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+            .map(|j| &walks[j.min(11)]);
+        write_walk(&map, &walks[from], to, &out);
     }
     for (i, &s) in starts.iter().enumerate() {
         if at(&walks[0], s) < 0 {
@@ -236,14 +241,19 @@ fn thousand_spires_plays_the_same_for_every_team() {
     for slot in 0..4 {
         let twins = [slot, 4 + slot, 8 + slot];
         let island = twins.map(|i| metres(at(&walks[i], map.mid)));
-        let enemy = twins.map(|i| {
+        let nearest = twins.map(|i| {
             (0..12)
                 .filter(|&j| j / 4 != i / 4)
-                .map(|j| at(&walks[i], starts[j]))
-                .filter(|&d| d >= 0)
-                .map(metres)
-                .fold(f64::INFINITY, f64::min)
+                .map(|j| (at(&walks[i], starts[j]), j))
+                .filter(|&(d, _)| d >= 0)
+                .min()
+                .map_or((f64::INFINITY, 0), |(d, j)| (metres(d), j))
         });
+        let enemy = nearest.map(|n| n.0);
+        println!(
+            "slot {slot}'s nearest enemies: starts {}, {}, {}",
+            nearest[0].1, nearest[1].1, nearest[2].1
+        );
         // The team's own ore: the fields in its third, by the north team's.
         let own = twins.map(|i| {
             let k = i / 4;
@@ -261,7 +271,7 @@ fn thousand_spires_plays_the_same_for_every_team() {
             // (The ground is natural, not turned: a base's way to the
             // middle or to an enemy wanders more than its way to its ore.)
             ("to the island", island, 0.12),
-            ("to the nearest enemy", enemy, 0.17),
+            ("to the nearest enemy", enemy, 0.14),
             ("to its team's ore", own, 0.08),
         ] {
             println!(
@@ -332,12 +342,29 @@ fn thousand_spires_plays_the_same_for_every_team() {
 }
 
 /// Where units can walk, one pixel a cell, north up.
-fn write_walk(map: &Map, walk: &[i32], out: &str) {
+fn write_walk(map: &Map, walk: &[i32], to: Option<&Vec<i32>>, out: &str) {
+    // The way: cells on a shortest walk between the two, within half a percent.
+    let best = to.map(|t| {
+        walk.iter()
+            .zip(t)
+            .filter(|(a, b)| **a >= 0 && **b >= 0)
+            .map(|(a, b)| a + b)
+            .min()
+            .unwrap_or(0)
+    });
     let mut ppm = format!("P6 {} {} 255\n", map.w, map.h).into_bytes();
     for cy in (0..map.h).rev() {
         for cx in 0..map.w {
             let i = (cy * map.w + cx) as usize;
-            let rgb = if map.sea_cell(cx, cy) {
+            let on_way = match (to, best) {
+                (Some(t), Some(best)) => {
+                    walk[i] >= 0 && t[i] >= 0 && (walk[i] + t[i]) as f64 <= best as f64 * 1.005
+                }
+                _ => false,
+            };
+            let rgb = if on_way {
+                [255, 0, 0]
+            } else if map.sea_cell(cx, cy) {
                 [40, 70, 140]
             } else if walk[i] >= 0 {
                 // Lighter the nearer, banded every kilometre.

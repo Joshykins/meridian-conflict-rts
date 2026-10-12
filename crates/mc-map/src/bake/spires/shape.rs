@@ -26,10 +26,8 @@ const FRAY: f64 = 260.0;
 /// one to the next, metres.
 const BENCH_0: f64 = 10.0;
 const BENCH: f64 = 46.0;
-/// The massif's blocks: the cell they are cut from, and the finer one some
-/// are split into columns by; metres.
-const BLOCK_CELL: f64 = 230.0;
-const COLUMN_CELL: f64 = 96.0;
+/// The massif's towers: the cell each may stand in, metres.
+const TOWER_CELL: f64 = 210.0;
 /// The highest a massif top or pillar stands, metres over the water (the
 /// map's heights stop at 768).
 const PEAK: f64 = 740.0;
@@ -146,12 +144,27 @@ impl Terrain {
 
     /// Where the plan is read for a design point: bent by a slow warp of the
     /// map's own, so no two thirds' escarpments, valleys, coasts or massifs
-    /// lie alike. Held still round the bases, the ore and the island.
+    /// lie alike. Held still round the bases, the ore, the island and the
+    /// fords, and down the gates.
     pub(super) fn sp_warp(&self, q: (f64, f64)) -> (f64, f64) {
         let k = WARP
             * smoothstep(650.0, 1_900.0, self.sp_base_dist(q))
             * smoothstep(120.0, 700.0, self.sp_ore_dist(q))
-            * smoothstep(700.0, 1_800.0, q.0.hypot(q.1));
+            * smoothstep(700.0, 1_800.0, q.0.hypot(q.1))
+            // and at the fords, so every valley is crossed where the plan has it,
+            * smoothstep(300.0, 1_500.0, {
+                let (b, t) = edge_frame(half(q));
+                FORDS
+                    .iter()
+                    .map(|&f| (t - f).hypot(b))
+                    .fold(f64::INFINITY, f64::min)
+            })
+            // and down each team's gate to the lake, so every gate is as long.
+            * smoothstep(250.0, 1_100.0, half(q).0).max(smoothstep(
+                MASSIF_OUT + 300.0,
+                MASSIF_OUT + 1_200.0,
+                q.0.hypot(q.1),
+            ));
         if k <= 0.0 {
             return q;
         }
@@ -306,6 +319,7 @@ impl Terrain {
             (INNER, (-INNER.0, INNER.1)),
             (INNER, FLANK),
             (INNER, to_coast(INNER)),
+            (INNER, to_valley(INNER)),
             (FLANK, to_valley(FLANK)),
             (FLANK, to_coast(FLANK)),
         ];
@@ -371,10 +385,10 @@ impl Terrain {
         let cones =
             smoothstep(0.18, 0.4, field) * smoothstep(0.6, 1.0, keep) * smoothstep(4.0, 12.0, land);
         if cones > 0.0 {
-            let (f1, _, h1) = worley(self.seed ^ 0x636F_6E65, q, 170.0);
+            let (f1, h1) = worley(self.seed ^ 0x636F_6E65, q, 170.0);
             let d = dist(q, f1);
-            let radius = 70.0 + 40.0 * unit(h1, 0);
-            let tall = (55.0 + 110.0 * unit(h1, 24)) * cones;
+            let radius = 95.0 + 45.0 * unit(h1, 0);
+            let tall = (40.0 + 70.0 * unit(h1, 24)) * cones;
             let cone = smoothstep(radius, 0.0, d + 8.0 * grain);
             h += tall * cone.powf(0.8);
         }
@@ -494,51 +508,52 @@ impl Terrain {
         (ring.max(0.7 * out)) * off_valley
     }
 
-    /// The massif's height at a design point, or None off its blocks.
-    fn sp_blocks(&self, q: (f64, f64), mask: f64) -> Option<f64> {
-        let (f1, f2, h1) = worley(self.seed ^ 0x626C_6B73, q, BLOCK_CELL);
-        // Walls stand back from the cell's edge by a gap that widens as the
-        // massif thins, till only cores are left, then nothing.
-        let rough = 5.0 * self.crag.fbm(q.0 / 40.0, q.1 / 40.0, 2, 0.5);
-        let gap = 7.0 + 0.55 * BLOCK_CELL * (1.0 - mask).powf(1.4);
-        // Corners rounded off (by the distance in from a circle round the
-        // cell's point), so no block ends in a sliver the 8 m grid draws as a
-        // spike.
-        let edge = bisector(q, f1, f2).min(0.62 * BLOCK_CELL - dist(q, f1)) + rough;
-        let wall = smoothstep(gap, gap + 7.0, edge);
-        if wall <= 0.0 {
-            return None;
-        }
-        let peaks = self.mtn_height.fbm(f1.0 / 1_300.0, f1.1 / 1_300.0, 3, 0.5);
-        let mut top =
-            TABLE + (180.0 + 420.0 * mask * (0.6 + 0.4 * peaks)) * (0.55 + 0.45 * unit(h1, 0));
-        // Half the blocks split into columns of their own heights.
-        if unit(h1, 24) < 0.55 {
-            let (c1, c2, ch) = worley(self.seed ^ 0x636F_6C73, q, COLUMN_CELL);
-            let split = bisector(q, c1, c2).min(0.6 * COLUMN_CELL - dist(q, c1)) + 0.6 * rough;
-            let slot = smoothstep(7.0, 13.0, split);
-            if slot <= 0.0 {
-                return None;
-            }
-            top *= 0.8 + 0.25 * unit(ch, 0);
-            top = TABLE + (top - TABLE) * slot;
-        }
-        let crown = 6.0 * self.detail.fbm(q.0 / 60.0, q.1 / 60.0, 2, 0.5);
-        Some((top + crown).min(PEAK) * wall)
-    }
-
-    /// The massif over the ground at a point: its blocks and columns, the
-    /// ravines between them floored a little above the ground under them.
+    /// The massif over the ground at a point: tower karst, steep towers and
+    /// cones with rounded tops standing from saddles, crowded where the massif
+    /// is thick and standing apart toward its edge. (Erosion then cuts their
+    /// flanks into gullies and spurs, and the renderer's karst relief flutes
+    /// their walls: `crag_relief` in rock.wgsl.)
     fn sp_massif(&self, x: f64, y: f64, q: (f64, f64), w: (f64, f64), ground: f64) -> f64 {
         let mask = self.sp_massif_mask(x, y, q, w);
         if mask <= 0.0 {
             return ground;
         }
-        let floor = ground + 70.0 * mask * mask;
-        match self.sp_blocks(q, mask) {
-            Some(top) => floor.max(top),
-            None => floor,
+        let saddle = ground + 110.0 * mask * mask;
+        let peaks = self.mtn_height.fbm(x / 1_300.0, y / 1_300.0, 3, 0.5);
+        let (ci, cj) = (
+            (q.0 / TOWER_CELL).floor() as i64,
+            (q.1 / TOWER_CELL).floor() as i64,
+        );
+        let mut h = saddle;
+        for dj in -1..=1 {
+            for di in -1..=1 {
+                let hash = hash2(self.seed ^ 0x746F_7772, ci + di, cj + dj);
+                // Fewer towers where the massif thins, none past its edge.
+                if unit(hash, 40) > 0.25 + 0.95 * mask {
+                    continue;
+                }
+                let f = (
+                    ((ci + di) as f64 + 0.15 + 0.7 * unit(hash, 0)) * TOWER_CELL,
+                    ((cj + dj) as f64 + 0.15 + 0.7 * unit(hash, 24)) * TOWER_CELL,
+                );
+                let mix = hash2(hash, 5, 9);
+                let radius = TOWER_CELL * (0.42 + 0.3 * unit(mix, 0));
+                let a = (q.1 - f.1).atan2(q.0 - f.0);
+                let lobes = 0.16 * (3.0 * a + 6.3 * unit(mix, 24)).sin()
+                    + 0.08 * (5.0 * a + 6.3 * unit(mix, 40)).sin();
+                let t = dist(q, f) / (radius * (1.0 + lobes));
+                if t >= 1.0 {
+                    continue;
+                }
+                // A tower's sides steepen to a wall at its foot; its top is a
+                // dome (a high power) or a cone (a low one).
+                let k = 2.2 + 4.0 * unit(hash2(mix, 1, 2), 0);
+                let tall = (260.0 + 380.0 * mask * (0.6 + 0.4 * peaks))
+                    * (0.55 + 0.45 * unit(hash2(mix, 3, 4), 0));
+                h = h.max(ground + tall * (1.0 - t.powf(k)));
+            }
         }
+        h.min(PEAK)
     }
 
     /// The pillars standing on their own over the ground at a point.
@@ -591,7 +606,7 @@ impl Terrain {
                     0.4,
                     self.forest_kind.fbm(x / 1_400.0, y / 1_400.0, 2, 0.5),
                 );
-        let (land, valley) = self.sp_level(x, y, at, w);
+        let (_, valley) = self.sp_level(x, y, at, w);
         let channel = self.sp_channel(t).0;
         let coast = self.sp_coast(off_axis(p));
         let (chance, size, tall) = if at.0.hypot(at.1) < LAKE_R - 150.0 {
@@ -618,47 +633,82 @@ impl Terrain {
         } else if r > coast - 250.0 {
             NONE
         } else if valley > 0.95 {
-            // The valley floor, clear of the river and its banks.
-            if b < channel + 160.0 {
+            // The valley floor, clear of the river and its banks and of the
+            // ways to the fords.
+            if b < channel + 160.0 || FORDS.iter().any(|&f| (t - f).abs() < 480.0) {
                 NONE
             } else {
                 (0.15, 0.9, (90.0, 260.0))
             }
-        } else if valley < 0.05 && land > 4.0 {
-            // The benches.
-            let forest = smoothstep(
-                0.25,
-                0.55,
-                self.forest_kind.fbm(x / 2_200.0 - 5.0, y / 2_200.0, 3, 0.5),
-            );
-            (
-                0.03 + 0.3 * forest,
-                0.6 + 0.3 * forest,
-                (40.0, 120.0 + 120.0 * forest),
-            )
         } else {
             NONE
         };
         ((chance * drift).min(0.8), size, tall)
     }
 
-    pub(in crate::bake) fn natural_spires(&self, x: f64, y: f64) -> f64 {
+    /// The ground before erosion and the pillars, and how much erosion may
+    /// cut it (0..1: the massif fully, the open country a little, nothing by
+    /// the ways or the water).
+    fn sp_shape(&self, x: f64, y: f64) -> (f64, f64) {
         let q = design((x, y));
         let w = self.sp_warp(q);
         let (land, _) = self.sp_level(x, y, q, w);
         let land = self.sp_relief(x, y, q, w, land);
         let h = self.sp_water(x, y, q, w, land);
-        let h = self.sp_massif(x, y, q, w, h);
-        self.sp_pillars(q, h)
+        let massif = self.sp_massif(x, y, q, w, h);
+        let cut = smoothstep(0.0, 40.0, massif - h).max(0.4 * self.sp_keep(q, w))
+            * smoothstep(2.0, 8.0, h);
+        (massif, cut)
+    }
+
+    pub(in crate::bake) fn natural_spires(&self, x: f64, y: f64) -> f64 {
+        let (h, cut) = self.sp_shape(x, y);
+        let h = if self.erosion.delta.is_empty() || cut <= 0.0 {
+            h
+        } else {
+            (h + self.erosion.at(x, y) * cut).max(h.min(2.5))
+        };
+        self.sp_pillars(design((x, y)), h)
+    }
+
+    /// Water erosion over the whole country before the pillars stand on it:
+    /// gullies down the towers' flanks and the benches' faces, as in Alaska.
+    pub(in crate::bake) fn erode_spires(&mut self) {
+        const STEP: f64 = 16.0;
+        const VERTICAL: f32 = 40.0;
+        let n = (self.size_x / STEP) as usize + 1;
+        let mut h = vec![0f32; n * n];
+        let threads = std::thread::available_parallelism().map_or(4, |t| t.get());
+        let rows = n.div_ceil(threads);
+        std::thread::scope(|s| {
+            for (k, chunk) in h.chunks_mut(rows * n).enumerate() {
+                let t = &*self;
+                s.spawn(move || {
+                    for (r, row) in chunk.chunks_mut(n).enumerate() {
+                        let y = (k * rows + r) as f64 * STEP;
+                        for (i, v) in row.iter_mut().enumerate() {
+                            *v = t.sp_shape(i as f64 * STEP, y).0.max(-2.0) as f32 / VERTICAL;
+                        }
+                    }
+                });
+            }
+        });
+        let before = h.clone();
+        crate::bake::alpine::erode(&mut h, n, self.seed);
+        crate::bake::alpine::erode(&mut h, n, self.seed ^ 0x7370_6972);
+        let delta = crate::bake::bays::settle_gullies(&h, &before, n, STEP, VERTICAL);
+        self.erosion = crate::bake::alpine::Erosion {
+            n,
+            step: STEP,
+            delta,
+        };
     }
 }
 
-/// The nearest and second nearest of a jittered grid's points to `q`, and
-/// the nearest's hash.
-fn worley(seed: u64, q: (f64, f64), cell: f64) -> ((f64, f64), (f64, f64), u64) {
+/// The nearest of a jittered grid's points to `q`, and its hash.
+fn worley(seed: u64, q: (f64, f64), cell: f64) -> ((f64, f64), u64) {
     let (ci, cj) = ((q.0 / cell).floor() as i64, (q.1 / cell).floor() as i64);
     let mut best = (f64::INFINITY, (0.0, 0.0), 0u64);
-    let mut next = (f64::INFINITY, (0.0, 0.0));
     for dj in -1..=1 {
         for di in -1..=1 {
             let (i, j) = (ci + di, cj + dj);
@@ -669,22 +719,11 @@ fn worley(seed: u64, q: (f64, f64), cell: f64) -> ((f64, f64), (f64, f64), u64) 
             );
             let d = dist(q, f);
             if d < best.0 {
-                next = (best.0, best.1);
                 best = (d, f, hash);
-            } else if d < next.0 {
-                next = (d, f);
             }
         }
     }
-    (best.1, next.1, best.2)
-}
-
-/// Metres from `q` to the line halfway between `a` (the nearer) and `b`.
-fn bisector(q: (f64, f64), a: (f64, f64), b: (f64, f64)) -> f64 {
-    let (dx, dy) = (b.0 - a.0, b.1 - a.1);
-    let len = dx.hypot(dy).max(1e-6);
-    let mid = (0.5 * (a.0 + b.0), 0.5 * (a.1 + b.1));
-    ((mid.0 - q.0) * dx + (mid.1 - q.1) * dy) / len
+    (best.1, best.2)
 }
 
 /// The bench a lie falls on, and how far up it toward the next, 0..1.

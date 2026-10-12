@@ -208,7 +208,7 @@ impl Terrain {
             .forest
             .fbm(x / (0.09 * l) - 33.7, y / (0.09 * l) + 57.2, 2, 0.5);
         let clearing = smoothstep(0.30, 0.55, clearing);
-        let mut habitable = smoothstep(2.0, 5.0, height) * (1.0 - smoothstep(0.45, 0.8, slope));
+        let mut habitable = smoothstep(2.0, 5.0, height) * (1.0 - smoothstep(0.7, 0.95, slope));
         let q = design((x, y));
         let r = q.0.hypot(q.1);
         // Open broadleaf woods over most of the land, thinner on the lowland by
@@ -265,6 +265,7 @@ impl Terrain {
         let start_core = (0.02 * self.size).clamp(200.0, 700.0);
         self.start_outer = 2.0 * start_core;
         self.forest_edge = -0.1;
+        self.erode_spires();
         self.sp = Spires {
             pillars: shape::Pillars::lay(self),
         };
