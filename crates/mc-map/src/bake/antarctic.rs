@@ -541,7 +541,7 @@ impl Terrain {
                 let d = dist(q, (lx, ly)) + shore + 0.6 * ragged_of(r, q, (lx, ly));
                 let k = smoothstep(r + 170.0, r, d);
                 if k > 0.0 {
-                    land += (level + 0.25 * (d - r).max(0.0).min(40.0) - land) * k;
+                    land += (level + 0.25 * (d - r).clamp(0.0, 40.0) - land) * k;
                 }
             }
         }
