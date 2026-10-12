@@ -15,6 +15,7 @@
 //! mc-bake --layout siege --size-km 6 --seed 3 --name "Halcyon" -o maps/halcyon.mcmap
 //! mc-bake --layout antarctic --size-km 12 --seed 37 --name "Erebus Strait" -o maps/erebus_strait.mcmap
 //! mc-bake --layout spires --size-km 24 --seed 17 --name "Thousand Spires" -o maps/thousand_spires.mcmap
+//! mc-bake --layout harvest --size-km 24 --seed 41 --name "The Last Harvest" -o maps/last_harvest.mcmap
 //! ```
 //!
 //! Every layout but the survival and siege ones (each lays its own with its plan) is then
@@ -74,10 +75,15 @@ usage: mc-bake -o <file.mcmap> [options]
                    karst: a lake ringed by a massif of pillars in the
                    middle, a valley with a river and an estuary between
                    every two teams, terraces down to the sea; exactly 24 km
+                   harvest: \"The Last Harvest\", the survival map for four
+                   defenders: an autumn heartland and a valley up to the
+                   Progenitor's base, desert, alpine country, isles and
+                   fjords round it with the Shaper sites; 4 defender starts
+                   and the Heart's; exactly 24 km
   --players <n>    start positions, 1-32 (default: 2 up to 8 km, 4 up to 24 km,
                    else 8; islands and alpine: always 2; the 8-player layouts
                    take exactly 8, crosswater and antarctic 4, tripoint 3, siege 2,
-                   spires 12)
+                   spires 12, harvest 5)
   --threads <n>    worker threads (default: all cores; does not change the result)
   --preview <ppm>  also write a shaded overview image with markers
   --verify         re-read the file and check its content id
@@ -142,9 +148,10 @@ fn parse_args() -> Result<Args, String> {
                     "siege" => Layout::Siege,
                     "antarctic" => Layout::Antarctic,
                     "spires" => Layout::Spires,
+                    "harvest" => Layout::Harvest,
                     other => {
                         return Err(format!(
-                            "unknown layout '{other}' (basin, islands, alpine, alpine-teams, archipelago, twin-bays, threshold, canyon, frostline, crosswater, tripoint, siege, antarctic or spires)"
+                            "unknown layout '{other}' (basin, islands, alpine, alpine-teams, archipelago, twin-bays, threshold, canyon, frostline, crosswater, tripoint, siege, antarctic, spires or harvest)"
                         ))
                     }
                 }
@@ -201,6 +208,12 @@ fn parse_args() -> Result<Args, String> {
     if args.layout == Layout::Spires && args.players.is_some_and(|n| n != 12) {
         return Err("--layout spires is a twelve-player layout (--players 12)".into());
     }
+    if args.layout == Layout::Harvest && args.players.is_some_and(|n| n != 5) {
+        return Err("--layout harvest has exactly 5 starts (--players 5)".into());
+    }
+    if args.layout == Layout::Harvest && args.size_km != 24 {
+        return Err("--layout harvest is exactly 24 km (--size-km 24)".into());
+    }
     if args.layout == Layout::Threshold && args.players.is_some_and(|n| n != 4) {
         return Err("--layout threshold has exactly 4 starts (--players 4)".into());
     }
@@ -249,6 +262,7 @@ fn run(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
         Layout::Siege => BakeParams::siege(&name, args.size_km / 2, args.seed),
         Layout::Antarctic => BakeParams::antarctic(&name, args.size_km / 2, args.seed),
         Layout::Spires => BakeParams::spires(&name, args.size_km / 2, args.seed),
+        Layout::Harvest => BakeParams::harvest(&name, args.size_km / 2, args.seed),
     };
     params.threads = args.threads;
     if let Some(players) = args.players {

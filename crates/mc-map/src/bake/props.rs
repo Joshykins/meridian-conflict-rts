@@ -30,6 +30,7 @@ impl Terrain {
                 Layout::Frostline => self.frostline_forest(x, y, height, slope),
                 Layout::Tripoint => self.tripoint_forest(x, y, height, slope),
                 Layout::Spires => self.spires_forest(x, y, height, slope),
+                Layout::Harvest => self.harvest_forest(x, y, height, slope),
                 Layout::Crosswater => self.cw_forest(x, y, height, slope),
                 // Nothing grows on Antarctica.
                 Layout::Antarctic => (0.0, 0.0),
@@ -181,6 +182,10 @@ impl Terrain {
         if self.layout == Layout::Siege {
             return self.siege_tree(x, y, hash);
         }
+        // The Last Harvest's by the region; its `conifer` slot carries the height.
+        if self.layout == Layout::Harvest {
+            return self.harvest_tree(x, y, conifer, hash);
+        }
         // The alpine maps' and Crosswater's woods are not mirrored.
         let (px, py) = match self.layout {
             Layout::Alpine | Layout::AlpineTeams | Layout::Crosswater => (x, y),
@@ -237,6 +242,9 @@ impl Terrain {
             if self.layout == Layout::Siege && !self.siege_clear(x, y) {
                 return true;
             }
+            if self.layout == Layout::Harvest && !self.harvest_clear(x, y) {
+                return true;
+            }
             // Starts sit in ragged glades (`start_clearing`), not drawn circles;
             // town pads keep their streets clear.
             self.start_clearing(x, y) < 0.02
@@ -247,7 +255,7 @@ impl Terrain {
         };
         let mut props = Vec::new();
         // The alpine map is rockier, and its woods climb steeper ground.
-        let alpine = self.is_alpine() || self.layout == Layout::Threshold;
+        let alpine = self.is_alpine() || matches!(self.layout, Layout::Threshold | Layout::Harvest);
         // Antarctica's rock is its ground's, under the snow: no boulders.
         let arctic = self.layout == Layout::Antarctic;
 
@@ -289,7 +297,9 @@ impl Terrain {
                         || (self.layout == Layout::Frostline && frostline::east_of(x, y) < 0.0)
                         || (self.layout == Layout::Tripoint
                             && crate::landmark::tripoint_region((x, y))
-                                == crate::landmark::TRIPOINT_DESERT);
+                                == crate::landmark::TRIPOINT_DESERT)
+                        || (self.layout == Layout::Harvest
+                            && self.hv_region((x, y)) == crate::landmark::HARVEST_DESERT);
                     let kind = if desert {
                         // Blocks of bedded sandstone fallen from the walls.
                         [PropKind::RockSlab, PropKind::RockLarge][(roll > 0.985) as usize]

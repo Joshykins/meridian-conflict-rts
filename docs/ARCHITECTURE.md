@@ -429,7 +429,19 @@ invulnerable unit, and the mirror marks it `SHIELD_VEIL` so it is drawn apart fr
   way its base faces, its `kind` (`SiteKind`: Printer, or the auxiliary Artillery and Nuke), the `room` (m) of level
   clear ground its base grows into (default 450 for a printer, 350 for an auxiliary site) and the `path` its
   formations take toward the defenders; aircraft fly straight). The ray raises Printer sites only so far.
-  There is one survival map: `maps/threshold` ("The Threshold", `mc-bake --layout threshold --size-km 16 --seed 31`,
+  `maps/last_harvest` ("The Last Harvest", `mc-bake --layout harvest --size-km 24 --seed 41`,
+  `crates/mc-map/src/bake/harvest.rs`) is the survival map for four defenders, made for the Shaper sites: the
+  defenders' starts at the south of an autumn heartland by the south sea, a river and its fords north of them, a
+  broad valley north to the base, which stands at grade (no rampart, no ramps) with the Heart, the Forges, the
+  Great Forge, the aeries and three Shaper sites on its floor; round the heartland four more climates, each with
+  its printing sites and the way (road, canyon pass, valley, sandbar or sea lane) the bake cuts for each, and an
+  auxiliary site hidden behind them (a mesa-ringed hollow, a cirque, a basin up a pass, an atoll): the desert
+  (north-west), alpine country (north-east), the isles (south-west) and the fjords (south-east). Its sidecar has
+  five `regions` and the walls in `mc_map::landmark::HARVEST_WALLS`; the bake prints its bays and sites
+  (`cargo test -p mc-map --lib harvest_block -- --nocapture`), and `crates/mc-map/tests/last_harvest.rs` checks the
+  rooms, bays and guns level and clear, the paths drivable or sailable, every site reaching the defenders and the
+  auxiliary ones only by their narrow ways, the ore and the regions.
+  The older survival map is `maps/threshold` ("The Threshold", `mc-bake --layout threshold --size-km 16 --seed 31`,
   `crates/mc-map/src/bake/threshold.rs`): one road along a coast between mountains and the sea, the defenders' lowland
   in the west, a single pass, and the east half one Precursor facility on a plateau behind the Rampart, one ramp up
   under the Gate. Its forges, sea gate, cradles, heart, halos, monoliths, needles and platforms are props
@@ -501,8 +513,9 @@ invulnerable unit, and the mirror marks it `SHIELD_VEIL` so it is drawn apart fr
   `strategic` block: the Shaper assembles interceptors like a Parhelion (`nukes.rs`), more held and wider cover as
   it grows.
 - **Economy.** Nothing is handed out. The engine's rounds are the defenders' materials: every unit it prints dies into a
-  wreck worth most of its cost, so reclaim is the economy. The Threshold still carries ore at every spawn and across the
-  lowland, and the wreckage of earlier assaults along the road from the Rampart to the spawns (`bake/threshold/wrecks.rs`). The heart, the print bays and the Shapers are always revealed to the defenders
+  wreck worth most of its cost, so reclaim is the economy. The survival maps still carry ore at every spawn and across the
+  lowland, and the wreckage of earlier assaults along the ways the waves take to the spawns (`bake/planned_wrecks.rs`,
+  fields in `bake/threshold/wrecks.rs` and `bake/harvest/wrecks.rs`). The heart, the print bays and the Shapers are always revealed to the defenders
   (`survival_reveal`). The skirmish AI skips the engine side; an AI *defender* only attacks nodes.
 - **Interface.** `SimStatus::survival` (`World::survival_status`) feeds the HUD's survival card under the minimap
   (`hud/survival.rs`, `SurvivalHud`: round, what the engine is doing, the tier chip, what is coming per domain, the
@@ -511,6 +524,6 @@ invulnerable unit, and the mirror marks it `SHIELD_VEIL` so it is drawn apart fr
   chip pulse. The minimap draws the fronts, the engine and the nodes; toasts and stingers
   (`data/sounds/survival.ron`) announce rounds, tiers, heavy waves, nodes and the Shaper levels that bring a new kind;
   the ray and print beams are loops.
-- **Headless.** `--scene survival --map maps/threshold.mcmap [--observe] --bench N` prints rounds and node events and a
+- **Headless.** `--scene survival --map maps/last_harvest.mcmap [--observe] --bench N` prints rounds and node events and a
   line a minute (`MERIDIAN_SURVIVAL=rounds:grace:interval:intensity:fronts:tier:nodes`,
   `MERIDIAN_SURVIVAL_SPAWN=i`, `MERIDIAN_SURVIVAL_WHY=1` lists where the hostiles are). Tests: `mc-sim/tests/survival.rs`.

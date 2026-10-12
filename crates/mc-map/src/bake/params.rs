@@ -1,7 +1,7 @@
 //! The layouts a map can be baked to, the parameters of a bake, and what
 //! each layout asks of them.
 
-use super::{antarctic, crosswater, frostline, siege, spires, tripoint};
+use super::{antarctic, crosswater, frostline, harvest, siege, spires, tripoint};
 use crate::format::MapError;
 use crate::{MAX_START_POSITIONS, TILE_SIZE_M};
 
@@ -79,6 +79,13 @@ pub enum Layout {
     /// for every team, each third's ground its own; the north team's four
     /// starts first, then the others' turned. Exactly 24 km.
     Spires,
+    /// "The Last Harvest": the survival map for four defenders (see
+    /// `harvest.rs`). An autumn heartland in the middle, the defenders' four
+    /// starts at its south by the sea, a valley north to the Progenitor's base
+    /// at grade; desert, alpine country, isles and fjords round it, each with
+    /// the Shaper sites the rounds come from. Five starts: the defenders' four,
+    /// then the Heart's. Exactly 24 km.
+    Harvest,
 }
 
 #[derive(Clone, Debug)]
@@ -223,6 +230,15 @@ impl BakeParams {
         }
     }
 
+    /// A square [`Layout::Harvest`] map: four defender starts and the Heart's.
+    pub fn harvest(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
+        BakeParams {
+            players: 5,
+            layout: Layout::Harvest,
+            ..BakeParams::square(name, size_tiles, seed)
+        }
+    }
+
     /// A square [`Layout::Threshold`] map: three defender starts and the facility's.
     pub fn threshold(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
         BakeParams {
@@ -321,6 +337,16 @@ impl BakeParams {
         {
             return Err(MapError::Invalid(
                 "the Antarctic layout is for exactly 4 players on a 12 km map".into(),
+            ));
+        }
+        if self.layout == Layout::Harvest
+            && (self.players != 5
+                || (self.tiles_w as i32 * TILE_SIZE_M) as f64 != harvest::SIZE
+                || self.tiles_h != self.tiles_w)
+        {
+            return Err(MapError::Invalid(
+                "the Harvest layout has exactly 5 starts (4 defenders and the Heart) on a 24 km map"
+                    .into(),
             ));
         }
         if self.layout == Layout::Threshold && self.players != 4 {

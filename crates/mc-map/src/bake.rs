@@ -64,8 +64,10 @@ mod bays;
 mod canyon;
 mod crosswater;
 mod frostline;
+mod harvest;
 mod machine;
 mod params;
+mod planned_wrecks;
 mod props;
 mod siege;
 mod spires;
@@ -76,7 +78,7 @@ mod tripoint;
 pub(crate) fn planned_wreck_keys() -> impl Iterator<Item = &'static str> {
     siege::wrecks::ASSAULT
         .iter()
-        .chain(&threshold::wrecks::KINDS)
+        .chain(&planned_wrecks::KINDS)
         .map(|k| k.0)
 }
 
@@ -216,6 +218,7 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
     let wrecks = match terrain.layout {
         Layout::Siege => terrain.siege_wrecks(),
         Layout::Threshold => terrain.threshold_wrecks(),
+        Layout::Harvest => terrain.harvest_wrecks(),
         _ => Vec::new(),
     };
     if !wrecks.is_empty() {
@@ -278,7 +281,7 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
 fn z_range(layout: Layout) -> (Fx, Fx) {
     match layout {
         // Peaks well over the clouds: -256 m to +1791 m in 1/32 m steps.
-        Layout::Threshold => (Fx::from_int(-256), Fx::ratio(1, 32)),
+        Layout::Threshold | Layout::Harvest => (Fx::from_int(-256), Fx::ratio(1, 32)),
         _ => (DEFAULT_MIN_Z, DEFAULT_Z_STEP),
     }
 }
@@ -427,6 +430,8 @@ struct Terrain {
     tp: tripoint::Tripoint,
     /// Spires layout only: what it works out at set-up (`spires.rs`).
     sp: spires::Spires,
+    /// Harvest layout only: what it works out at set-up (`harvest.rs`).
+    hv: harvest::Harvest,
     /// Siege layout only: the city's plan (`siege.rs`).
     siege: siege::Siege,
     /// The machine's benches: ground cut level for its nodes (`machine.rs`).
@@ -513,6 +518,7 @@ impl Terrain {
             siege: siege::Siege::default(),
             tp: tripoint::Tripoint::default(),
             sp: spires::Spires::default(),
+            hv: harvest::Harvest::default(),
             benches: Vec::new(),
         };
 
@@ -538,6 +544,10 @@ impl Terrain {
         }
         if params.layout == Layout::Threshold {
             t.setup_threshold();
+            return t;
+        }
+        if params.layout == Layout::Harvest {
+            t.setup_harvest();
             return t;
         }
         if t.is_alpine() {
@@ -637,7 +647,10 @@ impl Terrain {
         let (vx, vy) = (x - self.size_x / 2.0, y - self.size_y / 2.0);
         let r = (vx * vx + vy * vy).sqrt();
         // The survival map and the siege are not symmetric: nothing folds.
-        if matches!(self.layout, Layout::Threshold | Layout::Siege) {
+        if matches!(
+            self.layout,
+            Layout::Threshold | Layout::Siege | Layout::Harvest
+        ) {
             return (vx, vy, r);
         }
         // The alpine map is fair by a half turn: fold the far half onto the near.
@@ -714,6 +727,7 @@ impl Terrain {
             Layout::Siege => self.natural_siege(x, y),
             Layout::Antarctic => self.natural_antarctic(x, y),
             Layout::Spires => self.natural_spires(x, y),
+            Layout::Harvest => self.natural_harvest(x, y),
         };
         if self.benches.is_empty() {
             h
@@ -727,7 +741,11 @@ impl Terrain {
         self.is_alpine()
             || matches!(
                 self.layout,
-                Layout::Threshold | Layout::Frostline | Layout::Tripoint | Layout::Antarctic
+                Layout::Threshold
+                    | Layout::Frostline
+                    | Layout::Tripoint
+                    | Layout::Antarctic
+                    | Layout::Harvest
             )
     }
 
@@ -1307,6 +1325,7 @@ impl Terrain {
                     Layout::Frostline => self.frostline_snow(x, y, z(i, j), gx, gy),
                     Layout::Tripoint => self.tripoint_snow(x, y, z(i, j), gx, gy),
                     Layout::Antarctic => self.antarctic_snow(x, y, z(i, j), gx, gy),
+                    Layout::Harvest => self.harvest_snow(x, y, z(i, j), gx, gy),
                     _ => self.alpine_snow(x, y, z(i, j), gx, gy),
                 };
                 // No glacier ice on the machine's benches or their cut faces.
@@ -1371,4 +1390,6 @@ mod test_maps {
         LazyLock::new(|| Terrain::new(&BakeParams::siege("t", 3, 3)));
     pub(super) static SPIRES: LazyLock<Terrain> =
         LazyLock::new(|| Terrain::new(&BakeParams::spires("t", 12, 17)));
+    pub(super) static HARVEST: LazyLock<Terrain> =
+        LazyLock::new(|| Terrain::new(&BakeParams::harvest("t", 12, 41)));
 }

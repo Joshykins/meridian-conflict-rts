@@ -201,6 +201,140 @@ pub fn tripoint_region((x, y): (f64, f64)) -> usize {
     }
 }
 
+/// The Last Harvest's regions (`bake/harvest.rs`), in the sidecar's order: the
+/// autumn heartland and its valley up to the Progenitor's base, the desert
+/// to the north-west, the alpine country to the north-east, the isles to the
+/// south-west and the fjords to the south-east.
+pub const HARVEST_HEARTLAND: usize = 0;
+pub const HARVEST_DESERT: usize = 1;
+pub const HARVEST_ALPINE: usize = 2;
+pub const HARVEST_ISLES: usize = 3;
+pub const HARVEST_FJORDS: usize = 4;
+/// How many regions The Last Harvest has.
+pub const HARVEST_REGIONS: usize = 5;
+
+/// A climate wall's line, and the regions on its left and right hands.
+pub type HarvestWall = (&'static [(f64, f64)], usize, usize);
+
+/// The Last Harvest's climate walls on the 24 576 m map, map metres: each
+/// line with the region on its left and on its right hand, walking it from its
+/// first point. Two junctions, west and east of the heartland, where three
+/// regions meet. The map's sidecar (`maps/last_harvest.ron`) gives the
+/// renderer the same lines; `tests/last_harvest.rs` holds the two together.
+pub const HARVEST_WALLS: [HarvestWall; 6] = [
+    // Desert | heartland: from the north edge down the desert's rim beside
+    // the base and the valley to the west junction.
+    (
+        &[
+            (8_700.0, 24_900.0),
+            (8_400.0, 20_600.0),
+            (8_900.0, 17_800.0),
+            (8_700.0, 14_600.0),
+            (7_900.0, 12_600.0),
+            HARVEST_WEST_JUNCTION,
+        ],
+        HARVEST_HEARTLAND,
+        HARVEST_DESERT,
+    ),
+    // Desert | isles: from the west edge along the desert's sea cliffs.
+    (
+        &[
+            (-300.0, 11_500.0),
+            (3_000.0, 11_100.0),
+            HARVEST_WEST_JUNCTION,
+        ],
+        HARVEST_DESERT,
+        HARVEST_ISLES,
+    ),
+    // Isles | heartland: down the heartland's west coast to the south edge.
+    (
+        &[
+            HARVEST_WEST_JUNCTION,
+            (6_500.0, 8_700.0),
+            (5_900.0, 5_800.0),
+            (6_300.0, 2_900.0),
+            (6_000.0, -300.0),
+        ],
+        HARVEST_HEARTLAND,
+        HARVEST_ISLES,
+    ),
+    // Alpine | heartland: from the north edge down the mountains' front
+    // beside the base and the valley to the east junction.
+    (
+        &[
+            (15_900.0, 24_900.0),
+            (16_200.0, 20_600.0),
+            (15_700.0, 17_200.0),
+            (16_000.0, 13_900.0),
+            (17_000.0, 12_000.0),
+            HARVEST_EAST_JUNCTION,
+        ],
+        HARVEST_ALPINE,
+        HARVEST_HEARTLAND,
+    ),
+    // Alpine | fjords: from the east junction to the east edge.
+    (
+        &[
+            HARVEST_EAST_JUNCTION,
+            (21_200.0, 11_400.0),
+            (24_900.0, 11_000.0),
+        ],
+        HARVEST_ALPINE,
+        HARVEST_FJORDS,
+    ),
+    // Fjords | heartland: down the sound's west shore to the south edge.
+    (
+        &[
+            HARVEST_EAST_JUNCTION,
+            (18_000.0, 8_300.0),
+            (17_900.0, 5_200.0),
+            (17_600.0, 2_300.0),
+            (17_800.0, -300.0),
+        ],
+        HARVEST_FJORDS,
+        HARVEST_HEARTLAND,
+    ),
+];
+/// Where the desert, the isles and the heartland meet; where the alpine
+/// country, the fjords and the heartland meet.
+pub const HARVEST_WEST_JUNCTION: (f64, f64) = (6_400.0, 11_200.0);
+pub const HARVEST_EAST_JUNCTION: (f64, f64) = (18_300.0, 10_900.0);
+
+/// Which of The Last Harvest's regions a point of the map lies in: the one on
+/// its side of the nearest wall segment ([`HARVEST_WALLS`]), by the rule the
+/// renderer reads the sidecar's walls by (`mc_data::regions::Walls::probe`):
+/// where the nearest point of two segments is the end they share, the one
+/// whose line, carried on, the point is furthest from decides.
+pub fn harvest_region((x, y): (f64, f64)) -> usize {
+    let mut best = (f64::INFINITY, -1.0, true, HARVEST_HEARTLAND);
+    for &(line, left, right) in &HARVEST_WALLS {
+        for w in line.windows(2) {
+            let ((ax, ay), (bx, by)) = (w[0], w[1]);
+            let (ex, ey) = (bx - ax, by - ay);
+            let (px, py) = (x - ax, y - ay);
+            let len2 = ex * ex + ey * ey;
+            let t = (px * ex + py * ey) / len2;
+            let end = !(0.0..1.0).contains(&t) || t == 0.0;
+            let tc = t.clamp(0.0, 1.0);
+            let d = (px - ex * tc).hypot(py - ey * tc);
+            let cross = ex * py - ey * px;
+            let off_line = cross.abs() / len2.sqrt();
+            let region = if cross > 0.0 { left } else { right };
+            let (bd, boff, bend, _) = best;
+            let margin = match (end, bend) {
+                (true, false) => -0.05,
+                (false, true) => 0.05,
+                _ => 0.0,
+            };
+            let shared = end && bend && d == bd;
+            if d < bd + margin || (shared && off_line > boff) {
+                best = (d, off_line, end, region);
+            }
+        }
+    }
+    best.3
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
