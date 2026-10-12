@@ -13,7 +13,15 @@ const SEA_WIND: vec2<f32> = vec2<f32>(0.91, 0.41);
 // each running at its own speed (deep water: sqrt(g k)), so crests form, pass
 // through each other and break up as real water does instead of a pattern
 // sliding over it. Headings fan out round the wind, the short ones most.
-const SEA_TRAINS: u32 = 20u;
+// Several trains share each band of lengths, each on its own heading: with one
+// train to a band, two of them ruled any patch of the sea at any zoom, and two
+// plane waves crossing make a lattice of diamonds however their crests are bent.
+const SEA_TRAINS: u32 = 32u;
+// Each train's length against the one before it: 150 m down to about half a metre.
+const SEA_TRAIN_RATIO: f32 = 0.8285;
+// Steepness each train is given against one train to a band (0.735 a step, as
+// before): the slope variance of a band is shared out among its trains.
+const SEA_TRAIN_SHARE: f32 = 0.79;
 
 struct SeaWaves {
     slope: vec2<f32>,
@@ -76,11 +84,12 @@ fn sea_waves(xy: vec2<f32>, time: f32, pixel: f32, across: f32, long: f32, wind:
         let fi = f32(i);
         // Off a strict geometric series by up to 8%: exact ratios between the
         // trains' lengths line their crossings up into a repeating diamond.
-        let lambda = 150.0 * pow(0.735, fi) * (1.0 + 0.16 * (fract(fi * 0.7548777 + 0.31) - 0.5));
+        let lambda = 150.0 * pow(SEA_TRAIN_RATIO, fi) * (1.0 + 0.16 * (fract(fi * 0.7548777 + 0.31) - 0.5));
         let k = 6.283185 / lambda;
-        // Steepness (k times height): gentle swell, steeper wind waves.
-        let steep = mix(0.03, 0.075, smoothstep(1.0, 9.0, fi)) * select(1.0, long, i < 6u) * select(1.0, chop, i > 11u)
-            * select(1.0, wind, i >= 4u);
+        // Steepness (k times height): gentle swell (past 110 m), steeper wind waves
+        // (under 10 m); the swell rides `long`, the wind waves `wind`, the chop `chop`.
+        let steep = mix(0.075, 0.03, smoothstep(2.3, 4.7, log(lambda))) * SEA_TRAIN_SHARE
+            * select(1.0, long, lambda > 30.0) * select(1.0, chop, lambda < 4.5) * select(1.0, wind, lambda < 45.0);
         // A train only a few pixels long is handed to the roughness: its sharp
         // crests carry harmonics finer than the pixels, and in the sun's glint
         // they alias into a hatch of hard lines.
