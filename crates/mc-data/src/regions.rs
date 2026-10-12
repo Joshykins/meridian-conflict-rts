@@ -373,6 +373,28 @@ impl Walls {
     }
 }
 
+/// Where the ground's and the sea's look read the walls for (`x`, `y`) on a map whose
+/// regions merge into each other over `blend` metres either side of a wall
+/// (`MapConfig::blend`): the point moved by up to twice that by a slow, fixed
+/// wander, so one region gives way to the next along no ruled line, in bays and
+/// tongues kilometres long. The point itself where `blend` is 0. (shaders/bindings.wgsl
+/// `region_look_xy` is the same sum; a bake lays its regions' relief by it too.)
+pub fn wander(x: f32, y: f32, blend: f32) -> (f32, f32) {
+    if blend <= 0.0 {
+        return (x, y);
+    }
+    let reach = 2.0 * blend;
+    // Waves running three ways at three lengths (about 5.5, 2.5 and 1.1 km).
+    let wave = |a: f32, b: f32, k: f32, phase: f32| ((a * x + b * y) / k + phase).sin();
+    let dx = 0.55 * wave(0.8, 0.6, 850.0, 1.7)
+        + 0.3 * wave(-0.5, 0.87, 390.0, 4.1)
+        + 0.15 * wave(0.95, -0.31, 170.0, 0.3);
+    let dy = 0.55 * wave(-0.6, 0.8, 900.0, 5.2)
+        + 0.3 * wave(0.87, 0.5, 410.0, 2.6)
+        + 0.15 * wave(0.31, 0.95, 180.0, 3.9);
+    (x + reach * dx, y + reach * dy)
+}
+
 /// 0 at or below `a`, 1 at or above `b`, eased between (as the shaders' `smoothstep`).
 fn smoothstep(a: f32, b: f32, x: f32) -> f32 {
     let t = ((x - a) / (b - a)).clamp(0.0, 1.0);

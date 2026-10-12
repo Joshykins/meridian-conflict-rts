@@ -885,7 +885,15 @@ fn shade_ground(world: vec3<f32>, crag: vec4<f32>, pixel: vec2<f32>, dpx: vec3<f
     // Polar ground (polar.wgsl): what the snow leaves bare is dark rock and moraine.
     let cold = hab.polar;
     if cold > 0.0 {
-        albedo = side_mix3(albedo, polar_ground(albedo, hab, rock_w), cold);
+        var bare = polar_ground(albedo, hab, rock_w);
+        if globals.map_look.y > 0.0 {
+            // Where the regions merge (`region_blend`) the cold comes in by degrees:
+            // the grass browns to tundra first, bare rock only toward the polar heart.
+            let lum = dot(albedo, vec3<f32>(0.2126, 0.7152, 0.0722));
+            let tundra = lum * vec3<f32>(1.2, 1.0, 0.66) * 0.85;
+            bare = mix(tundra, bare, smoothstep(0.45, 0.95, cold));
+        }
+        albedo = side_mix3(albedo, bare, cold);
     }
     var canyon_grad = vec2<f32>(0.0);
     var canyon_rough = -1.0;

@@ -60,13 +60,13 @@ fn shore_at(xy: vec2<f32>, depth: f32) -> Shore {
 // blows (`surf_wind`).
 fn surf_climate(xy: vec2<f32>) -> f32 {
     // (At a climate wall one region's surf ends and the next one's begins, as their
-    // seas do: within a few metres.)
-    let climate = climate_within(xy, REGIONS_BLEND_M);
+    // seas do: within a few metres, or the map's `sea_blend`.)
+    let climate = climate_within(xy, sea_blend());
     var base = side_mix(1.0, SURF_TROPICAL, climate.x);
     if climate.y > 0.0 {
         base = side_mix(base, SURF_DESERT, climate.y);
     }
-    let cold = polar_within(xy, REGIONS_BLEND_M);
+    let cold = polar_within(xy, sea_blend());
     if cold > 0.0 {
         base = side_mix(base, SURF_POLAR, cold);
     }
@@ -94,9 +94,10 @@ fn surf_travel(depth: f32, slope: f32) -> f32 {
 // The point the breakers at `xy` are worked out for (`surf_lag`, `surf_size`): `xy`
 // itself, but on a map with regions each region's surf is its own, read a long way
 // off per region, so a line of breakers does not run on through a climate wall.
-// (shore.rs `surf_point`.)
+// Where the regions merge (`region_blend`) the breakers run on, one line, and only
+// their size hands over (`surf_climate`). (shore.rs `surf_point`.)
 fn surf_point(xy: vec2<f32>) -> vec2<f32> {
-    if !has_regions() {
+    if !has_regions() || globals.map_look.y > 0.0 {
         return xy;
     }
     return xy + f32(region_probe(xy).region) * vec2<f32>(SURF_REGION_STEP_X, SURF_REGION_STEP_Y);

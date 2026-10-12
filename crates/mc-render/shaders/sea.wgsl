@@ -184,7 +184,7 @@ fn sea_waves(xy: vec2<f32>, time: f32, pixel: f32, across: f32, long: f32, wind:
 // region's own (turned, scaled by its weather, and a long way off), so no crest,
 // lane or line of foam carries on from one sea into the next across a climate
 // wall. The seas hand over within the few metres either side of the wall that the
-// ground does (`REGIONS_BLEND_M`).
+// ground does (`region_blend`), wider out on the open water (`sea_blend`).
 struct SeaFrame {
     // A map point in the field: turned and scaled by `turn` (a cosine and a sine,
     // times `scale`), then moved by `shift`.
@@ -221,7 +221,7 @@ fn sea_frame_at(xy: vec2<f32>) -> SeaFrame {
     if !has_regions() {
         return sea_frame_plain();
     }
-    return sea_frame(region_probe(xy).region);
+    return sea_frame(region_probe(region_look_xy(xy)).region);
 }
 
 // `xy` in the frame's field.
@@ -489,7 +489,7 @@ fn open_sea_at(spot: SeaSpot) -> OpenSea {
     if !has_regions() {
         return open_sea(spot, sea_frame_plain());
     }
-    let shares = region_shares(spot.xy, max(REGIONS_BLEND_M, spot.pixel * 1.5));
+    let shares = region_shares(region_look_xy(spot.xy), max(sea_blend(), spot.pixel * 1.5));
     if !shares.mixed {
         return open_sea(spot, sea_frame(shares.region));
     }

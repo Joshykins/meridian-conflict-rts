@@ -91,7 +91,9 @@ struct Globals {
     // it is autumn (`autumn_within`), which is drawn over the temperate look. Region
     // 0 repeats `climate.x`.
     region_climate: array<vec4<f32>, REGIONS_MAX>,
-    // x metres the desert's rock beds are lowered (`MapConfig::strata_lift`, desert.wgsl).
+    // x metres the desert's rock beds are lowered (`MapConfig::strata_lift`, desert.wgsl);
+    // y metres either side of a climate wall the ground and sea hand over across
+    // (`MapConfig::blend`, `region_blend`).
     map_look: vec4<f32>,
     // The mines' reaches the ore dims under (renderer/ore_fields.rs): x the first's
     // index in `stains`, y how many. Each is a Stain: centre, reach, strength 0..255.

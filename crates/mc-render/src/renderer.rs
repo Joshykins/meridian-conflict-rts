@@ -377,7 +377,7 @@ pub(crate) struct Globals {
     /// Each region's climate (map_look.rs): x 1 where it is tropical, y 1 where desert,
     /// z 1 where polar, w 1 where autumn.
     pub(crate) region_climate: [[f32; 4]; crate::gpu_consts::regions::MAX as usize],
-    /// x the map's `strata_lift` in metres.
+    /// x the map's `strata_lift` in metres, y its regions' `blend`.
     pub(crate) map_look: [f32; 4],
     /// The mines' reaches the ore dims under (`ore_fields.rs`): x the first's
     /// index in the stains, y how many.
@@ -3258,9 +3258,15 @@ impl Renderer {
     }
 
     /// The point the breakers at `xy` are worked out for (`shore::surf_point`): its
-    /// region's own, on a map with regions.
+    /// region's own, on a map with regions whose walls part them (where the regions
+    /// merge, `MapLook::blend`, one line of breakers runs on through them all).
     pub fn surf_point(&self, xy: glam::Vec2) -> glam::Vec2 {
-        crate::shore::surf_point(self.look.walls().region_at(xy.x, xy.y), xy)
+        let region = if self.look.blend > 0.0 {
+            0
+        } else {
+            self.look.walls().region_at(xy.x, xy.y)
+        };
+        crate::shore::surf_point(region, xy)
     }
 
     /// Lightning since the last call, for thunder.

@@ -46,7 +46,7 @@ fn climate_within(xy: vec2<f32>, half: f32) -> vec2<f32> {
     if !has_regions() {
         return vec2<f32>(select(0.0, 1.0, tropical()), select(0.0, 1.0, desert()));
     }
-    let shares = region_shares(xy, half);
+    let shares = region_shares(region_look_xy(xy), half);
     if !shares.mixed {
         return globals.region_climate[shares.region].xy;
     }
@@ -61,7 +61,7 @@ fn climate_within(xy: vec2<f32>, half: f32) -> vec2<f32> {
 }
 
 fn climate_at(xy: vec2<f32>, px: f32) -> vec2<f32> {
-    return climate_within(xy, max(REGIONS_BLEND_M, px * 1.5));
+    return climate_within(xy, max(region_blend(), px * 1.5));
 }
 
 // How much of the desert's look `xy` takes: `f32(desert())` on a map of one climate.
@@ -81,7 +81,7 @@ fn autumn_within(xy: vec2<f32>, half: f32) -> f32 {
     if !has_regions() {
         return select(0.0, 1.0, autumn());
     }
-    let shares = region_shares(xy, half);
+    let shares = region_shares(region_look_xy(xy), half);
     if !shares.mixed {
         return globals.region_climate[shares.region].w;
     }
@@ -94,7 +94,7 @@ fn autumn_within(xy: vec2<f32>, half: f32) -> f32 {
 }
 
 fn autumn_at(xy: vec2<f32>, px: f32) -> f32 {
-    return autumn_within(xy, max(REGIONS_BLEND_M, px * 1.5));
+    return autumn_within(xy, max(region_blend(), px * 1.5));
 }
 
 // How much of the polar look `xy` takes, 0-1, handed over across a climate wall within
@@ -105,7 +105,7 @@ fn polar_within(xy: vec2<f32>, half: f32) -> f32 {
     if !has_regions() {
         return select(0.0, 1.0, polar());
     }
-    let shares = region_shares(xy, half);
+    let shares = region_shares(region_look_xy(xy), half);
     if !shares.mixed {
         return globals.region_climate[shares.region].z;
     }
@@ -120,7 +120,10 @@ fn polar_within(xy: vec2<f32>, half: f32) -> f32 {
 }
 
 fn polar_at(xy: vec2<f32>, px: f32) -> f32 {
-    return polar_within(xy, max(REGIONS_BLEND_M, px * 1.5));
+    // (Where the regions merge, the cold comes in over three times the blend: the
+    // grass browns and thins to tundra a long way before the ground is all rock and
+    // snow.)
+    return polar_within(xy, max(max(region_blend(), 3.0 * globals.map_look.y), px * 1.5));
 }
 
 // How much of what falls from the clouds over `xy` is snow rather than rain, 0-1: all
@@ -162,7 +165,8 @@ fn wall_seam(xy: vec2<f32>, px: f32) -> vec3<f32> {
     let f = fract(probe.along / 520.0 - time * 0.07);
     let band = pow(f, 8.0) * (1.0 - smoothstep(0.975, 1.0, f));
     let light = vec3<f32>(0.45, 0.78, 1.0);
-    return light * breath * (core * (0.8 + 1.4 * heart * heart + 1.6 * band) + halo * halo * (0.16 + 0.2 * band));
+    return light * breath * wall_glow()
+        * (core * (0.8 + 1.4 * heart * heart + 1.6 * band) + halo * halo * (0.16 + 0.2 * band));
 }
 
 // Metres the desert's rock beds lie lower on this map than in Vermilion Gorge
@@ -171,6 +175,47 @@ fn wall_seam(xy: vec2<f32>, px: f32) -> vec3<f32> {
 // water itself matters (the beach, the wet line).
 fn strata_lift() -> f32 {
     return globals.map_look.x;
+}
+
+// Metres either side of a climate wall over which the ground and the sea hand over
+// from one region to the next: a few, for the crisp line of the Precursors' walls, or
+// the map's own `blend` (`MapConfig::blend`) where its regions merge into each other.
+fn region_blend() -> f32 {
+    return max(REGIONS_BLEND_M, globals.map_look.y);
+}
+
+// The same for the open water: four times as wide on a map whose regions merge, so
+// one sea's colour and waves give way to the next's over kilometres of open water.
+fn sea_blend() -> f32 {
+    return max(REGIONS_BLEND_M, 4.0 * globals.map_look.y);
+}
+
+// How brightly the Precursors' walls are lit (their foot's line, `wall_seam`, and their
+// curtain, curtain.wgsl): fully where the regions meet on the line; not at all on a map
+// whose regions merge into each other (`region_blend`), where there is no line to light.
+fn wall_glow() -> f32 {
+    return 1.0 - smoothstep(REGIONS_BLEND_M, 300.0, globals.map_look.y);
+}
+
+// Where the ground's and the sea's look read the walls for `xy`: on a map whose regions
+// merge (`region_blend`), the point moved by up to twice the blend by a slow, fixed
+// wander, so one region gives way to the next along no ruled line, in bays and tongues
+// kilometres long. mc_data's `regions::wander` is the same sum (the bake lays the
+// regions' relief by it too, so the ground's colour and its shape change together).
+fn region_look_xy(xy: vec2<f32>) -> vec2<f32> {
+    let blend = globals.map_look.y;
+    if blend <= 0.0 {
+        return xy;
+    }
+    let x = xy.x;
+    let y = xy.y;
+    let dx = 0.55 * sin((0.8 * x + 0.6 * y) / 850.0 + 1.7)
+        + 0.3 * sin((-0.5 * x + 0.87 * y) / 390.0 + 4.1)
+        + 0.15 * sin((0.95 * x - 0.31 * y) / 170.0 + 0.3);
+    let dy = 0.55 * sin((-0.6 * x + 0.8 * y) / 900.0 + 5.2)
+        + 0.3 * sin((0.87 * x + 0.5 * y) / 410.0 + 2.6)
+        + 0.15 * sin((0.31 * x + 0.95 * y) / 180.0 + 3.9);
+    return xy + 2.0 * blend * vec2<f32>(dx, dy);
 }
 @group(0) @binding(1) var<storage, read> dynamic_entities: array<Entity>;
 @group(0) @binding(2) var<storage, read> static_entities: array<Entity>;
@@ -1207,7 +1252,8 @@ fn melt_sample(xy: vec2<f32>) -> vec3<f32> {
 // How much of each climate's water the sea at `xy` is, 0-1, as `climate_at` and
 // `polar_at` give them: x tropical, y desert, z polar (temperate what is left).
 fn sea_climate_at(xy: vec2<f32>, px: f32) -> vec3<f32> {
-    return vec3<f32>(climate_at(xy, px), polar_at(xy, px));
+    let half = max(sea_blend(), px * 1.5);
+    return vec3<f32>(climate_within(xy, half), polar_within(xy, half));
 }
 
 // Light lost per metre of the water, red first (sea.wgsl `water_optics`): clear

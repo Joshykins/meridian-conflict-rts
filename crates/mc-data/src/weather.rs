@@ -26,6 +26,11 @@
 //!     // Metres the desert's rock beds are lowered on this map: ground at height
 //!     // h is coloured as Vermilion Gorge's is at h + strata_lift. Default 0.
 //!     strata_lift: 50,
+//!     // Optional: metres either side of a wall over which the ground and the sea
+//!     // hand over from one region to the next, the line they hand over along
+//!     // wandering up to twice that off the wall (`regions::wander`), and the
+//!     // Precursors' light on the walls put out. Default 0: a crisp, lit line.
+//!     blend: 400,
 //!     // 2 to 8 regions. The first is region 0: its wind blows over the whole map,
 //!     // and its climate files the map in the browser unless `biome` says.
 //!     regions: [
@@ -339,6 +344,11 @@ pub struct MapConfig {
     /// `h` above the water is coloured as Vermilion Gorge's is at `h +
     /// strata_lift` (shaders/desert.wgsl).
     pub strata_lift: f32,
+    /// Metres either side of a climate wall over which one region's ground and
+    /// sea hand over to the next's, along a line wandering off the wall
+    /// (`regions::wander`), the walls unlit; 0, the default, for the crisp lit
+    /// line of the Precursors' walls.
+    pub blend: f32,
 }
 
 impl Default for MapConfig {
@@ -352,6 +362,7 @@ impl Default for MapConfig {
             biome: None,
             style: None,
             strata_lift: 0.0,
+            blend: 0.0,
         }
     }
 }
@@ -373,6 +384,7 @@ struct MapConfigFile {
     biome: Option<Biome>,
     style: Option<MapStyle>,
     strata_lift: f32,
+    blend: f32,
 }
 
 impl TryFrom<MapConfigFile> for MapConfig {
@@ -415,6 +427,7 @@ impl TryFrom<MapConfigFile> for MapConfig {
             biome: file.biome,
             style: file.style,
             strata_lift: file.strata_lift,
+            blend: file.blend.max(0.0),
         })
     }
 }
@@ -427,6 +440,8 @@ pub struct MapLook {
     climates: Vec<Climate>,
     /// `MapConfig::strata_lift`.
     pub strata_lift: f32,
+    /// `MapConfig::blend`.
+    pub blend: f32,
     /// The climate walls between the regions.
     walls: Walls,
 }
@@ -443,6 +458,7 @@ impl MapLook {
         MapLook {
             climates: vec![climate],
             strata_lift: 0.0,
+            blend: 0.0,
             walls: Walls::default(),
         }
     }
@@ -457,8 +473,10 @@ impl MapLook {
         &self.walls
     }
 
-    /// The climate at a map position: its region's.
+    /// The climate at a map position: its region's (where the regions merge, as
+    /// the ground's look reads them: `regions::wander`).
     pub fn climate_at(&self, x: f32, y: f32) -> Climate {
+        let (x, y) = crate::regions::wander(x, y, self.blend);
         self.climates[self.walls.region_at(x, y)]
     }
 
@@ -674,6 +692,7 @@ impl MapConfig {
         MapLook {
             climates: self.regions.iter().map(|r| r.climate).collect(),
             strata_lift: self.strata_lift,
+            blend: self.blend,
             walls: self.walls.clone(),
         }
     }

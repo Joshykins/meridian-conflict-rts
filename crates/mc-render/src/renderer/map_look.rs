@@ -81,7 +81,7 @@ impl Renderer {
         ClimateGlobals {
             climate: climate_code(climates[0]),
             region_climate,
-            map_look: [self.look.strata_lift, 0.0, 0.0, 0.0],
+            map_look: [self.look.strata_lift, self.look.blend, 0.0, 0.0],
         }
     }
 

@@ -109,6 +109,7 @@ fn fs_curtain_lit(in: CurtainOut) -> vec4<f32> {
 
     // The whole of it breathes, as the line of light at its foot does.
     let breath = 0.85 + 0.15 * sin(time * 0.75);
-    let light = (veil + 0.17 * foot + 0.16 * threads + 0.05 * rung) * depth * fade * breath;
+    let light = (veil + 0.17 * foot + 0.16 * threads + 0.05 * rung) * depth * fade * breath
+        * wall_glow();
     return vec4<f32>(CURTAIN_LIGHT * light, 1.0);
 }
