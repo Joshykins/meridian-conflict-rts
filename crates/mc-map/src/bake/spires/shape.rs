@@ -501,7 +501,10 @@ impl Terrain {
         // massif thins, till only cores are left, then nothing.
         let rough = 5.0 * self.crag.fbm(q.0 / 40.0, q.1 / 40.0, 2, 0.5);
         let gap = 7.0 + 0.55 * BLOCK_CELL * (1.0 - mask).powf(1.4);
-        let edge = bisector(q, f1, f2) + rough;
+        // Corners rounded off (by the distance in from a circle round the
+        // cell's point), so no block ends in a sliver the 8 m grid draws as a
+        // spike.
+        let edge = bisector(q, f1, f2).min(0.62 * BLOCK_CELL - dist(q, f1)) + rough;
         let wall = smoothstep(gap, gap + 7.0, edge);
         if wall <= 0.0 {
             return None;
@@ -512,13 +515,13 @@ impl Terrain {
         // Half the blocks split into columns of their own heights.
         if unit(h1, 24) < 0.55 {
             let (c1, c2, ch) = worley(self.seed ^ 0x636F_6C73, q, COLUMN_CELL);
-            let split = bisector(q, c1, c2) + 0.6 * rough;
-            let slot = smoothstep(4.0, 9.0, split);
+            let split = bisector(q, c1, c2).min(0.6 * COLUMN_CELL - dist(q, c1)) + 0.6 * rough;
+            let slot = smoothstep(7.0, 13.0, split);
             if slot <= 0.0 {
                 return None;
             }
             top *= 0.8 + 0.25 * unit(ch, 0);
-            top = TABLE + (top - TABLE) * slot.max(0.25);
+            top = TABLE + (top - TABLE) * slot;
         }
         let crown = 6.0 * self.detail.fbm(q.0 / 60.0, q.1 / 60.0, 2, 0.5);
         Some((top + crown).min(PEAK) * wall)

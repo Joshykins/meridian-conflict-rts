@@ -582,6 +582,11 @@ fn grass_materials(g: vec4<f32>, h: Habitat, tip: f32) -> vec3<f32> {
         meadow.mid = side_mix3(meadow.mid, c.mid, h.desert);
         meadow.tip = side_mix3(meadow.tip, c.tip, h.desert);
     }
+    // Autumn: the sward gone to seed, as `cs_tufts` turns most of it to meadow.
+    if h.autumn > 0.0 {
+        lush.mid = side_mix3(lush.mid, mix(lush.mid, meadow.mid, 0.75), h.autumn);
+        lush.tip = side_mix3(lush.tip, mix(lush.tip, meadow.tip, 0.75), h.autumn);
+    }
     let moss = grass_colours(GRASS_MOSS, dry);
     let total = max(g.y + g.z + g.w, 1e-4);
     return (mix(lush.mid, lush.tip, tip) * g.y + mix(meadow.mid, meadow.tip, tip) * g.z

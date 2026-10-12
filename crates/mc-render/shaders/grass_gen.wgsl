@@ -612,6 +612,9 @@ fn cs_tufts(@builtin(global_invocation_id) id: vec3<u32>) {
         kind = GRASS_TROPICAL;
     } else if hab.desert > side {
         kind = select(GRASS_DESERT, GRASS_SHRUB, shrub.cover > 0.5);
+    } else if hab.autumn > side && kind == GRASS_LUSH && veg_rand(seed ^ 0x85EBCA77u) < 0.75 {
+        // Autumn: most of the sward has gone to seed, straw and gold.
+        kind = GRASS_MEADOW;
     } else if hab.highland > 0.5 + veg_rand(seed ^ 0x165667B1u) * 0.4 {
         kind = GRASS_HIGHLAND;
     }

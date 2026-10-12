@@ -248,11 +248,12 @@ impl Terrain {
     /// pines on the high tops (the pillars' and the massif's) and a few
     /// stands of them lower down, birch-pale dead trees here and there.
     pub(super) fn spires_tree(&self, x: f64, y: f64, height: f64, hash: u64) -> PropKind {
-        let (dead, pick) = (unit(hash, 40), unit(hash, 48));
+        // (Bits of their own: `unit(hash, 48)` would have only 16 left.)
+        let (dead, pick) = (unit(hash, 40), unit(crate::noise::hash2(hash, 3, 1), 0));
         let stand = self.forest_kind.get(x / 520.0 + 11.0, y / 520.0 - 5.0);
-        let pines = 0.08
-            + 0.55 * smoothstep(TABLE + 60.0, TABLE + 220.0, height)
-            + 0.3 * smoothstep(0.35, 0.6, stand);
+        let pines = 0.05
+            + 0.3 * smoothstep(TABLE + 60.0, TABLE + 220.0, height)
+            + 0.15 * smoothstep(0.35, 0.6, stand);
         match () {
             _ if dead < 0.012 => PropKind::TreeDead,
             _ if pick < pines => PropKind::TreePine,

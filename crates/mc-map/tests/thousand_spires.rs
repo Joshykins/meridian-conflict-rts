@@ -12,7 +12,8 @@
 //!   other teams within 8%, to the island in the middle within 12%, to the
 //!   nearest enemy base within 17%;
 //! * the sea is one, round the map and up the three estuaries, and the lake
-//!   in the middle is too shallow for ships.
+//!   in the middle is too shallow for ships;
+//! * the woods are deciduous: most trees broadleaf.
 //!
 //! The map is not checked in; without the file the test says so and passes.
 //!
@@ -24,7 +25,7 @@
 //! sail.
 
 use mc_core::{Fx, FxVec2};
-use mc_map::{Heightfield, MapFile, CELL_SIZE_M};
+use mc_map::{Heightfield, MapFile, PropKind, CELL_SIZE_M};
 use std::collections::VecDeque;
 use std::path::PathBuf;
 
@@ -301,6 +302,30 @@ fn thousand_spires_plays_the_same_for_every_team() {
     );
     if km2(stray) > 0.5 {
         problems.push(format!("{:.2} km² of sailable water cut off", km2(stray)));
+    }
+
+    // Deciduous woods: most trees broadleaf (the autumn map turns them).
+    let trees: Vec<PropKind> = file
+        .props()
+        .iter()
+        .map(|p| p.kind)
+        .filter(|k| k.is_tree())
+        .collect();
+    let broadleaf = trees
+        .iter()
+        .filter(|&&k| k == PropKind::TreeBroadleaf)
+        .count();
+    let pines = trees.iter().filter(|&&k| k == PropKind::TreePine).count();
+    println!(
+        "{} trees: {broadleaf} broadleaf, {pines} pine, {} other",
+        trees.len(),
+        trees.len() - broadleaf - pines
+    );
+    if (broadleaf as f64) < 0.6 * trees.len() as f64 {
+        problems.push(format!(
+            "only {broadleaf} of {} trees broadleaf",
+            trees.len()
+        ));
     }
 
     assert!(problems.is_empty(), "{}", problems.join("\n"));
