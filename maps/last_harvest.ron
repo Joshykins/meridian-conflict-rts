@@ -85,7 +85,7 @@
             (name: "Stubble Point", start: 3, blurb: "Eastmost, by the sound: the fjords' columns and ships come at it first."),
         ],
         fronts: [
-            (name: "The Valley Road", domain: Land, path: [(12300, 18000), (12350, 15000), (12250, 12000), (12300, 9000), (12300, 6600)]),
+            (name: "The Valley Road", domain: Land, path: [(12385, 17737), (12298, 16188), (12172, 14643), (12394, 13103), (12285, 11552), (12292, 9998), (12345, 8443), (12274, 6888), (12250, 6500)]),
             (name: "Desert Wind", domain: Air, path: [(11000, 21000), (6000, 16000), (6500, 9000), (9800, 5500)]),
             (name: "High Road", domain: Air, path: [(13600, 21000), (19000, 16000), (18000, 9000), (14900, 5600)]),
         ],

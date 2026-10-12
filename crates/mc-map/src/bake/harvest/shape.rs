@@ -301,7 +301,7 @@ const SHOULDER: f64 = 900.0;
 const FILL: f64 = 4.0;
 /// The most an embankment spreads.
 const FILL_MOST: f64 = 260.0;
-const LOW_CUT: f64 = 4.0;
+const LOW_CUT: f64 = 6.0;
 /// Metres between a way's profile's samples.
 const STEP: f64 = 16.0;
 /// The ways' index: cells this big across the map.
@@ -925,8 +925,12 @@ impl Terrain {
             } else {
                 (FILL, FILL_MOST)
             };
-            let edge = way.half + (run * (h - floor).abs() + 8.0).min(most);
-            h += (floor - h) * (1.0 - smoothstep(way.half, edge, d));
+            // Across the lowland a way is a narrow strip, its banks long and
+            // low: the country round it is its road.
+            let lowland = 1.0 - smoothstep(64.0, 76.0, h.max(floor));
+            let half = way.half + (40.0 - way.half) * lowland;
+            let edge = half + (run * (h - floor).abs() + 8.0).min(most);
+            h += (floor - h) * (1.0 - smoothstep(half, edge, d));
         }
         // The rooms' floors once more, exactly, over anything a way's walls
         // spread into them.
@@ -1044,7 +1048,7 @@ impl Terrain {
     }
 
     /// A way's floor: the ground along it, smoothed, held level through the
-    /// rooms it leaves and enters, never under 1 m over the water, and no
+    /// rooms it leaves and enters, never under 2.5 m over the water (fords and sandbars), and no
     /// steeper than [`GRADE`] anywhere.
     fn hv_profile(&self, way: &Way) -> Vec<f64> {
         let total = *way.run.last().unwrap();
@@ -1072,7 +1076,7 @@ impl Terrain {
         // every room it touches: each room's level exactly, and from there
         // down (or up) to the ground no steeper than the grade.
         let rise = GRADE * STEP;
-        let mut low: Vec<f64> = raw.iter().map(|v| v.max(1.0)).collect();
+        let mut low: Vec<f64> = raw.iter().map(|v| v.max(2.5)).collect();
         for i in 1..n {
             low[i] = low[i].min(low[i - 1] + rise);
         }
