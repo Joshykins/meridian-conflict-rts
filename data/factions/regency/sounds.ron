@@ -835,6 +835,66 @@
             ],
         ),
 
+        // The Bardiche's Pinch Lance (`regency_t3_lance_aa`): one bolt every 4.8 s at a heavy
+        // aircraft. Dry and heavy, weight in the low end, nothing tonal that rings or whines.
+        //
+        // The charge, 0.4 s before the bolt (every Bardiche in a line may charge together,
+        // so it is short, sparse and done at the shot): a contactor clunk, a rough low
+        // growl swelling under a short dry sizzle, the pinch snapping shut on the knot.
+        "regency_bardiche_charge": (
+            length: 0.5, peak: 0.3, room: 0.15,
+            layers: [
+                Burst(low: 70, high: 500, attack: 0.0008, decay: 0.014, gain: 3, seed: 451),
+                Fm(at: 0.01, from: 58, to: 66, glide: 0.35, ratio: 0.5, index: 2.0, fade: 0.4, attack: 0.3, decay: 0.03, gain: 0.3),
+                Fm(at: 0.05, from: 160, to: 176, glide: 0.3, ratio: 0.5, index: 1.6, fade: 0.4, attack: 0.26, decay: 0.03, gain: 0.9),
+                Drive(1.4),
+                Roll(at: 0.1, from: 420, to: 620, glide: 0.25, attack: 0.25, decay: 0.03, gain: 0.9, swell: 10, depth: 0.7, seed: 452),
+                Burst(at: 0.36, low: 140, high: 900, attack: 0.02, decay: 0.01, gain: 2.5, seed: 453),
+            ],
+        ),
+        // The bolt leaving: the lance discharging in one hard crack, a deep dry punch
+        // driven with it, a short rough growl, the report clipped off by the open sky (no
+        // slapback, little room), one low clunk of the tines closing. Over by about 0.5 s.
+        "regency_bardiche_fire": (
+            length: 0.9, peak: 0.66, room: 0.15,
+            layers: [
+                // The lance discharging.
+                Burst(low: 900, high: 3600, attack: 0.0001, decay: 0.004, gain: 9, seed: 461),
+                Burst(low: 300, high: 1400, attack: 0.0002, decay: 0.014, gain: 11, seed: 462),
+                // The punch: a mid body small speakers carry, and the low weight under it.
+                Burst(low: 120, high: 600, attack: 0.0005, decay: 0.05, gain: 17, seed: 463),
+                Burst(at: 0.001, low: 30, high: 180, attack: 0.002, decay: 0.11, gain: 8, seed: 464),
+                Tone(from: 95, to: 46, glide: 0.07, attack: 0.001, decay: 0.13, gain: 0.8),
+                Tone(from: 52, to: 32, glide: 0.2, attack: 0.002, decay: 0.22, gain: 0.55),
+                // The plasma's growl, short.
+                Fm(from: 104, to: 78, glide: 0.1, ratio: 0.5, index: 2.4, fade: 0.1, attack: 0.002, decay: 0.09, gain: 0.55),
+                Drive(1.6),
+                // The report, dry and short.
+                Sweep(at: 0.01, from: 900, to: 180, glide: 0.25, q: 0.9, attack: 0.008, decay: 0.12, gain: 0.6, seed: 465),
+                // The tines closing.
+                Fm(at: 0.2, from: 420, to: 380, glide: 0.02, ratio: 3.5, index: 1.2, fade: 0.02, attack: 0.0005, decay: 0.025, gain: 0.15),
+                Burst(at: 0.2, low: 70, high: 400, attack: 0.002, decay: 0.03, gain: 2.2, seed: 466),
+            ],
+        ),
+        // The bolt striking its plane: a solid, heavy slam high in the air, a low thump
+        // held under it and a low roll away across the sky. No crackle, no sizzle, nothing
+        // high left hanging.
+        "regency_bardiche_hit": (
+            length: 1.6, peak: 0.7, room: 0.35,
+            layers: [
+                Burst(low: 500, high: 2200, attack: 0.0002, decay: 0.006, gain: 7, seed: 471),
+                Burst(low: 100, high: 700, attack: 0.0005, decay: 0.07, gain: 18, seed: 472),
+                Burst(at: 0.002, low: 25, high: 170, attack: 0.003, decay: 0.2, gain: 8, seed: 473),
+                Tone(from: 110, to: 48, glide: 0.08, attack: 0.001, decay: 0.15, gain: 1.2),
+                Tone(from: 58, to: 30, glide: 0.3, attack: 0.003, decay: 0.4, gain: 1.0),
+                Fm(from: 115, to: 70, glide: 0.15, ratio: 0.5, index: 2.2, fade: 0.12, attack: 0.002, decay: 0.14, gain: 0.5),
+                Drive(1.5),
+                // Rolling away low across the sky: slow swells, not crackle.
+                Roll(at: 0.04, from: 320, to: 70, glide: 1.0, attack: 0.06, decay: 0.6, gain: 0.35, swell: 3, depth: 0.45, pan: -0.3, seed: 474),
+                Roll(at: 0.07, from: 300, to: 60, glide: 1.0, attack: 0.07, decay: 0.6, gain: 0.35, swell: 3, depth: 0.45, pan: 0.3, seed: 475),
+            ],
+        ),
+
         // ---- movement ------------------------------------------------------------------
         // The Outrider walking: a small six-legged crawler scuttling on alternate tripods,
         // eight steps in the 0.96 s loop with a slight swing. Each step is three soft

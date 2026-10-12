@@ -246,10 +246,9 @@
             targets: ["Air"], color: Orange, red: 1.0,
             plasma_grade: Some(Pinched),
             flash: 1.0, impact: 1.4, tracer: 1.6,
-            // Stand-ins: the Halberd's charge, shot and strike until it has its own.
             sounds: (
-                fire: "regency_halberd_fire", charge: "regency_halberd_charge", charge_time: 0.4,
-                impact: "regency_halberd_hit",
+                fire: "regency_bardiche_fire", charge: "regency_bardiche_charge", charge_time: 0.4,
+                impact: "regency_bardiche_hit",
             ),
         )],
         mesh: "regency_lance_aa", icon: AntiAir,

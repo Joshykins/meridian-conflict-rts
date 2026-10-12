@@ -155,25 +155,13 @@ pub(super) const MODELS: &[ModelDef] = &[
         censer::HEIGHT,
         censer::censer,
     ),
-    // The tech 3 lance anti-air: a hover hull, one long Pinch lance on its turret
-    // (`lance_aa`), three designs while one is picked.
+    // The tech 3 lance anti-air: a hover hull, one long Pinch lance between the split
+    // cheeks of its turret (`lance_aa`).
     ModelDef::new(
         "regency_lance_aa",
         lance_aa::RADIUS,
         lance_aa::HEIGHT,
-        lance_aa::split,
-    ),
-    ModelDef::new(
-        "regency_lance_aa~b",
-        lance_aa::RADIUS,
-        lance_aa::HEIGHT,
-        lance_aa::yoke,
-    ),
-    ModelDef::new(
-        "regency_lance_aa~c",
-        lance_aa::RADIUS,
-        lance_aa::HEIGHT,
-        lance_aa::sheath,
+        lance_aa::lance_aa,
     ),
     // The tech 4 assault tripod: a keeled head high on three legs (`strider`).
     ModelDef::new(
