@@ -60,10 +60,10 @@ pub enum Layout {
     /// third of a turn wherever units can go; starts Alaska, desert, jungle.
     /// Exactly 12 km.
     Tripoint,
-    /// "Halcyon": three against three at the wall of a besieged city, the
+    /// "Halcyon": one against one at the wall of a besieged city, the
     /// city north of it, its outskirts south (see `siege.rs`). Not fair by
-    /// symmetry: the city's starts alternate with the outskirts'. Exactly
-    /// 12 km.
+    /// symmetry: the city's start first, the outskirts' second. Exactly
+    /// 6 km.
     Siege,
 }
 
@@ -182,10 +182,10 @@ impl BakeParams {
         }
     }
 
-    /// A square six-player [`Layout::Siege`] map.
+    /// A square two-player [`Layout::Siege`] map.
     pub fn siege(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
         BakeParams {
-            players: 6,
+            players: 2,
             layout: Layout::Siege,
             ..BakeParams::square(name, size_tiles, seed)
         }
@@ -265,12 +265,12 @@ impl BakeParams {
             ));
         }
         if self.layout == Layout::Siege
-            && (self.players != 6
+            && (self.players != 2
                 || (self.tiles_w as i32 * TILE_SIZE_M) as f64 != siege::SIZE
                 || self.tiles_h != self.tiles_w)
         {
             return Err(MapError::Invalid(
-                "the Siege layout is for exactly 6 players on a 12 km map".into(),
+                "the Siege layout is for exactly 2 players on a 6 km map".into(),
             ));
         }
         if self.layout == Layout::Threshold && self.players != 4 {

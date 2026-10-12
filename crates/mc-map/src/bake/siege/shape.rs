@@ -23,7 +23,7 @@ impl Terrain {
         let knolls = self.mtn.fbm(x / 760.0 - 2.2, y / 760.0 + 9.1, 2, 0.5);
         let grain = self.detail.fbm(x / 260.0 + 1.3, y / 260.0 - 4.4, 2, 0.5);
         let away = smoothstep(wall - 380.0, wall - 1_600.0, y);
-        let quarry = 20.0 * bump(dist(p, OUT_STARTS[1]) / 1_500.0);
+        let quarry = 16.0 * bump(dist(p, OUT_START) / 1_100.0);
         let out = WALL_FOOT + away * (34.0 * roll + 9.0 * knolls) + 1.2 * grain + quarry;
         let w = smoothstep(wall - 120.0, wall + 160.0, y);
         out + (city - out) * w

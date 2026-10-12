@@ -1,29 +1,25 @@
-//! "Halcyon": three against three at the wall of a besieged city.
+//! "Halcyon": one against one at the wall of a besieged city.
 //!
-//! [`Layout::Siege`], 12 km. The north half is the city of Halcyon, an ARC
+//! [`Layout::Siege`], 6 km. The north half is the city of Halcyon, an ARC
 //! colony's capital on Asteria: a street grid of blocks and avenues, glass
 //! towers downtown, an old town on a low hill round Concord Square, parks, a
 //! railway and a spaceport. The south half is its outskirts: suburbs burnt out
 //! along the front, an industrial estate in the east, farms, lanes and woods.
 //! Between them runs the city's wall ([`WALL`]), a 26 m curtain of concrete
-//! with towers at its corners and between, pierced by three gates
+//! with towers at its corners and between, pierced by a gate on the highway
 //! ([`GATES_X`]), and already breached in two places ([`BREACHES_X`]). Its
 //! segments are city structures like every building ([`crate::city`]): shells
 //! knock them down and open new ways through.
 //!
-//! The defenders' three bases are inside (the rail yards in the west, the
-//! Governor's Park behind the old town, the spaceport in the east), the
-//! besiegers' outside (an estate among the farms in the west, the quarry
-//! hill on the highway in the south, the works yard in the east), each the
-//! same walk from the wall as its opposite. Starts alternate city and
-//! outskirts, so skirmish's "Two Sides" (teams by alternate slot) puts the
-//! city against the outskirts.
+//! The defender's base is inside, the rail yards north of the old town; the
+//! besieger's outside, on the quarry hill at the highway's end; each the same
+//! walk from the wall as the other. The city's start is the first.
 //!
-//! A siege is not fair by symmetry. What evens it: every base has the same
-//! three fields round it and the same level room; each side has the same
-//! number of contested fields at the same walks from its bases (inside the
-//! city in its squares and parks, outside in the glacis, the suburbs and the
-//! farms); the gates and breaches stand in front of the bases. The city has
+//! A siege is not fair by symmetry. What evens it: both bases have the same
+//! three fields round them and the same level room; each side has the same
+//! number of contested fields at the same walks from its base (inside the
+//! city downtown and behind the breaches, outside on the glacis and in the
+//! suburbs); the gate and the breaches stand in front of the bases. The city has
 //! cover, the wall and its narrow streets; the outskirts have open ground,
 //! room to build and roads to the gates. `tests/halcyon.rs` holds the baked
 //! map to the walks.
@@ -55,69 +51,62 @@ mod tests;
 mod wrecks;
 
 /// The map's edge, metres: the design is for exactly this.
-pub(super) const SIZE: f64 = 12_288.0;
+pub(super) const SIZE: f64 = 6_144.0;
 /// The north-south middle line.
 const MID: f64 = SIZE / 2.0;
 
 /// The wall's trace, west to east, from beyond one edge to beyond the other;
-/// a tower stands at each corner. Mirror-like about the middle line, so each
-/// pair of bases faces the same wall.
+/// a tower stands at each corner. Mirrored about the middle line, bowed north
+/// in the middle where the gate is.
 pub(super) const WALL: &[P] = &[
-    (-200.0, 6_000.0),
-    (1_500.0, 6_080.0),
-    (3_400.0, 6_240.0),
-    (5_000.0, 6_120.0),
-    (7_288.0, 6_120.0),
-    (8_888.0, 6_240.0),
-    (10_788.0, 6_080.0),
-    (12_488.0, 6_000.0),
+    (-200.0, 3_000.0),
+    (1_100.0, 3_060.0),
+    (2_200.0, 3_140.0),
+    (3_944.0, 3_140.0),
+    (5_044.0, 3_060.0),
+    (6_344.0, 3_000.0),
 ];
-/// The gates: where the three roads to the bases go through the wall. Each is
-/// on a city avenue (`plan.rs`, 128 m grid from the middle line).
-pub(super) const GATES_X: [f64; 3] = [MID - 3_712.0, MID, MID + 3_712.0];
-/// The breaches: where the wall is already down, a gap of rubble.
-pub(super) const BREACHES_X: [f64; 2] = [4_224.0, 8_064.0];
+/// The gate: where the highway to the outskirts' base goes through the wall,
+/// on the city's middle avenue (`plan.rs`, 128 m grid from the middle line).
+pub(super) const GATES_X: [f64; 1] = [MID];
+/// The breaches: where the wall is already down, a gap of rubble, each on a
+/// city avenue.
+pub(super) const BREACHES_X: [f64; 2] = [MID - 1_536.0, MID + 1_536.0];
 /// Half a breach's width along the wall, metres.
 const BREACH_HALF: f64 = 80.0;
 
-/// The bases, city first then outskirts, west to east. Laid alternately
-/// (city, outskirts, ...) as starts.
-const CITY_STARTS: [P; 3] = [(2_304.0, 10_500.0), (MID, 11_448.0), (9_984.0, 10_500.0)];
-const OUT_STARTS: [P; 3] = [(2_304.0, 1_896.0), (MID, 948.0), (9_984.0, 1_896.0)];
+/// The bases: the city's rail yards and the outskirts' quarry, each about
+/// 2.4 km from the gate. Laid city first as starts.
+const CITY_START: P = (MID, 5_504.0);
+const OUT_START: P = (MID, 768.0);
 /// How far round a base the ground is kept open and level, metres.
 const BASE_CORE: f64 = 340.0;
 const BASE_OPEN: f64 = 560.0;
 
 /// Concord Square, at the old town's heart.
-const SQUARE: P = (MID, 9_344.0);
+const SQUARE: P = (MID, 4_608.0);
 /// The old town's hill, under the square.
-const OLD_TOWN: (P, f64) = (SQUARE, 760.0);
+const OLD_TOWN: (P, f64) = (SQUARE, 480.0);
 /// Downtown: an ellipse of towers between the old town and the wall.
-const DOWNTOWN: (P, f64, f64) = ((MID, 7_936.0), 1_750.0, 820.0);
+const DOWNTOWN: (P, f64, f64) = ((MID, 3_904.0), 1_100.0, 460.0);
 /// The parks either side of the old town: centre and half extents.
 const PARKS: [(P, f64, f64); 2] = [
-    ((4_224.0, 9_600.0), 380.0, 500.0),
-    ((8_064.0, 9_600.0), 420.0, 450.0),
+    ((MID - 1_536.0, 4_736.0), 300.0, 340.0),
+    ((MID + 1_536.0, 4_736.0), 320.0, 320.0),
 ];
 
 /// Contested ore inside the city and outside it: centre and radius. Each
 /// field inside has its counterpart outside at about the same walk from the
 /// bases (`tests/halcyon.rs`).
-const CITY_ORE: [(P, f64); 6] = [
-    ((2_816.0, 6_784.0), 70.0),
-    ((9_472.0, 6_784.0), 70.0),
-    ((MID + 160.0, 7_040.0), 75.0),
-    ((4_224.0, 9_472.0), 85.0),
-    ((8_064.0, 9_600.0), 85.0),
-    ((MID, 9_232.0), 70.0),
+const CITY_ORE: [(P, f64); 3] = [
+    ((MID - 1_536.0, 3_650.0), 70.0),
+    ((MID + 1_536.0, 3_650.0), 70.0),
+    ((MID + 160.0, 4_000.0), 75.0),
 ];
-const OUT_ORE: [(P, f64); 6] = [
-    ((1_900.0, 5_400.0), 70.0),
-    ((10_390.0, 5_400.0), 70.0),
-    ((MID - 260.0, 5_250.0), 75.0),
-    ((4_100.0, 3_250.0), 85.0),
-    ((8_250.0, 3_150.0), 85.0),
-    ((MID + 300.0, 3_000.0), 70.0),
+const OUT_ORE: [(P, f64); 3] = [
+    ((MID - 1_600.0, 2_450.0), 70.0),
+    ((MID + 1_600.0, 2_450.0), 70.0),
+    ((MID - 260.0, 2_250.0), 75.0),
 ];
 
 /// What the siege layout works out at set-up.
@@ -177,10 +166,8 @@ impl Terrain {
     pub(super) fn setup_siege(&mut self) {
         self.start_outer = 2.0 * BASE_CORE;
         // The land first: the plan levels its lots to it.
-        let starts: Vec<P> = CITY_STARTS
-            .iter()
-            .zip(&OUT_STARTS)
-            .flat_map(|(&c, &o)| [c, o])
+        let starts: Vec<P> = [CITY_START, OUT_START]
+            .into_iter()
             .map(|p| self.snap(p))
             .collect();
         self.pads = starts
@@ -502,13 +489,9 @@ impl Terrain {
     }
 }
 
-/// Distance from `p` to the nearest base, and whether it is a city base.
-fn nearest_base(p: P) -> (f64, bool) {
-    CITY_STARTS
-        .iter()
-        .map(|&s| (dist(p, s), true))
-        .chain(OUT_STARTS.iter().map(|&s| (dist(p, s), false)))
-        .fold((f64::MAX, false), |a, b| if b.0 < a.0 { b } else { a })
+/// Distance from `p` to the nearer base.
+fn nearest_base(p: P) -> f64 {
+    dist(p, CITY_START).min(dist(p, OUT_START))
 }
 
 /// How far into downtown `p` is: 0 outside its ellipse, 1 at its heart.

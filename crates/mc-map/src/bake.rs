@@ -1325,5 +1325,5 @@ mod test_maps {
     pub(super) static TRIPOINT: LazyLock<Terrain> =
         LazyLock::new(|| Terrain::new(&BakeParams::tripoint("t", 6, 13)));
     pub(super) static HALCYON: LazyLock<Terrain> =
-        LazyLock::new(|| Terrain::new(&BakeParams::siege("t", 6, 3)));
+        LazyLock::new(|| Terrain::new(&BakeParams::siege("t", 3, 3)));
 }

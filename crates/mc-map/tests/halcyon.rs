@@ -1,7 +1,7 @@
 //! "Halcyon" as baked (`maps/halcyon.mcmap`, `Layout::Siege`): the wall shuts
-//! the city off but for its gates and breaches, every base can walk to every
+//! the city off but for its gate and breaches, each base can walk to the
 //! other, the two sides' fields are about the same walk from their bases, and
-//! every base has the same level room.
+//! both bases have the same level room.
 //!
 //! `HALCYON_PLAN=out.ppm[,x0,y0,span,px] cargo test --profile gate -p mc-map
 //! --test halcyon -- --ignored plan_image` draws the plan: ground classes and
@@ -147,10 +147,10 @@ fn wall_y(file: &MapFile, x: f64) -> f64 {
 }
 
 #[test]
-fn the_wall_shuts_the_city_but_for_its_gates_and_breaches() {
+fn the_wall_shuts_the_city_but_for_its_gate_and_breaches() {
     let Some(map) = load() else { return };
     let starts = map.starts();
-    assert_eq!(starts.len(), 6);
+    assert_eq!(starts.len(), 2);
     let mut problems = Vec::new();
     for (k, &s) in starts.iter().enumerate() {
         let city = s.1 > wall_y(&map.file, s.0);
@@ -158,7 +158,7 @@ fn the_wall_shuts_the_city_but_for_its_gates_and_breaches() {
             problems.push(format!("start {k} is on the wrong side of the wall"));
         }
     }
-    // Every base walks to every other.
+    // Each base walks to the other.
     let walks: Vec<Vec<i32>> = starts
         .iter()
         .map(|&s| map.flood(s, false, |x, y| map.land_cell(x, y)))
@@ -170,7 +170,7 @@ fn the_wall_shuts_the_city_but_for_its_gates_and_breaches() {
             }
         }
     }
-    // With the gates and the breaches stopped, the city is shut even to a
+    // With the gate and the breaches stopped, the city is shut even to a
     // walker that slips corner to corner.
     let gates: Vec<(f64, f64)> = map
         .file
@@ -179,7 +179,7 @@ fn the_wall_shuts_the_city_but_for_its_gates_and_breaches() {
         .filter(|p| p.kind == PropKind::CityGate)
         .map(pos)
         .collect();
-    assert_eq!(gates.len(), 3, "three gates");
+    assert_eq!(gates.len(), 1, "one gate");
     let breaches: Vec<(f64, f64)> = map
         .file
         .props()
@@ -212,8 +212,8 @@ fn the_wall_shuts_the_city_but_for_its_gates_and_breaches() {
     assert!(problems.is_empty(), "{problems:#?}");
 }
 
-/// Each side's fields are about the same walk from its bases as the other
-/// side's; each base's own three are as near as every other base's.
+/// Each side's fields are about the same walk from its base as the other
+/// side's; each base's own three are as near as the other base's.
 #[test]
 fn both_sides_walk_as_far_to_their_ore() {
     let Some(map) = load() else { return };
@@ -267,19 +267,19 @@ fn both_sides_walk_as_far_to_their_ore() {
         problems.push(format!("own fields' walks differ: {own:?}"));
     }
     // Contested fields: each side's (on its side of the wall) summed over
-    // its three bases' nearest walks.
+    // its base's walks.
     let side_of = |p: (f64, f64)| p.1 > wall_y(&map.file, p.0);
     let mut sides = [0.0, 0.0];
     let mut counts = [0, 0];
     for &f in &fields {
-        let nearest_base = (0..6)
+        let nearest_base = (0..starts.len())
             .map(|k| walk_to(&walks[k], f))
             .fold(f64::MAX, f64::min);
         if nearest_base < 700.0 {
             continue;
         }
         let side = if side_of(f) { 0 } else { 1 };
-        let team: f64 = (0..6)
+        let team: f64 = (0..starts.len())
             .filter(|k| k % 2 == side)
             .map(|k| walk_to(&walks[k], f))
             .fold(f64::MAX, f64::min);

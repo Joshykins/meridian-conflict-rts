@@ -215,10 +215,20 @@ impl MapWriter {
         let inside =
             |p: &FxVec2| p.x >= Fx::ZERO && p.y >= Fx::ZERO && p.x <= size.x && p.y <= size.y;
         let corners = || ore.iter().flat_map(|r| r.points.iter());
-        if !starts.iter().chain(corners()).all(inside) || !props.iter().all(|p| inside(&p.pos)) {
-            return Err(MapError::Invalid(
-                "a prop or marker lies outside the map".into(),
-            ));
+        if let Some(p) = starts.iter().chain(corners()).find(|p| !inside(p)) {
+            return Err(MapError::Invalid(format!(
+                "a start or ore corner at ({}, {}) lies outside the map",
+                p.x.to_f64(),
+                p.y.to_f64()
+            )));
+        }
+        if let Some(p) = props.iter().find(|p| !inside(&p.pos)) {
+            return Err(MapError::Invalid(format!(
+                "a {:?} prop at ({}, {}) lies outside the map",
+                p.kind,
+                p.pos.x.to_f64(),
+                p.pos.y.to_f64()
+            )));
         }
         if ore.len() > MAX_ORE_REGIONS
             || ore

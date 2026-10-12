@@ -24,7 +24,7 @@ const ASSAULT: [Kind; 8] = [
 ];
 
 /// Salvage weight laid on each side of the wall.
-const WEIGHT_PER_SIDE: u32 = 210;
+const WEIGHT_PER_SIDE: u32 = 120;
 
 impl Terrain {
     pub(in crate::bake) fn siege_wrecks(&self) -> Vec<MapWreck> {

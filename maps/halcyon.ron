@@ -1,13 +1,12 @@
-// Halcyon: three against three at the wall of a besieged city. The city's
-// bases are inside it (the rail yards, the Governor's Park, the spaceport),
-// the besiegers' outside in its outskirts; skirmish's "Two Sides" puts the
-// city against the outskirts. Three gates and two breaches go through the
-// wall, and shells open more: every building in the city comes down. A grey
-// afternoon under broken cloud; skirmish set-up can override the weather and
-// the time of day.
+// Halcyon: one against one at the wall of a besieged city. The city's base
+// is inside it (the rail yards north of the old town), the besieger's outside
+// on the quarry hill at the end of the highway. One gate and two breaches go
+// through the wall, and shells open more: every building in the city comes
+// down. A grey afternoon under broken cloud; skirmish set-up can override the
+// weather and the time of day.
 (
     biome: Urban,
-    style: Teams,
+    style: Duel,
     weather: Cloudy,
     tweaks: (rain: 0.3, wind: 9),
     time: Afternoon,

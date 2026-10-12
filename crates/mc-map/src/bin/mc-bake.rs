@@ -12,7 +12,7 @@
 //! mc-bake --layout frostline --size-km 16 --seed 9 --name "Frostline" -o maps/frostline.mcmap
 //! mc-bake --layout crosswater --size-km 16 --seed 7 --name "Crosswater" -o maps/crosswater.mcmap
 //! mc-bake --layout tripoint --size-km 12 --seed 13 --name "Tripoint" -o maps/tripoint.mcmap
-//! mc-bake --layout siege --size-km 12 --seed 3 --name "Halcyon" -o maps/halcyon.mcmap
+//! mc-bake --layout siege --size-km 6 --seed 3 --name "Halcyon" -o maps/halcyon.mcmap
 //! ```
 //!
 //! Every layout but the survival and siege ones (the siege lays its own) is then
@@ -61,13 +61,12 @@ usage: mc-bake -o <file.mcmap> [options]
                    tripoint: \"Tripoint\", three-way free-for-all: Alaska,
                    desert and jungle parted by Precursor climate walls that
                    meet at an installation in the middle; exactly 12 km
-                   siege: \"Halcyon\", 3v3 at the wall of a besieged city:
+                   siege: \"Halcyon\", 1v1 at the wall of a besieged city:
                    the city north of its wall, the outskirts south, the
-                   city's starts alternating with the outskirts'; destructible
-                   buildings; exactly 12 km
+                   city's start first; destructible buildings; exactly 6 km
   --players <n>    start positions, 1-32 (default: 2 up to 8 km, 4 up to 24 km,
                    else 8; islands and alpine: always 2; the 8-player layouts
-                   take exactly 8, crosswater 4, tripoint 3)
+                   take exactly 8, crosswater 4, tripoint 3, siege 2)
   --threads <n>    worker threads (default: all cores; does not change the result)
   --preview <ppm>  also write a shaded overview image with markers
   --verify         re-read the file and check its content id
@@ -180,8 +179,8 @@ fn parse_args() -> Result<Args, String> {
     if args.layout == Layout::Crosswater && args.players.is_some_and(|n| n != 4) {
         return Err("--layout crosswater is a four-player layout (--players 4)".into());
     }
-    if args.layout == Layout::Siege && args.players.is_some_and(|n| n != 6) {
-        return Err("--layout siege is a six-player layout (--players 6)".into());
+    if args.layout == Layout::Siege && args.players.is_some_and(|n| n != 2) {
+        return Err("--layout siege is a two-player layout (--players 2)".into());
     }
     if args.layout == Layout::Threshold && args.players.is_some_and(|n| n != 4) {
         return Err("--layout threshold has exactly 4 starts (--players 4)".into());

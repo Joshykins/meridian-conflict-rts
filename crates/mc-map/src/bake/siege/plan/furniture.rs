@@ -12,7 +12,7 @@ use super::*;
 use crate::city::TRANSIT_SEGMENT_M;
 
 /// The avenue rows the maglev runs along, west to east.
-const TRANSIT_ROWS: [i64; 2] = [15, 33];
+const TRANSIT_ROWS: [i64; 2] = [3, 8];
 /// A station every this many blocks along a line.
 const STATION_EVERY: i64 = 11;
 /// Street lights' spacing along a street, metres.
@@ -42,6 +42,11 @@ impl Planner {
     }
 
     fn dress(&mut self, kind: PropKind, at: P, heading: f64, scale: f64, wear: f64) {
+        // The country road and the wall run on past the map's edge: what
+        // would stand beyond it is left out.
+        if !(8.0..SIZE - 8.0).contains(&at.0) || !(8.0..SIZE - 8.0).contains(&at.1) {
+            return;
+        }
         self.dressing.push(Dressing {
             kind,
             at,
@@ -86,7 +91,7 @@ impl Planner {
                     continue;
                 }
                 let open = |p: P| {
-                    nearest_base(p).0 < BASE_OPEN + 40.0
+                    nearest_base(p) < BASE_OPEN + 40.0
                         || ((p.0 - SQUARE.0).abs() < SQUARE_HALF + 40.0
                             && (p.1 - SQUARE.1).abs() < SQUARE_HALF + 40.0)
                 };
@@ -143,7 +148,7 @@ impl Planner {
             }
         }
         for (p, heading, along) in lights {
-            if self.near_crossing(p, along, 3.0) || nearest_base(p).0 < BASE_OPEN {
+            if self.near_crossing(p, along, 3.0) || nearest_base(p) < BASE_OPEN {
                 continue;
             }
             let wear = self.wear(p, 41);
@@ -188,7 +193,7 @@ impl Planner {
             let chance = if city { 0.05 } else { 0.012 } + 0.06 * wear;
             if unit(h, 0) >= chance
                 || self.near_crossing(p, along, 2.0)
-                || nearest_base(p).0 < BASE_OPEN
+                || nearest_base(p) < BASE_OPEN
                 || self
                     .lots_index
                     .near(p, 20.0)
@@ -226,7 +231,7 @@ impl Planner {
             let len = dist(s.a, s.b);
             let dir = ((s.b.0 - s.a.0) / len, (s.b.1 - s.a.1) / len);
             let normal = (-dir.1, dir.0);
-            let busy = Terrain::in_city(mid) && (downtown(mid) > 0.0 || mid.1 < 9_000.0);
+            let busy = Terrain::in_city(mid) && (downtown(mid) > 0.0 || mid.1 < 4_500.0);
             let chance = match s.road {
                 Road::Avenue | Road::Street if busy && s.walk > 0.0 => 0.12,
                 Road::Highway => 0.05,
@@ -307,15 +312,15 @@ impl Planner {
         }
     }
 
-    /// Comms masts: on the old town's hill, by the rail yards and the
-    /// spaceport, and on two hills outside.
+    /// Comms masts: on the old town's hill, either side of the rail yards,
+    /// and on two hills outside.
     fn masts(&mut self) {
         let spots = [
-            (SQUARE.0 + 420.0, SQUARE.1 + 520.0),
-            (CITY_STARTS[0].0 + 640.0, CITY_STARTS[0].1 - 600.0),
-            (CITY_STARTS[2].0 - 640.0, CITY_STARTS[2].1 - 600.0),
-            (OUT_STARTS[1].0 - 900.0, OUT_STARTS[1].1 + 500.0),
-            (OUT_STARTS[1].0 + 900.0, OUT_STARTS[1].1 + 500.0),
+            (SQUARE.0 + 420.0, SQUARE.1 + 260.0),
+            (CITY_START.0 - 700.0, CITY_START.1 - 300.0),
+            (CITY_START.0 + 700.0, CITY_START.1 - 300.0),
+            (OUT_START.0 - 900.0, OUT_START.1 + 500.0),
+            (OUT_START.0 + 900.0, OUT_START.1 + 500.0),
         ];
         for &at in &spots {
             // The first clear spot spiralling out from the one designed.
@@ -334,10 +339,9 @@ impl Planner {
 
     /// Rows of wind turbines along the outskirts' hills, clear of the lanes.
     fn wind_farms(&mut self) {
-        let rows: [(P, P); 3] = [
-            ((500.0, 4_300.0), (1_700.0, 2_900.0)),
-            ((3_700.0, 500.0), (5_200.0, 700.0)),
-            ((7_200.0, 600.0), (8_600.0, 400.0)),
+        let rows: [(P, P); 2] = [
+            ((250.0, 1_350.0), (900.0, 300.0)),
+            ((4_400.0, 650.0), (5_900.0, 450.0)),
         ];
         for (a, b) in rows {
             let n = (dist(a, b) / 260.0).floor() as usize;
@@ -351,14 +355,10 @@ impl Planner {
         }
     }
 
-    /// Solar farms: blocks of arrays in rows beside the estate and the
-    /// western villages.
+    /// Solar farms: blocks of arrays in rows west of the quarry and south of
+    /// the village.
     fn solar_farms(&mut self) {
-        let farms: [(P, i32, i32); 3] = [
-            ((8_000.0, 1_700.0), 5, 4),
-            ((11_300.0, 2_200.0), 3, 6),
-            ((900.0, 2_700.0), 4, 3),
-        ];
+        let farms: [(P, i32, i32); 2] = [((1_700.0, 900.0), 5, 4), ((1_100.0, 250.0), 4, 3)];
         for (corner, nx, ny) in farms {
             for j in 0..ny {
                 for i in 0..nx {

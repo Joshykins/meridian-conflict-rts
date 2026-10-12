@@ -5,9 +5,9 @@
 //! streets on the rest, two boulevards from the side gates to Concord Square;
 //! each block between them is filled from a few templates by district
 //! (downtown towers, old town tenements and courtyards, midtown offices,
-//! residential flats, works along the wall). The outskirts have the three
-//! highways to the gates, a country road across, lanes among the fields,
-//! suburbs behind the glacis and an industrial estate in the east.
+//! residential flats, works along the wall). The outskirts have the highway
+//! to the gate, a country road across, lanes among the fields, suburbs
+//! behind the glacis and an industrial estate in the east.
 
 use super::shape::LOT_FLAT;
 use super::*;
@@ -20,15 +20,17 @@ pub(super) mod furniture;
 /// The city grid's pitch, metres; lines run from the middle line both ways.
 const PITCH: f64 = 128.0;
 /// The first east-west grid line north of the wall.
-const GRID_Y0: f64 = 6_528.0;
-/// Grid lines (counted from the middle line, and from `GRID_Y0`) that are avenues.
-const AVENUE_COLUMNS: [i64; 7] = [-42, -29, -12, 0, 12, 29, 42];
-const AVENUE_ROWS: [i64; 4] = [5, 15, 24, 33];
-/// The grid row the railway runs along instead of a street.
-const RAIL_ROW: i64 = 28;
+const GRID_Y0: f64 = 3_328.0;
+/// Grid lines (counted from the middle line, and from `GRID_Y0`) that are
+/// avenues. The breaches open onto the avenues at columns -12 and 12.
+const AVENUE_COLUMNS: [i64; 5] = [-20, -12, 0, 12, 20];
+const AVENUE_ROWS: [i64; 2] = [3, 8];
+/// The grid row the railway runs along instead of a street: past the old
+/// town, through the rail yards' south edge.
+const RAIL_ROW: i64 = 14;
 /// The central station: the middle of the merged pair of cells it fills,
-/// north of the railway east of the middle avenue.
-const STATION_CELL: (i64, i64) = (2, RAIL_ROW);
+/// north of the railway west of the middle avenue, clear of the yards.
+const STATION_CELL: (i64, i64) = (-6, RAIL_ROW);
 const STATION: P = (
     MID + (STATION_CELL.0 + 1) as f64 * PITCH,
     GRID_Y0 + (RAIL_ROW as f64 + 0.5) * PITCH,
@@ -54,15 +56,11 @@ const RAIL_HALF: f64 = 7.0;
 const GAP: f64 = 3.0;
 /// The suburbs' belt behind the glacis, metres south of the wall: from the
 /// glacis to as deep as they ever reach ([`suburb_depth`]).
-const SUBURBS: (f64, f64) = (420.0, 1_650.0);
-/// The villages on the country road.
-const VILLAGES: [P; 3] = [
-    (1_300.0, 3_420.0),
-    (MID - 720.0, 3_400.0),
-    (10_900.0, 3_270.0),
-];
+const SUBURBS: (f64, f64) = (400.0, 1_250.0);
+/// The village on the country road.
+const VILLAGES: [P; 1] = [(1_000.0, 1_560.0)];
 /// The industrial estate in the east of the outskirts.
-const ESTATE: (P, P) = ((8_350.0, 2_500.0), (11_900.0, 4_450.0));
+const ESTATE: (P, P) = ((4_000.0, 900.0), (5_900.0, 2_000.0));
 
 /// What a block of the city holds.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -278,7 +276,7 @@ impl Planner {
         if (rect.c.1 - wall).abs() < glacis + radius && !rubble {
             return false;
         }
-        if nearest_base(rect.c).0 < BASE_OPEN + radius {
+        if nearest_base(rect.c) < BASE_OPEN + radius {
             return false;
         }
         if self
@@ -302,8 +300,7 @@ impl Planner {
             .any(|i| self.lots[i as usize].rect.near(rect, GAP))
     }
 
-    /// The bases' ground: rail yards, the Governor's Park, the spaceport's
-    /// apron; outside, the works yard and the quarry floor.
+    /// The bases' ground: the rail yards; outside, the quarry floor.
     fn bases(&mut self) {
         let square = |c: P, half: f64| Rect {
             c,
@@ -312,11 +309,8 @@ impl Planner {
             heading: 0.0,
         };
         let r = BASE_OPEN - 40.0;
-        self.area(square(CITY_STARTS[0], r), Ground::Ballast);
-        self.area(square(CITY_STARTS[1], r), Ground::Lawn);
-        self.area(square(CITY_STARTS[2], r), Ground::Apron);
-        self.area(square(OUT_STARTS[1], 0.8 * r), Ground::Earth);
-        self.area(square(OUT_STARTS[2], r), Ground::Yard);
+        self.area(square(CITY_START, r), Ground::Ballast);
+        self.area(square(OUT_START, 0.8 * r), Ground::Earth);
     }
 
     // -- roads --------------------------------------------------------------
@@ -334,7 +328,7 @@ impl Planner {
 
         // Where the grid is not: the bases, the parks, the square.
         let open = |p: P, avenue: bool| {
-            nearest_base(p).0 < BASE_OPEN - 60.0
+            nearest_base(p) < BASE_OPEN - 60.0
                 || (!avenue && in_park(p, -30.0))
                 || ((p.0 - SQUARE.0).abs() < SQUARE_HALF && (p.1 - SQUARE.1).abs() < SQUARE_HALF)
         };
@@ -381,8 +375,8 @@ impl Planner {
                 self.road(seg((a, y), (b, y), kind, size.0, size.1));
             }
         }
-        // The boulevards from the side gates to the square.
-        for &gx in &[GATES_X[0], GATES_X[2]] {
+        // The boulevards from the breaches to the square.
+        for &gx in &BREACHES_X {
             let from = (gx, ring_y(gx));
             let to = (
                 SQUARE.0 + (gx - SQUARE.0).signum() * SQUARE_HALF,
@@ -402,56 +396,35 @@ impl Planner {
 
     fn outskirts_roads(&mut self) {
         let below = |x: f64| y_at(WALL, x) + RING_OFFSET;
-        let w = [
-            (GATES_X[0], below(GATES_X[0])),
-            (GATES_X[0], 5_500.0),
-            (2_700.0, 4_400.0),
-            (2_480.0, 3_300.0),
-            (2_330.0, 2_520.0),
-            (OUT_STARTS[0].0, OUT_STARTS[0].1 + 250.0),
+        let gx = GATES_X[0];
+        let line = [
+            (gx, below(gx)),
+            (gx, 2_500.0),
+            (gx - 140.0, 1_900.0),
+            (gx + 60.0, 1_400.0),
+            (OUT_START.0, OUT_START.1 + 300.0),
         ];
-        let c = [
-            (GATES_X[1], below(GATES_X[1])),
-            (GATES_X[1], 5_300.0),
-            (6_020.0, 4_100.0),
-            (6_200.0, 2_700.0),
-            (OUT_STARTS[1].0, OUT_STARTS[1].1 + 300.0),
-        ];
-        let e = [
-            (GATES_X[2], below(GATES_X[2])),
-            (GATES_X[2], 5_500.0),
-            (9_620.0, 4_350.0),
-            (9_830.0, 3_250.0),
-            (9_960.0, 2_520.0),
-            (OUT_STARTS[2].0, OUT_STARTS[2].1 + 250.0),
-        ];
-        for line in [&w[..], &c[..], &e[..]] {
-            // Straight through the gate, then easing into curves.
-            self.road_line(&line[..2], Road::Highway, (HIGHWAY, 0.0), 64.0);
-            let smooth = super::super::canyon::smooth_open(&line[1..], 10);
-            self.road_line(&smooth, Road::Highway, (HIGHWAY, 0.0), 64.0);
-        }
+        // Straight through the gate, then easing into curves.
+        self.road_line(&line[..2], Road::Highway, (HIGHWAY, 0.0), 64.0);
+        let smooth = super::super::canyon::smooth_open(&line[1..], 10);
+        self.road_line(&smooth, Road::Highway, (HIGHWAY, 0.0), 64.0);
         // The country road across the outskirts.
         let across = [
-            (-60.0, 3_520.0),
-            (1_500.0, 3_380.0),
-            (3_000.0, 3_250.0),
-            (4_600.0, 3_420.0),
-            (MID, 3_340.0),
-            (7_700.0, 3_160.0),
-            (9_200.0, 3_380.0),
-            (10_800.0, 3_260.0),
-            (SIZE + 60.0, 3_400.0),
+            (-60.0, 1_600.0),
+            (900.0, 1_520.0),
+            (1_900.0, 1_640.0),
+            (MID, 1_560.0),
+            (4_200.0, 1_480.0),
+            (5_200.0, 1_600.0),
+            (SIZE + 60.0, 1_540.0),
         ];
         let across = super::super::canyon::smooth_open(&across, 12);
         self.road_line(&across, Road::Highway, (COUNTRY, 0.0), 64.0);
         // Lanes among the farms: north-south every kilometre or so, wandering,
-        // and two east-west ones; they stop short of the suburbs and the estate.
-        for (k, x) in [
-            700.0, 1_550.0, 3_450.0, 4_350.0, 5_250.0, 7_050.0, 7_950.0, 8_850.0, 11_000.0,
-        ]
-        .into_iter()
-        .enumerate()
+        // and one east-west; they stop short of the suburbs and the estate.
+        for (k, x) in [450.0, 1_250.0, 2_150.0, 4_050.0, 4_900.0, 5_700.0]
+            .into_iter()
+            .enumerate()
         {
             let h = hash2(self.seed ^ 0x6C61_6E65, k as i64, 0);
             let top = y_at(WALL, x) - suburb_depth(x) - 40.0;
@@ -468,14 +441,14 @@ impl Planner {
                 self.road_line(&line, Road::Lane, (LANE, 0.0), 64.0);
             }
         }
-        for (k, y) in [1_250.0, 4_650.0].into_iter().enumerate() {
+        for (k, y) in [400.0].into_iter().enumerate() {
             let h = hash2(self.seed ^ 0x6C61_6E66, k as i64, 0);
-            let line: Vec<P> = (0..=82)
+            let line: Vec<P> = (0..=(SIZE / 150.0) as i64 + 1)
                 .map(|i| {
                     let x = i as f64 * 150.0;
                     (x, y + 70.0 * ((x / 900.0) + unit(h, 0) * 6.0).sin())
                 })
-                .filter(|&p| !in_estate(p, 60.0) && nearest_base(p).0 > BASE_OPEN)
+                .filter(|&p| !in_estate(p, 60.0) && nearest_base(p) > BASE_OPEN)
                 .collect();
             // Only runs of the line that stayed whole.
             for run in line.chunk_by(|a, b| (b.0 - a.0) < 151.0) {
@@ -648,21 +621,18 @@ impl Planner {
 
     fn district(&self, c: P) -> District {
         let wall = y_at(WALL, c.0);
-        // The rail yards' and the spaceport's warehouses (not the park's).
-        let base = [CITY_STARTS[0], CITY_STARTS[2]]
-            .iter()
-            .map(|&s| dist(c, s))
-            .fold(f64::MAX, f64::min);
+        // The rail yards' warehouses.
+        let base = dist(c, CITY_START);
         let jitter = unit(self.hash(0x6469_7374, c), 0);
         if c.1 - wall < 420.0 + 160.0 * jitter {
             District::Belt
-        } else if base < 1_150.0 + 250.0 * jitter && c.1 < 11_900.0 {
+        } else if base < 720.0 + 150.0 * jitter && c.1 < SIZE - 400.0 {
             District::Logistics
         } else if downtown(c) > 0.05 {
             District::Downtown
         } else if old_town(c) > 0.15 {
             District::OldTown
-        } else if c.1 < 8_900.0 + 500.0 * jitter {
+        } else if c.1 < 4_400.0 + 250.0 * jitter {
             District::Midtown
         } else {
             District::Residential
@@ -749,7 +719,7 @@ impl Planner {
 
     fn fill_block(&mut self, b: Rect) {
         let c = b.c;
-        if nearest_base(c).0 < BASE_OPEN {
+        if nearest_base(c) < BASE_OPEN {
             return;
         }
         if in_park(c, 0.0) {
@@ -760,7 +730,7 @@ impl Planner {
         let (pick, more) = (unit(h, 0), unit(h, 24));
         // A field's block is a square (or a park in the north).
         if self.ore.iter().any(|&(p, r)| b.outside(p) < r) {
-            let ground = if c.1 > 9_000.0 {
+            let ground = if c.1 > 4_500.0 {
                 Ground::Lawn
             } else {
                 Ground::Paving
@@ -1160,7 +1130,7 @@ impl Planner {
         const DX: f64 = 192.0;
         const DY: f64 = 176.0;
         let (nx, ny) = (((x1 - x0) / DX) as i64, ((y1 - y0) / DY) as i64);
-        let open = |p: P| nearest_base(p).0 < BASE_OPEN - 40.0;
+        let open = |p: P| nearest_base(p) < BASE_OPEN - 40.0;
         for j in 0..=ny {
             let y = y0 + j as f64 * DY;
             for i in 0..nx {
@@ -1210,8 +1180,8 @@ impl Planner {
 
     /// Farmsteads by the lanes and the country road, each with a house.
     fn farms(&mut self) {
-        for j in 0..9_i64 {
-            for i in 0..18_i64 {
+        for j in 0..(MID / 560.0).ceil() as i64 {
+            for i in 0..(SIZE / 680.0).ceil() as i64 {
                 let h = hash2(self.seed ^ 0x6661_726D, i, j);
                 let p = (
                     (i as f64 + 0.2 + 0.6 * unit(h, 0)) * 680.0,
@@ -1317,7 +1287,7 @@ impl Planner {
             let mid = ((s.a.0 + s.b.0) / 2.0, (s.a.1 + s.b.1) / 2.0);
             let leafy = Terrain::in_city(mid)
                 && downtown(mid) < 0.3
-                && (s.road == Road::Avenue || mid.1 > 8_700.0);
+                && (s.road == Road::Avenue || mid.1 > 4_300.0);
             if !leafy {
                 continue;
             }
@@ -1349,7 +1319,7 @@ impl Planner {
                 .lots_index
                 .near(p, 30.0)
                 .any(|i| self.lots[i as usize].rect.outside(p) < LOT_FLAT + 1.0);
-            if crossing || on_lot || nearest_base(p).0 < BASE_OPEN {
+            if crossing || on_lot || nearest_base(p) < BASE_OPEN {
                 continue;
             }
             let h = self.hash(0x7374_7472, p);
@@ -1379,7 +1349,7 @@ impl Planner {
                     0.03 * (1.0 - smoothstep(150.0, 1_800.0, d)) + 0.002
                 };
                 if unit(h, 48) >= chance
-                    || nearest_base(p).0 < BASE_OPEN + 60.0
+                    || nearest_base(p) < BASE_OPEN + 60.0
                     || self.ore.iter().any(|&(o, r)| dist(o, p) < 1.6 * r + 20.0)
                     || (-30.0..60.0).contains(&d)
                 {
@@ -1423,7 +1393,7 @@ fn merged_north(seed: u64, k: i64, j: i64) -> bool {
 }
 
 /// How deep the suburbs reach south of the wall at `x`: their edge wanders
-/// between about 1 and 1.65 km.
+/// between about 0.6 and 1.25 km.
 pub(super) fn suburb_depth(x: f64) -> f64 {
     SUBURBS.1 - 220.0 * (1.0 + (x / 830.0 + 0.7).sin()) - 110.0 * (1.0 + (x / 310.0 + 2.1).sin())
 }
@@ -1433,7 +1403,7 @@ pub(super) fn suburb_depth(x: f64) -> f64 {
 pub(super) fn farmland(p: P) -> bool {
     y_at(WALL, p.0) - p.1 > suburb_depth(p.0) + 40.0
         && !in_estate(p, 30.0)
-        && nearest_base(p).0 > BASE_OPEN - 40.0
+        && nearest_base(p) > BASE_OPEN - 40.0
 }
 
 pub(super) fn in_estate(p: P, margin: f64) -> bool {
