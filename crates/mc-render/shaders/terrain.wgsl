@@ -3,6 +3,7 @@
 //!use habitat
 //!use streets
 //!use desert
+//!use polar
 //!use rock
 //!use scars
 // Terrain: CDLOD quadtree patches over a streamed heightmap.
@@ -388,7 +389,8 @@ fn ice_flow_mix(a: IceFlowTex, b: IceFlowTex, w: f32) -> IceFlowTex {
 }
 
 // An ice face seen straight on: `h` along it, `z` up it, `side` the way `h` runs.
-fn ice_face(h: f32, z: f32, side: vec2<f32>, pz: f32, dz: f32, top: f32, sheer: f32, fine: f32, snow_rgb: vec3<f32>) -> IceShade {
+fn ice_face(h: f32, z: f32, side: vec2<f32>, pz: f32, dz: f32, top: f32, sheer: f32, fine: f32, snow_rgb: vec3<f32>,
+    cold: f32) -> IceShade {
     // Split into tall columns and slabs, cracked finer inside each.
     let wq = vec2<f32>(h / 8.0, z / 17.0) + vec2<f32>(grad_noise2(vec2<f32>(h, z * 0.5), 23.0) - 0.5, 0.0) * 0.9;
     let w1 = ice_cells(wq);
@@ -401,6 +403,16 @@ fn ice_face(h: f32, z: f32, side: vec2<f32>, pz: f32, dz: f32, top: f32, sheer: 
     face = mix(face, vec3<f32>(0.55, 0.64, 0.7), smoothstep(0.52, 0.76, pick));
     face = mix(face, vec3<f32>(0.27, 0.29, 0.3), smoothstep(0.86, 0.95, pick));
     face = mix(face, vec3<f32>(0.03, 0.15, 0.27), 1.0 - smoothstep(0.0, 0.14, pick));
+    if cold > 0.0 {
+        // A polar ice wall (a shelf's front, an ice cliff): white firn and blue ice in
+        // bands, no dust in it, and only now and then a slab of deep blue.
+        var polar_face = mix(vec3<f32>(0.28, 0.52, 0.68), vec3<f32>(0.62, 0.74, 0.82), smoothstep(0.3, 0.7, pick));
+        polar_face = mix(polar_face, vec3<f32>(0.09, 0.3, 0.48), 1.0 - smoothstep(0.0, 0.1, pick));
+        let bz = z + (grad_noise2(vec2<f32>(h, 0.0) - 41.0, 90.0) - 0.5) * 10.0;
+        let firn = smoothstep(0.35, 0.75, sin(bz * 0.42 + sin(bz * 0.13) * 1.5) * 0.5 + 0.5);
+        polar_face = mix(polar_face, vec3<f32>(0.74, 0.8, 0.86), firn * 0.55);
+        face = side_mix3(face, polar_face, cold);
+    }
     face *= 0.85 + 0.3 * w2.y;
     // Darker into its cracks.
     face *= 0.7 + 0.3 * smoothstep(0.0, 0.35, w1.x);
@@ -412,7 +424,7 @@ fn ice_face(h: f32, z: f32, side: vec2<f32>, pz: f32, dz: f32, top: f32, sheer: 
     let lf = fract(lz / 11.0);
     let thick = 0.025 + 0.05 * hash11(li * 3.1 + 0.7);
     let dirt_layer = (1.0 - smoothstep(thick, thick + 0.03 + dz / 11.0, abs(lf - 0.5)))
-        * step(0.5, hash11(li * 7.7 + 1.3)) * sheer;
+        * step(0.5, hash11(li * 7.7 + 1.3)) * sheer * (1.0 - cold * 0.85);
     face = mix(face, vec3<f32>(0.1, 0.09, 0.08), dirt_layer * 0.8);
     // Melt streaks run down it.
     let streak = smoothstep(0.55, 0.85, grad_noise2(vec2<f32>(h / 1.4, z / 28.0), 1.0));
@@ -446,8 +458,10 @@ fn ice_face(h: f32, z: f32, side: vec2<f32>, pz: f32, dz: f32, top: f32, sheer: 
 // * snow: drifts on the ice, and firn above the glacier's snow line;
 // * faces (margins, calving fronts): columns and slabs of blue, white and dirty ice,
 //   a few layers of dirt across them, melt streaks, snow on ledges and the lip.
+// `cold` is the polar look's weight (`polar_at`): the ice bluer and cleaner, scoured
+// bare by the wind, its faces banded white and blue.
 fn glacier_shade(xy: vec2<f32>, z: f32, alt: f32, base_n: vec3<f32>, cover: f32, fine: f32,
-    patchy: f32, px: f32, dz: f32, snow_rgb: vec3<f32>) -> IceShade {
+    patchy: f32, px: f32, dz: f32, snow_rgb: vec3<f32>, cold: f32) -> IceShade {
     // The flow, read from the ground over some 140 m: the crown and
     // the blocks the ice breaks into must not turn it with every hummock.
     let flow_n = terrain_normal(xy, 70.0);
@@ -491,6 +505,8 @@ fn glacier_shade(xy: vec2<f32>, z: f32, alt: f32, base_n: vec3<f32>, cover: f32,
     // ---- Bare ice ----
     let clear = smoothstep(0.45, 0.8, tex.clear);
     var rgb = mix(vec3<f32>(0.36, 0.42, 0.47), vec3<f32>(0.15, 0.33, 0.47), clear * 0.85);
+    // Polar blue ice: the wind has scoured the snow off it, glossy and clear.
+    rgb = side_mix3(rgb, mix(vec3<f32>(0.42, 0.57, 0.68), vec3<f32>(0.2, 0.43, 0.63), clear), cold);
     rgb *= 0.86 + 0.26 * fine;
     var rough = mix(0.5, 0.26, clear);
     var bend = vec3<f32>(0.0);
@@ -499,7 +515,7 @@ fn glacier_shade(xy: vec2<f32>, z: f32, alt: f32, base_n: vec3<f32>, cover: f32,
     rgb *= 1.0 - 0.16 * tex.ogive * flowing * (1.0 - steep) * (1.0 - high);
 
     // Grime spreading down the tongue, patchy; dust melted into little pits up close.
-    let grime = low * smoothstep(0.3, 0.7, tex.grime + (fine - 0.5) * 0.3 + low * 0.15);
+    let grime = low * smoothstep(0.3, 0.7, tex.grime + (fine - 0.5) * 0.3 + low * 0.15) * (1.0 - cold * 0.85);
     rgb = mix(rgb, vec3<f32>(0.24, 0.23, 0.21) * (0.8 + 0.4 * fine), grime * 0.7);
     let speck = smoothstep(0.8, 0.92, grad_noise2(xy + 3.3, 1.3)) * (1.0 - smoothstep(0.08, 0.25, px));
     rgb = mix(rgb, vec3<f32>(0.08, 0.08, 0.08), speck * (0.3 + 0.5 * low));
@@ -554,17 +570,17 @@ fn glacier_shade(xy: vec2<f32>, z: f32, alt: f32, base_n: vec3<f32>, cover: f32,
         let k = wx / max(wx + wy, 1e-4);
         var f: IceShade;
         if k > 0.02 && k < 0.98 {
-            let a = ice_face(xy.y, z, vec2<f32>(0.0, 1.0), pz, dz, top, sheer, fine, snow_rgb);
-            let b = ice_face(xy.x, z, vec2<f32>(1.0, 0.0), pz, dz, top, sheer, fine, snow_rgb);
+            let a = ice_face(xy.y, z, vec2<f32>(0.0, 1.0), pz, dz, top, sheer, fine, snow_rgb, cold);
+            let b = ice_face(xy.x, z, vec2<f32>(1.0, 0.0), pz, dz, top, sheer, fine, snow_rgb, cold);
             let s = smoothstep(0.3, 0.7, k);
             f.rgb = mix(b.rgb, a.rgb, s);
             f.rough = mix(b.rough, a.rough, s);
             f.bend = mix(b.bend, a.bend, s);
             f.glow = mix(b.glow, a.glow, s);
         } else if k >= 0.98 {
-            f = ice_face(xy.y, z, vec2<f32>(0.0, 1.0), pz, dz, top, sheer, fine, snow_rgb);
+            f = ice_face(xy.y, z, vec2<f32>(0.0, 1.0), pz, dz, top, sheer, fine, snow_rgb, cold);
         } else {
-            f = ice_face(xy.x, z, vec2<f32>(1.0, 0.0), pz, dz, top, sheer, fine, snow_rgb);
+            f = ice_face(xy.x, z, vec2<f32>(1.0, 0.0), pz, dz, top, sheer, fine, snow_rgb, cold);
         }
         rgb = mix(rgb, f.rgb, wall);
         rough = mix(rough, f.rough, wall);
@@ -845,6 +861,11 @@ fn shade_ground(world: vec3<f32>, crag: vec4<f32>, pixel: vec2<f32>, dpx: vec3<f
     // A crag's clefts are in their own shade; the rock standing out of the wall
     // catches the light.
     albedo *= mix(1.0, 0.5 + 0.55 * smoothstep(-7.0, 5.0, crag_depth_here), crag_w);
+    // Polar ground (polar.wgsl): what the snow leaves bare is dark rock and moraine.
+    let cold = hab.polar;
+    if cold > 0.0 {
+        albedo = side_mix3(albedo, polar_ground(albedo, hab, rock_w), cold);
+    }
     var canyon_grad = vec2<f32>(0.0);
     var canyon_rough = -1.0;
     if arid > 0.0 {
@@ -914,7 +935,14 @@ fn shade_ground(world: vec3<f32>, crag: vec4<f32>, pixel: vec2<f32>, dpx: vec3<f
     }
     // Snow: drifts a little brighter and darker, bluer in its hollows.
     let drift = 0.93 + 0.1 * fine + 0.05 * sward;
-    let snow_rgb = vec3<f32>(0.65, 0.69, 0.74) * drift * mix(vec3<f32>(1.0), vec3<f32>(0.9, 0.95, 1.05), concavity * 1.5);
+    var snow_rgb = vec3<f32>(0.65, 0.69, 0.74) * drift * mix(vec3<f32>(1.0), vec3<f32>(0.9, 0.95, 1.05), concavity * 1.5);
+    // Polar snow (polar.wgsl): brighter and colder, carved by the wind.
+    var snow_grad = vec2<f32>(0.0);
+    if cold > 0.0 {
+        let ps = polar_snow(xy, px, concavity, fine);
+        snow_rgb = side_mix3(snow_rgb, ps.rgb, cold);
+        snow_grad = ps.grad * cold;
+    }
     // On a crag, snow lies where the rock holds it, wherever the ground round it
     // has snow: on ledges, and down the gullies between the ribs.
     let ledge = smoothstep(0.6, 0.85, facet.z);
@@ -931,7 +959,7 @@ fn shade_ground(world: vec3<f32>, crag: vec4<f32>, pixel: vec2<f32>, dpx: vec3<f
     var ice_rough = 0.5;
     if ice_w > 0.004 {
         let ice = glacier_shade(xy, z, alt, base_n, layer.x, fine, patchy, px,
-            max(abs(dpx.z), abs(dpy.z)), snow_rgb);
+            max(abs(dpx.z), abs(dpy.z)), snow_rgb, cold);
         albedo = mix(albedo, ice.rgb, ice_w);
         ice_bend = ice.bend;
         ice_glow = ice.glow * ice_w;
@@ -945,6 +973,9 @@ fn shade_ground(world: vec3<f32>, crag: vec4<f32>, pixel: vec2<f32>, dpx: vec3<f
     let ground_normal = normalize(base_n + (grad - base_n * dot(grad, base_n)));
     var n = normalize(mix(ground_normal, cliff.normal, rock_w));
     n = normalize(mix(n, base_n, max(snow_here * (1.0 - crag_w * 0.6), ice_w) * 0.7));
+    if cold > 0.0 {
+        n = normalize(n - vec3<f32>(snow_grad * snow_here * (1.0 - ice_w), 0.0));
+    }
     n = normalize(n + ice_bend * ice_w);
     let ground_rough = ga.color.a * bw.x + gb.color.a * bw.y + gc.color.a * bw.z;
     var rough = mix(clamp(ground_rough, 0.75, 1.0), clamp(cliff.roughness, 0.7, 0.95), rock_w);
@@ -962,7 +993,8 @@ fn shade_ground(world: vec3<f32>, crag: vec4<f32>, pixel: vec2<f32>, dpx: vec3<f
         rough = mix(rough, street_rough, hab.made);
     }
     // Rain darkens the ground and gives it a sheen while it falls.
-    let soaked = weather_at(xy).w;
+    // (What falls on polar ground is snow: it lies, it does not soak.)
+    let soaked = weather_at(xy).w * (1.0 - cold);
     albedo *= 1.0 - 0.3 * soaked;
     rough = mix(rough, 0.42, soaked * 0.75);
     // Cavity occlusion belongs to the material, and terrain concavity adds
@@ -1052,7 +1084,12 @@ fn shade_ground(world: vec3<f32>, crag: vec4<f32>, pixel: vec2<f32>, dpx: vec3<f
         albedo += drowned * arid;
     }
     if temperate > 0.0 {
-        albedo += mix(bare, bare * vec3<f32>(0.5, 0.68, 0.74), clamp(depth / 30.0, 0.0, 1.0)) * temperate;
+        var bed = mix(bare, bare * vec3<f32>(0.5, 0.68, 0.74), clamp(depth / 30.0, 0.0, 1.0));
+        if cold > 0.0 {
+            // A polar seabed: dark gravel and mud, not pale silt.
+            bed = side_mix3(bed, bed * vec3<f32>(0.45, 0.47, 0.48), cold * smoothstep(0.0, 3.0, depth));
+        }
+        albedo += bed * temperate;
     }
     if depth > 0.04 && dist < 180.0 {
         // Light that made it through the surface, crawling on the sand.

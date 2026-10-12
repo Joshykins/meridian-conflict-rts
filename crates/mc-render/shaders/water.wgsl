@@ -816,6 +816,12 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     let across = sqrt(length(dpdx(xy)) * length(dpdy(xy)));
     let sea = open_sea_at(SeaSpot(xy, weather_at(xy), time, pixel, across, amp, calm, far));
     let drops = rain_rings(xy, time, pixel, sea.rain);
+    // Drift ice on a polar sea (`sea_ice`): it stills the water it lies in.
+    var ice: SeaIce;
+    if sea.cold > 0.0 {
+        ice = sea_ice(xy, time, pixel, sea_ice_density(xy, depth) * sea.cold * amp);
+    }
+    let iced = 1.0 - ice.cover;
     // Rings, wakes and foam from what is happening on the water.
     var stir: SeaStir;
     if dist < 6000.0 {
@@ -828,7 +834,7 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     }
     // A muzzle blast presses the waves flat for a moment.
     let unpressed = 1.0 - stir.flat;
-    let n = normalize(vec3<f32>(-(sea.slope * unpressed + stir.slope + breakers.slope + drops), 1.0));
+    let n = normalize(vec3<f32>(-(sea.slope * unpressed + stir.slope + breakers.slope + drops) * iced, 1.0));
     let n_dot_v = clamp(dot(n, v), 0.0001, 1.0);
 
     // Schlick with the water's 2% at normal incidence.
@@ -874,7 +880,7 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     let lit = mix(0.45, 1.0, shadow) * (0.55 + 0.45 * sun_in);
     // Over a hull the water keeps the colour of the depth it stands in, so a
     // dived boat does not show as a patch of shallow-water green.
-    var optics = water_optics(mix(sink, max(sink, depth), hull), lit, climate_at(xy, pixel));
+    var optics = water_optics(mix(sink, max(sink, depth), hull), lit, sea_climate_at(xy, pixel));
     // Under a storm the sea goes a dull grey-green: little sun gets into it.
     let grey = dot(optics.scatter, vec3<f32>(0.3, 0.5, 0.2)) * vec3<f32>(0.85, 1.0, 0.95);
     optics.scatter = mix(optics.scatter, grey, sea.storm * 0.6) * mix(1.0, 0.65, sea.storm);
@@ -965,9 +971,9 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     }
     cover = max(cover, stir.foam);
     // The open sea's whitecaps (`open_sea`): what its crests drop lies as lace.
-    cover = max(cover, sea.lace);
-    let cap = sea.cap;
-    let far_caps = sea.far_foam * far;
+    cover = max(cover, sea.lace * iced);
+    let cap = sea.cap * iced;
+    let far_caps = sea.far_foam * far * iced;
     let foam = foam_lace(xy, time, pixel, cover * 0.85);
     let foam_color = vec3<f32>(0.80, 0.86, 0.88) * (0.35 + 0.65 * shadow) * (0.55 + 0.45 * sun_in);
     // Water a hull has churned full of air: paler and greener, lit from within,
@@ -982,7 +988,14 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     let lip = clamp(max(breakers.lip, max(cap * 0.55, cap_foam) * mix(1.0, 0.92, cap)), 0.0, 1.0);
     color = mix(color, foam_color * 1.08, lip * 0.95);
     color = mix(color, foam_color, far_caps * 0.9);
-    let white = max(foam, lip);
+    if ice.cover + ice.fringe > 0.0 {
+        // Floes: old snow on top, lit as the foam is; round each one's foot the ice
+        // under the water shows pale green-blue.
+        let ice_rgb = vec3<f32>(0.74, 0.8, 0.86) * (0.35 + 0.65 * shadow) * (0.55 + 0.45 * sun_in);
+        color = mix(color, ice_rgb * vec3<f32>(0.35, 0.62, 0.62), ice.fringe * 0.45);
+        color = mix(color, ice_rgb * ice.tone, ice.cover);
+    }
+    let white = max(max(foam, lip), ice.cover);
     if dist < 6000.0 {
         color += sea_flash(world, n, v, rough, fresnel, time, pixel) * (1.0 - white * 0.6);
     }
@@ -1095,7 +1108,7 @@ fn under_sea(clip: vec4<f32>) -> vec4<f32> {
     let deep = max(water - eye.z, 0.0);
     // The water's own glow: the light scattered toward the eye, brightest near
     // the surface and dimming with depth, strongest looking up toward the sun.
-    let optics = water_optics(12.0, 0.55 + 0.45 * sun_in, climate_at(eye.xy, 0.0));
+    let optics = water_optics(12.0, 0.55 + 0.45 * sun_in, sea_climate_at(eye.xy, 0.0));
     let toward_sun = pow(max(dot(dir, globals.sun.xyz), 0.0), 3.0);
     // Bright overhead, dark looking down into the deep.
     let fog_color = optics.scatter * (3.0 + 4.0 * toward_sun) * mix(0.25, 1.4, clamp(dir.z * 0.6 + 0.5, 0.0, 1.0))

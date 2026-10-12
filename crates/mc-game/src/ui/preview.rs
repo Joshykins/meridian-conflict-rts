@@ -54,6 +54,9 @@ struct Palette {
     /// Canyon country (`Climate::Desert`): the ground is coloured by the rock
     /// beds at its height (`desert_land`) and no snow lies by height.
     strata: bool,
+    /// The polar south (`Climate::Polar`): on a map without a snow layer, snow lies
+    /// on all but the steep ground, at any height.
+    snowbound: bool,
 }
 
 const TEMPERATE: Palette = Palette {
@@ -73,6 +76,7 @@ const TEMPERATE: Palette = Palette {
     upland: rgb(96, 103, 107),
     forest: rgb(54, 77, 94),
     strata: false,
+    snowbound: false,
 };
 
 /// Bright sand, turquoise over the banks, azure then deep blue in the channels.
@@ -93,6 +97,7 @@ const TROPICAL: Palette = Palette {
     upland: rgb(100, 112, 112),
     forest: rgb(64, 97, 101),
     strata: false,
+    snowbound: false,
 };
 
 /// Reservoir water: jade over the pale shallows, teal, cobalt in the old
@@ -115,6 +120,29 @@ const DESERT: Palette = Palette {
     upland: rgb(133, 126, 122),
     forest: rgb(70, 78, 66),
     strata: true,
+    snowbound: false,
+};
+
+/// A dark slate sea, grey-green over the shallows; dark rock, shingle and moraine
+/// where the snow leaves the ground bare.
+const POLAR: Palette = Palette {
+    sea: [
+        (0.0, rgb(92, 100, 102)),
+        (2.0, rgb(70, 84, 88)),
+        (4.5, rgb(54, 70, 76)),
+        (8.0, rgb(44, 60, 68)),
+        (12.5, rgb(38, 54, 63)),
+        (20.0, rgb(34, 48, 58)),
+        (32.0, rgb(31, 44, 54)),
+        (50.0, rgb(29, 41, 51)),
+    ],
+    sand: rgb(70, 70, 72),
+    sand_to: (2.0, 9.5),
+    open: rgb(62, 63, 66),
+    upland: rgb(58, 60, 64),
+    forest: rgb(54, 77, 94),
+    strata: false,
+    snowbound: true,
 };
 
 /// Canyon country's rock beds by height above the lake as steep ground shows
@@ -234,6 +262,7 @@ fn palette_of(climate: Climate) -> &'static Palette {
         Climate::Temperate => &TEMPERATE,
         Climate::Tropical => &TROPICAL,
         Climate::Desert => &DESERT,
+        Climate::Polar => &POLAR,
     }
 }
 
@@ -349,6 +378,7 @@ fn land(
     c = mix(c, ROCK, smoothstep(0.45, 0.95, grade));
     let snow = match lying {
         Some(lying) => smoothstep(0.3, 0.7, lying) * (1.0 - smoothstep(1.2, 2.5, grade)),
+        None if palette.snowbound => 1.0 - smoothstep(0.45, 0.9, grade),
         None => smoothstep(350.0, 450.0, z) * (1.0 - smoothstep(0.75, 1.2, grade)),
     };
     let ice = smoothstep(0.3, 0.7, ice);

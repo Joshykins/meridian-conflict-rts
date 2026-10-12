@@ -25,6 +25,10 @@ impl Game {
     pub(super) fn ambience_frame(&mut self, renderer: &Renderer, audio: &Audio, dt: f32) {
         let camera = &self.camera;
         let (darkness, wind, climate) = renderer.ambience_cues(camera.focus.truncate());
+        let focus = camera.focus;
+        let snowing = renderer
+            .map_look()
+            .snows_at(focus.x, focus.y, self.map.snow().is_some());
         let cues = Cues {
             focus: camera.focus,
             distance: camera.distance,
@@ -32,8 +36,8 @@ impl Game {
             darkness,
             wind,
             rain: self.rain_here,
-            tropical: climate == mc_data::weather::Climate::Tropical,
-            desert: climate == mc_data::weather::Climate::Desert,
+            snow: if snowing { renderer.rain_here() } else { 0.0 },
+            climate,
             sea: self.map.info().water_level.to_f32(),
             clock: renderer.time(),
         };

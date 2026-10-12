@@ -28,6 +28,7 @@ mod surf;
 
 use crate::audio::Audio;
 use glam::{Vec2, Vec3};
+use mc_data::weather::Climate;
 use mc_data::{SoundId, SoundLibrary};
 use mc_map::MapFile;
 use std::sync::mpsc::{self, Receiver};
@@ -51,10 +52,13 @@ pub struct Cues {
     pub wind: f32,
     /// How hard it rains where the camera looks, 0 to 1.
     pub rain: f32,
-    pub tropical: bool,
+    /// How hard it snows there, 0 to 1: silent itself, but the wind roars with it.
+    pub snow: f32,
+    /// The climate where the camera looks. Tropical: its own birds and night chorus.
     /// Canyon-country desert: ravens and wrens instead of songbirds, no frogs,
-    /// sparse crickets, and a sheltered lake's lapping instead of open swell.
-    pub desert: bool,
+    /// sparse crickets, and a sheltered lake's lapping instead of open swell. Polar:
+    /// nothing living to hear, only a hard wind and a rough sea.
+    pub climate: Climate,
     /// The water level, metres.
     pub sea: f32,
     /// The clock the shaders animate by (`Renderer::time`), which times the breakers.
@@ -513,7 +517,11 @@ impl Ambience {
         let day = 1.0 - smoothstep(0.35, 0.75, cues.darkness);
         let night = smoothstep(0.45, 0.85, cues.darkness);
         let dry = (1.0 - cues.rain).powi(2);
-        let windy = (cues.wind / 12.0).clamp(0.35, 1.7) + cues.rain * 0.4;
+        let polar = cues.climate == Climate::Polar;
+        // A polar wind blows harder over the bare ice, and roars in a blizzard.
+        let windy = (cues.wind / 12.0).clamp(0.35, 1.7) * if polar { 1.3 } else { 1.0 }
+            + cues.rain * 0.4
+            + cues.snow * 0.5;
         let land = 1.0 - s.water;
         let open = land * (1.0 - s.forest);
         let broadleaf = s.forest * (1.0 - s.conifer);
@@ -523,8 +531,10 @@ impl Ambience {
         let sea = (s.water - 0.5).max(0.0) * 2.0;
         // After a nuclear blast: still, then easing back over its last stretch.
         let still = 1.0 - smoothstep(0.0, HUSH - HUSH_HELD, self.hush);
-        let calm_birds = smoothstep(10.0, 35.0, self.quiet) * still;
-        let calm_insects = smoothstep(4.0, 15.0, self.quiet) * still;
+        // (Nothing sings, chirps or croaks on polar ground.)
+        let alive = if polar { 0.0 } else { 1.0 };
+        let calm_birds = smoothstep(10.0, 35.0, self.quiet) * still * alive;
+        let calm_insects = smoothstep(4.0, 15.0, self.quiet) * still * alive;
         let level = LEVEL * if self.music { 0.8 } else { 1.0 };
         // Leaves, surf and waves all but go under a fight; the wind stays, low.
         let duck = level / (1.0 + self.battle * 6.0) * (0.03 + 0.97 * still);
@@ -539,13 +549,18 @@ impl Ambience {
             self.gusts[4].step(dt, dice, (5.0, 14.0)),
         ];
         let trees = |g: f32| windy.powf(1.3) * g.powf(1.4);
-        let chorus = if cues.tropical { 0.0 } else { 1.0 };
-        // The desert's night is thinner, it has no frogs, and its water is a
-        // sheltered lake: lapping along the shore, little open swell.
-        let (sparse, frogs, swell) = if cues.desert {
-            (0.45, 0.0, 0.35)
+        let chorus = if cues.climate == Climate::Tropical {
+            0.0
         } else {
-            (1.0, 1.0, 1.0)
+            1.0
+        };
+        // The desert's night is thinner, it has no frogs, and its water is a
+        // sheltered lake: lapping along the shore, little open swell. A polar sea
+        // runs high.
+        let (sparse, frogs, swell) = match cues.climate {
+            Climate::Desert => (0.45, 0.0, 0.35),
+            Climate::Polar => (1.0, 1.0, 1.4),
+            Climate::Temperate | Climate::Tropical => (1.0, 1.0, 1.0),
         };
         let frog_chorus = chorus * frogs;
         // (gain, pan, pitch) of each bed voice, in `BEDS` order.
@@ -641,12 +656,10 @@ impl Ambience {
         let perches = land * (0.15 + 0.5 * s.forest + 1.1 * edge);
         let weather = dry * (1.0 - ((cues.wind - 14.0) / 10.0).clamp(0.0, 0.6));
         let birds = 0.6 * day * close * perches * weather * calm_birds;
-        let calls = if cues.tropical {
-            &ids.tropical_birds
-        } else if cues.desert {
-            &ids.desert_birds
-        } else {
-            &ids.birds
+        let calls = match cues.climate {
+            Climate::Tropical => &ids.tropical_birds,
+            Climate::Desert => &ids.desert_birds,
+            Climate::Temperate | Climate::Polar => &ids.birds,
         };
         if !calls.is_empty() && dice.chance(birds, dt) {
             let total: f32 = calls
@@ -684,7 +697,7 @@ impl Ambience {
             }
         }
         // The night's odd voices over its chorus.
-        if !cues.tropical {
+        if cues.climate != Climate::Tropical {
             let owls = night * close * land * (0.2 + 0.8 * s.forest) * calm_birds / 35.0;
             if let (Some(owl), true) = (ids.owl, dice.chance(owls, dt)) {
                 let pan = (s.forest_pan * 0.4 + dice.range(-0.6, 0.6)).clamp(-0.9, 0.9);
@@ -748,7 +761,7 @@ impl Ambience {
         let ids = self.ids.as_ref().expect("looked up above");
         let focus = cues.focus.truncate();
         let reach = (cues.distance * 0.6).clamp(120.0, 1500.0);
-        let climate = mc_render::shore::climate_scale(cues.desert, cues.tropical, cues.wind);
+        let climate = mc_render::shore::climate_scale(cues.climate, cues.wind);
         let mut hits = Vec::new();
         self.surf.step(
             (ground, surf_at),
@@ -868,8 +881,8 @@ mod tests {
             darkness,
             wind: 12.0,
             rain: 0.0,
-            tropical: false,
-            desert: false,
+            snow: 0.0,
+            climate: Climate::Temperate,
             sea: 0.0,
             clock: 0.0,
         }

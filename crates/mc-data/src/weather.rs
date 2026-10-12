@@ -462,12 +462,17 @@ impl MapLook {
         self.climates[self.walls.region_at(x, y)]
     }
 
-    /// Whether what falls from the clouds at a map position is snow, not rain: in a
-    /// temperate region of a map with regions, if the map's file carries a snow layer
-    /// (`snow_layer`). The alpine part of such a map is cold enough for it; any
+    /// Whether what falls from the clouds at a map position is snow, not rain: always
+    /// in a polar climate (a polar map, or a polar region of a map with regions), and
+    /// in a temperate region of a map with regions if the map's file carries a snow
+    /// layer (`snow_layer`): the alpine part of such a map is cold enough for it. Any
     /// other map keeps its rain. (shaders/bindings.wgsl `snowfall_at`.)
     pub fn snows_at(&self, x: f32, y: f32, snow_layer: bool) -> bool {
-        snow_layer && self.climates.len() > 1 && self.climate_at(x, y) == Climate::Temperate
+        match self.climate_at(x, y) {
+            Climate::Polar => true,
+            Climate::Temperate => snow_layer && self.climates.len() > 1,
+            Climate::Tropical | Climate::Desert => false,
+        }
     }
 }
 
@@ -525,13 +530,16 @@ impl MapStyle {
 /// temperate greens and grey-green sea, a bright tropical one (white coral
 /// sand, lush green, turquoise shallows over sapphire depths), or canyon-country
 /// desert (red-rock strata, pale caliche and red sand dotted with dark shrubs,
-/// jade-to-cobalt reservoir water with a bleached bathtub ring).
+/// jade-to-cobalt reservoir water with a bleached bathtub ring), or the polar
+/// south (snow and ice over dark bare rock, nothing green, a dark rough sea with
+/// ice drifting in it, and snow, never rain, from the sky).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Climate {
     #[default]
     Temperate,
     Tropical,
     Desert,
+    Polar,
 }
 
 impl Climate {
@@ -541,6 +549,7 @@ impl Climate {
             "temperate" => Some(Climate::Temperate),
             "tropical" | "tropic" => Some(Climate::Tropical),
             "desert" | "arid" => Some(Climate::Desert),
+            "polar" | "antarctic" | "arctic" => Some(Climate::Polar),
             _ => None,
         }
     }
@@ -602,6 +611,7 @@ impl MapConfig {
             Climate::Tropical => Biome::Tropical,
             Climate::Desert => Biome::Desert,
             Climate::Temperate => Biome::Temperate,
+            Climate::Polar => Biome::Arctic,
         })
     }
 
@@ -702,6 +712,32 @@ mod tests {
         let c = MapConfig::parse("(climate: Desert)").unwrap();
         assert_eq!((c.climate(), c.biome()), (Climate::Desert, Biome::Desert));
         assert_eq!(Climate::from_name("arid"), Some(Climate::Desert));
+        let c = MapConfig::parse("(weather: Stormy, climate: Polar)").unwrap();
+        assert_eq!((c.climate(), c.biome()), (Climate::Polar, Biome::Arctic));
+        for name in ["polar", "Antarctic", " ARCTIC "] {
+            assert_eq!(Climate::from_name(name), Some(Climate::Polar));
+        }
+        assert_eq!(Climate::from_name("tundra"), None);
+    }
+
+    #[test]
+    fn it_snows_everywhere_polar() {
+        // A polar map: snow from the sky everywhere, snow layer or none.
+        let polar = MapConfig::parse("(climate: Polar)").unwrap().look();
+        assert!(polar.snows_at(10.0, 10.0, true));
+        assert!(polar.snows_at(10.0, 10.0, false));
+        // A polar region of a map with regions snows; its tropical neighbour rains.
+        let c = MapConfig::parse(
+            "(regions: [(name: \"Ice\", climate: Polar), (name: \"Reef\", climate: Tropical)],
+              walls: [(line: [(500, 0), (500, 900)], left: 0, right: 1)])",
+        )
+        .unwrap();
+        let look = c.look();
+        assert_eq!(look.climates(), [Climate::Polar, Climate::Tropical]);
+        assert!(look.snows_at(100.0, 450.0, false));
+        assert!(!look.snows_at(900.0, 450.0, true));
+        // A temperate map without regions keeps its rain, snow layer or not.
+        assert!(!MapLook::single(Climate::Temperate).snows_at(10.0, 10.0, true));
     }
 
     #[test]

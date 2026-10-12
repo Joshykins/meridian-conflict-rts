@@ -162,6 +162,8 @@ struct SeaFrame {
     // How open the water is to the wind: 1 the open sea, 0.55 a canyon lake, which
     // is sheltered (the wind has no fetch to raise a sea).
     open: f32,
+    // 1 for a polar sea: rough even on a fair day (`sea_state`), with ice in it.
+    cold: f32,
 }
 
 // How far apart the regions' frames lie in the field.
@@ -169,13 +171,14 @@ const SEA_REGION_STEP: vec2<f32> = vec2<f32>(3301.0, -2713.0);
 
 // The sea of a map without regions: the field as it lies.
 fn sea_frame_plain() -> SeaFrame {
-    return SeaFrame(vec2<f32>(1.0, 0.0), vec2<f32>(0.0), 1.0, 1.0, select(1.0, 0.55, desert()));
+    return SeaFrame(vec2<f32>(1.0, 0.0), vec2<f32>(0.0), 1.0, 1.0, select(1.0, 0.55, desert()), select(0.0, 1.0, polar()));
 }
 
 // Region `r`'s sea (`Atmosphere::region_sea`).
 fn sea_frame(r: u32) -> SeaFrame {
     let sea = atmos.region_sea[r];
-    return SeaFrame(sea.xy, f32(r) * SEA_REGION_STEP, length(sea.xy), sea.z, select(1.0, 0.55, globals.region_climate[r].y > 0.5));
+    return SeaFrame(sea.xy, f32(r) * SEA_REGION_STEP, length(sea.xy), sea.z, select(1.0, 0.55, globals.region_climate[r].y > 0.5),
+        globals.region_climate[r].z);
 }
 
 // The sea `xy` is part of, all one region's: for what need not hand over at a wall.
@@ -208,6 +211,8 @@ struct SeaState {
     rain: f32,
     // How open the water is to the wind: 1 the open sea, 0.55 a canyon lake.
     open: f32,
+    // 1 for a polar sea (`SeaFrame::cold`).
+    cold: f32,
 }
 
 // `weather` is the sky's weather over the water (`weather_at`), `frame` the sea it
@@ -218,8 +223,17 @@ fn sea_state(weather: vec4<f32>, frame: SeaFrame) -> SeaState {
     out.rain = clamp(weather.w, 0.0, 1.0);
     out.open = frame.open;
     out.wind = length(atmos.wind.zw) / 12.0 * (1.0 + out.storm * 0.9) * out.open * frame.rough;
+    out.cold = frame.cold;
+    if frame.cold > 0.0 {
+        // The Southern Ocean is never calm: a polar sea runs as a fair day's does in a
+        // strong breeze even under a clear sky, and a storm makes a gale of it.
+        out.wind = side_mix(out.wind, POLAR_SEA_WIND + out.wind * 0.9, frame.cold);
+    }
     return out;
 }
+
+// The least wind (against a fair day's) a polar sea runs in (`sea_state`).
+const POLAR_SEA_WIND: f32 = 0.8;
 
 // What share of the open sea is breaking white in this wind, about: none in a
 // calm, a scattering on a fair day, most crests in a gale (the Beaufort scale's
@@ -330,6 +344,7 @@ struct OpenSea {
     storm: f32,
     rain: f32,
     open: f32,
+    cold: f32,
     // As `SeaWaves`: the surface's slope, the slope variance of the trains the pixel
     // is too coarse to show, and the long swell's height (-1 to 1).
     slope: vec2<f32>,
@@ -355,6 +370,7 @@ fn open_sea(spot: SeaSpot, frame: SeaFrame) -> OpenSea {
     out.storm = sea.storm;
     out.rain = sea.rain;
     out.open = sea.open;
+    out.cold = sea.cold;
     // The point and the pixel's footprint in the sea's own field.
     let xy = sea_point(frame, spot.xy);
     let pixel = spot.pixel * frame.scale;
@@ -363,7 +379,8 @@ fn open_sea(spot: SeaSpot, frame: SeaFrame) -> OpenSea {
     // The short waves come and go in gusts running downwind.
     let gust = grad_noise2(xy - SEA_WIND * time * 5.0 + vec2<f32>(37.0, 11.0), 120.0);
     let chop = mix(0.45, 1.35, smoothstep(0.3, 0.72, gust)) * mix(0.85, 1.1, smoothstep(0.6, 2.0, sea.wind));
-    let long = spot.amp * mix(1.0, 2.0, smoothstep(0.8, 2.4, sea.wind));
+    // (A polar sea's long swell runs higher still: it has come round the world.)
+    let long = spot.amp * mix(1.0, 2.0, smoothstep(0.8, 2.4, sea.wind)) * (1.0 + 0.35 * sea.cold);
     let wind_sea = mix(0.8, 1.9, smoothstep(0.5, 2.4, sea.wind));
     let waves = sea_waves(xy, time, pixel, across, long, wind_sea, chop);
     out.slope = sea_slope(frame, waves.slope);
@@ -418,6 +435,7 @@ fn open_sea_add(sum: OpenSea, sea: OpenSea, share: f32) -> OpenSea {
     out.storm += sea.storm * share;
     out.rain += sea.rain * share;
     out.open += sea.open * share;
+    out.cold += sea.cold * share;
     out.slope += sea.slope * share;
     out.lost += sea.lost * share;
     out.swell += sea.swell * share;
@@ -459,12 +477,13 @@ struct Optics {
     scatter: vec3<f32>,
 }
 
-// `climate` is `climate_at` where the water is: how much of the tropical (x) and the
-// desert's (y) water it is, all or nothing but where two regions meet at a climate wall.
-fn water_optics(column: f32, lit: f32, climate: vec2<f32>) -> Optics {
+// `climate` is `sea_climate_at` where the water is: how much of the tropical (x), the
+// desert's (y) and the polar (z) water it is, all or nothing but where two regions
+// meet at a climate wall.
+fn water_optics(column: f32, lit: f32, climate: vec3<f32>) -> Optics {
     var o: Optics;
     o.absorb = sea_absorb(climate);
-    let temperate = 1.0 - climate.x - climate.y;
+    let temperate = 1.0 - climate.x - climate.y - climate.z;
     var scatter = vec3<f32>(0.0);
     if climate.x > 0.0 {
         // Bahamas water: very clear, so sand shows through turquoise over the
@@ -477,6 +496,11 @@ fn water_optics(column: f32, lit: f32, climate: vec2<f32>) -> Optics {
         // jade over the pale shallows, teal-blue, then cobalt down the old channel.
         let deep_hue = mix(DESERT_TEAL, DESERT_DEEP, smoothstep(DESERT_SCATTER_DEPTHS.y, DESERT_SCATTER_DEPTHS.z, column));
         scatter += mix(DESERT_JADE, deep_hue, smoothstep(DESERT_SCATTER_DEPTHS.x, DESERT_SCATTER_DEPTHS.y, column)) * climate.y;
+    }
+    if climate.z > 0.0 {
+        // The Southern Ocean: grey-green over the shallows, dark slate and steel
+        // blue-black in the deep.
+        scatter += mix(POLAR_SHALLOW, POLAR_DEEP, smoothstep(POLAR_SCATTER_DEPTHS.x, POLAR_SCATTER_DEPTHS.y, column)) * climate.z;
     }
     if temperate > 0.0 {
         // Clear, lightly green coastal water: red is gone in a few metres, and
@@ -501,3 +525,106 @@ const DESERT_JADE: vec3<f32> = vec3<f32>(0.006, 0.050, 0.036);
 const DESERT_TEAL: vec3<f32> = vec3<f32>(0.002, 0.026, 0.050);
 const DESERT_DEEP: vec3<f32> = vec3<f32>(0.001, 0.007, 0.034);
 const DESERT_SCATTER_DEPTHS: vec3<f32> = vec3<f32>(3.0, 12.0, 35.0);
+
+// The polar sea (`water_optics`): grey-green shallows, near-black slate deeps.
+const POLAR_SHALLOW: vec3<f32> = vec3<f32>(0.0065, 0.022, 0.022);
+const POLAR_DEEP: vec3<f32> = vec3<f32>(0.0016, 0.0042, 0.0068);
+const POLAR_SCATTER_DEPTHS: vec2<f32> = vec2<f32>(2.0, 22.0);
+
+// ---------------------------------------------------------------- ice on a polar sea
+
+// How much drift ice a polar sea carries at `xy`, `depth` metres deep, 0-1: thickest
+// off coasts where the land's ice (its snow layer's glaciers and ice sheet) meets the
+// sea and calves, a little anywhere, gathered by the currents into fields.
+fn sea_ice_density(xy: vec2<f32>, depth: f32) -> f32 {
+    var coast = 0.0;
+    for (var k = 0; k < 6; k++) {
+        let a = f32(k) * 1.0471976 + 0.3;
+        let dir = vec2<f32>(cos(a), sin(a));
+        coast = max(coast, ground_snow_at(xy + dir * 220.0).x);
+        coast = max(coast, ground_snow_at(xy + dir.yx * 520.0).x * 0.7);
+    }
+    let shore = 1.0 - smoothstep(4.0, 40.0, depth);
+    // Gathered in fields and streamers by the currents, open water between them.
+    let field = smoothstep(0.5, 0.8, grad_noise2(xy + vec2<f32>(913.0, -377.0), 700.0) * 0.7
+        + grad_noise2(xy - vec2<f32>(211.0, 97.0), 160.0) * 0.3 + coast * 0.25);
+    return clamp((0.015 + 0.4 * coast + 0.05 * shore) * field, 0.0, 0.6);
+}
+
+// The floes of a cell lattice at `p` (in cells): x how far inside the nearest floe's
+// edge `p` lies, in cells (about the Voronoi cell's edge distance), y a number 0-1 for
+// that floe.
+fn floe_cells(p: vec2<f32>) -> vec2<f32> {
+    let i = floor(p);
+    let f = p - i;
+    var d1 = 9.0;
+    var d2 = 9.0;
+    var id = vec2<f32>(0.0);
+    for (var y = -1; y <= 1; y++) {
+        for (var x = -1; x <= 1; x++) {
+            let o = vec2<f32>(f32(x), f32(y));
+            let c = i + o;
+            let h = vec2<f32>(hash21(c), hash21(c + vec2<f32>(17.3, 5.1)));
+            let r = o + 0.15 + h * 0.7 - f;
+            let d = dot(r, r);
+            if d < d1 {
+                d2 = d1;
+                d1 = d;
+                id = c;
+            } else if d < d2 {
+                d2 = d;
+            }
+        }
+    }
+    return vec2<f32>((sqrt(d2) - sqrt(d1)) * 0.5, hash21(id + vec2<f32>(41.0, 3.0)));
+}
+
+// Drift ice on the water.
+struct SeaIce {
+    // How much of the pixel is ice standing out of the water, 0-1.
+    cover: f32,
+    // Its brightness against fresh snow's: older, wetter floes are greyer.
+    tone: f32,
+    // The pale-green fringe of a floe's foot seen through the water round it.
+    fringe: f32,
+}
+
+// Drift ice at `xy` (polar seas only): floes a dozen metres across with brash
+// between them, `density` 0-1 of the sea covered (`sea_ice_density`), drifting
+// slowly downwind. Each size fades to its mean cover as its cells shrink toward a
+// pixel, so from high up it is a whitening of the sea in fields, not speckle.
+fn sea_ice(xy: vec2<f32>, time: f32, pixel: f32, density: f32) -> SeaIce {
+    var out: SeaIce;
+    if density <= 0.001 {
+        return out;
+    }
+    let drift = SEA_WIND * time * 0.35;
+    // Floes.
+    let big_cell = 17.0;
+    // Edges wandered off the cells' straight lines, as broken ice is.
+    let q = xy - drift;
+    let wander = vec2<f32>(grad_noise2(q, 6.0), grad_noise2(q + vec2<f32>(37.0, 71.0), 6.0)) - 0.5;
+    let big = floe_cells((q + wander * 4.5) / big_cell);
+    let big_shown = smoothstep(3.0, 8.0, big_cell / max(pixel, 0.001));
+    // Some floes fill their cell, others are a broken piece in the middle of it.
+    let gap = 0.05 + 0.4 * fract(big.y * 7.3) * fract(big.y * 3.7);
+    let aa = pixel / big_cell * 0.8 + 0.01;
+    let there = step(big.y, density);
+    let floe = there * smoothstep(gap - aa, gap + aa, big.x);
+    out.fringe = there * (1.0 - floe) * smoothstep(gap - 0.09 - aa, gap, big.x) * big_shown;
+    let big_cover = mix(density * 0.7, floe, big_shown);
+    // Brash: the broken bits between them, thinner on the open water.
+    let small_cell = 3.1;
+    let small = floe_cells((xy - drift * 1.15 + wander * 1.2) / small_cell + 0.5);
+    let small_shown = smoothstep(3.0, 8.0, small_cell / max(pixel, 0.001));
+    let chance = density * 0.3;
+    let saa = pixel / small_cell * 0.8 + 0.01;
+    let bit = step(small.y, chance) * smoothstep(0.16 - saa, 0.16 + saa, small.x);
+    let small_cover = mix(chance * 0.5, bit, small_shown);
+    out.cover = clamp(max(big_cover, small_cover * 0.8), 0.0, 1.0);
+    // Each floe its own shade, a wet grey rim round it.
+    let rim = 1.0 - smoothstep(gap, gap + 0.05 + aa, big.x);
+    let on_floe = big_shown * step(small_cover * 0.8, big_cover);
+    out.tone = mix(1.0, mix(0.72, 1.02, fract(big.y * 13.1)) * (1.0 - 0.3 * rim), on_floe);
+    return out;
+}

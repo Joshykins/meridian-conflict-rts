@@ -1702,10 +1702,12 @@ shared! {
         pub const RUNUP_RISE: f32 = 1.2;
         /// Share of the period the wash runs up and back for.
         pub const SWASH: f32 = 0.62;
-        /// The breakers on a sheltered canyon lake, and on a reef-sheltered tropical
-        /// shore, as a share of the open coast's.
+        /// The breakers on a sheltered canyon lake, on a reef-sheltered tropical
+        /// shore and on a polar coast (a rough sea's heavy surf), as a share of the
+        /// open coast's.
         pub const DESERT: f32 = 0.25;
         pub const TROPICAL: f32 = 0.8;
+        pub const POLAR: f32 = 1.4;
         /// Breakers grow by this share per m/s of wind: size 0.4 + WIND_GAIN * wind,
         /// 1 on a fair day's 12 m/s, clamped to 0.6..1.5 (shore.wgsl `surf_wind`).
         pub const WIND_GAIN: f32 = 0.05;

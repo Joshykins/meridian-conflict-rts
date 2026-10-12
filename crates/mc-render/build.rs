@@ -16,6 +16,7 @@
 //! surface to those containing `//!use scenery`; `shaders/desert.wgsl`
 //! (canyon-country desert ground) after habitat for `//!use desert`;
 //! `shaders/sea.wgsl` (the open sea's waves and each climate's water) for `//!use sea`;
+//! `shaders/polar.wgsl` (the polar ground's snow and rock) after desert for `//!use polar`;
 //! `shaders/warp_hull.wgsl` and `shaders/warp_puffs.wgsl` (a capital ship's warp)
 //! for `//!use warp_hull` and `//!use warp_puffs`; `shaders/plasma_puffs.wgsl` (the
 //! Regency's squeezed plasma) for `//!use plasma_puffs`; `shaders/props.wgsl` (trees'

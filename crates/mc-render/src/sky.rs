@@ -1394,10 +1394,7 @@ impl Sky {
                     .regions
                     .storm_fade(self.storms[i].region, self.storms[i].pos);
             // Its region's weather sets how often it flashes, on a map with regions.
-            let lightning = self
-                .regions
-                .weather_at(self.storms[i].pos, self.weather)
-                .lightning;
+            let lightning = self.regions.lightning_at(self.storms[i].pos, self.weather);
             self.storms[i].next_flash -= dt * smoothstep(0.6, 0.9, strength);
             if self.storms[i].next_flash > 0.0 || self.flashes.len() >= MAX_FLASHES {
                 continue;
@@ -2140,7 +2137,7 @@ mod shots {
         if let Some(hour) = std::env::var("SKY_HOUR").ok().and_then(|v| v.parse().ok()) {
             renderer.set_hour(hour);
         }
-        // The map's climate from its `.ron`, or SKY_CLIMATE=temperate|tropical|desert.
+        // The map's climate from its `.ron`, or SKY_CLIMATE=temperate|tropical|desert|polar.
         let config =
             mc_data::weather::MapConfig::for_map(&root.join(format!("maps/{map_name}.mcmap")))
                 .unwrap_or_default();

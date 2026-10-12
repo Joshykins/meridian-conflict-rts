@@ -30,15 +30,15 @@ pub fn shore_at(height: impl Fn(Vec2) -> f32, water: f32, xy: Vec2) -> Shore {
     }
 }
 
-/// The breakers' size on a map's water: a canyon lake, a tropical shore or the
-/// open coast, in a wind of `wind` m/s (shore.wgsl `surf_climate`).
-pub fn climate_scale(desert: bool, tropical: bool, wind: f32) -> f32 {
-    let base = if desert {
-        surf::DESERT
-    } else if tropical {
-        surf::TROPICAL
-    } else {
-        1.0
+/// The breakers' size on a map's water: a canyon lake, a tropical shore, the
+/// open coast or a polar one, in a wind of `wind` m/s (shore.wgsl `surf_climate`).
+pub fn climate_scale(climate: mc_data::weather::Climate, wind: f32) -> f32 {
+    use mc_data::weather::Climate;
+    let base = match climate {
+        Climate::Desert => surf::DESERT,
+        Climate::Tropical => surf::TROPICAL,
+        Climate::Polar => surf::POLAR,
+        Climate::Temperate => 1.0,
     };
     base * (0.4 + wind * surf::WIND_GAIN).clamp(0.6, 1.5)
 }

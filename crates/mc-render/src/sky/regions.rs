@@ -28,7 +28,13 @@ pub(super) struct Regions {
     /// Each region's weather, region 0's first (`Sky::set_weathers`). A region past
     /// its end plays the map's own, the sky's `weather`.
     weathers: Vec<Weather>,
+    /// Which regions are polar (`Sky::set_polar`): their storms snow, and seldom flash.
+    polar: [bool; MAX_REGIONS],
 }
+
+/// Lightning in a polar region's storms against its weather's own rate: thundersnow
+/// is rare, and a blizzard is a white-out, not a strobe.
+const POLAR_LIGHTNING: f32 = 0.1;
 
 impl Default for Regions {
     fn default() -> Regions {
@@ -69,6 +75,7 @@ impl Regions {
             shares: walls.shares(size.x, size.y),
             walls,
             weathers: Vec::new(),
+            polar: [false; MAX_REGIONS],
         }
     }
 
@@ -85,6 +92,18 @@ impl Regions {
     /// The weather over `at`, where `own` is the map's own.
     pub(super) fn weather_at(&self, at: Vec2, own: Weather) -> Weather {
         self.weather(self.walls.region_at(at.x, at.y), own)
+    }
+
+    /// How often the storms over `at` flash against the usual (`Weather::lightning`),
+    /// where `own` is the map's own weather: a polar region's seldom.
+    pub(super) fn lightning_at(&self, at: Vec2, own: Weather) -> f32 {
+        let region = self.walls.region_at(at.x, at.y);
+        let lightning = self.weather(region, own).lightning;
+        if self.polar.get(region).copied().unwrap_or(false) {
+            lightning * POLAR_LIGHTNING
+        } else {
+            lightning
+        }
     }
 
     /// How stormy the map is, taken as a whole (`Weather::storms`): each region's by
@@ -186,11 +205,23 @@ impl Sky {
             return;
         }
         let weathers = std::mem::take(&mut self.regions.weathers);
+        let polar = self.regions.polar;
         self.regions = Regions {
             weathers,
+            polar,
             ..Regions::new(walls, self.map_size)
         };
         self.restart();
+    }
+
+    /// Which of the map's regions are polar, region 0's first (one on a map without
+    /// regions; the renderer's `set_map_look`): their storms seldom flash.
+    pub(crate) fn set_polar(&mut self, polar: impl Iterator<Item = bool>) {
+        let mut cold = [false; MAX_REGIONS];
+        for (slot, p) in cold.iter_mut().zip(polar) {
+            *slot = p;
+        }
+        self.regions.polar = cold;
     }
 
     /// Plays the match in `weathers`, one for each of the map's regions, region 0's
@@ -256,6 +287,24 @@ mod tests {
                       (line: [(4000, 4000), (4000, 8000)], left: 0, right: 2),
                       (line: [(4000, 4000), (8000, 4000)], left: 2, right: 1)])",
         )
+    }
+
+    #[test]
+    fn polar_storms_seldom_flash() {
+        let clear = Weather::from(WeatherPreset::Clear);
+        let stormy = Weather::from(WeatherPreset::Stormy);
+        let mut regions = two();
+        let east = Vec2::new(7000.0, 500.0);
+        assert_eq!(regions.lightning_at(east, clear), stormy.lightning);
+        regions.polar[1] = true;
+        assert_eq!(
+            regions.lightning_at(east, clear),
+            stormy.lightning * POLAR_LIGHTNING
+        );
+        assert_eq!(
+            regions.lightning_at(Vec2::new(1000.0, 500.0), stormy),
+            clear.lightning
+        );
     }
 
     #[test]

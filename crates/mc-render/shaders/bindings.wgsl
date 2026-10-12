@@ -15,7 +15,15 @@ fn tropical() -> bool {
 // strata by height, the reservoir's bathtub ring, red sand and pale caliche
 // dotted with dark shrubs, jade-to-cobalt lake water.
 fn desert() -> bool {
-    return globals.climate.x > 1.5;
+    return globals.climate.x > 1.5 && globals.climate.x < 2.5;
+}
+
+// The map's climate is polar (`Globals::climate` 3): the temperate look under the
+// map's snow layer, but bare ground is dark rock and moraine (no grass), snow
+// lies bright and wind-sculpted, the sea is dark and rough with ice in it, and
+// what falls from the sky is snow.
+fn polar() -> bool {
+    return globals.climate.x > 2.5;
 }
 
 // How much of each climate's look the ground or sea at `xy` takes, 0-1: x tropical,
@@ -57,16 +65,43 @@ fn tropical_at(xy: vec2<f32>, px: f32) -> f32 {
     return climate_at(xy, px).x;
 }
 
-// How much of what falls from the clouds over `xy` is snow rather than rain, 0-1: in
-// a temperate region of a map with regions, if the map carries a snow layer (the
-// alpine part of such a map); nowhere on any other map. mc_data's `MapLook::snows_at`
-// is the same.
+// How much of the polar look `xy` takes, 0-1, handed over across a climate wall within
+// `half` metres as `climate_within` does: `f32(polar())` on a map of one climate. A
+// polar region is temperate to `climate_within` (its x and y are 0): the polar look
+// is drawn over the temperate one by this weight.
+fn polar_within(xy: vec2<f32>, half: f32) -> f32 {
+    if !has_regions() {
+        return select(0.0, 1.0, polar());
+    }
+    let shares = region_shares(xy, half);
+    if !shares.mixed {
+        return globals.region_climate[shares.region].z;
+    }
+    var cold = 0.0;
+    let regions = u32(atmos.regions.y);
+    for (var r = 0u; r < regions; r++) {
+        if shares.w[r] > 0.0 {
+            cold += globals.region_climate[r].z * shares.w[r];
+        }
+    }
+    return cold;
+}
+
+fn polar_at(xy: vec2<f32>, px: f32) -> f32 {
+    return polar_within(xy, max(REGIONS_BLEND_M, px * 1.5));
+}
+
+// How much of what falls from the clouds over `xy` is snow rather than rain, 0-1: all
+// of it where the climate is polar; in a temperate region of a map with regions, if
+// the map carries a snow layer (the alpine part of such a map); nowhere else. mc_data's
+// `MapLook::snows_at` is the same.
 fn snowfall_at(xy: vec2<f32>) -> f32 {
     if !has_regions() {
-        return 0.0;
+        return select(0.0, 1.0, polar());
     }
     let climate = climate_within(xy, REGIONS_SKY_BLEND_M);
-    return (1.0 - climate.x - climate.y) * ground_snow_at(xy).z;
+    let cold = polar_within(xy, REGIONS_SKY_BLEND_M);
+    return cold + (1.0 - climate.x - climate.y - cold) * ground_snow_at(xy).z;
 }
 
 // The foot of a climate wall: a line of Precursor light on the ground and the sea
@@ -870,6 +905,39 @@ const DAMP_MIE: f32 = 3.5e-5;
 // Aerial perspective: light lost and gained on the way from `world` to the
 // eye through the same air the sky is made of.
 fn apply_haze(color: vec3<f32>, world: vec3<f32>, eye: vec3<f32>) -> vec3<f32> {
+    let cold = polar_within(world.xy, REGIONS_SKY_BLEND_M);
+    if cold > 0.0 {
+        return air_haze(blowing_snow(color, world, eye, cold), world, eye);
+    }
+    return air_haze(color, world, eye);
+}
+
+// Snow blown low over polar ground (`apply_haze`): the falling snow of a storm and
+// the snow the wind lifts off the ground, thickest in the lowest few tens of metres,
+// so a blizzard whites out a low view across the land while from the strategic
+// height the battle still reads through it. `cold` is the polar look's weight there.
+fn blowing_snow(color: vec3<f32>, world: vec3<f32>, eye: vec3<f32>, cold: f32) -> vec3<f32> {
+    let w = weather_at(world.xy);
+    let blow = smoothstep(0.1, 0.9, w.w * 0.8 + w.y * 0.3) * cold;
+    if blow <= 0.0 {
+        return color;
+    }
+    let ground = vec3<f32>(0.0, 0.0, max(terrain_height(world.xy), globals.map.z));
+    let column = air_column(eye - ground, world - ground, BLOWING_SNOW_H);
+    let through = exp(-column * BLOWING_SNOW * blow);
+    // Lit white from all round, as mist is (clouds.wgsl `mist_march`).
+    let sun_light = atmos.sun_color.rgb * atmos.sun_color.w;
+    let lit = (sun_light * max(globals.sun.z, 0.0) / PI + atmos.sky_color.rgb) * 0.85;
+    return color * through + lit * (1.0 - through);
+}
+
+// Blowing snow: how thick it lies at the ground in a full blizzard, per metre, and
+// the height over which it thins by e.
+const BLOWING_SNOW: f32 = 0.0028;
+const BLOWING_SNOW_H: f32 = 45.0;
+
+// The air's own haze (`apply_haze`).
+fn air_haze(color: vec3<f32>, world: vec3<f32>, eye: vec3<f32>) -> vec3<f32> {
     // Desert air is dry and clear: far less haze, so what is left is mostly
     // the air's own blue, the blue-violet that fills a canyon's depths.
     // (Across a climate wall the air changes over a few hundred metres, not on the line.)
@@ -1094,17 +1162,28 @@ fn melt_sample(xy: vec2<f32>) -> vec3<f32> {
 
 // ---------------------------------------------------------------- under the sea
 
-// Light lost per metre of the water, red first (water.wgsl `water_optics`): clear
+// How much of each climate's water the sea at `xy` is, 0-1, as `climate_at` and
+// `polar_at` give them: x tropical, y desert, z polar (temperate what is left).
+fn sea_climate_at(xy: vec2<f32>, px: f32) -> vec3<f32> {
+    return vec3<f32>(climate_at(xy, px), polar_at(xy, px));
+}
+
+// Light lost per metre of the water, red first (sea.wgsl `water_optics`): clear
 // green coastal water, the Bahamas' very clear water (tropical), or a canyon
-// reservoir's (desert). `climate` is `climate_at` where the water is.
-fn sea_absorb(climate: vec2<f32>) -> vec3<f32> {
-    let temperate = 1.0 - climate.x - climate.y;
+// reservoir's (desert), or the dark polar sea. `climate` is `sea_climate_at` where the
+// water is.
+fn sea_absorb(climate: vec3<f32>) -> vec3<f32> {
+    let temperate = 1.0 - climate.x - climate.y - climate.z;
     var absorb = vec3<f32>(0.0);
     if climate.x > 0.0 {
         absorb += vec3<f32>(0.30, 0.042, 0.026) * climate.x;
     }
     if climate.y > 0.0 {
         absorb += vec3<f32>(0.40, 0.068, 0.095) * climate.y;
+    }
+    if climate.z > 0.0 {
+        // The polar sea: cold, deep and dark, plankton-thick near the ice.
+        absorb += vec3<f32>(0.3, 0.07, 0.055) * climate.z;
     }
     if temperate > 0.0 {
         absorb += vec3<f32>(0.17, 0.032, 0.025) * temperate;
@@ -1115,7 +1194,7 @@ fn sea_absorb(climate: vec2<f32>) -> vec3<f32> {
 // Light lost per metre along a view from under the water the eye is in: clearer
 // than the absorption says, so the seabed and a fight read out to 100 m or so.
 fn under_sea_extinction() -> vec3<f32> {
-    return sea_absorb(climate_at(globals.camera.xy, 0.0)) * 0.2 + vec3<f32>(0.004);
+    return sea_absorb(sea_climate_at(globals.camera.xy, 0.0)) * 0.2 + vec3<f32>(0.004);
 }
 
 // With the free camera under the water (water.wgsl `under_sea`), what is drawn

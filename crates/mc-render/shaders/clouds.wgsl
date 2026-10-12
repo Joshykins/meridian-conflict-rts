@@ -1097,9 +1097,15 @@ fn with_rain(cloud: vec4<f32>, eye: vec3<f32>, rd: vec3<f32>, t_scene: f32, pixe
                 vec3<f32>(q / 260.0, (p.z + time * 55.0) / 1800.0), 0.0).z;
             let under = cloud_floor(p.xy) + atmos.layer.x - 60.0;
             let hang = smoothstep(under, under - 250.0, p.z);
-            let sigma = r * 0.00055 * (0.35 + 1.3 * streak) * hang;
+            var sigma = r * 0.00055 * (0.35 + 1.3 * streak) * hang;
             // Lit grey by the sky, a little by the sun through the cloud above.
-            let source = atmos.sky_color.rgb * 1.1 + atmos.sun_color.rgb * 0.035;
+            var source = atmos.sky_color.rgb * 1.1 + atmos.sun_color.rgb * 0.035;
+            let cold = polar_within(p.xy, REGIONS_SKY_BLEND_M);
+            if cold > 0.0 {
+                // Polar snow comes down in thicker, whiter veils than rain.
+                sigma *= 1.0 + 0.6 * cold;
+                source = mix(source, atmos.sky_color.rgb * 1.6 + atmos.sun_color.rgb * 0.08, cold);
+            }
             let absorb = exp(-sigma * dt);
             light += through * source * (1.0 - absorb);
             through *= absorb;
@@ -1179,6 +1185,8 @@ fn vs_rain(@builtin(vertex_index) vertex: u32, @builtin(instance_index) drop: u3
     if snow {
         fall *= 0.2;
         slant *= 3.0;
+        // In a polar storm it is a blizzard: the wind drives the snow almost flat.
+        slant *= 1.0 + 1.6 * polar_within(xy, REGIONS_SKY_BLEND_M) * clamp(weather_at(xy).y, 0.0, 1.0);
     }
     let phase = fract(h.z - atmos.weather.w * fall / column);
     let ground = terrain_height(xy);

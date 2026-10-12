@@ -51,6 +51,10 @@ struct Habitat {
     // sides meet. Everything above is already mixed by them.
     tropical: f32,
     desert: f32,
+    // How much of the polar look it takes (`polar_at`), the same way: snow over
+    // everything but steep rock and wind-scoured ground, which is dark rock, scree
+    // and moraine; nothing grows.
+    polar: f32,
     // A city's made ground (the map's streets layer): the cell, and how much of
     // the ground here is made, 0-1 (roads, pavements, yards, rubble, fields:
     // everything but its lawns and the terrain's own ground). Nothing grows on it.
@@ -101,6 +105,7 @@ fn habitat(xy: vec2<f32>, z: f32, base_n: vec3<f32>, px: f32) -> Habitat {
     let climate = climate_at(xy, px);
     h.tropical = climate.x;
     h.desert = climate.y;
+    h.polar = polar_at(xy, px);
     h.street = street_cell(xy);
     h.made = street_made(h.street);
 
@@ -184,6 +189,21 @@ fn habitat(xy: vec2<f32>, z: f32, base_n: vec3<f32>, px: f32) -> Habitat {
         h.snow_w *= 1.0 - h.desert;
         h.ice_w *= 1.0 - h.desert;
     }
+    if h.polar > 0.0 && layer.z >= 0.5 {
+        // A polar map's ice walls (a shelf's front, an ice cliff) are faces too steep
+        // to hold snow where its layer lays ice or snow: ice, not rock
+        // (terrain.wgsl `glacier_shade` draws its faces).
+        let wall = smoothstep(0.35, 0.6, slope) * smoothstep(0.45, 0.75, max(layer.x, layer.y));
+        h.ice_w = side_mix(h.ice_w, max(h.ice_w, wall), h.polar);
+        h.snow_w *= 1.0 - wall * h.polar;
+    }
+    if h.polar > 0.0 && layer.z < 0.5 {
+        // A polar map without a snow layer of its own: snow lies on all but the steep
+        // ground and patches the wind scours bare.
+        let scoured = smoothstep(0.62, 0.8, broad * 0.6 + patchy * 0.5 - curvature * 0.8);
+        let lying = (1.0 - scoured) * (1.0 - smoothstep(0.3, 0.55, slope + (fine - 0.5) * 0.15));
+        h.snow_w = side_mix(h.snow_w, lying * (1.0 - h.ice_w), h.polar);
+    }
     let open = (1.0 - sand_w) * (1.0 - canopy);
     let highland = smoothstep(140.0, 300.0, alt + (broad - 0.5) * 140.0);
     h.open = open;
@@ -254,6 +274,22 @@ fn habitat(xy: vec2<f32>, z: f32, base_n: vec3<f32>, px: f32) -> Habitat {
         // Slickrock: the bed's own rock bare on convex ground and in broad patches.
         h.w[7] = side_mix(h.w[7], ground * (smoothstep(0.6, 0.85, broad * 0.55 + patchy * 0.5 - curvature * 0.6)
             + smoothstep(0.04, 0.1, slope) * 0.3) * (1.0 - canopy), k);
+    }
+    if h.polar > 0.0 {
+        // Nothing grows: the ground the snow leaves bare is rock, scree, and gravel and
+        // moraine on the flats (terrain.wgsl `polar_ground` colours them).
+        let ground = 1.0 - sand_w;
+        let k = h.polar;
+        h.w[1] = side_mix(h.w[1], 0.0, k);
+        h.w[2] = side_mix(h.w[2], 0.0, k);
+        h.w[3] = side_mix(h.w[3], 0.0, k);
+        h.w[4] = side_mix(h.w[4], 0.0, k);
+        h.w[9] = side_mix(h.w[9], 0.0, k);
+        h.w[5] = side_mix(h.w[5], ground * (smoothstep(0.03, 0.12, slope) * (1.0 - rock_face) * 1.4
+            + smoothstep(0.55, 0.8, patchy) * 0.6), k);
+        h.w[6] = side_mix(h.w[6], ground * (0.7 + smoothstep(0.4, 0.7, tussock) * 0.5), k);
+        h.w[7] = side_mix(h.w[7], ground * (smoothstep(0.6, 0.85, broad * 0.55 + patchy * 0.5 - curvature * 0.6)
+            + smoothstep(0.04, 0.1, slope) * 0.4 + highland * 0.5), k);
     }
     return h;
 }
@@ -434,7 +470,8 @@ fn grass_share(h: Habitat) -> vec4<f32> {
         * (1.0 - h.sand_w);
     // Nothing grows on a city's made ground; a lawn is kept mown short.
     let mown = select(1.0, 0.55, h.street.ground == STREET_GROUND_LAWN);
-    let green = vec4<f32>(density * (1.0 - h.made) * mown, lush, meadow, moss);
+    // (Nothing grows on polar ground.)
+    let green = vec4<f32>(density * (1.0 - h.made) * mown * (1.0 - h.polar), lush, meadow, moss);
     if h.desert > 0.0 {
         // Where two regions meet at a climate wall.
         return mix(green, arid, h.desert);

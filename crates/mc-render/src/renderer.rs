@@ -361,7 +361,7 @@ pub(crate) struct Globals {
     /// Strategic missiles in flight: nose and kind, then axis and heat (nuke_fx.rs).
     pub(crate) strategic: [[f32; 4]; nuke_fx::MISSILE_SLOTS * 2],
     /// x the map's climate, region 0's on a map with regions: 0 temperate, 1 tropical,
-    /// 2 desert (map_look.rs; `climate_at` in bindings.wgsl);
+    /// 2 desert, 3 polar (map_look.rs; `climate_at` in bindings.wgsl);
     /// y 1 while grass is grown (grass.rs), so the ground under it is shaded for it;
     /// z how far from the eye it grows (`grass::reach`);
     /// w how many sim ticks this frame covers (the treads' motion blur, entity.wgsl).
@@ -373,7 +373,8 @@ pub(crate) struct Globals {
     pub(crate) settling: [[f32; 4]; settle::SLOTS as usize * 2],
     /// x how many of `settling` are in use.
     pub(crate) settle: [f32; 4],
-    /// Each region's climate (map_look.rs): x 1 where it is tropical, y 1 where desert.
+    /// Each region's climate (map_look.rs): x 1 where it is tropical, y 1 where desert,
+    /// z 1 where polar.
     pub(crate) region_climate: [[f32; 4]; crate::gpu_consts::regions::MAX as usize],
     /// x the map's `strata_lift` in metres.
     pub(crate) map_look: [f32; 4],

@@ -13,7 +13,7 @@
 //! `flight` (a winged flier's rig) and `crawl` (a many-legged walker's legs).
 
 /// Files put in front of shaders, never compiled on their own.
-pub(crate) const PRELUDES: [&str; 27] = [
+pub(crate) const PRELUDES: [&str; 28] = [
     "common",
     "bindings",
     "regions",
@@ -29,6 +29,7 @@ pub(crate) const PRELUDES: [&str; 27] = [
     "scenery",
     "city",
     "desert",
+    "polar",
     "rock",
     "scars",
     "warp_hull",
@@ -58,6 +59,7 @@ pub(crate) struct Preludes {
     scenery: String,
     city: String,
     desert: String,
+    polar: String,
     rock: String,
     scars: String,
     warp_hull: String,
@@ -97,6 +99,7 @@ impl Preludes {
             scenery: read("scenery"),
             city: read("city"),
             desert: read("desert"),
+            polar: read("polar"),
             rock: read("rock"),
             scars: read("scars"),
             warp_hull: read("warp_hull"),
@@ -144,6 +147,10 @@ impl Preludes {
         // Canyon-country desert colours (needs habitat).
         if uses("desert") {
             prelude = format!("{prelude}\n{}", self.desert);
+        }
+        // The polar ground's snow and bare rock (terrain.wgsl; needs habitat).
+        if uses("polar") {
+            prelude = format!("{prelude}\n{}", self.polar);
         }
         // Cliff stone, for the walls and the rock on them (needs desert).
         if uses("rock") {

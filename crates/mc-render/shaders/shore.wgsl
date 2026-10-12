@@ -56,7 +56,8 @@ fn shore_at(xy: vec2<f32>, depth: f32) -> Shore {
 }
 
 // The breakers' size on the water at `xy`: open coast, a reef-sheltered tropical
-// shore, or a canyon lake, and bigger the harder the wind blows (`surf_wind`).
+// shore, a canyon lake or a polar coast's heavy surf, and bigger the harder the wind
+// blows (`surf_wind`).
 fn surf_climate(xy: vec2<f32>) -> f32 {
     // (At a climate wall one region's surf ends and the next one's begins, as their
     // seas do: within a few metres.)
@@ -64,6 +65,10 @@ fn surf_climate(xy: vec2<f32>) -> f32 {
     var base = side_mix(1.0, SURF_TROPICAL, climate.x);
     if climate.y > 0.0 {
         base = side_mix(base, SURF_DESERT, climate.y);
+    }
+    let cold = polar_within(xy, REGIONS_BLEND_M);
+    if cold > 0.0 {
+        base = side_mix(base, SURF_POLAR, cold);
     }
     return base * surf_wind(length(atmos.wind.zw));
 }
