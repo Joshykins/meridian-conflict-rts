@@ -117,7 +117,12 @@ fn sea_waves(xy: vec2<f32>, time: f32, pixel: f32, across: f32, long: f32, wind:
         // exp(sin - 1): sharp crests, broad troughs, as wind waves stand.
         let e = exp(s - 1.0);
         let amp = steep / k * fade_crest * strength;
-        out.slope += dir * (amp * k * e * cos(phase)) * (fade / fade_crest);
+        // The short trains' crests are rounder (exp(q (sin - 1)) / q, nearly a sine
+        // at small q): sharp, a few of them crossing carved the surface into
+        // facets with straight ridges, a lattice that read as a mesh.
+        let q = mix(0.3, 1.0, smoothstep(6.0, 30.0, lambda));
+        let e_slope = exp(q * (s - 1.0));
+        out.slope += dir * (amp * k * e_slope * cos(phase)) * (fade / fade_crest);
         if lambda > 3.0 && lambda < 70.0 {
             // Weighed by steepness more than height: a crest breaks where the water
             // is steep, and weighed by height the two longest trains ruled the sum
