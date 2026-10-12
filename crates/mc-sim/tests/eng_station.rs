@@ -373,3 +373,90 @@ fn a_station_takes_no_adjacency_saving() {
     }
     assert!(uses(bp("aster_t2_land_factory"), Resource::Materials));
 }
+
+/// A plan a station shares with an engineer is dragged for both: the station's copy
+/// does not stay behind in the drop's way. Dragged beyond the station's reach, the
+/// station lets it go and the engineer keeps it; a plan only the station holds stays.
+#[test]
+fn a_dragged_plan_moves_for_the_station_holding_it_too() {
+    use mc_sim::tables::OrderKind;
+    let mut w = world();
+    let ids = spawn(
+        &mut w,
+        &[
+            ("aster_t1_eng_station", 600, 600, 1000),
+            ("aster_t1_engineer", 600, 660, 1000),
+        ],
+    );
+    let (station, engineer) = (ids[0], ids[1]);
+    let range = {
+        let row = w.state.units.row(station).unwrap();
+        let bp = w.blueprints.unit(w.state.units.blueprint[row]);
+        bp.builder.as_ref().unwrap().range.floor_int()
+    };
+    let power = w.blueprints.id_of("aster_t1_power").unwrap();
+    let plan = |x, y, queue| {
+        cmd(Command::Build {
+            units: vec![station, engineer],
+            blueprint: power,
+            pos: FxVec2::from_ints(x, y),
+            heading: Angle::ZERO,
+            queue,
+        })
+    };
+    // The first is begun at once; the second stays a plan.
+    let (first, second) = (plan(720, 600, false), plan(600, 760, true));
+    w.tick(&[first, second]).unwrap();
+    let plans = |w: &World, id: UnitId| -> Vec<FxVec2> {
+        let row = w.state.units.row(id).unwrap();
+        let begun = w.state.units.row(w.state.units.build_target[row]).is_some();
+        (w.state.orders.iter(&w.state.units, row).enumerate())
+            .filter(|(i, o)| o.kind == OrderKind::Build && !(*i == 0 && begun))
+            .map(|(_, o)| o.pos)
+            .collect()
+    };
+    let from = *plans(&w, engineer).last().unwrap();
+    assert_eq!(plans(&w, station), vec![from], "both hold the plan");
+    let relocate = |from, x, y| {
+        cmd(Command::RelocateOrder {
+            units: vec![station, engineer],
+            kind: OrderKind::Build,
+            from,
+            to: FxVec2::from_ints(x, y),
+        })
+    };
+
+    // A short drag, onto part of its own ground.
+    w.tick(&[relocate(from, 612, 772)]).unwrap();
+    let to = *plans(&w, engineer).last().unwrap();
+    assert_ne!(to, from, "the plan was not moved");
+    assert_eq!(
+        plans(&w, station),
+        vec![to],
+        "the station's copy stayed behind"
+    );
+
+    // Beyond the station's reach: the engineer takes it there alone.
+    let far = 600 + range + 200;
+    w.tick(&[relocate(to, far, 600)]).unwrap();
+    let there = *plans(&w, engineer).last().unwrap();
+    assert!(
+        there.distance(FxVec2::from_ints(far, 600)) < mc_core::Fx::from_int(16),
+        "engineer's plan at {there:?}"
+    );
+    assert!(
+        plans(&w, station).is_empty(),
+        "the station kept a plan it cannot reach"
+    );
+
+    // A plan the station alone holds is not dragged out of its reach.
+    let mut only = plan(480, 600, true);
+    if let Command::Build { units, .. } = &mut only.command {
+        units.retain(|&u| u == station);
+    }
+    w.tick(&[only]).unwrap();
+    let at = plans(&w, station)[0];
+    w.tick(&[relocate(at, far, 900)]).unwrap();
+    assert!(refused_out_of_reach(&w), "the drag was refused");
+    assert_eq!(plans(&w, station), vec![at]);
+}

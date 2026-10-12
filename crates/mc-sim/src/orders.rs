@@ -36,7 +36,7 @@ const WORK_AIM_TOLERANCE: u16 = 728;
 const DT: i32 = TICKS_PER_SECOND as i32;
 /// How far a followed guard's centre may have moved on from where a `RelocateOrder`
 /// found it and still be the one meant, metres: a fast unit's travel over the command delay.
-const GUARD_FOLLOW_SLACK: Fx = Fx::from_int(64);
+pub(crate) const GUARD_FOLLOW_SLACK: Fx = Fx::from_int(64);
 /// A member of an arrived block has this long to find its exact slot before
 /// it settles for near it (movement counts the ticks it spends jostling).
 const SLOT_GRACE_TICKS: u16 = 2 * TICKS_PER_SECOND as u16;
@@ -623,7 +623,7 @@ impl World {
     /// Whether `blueprint` at `site`, turned to `heading`, would overlap a structure
     /// `player` has planned. The very same plan in another queue is not in the way:
     /// whoever gets there second joins in. `skip` names plans that do not count.
-    fn plan_blocks(
+    pub(crate) fn plan_blocks(
         &self,
         player: u8,
         blueprint: BlueprintId,
@@ -642,120 +642,6 @@ impl World {
             let d = o.pos - site;
             d.x.abs() < reach(lot.0, other.0) && d.y.abs() < reach(lot.1, other.1)
         })
-    }
-
-    /// Drags queued orders somewhere else: every `kind` order these units hold at
-    /// `from` goes to `to`. A structure that has been begun stays where it is.
-    fn relocate_orders(
-        &mut self,
-        player: u8,
-        ids: &[UnitId],
-        kind: OrderKind,
-        from: FxVec2,
-        to: FxVec2,
-    ) -> Result<(), SimError> {
-        if !matches!(
-            kind,
-            OrderKind::Move
-                | OrderKind::AttackMove
-                | OrderKind::Build
-                | OrderKind::Patrol
-                | OrderKind::AttackGround
-                | OrderKind::Strike
-                | OrderKind::Bombard
-                | OrderKind::Guard
-                | OrderKind::ReclaimArea
-        ) {
-            return Ok(());
-        }
-        let rows = self.owned(player, ids, cat::MOBILE);
-        let units = &self.state.units;
-        // A guard round a unit moves with it: by the time the drag arrives its centre
-        // has gone on a little from where the player picked it up.
-        let found = |o: &Order| {
-            o.pos == from
-                || (kind == OrderKind::Guard
-                    && units.row(o.target).is_some()
-                    && o.pos.distance(from) <= GUARD_FOLLOW_SLACK)
-        };
-        // (row, order node, the order is the one being carried out)
-        let mut nodes: Vec<(usize, usize, bool)> = Vec::new();
-        for &row in &rows {
-            let begun = kind == OrderKind::Build && units.row(units.build_target[row]).is_some();
-            for (i, node) in self.state.orders.nodes(units, row).enumerate() {
-                let o = &self.state.orders.order[node as usize];
-                if o.kind == kind && found(o) && !(i == 0 && begun) {
-                    nodes.push((row, node as usize, i == 0));
-                }
-            }
-        }
-        let Some(&(_, first, _)) = nodes.first() else {
-            return Ok(());
-        };
-        let to = if kind == OrderKind::Build {
-            let (blueprint, heading) = {
-                let o = &self.state.orders.order[first];
-                (o.blueprint, o.heading)
-            };
-            nodes.retain(|&(_, node, _)| self.state.orders.order[node].blueprint == blueprint);
-            let bp = self.blueprints.unit(blueprint);
-            let site = snap_turned_to_build_grid(bp, to, heading);
-            // The plans being moved are not in their own way; the same plan in a queue left alone is.
-            let moved = |row: usize, o: &Order| {
-                o.pos == from && o.blueprint == blueprint && nodes.iter().any(|&(r, ..)| r == row)
-            };
-            let fits = site == from
-                || (self.can_place_turned(bp, site, heading)
-                    && !self.plan_blocks(player, blueprint, site, heading, moved));
-            if !fits {
-                self.reject_site(player, blueprint, site);
-                return Ok(());
-            }
-            site
-        } else {
-            self.clamp_to_map(to)
-        };
-        let mut moved_groups = std::collections::BTreeMap::new();
-        for (row, node, current) in nodes {
-            let previous = self.state.orders.order[node];
-            if previous.formation != 0 && to != from {
-                let (id, heading) = *moved_groups.entry(previous.formation).or_insert_with(|| {
-                    let anchor = self
-                        .state
-                        .formations
-                        .get(&previous.formation)
-                        .map_or(self.state.units.pos[row], |g| g.anchor);
-                    let heading = (to - anchor).angle();
-                    self.state.formation_serial += 1;
-                    let id = self.state.formation_serial;
-                    self.state.formations.insert(
-                        id,
-                        crate::formations::Group {
-                            anchor,
-                            heading,
-                            phase: 0,
-                            speed: Fx::ZERO,
-                        },
-                    );
-                    (id, heading)
-                });
-                let o = &mut self.state.orders.order[node];
-                o.formation = id;
-                o.offset = previous.offset.rotate(heading - previous.heading);
-                o.heading = heading;
-            }
-            self.state.orders.order[node].pos = to;
-            // Put down somewhere, a guard holds that spot and no longer follows anyone,
-            // and a build is a fresh plan there, not the site it may have lost.
-            if matches!(kind, OrderKind::Guard | OrderKind::Build) {
-                self.state.orders.order[node].target = Handle::NONE;
-            }
-            if current {
-                // The way there is asked for again when the order next runs.
-                self.state.units.stuck_ticks[row] = 0;
-            }
-        }
-        Ok(())
     }
 
     /// `AttackGround` or `Bombard` for every unit with a weapon that can hit the ground.
@@ -906,7 +792,7 @@ impl World {
 
     /// Tells `player` that `blueprint` cannot go at `site`: why, when it is a mine
     /// in another's reach, else that the lot will not do.
-    fn reject_site(&mut self, player: u8, blueprint: BlueprintId, site: FxVec2) {
+    pub(crate) fn reject_site(&mut self, player: u8, blueprint: BlueprintId, site: FxVec2) {
         let crowded = self
             .blueprints
             .unit(blueprint)

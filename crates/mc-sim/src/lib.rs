@@ -82,6 +82,7 @@ pub mod reclaim;
 mod reclaim_area;
 mod reclaim_heads;
 mod reform;
+mod relocate;
 pub mod repair;
 mod repair_field;
 mod seabed;
