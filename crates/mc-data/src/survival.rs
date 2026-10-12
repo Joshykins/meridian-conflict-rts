@@ -1,7 +1,7 @@
 //! How a survival map is laid out: the Precursor facility's heart (where the
 //! ray that raises Shapers leaves), the print bays built into its halls and
 //! its sea gate, the guns guarding it, where a defender may start, which way
-//! each front attacks from, and the cradles where Shapers form. Read from the
+//! each front attacks from, and the sites where Shapers rise and grow. Read from the
 //! `survival` block of a map's `maps/<stem>.ron`; a map without one is not
 //! offered for survival.
 //!
@@ -29,7 +29,9 @@
 //!         (name: "High Corridor", domain: Air, path: [(12000, 12000), (4200, 4200)]),
 //!     ],
 //!     node_sites: [
-//!         (name: "Cinder Ridge", at: (9800, 11800), domain: Land, facing: Some(180)),
+//!         (name: "Cinder Ridge", at: (9800, 11800), domain: Land, facing: Some(180),
+//!          room: 450, path: [(9000, 11000), (7000, 10000)]),
+//!         (name: "Hollow Battery", at: (14000, 13000), kind: Artillery),
 //!     ],
 //! )
 //! ```
@@ -88,19 +90,66 @@ pub struct FrontLayout {
     pub path: Vec<(f32, f32)>,
 }
 
-/// Somewhere the engine may raise a replication node: a cradle holding a row
-/// of Shapers.
+/// What a Shaper site is for. The numbers cross into the render frame
+/// (`ShaperInstance::kind`): never renumber one.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum SiteKind {
+    /// Prints formations on its platforms and sends them down its path.
+    #[default]
+    Printer = 0,
+    /// An auxiliary Shaper behind the lines that fires replication artillery.
+    Artillery = 1,
+    /// An auxiliary Shaper that launches Progenitor nukes.
+    Nuke = 2,
+}
+
+impl SiteKind {
+    /// Radius (m) of level, clear ground a site of this kind grows into when
+    /// the layout gives none.
+    pub fn default_room(self) -> f32 {
+        match self {
+            SiteKind::Printer => 450.0,
+            SiteKind::Artillery | SiteKind::Nuke => 350.0,
+        }
+    }
+}
+
+/// Somewhere the engine raises a Shaper, which grows there: its print
+/// platforms in an arc in front of it (across `facing`), its lesser
+/// structures at the sides and behind.
 #[derive(Clone, Debug, Default, PartialEq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct NodeSiteLayout {
     pub name: String,
+    /// Where the Shaper stands.
     pub at: (f32, f32),
-    /// Land sites print land (or air) units; naval sites stand in water and
-    /// print ships (or air).
+    /// Land sites print land (or air) units; naval sites stand on an islet or
+    /// shore pad and print ships (or air) on slips in the water in front.
+    /// Auxiliary sites are Land.
     pub domain: Domain,
-    /// Degrees (0 east, counter-clockwise) the Shapers face, their row square
-    /// to it: a cradle's facing. None: toward the defenders.
+    /// Degrees (0 east, counter-clockwise) the base faces: its platforms are
+    /// in front, its auxiliary pieces behind. None: toward the first point of
+    /// `path` (toward the defenders when it has none).
     pub facing: Option<f32>,
+    pub kind: SiteKind,
+    /// Radius (m) of level, clear, buildable ground the base grows into.
+    /// Zero: `SiteKind::default_room`.
+    pub room: f32,
+    /// Route from the site toward the defenders (Printer sites): drivable for
+    /// land, sailable for naval. The last leg to the defenders is added by the
+    /// sim; aircraft fly straight.
+    pub path: Vec<(f32, f32)>,
+}
+
+impl NodeSiteLayout {
+    /// `room`, or the kind's default when the layout gives none.
+    pub fn room_or_default(&self) -> f32 {
+        if self.room > 0.0 {
+            self.room
+        } else {
+            self.kind.default_room()
+        }
+    }
 }
 
 /// A print bay built into the facility: a printed unit stands at `at` while
@@ -172,10 +221,40 @@ impl SurvivalLayout {
         {
             return Some("survival: naval fronts need a naval bay".into());
         }
+        if self
+            .node_sites
+            .iter()
+            .any(|n| n.kind != SiteKind::Printer && n.domain != Domain::Land)
+        {
+            return Some("survival: an auxiliary site must be Land".into());
+        }
         if !self.bays.iter().any(|b| b.domain == Domain::Land) {
             return Some("survival: no land print bays".into());
         }
 
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_site_reads_its_kind_room_and_path_with_defaults() {
+        let old: NodeSiteLayout =
+            ron::from_str("(name: \"Old\", at: (10, 20), domain: Naval, facing: Some(180))")
+                .unwrap();
+        assert_eq!(old.kind, SiteKind::Printer);
+        assert!(old.path.is_empty());
+        assert_eq!(old.room_or_default(), 450.0);
+        let aux: NodeSiteLayout =
+            ron::from_str("(at: (1, 2), kind: Artillery, room: 300, path: [(5, 6), (7, 8)])")
+                .unwrap();
+        assert_eq!(aux.kind, SiteKind::Artillery);
+        assert_eq!(aux.room_or_default(), 300.0);
+        assert_eq!(aux.path, vec![(5.0, 6.0), (7.0, 8.0)]);
+        let bare: NodeSiteLayout = ron::from_str("(kind: Nuke)").unwrap();
+        assert_eq!(bare.room_or_default(), 350.0);
     }
 }

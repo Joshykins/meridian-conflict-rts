@@ -4,7 +4,7 @@
 //! last round is dead.
 
 use mc_core::{Fx, FxVec2};
-use mc_data::survival::Domain;
+use mc_data::survival::{Domain, SiteKind};
 use mc_data::Blueprints;
 use mc_jobs::Pool;
 use mc_map::Heightfield;
@@ -111,6 +111,9 @@ fn world_with(rules: SurvivalRules, defenders: u8) -> World {
             at: FxVec2::from_ints(3000, 3300),
             domain: Domain::Land,
             facing: Some(mc_core::Angle::from_degrees(225)),
+            kind: SiteKind::Printer,
+            room: Fx::from_int(450),
+            path: vec![FxVec2::from_ints(2600, 2900)],
         }],
         rules,
     })

@@ -425,7 +425,10 @@ invulnerable unit, and the mirror marks it `SHIELD_VEIL` so it is drawn apart fr
   (`mc_data::survival::SurvivalLayout`): the facility's heart (where the ray leaves, `ray_height` over the ground) and
   its start index, its print bays (`bays`: where a printed unit stands, its facing, the projector over it, Land or
   Naval), the guns it starts with (`guards`), the spawns a defender may pick, the fronts (domain and a path from the
-  facility toward the defenders), and the cradles (`node_sites`, each with the facing its row of Shapers takes).
+  facility toward the defenders), and the Shaper sites (`node_sites`: where the Shaper stands, its domain, the
+  way its base faces, its `kind` (`SiteKind`: Printer, or the auxiliary Artillery and Nuke), the `room` (m) of level
+  clear ground its base grows into (default 450 for a printer, 350 for an auxiliary site) and the `path` its
+  formations take toward the defenders; aircraft fly straight). The ray raises Printer sites only so far.
   There is one survival map: `maps/threshold` ("The Threshold", `mc-bake --layout threshold --size-km 16 --seed 31`,
   `crates/mc-map/src/bake/threshold.rs`): one road along a coast between mountains and the sea, the defenders' lowland
   in the west, a single pass, and the east half one Precursor facility on a plateau behind the Rampart, one ramp up

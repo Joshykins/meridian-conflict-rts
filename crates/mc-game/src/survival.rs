@@ -154,6 +154,9 @@ pub fn siege_for(
                 at: fx(n.at),
                 domain: n.domain,
                 facing: n.facing.map(degrees),
+                kind: n.kind,
+                room: Fx::from_f32(n.room_or_default()),
+                path: n.path.iter().copied().map(fx).collect(),
             })
             .collect(),
         rules,

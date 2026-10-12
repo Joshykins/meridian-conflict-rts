@@ -10,6 +10,17 @@ use mc_core::{Angle, Fx, FxVec2};
 use mc_data::survival::Domain;
 use mc_data::BlueprintId;
 
+/// The way a group of the engine's units goes before it turns on the defenders.
+#[derive(Clone, Copy, Debug)]
+pub(super) enum Route {
+    /// Down a front (index into `SurvivalConfig::fronts`).
+    Front(usize),
+    /// Down a Shaper site's path (index into `SurvivalConfig::node_sites`).
+    Site(usize),
+    /// Straight at them (ships: down the nearest sea front).
+    Free,
+}
+
 /// A ship's goal is open water no further than this from a defender (m).
 const SEA_GOAL_REACH: i32 = 500;
 
@@ -247,7 +258,14 @@ impl crate::World {
             let group: Vec<&Print> = done.iter().filter(|p| p.formation == f).collect();
             let units: Vec<UnitId> = group.iter().map(|p| p.unit).collect();
             if group[0].front == NODE_PRINT {
-                self.survival_send(&units, None, true)?;
+                // A Shaper's formation goes down its site's path.
+                let s = self.state.survival.as_ref().unwrap();
+                let route = s
+                    .nodes
+                    .iter()
+                    .find(|n| n.unit == group[0].source)
+                    .map_or(Route::Free, |n| Route::Site(n.site as usize));
+                self.survival_send(&units, route, true)?;
             } else {
                 self.survival_muster(&units, group[0].front, f)?;
             }
@@ -269,7 +287,7 @@ impl crate::World {
             .get(front as usize)
             .and_then(|f| f.path.first().copied())
         else {
-            return self.survival_send(units, None, true);
+            return self.survival_send(units, Route::Free, true);
         };
         let side = s.config.engine_player;
         let mut waiting: Vec<u16> = s
@@ -319,7 +337,7 @@ impl crate::World {
                 continue;
             }
             sent = sent.saturating_add(units.len() as u16);
-            self.survival_send(&units, Some(front as usize), true)?;
+            self.survival_send(&units, Route::Front(front as usize), true)?;
         }
         let s = self.state.survival.as_mut().unwrap();
         s.waves.extend(mustered.iter().map(|m| m.unit));
@@ -335,46 +353,71 @@ impl crate::World {
         Ok(())
     }
 
-    /// Attack-moves `units` down front `front` (if any), then at the
-    /// defenders: as one block when `together`, else each its own way. Ships
-    /// can reach neither a commander ashore nor a front of another domain, so
-    /// they go down the nearest sea front when they have none, and on to the
-    /// water by the nearest defender they can reach.
+    /// Attack-moves `units` down `route`, then at the defenders: as one block
+    /// when `together`, else each its own way. Ships can reach neither a
+    /// commander ashore nor a front of another domain, so they go down the
+    /// nearest sea front when their route has no sea path, and on to the
+    /// water by the nearest defender they can reach. Aircraft from a Shaper
+    /// site fly straight.
     pub(super) fn survival_send(
         &mut self,
         units: &[UnitId],
-        front: Option<usize>,
+        route: Route,
         together: bool,
     ) -> Result<(), SimError> {
-        let naval = |w: &Self, u: &UnitId| {
-            w.state.units.row(*u).is_some_and(|r| {
+        let domain = |w: &Self, u: &UnitId| {
+            w.state.units.row(*u).map_or(Domain::Land, |r| {
                 w.blueprints
                     .unit(w.state.units.blueprint[r])
                     .motion
-                    .is_some_and(|m| domain_of(m.layer) == Domain::Naval)
+                    .map_or(Domain::Land, |m| domain_of(m.layer))
             })
         };
-        let (ships, rest): (Vec<UnitId>, Vec<UnitId>) =
-            units.iter().copied().partition(|u| naval(self, u));
+        let (ships, rest): (Vec<UnitId>, Vec<UnitId>) = units
+            .iter()
+            .copied()
+            .partition(|u| domain(self, u) == Domain::Naval);
         let s = self.state.survival.as_ref().unwrap();
         let side = s.config.engine_player;
-        let path_of = |f: usize| -> Vec<FxVec2> {
-            s.config
+        // The route's way points, without the facility end of a front.
+        let path: Vec<FxVec2> = match route {
+            Route::Front(f) => s
+                .config
                 .fronts
                 .get(f)
-                .map_or(Vec::new(), |f| f.path.iter().skip(1).copied().collect())
+                .map_or(Vec::new(), |f| f.path.iter().skip(1).copied().collect()),
+            Route::Site(i) => s
+                .config
+                .node_sites
+                .get(i)
+                .map_or(Vec::new(), |n| n.path.clone()),
+            Route::Free => Vec::new(),
         };
         let mut legs: Vec<(Vec<UnitId>, Vec<FxVec2>)> = Vec::new();
         if !rest.is_empty() {
-            let mut path = front.map_or(Vec::new(), path_of);
-            path.push(self.survival_target());
-            legs.push((rest, path));
+            let (air, land): (Vec<UnitId>, Vec<UnitId>) = match route {
+                Route::Site(_) => rest
+                    .iter()
+                    .copied()
+                    .partition(|u| domain(self, u) == Domain::Air),
+                _ => (Vec::new(), rest),
+            };
+            let target = self.survival_target();
+            if !land.is_empty() {
+                let mut p = path.clone();
+                p.push(target);
+                legs.push((land, p));
+            }
+            if !air.is_empty() {
+                legs.push((air, vec![target]));
+            }
         }
         if !ships.is_empty() {
             let from = self.survival_centre(&ships);
-            let mut path = match front {
-                Some(f) => path_of(f),
-                None => self.nearest_sea_front(from),
+            let mut p = if path.is_empty() {
+                self.nearest_sea_front(from)
+            } else {
+                path
             };
             let size = ships
                 .iter()
@@ -383,11 +426,11 @@ impl crate::World {
                 .map(|m| m.size_class)
                 .max()
                 .unwrap_or(0);
-            let end = path.last().copied().unwrap_or(from);
+            let end = p.last().copied().unwrap_or(from);
             if let Some(goal) = self.survival_sea_goal(end, size) {
-                path.push(goal);
+                p.push(goal);
             }
-            legs.push((ships, path));
+            legs.push((ships, p));
         }
         for (group, path) in legs {
             for chunk in group.chunks(crate::command::MAX_COMMAND_UNITS) {

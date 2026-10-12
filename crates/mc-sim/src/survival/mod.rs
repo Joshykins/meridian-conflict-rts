@@ -43,7 +43,7 @@ use crate::mirror::SimEvent;
 use crate::tables::NO_ORDER;
 use crate::{SimError, UnitId};
 use mc_core::{Angle, Fx, FxVec2, FxVec3, Rng, StateHasher};
-use mc_data::survival::Domain;
+use mc_data::survival::{Domain, SiteKind};
 use mc_data::{BlueprintId, MoveLayer};
 use plan::Formation;
 pub use rules::{HeavyWave, SurvivalRules};
@@ -78,13 +78,20 @@ pub struct Front {
     pub path: Vec<FxVec2>,
 }
 
-/// A cradle: where a row of Shapers is raised.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+/// A Shaper site: where the ray raises a Shaper, which grows there.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct NodeSite {
     pub at: FxVec2,
     pub domain: Domain,
-    /// The way its Shapers face, their row square to it; None: toward the defenders.
+    /// The way its base faces; None: toward the first point of `path`, or the
+    /// defenders when it has none.
     pub facing: Option<Angle>,
+    pub kind: SiteKind,
+    /// Radius of level, clear ground its base grows into.
+    pub room: Fx,
+    /// Route from the site toward the defenders; the last leg to them is the
+    /// sim's. Aircraft fly straight.
+    pub path: Vec<FxVec2>,
 }
 
 /// A print bay built into the facility.
@@ -527,7 +534,7 @@ impl crate::World {
         if idle.is_empty() {
             return Ok(());
         }
-        self.survival_send(&idle, None, false)
+        self.survival_send(&idle, print::Route::Free, false)
     }
 
     /// The last round has gone and none of it is left: the defenders win.
@@ -573,14 +580,16 @@ impl crate::World {
         }
         let heart = s.config.engine;
         let bays: Vec<FxVec2> = s.config.bays.iter().map(|b| b.at).collect();
-        let nodes: Vec<FxVec2> = s
+        // A standing Shaper shows its whole site, the ground its base grows into.
+        let nodes: Vec<(FxVec2, Fx)> = s
             .nodes
             .iter()
             .filter_map(|n| {
+                let room = s.config.node_sites.get(n.site as usize)?.room;
                 self.state
                     .units
                     .row(n.unit)
-                    .map(|r| self.state.units.pos[r])
+                    .map(|r| (self.state.units.pos[r], room.max(Fx::from_int(160))))
             })
             .collect();
         // The facility hides nothing: its heart and its print bays are always seen.
@@ -600,8 +609,8 @@ impl crate::World {
                 self.fog.reveal(at, Fx::from_int(60), Fx::ZERO, mask);
             }
         }
-        for at in nodes {
-            self.fog.reveal(at, Fx::from_int(160), Fx::ZERO, mask);
+        for (at, room) in nodes {
+            self.fog.reveal(at, room, Fx::ZERO, mask);
         }
     }
 }

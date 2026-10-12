@@ -11,7 +11,7 @@ use super::{Node, HZ, NODE_PRINT, RAISE_TICKS, SHAPERS_PER_SITE, SHAPER_SPACING}
 use crate::mirror::SimEvent;
 use crate::SimError;
 use mc_core::{Fx, FxVec2};
-use mc_data::survival::Domain;
+use mc_data::survival::{Domain, SiteKind};
 use mc_data::BlueprintId;
 
 impl crate::World {
@@ -28,7 +28,10 @@ impl crate::World {
             .iter()
             .enumerate()
             .filter(|(i, site)| {
-                s.nodes.iter().filter(|n| n.site as usize == *i).count() < SHAPERS_PER_SITE
+                // Auxiliary sites (artillery, nukes) wait for their own Shapers,
+                // which are not built yet: the ray raises printers only.
+                site.kind == SiteKind::Printer
+                    && s.nodes.iter().filter(|n| n.site as usize == *i).count() < SHAPERS_PER_SITE
                     && match site.domain {
                         Domain::Naval => rules.has(Domain::Naval) || rules.has(Domain::Air),
                         _ => rules.has(Domain::Land) || rules.has(Domain::Air),
@@ -42,7 +45,7 @@ impl crate::World {
         let tier = rules.tier_at(s.round);
         let mut rng = s.rng;
         let site_i = free[rng.below(free.len() as u32) as usize];
-        let site = s.config.node_sites[site_i];
+        let site = s.config.node_sites[site_i].clone();
         // A land site raises land Shapers, a sea site naval ones; either may raise air.
         let mut kinds = Vec::new();
         if rules.has(site.domain) && site.domain != Domain::Air {
@@ -68,9 +71,14 @@ impl crate::World {
         let nbp = self.blueprints.unit(node_bp);
         // The first stands on the site, the next ones either side of it, across the
         // way the site faces: a row of Shapers printing side by side.
-        let heading = site
-            .facing
-            .unwrap_or_else(|| (self.survival_target() - site.at).angle());
+        let heading = site.facing.unwrap_or_else(|| {
+            let toward = site
+                .path
+                .first()
+                .copied()
+                .unwrap_or_else(|| self.survival_target());
+            (toward - site.at).angle()
+        });
         let ahead = FxVec2::from_angle(heading);
         let across = FxVec2::new(-ahead.y, ahead.x);
         let taken: Vec<FxVec2> = self
