@@ -108,7 +108,6 @@ fn sea_waves(xy: vec2<f32>, time: f32, pixel: f32, across: f32, long: f32, wind:
         // in diamonds: the short ones also come and go in patches a few waves across.
         let near = clamp(0.5 + dot(wander, mix_b.wzyx) * 2.4, 0.0, 1.0);
         let local = mix(1.0, mix(0.3, 1.45, near), smoothstep(30.0, 12.0, lambda));
-        let strength = mix(0.2, 1.55, lot * lot * (3.0 - 2.0 * lot)) * local;
         // Cycles of wander each field may add: bounded so its gradient never
         // stretches the train's wavelength by more than about a third.
         let turn = vec2<f32>(cos(fi * 2.13 + 0.4), sin(fi * 2.13 + 0.4));
@@ -117,11 +116,33 @@ fn sea_waves(xy: vec2<f32>, time: f32, pixel: f32, across: f32, long: f32, wind:
         let bend = dot(fields, mix_b) * 2.2 + wobble;
         let a = heading + (fract(fi * 0.618034 + 0.13) * 2.0 - 1.0) * spread;
         let dir = vec2<f32>(cos(a), sin(a));
+        // Short waves run in groups a few waves long and a couple of crests wide,
+        // drifting at half the waves' speed, each group in its own phase. Endless
+        // plane waves under ~10 m crossed in one regular hatch all over a close view,
+        // dozens of waves across; groups that rise, fall through nothing and come
+        // back half a wave on (the envelope changes sign) leave no carrier to hatch.
+        var group = 1.0;
+        let grouped = smoothstep(30.0, 10.0, lambda);
+        if grouped > 0.0 {
+            let travel = 0.5 * sqrt(9.81 / k) * time;
+            let at = vec2<f32>((dot(dir, xy) - travel) * 0.5, dot(vec2<f32>(-dir.y, dir.x), xy)) + vec2<f32>(fi * 37.1, fi * 11.7);
+            // Gradient noise's spread is about 0.076: this gain keeps the slope variance.
+            let envelope = clamp((grad_noise2(at, lambda * 2.0) - 0.5) * 13.0, -2.5, 2.5);
+            group = mix(1.0, envelope, grouped);
+        }
+        let flipped = select(0.0, 0.5, group < 0.0);
+        group = abs(group);
+        // The broad fields set a long train's strength over hundreds of metres; a
+        // short one's would be the same all over a close view, so the two or three
+        // they raised (up to eight times the rest) ruled the screen. Under 8 m the
+        // trains stand about level there and come and go in their groups instead.
+        let broad = smoothstep(4.0, 16.0, lambda);
+        let strength = mix(mix(0.8, 1.15, lot), mix(0.2, 1.55, lot * lot * (3.0 - 2.0 * lot)), broad) * local * group;
         // In cycles, folded before the multiply so kilometres of map and hours of
         // play keep the phase precise.
         let along = dot(dir, xy) / lambda;
         let cycles = sqrt(9.81 * k) / 6.283185 * time;
-        let phase = 6.283185 * (fract(along) - fract(cycles) + fract(fi * 0.3713)) + bend * 6.283185;
+        let phase = 6.283185 * (fract(along) - fract(cycles) + fract(fi * 0.3713) + flipped) + bend * 6.283185;
         let s = sin(phase);
         // exp(sin - 1): sharp crests, broad troughs, as wind waves stand.
         let e = exp(s - 1.0);
