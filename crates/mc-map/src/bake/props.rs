@@ -248,13 +248,10 @@ impl Terrain {
         let mut props = Vec::new();
         // The alpine map is rockier, and its woods climb steeper ground.
         let alpine = self.is_alpine() || self.layout == Layout::Threshold;
+        // Antarctica's rock is its ground's, under the snow: no boulders.
         let arctic = self.layout == Layout::Antarctic;
 
-        let (rock_slope, rock_roll) = if alpine || arctic {
-            (0.18, 0.8)
-        } else {
-            (0.3, 0.93)
-        };
+        let (rock_slope, rock_roll) = if alpine { (0.18, 0.8) } else { (0.3, 0.93) };
         // (So do Tripoint's jungle's, up its mountains.)
         let forest_slope = if alpine || matches!(self.layout, Layout::Tripoint | Layout::Spires) {
             0.95
@@ -285,7 +282,7 @@ impl Terrain {
                 } else if (rock_slope..1.5).contains(&slope)
                     && roll > rock_roll
                     && !(self.is_alpine() && self.alpine_ice(x, y) > 0.05)
-                    && !(arctic && self.an_ice_cover(x, y).0 > 0.05)
+                    && !arctic
                     && self.machine_clear(x, y)
                 {
                     let desert = self.layout == Layout::Canyon

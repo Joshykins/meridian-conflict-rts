@@ -7,20 +7,20 @@
 //!
 //! Behind each coast the ice sheet stands over the lowland in an ice wall
 //! forty or fifty metres high, broken by one ramp behind each start; on top it
-//! rises gently inland, nunataks breaking through it. In the middle of each
+//! rises in long swells inland, nunataks breaking through it, and along the
+//! map's edges it runs up into mountains. In the middle of each
 //! coast it bulges forward into two massifs of mountains, a snowy valley
 //! between them running down to the shore. The allies meet along the coast
 //! (a strip of shore runs under the massifs' seaward ends and across the
 //! valley's foot) or over the sheet, behind the mountains.
 //!
-//! In the strait lie two volcanic islands, each nearer one coast: a ring of
-//! black ground round a flooded caldera whose one gap lets ships in, a cone
-//! standing on the ring. Tabular icebergs lie aground here and there.
+//! In the strait lie two volcanic islands, each nearer one coast: long and
+//! lobed, beaches of dark sand and flats either side of a broken ridge, a
+//! volcano at one end. Tabular icebergs lie aground here and there.
 //!
 //! Thick sea ice, flat and a metre over the water, reaches out from each
 //! coast, a kilometre or more in places and held back in front of the starts
-//! to keep their harbours open; each island has a fringe of its own, its
-//! caldera and gap kept open. Units walk and build on it. Open water always
+//! to keep their harbours open; each island has a fringe of its own. Units walk and build on it. Open water always
 //! parts the coast's ice from the islands' and runs the length of the strait
 //! between the two coasts' ice, so the teams never meet on foot.
 //!
@@ -50,34 +50,34 @@ const MID: f64 = SIZE / 2.0;
 
 /// The west team's starts, south first. Each is followed in the start list
 /// by its turned image on the east coast, so the teams alternate.
-const STARTS: [(f64, f64); 2] = [(2_100.0, 2_700.0), (2_200.0, 9_500.0)];
+const STARTS: [(f64, f64); 2] = [(1_850.0, 2_700.0), (1_940.0, 9_500.0)];
 
 /// The west coast's land, closed off the map: from beyond the south edge up
 /// the coast to beyond the north edge.
 const WEST: &[(f64, f64)] = &[
     (-900.0, -900.0),
-    (3_900.0, -900.0),
-    (3_850.0, 500.0),
-    (3_600.0, 1_300.0),
-    (3_250.0, 2_000.0),
-    (3_300.0, 2_700.0),
-    (3_600.0, 3_300.0),
-    (4_000.0, 3_900.0),
-    (4_250.0, 4_600.0),
-    (4_150.0, 5_200.0),
-    (4_300.0, 5_700.0),
-    (4_380.0, 6_150.0),
-    (4_300.0, 6_600.0),
-    (4_200.0, 7_100.0),
-    (4_350.0, 7_700.0),
-    (4_050.0, 8_300.0),
-    (3_500.0, 8_800.0),
-    (3_350.0, 9_500.0),
-    (3_600.0, 10_200.0),
-    (3_950.0, 10_800.0),
-    (3_750.0, 11_500.0),
-    (3_950.0, 12_300.0),
-    (4_100.0, 13_200.0),
+    (3_430.0, -900.0),
+    (3_390.0, 500.0),
+    (3_170.0, 1_300.0),
+    (2_860.0, 2_000.0),
+    (2_900.0, 2_700.0),
+    (3_170.0, 3_300.0),
+    (3_520.0, 3_900.0),
+    (3_740.0, 4_600.0),
+    (3_650.0, 5_200.0),
+    (3_780.0, 5_700.0),
+    (3_850.0, 6_150.0),
+    (3_780.0, 6_600.0),
+    (3_700.0, 7_100.0),
+    (3_830.0, 7_700.0),
+    (3_560.0, 8_300.0),
+    (3_080.0, 8_800.0),
+    (2_950.0, 9_500.0),
+    (3_170.0, 10_200.0),
+    (3_480.0, 10_800.0),
+    (3_300.0, 11_500.0),
+    (3_480.0, 12_300.0),
+    (3_610.0, 13_200.0),
     (-900.0, 13_200.0),
 ];
 
@@ -87,31 +87,31 @@ const WEST: &[(f64, f64)] = &[
 /// in ice cliffs.
 const ICE: &[(f64, f64)] = &[
     (-900.0, -900.0),
-    (4_500.0, -900.0),
-    (4_350.0, 150.0),
-    (3_500.0, 550.0),
-    (2_500.0, 700.0),
-    (1_500.0, 950.0),
-    (1_000.0, 1_400.0),
-    (850.0, 1_800.0),
-    (750.0, 2_900.0),
-    (950.0, 3_800.0),
-    (1_600.0, 4_500.0),
-    (2_300.0, 5_000.0),
-    (2_500.0, 5_600.0),
-    (2_550.0, 6_150.0),
-    (2_500.0, 6_700.0),
-    (2_300.0, 7_300.0),
-    (1_600.0, 7_800.0),
-    (950.0, 8_500.0),
-    (750.0, 9_500.0),
-    (850.0, 10_500.0),
-    (1_100.0, 11_150.0),
-    (1_800.0, 11_500.0),
-    (2_700.0, 11_550.0),
-    (3_500.0, 11_750.0),
-    (4_250.0, 12_150.0),
-    (4_450.0, 13_200.0),
+    (3_960.0, -900.0),
+    (3_830.0, 150.0),
+    (3_080.0, 550.0),
+    (2_200.0, 700.0),
+    (1_320.0, 950.0),
+    (880.0, 1_400.0),
+    (750.0, 1_800.0),
+    (660.0, 2_900.0),
+    (840.0, 3_800.0),
+    (1_410.0, 4_500.0),
+    (2_020.0, 5_000.0),
+    (2_200.0, 5_600.0),
+    (2_240.0, 6_150.0),
+    (2_200.0, 6_700.0),
+    (2_020.0, 7_300.0),
+    (1_410.0, 7_800.0),
+    (840.0, 8_500.0),
+    (660.0, 9_500.0),
+    (750.0, 10_500.0),
+    (970.0, 11_150.0),
+    (1_580.0, 11_500.0),
+    (2_380.0, 11_550.0),
+    (3_080.0, 11_750.0),
+    (3_740.0, 12_150.0),
+    (3_920.0, 13_200.0),
     (-900.0, 13_200.0),
 ];
 /// The sheet's top at its edge over the lowland, and how much it rises per
@@ -119,7 +119,7 @@ const ICE: &[(f64, f64)] = &[
 const SHEET_EDGE_H: f64 = 72.0;
 const SHEET_RISE: f64 = 0.028;
 /// Half the run of the ice wall (m), and of a ramp up it.
-const WALL: f64 = 9.0;
+const WALL: f64 = 15.0;
 const RAMP_RUN: f64 = 300.0;
 
 /// A way cut across a slope: a line across it (from `a`, the foot, to `b`) and
@@ -133,12 +133,12 @@ struct Cut {
 /// The ramps up the ice wall, one behind each start.
 const RAMPS: &[Cut] = &[
     Cut {
-        a: (1_250.0, 3_350.0),
+        a: (1_100.0, 3_350.0),
         b: (450.0, 3_250.0),
         half: 110.0,
     },
     Cut {
-        a: (1_300.0, 10_050.0),
+        a: (1_140.0, 10_050.0),
         b: (500.0, 10_150.0),
         half: 110.0,
     },
@@ -152,55 +152,68 @@ struct Ridge {
     tall: f64,
 }
 
-/// The massifs either side of the valley, from the sheet toward the coast;
-/// a strip of shore runs under their seaward ends.
+/// The massifs either side of the valley, from the sheet toward the coast (a
+/// strip of shore runs under their seaward ends), and the ranges along the
+/// map's edges.
 const RIDGES: &[Ridge] = &[
     Ridge {
         line: &[
-            (2_250.0, 4_700.0),
-            (2_850.0, 5_000.0),
-            (3_250.0, 5_250.0),
-            (3_450.0, 5_380.0),
+            (1_980.0, 4_700.0),
+            (2_510.0, 5_000.0),
+            (2_860.0, 5_250.0),
+            (3_040.0, 5_380.0),
         ],
         half: 330.0,
         tall: 360.0,
     },
     Ridge {
         line: &[
-            (2_250.0, 7_600.0),
-            (2_850.0, 7_300.0),
-            (3_250.0, 7_050.0),
-            (3_450.0, 6_920.0),
+            (1_980.0, 7_600.0),
+            (2_510.0, 7_300.0),
+            (2_860.0, 7_050.0),
+            (3_040.0, 6_920.0),
         ],
         half: 320.0,
         tall: 420.0,
+    },
+    // Along the map's edge behind the sheet, and round its corner where the
+    // sheet runs out over the sea: the edges are mountains, not empty ice.
+    Ridge {
+        line: &[
+            (-140.0, -700.0),
+            (-60.0, 2_400.0),
+            (-160.0, 6_100.0),
+            (-70.0, 9_800.0),
+            (-150.0, 13_000.0),
+        ],
+        half: 280.0,
+        tall: 260.0,
+    },
+    Ridge {
+        line: &[(-400.0, -140.0), (1_400.0, -60.0), (3_000.0, -150.0)],
+        half: 260.0,
+        tall: 220.0,
+    },
+    Ridge {
+        line: &[(-400.0, 12_430.0), (1_300.0, 12_360.0), (2_900.0, 12_440.0)],
+        half: 260.0,
+        tall: 200.0,
     },
 ];
 
 /// Nunataks through the sheet and tors on the lowland: centre, radius and
 /// height over the ground round them, metres.
 const NUNATAKS: &[(f64, f64, f64, f64)] = &[
-    (450.0, 5_300.0, 230.0, 170.0),
-    (850.0, 7_250.0, 190.0, 130.0),
-    (350.0, 1_500.0, 170.0, 110.0),
-    (400.0, 11_000.0, 210.0, 150.0),
-    (2_900.0, 250.0, 220.0, 140.0),
-    (3_100.0, 12_050.0, 200.0, 130.0),
+    (400.0, 5_300.0, 230.0, 170.0),
+    (750.0, 7_250.0, 190.0, 130.0),
+    (310.0, 1_500.0, 170.0, 110.0),
+    (350.0, 11_000.0, 210.0, 150.0),
 ];
 const TORS: &[(f64, f64, f64, f64)] = &[
-    (1_350.0, 3_500.0, 150.0, 60.0),
-    (3_550.0, 1_250.0, 130.0, 50.0),
-    (1_500.0, 8_700.0, 150.0, 60.0),
-    (1_450.0, 10_800.0, 170.0, 70.0),
-];
-
-/// Frozen lakes in the lowland: centre, radius and the ice's level, metres.
-/// Flat, walkable, buildable on.
-const LAKES: &[(f64, f64, f64, f64)] = &[
-    (1_250.0, 2_350.0, 160.0, 22.0),
-    (2_650.0, 4_050.0, 140.0, 24.0),
-    (2_700.0, 10_250.0, 150.0, 22.0),
-    (2_750.0, 7_950.0, 130.0, 26.0),
+    (1_190.0, 3_500.0, 150.0, 60.0),
+    (3_120.0, 1_250.0, 130.0, 50.0),
+    (1_320.0, 8_700.0, 150.0, 60.0),
+    (1_280.0, 10_800.0, 170.0, 70.0),
 ];
 
 /// Where the ground is designed to be the same under the turn however the
@@ -209,31 +222,58 @@ const LAKES: &[(f64, f64, f64, f64)] = &[
 /// half width, metres.
 const TAME: &[Cut] = &[
     Cut {
-        a: (3_700.0, 4_200.0),
-        b: (4_300.0, 6_150.0),
+        a: (3_260.0, 4_200.0),
+        b: (3_780.0, 6_150.0),
         half: 550.0,
     },
     Cut {
-        a: (4_300.0, 6_150.0),
-        b: (3_700.0, 8_000.0),
+        a: (3_780.0, 6_150.0),
+        b: (3_260.0, 8_000.0),
         half: 550.0,
     },
 ];
 
-/// The first island: its middle, the radius of its coast, the caldera's
-/// shore inside and the ring's crest between them, metres.
-const ISLAND: (f64, f64) = (5_750.0, 8_800.0);
-const ISLAND_R: f64 = 880.0;
-const CALDERA_R: f64 = 360.0;
-const CREST_R: f64 = 470.0;
-/// The caldera's gap to the sea: its bearing from the middle (radians), its
-/// half width and its depth, metres.
-const GAP_BEARING: f64 = -50.0 * PI / 180.0;
-const GAP_HALF: f64 = 110.0;
-const GAP_DEEP: f64 = 14.0;
-/// The cone on the ring: bearing from the island's middle, distance out,
-/// radius and height, metres.
-const CONE: (f64, f64, f64, f64) = (115.0 * PI / 180.0, 620.0, 300.0, 260.0);
+/// The first island: its middle, and how far its long axis is turned from
+/// east (radians). Its own frame (`island_local`) runs along that axis.
+const ISLAND: (f64, f64) = (5_850.0, 8_700.0);
+const ISLAND_TURN: f64 = 1.2;
+/// The island's coast in its own frame, metres: long and lobed, a bay on
+/// each side.
+const ISLAND_SHAPE: &[(f64, f64)] = &[
+    (-1_420.0, 70.0),
+    (-1_280.0, 400.0),
+    (-950.0, 580.0),
+    (-610.0, 530.0),
+    (-400.0, 320.0),
+    (-160.0, 450.0),
+    (200.0, 700.0),
+    (610.0, 650.0),
+    (950.0, 510.0),
+    (1_280.0, 270.0),
+    (1_460.0, -30.0),
+    (1_320.0, -350.0),
+    (1_010.0, -510.0),
+    (680.0, -450.0),
+    (430.0, -630.0),
+    (0.0, -760.0),
+    (-400.0, -650.0),
+    (-810.0, -570.0),
+    (-1_150.0, -350.0),
+    (-1_350.0, -160.0),
+];
+/// How far the island reaches from its middle at most, metres.
+const ISLAND_REACH: f64 = 1_500.0;
+/// The ridge down its middle in its own frame, its half width and height,
+/// and the volcano at its east end: centre, radius and height, metres.
+const SPINE: &[(f64, f64)] = &[
+    (-950.0, -40.0),
+    (-420.0, 150.0),
+    (120.0, 60.0),
+    (640.0, -80.0),
+];
+const SPINE_HALF: f64 = 170.0;
+const SPINE_TALL: f64 = 115.0;
+const CONE: (f64, f64, f64, f64) = (900.0, -60.0, 320.0, 250.0);
 
 /// Tabular icebergs aground: centre, radius and top over the water, metres.
 const BERGS: &[(f64, f64, f64, f64)] = &[
@@ -255,7 +295,7 @@ const SEA_ICE_H: f64 = 1.3;
 /// The sea bed under the edges of the sea ice and round the bergs' feet,
 /// metres: deep enough for ships (6 m).
 const UNDER_EDGE: f64 = -9.0;
-const SEA_ICE_REACH: (f64, f64) = (250.0, 1_150.0);
+const SEA_ICE_REACH: (f64, f64) = (200.0, 780.0);
 const HARBOUR: (f64, f64) = (180.0, 1_900.0);
 const ISLAND_ICE: f64 = 210.0;
 const LEAD: f64 = 380.0;
@@ -265,31 +305,30 @@ const ISLAND_WATER: f64 = 380.0;
 /// Ore away from the starts: centre and radius, metres.
 const ORE: &[(f64, f64, f64)] = &[
     // The south start's lowland, and the shore under the south massif.
-    (3_050.0, 1_800.0, 65.0),
-    (1_500.0, 1_900.0, 65.0),
-    (2_900.0, 3_700.0, 70.0),
-    (2_200.0, 4_150.0, 70.0),
-    (3_800.0, 4_800.0, 60.0),
+    (2_680.0, 1_800.0, 65.0),
+    (1_320.0, 1_900.0, 65.0),
+    (2_550.0, 3_700.0, 70.0),
+    (1_940.0, 4_150.0, 70.0),
+    (3_340.0, 4_800.0, 60.0),
     // The north start's.
-    (3_050.0, 10_600.0, 65.0),
-    (1_500.0, 10_300.0, 65.0),
-    (3_150.0, 8_800.0, 70.0),
-    (2_150.0, 8_250.0, 70.0),
-    (3_700.0, 7_450.0, 60.0),
+    (2_680.0, 10_600.0, 65.0),
+    (1_320.0, 10_300.0, 65.0),
+    (2_770.0, 8_800.0, 70.0),
+    (1_890.0, 8_250.0, 70.0),
+    (3_260.0, 7_450.0, 60.0),
     // Moraine by the nunataks on the sheet.
-    (850.0, 5_650.0, 60.0),
-    (1_250.0, 6_900.0, 60.0),
+    (750.0, 5_650.0, 60.0),
+    (1_100.0, 6_900.0, 60.0),
     // Down the valley between the massifs.
-    (3_500.0, 6_150.0, 70.0),
+    (3_080.0, 6_150.0, 70.0),
 ];
-/// The island's fields: bearing from its middle (radians) and radius; all
-/// at [`ISLAND_ORE_OUT`] metres out, on the flats outside the ring's crest.
-const ISLAND_ORE: &[(f64, f64)] = &[
-    (20.0 * PI / 180.0, 70.0),
-    (180.0 * PI / 180.0, 70.0),
-    (240.0 * PI / 180.0, 65.0),
+/// The island's fields in its own frame: centre and radius, metres, on the
+/// flats either side of the ridge.
+const ISLAND_ORE: &[(f64, f64, f64)] = &[
+    (-900.0, -360.0, 65.0),
+    (-150.0, 450.0, 70.0),
+    (380.0, -420.0, 65.0),
 ];
-const ISLAND_ORE_OUT: f64 = 640.0;
 
 /// Half width (m) of the band over which noise hands over between images.
 const BLEND: f64 = 500.0;
@@ -312,6 +351,8 @@ struct Outlines {
     west: Vec<(f64, f64)>,
     ice: Vec<(f64, f64)>,
     ridges: Vec<Vec<(f64, f64)>>,
+    island: Vec<(f64, f64)>,
+    spine: Vec<(f64, f64)>,
 }
 
 fn outlines() -> &'static Outlines {
@@ -320,17 +361,9 @@ fn outlines() -> &'static Outlines {
         west: smooth_closed(WEST, 4),
         ice: smooth_closed(ICE, 4),
         ridges: RIDGES.iter().map(|r| smooth_open(r.line, 4)).collect(),
+        island: smooth_closed(ISLAND_SHAPE, 4),
+        spine: smooth_open(SPINE, 4),
     })
-}
-
-/// The bearing of the caldera's gap of the island at `c`: the first
-/// island's, or its turned twin's.
-fn gap_bearing(c: (f64, f64)) -> f64 {
-    if c == ISLAND {
-        GAP_BEARING
-    } else {
-        GAP_BEARING + PI
-    }
 }
 
 /// A point at `bearing` and `out` metres from `c`.
@@ -338,11 +371,26 @@ fn polar(c: (f64, f64), bearing: f64, out: f64) -> (f64, f64) {
     (c.0 + out * bearing.cos(), c.1 + out * bearing.sin())
 }
 
+/// A map point in the first island's own frame.
+fn island_local(q: (f64, f64)) -> (f64, f64) {
+    let (s, c) = ISLAND_TURN.sin_cos();
+    let (dx, dy) = (q.0 - ISLAND.0, q.1 - ISLAND.1);
+    (dx * c + dy * s, -dx * s + dy * c)
+}
+
+/// A point of the first island's own frame on the map.
+fn island_map(l: (f64, f64)) -> (f64, f64) {
+    let (s, c) = ISLAND_TURN.sin_cos();
+    (ISLAND.0 + l.0 * c - l.1 * s, ISLAND.1 + l.0 * s + l.1 * c)
+}
+
 /// The ice sheet at a point: its top, how far it covers the point (0..1)
 /// and how far the point is inside it (m, negative outside).
 struct IceAt {
     sheet_top: f64,
     sheet: f64,
+    /// How far the sheet's ice covers the point, its wall down to the foot.
+    cover: f64,
     within: f64,
 }
 
@@ -380,15 +428,15 @@ impl Terrain {
     }
 
     /// 1 where the ground must be the same under the turn, 0 where each side
-    /// may have its own: round the starts and the ore, the ramps, the lakes,
-    /// the shore strips across the valley's foot.
+    /// may have its own: round the starts and the ore, the ramps, the shore
+    /// strips across the valley's foot.
     pub(super) fn an_tame(&self, x: f64, y: f64) -> f64 {
         let near = |q: (f64, f64), at: (f64, f64), reach: f64| {
             smoothstep(reach + 400.0, reach, dist(q, at))
         };
         let island_ore = ISLAND_ORE
             .iter()
-            .map(|&(bearing, r)| (polar(ISLAND, bearing, ISLAND_ORE_OUT), r));
+            .map(|&(lx, ly, r)| (island_map((lx, ly)), r));
         self.an_max(x, y, |q| {
             let cuts = RAMPS
                 .iter()
@@ -399,11 +447,6 @@ impl Terrain {
                 .iter()
                 .map(|&s| near(q, s, 1_500.0))
                 .chain(ORE.iter().map(|&(ox, oy, r)| near(q, (ox, oy), r + 250.0)))
-                .chain(
-                    LAKES
-                        .iter()
-                        .map(|&(lx, ly, r, _)| near(q, (lx, ly), r + 200.0)),
-                )
                 .chain(island_ore.clone().map(|(c, r)| near(q, c, r + 250.0)))
                 .fold(cuts, f64::max)
         })
@@ -448,11 +491,6 @@ impl Terrain {
                     .fold(starts, f64::min);
                 ORE.iter()
                     .map(|&(ox, oy, r)| near(q, (ox, oy), r + 40.0))
-                    .chain(
-                        LAKES
-                            .iter()
-                            .map(|&(lx, ly, r, _)| near(q, (lx, ly), r + 60.0)),
-                    )
                     .fold(ramps, f64::min)
             })
             .fold(1.0, f64::min)
@@ -463,8 +501,8 @@ impl Terrain {
         let o = outlines();
         let tame = self.an_tame(x, y);
         let n = |f: &dyn Fn(f64, f64) -> f64| self.an_wild(x, y, tame, f);
-        let fray = n(&|x, y| self.mtn_mask.fbm(x / 600.0 + 5.0, y / 600.0, 3, 0.5)) * 130.0
-            + n(&|x, y| self.detail.fbm(x / 90.0 - 2.0, y / 90.0 + 6.0, 2, 0.5)) * 18.0
+        // Only broad wander: fine noise on a wall this steep stands up as teeth.
+        let fray = n(&|x, y| self.mtn_mask.fbm(x / 600.0 + 5.0, y / 600.0, 2, 0.5)) * 130.0
             + (1.0 - tame) * self.mtn_mask.fbm(x / 2_200.0 + 60.0, y / 2_200.0, 3, 0.5) * 450.0;
         let swell = n(&|x, y| self.tilt.fbm(x / 1_300.0 - 4.0, y / 1_300.0 + 9.0, 3, 0.5));
         let ramp = self.an_max(x, y, |q| {
@@ -476,11 +514,16 @@ impl Terrain {
         let sheet_in = self.an_max(x, y, |q| inside(q, &o.ice)) + fray * (1.0 - ramp);
         let run = WALL + (RAMP_RUN - WALL) * ramp;
         let sheet = smoothstep(-run, run, sheet_in);
-        let sheet_top = SHEET_EDGE_H + SHEET_RISE * sheet_in.clamp(0.0, 4_000.0) + 7.0 * swell;
+        // The top rounds over into the wall instead of ending in a lip, and rolls
+        // in long, low swells inland.
+        let shoulder = 8.0 * (1.0 - smoothstep(0.0, 90.0, sheet_in));
+        let sheet_top =
+            SHEET_EDGE_H + SHEET_RISE * sheet_in.clamp(0.0, 4_000.0) + 16.0 * swell - shoulder;
 
         IceAt {
             sheet_top,
             sheet,
+            cover: smoothstep(-(run + 25.0), run, sheet_in),
             within: sheet_in,
         }
     }
@@ -508,17 +551,6 @@ impl Terrain {
         let low = land - 10.0;
         land = 10.0 + 0.5 * (low + (low * low + 16.0).sqrt());
         land += 0.8 * n(&|x, y| self.detail.fbm(x / 60.0 + 9.0, y / 60.0 - 4.0, 2, 0.5));
-        // The frozen lakes: a shallow bowl round each, its ice dead level.
-        let shore = n(&|x, y| self.lake_shore.fbm(x / 120.0, y / 120.0, 2, 0.5)) * 55.0;
-        for q in [(x, y), turn((x, y))] {
-            for &(lx, ly, r, level) in LAKES {
-                let d = dist(q, (lx, ly)) + shore + 0.6 * ragged_of(r, q, (lx, ly));
-                let k = smoothstep(r + 170.0, r, d);
-                if k > 0.0 {
-                    land += (level + 0.25 * (d - r).clamp(0.0, 40.0) - land) * k;
-                }
-            }
-        }
         let crag = n(&|x, y| self.crag.ridged(x / 650.0, y / 650.0, 4, 0.5) - 0.55) + 0.55;
         let rough = n(&|x, y| self.crag.ridged(x / 140.0 - 3.0, y / 140.0 + 8.0, 3, 0.5) - 0.55);
         land += self.an_max(x, y, |q| crags(TORS, q, crag, rough, 1.0));
@@ -549,7 +581,7 @@ impl Terrain {
     /// Metres inside the sea ice (negative outside): out from each coast to a
     /// reach that wanders along it, held back in front of the starts and away
     /// from the islands' own fringes, never across the lead down the middle;
-    /// a fringe round each island, its caldera and gap left open; open pools
+    /// a fringe round each island; open pools
     /// here and there. `s` is metres in from the coast.
     fn an_sea_ice(&self, x: f64, y: f64, s: f64) -> f64 {
         let tame = self.an_tame(x, y);
@@ -560,7 +592,6 @@ impl Terrain {
         let pools = n(&|x, y| self.lake.fbm(x / 380.0 - 70.0, y / 380.0 + 20.0, 3, 0.5));
         // In the frame of the side it lies on.
         let q = if x < MID { (x, y) } else { turn((x, y)) };
-        let islands = [ISLAND, turn(ISLAND)];
         let harbour = STARTS
             .iter()
             .map(|&a| smoothstep(HARBOUR.1, 0.6 * HARBOUR.1, dist(q, a)))
@@ -575,26 +606,10 @@ impl Terrain {
         // bight and stops short beyond a cape): both teams get the same ice.
         let designed = self.an_max(x, y, |q| inside(q, &outlines().west))
             + self.an_even(x, y, |x, y| self.an_coast_wobble(x, y));
-        let mut coast = (reach + designed + edge).min(30.0 - s).min(lead);
-        for c in islands {
-            let lobes = 0.25 * ragged_of(ISLAND_R, q, c);
-            coast = coast.min(dist(q, c) - (ISLAND_R + ISLAND_ICE + ISLAND_WATER) + edge + lobes);
-        }
-        let fringe = islands
-            .into_iter()
-            .map(|c| {
-                let d = dist(q, c);
-                let gap = segment(
-                    q,
-                    polar(c, gap_bearing(c), 0.6 * CALDERA_R),
-                    polar(c, gap_bearing(c), ISLAND_R + 500.0),
-                )
-                .0;
-                (ISLAND_R + ISLAND_ICE + 1.5 * edge + 0.5 * ragged_of(ISLAND_R, q, c) - d)
-                    .min(d - (CREST_R + 60.0))
-                    .min(gap - (GAP_HALF + 70.0))
-            })
-            .fold(f64::MIN, f64::max);
+        let coast = (reach + designed + edge).min(30.0 - s).min(lead);
+        let island = self.an_island_in(x, y);
+        let coast = coast.min(-island - (ISLAND_ICE + ISLAND_WATER) + edge);
+        let fringe = ISLAND_ICE + 1.5 * edge + island;
         coast.max(fringe).min(380.0 * (0.42 - pools))
     }
 
@@ -665,41 +680,46 @@ impl Terrain {
         })
     }
 
-    /// The volcanic islands: a ring round a flooded caldera, its gap to the
-    /// sea, the cone on the ring. `f64::MIN` away from them.
+    /// Metres inside either island's coast as designed (negative outside).
+    fn an_island_in(&self, x: f64, y: f64) -> f64 {
+        self.an_max(x, y, |q| {
+            let l = island_local(q);
+            if l.0.hypot(l.1) > ISLAND_REACH + 1_500.0 {
+                return -1_500.0;
+            }
+            inside(l, &outlines().island)
+        })
+    }
+
+    /// The volcanic islands: beaches of dark sand, flats either side of a
+    /// broken ridge, a volcano at one end. `f64::MIN` away from them.
     fn an_island(&self, x: f64, y: f64, crag: f64, rough: f64) -> f64 {
-        if dist((x, y), ISLAND).min(dist(turn((x, y)), ISLAND)) > ISLAND_R + 1_400.0 {
+        if self.an_island_in(x, y) < -1_400.0 {
             return f64::MIN;
         }
+        let o = outlines();
         let tame = self.an_tame(x, y);
         let n = |f: &dyn Fn(f64, f64) -> f64| self.an_wild(x, y, tame, f);
-        let fray = n(&|x, y| self.coast.fbm(x / 420.0 - 9.0, y / 420.0 + 2.0, 3, 0.5)) * 150.0
+        let fray = n(&|x, y| self.coast.fbm(x / 420.0 - 9.0, y / 420.0 + 2.0, 3, 0.5)) * 120.0
             + n(&|x, y| self.coast_warp.fbm(x / 110.0, y / 110.0, 2, 0.5)) * 30.0;
-        let inner = n(&|x, y| self.lake_shore.fbm(x / 200.0 + 4.0, y / 200.0, 2, 0.5)) * 50.0;
         let grain = n(&|x, y| self.detail.fbm(x / 120.0 - 7.0, y / 120.0 + 1.0, 2, 0.5));
-        let gap_a = polar(ISLAND, GAP_BEARING, 0.6 * CALDERA_R);
-        let gap_b = polar(ISLAND, GAP_BEARING, ISLAND_R + 500.0);
-        let cone = polar(ISLAND, CONE.0, CONE.1);
+        let peaks =
+            n(&|x, y| self.mtn.ridged(x / 260.0 + 2.0, y / 260.0 - 6.0, 3, 0.5) - 0.55) + 0.55;
         self.an_max(x, y, |q| {
-            let r = dist(q, ISLAND);
-            let out = r - fray;
-            // Sea floor up to the shore, beach, flats, crest, the caldera's
-            // inner wall down into its water.
-            let sea = -DEEP * smoothstep(ISLAND_R, ISLAND_R + 900.0, out).powf(0.7) - 2.0;
-            let flats = 8.0 + 12.0 * smoothstep(ISLAND_R - 120.0, CREST_R + 90.0, out);
-            let shore = smoothstep(ISLAND_R + 20.0, ISLAND_R - 120.0, out);
+            let l = island_local(q);
+            let si = inside(l, &o.island) + fray;
+            // Sea floor up to the shore, beach, flats rising inland.
+            let sea = -DEEP * smoothstep(0.0, 900.0, -si).powf(0.7) - 2.0;
+            let shore = smoothstep(-20.0, 120.0, si);
+            let flats = 8.0 + 12.0 * smoothstep(120.0, 450.0, si);
             let mut h = sea + (flats + 2.0 * grain - sea) * shore;
-            let rin = r - inner;
-            h += 30.0 * smoothstep(CREST_R + 90.0, CREST_R, rin) * (1.0 + 0.4 * rough);
-            let wall = smoothstep(CREST_R - 10.0, CALDERA_R, rin);
-            h += (-28.0 + 3.0 * grain - h) * wall;
-            // The gap: a deep channel through the ring.
-            let g = segment(q, gap_a, gap_b).0;
-            let cut = smoothstep(GAP_HALF + 60.0, GAP_HALF, g);
-            h += ((-GAP_DEEP - 6.0 * smoothstep(ISLAND_R, ISLAND_R + 500.0, r)).min(h) - h) * cut;
-            // The cone: steep flanks, a broken crown, a crater.
-            let (_, cr, ch) = (CONE.1, CONE.2, CONE.3);
-            let d = dist(q, cone) + 30.0 * rough;
+            // The ridge: steep, broken, too sheer to climb.
+            let d = polyline(l, &o.spine) + 40.0 * rough;
+            let ridge = smoothstep(SPINE_HALF + 60.0, -0.2 * SPINE_HALF, d);
+            h += SPINE_TALL * (0.7 + 0.6 * peaks) * (1.0 + 0.5 * (crag - 0.55)) * ridge.powf(1.3);
+            // The volcano: steep flanks, a broken crown, a crater.
+            let (cx, cy, cr, ch) = CONE;
+            let d = dist(l, (cx, cy)) + 30.0 * rough;
             let body = (1.0 - d / cr).max(0.0).powf(1.25);
             let crater = smoothstep(0.32 * cr, 0.12 * cr, d);
             h + ch * (1.0 + 0.5 * (crag - 0.55)) * body - 0.25 * ch * crater
@@ -731,28 +751,27 @@ impl Terrain {
         })
     }
 
-    /// How much of `(x, y)` is ice, 0..1, and how much of that is snow-covered
-    /// sheet, berg or sea ice rather than a lake's clear ice.
-    pub(super) fn an_ice_cover(&self, x: f64, y: f64) -> (f64, f64) {
+    /// How much of `(x, y)` is ice, 0..1, and how much of that lies under
+    /// snow (the sheet's and the bergs' tops; sea ice in patches).
+    fn an_ice_cover(&self, x: f64, y: f64, h: f64) -> (f64, f64) {
         let ice = self.an_ice(x, y);
+        // Rock that stands out of the sheet (the nunataks, the ranges) is
+        // rock, not ice.
+        let sheet = ice.cover * (1.0 - smoothstep(10.0, 35.0, h - ice.sheet_top));
         let berg = smoothstep(-2.0, 2.0, self.an_bergs(x, y));
-        let lake = self.an_max(x, y, |q| {
-            LAKES
-                .iter()
-                .map(|&(lx, ly, r, _)| smoothstep(r + 6.0, r - 6.0, dist(q, (lx, ly))))
-                .fold(0.0, f64::max)
-        });
+        // Sea ice lies at the water: none on the islands or the shore above.
         let sea = smoothstep(-2.0, 2.0, self.an_sea_ice(x, y, self.an_land(x, y)))
-            * (1.0 - ice.sheet.max(berg));
-        let cover = ice.sheet.max(berg).max(lake).max(sea);
+            * (1.0 - smoothstep(2.5, 4.5, h))
+            * (1.0 - sheet.max(berg));
+        let cover = sheet.max(berg).max(sea);
         // Sea ice lies under a patchy skin of snow, swept bare in places.
         let swept = 0.35 + 0.5 * smoothstep(-0.2, 0.3, self.tilt.fbm(x / 400.0, y / 400.0, 3, 0.5));
-        let snowed = ice.sheet.max(berg) * (1.0 - lake) + sea * swept;
+        let snowed = sheet.max(berg) + sea * swept;
         (cover, snowed)
     }
 
     /// Ice and lying snow at a point of height `h` with slope `(gx, gy)`:
-    /// snow over nearly everything, the ice walls and lakes, rock where it is
+    /// snow over nearly everything, the ice walls and sea ice, rock where it is
     /// steep or the wind has scoured it, dark shingle along the water, bare
     /// ground round the ore, the islands' warm black ground half bare.
     pub(super) fn antarctic_snow(&self, x: f64, y: f64, h: f64, gx: f64, gy: f64) -> (f64, f64) {
@@ -760,7 +779,7 @@ impl Terrain {
             return (0.0, 0.0);
         }
         let slope = (gx * gx + gy * gy).sqrt();
-        let (ice, snowed) = self.an_ice_cover(x, y);
+        let (ice, snowed) = self.an_ice_cover(x, y, h);
         let scour = smoothstep(
             0.12,
             0.45,
@@ -768,11 +787,7 @@ impl Terrain {
                 + 0.35 * self.detail.fbm(x / 140.0 - 12.0, y / 140.0 + 40.0, 2, 0.5),
         );
         let steep = 1.0 - smoothstep(0.55, 1.05, slope);
-        let volcanic = smoothstep(
-            ISLAND_R + 300.0,
-            ISLAND_R - 200.0,
-            dist((x, y), ISLAND).min(dist(turn((x, y)), ISLAND)),
-        );
+        let volcanic = smoothstep(-300.0, 200.0, self.an_island_in(x, y));
         // The knolls' crowns are blown bare.
         let crowns = smoothstep(0.35, 0.8, self.an_knolls(x, y, self.an_tame(x, y)));
         let mut ground =
@@ -784,19 +799,13 @@ impl Terrain {
             }
         }
         // The sheet and the bergs are snow on top, their ice bare only in
-        // their walls; the lakes are bare ice with a little drift.
+        // their walls; sea ice is bare in places.
         let bare = (ice - snowed).max(0.0);
         let walls = smoothstep(0.35, 0.8, slope);
         let on_sheet = snowed * 0.97 * (1.0 - walls);
         let on_bare = bare * 0.25 * (1.0 - smoothstep(0.7, 1.3, slope));
         let ice_shows = (bare + snowed * walls).min(1.0);
-        // Cirque and hanging ice on the massifs' gentler high ground.
-        let high = smoothstep(150.0, 210.0, h)
-            * (1.0 - smoothstep(0.45, 0.8, slope))
-            * (1.0 - volcanic)
-            * (1.0 - ice);
-        let snow = ground * (1.0 - ice) + on_sheet + on_bare;
-        (ice_shows.max(high), snow * (1.0 - 0.4 * high))
+        (ice_shows, ground * (1.0 - ice) + on_sheet + on_bare)
     }
 
     pub(super) fn natural_antarctic(&self, x: f64, y: f64) -> f64 {
@@ -897,7 +906,7 @@ impl Terrain {
         sites.extend(
             ISLAND_ORE
                 .iter()
-                .map(|&(bearing, r)| (polar(ISLAND, bearing, ISLAND_ORE_OUT), r)),
+                .map(|&(lx, ly, r)| (island_map((lx, ly)), r)),
         );
         let mut fields = Vec::new();
         for (p, r) in sites {

@@ -36,7 +36,7 @@ fn erebus_strait_is_the_same_under_a_half_turn_where_it_is_tame() {
             assert!((a - b).abs() < 0.02, "{a} vs {b} at {p:?}");
             // Where the ice lies (its blue patches and the snow on it are
             // each side's own).
-            let (ia, ib) = (t.an_ice_cover(p.0, p.1).0, t.an_ice_cover(q.0, q.1).0);
+            let (ia, ib) = (t.an_ice_cover(p.0, p.1, a).0, t.an_ice_cover(q.0, q.1, b).0);
             assert!((ia - ib).abs() < 1e-6, "ice {ia} vs {ib} at {p:?}");
         }
     }

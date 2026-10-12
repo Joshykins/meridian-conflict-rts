@@ -9,8 +9,7 @@
 //!   teams cannot walk to each other at all;
 //! * each start's walk to every ore field on its coast is as long as the
 //!   turned start's to the turned field;
-//! * the islands' fields are dry and ships reach them; the sea is one, and
-//!   ships sail into each caldera through its gap;
+//! * the islands' fields are dry and ships reach them; the sea is one;
 //! * nothing grows.
 //!
 //! The map is not checked in; without the file the test says so and passes.
@@ -218,14 +217,22 @@ fn erebus_strait_plays_the_same_for_both_teams() {
             .min()
             .unwrap_or((-1, -1));
         if a < 0 {
-            // An island's: ships reach its shore.
-            let near_sea = (-40..=40).step_by(4).any(|dy: i32| {
-                (-40..=40).step_by(4).any(|dx: i32| {
-                    let (x, y) = (cx as i32 + dx, cy as i32 + dy);
-                    x >= 0 && y >= 0 && sea[(y as u32 * w + x as u32) as usize] >= 0
+            // An island's: walking from it reaches a shore ships can come to.
+            let walk = map.walk(c);
+            let landing = (0..h).any(|y| {
+                (0..w).any(|x| {
+                    walk[(y * w + x) as usize] >= 0
+                        && [(4, 0), (-4, 0), (0, 4), (0, -4)].iter().any(|&(dx, dy)| {
+                            let (nx, ny) = (x as i32 + dx, y as i32 + dy);
+                            nx >= 0
+                                && ny >= 0
+                                && (nx as u32) < w
+                                && (ny as u32) < h
+                                && sea[(ny as u32 * w + nx as u32) as usize] >= 0
+                        })
                 })
             });
-            if !near_sea {
+            if !landing {
                 problems.push(format!("ore at {c:?} is out of reach by land and by sea"));
             }
         } else if b < 0 || (a - b).abs() as f64 > 0.03 * a.max(b) as f64 + 6.0 {
@@ -264,13 +271,6 @@ fn erebus_strait_plays_the_same_for_both_teams() {
     if seas.len() > 1 && km2(seas[1]) > 0.1 {
         problems.push(format!("a second sea of {:.2} km²", km2(seas[1])));
     }
-    // Into the calderas (the designed island's middle and its twin's).
-    for c in [(5_750.0, 8_800.0), turn((5_750.0, 8_800.0))] {
-        if at(&sea, c) < 0 {
-            problems.push(format!("ships cannot sail into the caldera at {c:?}"));
-        }
-    }
-
     if file.props().iter().any(|p| p.kind.is_tree()) {
         problems.push("trees grow on Antarctica".into());
     }
