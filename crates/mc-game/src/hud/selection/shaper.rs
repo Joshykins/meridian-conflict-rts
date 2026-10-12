@@ -361,6 +361,8 @@ fn artillery_block(a: &ArtilleryCard, level: u16) -> Block {
             share: 1.0 - a.next_in_secs / a.interval_secs.max(0.1),
             text: if a.held {
                 "Held: field full".to_string()
+            } else if a.next_in_secs < 0.05 {
+                "Volley now".to_string()
             } else {
                 format!("Volley in {}", secs(a.next_in_secs))
             },
@@ -390,11 +392,8 @@ fn warhead_block(w: &WarheadCard, level: u16) -> Block {
             secs(w.gap_secs),
             gain(gap(level), gap(level.saturating_add(1)), true),
         ),
-        row(
-            "Blast",
-            format!("{:.0} m  core {:.0} m", w.blast_radius, w.blast_core),
-            None,
-        ),
+        row("Blast", format!("{:.0} m", w.blast_radius), None),
+        row("Blast Core", format!("{:.0} m", w.blast_core), None),
         row("Blast Damage", amount(w.blast_damage), None),
     ];
     if w.in_flight > 0 {
@@ -404,11 +403,16 @@ fn warhead_block(w: &WarheadCard, level: u16) -> Block {
         title: "Warheads",
         tone: crate::hud::silo::WARHEAD,
         ring: 0,
-        gadget: Gadget::Slots {
-            stock: u32::from(w.stock),
-            capacity: u32::from(w.capacity),
-            next: 0.0,
-            warhead: true,
+        // No silo standing yet: no slots to show.
+        gadget: if w.capacity == 0 {
+            Gadget::None
+        } else {
+            Gadget::Slots {
+                stock: u32::from(w.stock),
+                capacity: u32::from(w.capacity),
+                next: 0.0,
+                warhead: true,
+            }
         },
         rows,
     }
@@ -516,6 +520,7 @@ pub(super) fn card(ui: &mut Ui, hud: &mut Hud, s: &Scene, pick: &ShaperPick, anc
         .get(&c.unit.0)
         .map(|&i| &s.view.frame.units[i]);
     let bp = shaper.map(|u| s.bp(u));
+    let name = bp.map_or("Shaper", |b| b.name.as_str());
     let next_round = shaper
         .and_then(crate::hud::silo::Launcher::of)
         .map_or(0.0, |l| l.progress);
@@ -541,8 +546,49 @@ pub(super) fn card(ui: &mut Ui, hud: &mut Hud, s: &Scene, pick: &ShaperPick, anc
     hud.claim(ui, r);
     ui.panel(r);
     let x = r.x + PAD;
-    let t = ui.time;
 
+    header(ui, hud, pick, name, r, note);
+    let mut y = r.y + head_h;
+
+    if !c.products.is_empty() {
+        builds(ui, s, c, &names, &chips, x, y);
+        y += builds_h;
+    }
+
+    // The blocks, two columns. A block under the pointer lights its ring on the
+    // ground; last frame's focus lights it here.
+    let col_w = (cw - COL_GAP) * 0.5;
+    let focus = hud.survival.shaper_focus;
+    let mut hover = 0;
+    for (i, (b, (col, dy))) in blocks.iter().zip(at).enumerate() {
+        let bx = x + col as f32 * (col_w + COL_GAP);
+        let br = Rect::new(bx - 6.0, y + dy - 9.0, col_w + 12.0, b.height());
+        let res = ui.interact_with(id("shaper-block", i), br, true, false);
+        if res.hovered && b.ring != 0 {
+            hover = b.ring;
+        }
+        let lit = focus_of(
+            ui,
+            "shaper-block-focus",
+            i,
+            u64::from(focus),
+            u64::from(b.ring),
+        );
+        draw_block(ui, b, bx, y + dy, col_w, lit);
+    }
+    hud.survival.shaper_focus = hover;
+    hud.details_focus = 0;
+    hud.reach_focus = None;
+}
+
+/// The card's head in `r`: the name, its site and the close cross; level, tier and
+/// kind and how tall it stands; with `note`, whether it is rising or evolving and
+/// which piece of its base is selected.
+fn header(ui: &mut Ui, hud: &mut Hud, pick: &ShaperPick, name: &str, r: Rect, note: bool) {
+    let c = &pick.card;
+    let (x, cw) = (r.x + PAD, W - 2.0 * PAD);
+    let t = ui.time;
+    let catching = c.level < c.catch_up;
     // The name, its site, and the close cross.
     let site = hud
         .survival
@@ -550,7 +596,6 @@ pub(super) fn card(ui: &mut Ui, hud: &mut Hud, s: &Scene, pick: &ShaperPick, anc
         .get(c.site as usize)
         .cloned()
         .unwrap_or_else(|| format!("Site {}", c.site + 1));
-    let name = bp.map_or("Shaper", |b| b.name.as_str());
     let end = ui.text(x, r.y + 24.0, type_scale::ITEM, rgb(0xFFFFFF, 1.0), name);
     let close = Rect::new(r.right() - 34.0, r.y + 12.0, 22.0, 22.0);
     ui.text_fit_left(
@@ -630,91 +675,76 @@ pub(super) fn card(ui: &mut Ui, hud: &mut Hud, s: &Scene, pick: &ShaperPick, anc
             &parts.join("  \u{b7}  "),
         );
     }
-    let mut y = r.y + head_h;
+}
 
+/// What it builds from (`x`, `y`): its products as chips (`chip_layout`), then the
+/// formation and the next print.
+fn builds(
+    ui: &mut Ui,
+    s: &Scene,
+    c: &ShaperCard,
+    names: &[String],
+    chips: &[(f32, usize, f32)],
+    x: f32,
+    y: f32,
+) {
+    let cw = W - 2.0 * PAD;
+    let lines = chips.last().map_or(0, |c| c.1 + 1);
     // What it builds: its products, then the formation and the next print (a
     // Seedcaster's products are what its shells print).
-    if !c.products.is_empty() {
-        ui.section(x, y, cw - 180.0, "Builds");
-        let heavy = if c.batch.1 > 0 {
-            format!(" + {} heavy", c.batch.1)
+    ui.section(x, y, cw - 180.0, "Builds");
+    let heavy = if c.batch.1 > 0 {
+        format!(" + {} heavy", c.batch.1)
+    } else {
+        String::new()
+    };
+    ui.text_right(
+        x + cw,
+        y,
+        type_scale::MICRO,
+        rgb(palette::DIM, 1.0),
+        &if c.kind == SiteKind::Printer {
+            format!("Formation of {}{heavy}", c.batch.0)
         } else {
-            String::new()
+            "Its shells print them".to_string()
+        },
+    );
+    let y = y + 18.0;
+    for ((p, n), (cx, line, _)) in c.products.iter().zip(names).zip(chips) {
+        let pb = s.blueprints.unit(*p);
+        let tone = match Domain::of(pb) {
+            Domain::Air => crate::hud::style::AIR,
+            Domain::Navy => crate::hud::style::NAVY,
+            _ => crate::hud::style::LAND,
         };
-        ui.text_right(
-            x + cw,
-            y,
-            type_scale::MICRO,
-            rgb(palette::DIM, 1.0),
-            &if c.kind == SiteKind::Printer {
-                format!("Formation of {}{heavy}", c.batch.0)
-            } else {
-                "Its shells print them".to_string()
-            },
-        );
-        y += 18.0;
-        for ((p, n), (cx, line, _)) in c.products.iter().zip(&names).zip(&chips) {
-            let pb = s.blueprints.unit(*p);
-            let tone = match Domain::of(pb) {
-                Domain::Air => crate::hud::style::AIR,
-                Domain::Navy => crate::hud::style::NAVY,
-                _ => crate::hud::style::LAND,
-            };
-            let cy = y + *line as f32 * 22.0;
-            icons::strategic(
-                ui,
-                pb.visual.icon,
-                pb.tech,
-                Vec2::new(x + cx + 7.0, cy),
-                6.5,
-                rgb(tone, 1.0),
-                ink(0.9),
-            );
-            ui.text(
-                x + cx + 20.0,
-                cy,
-                type_scale::CAPTION,
-                rgb(palette::TEXT, 0.92),
-                n,
-            );
-        }
-        y += lines as f32 * 22.0;
-        let printed = format!("{} printed", whole(c.printed as f32));
-        let line = match c.kind {
-            SiteKind::Printer if c.next_print > 0.05 => {
-                format!("Next print in {}  \u{b7}  {printed}", secs(c.next_print))
-            }
-            SiteKind::Printer => format!("Prints with the round  \u{b7}  {printed}"),
-            _ => printed,
-        };
-        ui.text(x, y, type_scale::MICRO, rgb(palette::DIM, 1.0), &line);
-        y += 18.0 + 8.0;
-    }
-
-    // The blocks, two columns. A block under the pointer lights its ring on the
-    // ground; last frame's focus lights it here.
-    let col_w = (cw - COL_GAP) * 0.5;
-    let focus = hud.survival.shaper_focus;
-    let mut hover = 0;
-    for (i, (b, (col, dy))) in blocks.iter().zip(at).enumerate() {
-        let bx = x + col as f32 * (col_w + COL_GAP);
-        let br = Rect::new(bx - 6.0, y + dy - 9.0, col_w + 12.0, b.height());
-        let res = ui.interact_with(id("shaper-block", i), br, true, false);
-        if res.hovered && b.ring != 0 {
-            hover = b.ring;
-        }
-        let lit = focus_of(
+        let cy = y + *line as f32 * 22.0;
+        icons::strategic(
             ui,
-            "shaper-block-focus",
-            i,
-            u64::from(focus),
-            u64::from(b.ring),
+            pb.visual.icon,
+            pb.tech,
+            Vec2::new(x + cx + 7.0, cy),
+            6.5,
+            rgb(tone, 1.0),
+            ink(0.9),
         );
-        draw_block(ui, b, bx, y + dy, col_w, lit);
+        ui.text(
+            x + cx + 20.0,
+            cy,
+            type_scale::CAPTION,
+            rgb(palette::TEXT, 0.92),
+            n,
+        );
     }
-    hud.survival.shaper_focus = hover;
-    hud.details_focus = 0;
-    hud.reach_focus = None;
+    let y = y + lines as f32 * 22.0;
+    let printed = format!("{} printed", whole(c.printed as f32));
+    let line = match c.kind {
+        SiteKind::Printer if c.next_print > 0.05 => {
+            format!("Next print in {}  \u{b7}  {printed}", secs(c.next_print))
+        }
+        SiteKind::Printer => format!("Prints with the round  \u{b7}  {printed}"),
+        _ => printed,
+    };
+    ui.text(x, y, type_scale::MICRO, rgb(palette::DIM, 1.0), &line);
 }
 
 /// One block at (`x`, `y`), `w` wide; `(lit, back)` ease its focus (`focus_of`).
