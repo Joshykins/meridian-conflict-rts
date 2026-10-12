@@ -18,7 +18,7 @@ use crate::{part, pattern};
 
 use super::super::kit::{dark_plate, metal, v3};
 use super::super::machine::{collar, red_slot, Course, Frame};
-use super::super::turrets::sunspear;
+use super::super::turrets::fusion_kit;
 use super::chassis::{body, Hull};
 use super::{coarse_gun, fusion_core, team_patch, turret_hull, yoke, Line};
 
@@ -168,7 +168,7 @@ fn split(b: &mut MeshBuilder) {
                 );
             }
             for z in [-0.3f32, 0.3] {
-                sunspear::lens(b, v3(14.25, 0.45, z), v3(len, 0.0, 0.0), 0.26);
+                fusion_kit::lens(b, v3(14.25, 0.45, z), v3(len, 0.0, 0.0), 0.26);
             }
         });
     });

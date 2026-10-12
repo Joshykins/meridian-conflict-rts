@@ -1,7 +1,7 @@
 //! The Behemoth's AEB light (`models::pattern::COIL`, `COIL_TURN`): the shader breathes
 //! the coils idle, climbs them stage by stage through the charge, blinds them at the shot
 //! and cools them after, and turns the capacitor rings' lugs faster as the charge builds.
-//! The Sunspear's plasma coils light the same way, and its working gear
+//! The Regency fusion guns' plasma coils light the same way, and their working gear
 //! (`rig::CHARGE_GEAR_MASK`) opens through the charge and vents after the shot.
 //! It needs each unit's charge on the clock, which the sim does not mirror: this keeps it
 //! from the events (`SimEvent::StormCharging` or `WeaponCharging` starts a charge, the

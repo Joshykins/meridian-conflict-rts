@@ -24,7 +24,7 @@ use crate::pattern;
 use super::super::super::kit::{dark_plate, metal, seam, slab, v3};
 use super::super::super::machine::{armour, hoop_on, swept, Course, Frame};
 use super::super::super::parts::{drum, inlay, ridged};
-use super::super::sunspear::{coil_light, lens};
+use super::super::fusion_kit::{coil_light, lens};
 use super::super::{bar_through, hull_x, CHAMFERED};
 use super::{CHEEK, LINE};
 

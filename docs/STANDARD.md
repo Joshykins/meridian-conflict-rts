@@ -422,7 +422,7 @@ Starting points for step 5. File references are from 2026-10-08.
   commander/arms.rs:94, naval/frigate.rs:308, naval/cruiser.rs:392,
   naval/assault_submarine.rs:343).
 - Move `CHAMFERED` and the 15 local `THICK`s into proportions.
-- One prism charge brush (turrets/sunspear.rs:110, strider/cannon.rs:25,
+- One prism charge brush (turrets/fusion_kit.rs:27, strider/cannon.rs:25,
   fusion_guns/howitzer.rs:98).
 - Nanite light only via `NANITE_SLOT`; remove the `GLOW_VIOLET` mesh pieces
   (commander arms and shoulder, brood, tidebrood, taproot, space hulls).

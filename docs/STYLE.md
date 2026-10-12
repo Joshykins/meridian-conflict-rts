@@ -346,11 +346,12 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
   - **Pinch-fusion:** the same charge far harder: the ball is a star, as a
     power generator's (white-hot, the prism drifting over it), lightning
     crackling round it and pulled into it. The gun works with it (the
-    Sunspear: its rails part, its lens heads slide out, its coils light from
-    the breech in the prism going white, its gimbal cage spins up round its
-    star core; after the shot its radiators vent and it cools through lavender
-    to violet). Every light on a Pinch-fusion gun is the star's
-    (`GLOW_PRISM`), not the red of the lower grades. It launches with a
+    Sunspear: the four rails round its core flare off it, opening its mouth
+    round the knot, the slots down them rippling toward the mouth, and snap
+    back on the shot; its vent lids stand up with the heat and settle). The
+    star itself is the prism's; the Sunspear's own light is the red of slots
+    let into its plates (`pattern::EMBER_SLOT`), and the older fusion guns
+    still carry prism-lit coils (`GLOW_PRISM`). It launches with a
     blinding white flash and a cone of the star's streamers, pinching out a
     jet of fusion, long and fast (a white-hot core in a sheath of the prism,
     the fastest Regency shot), arcing a little onto its mark (laid flat,

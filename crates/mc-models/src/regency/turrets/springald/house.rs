@@ -16,7 +16,7 @@ use crate::pattern;
 use super::super::super::kit::{cable, dark_plate, metal, seam, v3};
 use super::super::super::machine::{armour, hoop, teeth, Course, Frame};
 use super::super::super::parts::{bay, inlay, locker, plan_loft, ridged};
-use super::super::sunspear::coil_light;
+use super::super::fusion_kit::coil_light;
 use super::super::team_patch;
 use super::{CHEEK, DECK, LINE, RACE, ROOF};
 

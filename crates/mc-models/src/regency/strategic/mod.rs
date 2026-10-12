@@ -43,7 +43,7 @@ use crate::part;
 
 use super::kit::{dark_plate, metal, seam, v3};
 use super::machine::*;
-use super::turrets::sunspear::lens;
+use super::turrets::fusion_kit::lens;
 
 /// The silo's (radius, height), and the array's.
 pub(super) const SILO_SIZE: (f32, f32) = (42.5, 26.0);

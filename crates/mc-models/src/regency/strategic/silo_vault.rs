@@ -17,7 +17,7 @@ use crate::{part, Pit};
 
 use super::super::kit::{dark_plate, metal, seam, v3};
 use super::super::machine::*;
-use super::super::turrets::sunspear::lens;
+use super::super::turrets::fusion_kit::lens;
 use super::*;
 
 /// The platform's deck, and the bunker's roof.

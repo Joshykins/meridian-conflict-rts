@@ -23,7 +23,7 @@ use crate::{part, Siege};
 
 use super::super::kit::{dark_plate, metal, nanite_plate, seam, v3};
 use super::super::machine::{armour, collar, hoop, hoop_on, red_slot, Course, Frame};
-use super::super::turrets::sunspear;
+use super::super::turrets::fusion_kit;
 use super::{team_patch, Line};
 
 /// The blueprint's radius and height.
@@ -118,9 +118,9 @@ pub(super) fn draw(b: &mut MeshBuilder) {
         b.set_charge_gear(LINE.pivot, S);
         LINE.gun(b, |b| {
             b.with(Affine3A::from_scale(Vec3::splat(S)), |b| {
-                sunspear::rails(b, 25.0, true);
+                fusion_kit::rails(b, 25.0, true);
                 // The coils ride the barrel back into the breech.
-                b.with_siege(0, |b| b.with_recoil(sunspear::pinch_coils));
+                b.with_siege(0, |b| b.with_recoil(fusion_kit::pinch_coils));
             });
         });
     });

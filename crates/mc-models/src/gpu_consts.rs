@@ -510,7 +510,8 @@ shared! {
     /// entity.wgsl `charge_gear_pose` from the unit's charge (`renderer/titan_charge.rs`):
     /// through the charge the gear opens, after the shot it holds open a moment and closes
     /// as the gun cools; vents lift with the heat after the shot. Travels are metres at
-    /// the model's authored size, times `ModelInfo::charge_gear.w`. The Sunspear's.
+    /// the model's authored size, times `ModelInfo::charge_gear.w`: the Sunspear's rails, the
+    /// Saker's and the Springald's bores, the fusion guns' rails.
     pub mod charge_gear as "CHARGE_GEAR_" {
         /// Where a vertex's gear sits in its rig word, and the mask after the shift. It
         /// borrows `UPGRADE_AT` bits 19..22, which only mean anything on refit pieces (and

@@ -580,7 +580,9 @@
     // arcs onto its mark (`flat_fire`: a direct-fire gun, not artillery), so it reaches
     // over a low rise in the ground. It crosses its whole reach in 0.6 s (4500 m/s, and
     // the loft only 0.2 s so the arc stays as flat as it was at 1500 m/s). Model:
-    // `regency_fusion_cannon` (`models::regency::turrets::sunspear`), the Citadel's size.
+    // `regency_fusion_cannon` (`models::regency::turrets::sunspear`), the Citadel's size:
+    // a casemate whose four rails flare round the knot, which forms just in front of the
+    // gun's mouth (`muzzle`).
     (
         key: "regency_t3_point_defense",
         name: "Sunspear",

@@ -30,7 +30,7 @@ use crate::{part, rig};
 
 use super::kit::{dark_plate, v3};
 use super::machine::{armour, collar, hoop, Frame};
-use super::turrets::sunspear;
+use super::turrets::fusion_kit;
 
 pub(super) use howitzer::{HEIGHT as HOWITZER_HEIGHT, RADIUS as HOWITZER_RADIUS};
 pub(super) use skyspear::{HEIGHT as SKYSPEAR_HEIGHT, RADIUS as SKYSPEAR_RADIUS};
@@ -171,13 +171,13 @@ fn yoke(b: &mut MeshBuilder, pivot: Vec3, y: f32, thick: f32, x: [f32; 2], z: [f
 /// The Sunspear's caged fusion core drawn `s` times its size, its cradle's foot at `foot`;
 /// records the hub its gimbal rings spin about, with the charge gear's travels at `gear`.
 fn fusion_core(b: &mut MeshBuilder, foot: Vec3, s: f32, gear: f32) {
-    let core = sunspear::CORE;
+    let core = fusion_kit::CORE;
     b.set_charge_gear(foot + Vec3::Z * 4.4 * s, gear);
     b.with(
         Affine3A::from_translation(foot)
             * Affine3A::from_scale(Vec3::splat(s))
             * Affine3A::from_translation(-core),
-        |b| sunspear::caged_core(b, core),
+        |b| fusion_kit::caged_core(b, core),
     );
 }
 

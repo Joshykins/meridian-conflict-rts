@@ -136,7 +136,7 @@ pub mod pattern {
     /// blinds at the shot and lets it cool (the renderer feeds the charge through
     /// `UnitInstance::mount`, `renderer/titan_charge.rs`). On `GLOW` faces the Behemoth's
     /// AEB-3 blue; on `GLOW_LASER` faces the Regency's red-white plasma coil (the
-    /// Sunspear's), where stage `gpu_consts::charge_gear::HEAT_STAGE` is a vent's heat.
+    /// fusion guns', `regency::turrets::fusion_kit`), where stage `gpu_consts::charge_gear::HEAT_STAGE` is a vent's heat.
     pub const COIL: u32 = 19;
     pub const COIL_STAGES: u32 = 8;
     /// A capacitor ring's lugs on such a weapon (`METAL` faces only): turned about the

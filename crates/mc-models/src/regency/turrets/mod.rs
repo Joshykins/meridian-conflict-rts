@@ -14,7 +14,8 @@
 //!   (`springald`).
 //!
 //! The pinch guns gather their charge in front of the bore, between projectors that reach
-//! past its mouth, and their `muzzle` is the middle of that charge.
+//! past its mouth (the Sunspear's just in front of its closed mouth, inside its rails'
+//! reach), and their `muzzle` is the middle of that charge.
 //!
 //! Guns are drawn in their own frame ([`gun_frame`]): the origin at the trunnion, +x down
 //! the bore, +z up off it.
@@ -22,14 +23,15 @@
 mod basilisk;
 mod belfry;
 mod canopy;
+/// The pinch-fusion pieces the fusion guns share (`fusion_guns`, the Springald, the
+/// Rondel and others).
+pub(super) mod fusion_kit;
 mod gorget;
 mod halberd;
 mod picket;
 pub(super) mod rondel;
 mod springald;
-/// The Sunspear's gun pieces are shared by the tech 3 mobile fusion guns
-/// (`fusion_guns`), the same gun drawn smaller.
-pub(super) mod sunspear;
+mod sunspear;
 
 pub(super) use basilisk::basilisk;
 pub(super) use belfry::belfry;

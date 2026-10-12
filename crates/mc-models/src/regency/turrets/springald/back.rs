@@ -19,7 +19,7 @@ use super::super::super::kit::{cable, dark_plate, metal, seam, v3};
 use super::super::super::machine::{armour, hoop_on, swept, Frame};
 use super::super::super::parts::{bay, ridged};
 use super::super::bar_through;
-use super::super::sunspear::coil_light;
+use super::super::fusion_kit::coil_light;
 use super::{CHEEK, LINE, ROOF};
 
 /// The cells' row across the turret's back, and their tops.

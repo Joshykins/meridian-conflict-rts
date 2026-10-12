@@ -18,7 +18,7 @@ use crate::material::*;
 
 use super::super::kit::{dark_plate, metal, seam, v3};
 use super::super::machine::*;
-use super::sunspear::coil_light;
+use super::fusion_kit::coil_light;
 
 /// The tech 2 lenses, either side across y.
 const T2_LENSES: [Vec3; 2] = [Vec3::new(0.0, 3.0, 10.0), Vec3::new(0.0, -3.0, 10.0)];

@@ -27,7 +27,7 @@ use crate::pattern;
 use super::super::super::kit::{cable, dark_plate, metal, seam, v3};
 use super::super::super::machine::{armour, collar, hoop, hoop_on, swept, teeth, Course, Frame};
 use super::super::super::parts::{face_out, inlay, ridged};
-use super::super::super::turrets::sunspear::{coil_light, lens};
+use super::super::super::turrets::fusion_kit::{coil_light, lens};
 use super::guns::facets;
 use super::hull::{body_x, mirrored, pointed, team_patch, tier, CHAMFERED};
 use super::{charge, MAIN, TWIN};
