@@ -1988,10 +1988,13 @@ impl Renderer {
             format: vk::Format::R8G8B8A8_UNORM,
             usage: sampled,
             layers: 3,
-            mips: 1,
+            mips: 1 + cover.mips.len() as u32,
             array: true,
         })?;
         gpu.upload_image(&ground_cover, 0, 0, None, &cover.texels, true)?;
+        for (mip, (_, _, data)) in cover.mips.iter().enumerate() {
+            gpu.upload_image(&ground_cover, 0, mip as u32 + 1, None, data, false)?;
+        }
         gpu.upload_image(&ground_cover, 1, 0, None, &cover.ways, false)?;
         gpu.upload_image(&ground_cover, 2, 0, None, &cover.streets, false)?;
         let pad_res = models::PAD_FOOTPRINT_RES;

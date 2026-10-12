@@ -819,7 +819,7 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     // Drift ice on a polar sea (`sea_ice`): it stills the water it lies in.
     var ice: SeaIce;
     if sea.cold > 0.0 {
-        ice = sea_ice(xy, time, pixel, sea_ice_density(xy, depth) * sea.cold * amp);
+        ice = sea_ice(xy, time, pixel, sea_ice_density(xy) * sea.cold * amp);
     }
     let iced = 1.0 - ice.cover;
     // Rings, wakes and foam from what is happening on the water.

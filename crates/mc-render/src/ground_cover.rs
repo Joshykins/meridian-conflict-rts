@@ -35,7 +35,16 @@ pub struct GroundCover {
     /// each one sample's own (read unfiltered). All zero on a map without
     /// one: ground of the terrain's own on a road of no kind.
     pub streets: Vec<u8>,
+    /// On a map with a snow layer, the first layer's mips below its own texels,
+    /// each half the last (width, height, RGBA8): the polar sea reads how much of
+    /// the land's ice lies within a few hundred metres from them (sea.wgsl
+    /// `ice_near`), smooth at any distance. None on a map without a snow layer.
+    pub mips: Vec<(u32, u32, Vec<u8>)>,
 }
+
+/// Mips `GroundCover::mips` holds below the first layer's own texels: the last is
+/// 64 texels a side of the first, half a kilometre on a map of 8 m texels.
+const ICE_MIPS: usize = 6;
 
 /// A tree's crown radius at scale 1 in metres, and how much of it is conifer
 /// (needle litter under it): the tree models' own reach, for everything that
@@ -128,13 +137,47 @@ fn ground_cover_made(map: &MapFile) -> GroundCover {
         Some(layer) => streets_at_texels(layer, map.info().streets_dims(), cell, (w, h)),
         None => vec![0u8; w * h * 4],
     };
+    let mips = if map.snow().is_some() {
+        mips_of(&texels, (w, h), ICE_MIPS)
+    } else {
+        Vec::new()
+    };
     GroundCover {
         width: w as u32,
         height: h as u32,
         texels,
         ways,
         streets,
+        mips,
     }
+}
+
+/// `levels` mips of an RGBA8 image `(w, h)` texels: each the mean of the last's 2x2
+/// texels (an odd edge texel counts for the ones it would pair with), at least 1 a side.
+fn mips_of(texels: &[u8], (w, h): (usize, usize), levels: usize) -> Vec<(u32, u32, Vec<u8>)> {
+    let mut out: Vec<(u32, u32, Vec<u8>)> = Vec::with_capacity(levels);
+    let (mut pw, mut ph) = (w, h);
+    for _ in 0..levels {
+        let prev = out.last().map_or(texels, |m| m.2.as_slice());
+        let (nw, nh) = ((pw / 2).max(1), (ph / 2).max(1));
+        let mut next = vec![0u8; nw * nh * 4];
+        for y in 0..nh {
+            for x in 0..nw {
+                for c in 0..4 {
+                    let mut sum = 0u32;
+                    for (dx, dy) in [(0, 0), (1, 0), (0, 1), (1, 1)] {
+                        let sx = (x * 2 + dx).min(pw - 1);
+                        let sy = (y * 2 + dy).min(ph - 1);
+                        sum += prev[(sy * pw + sx) * 4 + c] as u32;
+                    }
+                    next[(y * nw + x) * 4 + c] = ((sum + 2) / 4) as u8;
+                }
+            }
+        }
+        out.push((nw as u32, nh as u32, next));
+        (pw, ph) = (nw, nh);
+    }
+    out
 }
 
 /// The streets layer's samples (one per height sample, `CELL_SIZE_M` apart)
@@ -326,6 +369,18 @@ mod tests {
         assert_eq!(b[2] as u32 & g::JUNCTION, g::JUNCTION);
         assert_eq!(b[3] as u32 >> g::BATTERED_SHIFT, 9);
         assert_eq!(g::FIELD_CELL as f64, mc_map::format::FIELD_CELL_M);
+    }
+
+    #[test]
+    fn each_mip_is_half_the_last_and_keeps_the_mean() {
+        let (w, h) = (16, 10);
+        let texels: Vec<u8> = (0..w * h * 4).map(|i| (i % 4 * 60) as u8).collect();
+        let mips = mips_of(&texels, (w, h), 5);
+        let dims: Vec<(u32, u32)> = mips.iter().map(|m| (m.0, m.1)).collect();
+        assert_eq!(dims, [(8, 5), (4, 2), (2, 1), (1, 1), (1, 1)]);
+        for (_, _, m) in &mips {
+            assert_eq!(&m[..4], &[0, 60, 120, 180]);
+        }
     }
 
     #[test]

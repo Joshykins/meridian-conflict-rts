@@ -958,12 +958,27 @@ fn shade_ground(world: vec3<f32>, crag: vec4<f32>, pixel: vec2<f32>, dpx: vec3<f
     var ice_glow = vec3<f32>(0.0);
     var ice_rough = 0.5;
     if ice_w > 0.004 {
-        let ice = glacier_shade(xy, z, alt, base_n, layer.x, fine, patchy, px,
-            max(abs(dpx.z), abs(dpy.z)), snow_rgb, cold);
-        albedo = mix(albedo, ice.rgb, ice_w);
+        // Polar sea ice: the layer's ice on flat ground a metre or two over the sea is
+        // fast ice (polar.wgsl), not a glacier; where it is all sea ice the glacier is
+        // not worked out at all.
+        let sea_ice_w = cold * (1.0 - smoothstep(3.0, 6.0, alt)) * (1.0 - smoothstep(0.004, 0.02, slope));
+        var ice: IceShade;
+        if sea_ice_w < 0.999 {
+            ice = glacier_shade(xy, z, alt, base_n, layer.x, fine, patchy, px,
+                max(abs(dpx.z), abs(dpy.z)), snow_rgb, cold);
+        }
+        var ice_rgb = ice.rgb;
         ice_bend = ice.bend;
         ice_glow = ice.glow * ice_w;
         ice_rough = ice.rough;
+        if sea_ice_w > 0.0 {
+            let si = polar_sea_ice(xy, px, fine, layer.y);
+            ice_rgb = mix(ice_rgb, si.rgb, sea_ice_w);
+            ice_bend = mix(ice_bend, vec3<f32>(-si.grad, 0.0), sea_ice_w);
+            ice_glow *= 1.0 - sea_ice_w;
+            ice_rough = mix(ice_rough, si.rough, sea_ice_w);
+        }
+        albedo = mix(albedo, ice_rgb, ice_w);
     }
 
     // Scan normals, then the procedural relief and stones as world slopes.

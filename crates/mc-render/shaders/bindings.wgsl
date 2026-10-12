@@ -922,7 +922,8 @@ fn blowing_snow(color: vec3<f32>, world: vec3<f32>, eye: vec3<f32>, cold: f32) -
     if blow <= 0.0 {
         return color;
     }
-    let ground = vec3<f32>(0.0, 0.0, max(terrain_height(world.xy), globals.map.z));
+    // (The smoothed land, one tap: the heightfield's own walk costs a dozen.)
+    let ground = vec3<f32>(0.0, 0.0, max(cloud_floor(world.xy), globals.map.z));
     let column = air_column(eye - ground, world - ground, BLOWING_SNOW_H);
     let through = exp(-column * BLOWING_SNOW * blow);
     // Lit white from all round, as mist is (clouds.wgsl `mist_march`).

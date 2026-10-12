@@ -533,23 +533,33 @@ const POLAR_SCATTER_DEPTHS: vec2<f32> = vec2<f32>(2.0, 22.0);
 
 // ---------------------------------------------------------------- ice on a polar sea
 
-// How much drift ice a polar sea carries at `xy`, `depth` metres deep, 0-1: thickest
-// off coasts where the land's ice (its snow layer's glaciers and ice sheet) meets the
-// sea and calves, a little anywhere, gathered by the currents into fields.
-fn sea_ice_density(xy: vec2<f32>, depth: f32) -> f32 {
-    var coast = 0.0;
-    for (var k = 0; k < 6; k++) {
-        let a = f32(k) * 1.0471976 + 0.3;
-        let dir = vec2<f32>(cos(a), sin(a));
-        coast = max(coast, ground_snow_at(xy + dir * 220.0).x);
-        coast = max(coast, ground_snow_at(xy + dir.yx * 520.0).x * 0.7);
-    }
-    let shore = 1.0 - smoothstep(4.0, 40.0, depth);
-    // Gathered in fields and streamers by the currents, open water between them.
-    let field = smoothstep(0.5, 0.8, grad_noise2(xy + vec2<f32>(913.0, -377.0), 700.0) * 0.7
-        + grad_noise2(xy - vec2<f32>(211.0, 97.0), 160.0) * 0.3 + coast * 0.25);
-    return clamp((0.015 + 0.4 * coast + 0.05 * shore) * field, 0.0, 0.6);
+// How much of the ground within about `reach` metres of `xy` is the land's ice (the
+// snow layer's), 0-1: the ground cover's mips (ground_cover.rs `mips`, on a map with a
+// snow layer), so it falls off smoothly with distance from an ice edge, at any zoom.
+fn ice_near(xy: vec2<f32>, reach: f32) -> f32 {
+    let texel = globals.map.x / f32(textureDimensions(ground_cover).x);
+    let lod = log2(max(reach / texel, 1.0));
+    return textureSampleLevel(ground_cover, clamp_sampler, xy / globals.map.xy, 0, lod).b;
 }
+
+// How much drift ice a polar sea carries at `xy`, 0-1: floes and brash broken off the
+// ice (fast ice, shelves, bergs, glacier fronts) in a band a few hundred metres off its
+// edge, thinning out to none, patchy along it. The open sea beyond is clear.
+fn sea_ice_density(xy: vec2<f32>) -> f32 {
+    let near = ice_near(xy, SEA_ICE_REACH);
+    if near <= 0.002 {
+        return 0.0;
+    }
+    // Torn into patches along the edge by the currents.
+    let patches = grad_noise2(xy + vec2<f32>(913.0, -377.0), 260.0) * 0.6
+        + grad_noise2(xy - vec2<f32>(211.0, 97.0), 90.0) * 0.4;
+    let band = smoothstep(0.03, 0.4, near + (patches - 0.5) * 0.2);
+    return band * mix(0.25, 0.6, smoothstep(0.35, 0.7, patches));
+}
+
+// Metres over which the land's ice is looked for round a point of the sea
+// (`sea_ice_density`): the drift ice's band reaches about this far off an ice edge.
+const SEA_ICE_REACH: f32 = 160.0;
 
 // The floes of a cell lattice at `p` (in cells): x how far inside the nearest floe's
 // edge `p` lies, in cells (about the Voronoi cell's edge distance), y a number 0-1 for
