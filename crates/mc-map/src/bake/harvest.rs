@@ -40,7 +40,8 @@ use super::canyon::{smooth_closed, smooth_open};
 use super::{Pad, Terrain};
 use crate::format::PropKind;
 use crate::landmark::{
-    harvest_region, HARVEST_ALPINE, HARVEST_DESERT, HARVEST_FJORDS, HARVEST_ISLES,
+    harvest_depth, harvest_look, harvest_region, HARVEST_ALPINE, HARVEST_DESERT, HARVEST_FJORDS,
+    HARVEST_ISLES,
 };
 use crate::noise::{smoothstep, unit};
 use crate::BUILD_CELL_M;
@@ -456,9 +457,10 @@ pub(super) struct Harvest {
 }
 
 impl Terrain {
-    /// The region a point lies in, by the walls (`landmark::HARVEST_*`).
+    /// The region whose look a point takes: by the walls (`landmark::HARVEST_*`),
+    /// read where the renderer reads them for the ground's colour (`harvest_look`).
     pub(super) fn hv_region(&self, p: (f64, f64)) -> usize {
-        harvest_region(p)
+        harvest_region(harvest_look(p))
     }
 
     pub(super) fn setup_harvest(&mut self) {
@@ -468,7 +470,7 @@ impl Terrain {
         // The ground's outlines first; the erosion is run over them before
         // the ways, rooms and the base's floor are cut, which it never touches.
         self.hv.plan = shape::Plan::outlines();
-        self.hv_lay_knolls();
+        self.hv_lay_hills();
         self.erode_alpine();
         self.hv_profiles();
 
@@ -525,12 +527,30 @@ impl Terrain {
                     smoothstep(line - 50.0, line + 110.0, h) * (1.0 - smoothstep(0.9, 1.6, slope));
                 (0.0, snow)
             }
-            HARVEST_FJORDS => {
-                let drift = self.tilt.fbm(x / 520.0 + 17.0, y / 520.0 - 3.0, 3, 0.5);
-                let low = smoothstep(1.5, 6.0, h) * (0.75 + 0.25 * smoothstep(-0.2, 0.2, drift));
-                (0.0, low * (1.0 - smoothstep(0.9, 1.6, slope)))
+            _ => {
+                // Toward the fjords: frost in the hollows a little way past the
+                // wall, tundra with snow lying in drifts, then snow all over, and
+                // ice capping the high plateau toward the fjords.
+                let cold = harvest_depth(harvest_look((x, y)), HARVEST_FJORDS)
+                    + 350.0 * self.tilt.fbm(x / 1_600.0 - 5.0, y / 1_600.0, 2, 0.5);
+                let frost = smoothstep(-900.0, 2_600.0, cold);
+                if frost <= 0.0 {
+                    return (0.0, 0.0);
+                }
+                // (Drifts in the lee, on the faces that look north, and in hollows;
+                // small and many at first, run together further in.)
+                let north = (-gy / slope.max(1e-3)) * smoothstep(0.02, 0.15, slope);
+                let drift = 0.7 * self.tilt.fbm(x / 420.0 + 17.0, y / 420.0 - 3.0, 3, 0.5)
+                    + 0.45 * self.detail.fbm(x / 110.0 - 12.0, y / 110.0 + 40.0, 3, 0.55)
+                    + 0.25 * north;
+                let lying = smoothstep(0.55 - 1.1 * frost, 0.75 - 1.1 * frost, drift)
+                    * smoothstep(1.5, 6.0, h)
+                    * (1.0 - smoothstep(0.9, 1.6, slope));
+                let ice = smoothstep(2_800.0, 5_000.0, cold)
+                    * smoothstep(170.0, 300.0, h)
+                    * (1.0 - smoothstep(0.2, 0.45, slope));
+                (ice, lying)
             }
-            _ => (0.0, 0.0),
         }
     }
 
@@ -556,28 +576,51 @@ impl Terrain {
                 habitable *= (1.0 - smoothstep(0.25, 0.45, slope))
                     * (1.0 - smoothstep(150.0, 200.0, height));
                 let forest = smoothstep(self.forest_edge + 0.1, self.forest_edge + 0.3, broad);
-                0.6 * (forest * (1.0 - 0.85 * clearing)).max(smoothstep(0.5, 0.7, copse) * 0.6)
+                0.35 * (forest * (1.0 - 0.85 * clearing)).max(smoothstep(0.5, 0.7, copse) * 0.6)
             }
             HARVEST_ALPINE => {
                 let line = 430.0 + 60.0 * self.forest_kind.get(x / 900.0, y / 900.0);
                 habitable *= (1.0 - smoothstep(0.5, 0.85, slope))
                     * (1.0 - smoothstep(line - 70.0, line, height));
                 let forest = smoothstep(self.forest_edge - 0.1, self.forest_edge + 0.15, broad);
-                0.6 * (forest * (1.0 - 0.8 * clearing)).max(smoothstep(0.42, 0.62, copse) * 0.75)
+                0.35 * (forest * (1.0 - 0.8 * clearing)).max(smoothstep(0.42, 0.62, copse) * 0.75)
             }
             HARVEST_ISLES => {
                 habitable *= (1.0 - smoothstep(0.7, 0.95, slope)) * smoothstep(1.5, 3.5, height);
                 let forest = smoothstep(self.forest_edge - 0.4, self.forest_edge - 0.12, broad);
-                0.5 * (forest * (1.0 - 0.6 * clearing)).max(smoothstep(0.3, 0.5, copse) * 0.85)
+                0.4 * (forest * (1.0 - 0.6 * clearing)).max(smoothstep(0.3, 0.5, copse) * 0.85)
             }
             HARVEST_FJORDS => 0.0,
             _ => {
-                habitable *= 1.0 - smoothstep(0.6, 0.9, slope);
-                let forest = smoothstep(self.forest_edge - 0.25, self.forest_edge + 0.1, broad);
-                let open =
-                    (forest * (1.0 - 0.75 * clearing)).max(smoothstep(0.42, 0.62, copse) * 0.7);
-                // The karst knolls' tops wooded thick.
-                0.85 * open + 0.15 * smoothstep(BASE_H + 50.0, BASE_H + 110.0, height)
+                // Broad stands of broadleaf with ragged edges and glades in them,
+                // a few copses out in the open; thinning to scrub toward the
+                // desert and to bare tundra toward the fjords.
+                let look = harvest_look((x, y));
+                habitable *= (1.0 - smoothstep(0.6, 0.9, slope))
+                    * (1.0 - smoothstep(-1_600.0, -300.0, harvest_depth(look, HARVEST_DESERT)))
+                    * (1.0 - smoothstep(-1_400.0, -200.0, harvest_depth(look, HARVEST_FJORDS)));
+                let wide = 1.8 * l;
+                let field = self.forest.fbm(x / wide + 5.3, y / wide - 2.9, 4, 0.55)
+                    + 0.3
+                        * self
+                            .forest
+                            .fbm(x / (0.4 * l) - 7.1, y / (0.4 * l) + 3.3, 2, 0.5)
+                    // (Ragged at the edges: thickets run out, bays run in.)
+                    + 0.1 * self.detail.fbm(x / 130.0 + 2.0, y / 130.0 - 8.0, 2, 0.5);
+                // (Held to their own edge, not the budget's `forest_edge`: the
+                // other regions give way first when the trees run over.)
+                let stands = smoothstep(-0.12, 0.1, field);
+                // Clearings in the woods, some a few trees across, some meadows.
+                let meadows = smoothstep(
+                    0.3,
+                    0.46,
+                    self.forest
+                        .fbm(x / (0.3 * l) + 19.0, y / (0.3 * l) - 4.0, 2, 0.5),
+                );
+                let glades = smoothstep(0.34, 0.5, clearing).max(meadows);
+                // Half the canopy's trees are enough for a closed wood; a few
+                // copses and lone trees out in the open.
+                0.55 * stands * (1.0 - 0.9 * glades) + 0.08 * smoothstep(0.56, 0.7, copse) + 0.003
             }
         };
         if habitable > 0.0 {
@@ -595,7 +638,7 @@ impl Terrain {
     }
 
     /// Each region's trees: broadleaf in the heartland (red and gold under
-    /// the autumn climate) with pines on the knolls' tops; juniper and pinyon
+    /// the autumn climate) with pines on the hills' tops; juniper and pinyon
     /// in the desert; spruce and pine with birch low in the alpine valleys;
     /// jungle and palms on the isles.
     pub(super) fn harvest_tree(&self, x: f64, y: f64, height: f64, hash: u64) -> PropKind {

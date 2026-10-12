@@ -492,7 +492,7 @@ pub(super) fn polyline(p: (f64, f64), line: &[(f64, f64)]) -> f64 {
 
 /// Distance from `p` to a polyline, and how far along it the nearest point
 /// lies (0 at the first point, 1 at the last).
-fn polyline_at(p: (f64, f64), line: &[(f64, f64)]) -> (f64, f64) {
+pub(super) fn polyline_at(p: (f64, f64), line: &[(f64, f64)]) -> (f64, f64) {
     let (mut best, mut at, mut run) = (f64::INFINITY, 0.0, 0.0);
     for w in line.windows(2) {
         let len = dist(w[1], w[0]);

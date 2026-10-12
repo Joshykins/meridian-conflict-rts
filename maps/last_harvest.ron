@@ -15,6 +15,9 @@
 (
     biome: Autumn,
     time: Dusk,
+    // The regions merge into one another over half a kilometre either side of a
+    // wall, along a line wandering a kilometre or so off it; the walls are not lit.
+    blend: 500,
     regions: [
         (name: "Heartland", climate: Autumn, weather: Fair, tweaks: (mist: 0.6, rain: 0.2)),
         (name: "Desert", climate: Desert, weather: Clear, tweaks: (rain: 0.0, wind: 9)),
@@ -23,12 +26,12 @@
         (name: "Fjords", climate: Polar, weather: Cloudy, tweaks: (rain: 0.6, wind: 16)),
     ],
     walls: [
-        (line: [(8700, 24900), (8400, 20600), (8900, 17800), (8700, 14600), (7900, 12600), (6400, 11200)], left: 0, right: 1),
-        (line: [(-300, 11500), (3000, 11100), (6400, 11200)], left: 1, right: 3),
-        (line: [(6400, 11200), (6500, 8700), (5900, 5800), (6300, 2900), (6000, -300)], left: 0, right: 3),
-        (line: [(15900, 24900), (16200, 20600), (15700, 17200), (16000, 13900), (17000, 12000), (18300, 10900)], left: 2, right: 0),
-        (line: [(18300, 10900), (21200, 11400), (24900, 11000)], left: 2, right: 4),
-        (line: [(18300, 10900), (18000, 8300), (17900, 5200), (17600, 2300), (17800, -300)], left: 4, right: 0),
+        (line: [(8600, 24900), (8400, 21800), (8900, 18600), (8900, 15400), (7900, 12500), (6400, 11200)], left: 0, right: 1),
+        (line: [(-300, 11500), (1800, 11000), (3900, 11400), (6400, 11200)], left: 1, right: 3),
+        (line: [(6400, 11200), (6600, 9500), (5700, 8100), (5900, 5800), (5400, 4600), (6600, 2500), (6400, -300)], left: 0, right: 3),
+        (line: [(16000, 24900), (16200, 21700), (15800, 18200), (15600, 15000), (16600, 12600), (18300, 10900)], left: 2, right: 0),
+        (line: [(18300, 10900), (20000, 11600), (22300, 11100), (24900, 11500)], left: 2, right: 4),
+        (line: [(18300, 10900), (17300, 9200), (16900, 7000), (17300, 4800), (17000, 2600), (17200, -300)], left: 4, right: 0),
     ],
     survival: (
         engine: (12300, 22044),

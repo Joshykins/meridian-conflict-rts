@@ -58,7 +58,7 @@ fn harvest_block() {
 }
 
 /// `HARVEST_RELIEF=x0,y0,span,px,out.ppm cargo test --profile gate -p mc-map --lib harvest_relief -- --ignored`:
-/// a hillshade (sun from the north-west), tinted by region, water blue,
+/// a hillshade (sun from the north-west), the regions' looks parted by black lines, water blue,
 /// ground a unit cannot climb grey, the starts red, the sites' rooms yellow
 /// (auxiliary ones orange), to judge the land without the game.
 #[test]
@@ -107,8 +107,8 @@ fn harvest_relief() {
                 (40.0, 70.0 + h.max(-45.0), 120.0 + h.max(-45.0))
             } else if slope > 0.5 {
                 (150.0, 140.0, 130.0)
-            } else if harvest_region((x, y)) != harvest_region((x + step, y))
-                || harvest_region((x, y)) != harvest_region((x, y + step))
+            } else if t.hv_region((x, y)) != t.hv_region((x + step, y))
+                || t.hv_region((x, y)) != t.hv_region((x, y + step))
             {
                 (20.0, 20.0, 20.0)
             } else {

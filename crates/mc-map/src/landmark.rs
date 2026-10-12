@@ -222,74 +222,80 @@ pub type HarvestWall = (&'static [(f64, f64)], usize, usize);
 /// regions meet. The map's sidecar (`maps/last_harvest.ron`) gives the
 /// renderer the same lines; `tests/last_harvest.rs` holds the two together.
 pub const HARVEST_WALLS: [HarvestWall; 6] = [
-    // Desert | heartland: from the north edge down the desert's rim beside
-    // the base and the valley to the west junction.
+    // Desert | heartland: from the north edge down the foot of the desert's
+    // mesas, beside the base and the valley, to the west junction.
     (
         &[
-            (8_700.0, 24_900.0),
-            (8_400.0, 20_600.0),
-            (8_900.0, 17_800.0),
-            (8_700.0, 14_600.0),
-            (7_900.0, 12_600.0),
+            (8_600.0, 24_900.0),
+            (8_400.0, 21_800.0),
+            (8_900.0, 18_600.0),
+            (8_900.0, 15_400.0),
+            (7_900.0, 12_500.0),
             HARVEST_WEST_JUNCTION,
         ],
         HARVEST_HEARTLAND,
         HARVEST_DESERT,
     ),
-    // Desert | isles: from the west edge along the desert's sea cliffs.
+    // Desert | isles: from the west edge along the foot of the desert's sea cliffs.
     (
         &[
             (-300.0, 11_500.0),
-            (3_000.0, 11_100.0),
+            (1_800.0, 11_000.0),
+            (3_900.0, 11_400.0),
             HARVEST_WEST_JUNCTION,
         ],
         HARVEST_DESERT,
         HARVEST_ISLES,
     ),
-    // Isles | heartland: down the heartland's west coast to the south edge.
+    // Isles | heartland: just off the heartland's west coast, to the south edge.
     (
         &[
             HARVEST_WEST_JUNCTION,
-            (6_500.0, 8_700.0),
+            (6_600.0, 9_500.0),
+            (5_700.0, 8_100.0),
             (5_900.0, 5_800.0),
-            (6_300.0, 2_900.0),
-            (6_000.0, -300.0),
+            (5_400.0, 4_600.0),
+            (6_600.0, 2_500.0),
+            (6_400.0, -300.0),
         ],
         HARVEST_HEARTLAND,
         HARVEST_ISLES,
     ),
-    // Alpine | heartland: from the north edge down the mountains' front
-    // beside the base and the valley to the east junction.
+    // Alpine | heartland: from the north edge along the alpine foothills
+    // beside the base and the valley, to the east junction.
     (
         &[
-            (15_900.0, 24_900.0),
-            (16_200.0, 20_600.0),
-            (15_700.0, 17_200.0),
-            (16_000.0, 13_900.0),
-            (17_000.0, 12_000.0),
+            (16_000.0, 24_900.0),
+            (16_200.0, 21_700.0),
+            (15_800.0, 18_200.0),
+            (15_600.0, 15_000.0),
+            (16_600.0, 12_600.0),
             HARVEST_EAST_JUNCTION,
         ],
         HARVEST_ALPINE,
         HARVEST_HEARTLAND,
     ),
-    // Alpine | fjords: from the east junction to the east edge.
+    // Alpine | fjords: from the east junction over the ranges to the east edge.
     (
         &[
             HARVEST_EAST_JUNCTION,
-            (21_200.0, 11_400.0),
-            (24_900.0, 11_000.0),
+            (20_000.0, 11_600.0),
+            (22_300.0, 11_100.0),
+            (24_900.0, 11_500.0),
         ],
         HARVEST_ALPINE,
         HARVEST_FJORDS,
     ),
-    // Fjords | heartland: down the sound's west shore to the south edge.
+    // Fjords | heartland: over the tundra west of the sound, which the cold
+    // creeps into from the plateau (the bake's snow comes in by degrees).
     (
         &[
             HARVEST_EAST_JUNCTION,
-            (18_000.0, 8_300.0),
-            (17_900.0, 5_200.0),
-            (17_600.0, 2_300.0),
-            (17_800.0, -300.0),
+            (17_300.0, 9_200.0),
+            (16_900.0, 7_000.0),
+            (17_300.0, 4_800.0),
+            (17_000.0, 2_600.0),
+            (17_200.0, -300.0),
         ],
         HARVEST_FJORDS,
         HARVEST_HEARTLAND,
@@ -305,8 +311,41 @@ pub const HARVEST_EAST_JUNCTION: (f64, f64) = (18_300.0, 10_900.0);
 /// renderer reads the sidecar's walls by (`mc_data::regions::Walls::probe`):
 /// where the nearest point of two segments is the end they share, the one
 /// whose line, carried on, the point is furthest from decides.
-pub fn harvest_region((x, y): (f64, f64)) -> usize {
+pub fn harvest_region(p: (f64, f64)) -> usize {
+    harvest_probe(p, None).0
+}
+
+/// Metres The Last Harvest's regions merge over either side of a wall (the
+/// sidecar's `blend`): no lit wall, the look handing over along a wandering line.
+pub const HARVEST_BLEND: f64 = 500.0;
+
+/// Where a point's look (its climate's colour, its trees, the relief its region
+/// raises) reads The Last Harvest's walls: moved by the renderer's own wander
+/// (`mc_data::regions::wander`), so the ground's shape and its colour change
+/// together, along no ruled line. [`harvest_region`] of the point itself is the
+/// sidecar's region, as the sky and the set-up read it.
+pub fn harvest_look(p: (f64, f64)) -> (f64, f64) {
+    let (x, y) = mc_data::regions::wander(p.0 as f32, p.1 as f32, HARVEST_BLEND as f32);
+    (x as f64, y as f64)
+}
+
+/// Metres a point lies inside one of The Last Harvest's regions (negative
+/// outside it): to the nearest wall that bounds that region.
+pub fn harvest_depth(p: (f64, f64), region: usize) -> f64 {
+    let (at, d) = harvest_probe(p, Some(region));
+    if at == region {
+        d
+    } else {
+        -d
+    }
+}
+
+/// The region a point is in, and its distance to the nearest wall (of those
+/// bounding `region`, if one is given).
+fn harvest_probe((x, y): (f64, f64), region: Option<usize>) -> (usize, f64) {
+    let mut near = f64::INFINITY;
     let mut best = (f64::INFINITY, -1.0, true, HARVEST_HEARTLAND);
+    let region_of = |l: usize, r: usize| region.is_none_or(|g| g == l || g == r);
     for &(line, left, right) in &HARVEST_WALLS {
         for w in line.windows(2) {
             let ((ax, ay), (bx, by)) = (w[0], w[1]);
@@ -319,7 +358,7 @@ pub fn harvest_region((x, y): (f64, f64)) -> usize {
             let d = (px - ex * tc).hypot(py - ey * tc);
             let cross = ex * py - ey * px;
             let off_line = cross.abs() / len2.sqrt();
-            let region = if cross > 0.0 { left } else { right };
+            let side = if cross > 0.0 { left } else { right };
             let (bd, boff, bend, _) = best;
             let margin = match (end, bend) {
                 (true, false) => -0.05,
@@ -328,11 +367,14 @@ pub fn harvest_region((x, y): (f64, f64)) -> usize {
             };
             let shared = end && bend && d == bd;
             if d < bd + margin || (shared && off_line > boff) {
-                best = (d, off_line, end, region);
+                best = (d, off_line, end, side);
+            }
+            if region_of(left, right) {
+                near = near.min(d);
             }
         }
     }
-    best.3
+    (best.3, if region.is_some() { near } else { best.0 })
 }
 
 #[cfg(test)]

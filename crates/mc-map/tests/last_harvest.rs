@@ -13,7 +13,7 @@
 use mc_core::{Fx, FxVec2};
 use mc_data::survival::{Domain, SiteKind, SurvivalLayout};
 use mc_data::weather::{Climate, MapConfig};
-use mc_map::landmark::{harvest_region, HARVEST_WALLS};
+use mc_map::landmark::{harvest_look, harvest_region, HARVEST_BLEND, HARVEST_WALLS};
 use mc_map::{Heightfield, MapFile, CELL_SIZE_M};
 use std::collections::VecDeque;
 use std::f64::consts::TAU;
@@ -605,6 +605,14 @@ fn check_regions(
     if sides != want {
         problems.push(format!("the sidecar's walls part {sides:?}"));
     }
+    // The regions merge into each other over a broad band, not a ruled line,
+    // the band the bake raised each region's relief along.
+    if config.look().blend != HARVEST_BLEND as f32 {
+        problems.push(format!(
+            "the sidecar's blend is {} m, the bake's {HARVEST_BLEND} m",
+            config.look().blend
+        ));
+    }
     let climates: Vec<Climate> = config.regions().iter().map(|r| r.climate).collect();
     if climates
         != [
@@ -631,6 +639,24 @@ fn check_regions(
     if disagree > 0 {
         problems.push(format!(
             "the renderer and the bake disagree on the region at {disagree} points"
+        ));
+    }
+    // And on the climate the ground looks, which wanders off the walls.
+    let look = config.look();
+    let mut differ = 0;
+    for j in 0..n {
+        for i in 0..n {
+            let p = ((i as f64 + 0.37) * step, (j as f64 + 0.61) * step);
+            let bake = look.climates()[harvest_region(harvest_look(p))];
+            if look.climate_at(p.0 as f32, p.1 as f32) != bake {
+                differ += 1;
+            }
+        }
+    }
+    // (A point or two where f32 rounding puts a point on the other side of a wall.)
+    if differ > n * n / 2_000 {
+        problems.push(format!(
+            "the renderer's look and the bake's disagree at {differ} points"
         ));
     }
     for &s in spawns.iter().chain([&f(layout.engine)]) {

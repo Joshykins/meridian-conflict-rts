@@ -1,7 +1,7 @@
 //! The Last Harvest's ground: the heartland's lowland and the seas round it,
 //! the four regions raised over it each in its own way (the desert's rim and
 //! mesas, the alpine mountains and their basins, the fjords' plateau, the
-//! isles), the karst knolls, and then what the plan cuts into all that: the
+//! isles), the hills and outcrops, and then what the plan cuts into all that: the
 //! fjords, every site's way and room, and the base's floor.
 //!
 //! The regions' outlines are read through a slow warp and frayed by noise,
@@ -10,6 +10,7 @@
 
 use super::*;
 use crate::bake::bays::segment;
+use crate::landmark::{harvest_depth, harvest_look, HARVEST_HEARTLAND};
 use crate::noise::{bump, hash2};
 
 /// The south sea's coast: y at x. Under the isles the sea runs on north (the
@@ -44,74 +45,13 @@ const WEST_COAST: [(f64, f64); 11] = [
 ];
 /// The isles' sea's north shore, under the desert's sea cliffs: y at x.
 const ISLES_NORTH: [(f64, f64); 5] = [
-    (-600.0, 11_350.0),
-    (2_500.0, 11_050.0),
-    (4_600.0, 11_250.0),
-    (6_000.0, 11_300.0),
-    (7_500.0, 11_600.0),
+    (-600.0, 11_300.0),
+    (1_800.0, 10_800.0),
+    (3_900.0, 11_200.0),
+    (6_000.0, 11_050.0),
+    (7_500.0, 11_450.0),
 ];
 
-/// The regions raised over the lowland, as outlines.
-const DESERT: [(f64, f64); 23] = [
-    (-600.0, 11_400.0),
-    (1_500.0, 11_000.0),
-    (2_800.0, 11_250.0),
-    (4_200.0, 10_950.0),
-    (5_300.0, 11_350.0),
-    (6_400.0, 11_300.0),
-    (7_100.0, 11_900.0),
-    (7_600.0, 12_700.0),
-    (8_300.0, 12_900.0),
-    (8_900.0, 13_700.0),
-    (8_550.0, 14_400.0),
-    (9_300.0, 15_300.0),
-    (8_800.0, 16_200.0),
-    (9_100.0, 17_100.0),
-    (8_500.0, 17_900.0),
-    (8_700.0, 18_600.0),
-    (8_200.0, 19_500.0),
-    (8_500.0, 20_500.0),
-    (7_900.0, 21_500.0),
-    (8_300.0, 22_600.0),
-    (8_000.0, 23_600.0),
-    (8_400.0, 25_200.0),
-    (-600.0, 25_200.0),
-];
-const ALPINE: [(f64, f64); 23] = [
-    (16_100.0, 25_200.0),
-    (15_900.0, 23_800.0),
-    (16_400.0, 22_600.0),
-    (16_100.0, 21_300.0),
-    (16_500.0, 20_300.0),
-    (15_800.0, 19_300.0),
-    (15_600.0, 18_300.0),
-    (16_000.0, 17_500.0),
-    (15_500.0, 16_500.0),
-    (15_700.0, 15_300.0),
-    (15_300.0, 14_400.0),
-    (15_900.0, 13_600.0),
-    (16_400.0, 12_900.0),
-    (16_900.0, 12_300.0),
-    (17_600.0, 11_800.0),
-    (18_500.0, 11_250.0),
-    (20_000.0, 11_600.0),
-    (21_500.0, 11_300.0),
-    (23_000.0, 11_600.0),
-    (25_200.0, 11_300.0),
-    (25_200.0, 25_200.0),
-    (20_000.0, 25_200.0),
-    (18_000.0, 25_200.0),
-];
-const POLAR: [(f64, f64); 8] = [
-    (18_400.0, 11_400.0),
-    (25_200.0, 11_400.0),
-    (25_200.0, -600.0),
-    (18_900.0, -600.0),
-    (18_950.0, 2_200.0),
-    (18_900.0, 5_000.0),
-    (19_000.0, 7_800.0),
-    (18_800.0, 9_300.0),
-];
 /// The base's floor, level at [`BASE_H`].
 const BASE: [(f64, f64); 9] = [
     (9_200.0, 18_800.0),
@@ -125,7 +65,7 @@ const BASE: [(f64, f64); 9] = [
     (9_050.0, 21_000.0),
 ];
 /// How far round the base's floor the ground takes to come back.
-const BASE_BLEND: f64 = 280.0;
+const BASE_BLEND: f64 = 520.0;
 
 /// A fjord: its line from the sea in to its head, half its width and its bed.
 type Fjord = (&'static [(f64, f64)], f64, f64);
@@ -136,11 +76,11 @@ const FJORDS: [Fjord; 5] = [
     (
         &[
             (18_400.0, -600.0),
-            (18_550.0, 1_800.0),
-            (18_250.0, 3_300.0),
-            (18_450.0, 4_800.0),
-            (18_750.0, 6_300.0),
-            (18_500.0, 7_500.0),
+            (18_900.0, 1_400.0),
+            (18_050.0, 3_000.0),
+            (18_800.0, 4_600.0),
+            (19_100.0, 6_000.0),
+            (18_350.0, 7_300.0),
             (18_350.0, 8_150.0),
         ],
         470.0,
@@ -209,6 +149,40 @@ const RIVER: [(f64, f64); 11] = [
     (8_900.0, 8_800.0),
     (7_800.0, 9_300.0),
     (6_500.0, 9_450.0),
+];
+
+/// The dales: each from its head on a rise down to its mouth on the river.
+const DALES: [&[(f64, f64)]; 8] = [
+    // From the north, off the valley's flanks.
+    &[(8_300.0, 12_300.0), (8_700.0, 10_700.0), (8_850.0, 9_150.0)],
+    &[
+        (10_000.0, 13_900.0),
+        (10_350.0, 11_800.0),
+        (10_150.0, 9_500.0),
+    ],
+    &[
+        (14_700.0, 13_400.0),
+        (14_250.0, 11_600.0),
+        (13_750.0, 9_700.0),
+    ],
+    &[
+        (16_600.0, 9_800.0),
+        (16_000.0, 10_300.0),
+        (15_250.0, 10_400.0),
+    ],
+    // From the south, off the rises behind the starts.
+    &[(7_500.0, 7_100.0), (7_950.0, 8_200.0), (7_800.0, 9_200.0)],
+    &[(9_500.0, 6_900.0), (9_850.0, 8_000.0), (10_100.0, 9_150.0)],
+    &[
+        (12_950.0, 6_900.0),
+        (12_750.0, 8_100.0),
+        (12_550.0, 9_300.0),
+    ],
+    &[
+        (15_800.0, 7_000.0),
+        (15_350.0, 8_700.0),
+        (14_750.0, 9_950.0),
+    ],
 ];
 
 /// An island of the isles: centre, half lengths, the angle its long axis
@@ -296,6 +270,8 @@ const BASINS: [(&str, f64, bool); 5] = [
 
 /// The most a way's or a room's walls reach out from its floor, metres.
 const SHOULDER: f64 = 900.0;
+/// The most a room's level ground runs out past it in lobes.
+const ROOM_LOBES: f64 = 280.0;
 /// Metres out per metre up an embankment, and up the ground a way climbs
 /// through in the lowland.
 const FILL: f64 = 4.0;
@@ -419,32 +395,34 @@ impl Way {
 /// The ground's plan, worked out once.
 #[derive(Default)]
 pub(super) struct Plan {
-    desert: Vec<(f64, f64)>,
-    alpine: Vec<(f64, f64)>,
-    polar: Vec<(f64, f64)>,
     base: Vec<(f64, f64)>,
     fjords: Vec<Vec<(f64, f64)>>,
     /// The river, rounded, and metres along it at each of its points.
     river: Vec<(f64, f64)>,
     river_run: Vec<f64>,
-    /// The knolls in the heartland, one or none per cell of their grid
-    /// (`hv_lay_knolls`).
-    knolls: Vec<Option<Feature>>,
+    /// The dales down to the river, rounded.
+    dales: Vec<Vec<(f64, f64)>>,
+    /// The hills in the heartland, one or none per cell of their grid
+    /// (`hv_lay_hills`).
+    hills: Vec<Option<Hill>>,
     /// Every site's way, in [`SITES`]' order (their floors worked out once
     /// the ground is: `hv_profiles`).
     pub(super) ways: Vec<Way>,
 }
 
-/// A knoll: where, how wide, how high over the ground.
+/// A hill: where, how wide, how high over the ground; or a sandstone
+/// outcrop, a tilted bed of rock (`r` half its length) whose edge stands out
+/// as a low scarp, facing `heading`'s left.
 #[derive(Clone, Copy)]
-struct Feature {
+struct Hill {
     at: (f64, f64),
     r: f64,
     top: f64,
+    outcrop: Option<f64>,
 }
 
-/// The knolls' grid.
-const KNOLL_CELL: f64 = 430.0;
+/// The hills' grid.
+const HILL_CELL: f64 = 1_000.0;
 
 /// How many cells of `cell` metres cover the map's edge.
 fn cells_of(cell: f64) -> usize {
@@ -454,14 +432,12 @@ fn cells_of(cell: f64) -> usize {
 impl Plan {
     pub(super) fn outlines() -> Plan {
         Plan {
-            desert: closed(&DESERT),
-            alpine: closed(&ALPINE),
-            polar: closed(&POLAR),
             base: closed(&BASE),
             fjords: FJORDS.iter().map(|f| rounded(f.0)).collect(),
             river: rounded(&RIVER),
             river_run: Vec::new(),
-            knolls: Vec::new(),
+            dales: DALES.iter().map(|d| rounded(d)).collect(),
+            hills: Vec::new(),
             ways: SITES.iter().map(Way::new).collect(),
         }
         .with_river_run()
@@ -492,7 +468,7 @@ impl Plan {
 
     /// Whether a point is on (or at the edge of) the base's floor.
     pub(super) fn on_floor(&self, p: (f64, f64)) -> bool {
-        !self.base.is_empty() && inside(p, &self.base) > -60.0
+        !self.base.is_empty() && inside(p, &self.base) > 200.0
     }
 
     /// Metres from the nearest way's line, less its half width.
@@ -532,7 +508,7 @@ fn cliff(t: f64) -> f64 {
 pub(super) struct Raw {
     pub(super) h: f64,
     /// How much of the ground is the erosion's to furrow: the mountains, not
-    /// the desert's mesas or the knolls.
+    /// the desert's mesas.
     erodes: f64,
 }
 
@@ -548,18 +524,16 @@ impl Terrain {
     /// The ground before the erosion and the plan's cuts.
     pub(super) fn hv_raw(&self, p: (f64, f64)) -> Raw {
         let plan = &self.hv.plan;
-        // The outlines are read through a slow warp, and frayed.
-        let l = 5_600.0;
-        let q = (
-            p.0 + 1_300.0 * self.warp_x.fbm(p.0 / l, p.1 / l, 2, 0.5),
-            p.1 + 1_300.0 * self.warp_y.fbm(p.0 / l, p.1 / l, 2, 0.5),
-        );
+        // Each region rises from its climate walls (`HARVEST_WALLS`) read where the
+        // renderer reads them for its colour (`harvest_look`, which wanders them by
+        // kilometres), frayed a little more: its colour and its shape come in together.
+        let q = harvest_look(p);
         let fray = |k: f64| {
-            280.0
+            180.0
                 * self
                     .ridge
                     .fbm(p.0 / 1_500.0 + k, p.1 / 1_500.0 - k, 4, 0.55)
-                + 650.0
+                + 160.0
                     * self
                         .mtn_gap
                         .fbm(p.0 / 4_200.0 - k, p.1 / 4_200.0 + k, 2, 0.5)
@@ -567,25 +541,23 @@ impl Terrain {
         let shore = self.hv_shore(p);
         let mut h = self.hv_lowland(p, shore);
         let lowland = h;
-        let dp = inside(q, &plan.polar) + fray(3.1);
-        if dp > -200.0 {
+        let dp = harvest_depth(q, HARVEST_FJORDS) + fray(3.1);
+        if dp > -500.0 {
             h = self.hv_polar(p, dp, h, shore);
         }
-        let da = inside(q, &plan.alpine) + fray(7.3);
-        if da > -200.0 {
+        let da = harvest_depth(q, HARVEST_ALPINE) + fray(7.3);
+        if da > -1_000.0 {
             h = self.hv_alpine(p, da, h);
         }
-        let dd = inside(q, &plan.desert) + fray(-4.7);
+        let dd = harvest_depth(q, HARVEST_DESERT) + fray(-4.7);
         let mut desert = 0.0;
-        if dd > -10.0 {
-            desert = smoothstep(-10.0, 120.0, dd);
+        if dd > -1_100.0 {
+            desert = smoothstep(-1_100.0, 0.0, dd);
             h = self.hv_desert(p, dd, h);
         }
-        // Karst knolls stand about the heartland's open country.
-        let mut knoll = 0.0;
-        if h - lowland < 1.0 && shore > 300.0 && dd < -300.0 && da < -300.0 && dp < -300.0 {
-            knoll = self.hv_knolls(p);
-            h += knoll;
+        // Hills stand about the heartland's open country.
+        if h - lowland < 1.0 && shore > 300.0 && dd < -1_200.0 && da < -1_100.0 && dp < -600.0 {
+            h += self.hv_hills(p);
         }
         // The fjords wander off their lines and swell and narrow along them.
         let f = (
@@ -601,17 +573,36 @@ impl Terrain {
         for (k, line) in plan.fjords.iter().enumerate() {
             let (_, half, bed) = FJORDS[k];
             let half = half * (0.85 + 0.3 * self.lake.get(p.0 / 1_600.0 + k as f64, p.1 / 1_600.0));
+            // (The sound's shores wander the more, coves and points along them.)
+            let f = if k == 0 {
+                (
+                    f.0 + 380.0 * self.coast.fbm(p.0 / 1_300.0 - 6.0, p.1 / 1_300.0, 3, 0.55),
+                    f.1,
+                )
+            } else {
+                f
+            };
             let d = crate::bake::bays::polyline(f, line);
             if d < half + 900.0 {
-                // Steep walls, wider the higher the ground they cut.
-                let wall = 40.0 + 0.5 * (h - bed).max(0.0);
+                // Steep walls, wider the higher the ground they cut; the sound's
+                // shores low and shelving, out on the tundra.
+                let wall = if k == 0 {
+                    120.0 + 1.6 * (h - bed).max(0.0)
+                } else {
+                    40.0 + 0.5 * (h - bed).max(0.0)
+                };
                 let w = 1.0 - smoothstep(half - 80.0, half + wall, d);
                 let floor = bed + 4.0 * self.detail.fbm(p.0 / 300.0, p.1 / 300.0, 2, 0.5);
                 h += (floor - h) * w;
             }
         }
-        let erodes =
-            smoothstep(140.0, 360.0, h) * (1.0 - desert) * (1.0 - smoothstep(0.0, 20.0, knoll));
+        // The mountains furrowed deep, the heartland's hills and ridges into
+        // small valleys; not the desert's mesas.
+        let low = 0.35
+            * smoothstep(200.0, 600.0, shore)
+            * (1.0 - smoothstep(-900.0, -300.0, da))
+            * (1.0 - smoothstep(-700.0, -200.0, dp));
+        let erodes = smoothstep(140.0, 360.0, h).max(low) * (1.0 - desert);
         Raw { h, erodes }
     }
 
@@ -661,30 +652,25 @@ impl Terrain {
         }
         let inland = smoothstep(0.0, 2_400.0, shore);
         let north = smoothstep(9_000.0, 18_800.0, y);
-        let roll = self.lake.fbm(x / 1_700.0, y / 1_700.0, 3, 0.5);
-        let hills = self.ramp.fbm(x / 1_300.0 + 3.7, y / 1_300.0 - 1.3, 3, 0.5);
+        // Rolling country: long low swells, broad rises between them, and low
+        // ridges running across the heartland; dales down to the river.
+        let roll = self.lake.fbm(x / 2_300.0, y / 2_300.0, 4, 0.5);
+        let rises = self.ramp.fbm(x / 3_600.0 + 3.7, y / 3_600.0 - 1.3, 3, 0.5);
         let calm = SPAWNS.iter().fold(1.0_f64, |k, s| {
             k.min(smoothstep(500.0, 1_500.0, dist(p, s.0)))
         });
         let mut h = 3.0
             + 24.0 * inland
             + (BASE_H - 30.0) * north
-            + 11.0 * roll * inland
-            + 70.0 * smoothstep(-0.05, 0.6, hills) * inland * calm;
-        // The river, in a broad shallow valley of its own.
-        let wander = (
-            x + 180.0 * self.lake_shore.fbm(x / 900.0, y / 900.0, 2, 0.5),
-            y + 180.0 * self.lake_shore.fbm(x / 900.0 + 5.0, y / 900.0, 2, 0.5),
-        );
-        let (d, down) = self.hv.plan.river(wander);
-        if d < 1_200.0 {
-            // (Narrow where it springs from the mountains' foot.)
-            let half = (26.0 + 34.0 * down) * (0.2 + 0.8 * smoothstep(0.0, 0.12, down));
-            let plain = 9.0 - 5.0 * down;
+            + 16.0 * roll * inland
+            + (34.0 * smoothstep(-0.12, 0.55, rises) + 40.0 * self.hv_ridges(p)) * inland * calm
+            - 18.0 * self.hv_dales(p) * inland;
+        // The river's broad shallow valley (its channel is cut after the
+        // erosion, `hv_cut`, which would silt it up).
+        if let Some((d, half, plain)) = self.hv_river(p) {
             if h > plain {
                 h = plain + (h - plain) * smoothstep(half + 50.0, half + 1_000.0, d).powf(0.7);
             }
-            h += (-2.6 - h) * (1.0 - smoothstep(half - 8.0, half + 28.0, d));
         }
         // The isles' hills: jungle peaks, or an atoll's ring.
         for isle in &ISLES {
@@ -704,6 +690,71 @@ impl Terrain {
         sea + (h - sea) * smoothstep(0.0, 140.0, shore)
     }
 
+    /// Near the river: metres from its (wandering) line, half its channel's
+    /// width there (narrow where it springs from the mountains' foot), and
+    /// the height its valley's floor eases down to.
+    fn hv_river(&self, (x, y): (f64, f64)) -> Option<(f64, f64, f64)> {
+        let wander = (
+            x + 180.0 * self.lake_shore.fbm(x / 900.0, y / 900.0, 2, 0.5),
+            y + 180.0 * self.lake_shore.fbm(x / 900.0 + 5.0, y / 900.0, 2, 0.5),
+        );
+        let (d, down) = self.hv.plan.river(wander);
+        (d < 1_200.0).then(|| {
+            let half = (26.0 + 34.0 * down) * (0.2 + 0.8 * smoothstep(0.0, 0.12, down));
+            (d, half, 9.0 - 5.0 * down)
+        })
+    }
+
+    /// Metres inside the base's floor (negative outside), its edge frayed so
+    /// the floor gives way to the country in lobes, not along a ruled line.
+    fn hv_on_base(&self, p: (f64, f64)) -> f64 {
+        let frayed = inside(p, &self.hv.plan.base)
+            + 260.0 * self.mtn_gap.fbm(p.0 / 1_100.0 + 9.0, p.1 / 1_100.0, 3, 0.5);
+        // (Always well round the machine's bastions, whose benches are cut at
+        // the floor's level: no notch in the hills behind.)
+        super::base::BASTIONS
+            .iter()
+            .fold(frayed, |b, &(at, _, _)| b.max(700.0 - dist(p, at)))
+    }
+
+    /// Low ridges across the heartland, long and wandering, 0 to 1: broad
+    /// shoulders under a rounded crest, nowhere steep.
+    fn hv_ridges(&self, (x, y): (f64, f64)) -> f64 {
+        let l = 3_200.0;
+        let (wx, wy) = (
+            900.0 * self.warp_x.fbm(x / 4_500.0 + 2.0, y / 4_500.0, 2, 0.5),
+            900.0 * self.warp_y.fbm(x / 4_500.0, y / 4_500.0 + 2.0, 2, 0.5),
+        );
+        // (Long east to west, as the river runs.)
+        let crest = self
+            .crag
+            .ridged((x + wx) / (1.8 * l) + 7.7, (y + wy) / l - 2.2, 2, 0.45);
+        let t = smoothstep(0.45, 0.97, crest);
+        t * t * (0.75 + 0.25 * self.detail.fbm(x / 900.0, y / 900.0, 2, 0.5))
+    }
+
+    /// The heartland's dales, 0 to 1: shallow valleys wandering down to the
+    /// river from the rises either side of it, deepest at their mouths.
+    fn hv_dales(&self, p: (f64, f64)) -> f64 {
+        let w = (
+            p.0 + 220.0
+                * self
+                    .lake_shore
+                    .fbm(p.0 / 1_100.0 - 3.0, p.1 / 1_100.0, 3, 0.5),
+            p.1 + 220.0
+                * self
+                    .lake_shore
+                    .fbm(p.0 / 1_100.0, p.1 / 1_100.0 + 6.0, 3, 0.5),
+        );
+        let mut deep: f64 = 0.0;
+        for line in &self.hv.plan.dales {
+            let (d, down) = crate::bake::bays::polyline_at(w, line);
+            let wide = 160.0 + 260.0 * down;
+            deep = deep.max(smoothstep(0.0, 0.5, down) * (1.0 - smoothstep(0.2 * wide, wide, d)));
+        }
+        deep
+    }
+
     /// The desert at `dd` metres inside its outline, over the ground `low`
     /// outside it: mesas where a slow field comes up, run together into a rim
     /// of mesa walls along its edge, their tops at the canyon's beds; the
@@ -719,20 +770,33 @@ impl Terrain {
             420.0 * self.warp_x.get(x / 2_100.0 + 3.0, y / 2_100.0),
             420.0 * self.warp_y.get(x / 2_100.0, y / 2_100.0 + 3.0),
         );
-        let rim_w = 1_000.0 + 450.0 * self.mtn_gap.fbm(x / 1_900.0, y / 1_900.0, 2, 0.5);
-        let mut mesa = self.mtn_gap.fbm((x + wx) / l, (y + wy) / l, 4, 0.55)
-            + 0.02
-            + 0.8 * (1.0 - smoothstep(0.55 * rim_w, rim_w, dd));
+        // A rim of mesa walls a kilometre or so in from the edge, broken; outside
+        // it the mesas thin to lone buttes standing out over the heartland,
+        // none on a way; the flats rise gently out of the lowland.
+        let rim_w = 1_100.0 + 450.0 * self.mtn_gap.fbm(x / 1_900.0, y / 1_900.0, 2, 0.5);
+        let rim = 0.42
+            * smoothstep(800.0, 1_400.0, dd)
+            * (1.0 - smoothstep(1.4 * rim_w, 1.9 * rim_w, dd));
+        let mut mesa = self.mtn_gap.fbm((x + wx) / l, (y + wy) / l, 4, 0.55) + 0.02 + rim
+            - 0.16 * (1.0 - smoothstep(-300.0, 900.0, dd));
         for s in SITES.iter().filter(|s| s.cut < 0.5) {
             let d = dist(p, s.at);
             mesa -= 1.2 * (1.0 - smoothstep(s.room() + 150.0, s.room() + 900.0, d));
         }
+        if dd < 400.0 {
+            for (way, s) in self.hv.plan.ways.iter().zip(SITES) {
+                if let (Some((d, _)), true) = (way.near(p), s.cut < 0.5) {
+                    mesa -= 0.6 * (1.0 - smoothstep(way.half + 150.0, way.half + 500.0, d));
+                }
+            }
+        }
+        let ground = low + (flats - low) * smoothstep(-100.0, 700.0, dd);
         let tier = self.mtn_height.fbm(x / 2_600.0 + 1.0, y / 2_600.0, 3, 0.5);
         let tops = 205.0
             + 66.0 * cliff((tier + 0.12) / 0.05)
             + 70.0 * cliff((tier - 0.18) / 0.05)
             + 4.0 * self.detail.get(x / 500.0, y / 500.0);
-        let mut h = flats + (tops - flats) * cliff(mesa / 0.07);
+        let mut h = ground + (tops - ground) * cliff(mesa / 0.07) * smoothstep(-500.0, -150.0, dd);
         // The hollow: a ring of mesa round the artillery's room.
         let hollow = SITES.iter().find(|s| s.name == "The Hollow").unwrap();
         let d = dist(p, hollow.at)
@@ -742,14 +806,14 @@ impl Terrain {
             let ring = cliff((d - 520.0) / 140.0) * (1.0 - cliff((d - 1_250.0) / 200.0));
             h = h.max(flats + (300.0 + 40.0 * tier - flats) * ring);
         }
-        low + (h - low) * cliff(dd / 120.0)
+        h
     }
 
     /// The alpine country at `da` metres inside its outline, over `low`: its
     /// front, its peaks, the basins round the sites, the cirque's ring.
     fn hv_alpine(&self, p: (f64, f64), da: f64, low: f64) -> f64 {
         let (x, y) = p;
-        let mass = smoothstep(0.0, 2_800.0, da);
+        let mass = smoothstep(-300.0, 3_000.0, da);
         let l = 2_600.0;
         let (wx, wy) = (
             600.0 * self.warp_x.get(x / l + 5.0, y / l),
@@ -765,7 +829,8 @@ impl Terrain {
             + (300.0 + 900.0 * mass) * big.powf(1.8)
             + 150.0 * small * big
             + 50.0 * self.mtn_height.get(x / 2_900.0, y / 2_900.0);
-        let h = low + (peaks - low) * smoothstep(-150.0, 650.0, da);
+        // Foothills rise out of the lowland before the wall.
+        let h = low + (peaks - low) * smoothstep(-900.0, 900.0, da);
         let h = self.hv_valleys(p, h, low);
         self.hv_basins(p, h, HARVEST_ALPINE)
     }
@@ -775,23 +840,25 @@ impl Terrain {
     /// the sites there. (The fjords are cut after.)
     fn hv_polar(&self, p: (f64, f64), dp: f64, low: f64, shore: f64) -> f64 {
         let (x, y) = p;
-        let plateau = 70.0
-            + 80.0 * smoothstep(0.0, 3_000.0, dp)
+        // Tundra rising slowly off the heartland past the sound, then the
+        // plateau, its ranges further in toward the fjords.
+        let plateau = 22.0
+            + 128.0 * smoothstep(0.0, 4_200.0, dp)
             + 22.0 * self.tilt.fbm(x / 1_500.0 + 9.0, y / 1_500.0, 3, 0.5);
         let ranges = smoothstep(
             -0.3,
             0.25,
             self.mtn_mask.fbm(x / 3_000.0, y / 3_000.0, 2, 0.5),
-        ) * smoothstep(200.0, 1_400.0, dp);
+        ) * smoothstep(1_400.0, 3_400.0, dp);
         let big = self
             .crag
             .ridged(x / 2_200.0 + 11.0, y / 2_200.0 - 4.0, 4, 0.5)
             .max(0.0);
         let hills = self.crag.ridged(x / 900.0 - 3.0, y / 900.0 + 6.0, 3, 0.5);
         let ground = plateau
-            + 70.0 * hills * smoothstep(100.0, 900.0, dp)
+            + 70.0 * hills * smoothstep(500.0, 2_400.0, dp)
             + ranges * (160.0 + 560.0 * big.powf(1.5));
-        let w = smoothstep(-150.0, 450.0, dp) * smoothstep(0.0, 450.0, shore);
+        let w = smoothstep(-400.0, 1_600.0, dp) * smoothstep(0.0, 450.0, shore);
         let h = low + (ground - low) * w;
         let h = self.hv_valleys(p, h, low);
         self.hv_basins(p, h, HARVEST_FJORDS)
@@ -831,11 +898,11 @@ impl Terrain {
         h
     }
 
-    /// Sandstone knolls standing out of the heartland's woods: one may stand
-    /// in each cell of a jittered grid ([`Terrain::hv_features`]).
-    fn hv_knolls(&self, p: (f64, f64)) -> f64 {
-        let n = cells_of(KNOLL_CELL);
-        let (ci, cj) = ((p.0 / KNOLL_CELL) as i64, (p.1 / KNOLL_CELL) as i64);
+    /// Wooded hills about the heartland, and here and there a rocky outcrop:
+    /// one may stand in each cell of a jittered grid (`hv_lay_hills`).
+    fn hv_hills(&self, p: (f64, f64)) -> f64 {
+        let n = cells_of(HILL_CELL);
+        let (ci, cj) = ((p.0 / HILL_CELL) as i64, (p.1 / HILL_CELL) as i64);
         let mut add: f64 = 0.0;
         for dj in -1..=1 {
             for di in -1..=1 {
@@ -843,51 +910,88 @@ impl Terrain {
                 if i < 0 || j < 0 || i >= n as i64 || j >= n as i64 {
                     continue;
                 }
-                let Some(k) = self.hv.plan.knolls[j as usize * n + i as usize] else {
+                let Some(k) = self.hv.plan.hills[j as usize * n + i as usize] else {
                     continue;
                 };
-                let l = 0.8 * k.r;
-                let d = dist(p, k.at) + 0.25 * k.r * self.ridge.fbm(p.0 / l, p.1 / l + 9.0, 2, 0.5);
-                let t = d / k.r;
-                if t < 1.0 {
-                    add = add.max(k.top * smoothstep(1.0, 0.82, t) * (1.0 - 0.12 * t * t));
-                }
+                let shape = match k.outcrop {
+                    Some(heading) => self.hv_outcrop(p, &k, heading),
+                    None => {
+                        let l = 0.7 * k.r;
+                        let d = dist(p, k.at)
+                            + 0.3 * k.r * self.ridge.fbm(p.0 / l, p.1 / l + 9.0, 3, 0.5);
+                        let t = (d / k.r).min(1.0);
+                        (1.0 - t * t).powi(2)
+                    }
+                };
+                add = add.max(k.top * shape);
             }
         }
         add
     }
 
-    /// Lays the knolls, cell by cell: one where the karst comes up and the
-    /// dice say; none on a way, near a start, an ore field or the base.
-    pub(super) fn hv_lay_knolls(&mut self) {
+    /// An outcrop's rise, 0 to 1: its bed climbing gently across it to a
+    /// crest near one edge, then the scarp, weathered, falling away; tapering
+    /// at its ends, its outline and crest wandering.
+    fn hv_outcrop(&self, p: (f64, f64), k: &Hill, heading: f64) -> f64 {
+        let (s, c) = heading.sin_cos();
+        let (dx, dy) = (p.0 - k.at.0, p.1 - k.at.1);
+        let wob = |f: f64, z: f64| self.ridge.fbm(p.0 / f + z, p.1 / f - z, 3, 0.5);
+        let u = (dx * c + dy * s) / k.r + 0.25 * wob(0.6 * k.r, 3.0);
+        let v = (dy * c - dx * s) / (0.45 * k.r) + 0.3 * wob(0.35 * k.r, -5.0);
+        if u.abs() >= 1.0 || v.abs() >= 1.0 {
+            return 0.0;
+        }
+        let ends = (1.0 - u * u).powf(1.4);
+        let crest = 0.5 + 0.12 * wob(0.25 * k.r, 11.0);
+        let back = smoothstep(-1.0, crest, v);
+        let scarp = 1.0 - smoothstep(crest, crest + 0.3, v);
+        // (Ledges where the beds break along the face.)
+        let ledges = 0.92 + 0.08 * self.crag.ridged(p.0 / 45.0, p.1 / 45.0, 2, 0.5);
+        ends * back * scarp * ledges
+    }
+
+    /// Lays the hills, cell by cell, in clusters where a slow field comes up;
+    /// none on a way, near a start, an ore field, the river or the base.
+    pub(super) fn hv_lay_hills(&mut self) {
         let plan = &self.hv.plan;
-        let n = cells_of(KNOLL_CELL);
-        let knolls = (0..n * n)
+        let n = cells_of(HILL_CELL);
+        let hills = (0..n * n)
             .map(|k| {
                 let (i, j) = ((k % n) as i64, (k / n) as i64);
                 let hash = hash2(self.seed ^ 0x6b6e_6f6c, i, j);
                 let c = (
-                    (i as f64 + 0.15 + 0.7 * unit(hash, 8)) * KNOLL_CELL,
-                    (j as f64 + 0.15 + 0.7 * unit(hash, 16)) * KNOLL_CELL,
+                    (i as f64 + 0.15 + 0.7 * unit(hash, 8)) * HILL_CELL,
+                    (j as f64 + 0.15 + 0.7 * unit(hash, 16)) * HILL_CELL,
                 );
-                let karst = self
+                let cluster = self
                     .mtn_mask
                     .fbm(c.0 / 4_000.0 + 7.0, c.1 / 4_000.0 - 3.0, 2, 0.5);
-                let r = 60.0 + 95.0 * unit(hash, 24);
-                let picked = unit(hash, 0) < 0.75 * smoothstep(-0.15, 0.2, karst)
-                    && plan.off_ways(c) > r + 220.0
-                    && SPAWNS.iter().all(|s| dist(c, s.0) > 1_600.0)
-                    && ORE.iter().all(|o| dist(c, (o.0, o.1)) > o.2 + r + 300.0)
-                    && inside(c, &plan.base) < -900.0
-                    && plan.river(c).0 > r + 400.0;
-                picked.then(|| Feature {
+                let rocky = unit(hash, 40) < 0.3;
+                let r = if rocky {
+                    220.0 + 180.0 * unit(hash, 24)
+                } else {
+                    300.0 + 350.0 * unit(hash, 24)
+                };
+                let picked = unit(hash, 0) < 0.45 * smoothstep(-0.2, 0.2, cluster)
+                    && plan.off_ways(c) > r + 160.0
+                    && SPAWNS.iter().all(|s| dist(c, s.0) > 1_400.0)
+                    && ORE.iter().all(|o| dist(c, (o.0, o.1)) > o.2 + r + 200.0)
+                    && inside(c, &plan.base) < -700.0
+                    && plan.river(c).0 > r + 250.0;
+                picked.then(|| Hill {
                     at: c,
                     r,
-                    top: 130.0 + 200.0 * unit(hash, 32) * unit(hash, 40),
+                    top: if rocky {
+                        16.0 + 20.0 * unit(hash, 32)
+                    } else {
+                        25.0 + 40.0 * unit(hash, 32)
+                    },
+                    // (The beds dip about the same way across the heartland.)
+                    outcrop: rocky.then(|| 0.5 + 0.9 * (unit(hash2(hash, 7, 1), 0) - 0.5)),
                 })
             })
             .collect();
-        self.hv.plan.knolls = knolls;
+        self.hv.plan.hills = hills;
     }
 
     /// What the plan cuts into the ground: every way, every room, the base's floor.
@@ -898,6 +1002,10 @@ impl Terrain {
         for s in SITES {
             h = self.hv_room(s, p, h);
         }
+        if let Some((d, half, _)) = self.hv_river(p) {
+            h += (-2.6 - h) * (1.0 - smoothstep(half - 8.0, half + 28.0, d));
+        }
+        let mut heartland = None;
         for way in &plan.ways {
             let Some((d, along)) = way.near(p) else {
                 continue;
@@ -917,17 +1025,20 @@ impl Terrain {
                 continue;
             }
             let floor = way.floor(along);
-            let (run, most) = if h > floor {
-                (
-                    way.cut + (LOW_CUT - way.cut) * (1.0 - smoothstep(75.0, 110.0, h)),
-                    SHOULDER,
+            // Across the heartland a way is a narrow strip, its banks long and
+            // low: the country round it is its road.
+            let lowland = *heartland.get_or_insert_with(|| {
+                smoothstep(
+                    -200.0,
+                    400.0,
+                    harvest_depth(harvest_look(p), HARVEST_HEARTLAND),
                 )
+            });
+            let (run, most) = if h > floor {
+                (way.cut + (LOW_CUT - way.cut) * lowland, SHOULDER)
             } else {
                 (FILL, FILL_MOST)
             };
-            // Across the lowland a way is a narrow strip, its banks long and
-            // low: the country round it is its road.
-            let lowland = 1.0 - smoothstep(64.0, 76.0, h.max(floor));
             let half = way.half + (40.0 - way.half) * lowland;
             let edge = half + (run * (h - floor).abs() + 8.0).min(most);
             h += (floor - h) * (1.0 - smoothstep(half, edge, d));
@@ -942,7 +1053,7 @@ impl Terrain {
             }
         }
         if !plan.base.is_empty() {
-            let b = inside(p, &plan.base);
+            let b = self.hv_on_base(p);
             if b > -BASE_BLEND {
                 h += (BASE_H - h) * smoothstep(-BASE_BLEND, 0.0, b);
             }
@@ -955,15 +1066,41 @@ impl Terrain {
     fn hv_room(&self, s: &Site, p: (f64, f64), h: f64) -> f64 {
         let d = dist(p, s.at);
         let reach = s.room() + 40.0;
-        if d > reach + SHOULDER {
+        if d > reach + ROOM_LOBES + SHOULDER {
             return h;
         }
         if s.ground == Ground::Naval {
             return self.hv_slips(s, p, d, h);
         }
-        let run = if h > s.level { s.cut } else { FILL };
-        let edge = reach + (run * (h - s.level).abs() + 10.0).min(SHOULDER);
-        h + (s.level - h) * (1.0 - smoothstep(reach, edge, d))
+        // The level ground runs out past the room in lobes, and its shoulders
+        // wander: a floor the ground has, not a disc cut into it. A printer's
+        // room in the hills or the mountains is a valley's floor, the slopes
+        // coming down to it long and concave; the desert's rooms keep the
+        // canyon's sheer walls, and the hidden sites the steep sides of their
+        // rings, which must not open.
+        let lobes = ROOM_LOBES
+            * self
+                .mtn_gap
+                .fbm(p.0 / 380.0 + 1.7, p.1 / 380.0, 3, 0.5)
+                .max(0.0)
+            + 60.0 * self.ridge.fbm(p.0 / 140.0, p.1 / 140.0 - 3.0, 2, 0.5);
+        let core = reach + lobes.max(0.0);
+        let valley = s.kind == Kind::Printer && s.cut >= 0.5;
+        let run = match () {
+            _ if h <= s.level => FILL,
+            _ if valley => s.cut.max(3.4),
+            _ => s.cut.max(1.0),
+        };
+        let edge = core
+            + (run
+                * (h - s.level).abs()
+                * (0.75 + 0.6 * self.detail.get(p.0 / 260.0, p.1 / 260.0))
+                + 30.0)
+                .min(SHOULDER);
+        let t = smoothstep(core, edge, d);
+        // (A valley's foot: the slope eases out onto the floor.)
+        let t = if valley { t.powf(1.5) } else { t };
+        h + (s.level - h) * (1.0 - t)
     }
 
     /// A naval site: the Shaper's pad level on an islet or a shore, the land

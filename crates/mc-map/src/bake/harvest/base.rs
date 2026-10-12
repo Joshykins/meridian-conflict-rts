@@ -70,15 +70,32 @@ const NEEDLES: [((f64, f64), f64); 4] = [
     ((15_000.0, 23_900.0), 1.2),
 ];
 
-/// The paving's west and east edges.
-const FLOOR_WEST: f64 = 10_500.0;
-const FLOOR_EAST: f64 = 14_100.0;
+/// The paving's precinct: courts square to the floor's grid (west, east,
+/// south, north), each where the architecture asks for it.
+const PRECINCT: [(f64, f64, f64, f64); 6] = [
+    // The Gate's threshold.
+    (11_500.0, 13_100.0, 18_100.0, 18_700.0),
+    // The processional, from the Gate to the Heart's court.
+    (11_900.0, 12_700.0, 18_500.0, 21_300.0),
+    // The halls' aprons.
+    (10_300.0, 11_900.0, 19_900.0, 21_100.0),
+    (12_700.0, 14_300.0, 19_900.0, 21_100.0),
+    // The Heart's court, inside the tower ring.
+    (11_300.0, 13_300.0, 21_100.0, 23_000.0),
+    // The Great Forge's apron.
+    (11_100.0, 13_500.0, 22_900.0, 24_100.0),
+];
+/// The Heart's dais: half its side, and its tiles' side.
+const DAIS: f64 = 520.0;
+const DAIS_TILE: f64 = 130.0;
+/// The smallest paving tile's side, at the precinct's frayed edge.
+const TILE: f64 = 100.0;
 
-/// The machine's bastions on the heights either side of the floor, facing in
-/// over it: where, which way, at what scale.
-const BASTIONS: [((f64, f64), f64, f64); 2] = [
-    ((7_950.0, 23_250.0), 0.0, 1.2),
-    ((16_750.0, 23_150.0), PI, 1.2),
+/// The machine's bastions at the floor's north corners, facing in over it:
+/// where, which way, at what scale.
+pub(super) const BASTIONS: [((f64, f64), f64, f64); 2] = [
+    ((9_400.0, 23_750.0), 0.0, 1.2),
+    ((15_150.0, 23_750.0), PI, 1.2),
 ];
 
 /// A point in a piece's own frame (x along its heading), on the map.
@@ -179,9 +196,36 @@ impl Terrain {
                 }
             }
         }
-        // The paving: 400 m squares wherever the floor lies level under the
-        // whole square.
-        let level = |x: f64, y: f64| {
+        out.extend(self.hv_paving());
+        out
+    }
+
+    /// Metres inside the paving's precinct (negative outside), its courts
+    /// ([`PRECINCT`]) taken together.
+    fn hv_precinct(p: (f64, f64)) -> f64 {
+        PRECINCT
+            .iter()
+            .map(|&(w, e, s, n)| {
+                let (dx, dy) = ((w - p.0).max(p.0 - e), (s - p.1).max(p.1 - n));
+                if dx > 0.0 || dy > 0.0 {
+                    -dx.max(0.0).hypot(dy.max(0.0))
+                } else {
+                    -dx.max(dy)
+                }
+            })
+            .fold(f64::NEG_INFINITY, f64::max)
+    }
+
+    /// The paving, laid at grade in layers: the Heart's dais, a square of
+    /// tiles turned to the Heart's diagonal, inside the Heart's court; the
+    /// courts round it on the floor's own grid, great 400 m slabs where they
+    /// are wide, broken into 200 m slabs and 100 m tiles toward their edges,
+    /// a tile missing here and there; and past their edges loose tiles,
+    /// fewer further out into the grass, so the precinct wears away into the
+    /// country rather than ending on a line. Only where the floor lies level
+    /// under the whole piece.
+    fn hv_paving(&self) -> Vec<PrecursorSite> {
+        let level = |c: (f64, f64), half: f64, heading: f64| {
             [
                 (-1.0, -1.0),
                 (1.0, -1.0),
@@ -191,21 +235,100 @@ impl Terrain {
             ]
             .iter()
             .all(|&(i, j)| {
-                let (px, py) = (x + i * 199.0, y + j * 199.0);
-                px < SIZE && py < SIZE && (self.natural(px, py) - BASE_H).abs() < 0.05
+                let p = world(c, heading, (i * (half - 1.0), j * (half - 1.0)));
+                p.0 > 0.0
+                    && p.1 > 0.0
+                    && p.0 < SIZE
+                    && p.1 < SIZE
+                    && (self.natural(p.0, p.1) - BASE_H).abs() < 0.05
             })
         };
-        // (A precinct round the processional, the halls and the Heart.)
-        let mut y = 18_900.0;
-        while y < SIZE {
-            let mut x = FLOOR_WEST + 200.0;
-            while x < FLOOR_EAST {
-                if level(x, y) {
-                    put(PropKind::PrecursorFloor, (x, y), 0.0, 1.0);
+        let mut out = Vec::new();
+        let mut slab = |at: (f64, f64), half: f64, heading: f64| {
+            out.push(PrecursorSite {
+                kind: PropKind::PrecursorFloor,
+                x: at.0,
+                y: at.1,
+                heading,
+                scale: half / 200.0,
+            })
+        };
+        // The dais, on its own turned grid.
+        let turn = 0.25 * PI;
+        let n = (2.0 * DAIS / DAIS_TILE).round() as usize;
+        for j in 0..n {
+            for i in 0..n {
+                let local = (
+                    -DAIS + DAIS_TILE * (i as f64 + 0.5),
+                    -DAIS + DAIS_TILE * (j as f64 + 0.5),
+                );
+                let at = world(HEART, turn, local);
+                if level(at, 0.5 * DAIS_TILE, turn) {
+                    slab(at, 0.5 * DAIS_TILE, turn);
                 }
-                x += 400.0;
             }
-            y += 400.0;
+        }
+        // Whether a square on the floor's grid stays off the dais.
+        let off_dais = |c: (f64, f64), half: f64| {
+            let (s, co) = turn.sin_cos();
+            [(-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)]
+                .iter()
+                .all(|&(i, j)| {
+                    let (dx, dy) = (c.0 + i * half - HEART.0, c.1 + j * half - HEART.1);
+                    let (u, v) = (dx * co + dy * s, dy * co - dx * s);
+                    u.abs().max(v.abs()) > DAIS + 30.0
+                })
+        };
+        let (x0, y0) = (HEART.0 - 200.0 - 400.0 * 8.0, 17_600.0);
+        let mut stack: Vec<((f64, f64), f64)> = (0..19)
+            .flat_map(|j| (0..17).map(move |i| (i, j)))
+            .map(|(i, j)| ((x0 + 400.0 * i as f64, y0 + 400.0 * j as f64), 200.0))
+            .collect();
+        while let Some((c, half)) = stack.pop() {
+            let deep = [(-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)]
+                .iter()
+                .map(|&(i, j)| Self::hv_precinct((c.0 + i * half, c.1 + j * half)))
+                .fold(f64::INFINITY, f64::min);
+            let edge = Self::hv_precinct(c);
+            let tile = half <= 0.5 * TILE + 1.0;
+            let dice = unit(
+                crate::noise::hash2(self.seed ^ 0x736c_6162, c.0 as i64, c.1 as i64),
+                0,
+            );
+            let fits = || off_dais(c, half) && level(c, half, 0.0);
+            if deep >= -1.0 {
+                // (A tile gone here and there toward a court's edge.)
+                let gap = tile && edge < 300.0 && dice < 0.08;
+                if !gap && fits() {
+                    slab(c, half, 0.0);
+                    continue;
+                }
+                if tile {
+                    continue;
+                }
+            } else if tile {
+                // Out past the edge: a loose slab, smaller, skewed and shifted off
+                // the grid, as if the ground had moved under it.
+                if dice < 0.4 * smoothstep(-320.0, 0.0, edge).powf(1.5) {
+                    let h = crate::noise::hash2(self.seed ^ 0x6c6f_6f73, c.0 as i64, c.1 as i64);
+                    let at = (
+                        c.0 + 40.0 * (unit(h, 0) - 0.5),
+                        c.1 + 40.0 * (unit(h, 24) - 0.5),
+                    );
+                    let small = half * (0.45 + 0.4 * unit(h, 8));
+                    let skew = 0.24 * (unit(h, 32) - 0.5);
+                    if off_dais(at, small) && level(at, small, skew) {
+                        slab(at, small, skew);
+                    }
+                }
+                continue;
+            } else if edge < -(2.0 * half + 340.0) {
+                continue;
+            }
+            let q = 0.5 * half;
+            for (i, j) in [(-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] {
+                stack.push(((c.0 + i * q, c.1 + j * q), q));
+            }
         }
         out
     }
@@ -248,8 +371,7 @@ impl Terrain {
             m.link(ring[i], ring[(i + 1) % 4]);
         }
         for (k, &(at, heading, scale)) in BASTIONS.iter().enumerate() {
-            let level = self.natural(at.0, at.1).round();
-            let b = m.bastion(at, heading, scale, level);
+            let b = m.bastion(at, heading, scale, BASE_H);
             m.booms(b, heading, 1.5 * scale, scale);
             m.link(b, ring[[3, 2][k]]);
         }

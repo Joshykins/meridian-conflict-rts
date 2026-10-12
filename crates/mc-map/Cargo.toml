@@ -6,9 +6,8 @@ publish.workspace = true
 
 [dependencies]
 mc-core = { workspace = true }
-
-[dev-dependencies]
-# tests/threshold.rs reads the survival map's sidecar.
+# The Last Harvest lays its regions' relief by the renderer's own wander
+# (`mc_data::regions::wander`); the tests read the maps' sidecars.
 mc-data = { workspace = true }
 
 [[bin]]
