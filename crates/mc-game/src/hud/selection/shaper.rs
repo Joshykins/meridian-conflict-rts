@@ -21,7 +21,7 @@ const PAD: f32 = 18.0;
 const COL_GAP: f32 = 16.0;
 const ROW_H: f32 = 18.0;
 /// Width of the "+x/lvl" column at a row's right.
-const GROW_W: f32 = 62.0;
+const GROW_W: f32 = 58.0;
 const BLOCK_GAP: f32 = 12.0;
 
 /// A figure: its label, its value now, and what the next level adds.
@@ -69,7 +69,7 @@ impl Block {
     fn height(&self) -> f32 {
         let gadget = match self.gadget {
             Gadget::None => 0.0,
-            Gadget::Charge(_) | Gadget::Bar { .. } => 20.0,
+            Gadget::Charge(_) | Gadget::Bar { .. } => 10.0,
             Gadget::Slots { .. } => 30.0,
             Gadget::Absent(_) => ROW_H,
         };
@@ -84,7 +84,7 @@ fn amount(v: f32) -> String {
         format!("{:.1}M", v / 1_000_000.0)
     } else if a >= 99_950.0 {
         format!("{:.0}k", v / 1000.0)
-    } else if a >= 10.0 || a == 0.0 {
+    } else if a >= 10.0 || a.fract() == 0.0 {
         crate::hud::whole(v)
     } else {
         format!("{v:.1}")
@@ -103,9 +103,10 @@ fn secs(s: f32) -> String {
     }
 }
 
-/// What the next level adds to a figure `now` that will be `next`: "+35 m", "-0.2 s".
-/// None when it does not change (a figure at its cap). `unit` follows the number.
-fn gain(now: f32, next: f32, unit: &str, tenths: bool) -> Option<String> {
+/// What the next level adds to a figure `now` that will be `next`: "+35", "-0.2".
+/// None when it does not change (a figure at its cap). The figure's own unit is left
+/// to its value, for room.
+fn gain(now: f32, next: f32, tenths: bool) -> Option<String> {
     let d = next - now;
     let shown = if tenths {
         (d * 10.0).round() / 10.0
@@ -121,7 +122,7 @@ fn gain(now: f32, next: f32, unit: &str, tenths: bool) -> Option<String> {
     } else {
         amount(shown.abs())
     };
-    Some(format!("{sign}{n}{unit}"))
+    Some(format!("{sign}{n}"))
 }
 
 /// What a Shaper of a site kind does, for its header.
@@ -190,9 +191,7 @@ fn blocks(card: &ShaperCard, bp: Option<&UnitBlueprint>, next_round: f32) -> Vec
     let lance_gain = bp.and_then(|bp| Some((lance_at(bp, now)?, lance_at(bp, next)?)));
     out.push(match &card.lance {
         Some(l) => {
-            let g = |i: usize, unit: &str, tenths: bool| {
-                lance_gain.and_then(|(a, b)| gain(a[i], b[i], unit, tenths))
-            };
+            let g = |i: usize, tenths: bool| lance_gain.and_then(|(a, b)| gain(a[i], b[i], tenths));
             let paced = lance_gain.map(|(a, b)| (pace(a[0], a[1], a[2]), pace(b[0], b[1], b[2])));
             Block {
                 title: "Lance",
@@ -200,21 +199,21 @@ fn blocks(card: &ShaperCard, bp: Option<&UnitBlueprint>, next_round: f32) -> Vec
                 ring: SHAPER_LANCE,
                 gadget: Gadget::Charge(l.charging),
                 rows: vec![
-                    row("Charge", secs(l.charge_secs), g(0, " s", true)),
-                    row("Reload", secs(l.reload_secs), g(1, " s", true)),
+                    row("Charge", secs(l.charge_secs), g(0, true)),
+                    row("Reload", secs(l.reload_secs), g(1, true)),
                     row(
                         "Fire Rate",
                         format!("{:.1} /min", l.fire_rate),
-                        paced.and_then(|(a, b)| gain(a.0, b.0, "", true)),
+                        paced.and_then(|(a, b)| gain(a.0, b.0, true)),
                     ),
-                    row("Damage / Strike", amount(l.damage), g(2, "", false)),
+                    row("Damage / Strike", amount(l.damage), g(2, false)),
                     row(
                         "Damage / s",
                         amount(l.dps),
-                        paced.and_then(|(a, b)| gain(a.1, b.1, "", false)),
+                        paced.and_then(|(a, b)| gain(a.1, b.1, false)),
                     ),
-                    row("Splash", format!("{:.0} m", l.splash), g(3, " m", false)),
-                    row("Range", format!("{} m", amount(l.range)), g(4, " m", false)),
+                    row("Splash", format!("{:.0} m", l.splash), g(3, false)),
+                    row("Range", format!("{} m", amount(l.range)), g(4, false)),
                 ],
             }
         }
@@ -225,9 +224,7 @@ fn blocks(card: &ShaperCard, bp: Option<&UnitBlueprint>, next_round: f32) -> Vec
     out.push(match &card.shield {
         Some(sh) => {
             let (a, b) = (shield_at(now), shield_at(next));
-            let g = |f: fn(&mc_data::Shield) -> f32, unit: &str| {
-                gain(f(a.as_ref()?), f(b.as_ref()?), unit, false)
-            };
+            let g = |f: fn(&mc_data::Shield) -> f32| gain(f(a.as_ref()?), f(b.as_ref()?), false);
             Block {
                 title: "Shield",
                 tone: Reach::Shield.tone(),
@@ -237,20 +234,16 @@ fn blocks(card: &ShaperCard, bp: Option<&UnitBlueprint>, next_round: f32) -> Vec
                     text: format!("{} / {}", amount(sh.charge), amount(sh.health)),
                 },
                 rows: vec![
-                    row(
-                        "Hit Points",
-                        amount(sh.health),
-                        g(|s| s.health.to_f32(), ""),
-                    ),
+                    row("Hit Points", amount(sh.health), g(|s| s.health.to_f32())),
                     row(
                         "Radius",
                         format!("{:.0} m", sh.radius),
-                        g(|s| s.radius.to_f32(), " m"),
+                        g(|s| s.radius.to_f32()),
                     ),
                     row(
                         "Regen",
                         format!("{} /s", amount(sh.regen)),
-                        g(|s| s.regen.to_f32(), ""),
+                        g(|s| s.regen.to_f32()),
                     ),
                     row("Pylon Feed", format!("{} /s", amount(sh.feed)), None),
                 ],
@@ -266,10 +259,10 @@ fn blocks(card: &ShaperCard, bp: Option<&UnitBlueprint>, next_round: f32) -> Vec
     out.push(match &card.anti_nuke {
         Some(a) => {
             let (x, y) = (cover_at(now), cover_at(next));
-            let g = |i: usize, unit: &str, tenths: bool| {
+            let g = |i: usize, tenths: bool| {
                 let (x, y) = (x?, y?);
                 let pick = |v: (f32, f32)| if i == 0 { v.0 } else { v.1 };
-                gain(pick(x), pick(y), unit, tenths)
+                gain(pick(x), pick(y), tenths)
             };
             Block {
                 title: "Anti-Nuke",
@@ -284,13 +277,9 @@ fn blocks(card: &ShaperCard, bp: Option<&UnitBlueprint>, next_round: f32) -> Vec
                     row(
                         "Interceptors",
                         format!("{} / {}", a.stock, a.capacity),
-                        g(0, "", true),
+                        g(0, false),
                     ),
-                    row(
-                        "Coverage",
-                        format!("{} m", amount(a.coverage)),
-                        g(1, " m", false),
-                    ),
+                    row("Coverage", format!("{} m", amount(a.coverage)), g(1, false)),
                     row("Each Takes", secs(a.round_secs), None),
                 ],
             }
@@ -418,7 +407,7 @@ pub(super) fn card(ui: &mut Ui, hud: &mut Hud, s: &Scene, pick: &ShaperPick, anc
     };
     let catching = c.level < c.catch_up;
     let note = catching || c.raised < 1.0 || pick.piece.is_some();
-    let head_h = if note { 78.0 } else { 62.0 };
+    let head_h = if note { 86.0 } else { 72.0 };
     let h = head_h + builds_h + cols_h + PAD;
     let r = Rect::new(anchor.x, (anchor.y - 10.0 - h).max(14.0), W, h);
     hud.claim(ui, r);
@@ -611,7 +600,20 @@ fn draw_block(ui: &mut Ui, b: &Block, x: f32, y: f32, w: f32, (lit, back): (f32,
     }
     let fade = ui.fade;
     ui.fade *= 1.0 - 0.6 * back;
-    ui.section(x, y, w, b.title);
+    // A bar's figure on the title's line, right.
+    let status = match &b.gadget {
+        Gadget::Charge(k) if *k > 0.0 => Some(format!("Charging  {:.0}%", k * 100.0)),
+        Gadget::Charge(_) => Some("Ready".to_string()),
+        Gadget::Bar { text, .. } => Some(text.clone()),
+        _ => None,
+    };
+    let status_w = status
+        .as_ref()
+        .map_or(0.0, |s| ui.text_width(type_scale::MICRO, s) + 10.0);
+    ui.section(x, y, w - status_w, b.title);
+    if let Some(st) = &status {
+        ui.text_right(x + w, y, type_scale::MICRO, rgb(palette::DIM, 1.0), st);
+    }
     let mut y = y + 18.0;
     match &b.gadget {
         Gadget::None => {}
@@ -630,35 +632,16 @@ fn draw_block(ui: &mut Ui, b: &Block, x: f32, y: f32, w: f32, (lit, back): (f32,
                     rgb(0xFFFFFF, a),
                 );
             }
-            let state = if *k > 0.0 {
-                format!("Charging  {:.0}%", k * 100.0)
-            } else {
-                "Ready".to_string()
-            };
-            ui.text_right(
-                x + w,
-                y + 9.0,
-                type_scale::MICRO,
-                rgb(palette::DIM, 1.0),
-                &state,
-            );
-            y += 20.0;
+            y += 10.0;
         }
-        Gadget::Bar { share, text } => {
+        Gadget::Bar { share, .. } => {
             let track = Rect::new(x, y - 3.0, w, 4.0);
             ui.fill(track, rgb(b.tone, 0.14));
             ui.fill(
                 Rect::new(track.x, track.y, track.w * share.clamp(0.0, 1.0), track.h),
                 rgb(b.tone, 0.95),
             );
-            ui.text_right(
-                x + w,
-                y + 9.0,
-                type_scale::MICRO,
-                rgb(palette::DIM, 1.0),
-                text,
-            );
-            y += 20.0;
+            y += 10.0;
         }
         Gadget::Slots {
             stock,
@@ -726,6 +709,7 @@ mod tests {
     #[test]
     fn amounts_read_short() {
         assert_eq!(amount(0.0), "0");
+        assert_eq!(amount(1.0), "1");
         assert_eq!(amount(4.26), "4.3");
         assert_eq!(amount(1500.0), "1,500");
         assert_eq!(amount(41_250.0), "41,250");
@@ -743,15 +727,12 @@ mod tests {
 
     #[test]
     fn a_level_gain_is_signed_and_absent_at_a_cap() {
-        assert_eq!(gain(800.0, 835.0, " m", false).as_deref(), Some("+35 m"));
-        assert_eq!(
-            gain(6.0, 5.76, " s", true).as_deref(),
-            Some("\u{2212}0.2 s")
-        );
-        assert_eq!(gain(900.0, 900.0, " m", false), None);
+        assert_eq!(gain(800.0, 835.0, false).as_deref(), Some("+35"));
+        assert_eq!(gain(6.0, 5.76, true).as_deref(), Some("\u{2212}0.2"));
+        assert_eq!(gain(900.0, 900.0, false), None);
         // Too small to show at its precision is no change.
-        assert_eq!(gain(10.0, 10.01, " s", true), None);
-        assert_eq!(gain(1500.0, 1800.0, "", false).as_deref(), Some("+300"));
+        assert_eq!(gain(10.0, 10.01, true), None);
+        assert_eq!(gain(1500.0, 1800.0, false).as_deref(), Some("+300"));
     }
 
     #[test]
