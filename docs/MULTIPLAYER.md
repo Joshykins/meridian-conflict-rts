@@ -129,7 +129,10 @@ Games hosted from the client (LAN, direct IP) do not check names.
 5. **Play.** Ticks at 10/s. The input delay adapts to the players' round trips
    (see below). A dropped player's side stands idle; the player can reconnect
    with its token and re-enters from a snapshot. Players may pause (everyone
-   sees who paused); anyone may resume.
+   sees who paused); anyone may resume. Any player may also set the game speed
+   (0.1x to 12x, everyone sees who); the relay closes ticks that much faster,
+   raises the input delay to cover the same round trips in shorter ticks, and
+   the slowest machine still sets the pace.
 6. **End.** The match ends for a player when it is defeated, resigns or leaves.
    The replay is kept on every client and on the server.
 

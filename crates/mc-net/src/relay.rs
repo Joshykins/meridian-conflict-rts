@@ -32,8 +32,10 @@
 //! `Clock` and never stamp a tick at or below one they already sent, so a
 //! change never breaks the order of anyone's commands.
 //!
-//! **Pause.** Any player may stop the clock and any player may restart it;
-//! everyone is told who did.
+//! **Pause and speed.** Any player may stop the clock and any player may restart
+//! it, or run it faster or slower (`MIN_SPEED..=MAX_SPEED` percent of real time);
+//! everyone is told who did. A faster clock has shorter ticks, so the input delay
+//! is raised with it to cover the same round trips.
 //!
 //! **Joining a running match.** The relay asks one healthy player for a
 //! snapshot at the next tick to close, `S`. The request travels in front of

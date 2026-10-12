@@ -1,5 +1,5 @@
-//! The match clock: loading, closing turns, pause, round trips and the input
-//! delay that follows them, link stats, and desync detection.
+//! The match clock: loading, closing turns, pause and speed, round trips and the
+//! input delay that follows them, link stats, and desync detection.
 
 use std::time::{Duration, Instant};
 
@@ -9,7 +9,7 @@ use super::hub::{frame, Hub, Kind, MAX_SLOT_BACKLOG_BYTES};
 use super::ConnId;
 use crate::protocol::{
     command_cost, take_commands, Link, Message, PeerStat, TickBundle, MAX_ADAPTIVE_DELAY,
-    MAX_COMMANDS_BYTES, MAX_INPUT_DELAY, MAX_SECTIONS,
+    MAX_COMMANDS_BYTES, MAX_INPUT_DELAY, MAX_SECTIONS, MAX_SPEED, MIN_SPEED,
 };
 use crate::wire::NetError;
 
@@ -21,6 +21,14 @@ const DELAY_MARGIN_MS: u32 = 30;
 const RAISE_EVERY: Duration = Duration::from_secs(1);
 /// ...a lower one only after it would have done for this long.
 const LOWER_AFTER: Duration = Duration::from_secs(10);
+
+/// The adaptive delay's ceiling at `speed`: the same real time as `MAX_ADAPTIVE_DELAY`
+/// at normal speed, in more, shorter ticks.
+fn max_adaptive_delay(speed: u32) -> u32 {
+    (MAX_ADAPTIVE_DELAY * speed)
+        .div_ceil(100)
+        .clamp(1, MAX_INPUT_DELAY)
+}
 
 impl Hub {
     // ---- loading -----------------------------------------------------------------------------
@@ -63,7 +71,7 @@ impl Hub {
         if m.loading_until.take().is_none() {
             return;
         }
-        m.due = Instant::now() + self.config.tick_interval;
+        m.due = Instant::now() + self.config.tick_interval * 100 / m.speed;
         for (i, s) in self.slots.iter_mut().enumerate() {
             if s.occupied && !s.loaded {
                 eprintln!("mc-relay: slot {i} did not load in time; starting without it");
@@ -84,10 +92,16 @@ impl Hub {
         self.broadcast(&Message::Loading { loaded });
     }
 
-    // ---- pause and delay ---------------------------------------------------------------------
+    // ---- pause, speed and delay -------------------------------------------------------------
+
+    /// Wall-clock length of a tick at the match's speed.
+    pub(super) fn tick_interval(&self) -> Duration {
+        let speed = self.game.as_ref().map_or(100, |m| m.speed);
+        self.config.tick_interval * 100 / speed
+    }
 
     pub(super) fn set_paused(&mut self, paused: bool, by: Option<PlayerId>) {
-        let interval = self.config.tick_interval;
+        let interval = self.tick_interval();
         let Some(m) = &mut self.game else { return };
         if paused == m.paused.is_some() {
             return;
@@ -102,6 +116,33 @@ impl Hub {
         self.send_clock_by(None, by);
     }
 
+    /// Runs the clock at `percent` of real time, held to `MIN_SPEED..=MAX_SPEED`; the
+    /// `Clock` tells everyone the speed it runs at and who set it.
+    pub(super) fn set_speed(&mut self, percent: u32, by: PlayerId) {
+        let speed = percent.clamp(MIN_SPEED, MAX_SPEED);
+        let Some(m) = &mut self.game else { return };
+        let was = m.speed;
+        if speed == was {
+            return;
+        }
+        m.speed = speed;
+        // The next tick is due at the new pace, not after a slow interval still running.
+        m.due = m
+            .due
+            .min(Instant::now() + self.config.tick_interval * 100 / speed);
+        // The same round trip is more ticks at a faster clock: the delay follows at once,
+        // rather than the clock stalling on everyone until the next adapt.
+        if self.config.adaptive_delay {
+            let delay = (self.input_delay * speed)
+                .div_ceil(was)
+                .clamp(1, max_adaptive_delay(speed));
+            self.input_delay = delay;
+            self.delay_changed = Instant::now();
+            self.lower_since = None;
+        }
+        self.send_clock_by(None, Some(by));
+    }
+
     /// The clock as it stands, to `to` (everyone when `None`).
     pub(super) fn send_clock(&mut self, to: Option<ConnId>) {
         let by = self.game.as_ref().and_then(|m| m.paused).flatten();
@@ -110,8 +151,10 @@ impl Hub {
 
     fn send_clock_by(&mut self, to: Option<ConnId>, by: Option<PlayerId>) {
         let paused = self.game.as_ref().is_some_and(|m| m.paused.is_some());
+        let speed = self.game.as_ref().map_or(100, |m| m.speed);
         let msg = Message::Clock {
             paused,
+            speed,
             by,
             input_delay: self.input_delay,
         };
@@ -161,10 +204,11 @@ impl Hub {
             .filter_map(|c| self.conns.get(&c).and_then(|c| c.rtt.recent_max()))
             .max();
         let Some(worst) = worst else { return };
-        let tick_ms = (self.config.tick_interval.as_millis() as u32).max(1);
+        let tick_ms = (self.tick_interval().as_millis() as u32).max(1);
+        let speed = self.game.as_ref().map_or(100, |m| m.speed);
         let want = (worst + DELAY_MARGIN_MS)
             .div_ceil(tick_ms)
-            .clamp(1, MAX_ADAPTIVE_DELAY);
+            .clamp(1, max_adaptive_delay(speed));
         let since_change = now.duration_since(self.delay_changed);
         if want > self.input_delay {
             self.lower_since = None;
@@ -273,6 +317,7 @@ impl Hub {
 
     /// Closes at most one tick; the next one is due an interval later at the earliest.
     pub(super) fn try_close_tick(&mut self, now: Instant) {
+        let interval = self.tick_interval();
         let Some(m) = &self.game else { return };
         if now < m.due || m.loading_until.is_some() || m.paused.is_some() {
             return;
@@ -315,7 +360,7 @@ impl Hub {
             return;
         };
         m.log.push(bundle_frame.clone());
-        m.due = (m.due + self.config.tick_interval).max(now);
+        m.due = (m.due + interval).max(now);
         let recorded = m.replay.as_mut().map(|w| w.bundle(&bundle));
         if let Some(Err(e)) = recorded {
             self.replay_failed(e);

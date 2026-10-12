@@ -18,6 +18,8 @@ struct Rig {
     /// Control held: the reclaim survey is up.
     reclaim: bool,
     viewport: Vec2,
+    /// A network match's link.
+    net: Option<crate::netplay::NetLink>,
 }
 
 const VIEWPORT: Vec2 = Vec2::new(1920.0, 1080.0);
@@ -87,6 +89,7 @@ impl Rig {
             hover: None,
             reclaim: false,
             viewport,
+            net: None,
         }
     }
 
@@ -115,7 +118,7 @@ impl Rig {
             show_reclaim: self.reclaim,
             placing: None,
             placing_open: None,
-            net: None,
+            net: self.net.as_ref(),
             net_notices: &[],
             prefabs: crate::prefabs::Library::none(),
         };
@@ -1827,5 +1830,6 @@ mod idle;
 mod prefabs;
 mod priority;
 mod queue_tray;
+mod top_bar;
 mod warp;
 mod wings;

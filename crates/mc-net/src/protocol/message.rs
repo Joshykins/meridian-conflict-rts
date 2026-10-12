@@ -39,6 +39,9 @@ pub enum Message {
     },
     /// Stop (`true`) or restart the match clock. Any player may do either.
     Pause(bool),
+    /// Run the match clock at this percent of real time. Any player may; the relay
+    /// holds it to `MIN_SPEED..=MAX_SPEED`.
+    Speed(u32),
     /// Host only, in the lobby: the seats a person may take, one bit per slot.
     SetOpenSeats(PlayerMask),
     /// In the lobby: move to this free, open seat.
@@ -83,10 +86,12 @@ pub enum Message {
         slot: PlayerId,
         sections: Vec<u64>,
     },
-    /// The match clock: paused (and by whom; `None` is an observer or the relay)
-    /// and the input delay commands are now stamped with.
+    /// The match clock: paused, its speed in percent of real time, who last paused,
+    /// resumed or changed the speed (`None` is an observer or the relay), and the
+    /// input delay commands are now stamped with.
     Clock {
         paused: bool,
+        speed: u32,
         by: Option<PlayerId>,
         input_delay: u32,
     },
@@ -147,6 +152,7 @@ pub(super) mod tag {
     pub(in crate::protocol) const NET_STATS: u8 = 32;
     pub(in crate::protocol) const LISTING: u8 = 33;
     pub(in crate::protocol) const SET_CONTENT: u8 = 34;
+    pub(in crate::protocol) const SPEED: u8 = 35;
 }
 
 fn encode_opt_slot(e: &mut Enc, slot: Option<PlayerId>) {
@@ -344,6 +350,10 @@ impl Message {
                 e.u8(tag::PAUSE);
                 e.bool(*paused);
             }
+            Message::Speed(percent) => {
+                e.u8(tag::SPEED);
+                e.u32(*percent);
+            }
             Message::SetOpenSeats(mask) => {
                 e.u8(tag::SET_OPEN_SEATS);
                 e.u32(*mask);
@@ -382,11 +392,13 @@ impl Message {
             }
             Message::Clock {
                 paused,
+                speed,
                 by,
                 input_delay,
             } => {
                 e.u8(tag::CLOCK);
                 e.bool(*paused);
+                e.u32(*speed);
                 encode_opt_slot(e, *by);
                 e.u32(*input_delay);
             }
@@ -532,6 +544,7 @@ impl Message {
                 sections: decode_sections(d)?,
             },
             tag::PAUSE => Message::Pause(d.bool()?),
+            tag::SPEED => Message::Speed(d.u32()?),
             tag::SET_OPEN_SEATS => Message::SetOpenSeats(d.u32()?),
             tag::TAKE_SEAT => Message::TakeSeat(decode_slot(d)?),
             tag::KICK => Message::Kick(decode_slot(d)?),
@@ -551,6 +564,7 @@ impl Message {
             },
             tag::CLOCK => Message::Clock {
                 paused: d.bool()?,
+                speed: d.u32()?,
                 by: decode_opt_slot(d)?,
                 input_delay: d.u32()?,
             },

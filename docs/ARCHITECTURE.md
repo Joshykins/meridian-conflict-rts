@@ -206,9 +206,10 @@ drawn, which leaves a blob of tanks with the few rings on its edge. 499 selected
 1.4 ms of GPU time on an RTX 3080 Ti; a usual selection costs nothing measurable. The HUD prints
 a key to the colours on the ground above the deck (`View::reaches`).
 
-Pause and game speed belong to the session's clock (`Session::set_paused`, `set_speed`): only a
-single-machine session owns one, which `SimStatus::owns_clock` reports and the HUD's controls
-follow. Render interpolation spans `0.1 s / speed`, the gap ticks really arrive at.
+Pause and game speed belong to the session's clock (`Session::set_paused`, `set_speed`). A
+single-machine session owns one (`SimStatus::owns_clock`); a network match's is the relay's,
+which any player may pause or speed up, and the `Clock` it sends sets every machine's pause and
+speed. Render interpolation spans `0.1 s / speed`, the gap ticks really arrive at.
 Orders given on pause are not left waiting for the clock: `LocalSession` hands them back as a
 `HeldReady` bundle, which the sim carries out without stepping (`World::apply_held`) and the
 replay records in front of the next tick. A spawn stands and a route shows while time stands

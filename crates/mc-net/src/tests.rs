@@ -82,6 +82,8 @@ struct Client<S: Session> {
     chat: Vec<(Option<PlayerId>, String)>,
     /// The last `Clock`: paused, by whom, input delay.
     clock: Option<(bool, Option<PlayerId>, u32)>,
+    /// The last `Clock`'s speed.
+    speed: Option<u32>,
     loading: Option<mc_core::PlayerMask>,
     stats: Vec<PeerStat>,
     details: Vec<(PlayerId, Vec<u64>)>,
@@ -114,6 +116,7 @@ impl<S: Session> Client<S> {
             rejoined: Vec::new(),
             chat: Vec::new(),
             clock: None,
+            speed: None,
             loading: None,
             stats: Vec::new(),
             details: Vec::new(),
@@ -213,9 +216,13 @@ impl<S: Session> Client<S> {
                 SessionEvent::Chat { from, text, .. } => self.chat.push((from, text)),
                 SessionEvent::Clock {
                     paused,
+                    speed,
                     by,
                     input_delay,
-                } => self.clock = Some((paused, by, input_delay)),
+                } => {
+                    self.clock = Some((paused, by, input_delay));
+                    self.speed = Some(speed);
+                }
                 SessionEvent::Loading { loaded } => self.loading = Some(loaded),
                 SessionEvent::NetStats(stats) => self.stats = stats,
                 SessionEvent::DesyncDetail { slot, sections, .. } => {

@@ -1,4 +1,4 @@
-//! The match clock: the load barrier, pause, the adaptive input delay (through a
+//! The match clock: the load barrier, pause, speed, the adaptive input delay (through a
 //! proxy that adds a real round trip), link stats and desync details.
 
 use std::net::{TcpListener, TcpStream};
@@ -101,6 +101,52 @@ fn any_player_pauses_and_any_player_resumes() {
         cs.iter().all(|c| c.ticks() >= held + 30)
     });
     assert_same_history(&clients[0].sim, &clients[1].sim, held + 30);
+    relay.shutdown().unwrap();
+}
+
+/// Ticks every client has stepped over `for_` of pumping.
+fn ticks_over(clients: &mut [NetClient], for_: Duration) -> usize {
+    let from = clients[0].ticks();
+    pump_for(&mut refs(clients), for_);
+    clients[0].ticks() - from
+}
+
+#[test]
+fn any_player_sets_the_speed_and_the_clock_follows() {
+    // Ticks long enough to count: 20 ms at normal speed.
+    let relay = relay(2, |c| c.tick_interval = Duration::from_millis(20));
+    let mut clients = start_match(relay.local_addr(), 2);
+    pump_until(&mut refs(&mut clients), "running", |cs| {
+        // No `Clock` yet: a match starts at normal speed.
+        cs.iter().all(|c| c.ticks() >= 5 && c.speed.is_none())
+    });
+    let normal = ticks_over(&mut clients, Duration::from_millis(600));
+
+    assert!(clients[1].session.set_speed(400));
+    pump_until(&mut refs(&mut clients), "sped up by the other", |cs| {
+        cs.iter().all(|c| {
+            c.speed == Some(400)
+                && c.clock
+                    .is_some_and(|(p, by, _)| !p && by == Some(PlayerId(1)))
+        })
+    });
+    let fast = ticks_over(&mut clients, Duration::from_millis(600));
+    // About 30 against 120; a loaded machine slows both, never the fast one alone.
+    assert!(
+        fast >= normal * 2,
+        "4x closed {fast} ticks where 1x closed {normal}"
+    );
+
+    // Past the fastest the clock runs, the relay holds it there and says so.
+    assert!(clients[0].session.set_speed(100_000));
+    pump_until(&mut refs(&mut clients), "held to the top", |cs| {
+        cs.iter().all(|c| c.speed == Some(MAX_SPEED))
+    });
+    let at = clients[0].ticks();
+    pump_until(&mut refs(&mut clients), "still in step", |cs| {
+        cs.iter().all(|c| c.ticks() >= at + 30)
+    });
+    assert_same_history(&clients[0].sim, &clients[1].sim, at + 30);
     relay.shutdown().unwrap();
 }
 
@@ -291,6 +337,7 @@ fn stamps_only_rise_when_the_delay_moves() {
 
     let clock = |input_delay| Message::Clock {
         paused: false,
+        speed: 100,
         by: None,
         input_delay,
     };

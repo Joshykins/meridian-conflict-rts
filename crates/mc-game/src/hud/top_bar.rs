@@ -1,8 +1,8 @@
-//! The top bar (mission time, game speed or the network link, pause, menu) and
+//! The top bar (mission time, a network match's link, game speed, pause, menu) and
 //! the roster of commanders under it, with the speed list that drops from it.
 
 use super::{
-    clock, icons, speed_label, Hud, HudAction, Scene, EDGE, GAP, SPEEDS, SPEED_W, TOP_BAR_W,
+    clock, icons, speed_label, Hud, HudAction, Scene, EDGE, GAP, LINK_W, SPEEDS, SPEED_W, TOP_BAR_W,
 };
 use crate::audio::Sfx;
 use crate::netplay::NetLink;
@@ -17,7 +17,10 @@ impl Hud {
         let _t = mc_core::perf_span!("ui.top_bar");
         let view = s.view;
         let owns_clock = view.status.owns_clock;
-        let wide = TOP_BAR_W;
+        // Anyone playing a network match may stop or speed its clock; the relay tells
+        // everyone who did.
+        let runs_clock = owns_clock || (s.net.is_some() && !view.observing);
+        let wide = TOP_BAR_W + if s.net.is_some() { LINK_W } else { 0.0 };
         let r = Rect::new(ui.size.x - EDGE - wide, EDGE, wide, 44.0);
         self.glass(ui, r);
         let mid = r.mid_y();
@@ -43,14 +46,15 @@ impl Hud {
         }
         ui.vline(r.x + 132.0, r.y + 9.0, r.h - 18.0, rgb(palette::LINE, 0.14));
 
-        let sx = r.x + 196.0;
-        match s.net {
-            Some(link) => self.link_readout(ui, s, link, r, sx),
-            None => self.speed_control(ui, s, r, sx),
+        let mut sx = r.x + 196.0;
+        if let Some(link) = s.net {
+            self.link_readout(ui, s, link, r, sx);
+            sx += LINK_W;
+            ui.vline(sx - 64.0, r.y + 9.0, r.h - 18.0, rgb(palette::LINE, 0.14));
         }
+        self.speed_control(ui, s, r, sx, runs_clock);
         let after = sx + SPEED_W + 10.0;
-        // Anyone playing a network match may stop its clock; the relay tells everyone who did.
-        let can_pause = owns_clock || (s.net.is_some() && !view.observing);
+        let can_pause = runs_clock;
 
         // Paused, this is the way back: the play mark lit in the accent, breathing with
         // the frame round the screen (`pause.rs`).
@@ -295,12 +299,11 @@ impl Hud {
     }
 
     /// Slower and faster either side; the middle opens the list of every speed.
-    fn speed_control(&mut self, ui: &mut Ui, s: &Scene, r: Rect, sx: f32) {
+    fn speed_control(&mut self, ui: &mut Ui, s: &Scene, r: Rect, sx: f32, owns_clock: bool) {
         let view = s.view;
-        let owns_clock = view.status.owns_clock;
         let mid = r.mid_y();
         ui.text(
-            r.x + 146.0,
+            sx - 50.0,
             mid,
             type_scale::MICRO,
             rgb(palette::FAINT, 1.0),
@@ -366,12 +369,12 @@ impl Hud {
         self.speed_anchor = centre;
     }
 
-    /// A network match's link where the speed would be: signal bars, this machine's
-    /// round trip to the relay, and how long an order takes to act.
+    /// A network match's link, left of the speed: signal bars, this machine's round
+    /// trip to the relay, and how long an order takes to act.
     fn link_readout(&mut self, ui: &mut Ui, s: &Scene, link: &NetLink, r: Rect, sx: f32) {
         let mid = r.mid_y();
         ui.text(
-            r.x + 146.0,
+            sx - 50.0,
             mid,
             type_scale::MICRO,
             rgb(palette::FAINT, 1.0),
@@ -421,7 +424,9 @@ impl Hud {
             rgb(palette::FAINT, 1.0),
             &format!(
                 "Orders act in {:.1} s",
-                link.input_delay.max(1) as f32 / mc_core::TICKS_PER_SECOND as f32
+                // Real seconds: a faster clock has shorter ticks.
+                link.input_delay.max(1) as f32 * 100.0
+                    / (mc_core::TICKS_PER_SECOND * link.speed.unwrap_or(100)) as f32
             ),
         );
     }

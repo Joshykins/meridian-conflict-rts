@@ -153,6 +153,7 @@ fn samples() -> Vec<Message> {
             sections: vec![],
         },
         Message::Pause(true),
+        Message::Speed(400),
         Message::SetOpenSeats(0b1110),
         Message::TakeSeat(PlayerId(6)),
         Message::Kick(PlayerId(2)),
@@ -172,11 +173,13 @@ fn samples() -> Vec<Message> {
         },
         Message::Clock {
             paused: true,
+            speed: 50,
             by: Some(PlayerId(3)),
             input_delay: 4,
         },
         Message::Clock {
             paused: false,
+            speed: 1200,
             by: None,
             input_delay: 1,
         },

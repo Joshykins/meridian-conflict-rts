@@ -136,6 +136,8 @@ pub(super) struct Match {
     pub(super) loading_until: Option<Instant>,
     /// Set while paused: by whom (`None`: an observer or the relay).
     pub(super) paused: Option<Option<PlayerId>>,
+    /// The clock's speed in percent of real time, `MIN_SPEED..=MAX_SPEED`.
+    pub(super) speed: u32,
     /// Slots whose desync report has been passed on.
     pub(super) desync_reported: mc_core::PlayerMask,
 }
@@ -638,6 +640,11 @@ impl Hub {
             Message::Pause(paused) => {
                 if let Some(slot) = player {
                     self.set_paused(paused, Some(slot));
+                }
+            }
+            Message::Speed(percent) => {
+                if let Some(slot) = player {
+                    self.set_speed(percent, slot);
                 }
             }
             Message::DesyncReport { tick, sections } => {

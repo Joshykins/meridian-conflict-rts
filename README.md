@@ -224,8 +224,8 @@ Linux builds.
 | minimap | left click or drag: look there (or aim the armed order); right click: order the selection there |
 | selection panel | several units: one tile per type, click keeps only that type, shift-click drops it |
 | idle engineers / idle factories chips | select them all and bring the camera |
-| Pause | pause (single player) |
-| + / - | game speed, 0.1x to 12x (single player) |
+| Pause | pause (any player in a network match; everyone sees who) |
+| + / - | game speed, 0.1x to 12x (any player in a network match; everyone sees who) |
 | Delete / Ctrl+Delete | self-destruct the selection after a 5 second countdown, shown as a draining red ring round each unit (Delete again calls it off) / at once |
 | Ctrl+0-9 / 0-9 | set / recall a control group; twice quickly also brings the camera. Groups show as chips over the selection panel |
 | Home | jump to your commander (or, watching, to a living one) |

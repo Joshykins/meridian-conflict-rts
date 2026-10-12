@@ -86,6 +86,8 @@ const LOW: u32 = 0xFFE23D;
 
 /// Game speeds on offer, percent of real time.
 pub const SPEEDS: [u32; 9] = [10, 25, 50, 100, 150, 200, 400, 800, 1200];
+// A network match's relay runs every speed on the list.
+const _: () = assert!(SPEEDS[0] >= mc_net::MIN_SPEED && SPEEDS[8] <= mc_net::MAX_SPEED);
 
 /// A speed as the player reads it: `.25\u{d7}`, `1\u{d7}`, `12\u{d7}`.
 pub fn speed_label(pct: u32) -> String {
@@ -114,7 +116,9 @@ const ECONOMY_W: f32 = 292.0 * 2.0 + 46.0;
 const ECONOMY_H: f32 = 68.0 + focus::FOCUS_H;
 /// The narrowest the stall chip right of the economy gets.
 const STALL_CHIP_W: f32 = 236.0;
-/// The top bar's width: clock, speed, pause, menu.
+/// A network match's link readout, left of the speed in the top bar.
+const LINK_W: f32 = 228.0;
+/// The top bar's width: clock, speed, pause, menu (and a network match's link).
 const TOP_BAR_W: f32 = 146.0 + 50.0 + SPEED_W + 10.0 + 50.0 + 98.0;
 
 #[derive(Clone, Debug, PartialEq)]

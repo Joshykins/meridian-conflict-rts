@@ -147,6 +147,16 @@ impl Hud {
                         None,
                     );
                 }
+                NetNotice::Speed { by, speed } => {
+                    let who = by.map_or_else(|| "An observer".to_owned(), |p| name_of(s, p));
+                    self.notices.note(
+                        "net-speed",
+                        format!("{who} set the speed to {}", super::speed_label(*speed)),
+                        palette::TEXT,
+                        Glyph::Bar,
+                        None,
+                    );
+                }
                 NetNotice::Reconnected => self.notices.note(
                     "net-reconnected",
                     "Connection restored",

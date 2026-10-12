@@ -24,7 +24,7 @@ use mc_core::{PlayerId, MAX_PLAYERS};
 use crate::wire::{Dec, Enc, NetError, Result};
 
 /// Bumped on any incompatible change. Checked before anything else in `Hello`.
-pub const PROTOCOL_VERSION: u32 = 43;
+pub const PROTOCOL_VERSION: u32 = 44;
 
 /// Hard cap on a frame payload, enforced on both send and receive.
 pub const MAX_FRAME_LEN: usize = 6 << 20;
@@ -46,8 +46,12 @@ pub const MAX_CHAT_LEN: usize = 512;
 pub const MAX_SETUP_LEN: usize = 4 << 10;
 pub const MAX_OPTIONS_LEN: usize = 64 << 10;
 pub const MAX_INPUT_DELAY: u32 = 50;
-/// The most ticks the relay's adaptive input delay goes to (0.8 s at 10 ticks a second).
+/// The most ticks the relay's adaptive input delay goes to at normal speed (0.8 s at
+/// 10 ticks a second); faster, it covers the same real time in more, shorter ticks.
 pub const MAX_ADAPTIVE_DELAY: u32 = 8;
+/// The slowest and fastest a network match's clock runs, in percent of real time.
+pub const MIN_SPEED: u32 = 10;
+pub const MAX_SPEED: u32 = 1200;
 pub const MAX_BUILD_LEN: usize = 64;
 pub const MAX_TITLE_LEN: usize = 64;
 /// State hash sections a desync report may carry.

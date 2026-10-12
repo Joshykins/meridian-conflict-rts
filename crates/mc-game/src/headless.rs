@@ -639,6 +639,7 @@ pub fn screenshot(
             let (link, notices) = net_shot(state, &view)?;
             view.status.owns_clock = false;
             view.paused = link.paused_by.is_some();
+            view.speed = link.speed.unwrap_or(100);
             if state == "desync" {
                 view.status.error = Some("The machines fell out of step at 6:41.".into());
             }
@@ -1471,8 +1472,9 @@ pub fn write_png(path: &Path, width: u32, height: u32, rgba: &[u8]) -> Result<()
 }
 
 /// A network match's link and news for a screenshot (`--net-shot STATE`): `play`
-/// (link readout, lagging and dropped seats, chat), `chat` (the chat line open),
-/// `paused`, `waiting` (loading), `rejoin` (this machine reconnecting), `desync`.
+/// (link readout, lagging and dropped seats, chat, a player setting 2x), `chat`
+/// (the chat line open), `paused`, `waiting` (loading), `rejoin` (this machine
+/// reconnecting), `desync`.
 fn net_shot(
     state: &str,
     view: &crate::game::View,
@@ -1521,6 +1523,11 @@ fn net_shot(
             notices.push(chat(1, "bring it", false));
             if state == "play" {
                 notices.push(NetNotice::Dropped(3.min(seats.saturating_sub(1))));
+                link.speed = Some(200);
+                notices.push(NetNotice::Speed {
+                    by: Some(1.min(seats.saturating_sub(1))),
+                    speed: 200,
+                });
             }
         }
         "paused" => {

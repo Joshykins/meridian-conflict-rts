@@ -106,7 +106,9 @@ pub struct NetSession {
     role: Role,
     slot: Option<PlayerId>,
     token: Option<u64>,
-    /// Length of a tick as the relay paces them.
+    /// Length of a tick at normal speed, as the relay paces them.
+    tick_base: Duration,
+    /// Length of a tick at the match's speed now.
     tick: Duration,
     /// The next bunched tick is not released before this.
     next_release: Instant,
@@ -200,6 +202,7 @@ impl NetSession {
             role: config.role,
             slot: None,
             token: None,
+            tick_base: Duration::from_millis(1000 / TICKS_PER_SECOND as u64),
             tick: Duration::from_millis(1000 / TICKS_PER_SECOND as u64),
             next_release: Instant::now(),
         })
@@ -328,12 +331,19 @@ impl Session for NetSession {
 
     fn poll(&mut self) -> Vec<SessionEvent> {
         while let Ok(event) = self.incoming.try_recv() {
-            if let SessionEvent::Joined(w) = &event {
-                self.slot = w.slot;
-                self.token = Some(w.token);
-                if w.config.tick_ms > 0 {
-                    self.tick = Duration::from_millis(w.config.tick_ms as u64);
+            match &event {
+                SessionEvent::Joined(w) => {
+                    self.slot = w.slot;
+                    self.token = Some(w.token);
+                    if w.config.tick_ms > 0 {
+                        self.tick_base = Duration::from_millis(w.config.tick_ms as u64);
+                        self.tick = self.tick_base;
+                    }
                 }
+                SessionEvent::Clock { speed, .. } => {
+                    self.tick = self.tick_base * 100 / (*speed).max(1);
+                }
+                _ => {}
             }
             self.events.push(event);
         }
@@ -365,6 +375,11 @@ impl Session for NetSession {
     /// Asks the relay; the `Clock` event says when it has happened, and who did it.
     fn set_paused(&mut self, paused: bool) -> bool {
         self.role == Role::Player && self.send(&Message::Pause(paused)).is_ok()
+    }
+
+    /// Asks the relay, like `set_paused`.
+    fn set_speed(&mut self, percent: u32) -> bool {
+        self.role == Role::Player && self.send(&Message::Speed(percent)).is_ok()
     }
 
     fn loaded(&mut self) {
@@ -538,12 +553,14 @@ impl Reader {
             Message::Loading { loaded } => self.emit(SessionEvent::Loading { loaded }),
             Message::Clock {
                 paused,
+                speed,
                 by,
                 input_delay,
             } => {
                 self.input_delay = input_delay;
                 self.emit(SessionEvent::Clock {
                     paused,
+                    speed,
                     by,
                     input_delay,
                 });
@@ -570,6 +587,7 @@ impl Reader {
             | Message::Loaded
             | Message::DesyncReport { .. }
             | Message::Pause(_)
+            | Message::Speed(_)
             | Message::SetOpenSeats(_)
             | Message::TakeSeat(_)
             | Message::Kick(_)

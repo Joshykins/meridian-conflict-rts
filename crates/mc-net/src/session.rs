@@ -80,10 +80,12 @@ pub enum SessionEvent {
     Loading {
         loaded: mc_core::PlayerMask,
     },
-    /// The match clock changed: paused or running (and who did it; `None` is an
-    /// observer or the relay), and the input delay now in force.
+    /// The match clock changed: paused or running, its speed in percent of real
+    /// time, who did it (`None` is an observer or the relay), and the input delay
+    /// now in force.
     Clock {
         paused: bool,
+        speed: u32,
         by: Option<PlayerId>,
         input_delay: u32,
     },
@@ -156,8 +158,9 @@ pub trait Session {
         Err(NetError::Limit("there is nobody to talk to"))
     }
 
-    /// Runs the clock at `percent` of real time, if this session owns one.
-    /// Returns whether it does, like `set_paused`.
+    /// Runs the clock at `percent` of real time: a single-player match's own, or a
+    /// network match's through the relay (the `Clock` event says when it has
+    /// happened). Returns whether this session can, like `set_paused`.
     fn set_speed(&mut self, _percent: u32) -> bool {
         false
     }

@@ -382,6 +382,7 @@ impl Hub {
             start_delay: self.input_delay,
             loading_until: Some(now + self.config.load_timeout),
             paused: None,
+            speed: 100,
             desync_reported: 0,
         });
         let ids: Vec<ConnId> = self

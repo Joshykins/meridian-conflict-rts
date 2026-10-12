@@ -2605,28 +2605,30 @@ impl Game {
     }
 
     fn set_speed(&mut self, pct: u32) {
-        if !self.view.status.owns_clock {
-            return self
-                .hud
-                .toast("Game speed is fixed in a network match", palette::WARN);
+        if self.view.status.owns_clock {
+            self.view.speed = pct;
+            self.sim.speed.store(self.view.speed, Ordering::Relaxed);
+        } else if let (Some(net), false) = (&self.sim.net, self.view.observing) {
+            // Everyone's clock: the relay changes it and tells every player who did.
+            net.request(crate::netplay::NetRequest::Speed(pct));
+        } else {
+            self.hud.toast(
+                "Only the players can change this match's speed",
+                palette::WARN,
+            );
         }
-        self.view.speed = pct;
-        self.sim.speed.store(self.view.speed, Ordering::Relaxed);
     }
 
     fn step_speed(&mut self, step: i32) {
-        if !self.view.status.owns_clock {
-            return self
-                .hud
-                .toast("Game speed is fixed in a network match", palette::WARN);
-        }
         let at = hud::SPEEDS
             .iter()
             .position(|s| *s == self.view.speed)
             .or(hud::SPEEDS.iter().position(|s| *s == 100))
             .unwrap_or(0) as i32;
-        self.view.speed = hud::SPEEDS[(at + step).clamp(0, hud::SPEEDS.len() as i32 - 1) as usize];
-        self.sim.speed.store(self.view.speed, Ordering::Relaxed);
+        let next = hud::SPEEDS[(at + step).clamp(0, hud::SPEEDS.len() as i32 - 1) as usize];
+        if next != self.view.speed {
+            self.set_speed(next);
+        }
     }
 
     /// Brings the camera over the middle of the selection.
@@ -4540,8 +4542,9 @@ impl Game {
         let link = self.sim.net.as_ref().map(|n| n.link());
         let net_notices = self.sim.net.as_ref().map_or_else(Vec::new, |n| n.notices());
         if let Some(link) = &link {
-            // A network match's pause is the relay's, whoever asked for it.
+            // A network match's pause and speed are the relay's, whoever asked for them.
             self.view.paused = link.paused_by.is_some();
+            self.view.speed = link.speed.unwrap_or(100);
         }
         let placing_open = match (self.view.mode, sites.last()) {
             (Mode::Place(bp), Some(&(at, _))) => {

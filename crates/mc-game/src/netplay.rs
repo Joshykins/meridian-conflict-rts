@@ -1,5 +1,5 @@
 //! Network play inside a match: what the sim thread keeps about the session
-//! beyond ticks (links, pause, chat, reconnecting, a desync), and what the
+//! beyond ticks (links, pause and speed, chat, reconnecting, a desync), and what the
 //! interface asks of it.
 //!
 //! The sim thread owns a [`NetDriver`]; the interface holds a [`NetPlay`]
@@ -74,6 +74,8 @@ pub struct NetLink {
     pub input_delay: u32,
     /// Set while the match is paused: by whom (`None`: an observer or the relay).
     pub paused_by: Option<Option<u8>>,
+    /// The clock's speed in percent of real time, once a player has changed it.
+    pub speed: Option<u32>,
     /// Set after the start until the clock runs: the slots that have loaded.
     pub loading: Option<mc_core::PlayerMask>,
     pub rejoining: Option<Rejoining>,
@@ -104,6 +106,11 @@ pub enum NetNotice {
     Rejoined(u8),
     Paused(Option<u8>),
     Resumed(Option<u8>),
+    /// The clock now runs at `speed` percent of real time, set by `by`.
+    Speed {
+        by: Option<u8>,
+        speed: u32,
+    },
     /// This machine's connection came back.
     Reconnected,
 }
@@ -121,6 +128,8 @@ pub enum NetRequest {
         to: mc_core::PlayerMask,
     },
     Pause(bool),
+    /// Run everyone's clock at this percent of real time.
+    Speed(u32),
     /// Give up the match (so this side is defeated, not left standing idle), then leave.
     Surrender,
 }
@@ -211,6 +220,9 @@ impl NetDriver {
                 NetRequest::Pause(paused) => {
                     session.set_paused(paused);
                 }
+                NetRequest::Speed(percent) => {
+                    session.set_speed(percent);
+                }
                 NetRequest::Surrender => {
                     let resign = mc_sim::Command::Resign.encode();
                     if let Err(e) = session.submit(vec![resign]) {
@@ -247,17 +259,23 @@ impl NetDriver {
             }
             SessionEvent::Clock {
                 paused,
+                speed,
                 by,
                 input_delay,
             } => {
                 let by = by.map(|p| p.0);
                 let was = s.link.paused_by.is_some();
+                let was_speed = s.link.speed.unwrap_or(100);
                 s.link.input_delay = *input_delay;
                 s.link.paused_by = paused.then_some(by);
+                s.link.speed = Some(*speed);
                 match (was, *paused) {
                     (false, true) => s.notices.push(NetNotice::Paused(by)),
                     (true, false) => s.notices.push(NetNotice::Resumed(by)),
                     _ => {}
+                }
+                if *speed != was_speed {
+                    s.notices.push(NetNotice::Speed { by, speed: *speed });
                 }
             }
             SessionEvent::Chat {
