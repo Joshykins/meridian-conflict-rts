@@ -491,12 +491,15 @@ invulnerable unit, and the mirror marks it `SHIELD_VEIL` so it is drawn apart fr
   newer), and from level 8 heavies of its domain join it, one more every four levels. It builds up taller as it
   levels: its built height climbs 3 m/s toward `shaper_height(level)` (`60 + 1100 (1 - 0.9^(L-1))` m: about 730 m
   at level 10, 1010 m at 20), and `shaper_tier(level)` (one every four levels) is its visual tier. Its **foot** spreads
-  with its built height (`survival/foot.rs`, `shaper_foot`: `16 + 84 * grown` m from its middle, grown =
-  `(height - 60) / 1100`, so 16 m at level 1, 67 m at 10, 88 m at 20, never past `FOOT_MOST` 96 m), a whole path
+  with its built height (`survival/foot.rs`, `shaper_foot(kind, height)`: grown = `(height - 60) / 1100`, a
+  printer's `30 + 170 * grown` m from its middle, never past 200 m, so 30 m at level 1, 134 m at 10, 177 m at 20; an
+  auxiliary Shaper's `28 + 150 * grown`, never past 180 m; mc-models `shaper::reach` draws the same), a whole path
   cell at a time: the cells under it are blocked, units on the ground there are shoved out to the nearest ground
-  they can stand on, and a structure in the way holds the foot until it is gone (structures are never moved). Its
-  enemies' guns, Lances, blasts and nukes reach for the grown hull (`World::hull_radius`); its pylons (from 120 m),
-  platforms (150 m) and silos (200 m) stand clear of the widest foot. A dead Shaper's foot opens again
+  they can stand on, a piece of its own base there unravels to be raised again further out, and any other structure
+  in the way holds the foot until it is gone (structures are never moved). Its enemies' guns, Lances, blasts and
+  nukes reach for the grown hull (`World::hull_radius`); its base's pieces are placed past the foot of its level
+  (`base::slot_at`: pylons about 30 m out past it, platforms 50 m, silos 40 m, great platforms beyond, all inside the
+  site's `room`). A dead Shaper's foot opens again
   (`World::restore_blockers`, shared with `release_lot`). `ShaperInstance::foot` and `ShaperCard::foot` give the
   model and the card the foot as blocked now. A node can be
   destroyed even while it rises; once up, it dies into a rich wreck, and its site stands empty for the rest of that

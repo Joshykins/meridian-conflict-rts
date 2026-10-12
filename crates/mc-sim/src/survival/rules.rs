@@ -264,18 +264,21 @@ pub(super) fn pylon_feed(regen: Fx, pylons: usize) -> Fx {
     regen * pylons as i32 / 4
 }
 
-/// Metres from its middle to the edge of a Shaper's foot when it stands `height`
-/// metres tall: `16 + 84 * grown`, grown = `(height - 60) / 1100` (0 at level 1, about
-/// 0.61 at level 10 and 0.86 at 20), so 16 m at level 1, 67 m at 10, 88 m at 20, and
-/// never past 96 m: its base's pylons stand from 120 m, its platforms from 150 m and
-/// its silos from 200 m, all clear of it. The model is drawn to match.
-pub fn shaper_foot(height: Fx) -> Fx {
+/// Metres from its middle to the edge of the foot of a Shaper of `kind` standing
+/// `height` metres tall: it grows broad as it grows tall. With grown = `(height - 60) /
+/// 1100` (0 at level 1, about 0.61 at level 10 and 0.86 at 20), a printer's is
+/// `30 + 170 * grown` (30 m at level 1, 134 m at 10, 177 m at 20), never past 200 m; an
+/// auxiliary Shaper's `28 + 150 * grown` (28, 120, 158 m), never past 180 m. Its base's
+/// pieces stand out past it (`base::slot_at`). The model is drawn to match
+/// (mc-models `shaper::reach`, a test in mc-render holds the two equal).
+pub fn shaper_foot(kind: SiteKind, height: Fx) -> Fx {
     let grown = ((height - Fx::from_int(60)) / 1100).clamp(Fx::ZERO, Fx::ONE);
-    (Fx::from_int(16) + grown * 84).min(Fx::from_int(FOOT_MOST))
+    let (least, spread, most) = match kind {
+        SiteKind::Printer => (30, 170, 200),
+        SiteKind::Artillery | SiteKind::Nuke => (28, 150, 180),
+    };
+    (Fx::from_int(least) + grown * spread).min(Fx::from_int(most))
 }
-
-/// The widest a Shaper's foot reaches (`shaper_foot`), metres.
-pub const FOOT_MOST: i32 = 96;
 
 /// A Shaper's visual tier: one every four levels, each a stage, collar or ring more.
 pub fn shaper_tier(level: u16) -> u8 {

@@ -108,28 +108,35 @@ pub(super) fn platform_room(bp: &mc_data::UnitBlueprint) -> Fx {
 }
 
 /// Where slot `k` of a piece `side` metres across stands round a Shaper at `at`
-/// facing `heading`, inside `room`: platforms on arcs in front (great ones on the
-/// outer arc), pylons on a ring at the sides and behind. The middle slot first,
-/// then out to either side. None past the arc's ends.
+/// facing `heading` whose foot reaches `foot` (`rules::shaper_foot` at its level's
+/// height), inside `room`: platforms on arcs in front (great ones on the outer arc),
+/// pylons on a ring at the sides and behind, silos further out behind. The middle
+/// slot first, then out to either side. None past the arc's ends, or when the room
+/// has no ring clear of the foot left for it.
 fn slot_at(
     kind: PieceKind,
     k: u8,
     at: FxVec2,
     heading: Angle,
-    room: Fx,
+    (foot, room): (Fx, Fx),
     side: i32,
 ) -> Option<FxVec2> {
     let half = side / 2;
-    let room = room.round_int();
-    // Each arc as far out as the room lets it, between its nearest and furthest.
-    let ring = |near: i32, far: i32| (room - half).clamp(near, near.max(far));
+    let (foot, room) = (foot.round_int(), room.round_int());
+    // Each ring a way out past the foot, further as the room allows; never past the
+    // room's edge, and never on the foot. The rooms (450 m, 350 m) hold every ring
+    // round the widest feet (200 m, 180 m) but the great platforms', which the room
+    // pulls in at the highest levels.
+    let ring = |near: i32, far: i32| (room - half).min(far).max(near).min(room - half);
     let (ring, centre, spread) = match kind {
-        PieceKind::Platform => (ring(150 + half / 2, 190), 0u16, 0x3555u16),
-        PieceKind::GreatPlatform => (ring(260, 340), 0, 0x3555),
-        // Pylons and silos stand clear of the widest foot (`rules::FOOT_MOST`).
-        PieceKind::Pylon => (ring(120 + half / 2, 140), 0x8000, 0x4800),
-        PieceKind::Silo => (ring(200 + half / 2, 240), 0x8000, 0x3000),
+        PieceKind::Platform => (ring(foot + 50 + half / 2, foot + 90), 0u16, 0x3555u16),
+        PieceKind::GreatPlatform => (ring(foot + 160, foot + 240), 0, 0x3555),
+        PieceKind::Pylon => (ring(foot + 30 + half / 2, foot + 50), 0x8000, 0x4800),
+        PieceKind::Silo => (ring(foot + 40 + half / 2, foot + 80), 0x8000, 0x3000),
     };
+    if ring - half <= foot {
+        return None;
+    }
     let step = ((side + GAP) as i64 * PER_RADIAN / ring.max(1) as i64).min(0x4000) as i32;
     let out = (k as i32 + 1) / 2 * if k % 2 == 1 { 1 } else { -1 };
     let off = out * step;
@@ -242,6 +249,8 @@ impl crate::World {
             return Ok(());
         };
         let heading = self.state.units.heading[row];
+        // Clear of the foot the Shaper's level will spread it to.
+        let foot = super::rules::shaper_foot(site.kind, super::rules::shaper_height(n.level));
         let bp_id = kit.blueprint(kind, site.domain);
         let bp = self.blueprints.unit(bp_id);
         let across = bp.footprint.0.max(bp.footprint.1) as i32 * mc_map::BUILD_CELL_M;
@@ -250,7 +259,7 @@ impl crate::World {
         let spot = (0..MOST_SLOTS)
             .filter(|k| !taken.contains(k))
             .find_map(|k| {
-                let at = slot_at(kind, k, unit_at, heading, site.room, across)?;
+                let at = slot_at(kind, k, unit_at, heading, (foot, site.room), across)?;
                 let at = crate::world::snap_to_build_grid(bp, at);
                 self.can_place(bp, at).then_some((k, at))
             });
@@ -326,10 +335,14 @@ mod tests {
     #[test]
     fn slots_fan_out_in_front_and_pylons_stand_behind() {
         let at = FxVec2::from_ints(1000, 1000);
-        let room = Fx::from_int(450);
+        let room = (Fx::from_int(30), Fx::from_int(450));
         let east = Angle::ZERO;
         let first = slot_at(PieceKind::Platform, 0, at, east, room, 96).unwrap();
-        assert!(first.x > at.x + Fx::from_int(140), "{first:?}");
+        // Its near edge a way out past the foot (30 m).
+        assert!(
+            first.x - Fx::from_int(48) > at.x + Fx::from_int(60),
+            "{first:?}"
+        );
         let (a, b) = (
             slot_at(PieceKind::Platform, 1, at, east, room, 96).unwrap(),
             slot_at(PieceKind::Platform, 2, at, east, room, 96).unwrap(),
@@ -338,10 +351,42 @@ mod tests {
         assert!(a.distance(first) > Fx::from_int(100));
         let great = slot_at(PieceKind::GreatPlatform, 0, at, east, room, 192).unwrap();
         assert!(great.x > first.x + Fx::from_int(100));
-        assert!(great.distance(at) + Fx::from_int(96) <= room + Fx::ONE);
+        assert!(great.distance(at) + Fx::from_int(96) <= room.1 + Fx::ONE);
         let pylon = slot_at(PieceKind::Pylon, 0, at, east, room, 36).unwrap();
         assert!(pylon.x < at.x, "behind: {pylon:?}");
         // The arc ends: there is no tenth platform this close in.
         assert!(slot_at(PieceKind::Platform, 9, at, east, room, 96).is_none());
+    }
+
+    #[test]
+    fn pieces_stand_past_the_widest_foot_inside_the_room() {
+        let at = FxVec2::from_ints(1000, 1000);
+        let east = Angle::ZERO;
+        for (kind, room) in [(SiteKind::Printer, 450), (SiteKind::Nuke, 350)] {
+            let foot = super::super::rules::shaper_foot(kind, Fx::from_int(1160));
+            let room = Fx::from_int(room);
+            for (piece, side) in [
+                (PieceKind::Platform, 96),
+                (PieceKind::GreatPlatform, 192),
+                (PieceKind::Pylon, 36),
+                (PieceKind::Silo, 32),
+            ] {
+                if kind == SiteKind::Nuke && piece != PieceKind::Pylon && piece != PieceKind::Silo {
+                    continue;
+                }
+                let spot = slot_at(piece, 0, at, east, (foot, room), side)
+                    .unwrap_or_else(|| panic!("{kind:?} {piece:?}: no room"));
+                let d = spot.distance(at);
+                let half = Fx::from_int(side / 2);
+                assert!(
+                    d - half > foot,
+                    "{kind:?} {piece:?} at {d} on the foot {foot}"
+                );
+                assert!(
+                    d + half <= room + Fx::ONE,
+                    "{kind:?} {piece:?} at {d} past the room"
+                );
+            }
+        }
     }
 }

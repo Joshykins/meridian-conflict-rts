@@ -61,7 +61,7 @@ use print::Route;
 pub use rules::{
     aux_first_round, launch_gap_ticks, shaper_foot, shaper_height, shaper_platforms, shaper_pylons,
     shaper_silos, shaper_tier, shell_apex, shell_blast, shell_flight_ticks, shell_squad,
-    shells_per_volley, volley_ticks, HeavyWave, SurvivalRules, FOOT_MOST,
+    shells_per_volley, volley_ticks, HeavyWave, SurvivalRules,
 };
 use serde::{Deserialize, Serialize};
 

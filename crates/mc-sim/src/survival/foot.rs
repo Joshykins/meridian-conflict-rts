@@ -1,15 +1,15 @@
 //! A Shaper's foot: the ground its tower stands on grows with it. As its built height
-//! climbs (`Node::height`) the foot spreads (`rules::shaper_foot`, a disc of 16 m at
-//! level 1 to about 90 m at level 20, never 100), and the sim blocks the path cells
+//! climbs (`Node::height`) the foot spreads (`rules::shaper_foot`, a disc of 30 m at
+//! level 1 to about 180 m at level 20 for a printer), and the sim blocks the path cells
 //! under it, so the bigger tower is walked round, built round and shot at as the
 //! bigger thing it is (`World::hull_radius`).
 //!
 //! Units on the ground standing where it spreads to are shoved out to the nearest
-//! ground they can stand on. A structure in the way (anyone's) holds the foot where it
-//! is until it is gone: structures are never moved. The base's own pieces stand clear
-//! of the widest foot (platforms from 150 m, pylons from 120 m, silos from 200 m).
-//! When the Shaper dies its foot's cells open again, save those a neighbour still
-//! stands on.
+//! ground they can stand on. A piece of its own base standing there unravels back
+//! into it, to be raised again further out (`base::slot_at`, which places pieces past
+//! the foot of the Shaper's level). Any other structure in the way holds the foot
+//! where it is until it is gone: structures are never moved. When the Shaper dies its
+//! foot's cells open again, save those a neighbour still stands on.
 
 use super::rules::shaper_foot;
 use crate::lots::CellRect as Cells;
@@ -57,8 +57,9 @@ impl crate::World {
             .enumerate()
             .filter(|(_, n)| n.raised)
             .filter_map(|(i, n)| {
+                let kind = s.config.node_sites.get(n.site as usize)?.kind;
                 // Whole cells only, so it re-blocks as a cell's worth comes, not every tick.
-                let want = Fx::from_int((shaper_foot(n.height) / cell).floor_int()) * cell;
+                let want = Fx::from_int((shaper_foot(kind, n.height) / cell).floor_int()) * cell;
                 (want > n.foot).then_some((i, want))
             })
             .collect();
@@ -69,7 +70,9 @@ impl crate::World {
             };
             let at = self.state.units.pos[row];
             let cells = foot_cells(at, want, self.terrain.size_cells());
-            if self.structure_on(row, at, want, &cells) {
+            if self.unravel_pieces_on(i, &cells).is_err()
+                || self.structure_on(row, at, want, &cells)
+            {
                 continue;
             }
             for &(min, max) in &cells {
@@ -79,6 +82,33 @@ impl crate::World {
             self.shove_out(row, at, want);
             self.state.survival.as_mut().unwrap().nodes[i].foot = want;
         }
+    }
+
+    /// Pieces of Shaper `i`'s own base standing on any of `cells` unravel back into it
+    /// (its base raises them again past the foot, `base::slot_at`).
+    fn unravel_pieces_on(&mut self, i: usize, cells: &[Cells]) -> Result<(), crate::SimError> {
+        let pieces = self.state.survival.as_ref().unwrap().nodes[i]
+            .pieces
+            .clone();
+        for p in pieces {
+            let Some(r) = self.state.units.row(p.unit) else {
+                continue;
+            };
+            let units = &self.state.units;
+            let hull = crate::lots::hull_cells(self.bp(r), units.pos[r], units.heading[r]);
+            if !hull
+                .iter()
+                .any(|h| cells.iter().any(|c| crate::lots::cells_overlap(*h, *c)))
+            {
+                continue;
+            }
+            self.despawn_unit(r, false)?;
+            // Gone on purpose, not lost: no wait before it is raised again.
+            self.state.survival.as_mut().unwrap().nodes[i]
+                .pieces
+                .retain(|q| q.unit != p.unit);
+        }
+        Ok(())
     }
 
     /// Whether a structure other than the one in `shaper` stands on any of `cells`

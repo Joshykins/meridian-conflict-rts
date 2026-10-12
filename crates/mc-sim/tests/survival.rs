@@ -999,7 +999,13 @@ fn a_shaper_raises_platforms_in_front_prints_on_them_and_they_unravel_with_it() 
     assert_eq!(pads.len(), 1, "{base:?}");
     let off = *pads[0] - at;
     let d = off.length().to_f32();
-    assert!((150.0..=400.0).contains(&d), "{d} m out");
+    // Out past its foot (`shaper_foot`, 30 m at level 1), inside its room.
+    let foot = mc_sim::survival::shaper_foot(
+        mc_data::survival::SiteKind::Printer,
+        mc_sim::survival::shaper_height(1),
+    )
+    .to_f32();
+    assert!((foot + 50.0..=400.0).contains(&d), "{d} m out");
     assert!(off.x < Fx::ZERO && off.y < Fx::ZERO, "in front: {off:?}");
     // It prints its formations on it.
     let printed_near = |w: &World| {
@@ -1059,6 +1065,9 @@ fn a_shaper_raises_platforms_in_front_prints_on_them_and_they_unravel_with_it() 
             );
         }
         assert!(p.distance(at) <= Fx::from_int(450), "{k} outside the room");
+        // Never on its foot: a piece the foot spread to was raised again further out.
+        let foot = w.shaper_card(shaper).unwrap().foot;
+        assert!(p.distance(at).to_f32() > foot, "{k} on the foot ({foot} m)");
     }
     // Killed, it takes its base with it, wreckless.
     let units: Vec<mc_sim::UnitId> = w
