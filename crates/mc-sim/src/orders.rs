@@ -1271,6 +1271,10 @@ impl World {
             self.run_rollouts()?;
             self.run_batches()?;
         }
+        let fights = {
+            let _span = mc_core::perf_span!("orders.fight_lines");
+            self.fight_lines()
+        };
         // Units spawned while orders run start acting next tick.
         let rows = self.state.units.slots.rows();
         for row in 0..rows {
@@ -1352,7 +1356,7 @@ impl World {
             match o.kind {
                 OrderKind::Move | OrderKind::AttackMove => {
                     let _span = mc_core::perf_span!("orders.move");
-                    self.run_move(row, &o)?
+                    self.run_move(row, &o, &fights)?
                 }
                 OrderKind::Attack => {
                     let _span = mc_core::perf_span!("orders.attack");
@@ -1408,7 +1412,12 @@ impl World {
         }
     }
 
-    fn run_move(&mut self, row: usize, o: &Order) -> Result<(), SimError> {
+    fn run_move(
+        &mut self,
+        row: usize,
+        o: &Order,
+        fights: &crate::fight_line::FightLines,
+    ) -> Result<(), SimError> {
         if self.is_air(row) {
             return self.run_air_move(row, o);
         }
@@ -1446,7 +1455,11 @@ impl World {
             }
             return Ok(());
         }
-        if o.kind == OrderKind::AttackMove && self.has_clear_target(row) {
+        // On attack-move it stops to fire, or, with nothing to fire at what its
+        // block is fighting, behind the members that are (`fight_line.rs`).
+        if o.kind == OrderKind::AttackMove
+            && (self.has_clear_target(row) || self.holds_behind_fight(row, o, fights))
+        {
             self.state.units.flags[row] |= flag::HOLD;
         }
         self.ensure_moving(row, o.pos, goal)

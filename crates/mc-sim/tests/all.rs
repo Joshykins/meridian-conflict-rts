@@ -18,6 +18,7 @@ mod air_waypoints;
 mod air_wings;
 mod aircraft_crash;
 mod atoll;
+mod attack_move_support;
 mod battle;
 mod bore_and_seabed;
 mod breacher;
