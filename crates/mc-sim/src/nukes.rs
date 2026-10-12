@@ -834,6 +834,7 @@ impl World {
 
     /// The economy's answer to `launcher_jobs`: each job gets `efficiency` of its rate.
     pub(crate) fn advance_launchers(&mut self, row: usize, step: Fx) {
+        self.flow(row).round += step;
         let spec = self.launcher_spec(row).cloned().unwrap();
         let id = self.state.units.id(row);
         let l = self.state.strategic.launchers.entry(id).or_default();
@@ -1331,6 +1332,23 @@ impl World {
     reason = "presentation: launcher marks, missiles in flight and planned launches for the render mirror and HUD"
 )]
 impl World {
+    /// Seconds before the round the launcher in `row` is assembling is done at last
+    /// tick's pace, every engineer assisting it counted; `None` when it assembles nothing
+    /// or the work stands still.
+    pub(crate) fn round_left(&self, row: usize) -> Option<f32> {
+        let spec = self.launcher_spec(row)?;
+        let pace =
+            self.flows.get(row).map_or(Fx::ZERO, |f| f.round) * mc_core::TICKS_PER_SECOND as i32;
+        let done = self
+            .state
+            .strategic
+            .launchers
+            .get(&self.state.units.id(row))
+            .map_or(Fx::ZERO, |l| l.progress);
+        let left = spec.round_time - done;
+        (pace > Fx::ZERO && left > Fx::ZERO).then(|| (left / pace).to_f32())
+    }
+
     /// `UnitInstance::status[2]` for a launcher (`LAUNCHER_*`); zero for anything else.
     pub(crate) fn launcher_pad(&self, row: usize) -> u32 {
         let Some(spec) = self.launcher_spec(row) else {

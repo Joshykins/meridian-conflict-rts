@@ -433,7 +433,18 @@ pub fn panel(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, l: &Launch
     }
     // What it is doing, right of the slots.
     let sx = sx + 10.0;
-    let seconds = (1.0 - l.progress) * spec.round_seconds();
+    // The next round's time left at the pace the sim reports, engineers assisting
+    // counted (the soonest of a battery's); the launcher's own pace when none moves.
+    let eta = |id: u32| crate::sim_thread::queue_of(&s.view.status.queues, id)?.eta;
+    let seconds = match &battery {
+        Some(b) => b
+            .launchers
+            .iter()
+            .filter_map(|(id, _, _)| eta(*id))
+            .min_by(f32::total_cmp),
+        None => eta(u.unit_id),
+    }
+    .unwrap_or((1.0 - l.progress) * spec.round_seconds());
     let (state, state_tone) = if targeted > 0 {
         (format!("{targeted} targeted  \u{b7}  {free} free"), WARHEAD)
     } else if l.firing {

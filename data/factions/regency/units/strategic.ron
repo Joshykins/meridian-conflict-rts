@@ -21,10 +21,10 @@
         strategic: (
             kind: Nuke,
             // One warhead: about five minutes on the silo's own assembly line, as a Sunfall's.
-            // Its own power is high and the round long, so engineers assisting add little: a
-            // nuke is hard to rush (user, 2026-10-07).
-            missile: (materials: 6000, energy: 120000, time: 720000),
-            power: 2400,
+            // Its own power is modest, so engineers assisting count: three Mason IIIs cut a
+            // warhead by about a third (user, 2026-10-12; it was hard to rush before).
+            missile: (materials: 6000, energy: 120000, time: 240000),
+            power: 800,
             stock: 2,
             speed: 320,
             apogee: 4200,

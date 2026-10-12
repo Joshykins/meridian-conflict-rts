@@ -109,8 +109,8 @@ fn engineers_on_area_assist_speed_up_a_silo_in_their_ring() {
         until(&mut w, 5000, |e| matches!(e, SimEvent::RoundReady { .. })).unwrap()
     };
     assert!(
-        helped < alone && helped * 5 > alone * 4,
-        "three Mason IIIs guarding a ring round the silo speed it up only a little: {helped} vs {alone}"
+        helped * 10 < alone * 7 && helped * 10 > alone * 5,
+        "three Mason IIIs guarding a ring round the silo cut its warhead by about a third: {helped} vs {alone}"
     );
 }
 
@@ -414,34 +414,80 @@ fn with_auto_build_off_a_launcher_builds_only_what_is_queued() {
     );
 }
 
-#[test]
-fn engineers_assisting_a_silo_speed_up_its_warhead() {
-    let alone = {
-        let mut w = world();
-        free(&mut w, 0);
-        spawn(&mut w, 0, "aster_t4_nuke_silo", 600, 600);
-        until(&mut w, 5000, |e| matches!(e, SimEvent::RoundReady { .. })).unwrap()
-    };
-    let helped = {
-        let mut w = world();
-        free(&mut w, 0);
-        let silo = spawn(&mut w, 0, "aster_t4_nuke_silo", 600, 600);
-        let masons: Vec<_> = (0..3)
-            .map(|i| spawn(&mut w, 0, "aster_t3_engineer", 560 + i * 12, 660))
-            .collect();
+/// Ticks until the first warhead is ready at a silo with `masons` Mason IIIs assisting.
+fn silo_round_with(masons: i32) -> u32 {
+    let mut w = world();
+    free(&mut w, 0);
+    let silo = spawn(&mut w, 0, "aster_t4_nuke_silo", 600, 600);
+    let helpers: Vec<_> = (0..masons)
+        .map(|i| {
+            spawn(
+                &mut w,
+                0,
+                "aster_t3_engineer",
+                500 + (i % 10) * 12,
+                660 + (i / 10) * 12,
+            )
+        })
+        .collect();
+    if !helpers.is_empty() {
         cmd(
             &mut w,
             Command::Assist {
-                units: masons,
+                units: helpers,
                 target: silo,
                 queue: false,
             },
         );
-        until(&mut w, 5000, |e| matches!(e, SimEvent::RoundReady { .. })).unwrap()
-    };
+    }
+    until(&mut w, 5000, |e| matches!(e, SimEvent::RoundReady { .. })).unwrap()
+}
+
+#[test]
+fn engineers_assisting_a_silo_speed_up_its_warhead() {
+    let (alone, helped) = (silo_round_with(0), silo_round_with(3));
     assert!(
-        helped < alone && helped * 5 > alone * 4,
-        "three Mason IIIs (power 180) beside a silo (2400) speed it up only a little: {helped} vs {alone}"
+        helped * 10 < alone * 7 && helped * 10 > alone * 5,
+        "three Mason IIIs beside a silo cut its warhead by about a third: {helped} vs {alone}"
+    );
+}
+
+#[test]
+fn a_silo_times_its_warhead_by_the_engineers_assisting_it() {
+    let mut w = world();
+    free(&mut w, 0);
+    let silo = spawn(&mut w, 0, "aster_t4_nuke_silo", 600, 600);
+    let eta = |w: &World| {
+        let mut out = Vec::new();
+        w.write_orders(Some(0), &[silo.0], None, &mut out);
+        out[0].eta.expect("an assembling silo has a time left")
+    };
+    for _ in 0..20 {
+        w.tick(&[]).unwrap();
+    }
+    let alone = eta(&w);
+    let masons: Vec<_> = (0..3)
+        .map(|i| spawn(&mut w, 0, "aster_t3_engineer", 560 + i * 12, 660))
+        .collect();
+    cmd(
+        &mut w,
+        Command::Assist {
+            units: masons,
+            target: silo,
+            queue: false,
+        },
+    );
+    let mut helped = alone;
+    for _ in 0..200 {
+        w.tick(&[]).unwrap();
+        helped = eta(&w);
+        if helped * 10.0 < alone * 7.0 {
+            break;
+        }
+    }
+    assert!(
+        helped * 10.0 < alone * 7.0,
+        "three Mason IIIs at work bring the silo's time left down by a third: {helped} vs {alone}"
     );
 }
 

@@ -689,14 +689,16 @@
         motion: (layer: Naval, size: 5, speed: 32, accel: 7, turn: 16),
         strategic: (
             kind: Nuke,
-            // A warhead assembled aboard, as the silo's, and held four at most.
-            missile: (materials: 6000, energy: 120000, time: 18000),
+            // A warhead assembled aboard at the silo's pace (so engineers assisting speed it
+            // up as much as a silo's, and a crowd cannot build one in seconds), and held four
+            // at most.
+            missile: (materials: 6000, energy: 120000, time: 240000),
             // Drawn as a boat's missile, smaller than the silo's round.
             missile_scale: 0.35,
             // The twin round silos aft (models/aster/naval/submarine_titan.rs `SILO_*`),
             // each warhead leaving the next in turn, its nose just under the lid.
             tubes: [(-51.3, -4.05, 4.8), (-51.3, 4.05, 4.8)],
-            power: 60,
+            power: 800,
             stock: 4,
             speed: 320,
             apogee: 4200,

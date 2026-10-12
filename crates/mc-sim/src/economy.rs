@@ -70,6 +70,9 @@ pub struct UnitFlow {
     /// Build time it gained as a site or product under construction, from every builder
     /// on it together: what the interface times its finish by.
     pub built: Fx,
+    /// Build time a launcher's round gained, its own power and its helpers' together
+    /// after the side's efficiency: what the interface times the round by.
+    pub round: Fx,
 }
 
 /// One builder working on one target this tick.

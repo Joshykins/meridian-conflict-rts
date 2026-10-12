@@ -3049,7 +3049,11 @@ impl World {
             let rate = |v: Fx| (v * TICKS_PER_SECOND as i32).to_f32();
             // What it builds, or itself while it goes up with builders on it.
             let building = target.or_else(|| (flow.built > Fx::ZERO).then_some(row));
-            let eta = building.and_then(|t| self.work_left(t));
+            // A launcher's own round when it builds nothing else.
+            let eta = match building {
+                Some(t) => self.work_left(t),
+                None => self.round_left(row),
+            };
             let standing = self
                 .standing_view(row)
                 .into_iter()
