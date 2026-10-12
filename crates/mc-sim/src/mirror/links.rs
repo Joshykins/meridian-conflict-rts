@@ -14,8 +14,9 @@ pub struct LinkView {
     pub consumer_blueprint: BlueprintId,
     pub owner: u8,
     pub resource: Resource,
-    /// Share of the neighbour's use this provider saves across their shared edge.
-    pub share: f32,
+    /// Share of the neighbour's use this provider saves across their shared edge; `None`
+    /// on an enemy's link, whose economy the viewer is not told.
+    pub share: Option<f32>,
     /// The stretch of lot edge the two share, end to end, metres.
     pub edge: [[f32; 2]; 2],
     /// The provider's lot centre and the neighbour's: the conduit runs from one to the other.
@@ -45,8 +46,9 @@ impl World {
         })
     }
 
-    /// This tick's links that `viewer` may see: its own side's and its allies'. An
-    /// enemy's are left out, as its economy is.
+    /// This tick's links that `viewer` may see: its own side's and its allies', and an
+    /// enemy's whose two buildings its team sees (the conduit is on the ground for
+    /// anyone to look at), without the share, as an enemy's economy is hidden.
     pub(super) fn write_links(&self, viewer: Option<u8>, out: &mut Vec<LinkView>) {
         out.clear();
         let units = &self.state.units;
@@ -55,8 +57,12 @@ impl World {
                 continue;
             };
             let owner = units.owner[p];
-            if viewer.is_some_and(|v| self.are_enemies(v, owner)) {
-                continue;
+            let enemy = viewer.filter(|&v| self.are_enemies(v, owner));
+            if let Some(v) = enemy {
+                let mask = self.team_mask(v);
+                if self.state.fog_enabled && !(self.seen_by(p, mask) && self.seen_by(c, mask)) {
+                    continue;
+                }
             }
             let (pbp, cbp) = (self.bp(p), self.bp(c));
             out.push(LinkView {
@@ -66,7 +72,7 @@ impl World {
                 consumer_blueprint: cbp.id,
                 owner,
                 resource: l.resource,
-                share: l.share.to_f32(),
+                share: enemy.is_none().then(|| l.share.to_f32()),
                 edge: [l.edge.0.to_f32(), l.edge.1.to_f32()],
                 from: units.pos[p].to_f32(),
                 to: units.pos[c].to_f32(),

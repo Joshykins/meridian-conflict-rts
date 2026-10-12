@@ -69,14 +69,16 @@ pub struct Tie {
     pub edge: [[f32; 2]; 2],
 }
 
-/// The links of unit `id`, in and out.
+/// The links of unit `id`, in and out, that the viewer knows the share of (not an
+/// enemy's).
 pub fn ties_of(links: &[LinkView], id: u32) -> Vec<Tie> {
     links
         .iter()
         .filter(|l| l.consumer == id || l.provider == id)
-        .map(|l| {
+        .filter_map(|l| {
+            let share = l.share?;
             let incoming = l.consumer == id;
-            Tie {
+            Some(Tie {
                 partner: if incoming { l.provider } else { l.consumer },
                 partner_blueprint: if incoming {
                     l.provider_blueprint
@@ -84,10 +86,10 @@ pub fn ties_of(links: &[LinkView], id: u32) -> Vec<Tie> {
                     l.consumer_blueprint
                 },
                 resource: l.resource,
-                share: l.share,
+                share,
                 incoming,
                 edge: l.edge,
-            }
+            })
         })
         .collect()
 }
@@ -177,7 +179,7 @@ pub fn planned_links(
                 },
                 owner: local,
                 resource: t.resource,
-                share: t.share,
+                share: Some(t.share),
                 edge: t.edge,
                 from,
                 to,

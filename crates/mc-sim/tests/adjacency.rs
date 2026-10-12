@@ -336,3 +336,27 @@ fn the_mirror_shows_how_hard_a_fabricator_works() {
     w.tick(&[]).unwrap();
     assert_eq!(work(&w), 0.0, "paused");
 }
+
+#[test]
+fn an_enemy_sees_the_conduits_it_can_see_but_not_their_share() {
+    let mut w = world();
+    let fab = spawn(&mut w, 0, "aster_t3_fabricator", 792, 792, 1000);
+    spawn(&mut w, 0, "aster_t3_power", 852, 792, 1000);
+    w.tick(&[]).unwrap();
+    let links = |w: &World, viewer| {
+        let mut frame = mc_sim::mirror::RenderFrame::default();
+        w.write_render_frame(Some(viewer), &mut frame);
+        frame
+            .links
+            .iter()
+            .filter(|l| l.consumer == fab.0)
+            .map(|l| l.share)
+            .collect::<Vec<_>>()
+    };
+    assert!(matches!(links(&w, 0)[..], [Some(s)] if (s - 0.15).abs() < 1e-3));
+    assert_eq!(links(&w, 1), [None], "the conduit, not the share");
+    w.state.fog_enabled = true;
+    w.tick(&[]).unwrap();
+    assert!(links(&w, 1).is_empty(), "out of sight");
+    assert_eq!(links(&w, 0).len(), 1);
+}

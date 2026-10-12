@@ -39,13 +39,14 @@ pub fn draw(
     if !focus.is_empty() {
         for l in &view.frame.links {
             let mine = focus.contains(&l.consumer) || focus.contains(&l.provider);
-            if !mine {
+            // An enemy's link carries no share: its conduit is drawn, but not tagged.
+            let (true, Some(share)) = (mine, l.share) else {
                 continue;
-            }
+            };
             let hot = lit.is_some_and(|p| p == l.provider || p == l.consumer);
             let [a, b] = l.edge.map(Vec2::from);
             let from = Vec2::from(l.from);
-            let text = format!("{} {}", adj::percent(l.share), adj::word(l.resource));
+            let text = format!("{} {}", adj::percent(share), adj::word(l.resource));
             seam(
                 ui,
                 field,
