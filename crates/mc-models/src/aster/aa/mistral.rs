@@ -1,0 +1,296 @@
+//! Mistral: tech 3 tracked rail AA. One long rail cannon that throws a slug at one
+//! aircraft, on a T3 tracked hull in the Arbalest's language: hard facets, nothing lit
+//! but dark lenses, the rails bare metal. The gun lies level here; the renderer raises
+//! it to the sky at rest, as on every AA-only pivoted weapon.
+//!
+//! Three designs for the round (`rail_aa` is A, `rail_aa~b`, `rail_aa~c`), all on the
+//! blueprint's trunnion and muzzle:
+//! - A: the rail between two tall cheeks of a low turret (a yoke), a flat search array
+//!   leaned back on the bustle.
+//! - B: an enclosed turret on split tracks, the rail riding a cradle on its roof with a
+//!   tracking sensor slaved beside it that elevates with the gun.
+//! - C: an open turntable on a wide hull, the rail flanked by two long capacitor packs
+//!   that elevate with it, a tall search array on its own mast at the tail.
+use super::*;
+use glam::{Vec2, Vec3};
+
+/// The trunnion the rail pitches about: the blueprint's `pivot`.
+const TRUNNION: Vec3 = Vec3::new(-0.4, 0.0, 3.6);
+/// The rails' mouth: the blueprint's `muzzle`.
+const MUZZLE: Vec3 = Vec3::new(9.8, 0.0, 3.6);
+/// Where the rails' power block starts, a short way behind the trunnion so the breech
+/// clears the turret when the gun stands up at the sky.
+const BREECH: Vec3 = Vec3::new(-0.9, 0.0, 3.6);
+/// One rail's (width, height), and the slot between the pair.
+const RAIL: Vec2 = Vec2::new(0.26, 0.56);
+const GAP: f32 = 0.4;
+
+/// A: the yoke.
+pub(in crate::aster) fn yoke(b: &mut MeshBuilder, _: u8) {
+    let deck = tracked_chassis(
+        b,
+        &Chassis {
+            rear: -5.4,
+            front: 5.6,
+            track: (2.35, 3.85, 1.3),
+            split_tracks: false,
+            deck: 2.0,
+            dark: false,
+            lit: false,
+        },
+    );
+    b.set_dust_line(1.5);
+    hull_fittings(b, deck);
+    b.set_turret_pivot(v3(0.0, 0.0, deck.z));
+    b.set_arm_pivot(TRUNNION);
+    b.set_recoil(BREECH, MUZZLE, 0.4);
+    b.with_part(part::TURRET, |b| {
+        // A low faceted race, the cheeks standing up out of it either side of the rail.
+        b.paint(PLATING);
+        let roof = turret_shell(b, 5.4, 4.2, deck.z, 2.7);
+        b.with_limb(rig::ARM_GUN | rig::RECOIL, rail);
+        if b.coarse() {
+            team_panel(b, roof.at(0.3, 0.0), v2(1.4, 1.2));
+            return;
+        }
+        b.paint(PLATING);
+        b.mirror_y(|b| cheek(b, 0.62, 0.3));
+        team_panel(b, roof.at(0.25, -0.62), v2(1.0, 0.6));
+        team_panel(b, roof.at(0.25, 0.62), v2(1.0, 0.6));
+        search_array(b, v3(-2.15, 0.0, 2.7), 0.45, v2(1.1, 2.6));
+        if b.fine() {
+            // A dark sight in the left cheek's face, looking down the rail.
+            b.paint(GLASS);
+            b.cuboid(v3(1.32, 0.9, 3.9), v3(0.05, 0.26, 0.2));
+            antenna_unlit(b, roof.at(0.1, -0.85), 1.1, 0.15);
+        }
+    });
+}
+
+/// B: the roof cradle.
+pub(in crate::aster) fn cradle(b: &mut MeshBuilder, _: u8) {
+    let deck = tracked_chassis(
+        b,
+        &Chassis {
+            rear: -5.2,
+            front: 5.2,
+            track: (2.2, 3.7, 1.4),
+            split_tracks: true,
+            deck: 2.1,
+            dark: false,
+            lit: false,
+        },
+    );
+    b.set_dust_line(1.6);
+    hull_fittings(b, deck);
+    b.set_turret_pivot(v3(0.0, 0.0, deck.z));
+    b.set_arm_pivot(TRUNNION);
+    b.set_recoil(BREECH, MUZZLE, 0.4);
+    b.with_part(part::TURRET, |b| {
+        // An enclosed faceted house, the cradle's pedestal on its roof.
+        b.paint(PLATING);
+        let roof = turret_shell(b, 5.8, 4.4, deck.z, 3.0);
+        if !b.coarse() {
+            b.paint(ACCENT);
+            b.chamfered_box(v3(-0.4, 0.0, 3.08), v3(1.6, 1.5, 0.2), 0.2);
+        }
+        b.with_limb(rig::ARM_GUN | rig::RECOIL, |b| {
+            rail(b);
+            if !b.coarse() {
+                // The tracking sensor, slaved to the rail on an arm off the cradle.
+                b.paint(PLATING);
+                b.block(v3(-0.3, -0.7, 3.45), v3(0.3, -0.95, 3.75));
+                b.paint(PLATING_DARK);
+                b.chamfered_box(v3(0.3, -1.25, 3.6), v3(1.3, 0.6, 0.6), 0.12);
+                if b.fine() {
+                    b.paint(GLASS);
+                    b.cuboid(v3(0.96, -1.25, 3.6), v3(0.03, 0.42, 0.42));
+                }
+            }
+        });
+        if b.coarse() {
+            team_panel(b, roof.at(0.5, 0.0), v2(1.6, 1.2));
+            return;
+        }
+        team_panel(b, roof.at(0.55, 0.65), v2(1.2, 0.5));
+        // Capacitor drums fore and aft on the bustle, either side of the pedestal.
+        b.mirror_y(|b| {
+            let (y, z, r) = (1.15, 3.32, 0.32);
+            b.paint(PLATING_DARK);
+            b.cylinder_between(v3(-2.7, y, z), v3(-1.0, y, z), r, r, b.sides(8));
+            if b.fine() {
+                b.paint(METAL);
+                for x in [-2.6, -1.85, -1.15] {
+                    b.cylinder_between(v3(x, y, z), v3(x + 0.1, y, z), r * 1.1, r * 1.1, 8);
+                }
+            }
+        });
+        if b.fine() {
+            antenna_unlit(b, roof.at(0.05, 0.9), 1.0, 0.15);
+        }
+    });
+}
+
+/// C: the open turntable.
+pub(in crate::aster) fn turntable(b: &mut MeshBuilder, _: u8) {
+    let deck = tracked_chassis(
+        b,
+        &Chassis {
+            rear: -5.6,
+            front: 5.4,
+            track: (2.5, 4.0, 1.25),
+            split_tracks: false,
+            deck: 1.9,
+            dark: false,
+            lit: false,
+        },
+    );
+    b.set_dust_line(1.5);
+    hull_fittings(b, deck);
+    // A tall search array on its own mast at the tail, fixed to the hull.
+    if !b.coarse() {
+        b.paint(PLATING_DARK);
+        b.chamfered_box(v3(-3.9, 0.0, 2.15), v3(1.0, 1.0, 0.5), 0.15);
+        b.paint(METAL);
+        b.cylinder_between(
+            v3(-3.9, 0.0, 2.3),
+            v3(-3.9, 0.0, 3.4),
+            0.14,
+            0.11,
+            b.sides(6),
+        );
+    }
+    search_array(b, v3(-3.9, 0.0, 3.4), 0.35, v2(1.7, 2.2));
+    b.set_turret_pivot(v3(0.0, 0.0, deck.z));
+    b.set_arm_pivot(TRUNNION);
+    b.set_recoil(BREECH, MUZZLE, 0.4);
+    b.with_part(part::TURRET, |b| {
+        // A flat ring, a low saddle and the trunnion blocks: the gun is the turret.
+        if b.coarse() {
+            b.paint(PLATING);
+            b.cuboid_open(v3(-0.2, 0.0, 2.45), v3(3.8, 3.0, 1.1));
+            b.with_limb(rig::ARM_GUN | rig::RECOIL, rail);
+            team_panel(b, v3(-0.2, 0.0, 3.0), v2(1.4, 1.2));
+            return;
+        }
+        b.paint(ACCENT);
+        b.prism(v3(0.0, 0.0, deck.z), b.sides(12), 2.4, 2.3, 0.3);
+        b.paint(PLATING);
+        b.extrude_y_chamfered(
+            &[
+                [-2.0, 2.2],
+                [1.6, 2.2],
+                [1.9, 2.5],
+                [1.2, 3.0],
+                [-1.2, 3.0],
+                [-2.0, 2.7],
+            ],
+            1.5,
+            0.2,
+        );
+        b.with_limb(rig::ARM_GUN | rig::RECOIL, |b| {
+            rail(b);
+            // Capacitor packs either side of the rails, riding with them.
+            b.mirror_y(|b| {
+                b.paint(PLATING);
+                b.extrude_x(
+                    &[
+                        [0.72, 3.2],
+                        [1.25, 3.3],
+                        [1.25, 3.95],
+                        [0.95, 4.15],
+                        [0.72, 4.05],
+                    ],
+                    -1.1,
+                    3.4,
+                );
+                if b.fine() {
+                    b.paint(ACCENT);
+                    for x in [-0.4, 1.0, 2.4] {
+                        b.block(v3(x, 0.7, 3.18), v3(x + 0.18, 1.28, 4.17));
+                    }
+                }
+            });
+        });
+        team_panel(b, v3(-1.4, 0.0, 3.0), v2(0.9, 1.6));
+        // Trunnion blocks either side of the saddle.
+        b.mirror_y(|b| {
+            b.paint(PLATING);
+            b.chamfered_box(v3(-0.4, 1.45, 3.4), v3(1.0, 0.3, 0.9), 0.1);
+        });
+    });
+}
+
+/// The rail cannon, level from breech to muzzle.
+fn rail(b: &mut MeshBuilder) {
+    rail_gun(b, BREECH, MUZZLE, RAIL, GAP, Emitter::Unlit);
+}
+
+/// One cheek of the yoke on the +y side: a sloped plate from the turret roof up past the
+/// trunnion, `y` its inner face, `t` thick.
+fn cheek(b: &mut MeshBuilder, y: f32, t: f32) {
+    b.at(v3(0.0, y + t * 0.5, 0.0), |b| {
+        b.extrude_y_chamfered(
+            &[
+                [-1.9, 2.6],
+                [1.1, 2.6],
+                [1.45, 3.1],
+                [1.0, 4.3],
+                [-0.9, 4.45],
+                [-1.9, 3.5],
+            ],
+            t * 0.5,
+            0.08,
+        );
+    });
+}
+
+/// A flat search array leaned back to scan the sky: a post from `base` and a dark panel
+/// `size` (height, width) pitched back by `lean` radians, a steel strip along its foot.
+fn search_array(b: &mut MeshBuilder, base: Vec3, lean: f32, size: Vec2) {
+    if b.coarse() {
+        return;
+    }
+    let head = base + v3(0.0, 0.0, 0.3);
+    b.paint(METAL);
+    b.cylinder_between(base, head, 0.16, 0.14, b.sides(6));
+    b.pitched(head, lean, |b| {
+        b.paint(PLATING);
+        b.cuboid(v3(-0.1, 0.0, size.x * 0.5), v3(0.2, size.y, size.x));
+        b.paint(PLATING_DARK);
+        b.cuboid(
+            v3(0.02, 0.0, size.x * 0.5),
+            v3(0.06, size.y - 0.2, size.x - 0.2),
+        );
+        if b.fine() {
+            b.paint(METAL);
+            b.cuboid(v3(0.06, 0.0, 0.12), v3(0.04, size.y - 0.2, 0.06));
+        }
+    });
+}
+
+/// Driver's block, grilles, exhausts and lockers on the hull deck.
+fn hull_fittings(b: &mut MeshBuilder, deck: Roof) {
+    if !b.fine() {
+        return;
+    }
+    b.mirror_y(|b| {
+        vent(
+            b,
+            deck.at(0.08, 0.5) + Vec3::Z * 0.04,
+            v2(1.1, 0.8),
+            5,
+            METAL,
+        )
+    });
+    b.paint(ACCENT);
+    b.block(
+        deck.at(1.0, -0.3) + v3(-0.5, 0.0, 0.0),
+        deck.at(1.0, 0.3) + v3(-0.1, 0.0, 0.16),
+    );
+    b.paint(GLASS);
+    b.block(
+        deck.at(1.0, -0.24) + v3(-0.1, 0.0, 0.03),
+        deck.at(1.0, 0.24) + v3(-0.07, 0.0, 0.13),
+    );
+}

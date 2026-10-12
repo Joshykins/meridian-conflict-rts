@@ -132,6 +132,8 @@ const BLUEPRINTS: &[Blueprint] = &[
     unit("artillery_heavy", 11.0, 8.0, 3, &[[6.666, 0.0, 8.599]]),
     // Long guns: the bore reaches well past the hull (`models_fit_their_blueprints`).
     unit("bore_tank", 8.2, 4.2, 3, &[[10.3, 0.0, 3.3]]),
+    // The Mistral's rail: it too reaches past the hull.
+    unit("rail_aa", 7.0, 4.5, 3, &[[9.8, 0.0, 3.6]]),
     // The main turret's AEB-2; the sponson and flak houses are
     // `fulgur_houses_and_muzzles`.
     unit("assault_tank", 31.35, 24.75, 4, &[[37.95, 0.0, 18.48]]),

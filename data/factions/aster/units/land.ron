@@ -324,4 +324,35 @@
  radius: 5.5, height: 4.5, vision: 360, motion: (layer: Land, size: 1, speed: 28, accel: 30, turn: 100),
  weapons: [(name: "Conventional Flak", damage: 200, range: 480, reload: 0.7, speed: 320, trajectory: Direct,
  turret_turn: 240, muzzle: (6, 0, 3.3), pivot: (1.2, 0, 3.3), targets: ["Air"], color: Orange, sounds: (fire: "flak_gun", impact: "flak_burst"), flak: true, proximity: 12, splash: 30,)], mesh: "mobile_aa", icon: AntiAir, sounds: (moving: "tracks")),
+    (
+        // Tech 3 tracked AA: one long rail cannon that puts a near-instant slug into one
+        // aircraft at a time. Not flak and not a missile battery: no splash worth the name,
+        // one target a shot, a slow reload. Made to break the heavy air the Squall cannot
+        // reach: its 1300 m outranges the Thunderhead's Talon rockets (1280) and the
+        // Eclipse's bomb release (950), so either is under fire before it can strike.
+        // Four slugs kill an Eclipse (6000), a pair of Mistrals kills one on its run in.
+        // A sky-search radar finds what it shoots at; it sees the ground no further than a tank.
+        key: "aster_t3_mobile_aa",
+        name: "Mistral",
+        role: "Mobile Rail AA", title: "Rail AA",
+        tech: 3,
+        categories: ["Land", "AntiAir"],
+        health: 4000,
+        cost: (materials: 800, energy: 7000, time: 4000),
+        radius: 7.0, height: 4.5,
+        vision: 450, radar: 1400,
+        motion: (layer: Land, size: 1, speed: 26, accel: 20, turn: 80),
+        // `pivot`/`muzzle` are the model's trunnion and the rails' mouth (models/aster/aa/mistral.rs).
+        // At 2600 m/s the slug crosses 1300 m in five ticks: the lead (combat.rs
+        // `direct_air_aim`) puts it on a bomber at 210 m/s.
+        weapons: [(
+            name: "Skyrail Cannon",
+            damage: 1500, splash: 4, range: 1300, reload: 4.0, speed: 2600, rail: true, trajectory: Direct,
+            turret_turn: 90, muzzle: (9.8, 0, 3.6), pivot: (-0.4, 0, 3.6),
+            targets: ["Air"], color: Blue, flash: 1.6, impact: 1.6, shockwave: 0.8, tracer: 1.0,
+            sounds: (fire: "aster_rail_heavy", impact: "aster_rail_hit"),
+        )],
+        mesh: "rail_aa", icon: AntiAir,
+        sounds: (death: "blast_large", moving: "tracks_heavy"),
+    ),
 ]

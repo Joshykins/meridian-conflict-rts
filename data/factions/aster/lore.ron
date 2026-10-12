@@ -166,6 +166,12 @@
             "Conventional Flak": "Slow shells timed to burst in an aircraft's path rather than chase the hull.",
         },
     ),
+    "aster_t3_mobile_aa": (
+        lore: "Built after the first Eclipse raids, when Command learned that flak could not reach a bomber that dropped from a kilometre out. One long rail on treads, a radar that watches only the sky, and crews who count their kills one slug at a time.",
+        weapons: {
+            "Skyrail Cannon": "A slug thrown faster than anything with wings can turn. It does not burst and it does not spread: it finds one aircraft and goes through it.",
+        },
+    ),
     "aster_t1_interceptor": (
         lore: "Reach's basic fighter, still called Shrike by pilots out of habit.",
         weapons: {

@@ -3,6 +3,7 @@ use super::parts::*;
 mod flak_battery;
 mod floats;
 mod gnat;
+pub(super) mod mistral;
 mod skyguard;
 mod squall;
 use crate::builder::MeshBuilder;

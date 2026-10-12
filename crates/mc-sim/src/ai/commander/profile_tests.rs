@@ -15,6 +15,9 @@ fn roles_come_from_what_a_unit_can_do() {
     let has = |key: &str, r: u32| profile(&b, key).has(r);
     assert!(has("aster_t1_tank", role::LINE));
     assert!(has("aster_t1_mobile_aa", role::ANTI_AIR));
+    // The Mistral is the army's answer to tech 3 air: built for the anti-air share.
+    assert!(has("aster_t3_mobile_aa", role::ANTI_AIR));
+    assert!(!has("aster_t3_mobile_aa", role::SENSOR));
     assert!(has("aster_t2_lift_ship", role::TRANSPORT | role::WARP));
     assert!(has("aster_t3_lift_ship", role::TRANSPORT | role::PROJECT));
     assert!(has("aster_t2_sensor_ship", role::SENSOR | role::WARP));

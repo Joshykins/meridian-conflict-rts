@@ -29,6 +29,7 @@ const SHOOTERS: &[&str] = &[
     "aster_t2_aa_cruiser",
     "aster_t2_interceptor",
     "aster_t3_sam",
+    "aster_t3_mobile_aa",
     "aster_t3_air_superiority",
     "aster_t3_battleship",
     "aster_t3_carrier",
