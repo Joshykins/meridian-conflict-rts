@@ -1,7 +1,7 @@
 //! The layouts a map can be baked to, the parameters of a bake, and what
 //! each layout asks of them.
 
-use super::{crosswater, frostline, siege, tripoint};
+use super::{antarctic, crosswater, frostline, siege, tripoint};
 use crate::format::MapError;
 use crate::{MAX_START_POSITIONS, TILE_SIZE_M};
 
@@ -65,6 +65,13 @@ pub enum Layout {
     /// symmetry: the city's start first, the outskirts' second. Exactly
     /// 6 km.
     Siege,
+    /// "Erebus Strait": two against two across a polar sea, each team on
+    /// one coast of Antarctica under its ice sheet, a glacier between each
+    /// team's starts floating out as an ice shelf, two volcanic caldera
+    /// islands in the strait (see `antarctic.rs`). No trees. Fair by a half
+    /// turn; the west team's starts first, each followed by its image.
+    /// Exactly 12 km.
+    Antarctic,
 }
 
 #[derive(Clone, Debug)]
@@ -182,6 +189,15 @@ impl BakeParams {
         }
     }
 
+    /// A square four-player [`Layout::Antarctic`] map.
+    pub fn antarctic(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
+        BakeParams {
+            players: 4,
+            layout: Layout::Antarctic,
+            ..BakeParams::square(name, size_tiles, seed)
+        }
+    }
+
     /// A square two-player [`Layout::Siege`] map.
     pub fn siege(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
         BakeParams {
@@ -271,6 +287,15 @@ impl BakeParams {
         {
             return Err(MapError::Invalid(
                 "the Siege layout is for exactly 2 players on a 6 km map".into(),
+            ));
+        }
+        if self.layout == Layout::Antarctic
+            && (self.players != 4
+                || (self.tiles_w as i32 * TILE_SIZE_M) as f64 != antarctic::SIZE
+                || self.tiles_h != self.tiles_w)
+        {
+            return Err(MapError::Invalid(
+                "the Antarctic layout is for exactly 4 players on a 12 km map".into(),
             ));
         }
         if self.layout == Layout::Threshold && self.players != 4 {

@@ -1,0 +1,14 @@
+// Erebus Strait: two against two across a polar sea. Each team holds one coast
+// of Antarctica under its ice sheet, a glacier between its two starts floating
+// out as an ice shelf; two volcanic islands with flooded calderas lie in the
+// strait, tabular bergs aground round them. Nothing grows. A grey, windy day:
+// a dark, rough sea, cloud low over the ice, snow showers blowing through.
+// Skirmish set-up can override the weather (Stormy for a blizzard) and the
+// time of day.
+(
+    biome: Arctic,
+    style: Teams,
+    weather: Cloudy,
+    tweaks: (rain: 0.6, wind: 22),
+    time: Morning,
+)

@@ -30,6 +30,8 @@ impl Terrain {
                 Layout::Frostline => self.frostline_forest(x, y, height, slope),
                 Layout::Tripoint => self.tripoint_forest(x, y, height, slope),
                 Layout::Crosswater => self.cw_forest(x, y, height, slope),
+                // Nothing grows on Antarctica.
+                Layout::Antarctic => (0.0, 0.0),
                 Layout::Siege => (
                     self.siege_forest(x, y) * (1.0 - smoothstep(0.3, 0.5, slope)),
                     0.0,
@@ -241,7 +243,7 @@ impl Terrain {
         let mut props = Vec::new();
         // The alpine map is rockier, and its woods climb steeper ground.
         let alpine = self.is_alpine() || self.layout == Layout::Threshold;
-        let arctic = false;
+        let arctic = self.layout == Layout::Antarctic;
 
         let (rock_slope, rock_roll) = if alpine || arctic {
             (0.18, 0.8)
@@ -278,6 +280,7 @@ impl Terrain {
                 } else if (rock_slope..1.5).contains(&slope)
                     && roll > rock_roll
                     && !(self.is_alpine() && self.alpine_ice(x, y) > 0.05)
+                    && !(arctic && self.an_ice_cover(x, y).0 > 0.05)
                     && self.machine_clear(x, y)
                 {
                     let desert = self.layout == Layout::Canyon

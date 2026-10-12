@@ -58,6 +58,7 @@ const CITY_LOT_M: f64 = 48.0;
 const ORE_CORNERS: usize = 28;
 
 mod alpine;
+mod antarctic;
 mod archipelago;
 mod bays;
 mod canyon;
@@ -538,6 +539,10 @@ impl Terrain {
             t.setup_siege();
             return t;
         }
+        if params.layout == Layout::Antarctic {
+            t.setup_antarctic();
+            return t;
+        }
 
         let (cx, cy) = (size_x / 2.0, size_y / 2.0);
         let pad = |t: &Terrain, (x, y): (f64, f64), core: f64, floor: f64| Pad {
@@ -620,11 +625,11 @@ impl Terrain {
             let (qx, qy) = tripoint::turn((vx, vy), 3 - k);
             return (qx, qy, r);
         }
-        // Halden's Grip, The Axis and Frostline are fair by a half turn: fold
-        // the north-east half onto the south-west.
+        // Halden's Grip, The Axis, Frostline and Erebus Strait are fair by a
+        // half turn: fold the north-east half onto the south-west.
         if matches!(
             self.layout,
-            Layout::TwinBays | Layout::Archipelago | Layout::Frostline
+            Layout::TwinBays | Layout::Archipelago | Layout::Frostline | Layout::Antarctic
         ) {
             return if vx + vy > 0.0 {
                 (-vx, -vy, r)
@@ -674,6 +679,7 @@ impl Terrain {
             Layout::Tripoint => self.natural_tripoint(x, y),
             Layout::Crosswater => self.natural_crosswater(x, y),
             Layout::Siege => self.natural_siege(x, y),
+            Layout::Antarctic => self.natural_antarctic(x, y),
         };
         if self.benches.is_empty() {
             h
@@ -687,7 +693,7 @@ impl Terrain {
         self.is_alpine()
             || matches!(
                 self.layout,
-                Layout::Threshold | Layout::Frostline | Layout::Tripoint
+                Layout::Threshold | Layout::Frostline | Layout::Tripoint | Layout::Antarctic
             )
     }
 
@@ -1266,6 +1272,7 @@ impl Terrain {
                     Layout::Threshold => self.threshold_snow(x, y, z(i, j), gx, gy),
                     Layout::Frostline => self.frostline_snow(x, y, z(i, j), gx, gy),
                     Layout::Tripoint => self.tripoint_snow(x, y, z(i, j), gx, gy),
+                    Layout::Antarctic => self.antarctic_snow(x, y, z(i, j), gx, gy),
                     _ => self.alpine_snow(x, y, z(i, j), gx, gy),
                 };
                 // No glacier ice on the machine's benches or their cut faces.
@@ -1320,6 +1327,8 @@ mod test_maps {
         LazyLock::new(|| Terrain::new(&BakeParams::canyon("t", 6, 11)));
     pub(super) static FROSTLINE: LazyLock<Terrain> =
         LazyLock::new(|| Terrain::new(&BakeParams::frostline("t", 8, 9)));
+    pub(super) static ANTARCTIC: LazyLock<Terrain> =
+        LazyLock::new(|| Terrain::new(&BakeParams::antarctic("Erebus Strait", 6, 37)));
     pub(super) static CROSSWATER: LazyLock<Terrain> =
         LazyLock::new(|| Terrain::new(&BakeParams::crosswater("Crosswater", 8, 7)));
     pub(super) static TRIPOINT: LazyLock<Terrain> =
