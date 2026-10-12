@@ -14,7 +14,10 @@ use crate::hud::survival::VIOLET;
 use crate::rings::{SHAPER_COVER, SHAPER_LANCE, SHAPER_SHIELD};
 use crate::sim_thread::ShaperPick;
 use mc_data::survival::{Domain as SiteDomain, SiteKind};
-use mc_sim::survival::{shaper_platforms, shaper_pylons, PieceKind, ShaperCard};
+use mc_sim::survival::{
+    launch_gap_ticks, shaper_platforms, shaper_pylons, shaper_silos, shell_blast,
+    shells_per_volley, volley_ticks, ArtilleryCard, PieceKind, ShaperCard, WarheadCard,
+};
 
 const W: f32 = 540.0;
 const PAD: f32 = 18.0;
@@ -40,16 +43,19 @@ enum Gadget {
     None,
     /// The Lance's charge, 0..1.
     Charge(f32),
-    /// A bar filled `share`, with its figure on the right.
+    /// A bar filled `share` (a shield's charge, a volley's beat), with its figure
+    /// on the title's line.
     Bar {
         share: f32,
         text: String,
     },
-    /// Interceptors: ready, the most held, the next one's assembly 0..1.
+    /// Rounds: ready, the most held, the next one's assembly 0..1, and whether they
+    /// are warheads (banded) or interceptors.
     Slots {
         stock: u32,
         capacity: u32,
         next: f32,
+        warhead: bool,
     },
     /// Nothing of this kind: why, in place of the figures.
     Absent(&'static str),
@@ -157,6 +163,7 @@ fn piece_name(kind: PieceKind, domain: SiteDomain) -> &'static str {
         PieceKind::GreatPlatform if sea => "Great Print Slip",
         PieceKind::GreatPlatform => "Great Print Platform",
         PieceKind::Pylon => "Shield Pylon",
+        PieceKind::Silo => "Warhead Silo",
     }
 }
 
@@ -181,114 +188,234 @@ fn pace(charge: f32, reload: f32, damage: f32) -> (f32, f32) {
     (60.0 / cycle, damage / cycle)
 }
 
-/// The card's blocks, in order: the Lance, the shield, the anti-nuke, the base.
-/// `bp` is the Shaper's blueprint, for what a level adds; `next_round` how far its
-/// next interceptor is assembled, 0..1.
+/// The card's blocks, in order: an auxiliary Shaper's weapon (artillery or
+/// warheads), the Lance, the shield, the anti-nuke, the base. `bp` is the Shaper's
+/// blueprint, for what a level adds; `next_round` how far its next interceptor is
+/// assembled, 0..1.
 fn blocks(card: &ShaperCard, bp: Option<&UnitBlueprint>, next_round: f32) -> Vec<Block> {
-    let (now, next) = (card.level, card.level.saturating_add(1));
     let mut out = Vec::new();
+    out.extend(
+        card.artillery
+            .as_ref()
+            .map(|a| artillery_block(a, card.level)),
+    );
+    out.extend(card.warheads.as_ref().map(|w| warhead_block(w, card.level)));
+    out.push(lance_block(card, bp));
+    out.push(shield_block(card, bp));
+    out.push(anti_nuke_block(card, bp, next_round));
+    out.push(base_block(card));
+    out
+}
 
+fn lance_block(card: &ShaperCard, bp: Option<&UnitBlueprint>) -> Block {
+    let Some(l) = &card.lance else {
+        return absent("Lance", Reach::Direct.tone(), "No Lance");
+    };
+    let (now, next) = (card.level, card.level.saturating_add(1));
     let lance_gain = bp.and_then(|bp| Some((lance_at(bp, now)?, lance_at(bp, next)?)));
-    out.push(match &card.lance {
-        Some(l) => {
-            let g = |i: usize, tenths: bool| lance_gain.and_then(|(a, b)| gain(a[i], b[i], tenths));
-            let paced = lance_gain.map(|(a, b)| (pace(a[0], a[1], a[2]), pace(b[0], b[1], b[2])));
-            Block {
-                title: "Lance",
-                tone: Reach::Direct.tone(),
-                ring: SHAPER_LANCE,
-                gadget: Gadget::Charge(l.charging),
-                rows: vec![
-                    row("Charge", secs(l.charge_secs), g(0, true)),
-                    row("Reload", secs(l.reload_secs), g(1, true)),
-                    row(
-                        "Fire Rate",
-                        format!("{:.1} /min", l.fire_rate),
-                        paced.and_then(|(a, b)| gain(a.0, b.0, true)),
-                    ),
-                    row("Damage / Strike", amount(l.damage), g(2, false)),
-                    row(
-                        "Damage / s",
-                        amount(l.dps),
-                        paced.and_then(|(a, b)| gain(a.1, b.1, false)),
-                    ),
-                    row("Splash", format!("{:.0} m", l.splash), g(3, false)),
-                    row("Range", format!("{} m", amount(l.range)), g(4, false)),
-                ],
-            }
-        }
-        None => absent("Lance", Reach::Direct.tone(), "No Lance"),
-    });
+    let g = |i: usize, tenths: bool| lance_gain.and_then(|(a, b)| gain(a[i], b[i], tenths));
+    let paced = lance_gain.map(|(a, b)| (pace(a[0], a[1], a[2]), pace(b[0], b[1], b[2])));
+    Block {
+        title: "Lance",
+        tone: Reach::Direct.tone(),
+        ring: SHAPER_LANCE,
+        gadget: Gadget::Charge(l.charging),
+        rows: vec![
+            row("Charge", secs(l.charge_secs), g(0, true)),
+            row("Reload", secs(l.reload_secs), g(1, true)),
+            row(
+                "Fire Rate",
+                format!("{:.1} /min", l.fire_rate),
+                paced.and_then(|(a, b)| gain(a.0, b.0, true)),
+            ),
+            row("Damage / Strike", amount(l.damage), g(2, false)),
+            row(
+                "Damage / s",
+                amount(l.dps),
+                paced.and_then(|(a, b)| gain(a.1, b.1, false)),
+            ),
+            row("Splash", format!("{:.0} m", l.splash), g(3, false)),
+            row("Range", format!("{} m", amount(l.range)), g(4, false)),
+        ],
+    }
+}
 
+fn shield_block(card: &ShaperCard, bp: Option<&UnitBlueprint>) -> Block {
+    let Some(sh) = &card.shield else {
+        return absent("Shield", Reach::Shield.tone(), "No shield");
+    };
     let shield_at = |level| bp.and_then(|bp| mc_sim::growth::grown_shield(bp, level));
-    out.push(match &card.shield {
-        Some(sh) => {
-            let (a, b) = (shield_at(now), shield_at(next));
-            let g = |f: fn(&mc_data::Shield) -> f32| gain(f(a.as_ref()?), f(b.as_ref()?), false);
-            Block {
-                title: "Shield",
-                tone: Reach::Shield.tone(),
-                ring: SHAPER_SHIELD,
-                gadget: Gadget::Bar {
-                    share: sh.charge / sh.health.max(1.0),
-                    text: format!("{} / {}", amount(sh.charge), amount(sh.health)),
-                },
-                rows: vec![
-                    row("Hit Points", amount(sh.health), g(|s| s.health.to_f32())),
-                    row(
-                        "Radius",
-                        format!("{:.0} m", sh.radius),
-                        g(|s| s.radius.to_f32()),
-                    ),
-                    row(
-                        "Regen",
-                        format!("{} /s", amount(sh.regen)),
-                        g(|s| s.regen.to_f32()),
-                    ),
-                    row("Pylon Feed", format!("{} /s", amount(sh.feed)), None),
-                ],
-            }
-        }
-        None => absent("Shield", Reach::Shield.tone(), "No shield"),
-    });
+    let (a, b) = (
+        shield_at(card.level),
+        shield_at(card.level.saturating_add(1)),
+    );
+    let g = |f: fn(&mc_data::Shield) -> f32| gain(f(a.as_ref()?), f(b.as_ref()?), false);
+    Block {
+        title: "Shield",
+        tone: Reach::Shield.tone(),
+        ring: SHAPER_SHIELD,
+        gadget: Gadget::Bar {
+            share: sh.charge / sh.health.max(1.0),
+            text: format!("{} / {}", amount(sh.charge), amount(sh.health)),
+        },
+        rows: vec![
+            row("Hit Points", amount(sh.health), g(|s| s.health.to_f32())),
+            row(
+                "Radius",
+                format!("{:.0} m", sh.radius),
+                g(|s| s.radius.to_f32()),
+            ),
+            row(
+                "Regen",
+                format!("{} /s", amount(sh.regen)),
+                g(|s| s.regen.to_f32()),
+            ),
+            row("Pylon Feed", format!("{} /s", amount(sh.feed)), None),
+        ],
+    }
+}
 
+fn anti_nuke_block(card: &ShaperCard, bp: Option<&UnitBlueprint>, next_round: f32) -> Block {
+    let Some(a) = &card.anti_nuke else {
+        return absent("Anti-Nuke", Reach::AntiMissile.tone(), "None");
+    };
     let cover_at = |level| {
         bp.and_then(|bp| mc_sim::growth::grown_launcher(bp, level))
             .map(|s| (s.stock as f32, s.coverage.to_f32()))
     };
-    out.push(match &card.anti_nuke {
-        Some(a) => {
-            let (x, y) = (cover_at(now), cover_at(next));
-            let g = |i: usize, tenths: bool| {
-                let (x, y) = (x?, y?);
-                let pick = |v: (f32, f32)| if i == 0 { v.0 } else { v.1 };
-                gain(pick(x), pick(y), tenths)
-            };
-            Block {
-                title: "Anti-Nuke",
-                tone: Reach::AntiMissile.tone(),
-                ring: SHAPER_COVER,
-                gadget: Gadget::Slots {
-                    stock: a.stock as u32,
-                    capacity: a.capacity as u32,
-                    next: next_round,
-                },
-                rows: vec![
-                    row(
-                        "Interceptors",
-                        format!("{} / {}", a.stock, a.capacity),
-                        g(0, false),
-                    ),
-                    row("Coverage", format!("{} m", amount(a.coverage)), g(1, false)),
-                    row("Each Takes", secs(a.round_secs), None),
-                ],
-            }
-        }
-        None => absent("Anti-Nuke", Reach::AntiMissile.tone(), "None"),
-    });
+    let (x, y) = (cover_at(card.level), cover_at(card.level.saturating_add(1)));
+    let g = |pick: fn((f32, f32)) -> f32| gain(pick(x?), pick(y?), false);
+    Block {
+        title: "Anti-Nuke",
+        tone: Reach::AntiMissile.tone(),
+        ring: SHAPER_COVER,
+        gadget: Gadget::Slots {
+            stock: a.stock as u32,
+            capacity: a.capacity as u32,
+            next: next_round,
+            warhead: false,
+        },
+        rows: vec![
+            row(
+                "Interceptors",
+                format!("{} / {}", a.stock, a.capacity),
+                g(|v| v.0),
+            ),
+            row("Coverage", format!("{} m", amount(a.coverage)), g(|v| v.1)),
+            row("Each Takes", secs(a.round_secs), None),
+        ],
+    }
+}
 
-    // The base: what stands of each kind of piece, against what its level raises.
-    let (small, great) = shaper_platforms(card.level);
+/// A Seedcaster's replication artillery: its volley charging, and what a shell is.
+fn artillery_block(a: &ArtilleryCard, level: u16) -> Block {
+    let next = level.saturating_add(1);
+    let tps = mc_core::TICKS_PER_SECOND as f32;
+    let every = |l| volley_ticks(l) as f32 / tps;
+    let (r0, d0) = shell_blast(level);
+    let (r1, d1) = shell_blast(next);
+    let heavy = if a.squad.1 > 0 {
+        format!(" + {} heavy", a.squad.1)
+    } else {
+        String::new()
+    };
+    let mut rows = vec![
+        row(
+            "Volley Every",
+            secs(a.interval_secs),
+            gain(every(level), every(next), true),
+        ),
+        row(
+            "Shells / Volley",
+            a.shells_per_volley.to_string(),
+            gain(
+                shells_per_volley(level) as f32,
+                shells_per_volley(next) as f32,
+                false,
+            ),
+        ),
+        row(
+            "Squad / Shell",
+            format!("{}{heavy}  T{}", a.squad.0, a.squad_tech),
+            None,
+        ),
+        row(
+            "Burst",
+            format!("{:.0} m", a.blast_radius),
+            gain(r0.to_f32(), r1.to_f32(), false),
+        ),
+        row(
+            "Burst Damage",
+            amount(a.blast_damage),
+            gain(d0.to_f32(), d1.to_f32(), false),
+        ),
+    ];
+    if a.in_flight > 0 {
+        rows.push(row("In Flight", a.in_flight.to_string(), None));
+    }
+    Block {
+        title: "Replication Artillery",
+        tone: VIOLET,
+        ring: 0,
+        gadget: Gadget::Bar {
+            share: 1.0 - a.next_in_secs / a.interval_secs.max(0.1),
+            text: if a.held {
+                "Held: field full".to_string()
+            } else {
+                format!("Volley in {}", secs(a.next_in_secs))
+            },
+        },
+        rows,
+    }
+}
+
+/// An Unmaker's warheads: its silos' stock, and the blast.
+fn warhead_block(w: &WarheadCard, level: u16) -> Block {
+    let tps = mc_core::TICKS_PER_SECOND as f32;
+    let gap = |l| launch_gap_ticks(l) as f32 / tps;
+    let mut rows = vec![
+        row(
+            "Silos",
+            format!("{} / {}", w.silos, w.silos_wanted),
+            gain(
+                shaper_silos(level) as f32,
+                shaper_silos(level.saturating_add(1)) as f32,
+                false,
+            ),
+        ),
+        row("Warheads", format!("{} / {}", w.stock, w.capacity), None),
+        row("Each Takes", secs(w.round_secs), None),
+        row(
+            "Launch Every",
+            secs(w.gap_secs),
+            gain(gap(level), gap(level.saturating_add(1)), true),
+        ),
+        row(
+            "Blast",
+            format!("{:.0} m  core {:.0} m", w.blast_radius, w.blast_core),
+            None,
+        ),
+        row("Blast Damage", amount(w.blast_damage), None),
+    ];
+    if w.in_flight > 0 {
+        rows.push(row("In Flight", w.in_flight.to_string(), None));
+    }
+    Block {
+        title: "Warheads",
+        tone: crate::hud::silo::WARHEAD,
+        ring: 0,
+        gadget: Gadget::Slots {
+            stock: u32::from(w.stock),
+            capacity: u32::from(w.capacity),
+            next: 0.0,
+            warhead: true,
+        },
+        rows,
+    }
+}
+
+/// The base: what stands of each kind of piece, against what its level raises.
+fn base_block(card: &ShaperCard) -> Block {
     let standing = |k: PieceKind| {
         card.pieces
             .iter()
@@ -297,13 +424,15 @@ fn blocks(card: &ShaperCard, bp: Option<&UnitBlueprint>, next_round: f32) -> Vec
     };
     let printing = card.pieces.iter().filter(|p| !p.raised).count();
     let sea = card.domain == SiteDomain::Naval;
-    let mut rows = vec![
-        row(
+    let mut rows = Vec::new();
+    if card.kind == SiteKind::Printer {
+        let (small, great) = shaper_platforms(card.level);
+        rows.push(row(
             if sea { "Slips" } else { "Platforms" },
             format!("{} / {small}", standing(PieceKind::Platform)),
             None,
-        ),
-        row(
+        ));
+        rows.push(row(
             if sea {
                 "Great Slips"
             } else {
@@ -311,28 +440,27 @@ fn blocks(card: &ShaperCard, bp: Option<&UnitBlueprint>, next_round: f32) -> Vec
             },
             format!("{} / {great}", standing(PieceKind::GreatPlatform)),
             None,
+        ));
+    }
+    rows.push(row(
+        "Pylons",
+        format!(
+            "{} / {}",
+            standing(PieceKind::Pylon),
+            shaper_pylons(card.level)
         ),
-        row(
-            "Pylons",
-            format!(
-                "{} / {}",
-                standing(PieceKind::Pylon),
-                shaper_pylons(card.level)
-            ),
-            None,
-        ),
-    ];
+        None,
+    ));
     if printing > 0 {
         rows.push(row("Printing", printing.to_string(), None));
     }
-    out.push(Block {
+    Block {
         title: "Base",
         tone: VIOLET,
         ring: 0,
         gadget: Gadget::None,
         rows,
-    });
-    out
+    }
 }
 
 fn absent(title: &'static str, tone: u32, why: &'static str) -> Block {
@@ -504,7 +632,8 @@ pub(super) fn card(ui: &mut Ui, hud: &mut Hud, s: &Scene, pick: &ShaperPick, anc
     }
     let mut y = r.y + head_h;
 
-    // What it builds: its products, then the formation and the next print.
+    // What it builds: its products, then the formation and the next print (a
+    // Seedcaster's products are what its shells print).
     if !c.products.is_empty() {
         ui.section(x, y, cw - 180.0, "Builds");
         let heavy = if c.batch.1 > 0 {
@@ -517,7 +646,11 @@ pub(super) fn card(ui: &mut Ui, hud: &mut Hud, s: &Scene, pick: &ShaperPick, anc
             y,
             type_scale::MICRO,
             rgb(palette::DIM, 1.0),
-            &format!("Formation of {}{heavy}", c.batch.0),
+            &if c.kind == SiteKind::Printer {
+                format!("Formation of {}{heavy}", c.batch.0)
+            } else {
+                "Its shells print them".to_string()
+            },
         );
         y += 18.0;
         for ((p, n), (cx, line, _)) in c.products.iter().zip(&names).zip(&chips) {
@@ -546,18 +679,15 @@ pub(super) fn card(ui: &mut Ui, hud: &mut Hud, s: &Scene, pick: &ShaperPick, anc
             );
         }
         y += lines as f32 * 22.0;
-        let next = if c.next_print > 0.05 {
-            format!("Next print in {}", secs(c.next_print))
-        } else {
-            "Prints with the round".to_string()
+        let printed = format!("{} printed", whole(c.printed as f32));
+        let line = match c.kind {
+            SiteKind::Printer if c.next_print > 0.05 => {
+                format!("Next print in {}  \u{b7}  {printed}", secs(c.next_print))
+            }
+            SiteKind::Printer => format!("Prints with the round  \u{b7}  {printed}"),
+            _ => printed,
         };
-        ui.text(
-            x,
-            y,
-            type_scale::MICRO,
-            rgb(palette::DIM, 1.0),
-            &format!("{next}  \u{b7}  {} printed", whole(c.printed as f32)),
-        );
+        ui.text(x, y, type_scale::MICRO, rgb(palette::DIM, 1.0), &line);
         y += 18.0 + 8.0;
     }
 
@@ -647,6 +777,7 @@ fn draw_block(ui: &mut Ui, b: &Block, x: f32, y: f32, w: f32, (lit, back): (f32,
             stock,
             capacity,
             next,
+            warhead,
         } => {
             let gap = if *capacity > 8 { 3.0 } else { 5.0 };
             let room = w - 40.0;
@@ -662,7 +793,7 @@ fn draw_block(ui: &mut Ui, b: &Block, x: f32, y: f32, w: f32, (lit, back): (f32,
                     0.0
                 };
                 let at = Rect::new(x + i as f32 * (slot_w + gap), y - 7.0, slot_w, 24.0);
-                crate::hud::silo::round_slot(ui, at, fill, i < *stock, b.tone, false);
+                crate::hud::silo::round_slot(ui, at, fill, i < *stock, b.tone, *warhead);
             }
             if shown < *capacity {
                 ui.text(
