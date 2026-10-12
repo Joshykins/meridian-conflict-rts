@@ -123,9 +123,9 @@ fn a_charged_gun_is_fed_through_its_charge_and_heard_once() {
 #[test]
 fn a_ringed_map_gun_fires_twice_as_often_and_more() {
     let mut w = world();
-    // A 6x6 lot, 756..828 both ways, and a Reactor III pinwheeled along each side.
+    // An 8x8 lot, 744..840 both ways, and a Reactor III (the same size) along each side.
     let gun = spawn(&mut w, 0, "aster_t4_artillery", AT.0, AT.1, 1000);
-    for (x, y) in [(876, 804), (780, 876), (708, 780), (804, 708)] {
+    for (x, y) in [(888, 792), (792, 888), (696, 792), (792, 696)] {
         spawn(&mut w, 0, "aster_t3_power", x, y, 1000);
     }
     w.tick(&[]).unwrap();
