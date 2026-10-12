@@ -29,6 +29,7 @@ impl Terrain {
                 Layout::Canyon => self.canyon_forest(x, y, height, slope),
                 Layout::Frostline => self.frostline_forest(x, y, height, slope),
                 Layout::Tripoint => self.tripoint_forest(x, y, height, slope),
+                Layout::Spires => self.spires_forest(x, y, height, slope),
                 Layout::Crosswater => self.cw_forest(x, y, height, slope),
                 // Nothing grows on Antarctica.
                 Layout::Antarctic => (0.0, 0.0),
@@ -173,6 +174,10 @@ impl Terrain {
         if self.layout == Layout::Tripoint {
             return self.tripoint_tree(x, y, conifer, hash);
         }
+        // Thousand Spires' `conifer` slot carries the height.
+        if self.layout == Layout::Spires {
+            return self.spires_tree(x, y, conifer, hash);
+        }
         if self.layout == Layout::Siege {
             return self.siege_tree(x, y, hash);
         }
@@ -251,7 +256,7 @@ impl Terrain {
             (0.3, 0.93)
         };
         // (So do Tripoint's jungle's, up its mountains.)
-        let forest_slope = if alpine || self.layout == Layout::Tripoint {
+        let forest_slope = if alpine || matches!(self.layout, Layout::Tripoint | Layout::Spires) {
             0.95
         } else {
             0.5

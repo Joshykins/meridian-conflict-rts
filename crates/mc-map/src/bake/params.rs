@@ -1,7 +1,7 @@
 //! The layouts a map can be baked to, the parameters of a bake, and what
 //! each layout asks of them.
 
-use super::{antarctic, crosswater, frostline, siege, tripoint};
+use super::{antarctic, crosswater, frostline, siege, spires, tripoint};
 use crate::format::MapError;
 use crate::{MAX_START_POSITIONS, TILE_SIZE_M};
 
@@ -73,6 +73,12 @@ pub enum Layout {
     /// turn; the west team's starts first, each followed by its image.
     /// Exactly 12 km.
     Antarctic,
+    /// "Thousand Spires": three teams of four in autumn sandstone karst, a
+    /// lake in the middle ringed by a massif of pillars, a valley between
+    /// every two teams from the lake to the sea (see `spires.rs`). One plan
+    /// for every team, each third's ground its own; the north team's four
+    /// starts first, then the others' turned. Exactly 24 km.
+    Spires,
 }
 
 #[derive(Clone, Debug)]
@@ -199,6 +205,15 @@ impl BakeParams {
         }
     }
 
+    /// A square twelve-player [`Layout::Spires`] map.
+    pub fn spires(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
+        BakeParams {
+            players: 12,
+            layout: Layout::Spires,
+            ..BakeParams::square(name, size_tiles, seed)
+        }
+    }
+
     /// A square two-player [`Layout::Siege`] map.
     pub fn siege(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
         BakeParams {
@@ -279,6 +294,15 @@ impl BakeParams {
         {
             return Err(MapError::Invalid(
                 "the Tripoint layout is for exactly 3 players on a 12 km map".into(),
+            ));
+        }
+        if self.layout == Layout::Spires
+            && (self.players != 12
+                || (self.tiles_w as i32 * TILE_SIZE_M) as f64 != spires::SIZE
+                || self.tiles_h != self.tiles_w)
+        {
+            return Err(MapError::Invalid(
+                "the Spires layout is for exactly 12 players on a 24 km map".into(),
             ));
         }
         if self.layout == Layout::Siege

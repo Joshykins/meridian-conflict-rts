@@ -14,6 +14,7 @@
 //! mc-bake --layout tripoint --size-km 12 --seed 13 --name "Tripoint" -o maps/tripoint.mcmap
 //! mc-bake --layout siege --size-km 6 --seed 3 --name "Halcyon" -o maps/halcyon.mcmap
 //! mc-bake --layout antarctic --size-km 12 --seed 37 --name "Erebus Strait" -o maps/erebus_strait.mcmap
+//! mc-bake --layout spires --size-km 24 --seed 17 --name "Thousand Spires" -o maps/thousand_spires.mcmap
 //! ```
 //!
 //! Every layout but the survival and siege ones (the siege lays its own) is then
@@ -69,9 +70,14 @@ usage: mc-bake -o <file.mcmap> [options]
                    team on a coast under its ice sheet, mountains between
                    its starts, sea ice along it, two caldera islands in the
                    strait; no trees; exactly 12 km
+                   spires: \"Thousand Spires\", 4v4v4 in autumn sandstone
+                   karst: a lake ringed by a massif of pillars in the
+                   middle, a valley with a river and an estuary between
+                   every two teams, terraces down to the sea; exactly 24 km
   --players <n>    start positions, 1-32 (default: 2 up to 8 km, 4 up to 24 km,
                    else 8; islands and alpine: always 2; the 8-player layouts
-                   take exactly 8, crosswater and antarctic 4, tripoint 3, siege 2)
+                   take exactly 8, crosswater and antarctic 4, tripoint 3, siege 2,
+                   spires 12)
   --threads <n>    worker threads (default: all cores; does not change the result)
   --preview <ppm>  also write a shaded overview image with markers
   --verify         re-read the file and check its content id
@@ -135,9 +141,10 @@ fn parse_args() -> Result<Args, String> {
                     "tripoint" => Layout::Tripoint,
                     "siege" => Layout::Siege,
                     "antarctic" => Layout::Antarctic,
+                    "spires" => Layout::Spires,
                     other => {
                         return Err(format!(
-                            "unknown layout '{other}' (basin, islands, alpine, alpine-teams, archipelago, twin-bays, threshold, canyon, frostline, crosswater, tripoint, siege or antarctic)"
+                            "unknown layout '{other}' (basin, islands, alpine, alpine-teams, archipelago, twin-bays, threshold, canyon, frostline, crosswater, tripoint, siege, antarctic or spires)"
                         ))
                     }
                 }
@@ -191,6 +198,9 @@ fn parse_args() -> Result<Args, String> {
     if args.layout == Layout::Antarctic && args.players.is_some_and(|n| n != 4) {
         return Err("--layout antarctic is a four-player layout (--players 4)".into());
     }
+    if args.layout == Layout::Spires && args.players.is_some_and(|n| n != 12) {
+        return Err("--layout spires is a twelve-player layout (--players 12)".into());
+    }
     if args.layout == Layout::Threshold && args.players.is_some_and(|n| n != 4) {
         return Err("--layout threshold has exactly 4 starts (--players 4)".into());
     }
@@ -238,6 +248,7 @@ fn run(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
         Layout::Tripoint => BakeParams::tripoint(&name, args.size_km / 2, args.seed),
         Layout::Siege => BakeParams::siege(&name, args.size_km / 2, args.seed),
         Layout::Antarctic => BakeParams::antarctic(&name, args.size_km / 2, args.seed),
+        Layout::Spires => BakeParams::spires(&name, args.size_km / 2, args.seed),
     };
     params.threads = args.threads;
     if let Some(players) = args.players {

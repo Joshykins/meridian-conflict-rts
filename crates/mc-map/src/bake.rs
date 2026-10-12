@@ -68,6 +68,7 @@ mod machine;
 mod params;
 mod props;
 mod siege;
+mod spires;
 mod threshold;
 mod tripoint;
 
@@ -399,6 +400,8 @@ struct Terrain {
     frost: frostline::Frostline,
     /// Tripoint layout only: what it works out at set-up (`tripoint.rs`).
     tp: tripoint::Tripoint,
+    /// Spires layout only: what it works out at set-up (`spires.rs`).
+    sp: spires::Spires,
     /// Siege layout only: the city's plan (`siege.rs`).
     siege: siege::Siege,
     /// The machine's benches: ground cut level for its nodes (`machine.rs`).
@@ -484,6 +487,7 @@ impl Terrain {
             frost: frostline::Frostline::default(),
             siege: siege::Siege::default(),
             tp: tripoint::Tripoint::default(),
+            sp: spires::Spires::default(),
             benches: Vec::new(),
         };
 
@@ -541,6 +545,10 @@ impl Terrain {
         }
         if params.layout == Layout::Antarctic {
             t.setup_antarctic();
+            return t;
+        }
+        if params.layout == Layout::Spires {
+            t.setup_spires();
             return t;
         }
 
@@ -620,7 +628,7 @@ impl Terrain {
         }
         // Tripoint is fair by a third of a turn: turn every point into the
         // north third.
-        if self.layout == Layout::Tripoint {
+        if matches!(self.layout, Layout::Tripoint | Layout::Spires) {
             let k = tripoint::third((vx, vy));
             let (qx, qy) = tripoint::turn((vx, vy), 3 - k);
             return (qx, qy, r);
@@ -680,6 +688,7 @@ impl Terrain {
             Layout::Crosswater => self.natural_crosswater(x, y),
             Layout::Siege => self.natural_siege(x, y),
             Layout::Antarctic => self.natural_antarctic(x, y),
+            Layout::Spires => self.natural_spires(x, y),
         };
         if self.benches.is_empty() {
             h
@@ -1335,4 +1344,6 @@ mod test_maps {
         LazyLock::new(|| Terrain::new(&BakeParams::tripoint("t", 6, 13)));
     pub(super) static HALCYON: LazyLock<Terrain> =
         LazyLock::new(|| Terrain::new(&BakeParams::siege("t", 3, 3)));
+    pub(super) static SPIRES: LazyLock<Terrain> =
+        LazyLock::new(|| Terrain::new(&BakeParams::spires("t", 12, 17)));
 }
