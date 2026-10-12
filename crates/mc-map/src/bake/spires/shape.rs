@@ -43,6 +43,9 @@ struct Pillar {
     tall: f64,
     /// Its outline's lobes' phases.
     phase: (f64, f64),
+    /// How square its shoulders are: the power its crown falls off by, high
+    /// for a dome on sheer walls, low for a cone.
+    dome: f64,
 }
 
 /// The pillars, filed by [`PILLAR_CELL`] cell over the whole map.
@@ -104,9 +107,10 @@ impl Pillars {
         let mix = hash2(hash, 7, 11);
         Some(Pillar {
             at,
-            radius: size * (16.0 + 32.0 * unit(mix, 0)),
+            radius: size * (30.0 + 40.0 * unit(mix, 0)),
             tall: tall.0 + (tall.1 - tall.0) * unit(mix, 24).powf(1.4),
             phase: (6.3 * unit(mix, 40), 6.3 * unit(hash2(mix, 3, 5), 0)),
+            dome: 3.0 + 3.5 * unit(hash2(mix, 7, 1), 0),
         })
     }
 
@@ -558,24 +562,23 @@ impl Terrain {
         h.min(PEAK)
     }
 
-    /// The pillars standing on their own over the ground at a point.
+    /// The towers standing on their own over the ground at a point: the
+    /// massif's towers, alone (`sp_massif`): sheer walls rising to a domed or
+    /// coned crown. (The renderer flutes their walls as the massif's.)
     fn sp_pillars(&self, q: (f64, f64), ground: f64) -> f64 {
         let mut rise: f64 = 0.0;
         for p in self.sp.pillars.near(q) {
             let d = dist(q, p.at);
-            if d > p.radius + 60.0 {
+            if d > 1.3 * p.radius {
                 continue;
             }
             let a = (q.1 - p.at.1).atan2(q.0 - p.at.0);
-            let lobes = p.radius
-                * (0.16 * (3.0 * a + p.phase.0).sin() + 0.09 * (5.0 * a + p.phase.1).sin());
+            let lobes = 0.16 * (3.0 * a + p.phase.0).sin() + 0.09 * (5.0 * a + p.phase.1).sin();
             let rough = 3.0 * self.crag.fbm(q.0 / 17.0, q.1 / 17.0, 2, 0.5);
-            let e = d - p.radius - lobes + rough;
-            let body = smoothstep(4.0, -6.0, e);
-            let top = p.tall * (1.0 - 0.035 * (d / p.radius).min(1.2).powi(2))
-                + 4.0 * self.detail.fbm(q.0 / 25.0, q.1 / 25.0, 2, 0.5);
-            let skirt = 0.02 * p.tall * smoothstep(p.radius + 25.0, p.radius, d);
-            rise = rise.max(top * body).max(skirt);
+            let t = (d + rough) / (p.radius * (1.0 + lobes));
+            if t < 1.0 {
+                rise = rise.max(p.tall * (1.0 - t.powf(p.dome)));
+            }
         }
         (ground + rise).min(PEAK)
     }
@@ -616,7 +619,7 @@ impl Terrain {
             if at.0.hypot(at.1) < ISLAND.0 + 220.0 || p.0 < LAKE_FORD_HALF + 130.0 {
                 NONE
             } else {
-                (0.45, 1.0, (150.0, 320.0))
+                (0.32, 1.0, (150.0, 320.0))
             }
         } else if r < MASSIF_IN + 100.0 {
             // The lake's shore, round the gate's mouth.
@@ -630,7 +633,7 @@ impl Terrain {
             if r > coast + 1_400.0 || b < channel + 250.0 {
                 NONE
             } else {
-                (0.06, 0.8, (40.0, 140.0))
+                (0.05, 0.7, (40.0, 140.0))
             }
         } else if r > coast - 250.0 {
             NONE
@@ -640,7 +643,7 @@ impl Terrain {
             if b < channel + 160.0 || FORDS.iter().any(|&f| (t - f).abs() < 480.0) {
                 NONE
             } else {
-                (0.15, 0.9, (90.0, 260.0))
+                (0.11, 0.9, (90.0, 260.0))
             }
         } else {
             NONE
