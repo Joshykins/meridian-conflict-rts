@@ -45,9 +45,13 @@ fn the_middle_and_the_sea_are_where_they_should_be() {
         // The sea behind every team.
         assert!(at((0.0, 12_100.0)) < -20.0, "sea behind team {k}");
         // The massif stands tall either side of the gate.
-        let massif = [2_900.0, 3_500.0, 4_100.0]
-            .iter()
-            .flat_map(|&r| [at((-900.0, r)), at((900.0, r))])
+        // (Its towers stand apart: look over a grid either side of the gate.)
+        let massif = (0..12)
+            .flat_map(|i| {
+                (0..8).map(move |j| (-1_650.0 + 300.0 * i as f64, 2_900.0 + 220.0 * j as f64))
+            })
+            .filter(|p| p.0.abs() > 400.0)
+            .map(at)
             .fold(0.0, f64::max);
         assert!(massif > 300.0, "massif in third {k}: {massif}");
     }
