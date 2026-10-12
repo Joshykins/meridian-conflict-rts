@@ -248,6 +248,7 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 | Missile defence (T2, T3) | Rondel (II) |
 | Nuke silo, nuke defence, map gun (T4) | Mangonel, Barbican, Springald |
 | Area defence, orb battery (T4) | Carillon |
+| Anti-ship lance (T4) | Sarissa |
 | Air superiority fighter, strategic bomber (T3) | Partisan, Maul |
 | Spy plane (T3) | Augur |
 
@@ -470,6 +471,20 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     after another and swell into one bloom, a fireball climbs out of it, plasma rolls
     out low, globs are flung out, the ground melts into a pool and dark smoke climbs over
     it. No supernova, no pillar, no lightning anywhere on this gun (user calls 10-10).
+    The **Skyward Pinch-fusion Lance** (the T4 Sarissa, anti-ship) is a held fusion
+    beam that charges (renderer/regency_guns_fx/lance.rs, `Grade::Lance`, picked by
+    data: a `beam` with a charge and `PinchFusion`, not `star_beam`). Through its 3.5 s
+    charge the split bore's jaws part up and down off the core (charge gear `PART`),
+    their slots rippling toward the lens, rose-white fusion streaks run up the bore in
+    pulses and a star kindles at the lens, held by lightning tethers from the lens heads
+    on the jaws; over the last fifth it is squeezed to a hard point and strobes. It lights with a short
+    white flash, a pulse running up the lance, streamers thrown off round the mouth and
+    heat off the turret's back; the lance itself is the held fusion stream (fade beam
+    `HELD_FUSION`), a pulse running up it every half second while the star beats at
+    the lens. Where it holds on a hull, a white-hot spot in a rose bloom, molten globs
+    and sparks dropping off the plating and dark smoke torn off it (`lance_bite`).
+    When the burn ends the star collapses to violet, lavender motes vent round the
+    mouth, the jaws slam shut and the pylons' and bank's lids stand up glowing.
   - **AA:** no flak (user call 2026-10-03). Tech 1 is a **Plasmeric
     Repeater** turned on the sky, bolts out of each tube in turn that strike
     the plane they are fired at. Tech 2 is the **Twin Pinched-plasmeric

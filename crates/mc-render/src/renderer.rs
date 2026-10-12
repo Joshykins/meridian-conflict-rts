@@ -4998,7 +4998,11 @@ impl Renderer {
                 weapon,
             } => {
                 if self.blueprints.unit(*blueprint).weapons[*weapon as usize].beam {
-                    // A held beam: one steady stream, not a shot a tick (`plasma_fx`).
+                    // A held beam: one steady stream, not a shot a tick (`plasma_fx`); a
+                    // fusion lance burns at its lens (`regency_guns_fx`).
+                    let at = Vec3::from(pos.to_f32()) - Vec3::from(travel.to_f32());
+                    let dir = Vec3::from(vel.to_f32()).normalize_or_zero();
+                    self.regency_lance_fed(*blueprint, *weapon, at, dir, time);
                     self.beam_fired(
                         *owner,
                         *blueprint,

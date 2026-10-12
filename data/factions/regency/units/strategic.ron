@@ -1,5 +1,6 @@
 // Regency strategic weapons: the silo that throws a Pinch-fusion Warhead and the array of
-// Gravitic Interceptors that answers one, and the Springald map gun (last). The two
+// Gravitic Interceptors that answers one, the Springald map gun, the Carillon and the
+// Sarissa anti-ship lance (last). The two
 // launchers assemble and fire by the same rules as ARC's Sunfall and Parhelion (`docs/NUKES.md`), with a yield to match; only the look and
 // the sound are the Regency's (`nuke_look: Plasma` in faction.ron): the warhead goes up
 // as a red plasma nova and leaves a glowing cloud of plasma standing over the ground for
@@ -175,6 +176,50 @@
             ),
         )],
         mesh: "regency_carillon", icon: Defense,
+        sounds: (death: "blast_large"),
+    ),
+    // The Regency's answer to warships in the upper air, built at home: the Zenith's peer.
+    // Not a slug but a held lance. A long turret on a stepped plinth carries a split-bore
+    // Pinch-fusion projector; through a long charge its jaws part off the bore, then
+    // it lights and holds a lance of fusion on the hull for four seconds, raking it, and
+    // shuts its jaws and vents its heat. It shoots at nothing else: escorts keep it alive.
+    //
+    // Balance: the Zenith's (31500 materials, 100000 HP, 40000 every 7 s at 3200 m, 5700
+    // per second). Bent the Regency way, as the Spire is from the Narwhal: as much over the
+    // cycle (64000 in a 4 s burn every 11 s, 5800 a second) from a shorter reach (3000 m)
+    // on a lighter plinth (80000 HP), all of it up front. A frigate (55000 HP) falls inside
+    // one burn; the beam stays on a hull that turns away, where a slug can miss.
+    //
+    // Model: `regency_sarissa` (`models::regency::turrets::sarissa`), authored at this
+    // size; `pivot`/`muzzle` are its trunnion and the lens the lance leaves from.
+    (
+        key: "regency_t4_anti_ship",
+        name: "Sarissa",
+        role: "Anti-Ship Lance", title: "Anti-Ship",
+        tech: 4,
+        categories: ["Land", "Defense", "AntiAir", "Experimental"],
+        health: 80000,
+        cost: (materials: 28000, energy: 360000, time: 120000),
+        radius: 42.5, height: 52, footprint: (8, 8),
+        vision: 600,
+        weapons: [(
+            name: "Skyward Pinch-fusion Lance",
+            // Charged for 3.5 s with the jaws parting, then forty ticks of lance over
+            // four seconds; the jaws stay open until the burn ends. The reload runs from
+            // the burn's first tick and the charge comes after it: a burn every 11 s.
+            damage: 1600, splash: 20, range: 3000, reload: 7.5,
+            salvo: 40, salvo_delay: 0.1,
+            hitscan: true, beam: true, trajectory: Direct,
+            turret_turn: 16, sweep: 3, keeps_aim: true,
+            pivot: (0, 0, 39.5), muzzle: (72.5, 0, 39.5),
+            targets: ["Space"], color: Orange, red: 1.0,
+            plasma_grade: Some(PinchFusion), flash: 1.6, impact: 2.0, tracer: 1.2,
+            sounds: (
+                charge: "regency_sarissa_charge", charge_time: 3.5, charge_volume: 1.8,
+                hold: "regency_sarissa_hold", spindown: "regency_sarissa_vent",
+            ),
+        )],
+        mesh: "regency_sarissa", icon: AntiAir,
         sounds: (death: "blast_large"),
     ),
 ]

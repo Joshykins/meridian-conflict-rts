@@ -12,6 +12,7 @@
 //! - `regency_missile_defense`: the Rondel, gravity lenses that crush missiles (`rondel`).
 //! - `regency_springald`: the Springald map gun, a Triune Pinch-fusion Howitzer
 //!   (`springald`).
+//! - `regency_sarissa`: the Sarissa, a Skyward Pinch-fusion Lance (`sarissa`).
 //!
 //! The pinch guns gather their charge in front of the bore, between projectors that reach
 //! past its mouth (the Sunspear's just in front of its closed mouth, inside its rails'
@@ -30,6 +31,7 @@ mod gorget;
 mod halberd;
 mod picket;
 pub(super) mod rondel;
+mod sarissa;
 mod springald;
 mod sunspear;
 
@@ -39,6 +41,7 @@ pub(super) use canopy::canopy;
 pub(super) use gorget::gorget;
 pub(super) use halberd::halberd;
 pub(super) use picket::picket;
+pub(super) use sarissa::{sarissa, HEIGHT as SARISSA_HEIGHT, RADIUS as SARISSA_RADIUS};
 pub(super) use springald::{springald, HEIGHT as SPRINGALD_HEIGHT, RADIUS as SPRINGALD_RADIUS};
 pub(super) use sunspear::sunspear;
 

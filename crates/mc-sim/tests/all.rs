@@ -93,6 +93,7 @@ mod regency_space;
 mod regency_t3_guns;
 mod repair;
 mod repair_field;
+mod sarissa;
 mod sealed_pocket;
 mod self_destruct;
 mod seraph;

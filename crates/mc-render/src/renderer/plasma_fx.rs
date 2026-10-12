@@ -288,6 +288,7 @@ impl Renderer {
         let from = last.filter(|g| g.distance(at.truncate()) < RAKE_GAP);
         let w = &self.blueprints.unit(blueprint).weapons[weapon as usize];
         let burn = w.burn_ticks as f32 / mc_core::TICKS_PER_SECOND as f32;
+        let bite = on_unit && super::regency_guns_fx::is_lance(w);
         if glass && burn > 0.0 && w.plasma_grade.is_some() {
             self.plasma_left_burning(from, at, width, burn, time);
         }
@@ -328,7 +329,13 @@ impl Renderer {
         if star {
             self.star_outflow(at, width, on_unit, time);
         }
-        if fusion && !star {
+        // A fusion lance biting into a hull (`regency_guns_fx/lance.rs`).
+        if bite {
+            let dir = (at - muzzle).normalize_or(Vec3::Z);
+            self.lance_bite(at, dir, width, time);
+        }
+        // A fusion lance's bite on a hull is its own (`lance_bite`).
+        if fusion && !star && !bite {
             self.push_lit(
                 puff::WARP_GLOW as f32,
                 at + Vec3::Z * width,

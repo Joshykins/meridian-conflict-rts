@@ -30,6 +30,8 @@ impl Renderer {
         let ground = height < 1.5 && !on_unit;
         let under = height < 4.0;
         match grade {
+            // A held beam's strike is `plasma_fx`'s (`beam_struck`).
+            Grade::Lance => return false,
             Grade::Bolt => self.bolt_splash(at, impact, ground, under && !ground, start),
             Grade::Mortar => self.mortar_burst(at, impact, splash, ground, start),
             Grade::Flak => self.plasma_flak_burst(at, impact, splash, ground, start),

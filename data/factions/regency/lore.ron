@@ -38,6 +38,12 @@
             "Triune Pinch-fusion Howitzer": "Three knots of fusion gathered into one shell and thrown high over everything, its white-hot thread hanging across the sky long after it lands as a supernova.",
         },
     ),
+    "regency_t4_anti_ship": (
+        lore: "A fusion lance raised on a turntable over a stepped keep, aimed at nothing lower than the warships in the upper air. Its split bore's jaws part as it charges; then it lights, and holds.",
+        weapons: {
+            "Skyward Pinch-fusion Lance": "Fusion pinched into a stream and held on a hull for four seconds, raking along it as the ship turns; it melts through plating that would turn a shell.",
+        },
+    ),
     "regency_t4_area_defense": (
         lore: "A spire that never stops making fire. It gathers plasma out of the air into orbs and holds them drifting round its shaft like fireflies, a batch at a time, for as long as the peace lasts; when the sky or the ground fills, it lets them all go at once.",
         weapons: {

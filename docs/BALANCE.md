@@ -127,6 +127,12 @@ Off the lines, measured the same way:
 - The Regency's Springald (same cost and reach) is bent as the Kiln is from the Trebuchet:
   5600 in 40 m every 10 s (560 dps on paper), a 0.8 degree spread and a 4 s charge. Its
   shot is one shell, so a dome takes it as it takes a Culverin shell.
+- The Regency's Sarissa (T4 anti-ship lance, 28000 materials, 80000 HP) is the Zenith's
+  peer bent the Regency way: a held lance, 1600 a tick for a 4 s burn (64000) after a
+  3.5 s charge, a burn every 11 s (5800 a second against the Zenith's 5700), from 3000 m
+  against 3200. It never misses a turning hull, and an ARC frigate (55000) falls inside
+  one burn; its plinth is lighter. It shoots only `Space`. Measured: mc-sim
+  `tests/sarissa.rs`.
 - The Regency's Carillon (T4 area defence, 6500 materials, 26000 HP, 30 energy/s upkeep) is
   a store of damage, not a rate of it: it makes eight plasma flecks every 4 s and holds
   up to thirty-two (`Weapon::orbs`, `orb_time`), drifting round the spire like fireflies,

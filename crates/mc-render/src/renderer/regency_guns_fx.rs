@@ -80,6 +80,7 @@ mod airburst;
 mod burning;
 mod fusion;
 mod knotted;
+mod lance;
 mod plasmeric;
 mod railed;
 mod strike;
@@ -158,17 +159,23 @@ pub(super) enum Grade {
     /// A twin-rail Pinch-fusion gun, each bore's charge held between rails
     /// (`Weapon::rails`, `railed`).
     Railed,
+    /// A held Pinch-fusion beam that charges: a fusion lance (`lance`). Its stream is
+    /// `plasma_fx`'s; this draws its charge, its burn at the lens and its bite.
+    Lance,
 }
 
 /// The grade a weapon is drawn as: a plasma gun firing straight, laid flat with its shot
 /// arcing a little (`Weapon::flat_fire`, the Sunspear's), or lobbing it high (the
 /// Pinch-fusion Howitzer's; a lobbed Plasmeric shot is a Plasmeric Mortar), or a Gravitic
 /// Seeker (a guided plasma `missile`) with a proximity fuse, which leaves its cradle and
-/// bursts as flak does. None for a beam, a thrown charge, any other missile, or anything
-/// not plasma.
+/// bursts as flak does. A held beam that charges as a fusion lance. None for any other
+/// beam, a thrown charge, any other missile, or anything not plasma.
 pub(super) fn grade(w: &Weapon) -> Option<Grade> {
     let lobbed = w.trajectory == Trajectory::Ballistic && !w.flat_fire;
-    if w.beam || w.curve.0 > 0 {
+    if w.beam {
+        return lance::lance(w).then_some(Grade::Lance);
+    }
+    if w.curve.0 > 0 {
         return None;
     }
     if w.surge.is_some() && !w.missile {
@@ -192,6 +199,11 @@ pub(super) fn grade(w: &Weapon) -> Option<Grade> {
         PlasmaGrade::Gravitic => return None,
     };
     (!w.missile || grade == Grade::Flak).then_some(grade)
+}
+
+/// A held Pinch-fusion beam that charges, drawn as a fusion lance (`lance`).
+pub(super) fn is_lance(w: &Weapon) -> bool {
+    lance::lance(w)
 }
 
 /// The stars a gun's charge gathers: one in front of each bore when each bore fires a
@@ -228,7 +240,16 @@ struct Charge {
     stars: u8,
     /// The stars whose round has left (bit per star): a spent star is not laid again.
     spent: u8,
+    /// A lance's last tick of burn (`regency_lance_fed`), `NEVER` before its first.
+    fed: f32,
+    /// Down the bore where its first star was last laid.
+    dir: Vec3,
 }
+
+/// Long ago: a lance that has not yet burned.
+const NEVER: f32 = -1.0e4;
+/// Seconds without a tick of burn after which a lance has gone out.
+const LANCE_OUT: f32 = 0.3;
 
 /// A light the guns throw: from `start` for `life` seconds, fading out, pulsing `pulse`
 /// times a second (0 steady).
@@ -362,8 +383,12 @@ impl Renderer {
         let w = &self.blueprints.unit(blueprint).weapons[weapon as usize];
         let grade = match grade(w) {
             Some(
-                g
-                @ (Grade::Pinched | Grade::Fusion | Grade::Surge | Grade::Knotted | Grade::Railed),
+                g @ (Grade::Pinched
+                | Grade::Fusion
+                | Grade::Surge
+                | Grade::Knotted
+                | Grade::Railed
+                | Grade::Lance),
             ) => g,
             _ => return false,
         };
@@ -385,6 +410,8 @@ impl Renderer {
                 at: [at; MAX_STARS],
                 stars: stars(w),
                 spent: 0,
+                fed: NEVER,
+                dir: Vec3::X,
             });
         }
         true
@@ -399,11 +426,28 @@ impl Renderer {
         time: f32,
     ) {
         let tick = self.tick_seconds.max(0.02);
-        // A charge whose salvo never came (the target died) goes out a little after it was due.
-        self.plasma_fx
+        // A charge whose salvo never came (the target died) goes out a little after it was
+        // due; a lance once its burn has gone out, winding down as it goes.
+        let out = |c: &Charge| {
+            if c.grade == Grade::Lance {
+                time >= c.due + 3.0 && time - c.fed > LANCE_OUT
+            } else {
+                time >= c.due + tick * 4.0 + 0.1 * c.left as f32
+            }
+        };
+        let spent: Vec<(BlueprintId, u8, Vec3, Vec3)> = self
+            .plasma_fx
             .guns
             .charges
-            .retain(|c| time < c.due + tick * 4.0 + 0.1 * c.left as f32);
+            .iter()
+            .filter(|c| c.grade == Grade::Lance && c.fed > NEVER && out(c))
+            .map(|c| (c.blueprint, c.weapon, c.at[0], c.dir))
+            .collect();
+        self.plasma_fx.guns.charges.retain(|c| !out(c));
+        for (blueprint, weapon, at, dir) in spent {
+            let w = self.blueprints.unit(blueprint).weapons[weapon as usize].clone();
+            self.lance_spent(at, dir, &w, time);
+        }
         for i in 0..self.plasma_fx.guns.charges.len() {
             let c = &self.plasma_fx.guns.charges[i];
             let (unit, blueprint, weapon, laid, due) =
@@ -445,6 +489,11 @@ impl Renderer {
                         self.knotted_charge_step(at, dir, &w, f, when, span);
                     } else if grade == Grade::Railed {
                         self.railed_charge_step(at, dir, &w, f, when, span);
+                    } else if grade == Grade::Lance {
+                        let fed = self.plasma_fx.guns.charges[i].fed;
+                        let burning = fed > NEVER && when - fed < LANCE_OUT;
+                        self.lance_step(at, dir, &w, f, burning, when, span);
+                        self.plasma_fx.guns.charges[i].dir = dir;
                     } else {
                         let fusion = grade == Grade::Fusion;
                         // A pair of stars, each smaller: together as bright as one.
@@ -817,6 +866,34 @@ impl Renderer {
         });
     }
 
+    /// A tick of a held beam's burn (`ShotFired` of a `beam` weapon), `at` its muzzle: a
+    /// fusion lance charging there burns on, lighting with a flash on its first tick.
+    pub(super) fn regency_lance_fed(
+        &mut self,
+        blueprint: BlueprintId,
+        weapon: u8,
+        at: Vec3,
+        dir: Vec3,
+        time: f32,
+    ) {
+        let fx = &mut self.plasma_fx.guns;
+        let Some(c) = fx
+            .charges
+            .iter_mut()
+            .filter(|c| c.grade == Grade::Lance && c.blueprint == blueprint && c.weapon == weapon)
+            .filter(|c| c.at[0].distance(at) < 30.0)
+            .min_by(|a, b| a.at[0].distance(at).total_cmp(&b.at[0].distance(at)))
+        else {
+            return;
+        };
+        let first = c.fed <= NEVER;
+        c.fed = time;
+        if first {
+            let w = self.blueprints.unit(blueprint).weapons[weapon as usize].clone();
+            self.lance_ignites(at, dir, &w, time);
+        }
+    }
+
     /// A Regency plasma gun fired (`ShotFired`): `at` its muzzle as drawn, `dir` down the
     /// bore, `round_gap` seconds between the rounds a shot is drawn as. True when this
     /// drew the firing (and an ordinary gun's flash and smoke should not be).
@@ -837,6 +914,8 @@ impl Renderer {
         // The gun's length from its trunnion to its muzzle.
         let reach = railed::gun_reach(w);
         match grade {
+            // A held beam's ticks are `regency_lance_fed`'s.
+            Grade::Lance => return false,
             Grade::Bolt | Grade::Flak => self.bolt_fired(at, dir, rounds, flash, round_gap, time),
             Grade::Mortar => self.mortar_fired(at, dir, flash, time),
             Grade::Airburst => self.airburst_fired(at, dir, flash, time),

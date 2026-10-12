@@ -291,6 +291,14 @@ pub(super) const MODELS: &[ModelDef] = &[
         turrets::SPRINGALD_HEIGHT,
         turrets::springald,
     ),
+    // The Sarissa anti-ship lance: a split-bore Pinch-fusion lance on a long turret over a
+    // stepped plinth with a heat-sink pylon on each corner (`turrets::sarissa`).
+    ModelDef::new(
+        "regency_sarissa",
+        turrets::SARISSA_RADIUS,
+        turrets::SARISSA_HEIGHT,
+        turrets::sarissa,
+    ),
     // The Carillon, the orb-battery spire (`carillon`).
     ModelDef::new(
         "regency_carillon",
@@ -439,6 +447,8 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_nuke_defense" => 6000,
         // An 8 x 8 map gun: drum and outriggers, a long turret, its plant, a three-rail gun.
         "regency_springald" => 24000,
+        // An 8 x 8 plinth with four pylons, a long turret, a lance of vanes and coils.
+        "regency_sarissa" => 24000,
         // A plinth, a five-stage shaft, and twenty cradles of dish and prongs on arms.
         "regency_carillon" => 5000,
         _ => return None,
@@ -472,6 +482,9 @@ pub(super) fn reduced_share(key: &str) -> Option<f32> {
         "regency_heart_2" | "regency_heart_3" => Some(0.5),
         // A lofted vessel and plates that keep their sides when reduced.
         "regency_fabricator" => Some(0.5),
+        // An eight-sided stepped plinth, pylons and a lofted barrel: plated solids that
+        // keep their sides when reduced.
+        "regency_sarissa" => Some(0.5),
         // The tech 1 line: faceted plates and lift bells that keep their shape when reduced.
         "regency_hover_tank" | "regency_raider" | "regency_mobile_aa" | "regency_lens_walker" => {
             Some(0.5)

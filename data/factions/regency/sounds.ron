@@ -1176,6 +1176,108 @@
                 Burst(at: 1.68, low: 250, high: 1400, attack: 0.0004, decay: 0.005, gain: 0.9, pan: 0.4, seed: 150),
             ],
         ),
+        // ---- the Sarissa's Skyward Pinch-fusion Lance ----
+        // Its 3.5 s charge, heard once as it begins, the lance lighting at its end. A
+        // contactor and the two jaws parting off the bore (a heavy grind, a clank as they
+        // seat); a deep rough hum the gravity clamp makes, and over it the fusion poured
+        // up the bore: a roar that heaves in slow surges and grows, never a whine. In the
+        // last second an overload growl and arcs snapping, the pinch drawing in, then the
+        // ignition: a crack, a slam and a deep boom that rolls off as the lance takes over.
+        "regency_sarissa_charge": (
+            length: 4.5, peak: 0.85, room: 0.35,
+            layers: [
+                // The contactor, and the jaws parting, seating with a clank.
+                Burst(low: 45, high: 380, attack: 0.001, decay: 0.04, gain: 4, seed: 401),
+                Fm(at: 0.004, from: 190, to: 178, glide: 0.05, ratio: 1.41, index: 1.2, fade: 0.03, attack: 0.001, decay: 0.06, gain: 0.2),
+                Roll(at: 0.05, from: 140, to: 260, glide: 0.7, attack: 0.25, decay: 0.3, gain: 0.7, swell: 30, depth: 0.6, seed: 402),
+                Burst(at: 0.78, low: 120, high: 900, attack: 0.0005, decay: 0.02, gain: 5, seed: 403),
+                Fm(at: 0.78, from: 300, to: 292, glide: 0.05, ratio: 1.41, index: 1.4, fade: 0.03, attack: 0.001, decay: 0.07, gain: 0.3),
+                // The gravity clamp: a deep rough hum under the whole charge.
+                Fm(at: 0.03, from: 30, to: 42, glide: 3.4, ratio: 0.5, index: 2.8, fade: 8.0, attack: 3.4, decay: 0.03, gain: 0.6),
+                // Its mid body, coming in behind it.
+                Fm(at: 0.5, from: 88, to: 118, glide: 3.0, ratio: 0.5, index: 2.2, fade: 8.0, attack: 2.95, decay: 0.03, gain: 0.8),
+                // The fusion poured up the bore: a roar that heaves in slow surges and grows.
+                Roll(at: 0.4, from: 260, to: 820, glide: 3.1, attack: 3.05, decay: 0.03, gain: 0.95, swell: 3, depth: 0.55, seed: 404),
+                Roll(at: 0.9, from: 420, to: 1100, glide: 2.6, attack: 2.55, decay: 0.03, gain: 0.5, swell: 5, depth: 0.5, pan: 0.2, seed: 405),
+                // The overload: a rougher growl an octave up, only in the last stretch.
+                Fm(at: 2.4, from: 176, to: 236, glide: 1.1, ratio: 0.5, index: 1.8, fade: 8.0, attack: 1.07, decay: 0.03, gain: 0.6),
+                Fm(at: 2.9, from: 270, to: 330, glide: 0.6, ratio: 0.5, index: 1.2, fade: 8.0, attack: 0.57, decay: 0.03, gain: 0.25, pan: -0.15),
+                Roll(at: 2.6, from: 900, to: 1500, glide: 0.9, attack: 0.87, decay: 0.03, gain: 0.35, swell: 100, depth: 0.7, seed: 406),
+                // Arcs snapping round the lens, at random, harder as it goes.
+                Burst(at: 1.9, low: 700, high: 2600, attack: 0.0002, decay: 0.004, gain: 0.9, pan: 0.3, seed: 411),
+                Burst(at: 2.27, low: 700, high: 2600, attack: 0.0002, decay: 0.003, gain: 1.1, pan: -0.35, seed: 412),
+                Burst(at: 2.51, low: 700, high: 2600, attack: 0.0002, decay: 0.005, gain: 1.3, pan: 0.1, seed: 413),
+                Burst(at: 2.74, low: 700, high: 2600, attack: 0.0002, decay: 0.004, gain: 1.5, pan: -0.15, seed: 414),
+                Burst(at: 2.86, low: 700, high: 2600, attack: 0.0002, decay: 0.003, gain: 1.4, pan: 0.4, seed: 415),
+                Burst(at: 3.03, low: 700, high: 2600, attack: 0.0002, decay: 0.005, gain: 1.8, pan: -0.3, seed: 416),
+                Burst(at: 3.17, low: 700, high: 2600, attack: 0.0002, decay: 0.004, gain: 2.0, pan: 0.2, seed: 417),
+                Burst(at: 3.29, low: 700, high: 2600, attack: 0.0002, decay: 0.003, gain: 1.8, pan: -0.1, seed: 418),
+                Burst(at: 3.38, low: 700, high: 2600, attack: 0.0002, decay: 0.005, gain: 2.2, pan: 0.35, seed: 419),
+                // The pinch drawing in on itself into the ignition.
+                Sweep(at: 3.15, from: 450, to: 1500, glide: 0.33, q: 0.8, attack: 0.33, decay: 0.02, gain: 0.85, seed: 420),
+                // The lance lighting: a crack, a slam, a deep boom that holds, a growl in it.
+                Burst(at: 3.5, low: 600, high: 2800, attack: 0.0002, decay: 0.008, gain: 15, seed: 421),
+                Burst(at: 3.5, low: 80, high: 900, attack: 0.0005, decay: 0.1, gain: 28, seed: 422),
+                Burst(at: 3.502, low: 28, high: 220, attack: 0.004, decay: 0.28, gain: 14, seed: 423),
+                Tone(at: 3.5, from: 110, to: 42, glide: 0.18, attack: 0.001, decay: 0.24, gain: 1.3),
+                Tone(at: 3.5, from: 54, to: 30, glide: 0.4, attack: 0.004, decay: 0.34, gain: 0.9),
+                Fm(at: 3.5, from: 130, to: 76, glide: 0.3, ratio: 0.5, index: 2.4, fade: 0.25, attack: 0.002, decay: 0.26, gain: 0.7),
+                Drive(1.5),
+                Roll(at: 3.52, from: 380, to: 80, glide: 0.7, attack: 0.04, decay: 0.24, gain: 0.45, swell: 5, depth: 0.5, seed: 424),
+            ],
+        ),
+        // The lance held, heard as this loop while it burns on a hull: a deeper, wider
+        // furnace roar than the Colossus's, throbbing twice a second with the pulses running
+        // up the stream. Nothing high and no pure tone. Every wobble is a whole number of
+        // cycles in the 4 s loop.
+        "regency_sarissa_hold": (
+            length: 4.0, peak: 0.75, room: 0.35, looped: true,
+            layers: [
+                Fm(from: 36, to: 36, glide: 1, ratio: 0.5, index: 2.2, fade: 1000, attack: 0.01, decay: 100000, gain: 0.35),
+                Drive(1.6),
+                Rumble(freq: 48, q: 0.6, gain: 2.4, wobble: 0.25, depth: 0.5, seed: 431),
+                Rumble(freq: 85, q: 0.6, gain: 2.4, wobble: 0.5, depth: 0.55, pan: -0.2, seed: 432),
+                Rumble(freq: 140, q: 0.6, gain: 2.6, wobble: 0.75, depth: 0.5, pan: 0.2, seed: 433),
+                // The throb of the pulses running up the stream.
+                Rumble(freq: 260, q: 0.5, gain: 3.0, wobble: 2, depth: 0.7, seed: 434),
+                Fm(from: 96, to: 96, glide: 1, ratio: 0.5, index: 1.8, fade: 1000, attack: 0.01, decay: 100000, gain: 0.32, pan: -0.15),
+                Fm(from: 144, to: 144, glide: 1, ratio: 1.5, index: 1.2, fade: 1000, attack: 0.01, decay: 100000, gain: 0.1, pan: 0.15),
+                Wind(freq: 380, q: 0.4, gain: 4.6, swell: 1, depth: 0.7, sway: 0.4, pan: -0.3, seed: 435),
+                Wind(freq: 600, q: 0.4, gain: 3.8, swell: 1.5, depth: 0.7, sway: 0.4, pan: 0.3, seed: 436),
+                Wind(freq: 950, q: 0.4, gain: 1.8, swell: 2, depth: 0.8, sway: 0.5, seed: 437),
+            ],
+        ),
+        // The burn ending: the pinch lets go with a deep thump, the growl sinks as the
+        // core powers down, the heat blown off the pylons and the bank as a broad falling
+        // rush, then the two jaws slamming shut, one a beat after the other, and the lids
+        // settling: dull clanks, softer as it goes.
+        "regency_sarissa_vent": (
+            length: 2.8, peak: 0.65, room: 0.4,
+            layers: [
+                Burst(low: 40, high: 340, attack: 0.003, decay: 0.08, gain: 6, seed: 441),
+                Tone(from: 58, to: 30, glide: 0.35, attack: 0.004, decay: 0.3, gain: 0.6),
+                Fm(from: 118, to: 40, glide: 1.3, ratio: 0.5, index: 2.4, fade: 1.0, attack: 0.01, decay: 0.5, gain: 0.8),
+                Fm(from: 236, to: 84, glide: 1.1, ratio: 0.5, index: 1.4, fade: 0.7, attack: 0.01, decay: 0.34, gain: 0.35),
+                Drive(1.4),
+                // The heat blown off: a broad rush, falling.
+                Roll(at: 0.02, from: 1400, to: 260, glide: 1.3, attack: 0.04, decay: 0.5, gain: 0.9, swell: 12, depth: 0.7, seed: 442),
+                Sweep(at: 0.04, from: 1500, to: 340, glide: 1.4, q: 0.8, attack: 0.05, decay: 0.55, gain: 0.9, seed: 443),
+                Roll(at: 0.08, from: 340, to: 80, glide: 1.7, attack: 0.1, decay: 0.7, gain: 0.35, swell: 4, depth: 0.5, seed: 444),
+                // The jaws slamming shut, one a beat after the other: a heavy knock and a ring.
+                Burst(at: 0.32, low: 70, high: 700, attack: 0.0005, decay: 0.03, gain: 5.0, pan: 0.15, seed: 445),
+                Fm(at: 0.32, from: 220, to: 210, glide: 0.05, ratio: 1.41, index: 1.4, fade: 0.04, attack: 0.001, decay: 0.08, gain: 0.3, pan: 0.15),
+                Tone(at: 0.32, from: 70, to: 52, glide: 0.08, attack: 0.002, decay: 0.1, gain: 0.35),
+                Burst(at: 0.44, low: 70, high: 700, attack: 0.0005, decay: 0.03, gain: 4.4, pan: -0.15, seed: 446),
+                Fm(at: 0.44, from: 206, to: 198, glide: 0.05, ratio: 1.41, index: 1.4, fade: 0.04, attack: 0.001, decay: 0.08, gain: 0.26, pan: -0.15),
+                Tone(at: 0.44, from: 66, to: 50, glide: 0.08, attack: 0.002, decay: 0.1, gain: 0.3),
+                // The lids settling as it cools.
+                Burst(at: 1.1, low: 250, high: 1400, attack: 0.0004, decay: 0.006, gain: 1.8, pan: 0.35, seed: 449),
+                Burst(at: 1.42, low: 300, high: 1600, attack: 0.0004, decay: 0.004, gain: 1.3, pan: -0.3, seed: 450),
+                Fm(at: 1.7, from: 260, to: 252, glide: 0.05, ratio: 1.41, index: 1.2, fade: 0.02, attack: 0.001, decay: 0.05, gain: 0.18, pan: 0.1),
+                Burst(at: 1.7, low: 200, high: 1200, attack: 0.0004, decay: 0.007, gain: 1.4, pan: 0.1, seed: 451),
+                Burst(at: 2.1, low: 250, high: 1400, attack: 0.0004, decay: 0.005, gain: 0.8, pan: -0.4, seed: 452),
+            ],
+        ),
         // A Gravitic Bomb charging between the claw's fingers: a contactor, then the cage
         // climbing onto its note, a growl rising under it and the air hissing in low.
         "regency_gravitic_charge": (
