@@ -37,6 +37,7 @@ mod heart;
 mod hover_tank;
 mod kit;
 mod lance_aa;
+mod lens_walker;
 mod lift;
 mod loft;
 mod machine;
@@ -108,6 +109,9 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("regency_hover_tank", 4.6, 3.4, hover_tank::hover_tank),
     // The tech 1 mobile anti-air: a AA organ on a six-legged walker (`mobile_aa`).
     ModelDef::new("regency_mobile_aa", 4.0, 4.0, mobile_aa::mobile_aa),
+    // The tech 2 mobile missile defence: two gravity lenses held up by shoulder plates
+    // on a six-legged walker (`lens_walker`).
+    ModelDef::new("regency_lens_walker", 5.0, 5.6, lens_walker::lens_walker),
     // The tech 2 battle tank: a lift hull, its turret's gun a Pinched-plasmeric Cannon
     // (`battle_tank`).
     ModelDef::new("regency_battle_tank", 6.2, 4.4, battle_tank::battle_tank),
@@ -392,6 +396,8 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_battle_tank" => 5000,
         "regency_seeker_hover" => 4500,
         "regency_reclaimer" | "regency_mattock" => 3400,
+        // Six legs, a plated body and two gravity lenses.
+        "regency_lens_walker" => 4000,
         // Three long walking legs and a plated head with two cannons.
         "regency_strider" => 7000,
         // Four long legs, a plated carapace, the lance's jaws and coils, two chin guns and
@@ -467,7 +473,9 @@ pub(super) fn reduced_share(key: &str) -> Option<f32> {
         // A lofted vessel and plates that keep their sides when reduced.
         "regency_fabricator" => Some(0.5),
         // The tech 1 line: faceted plates and lift bells that keep their shape when reduced.
-        "regency_hover_tank" | "regency_raider" | "regency_mobile_aa" => Some(0.5),
+        "regency_hover_tank" | "regency_raider" | "regency_mobile_aa" | "regency_lens_walker" => {
+            Some(0.5)
+        }
         // Faceted plates and skirts that keep their sides when reduced.
         "regency_skyspear" | "regency_fusion_howitzer" => Some(0.52),
         // Faceted shards and a plated body that keep their sides when reduced.

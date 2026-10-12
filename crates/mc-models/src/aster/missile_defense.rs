@@ -121,7 +121,7 @@ fn coolant(b: &mut MeshBuilder, z: f32, r: f32) {
 }
 
 /// The tracking radar: a panel on a short mast at `z`, turning.
-fn radar(b: &mut MeshBuilder, z: f32, span: f32) {
+pub(super) fn radar(b: &mut MeshBuilder, z: f32, span: f32) {
     b.set_spinner_pivot(v3(0.0, 0.0, z));
     b.with_part(part::SPINNER, |b| {
         b.paint(METAL);

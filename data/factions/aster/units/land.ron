@@ -184,6 +184,30 @@
         sounds: (moving: "tracks_heavy"),
     ),
     (
+        // The Corona taken off its plinth: two of its laser heads on a tracked hull, to
+        // drive with the tanks and burn down the missiles and shells sent after them.
+        // Unarmed. Against the Corona it pays for moving: less reach (260 m to 300), a
+        // third of the hull, and it stops fewer missiles for what it costs, as a mobile
+        // unit should against a static defence. The heads are the model's `HEADS`
+        // (`models::aster::missile_carrier`).
+        key: "aster_t2_mobile_missile_defense",
+        name: "Aureole",
+        role: "Mobile Missile Defence", title: "Missile Defense",
+        tech: 2,
+        categories: ["Land"],
+        health: 760,
+        cost: (materials: 280, energy: 2800, time: 1800),
+        radius: 5.0, height: 6.0,
+        vision: 300,
+        motion: (layer: Land, size: 1, speed: 27, accel: 20, turn: 90),
+        anti_missile: 260,
+        anti_missile_mounts: [(-0.6, 1.5, 5.0), (-0.6, -1.5, 5.0)],
+        anti_missile_lasers: 2,
+        weapons: [],
+        mesh: "missile_carrier", icon: Shield,
+        sounds: (moving: "tracks_heavy"),
+    ),
+    (
         key: "aster_t3_assault_bot",
         name: "Paladin",
         role: "Siege Assault Bot", title: "Siege Bot",

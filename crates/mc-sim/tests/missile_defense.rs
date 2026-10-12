@@ -216,3 +216,43 @@ fn zz_probe_saturation() {
         }
     }
 }
+
+const AUREOLE: &str = "aster_t2_mobile_missile_defense";
+const PAULDRON: &str = "regency_t2_mobile_missile_defense";
+
+/// The mobile missile defences, the Aureole and the Pauldron, burn down a pair of
+/// Ballistas' shells as a Corona does; but per material they stop less of a battery that
+/// saturates them, as a mobile unit should against the static defence.
+#[test]
+fn the_mobile_missile_defences_cover_a_column_but_trade_worse_than_a_corona() {
+    let w = world();
+    let cost = |key| {
+        w.blueprints
+            .unit(w.blueprints.id_of(key).unwrap())
+            .cost_materials
+    };
+    let corona = barrage_on(CORONA, BALLISTA, 900, 8, 1, 340);
+    for key in [AUREOLE, PAULDRON] {
+        let unit = w.blueprints.unit(w.blueprints.id_of(key).unwrap());
+        assert!(unit.is_mobile(), "{key}");
+        assert_eq!(unit.anti_missile_lasers, 2, "{key}");
+        let pair = barrage_on(key, BALLISTA, 900, 2, 1, 340);
+        let eight = barrage_on(key, BALLISTA, 900, 8, 1, 340);
+        println!(
+            "ballistas (killed, through): {key} 2 {pair:?}, 8 {eight:?}; {CORONA} 8 {corona:?}"
+        );
+        assert!(pair.0 >= 10, "{key} stopped only {} shells", pair.0);
+        assert!(
+            pair.1 <= 1,
+            "{key} let {} of a pair's shells through",
+            pair.1
+        );
+        // Kills per material against the battery: the Corona's must be the better trade.
+        let mobile = Fx::from_int(eight.0 as i32) / cost(key);
+        let tower = Fx::from_int(corona.0 as i32) / cost(CORONA);
+        assert!(
+            mobile < tower,
+            "{key} trades {mobile} kills a material, the Corona {tower}"
+        );
+    }
+}

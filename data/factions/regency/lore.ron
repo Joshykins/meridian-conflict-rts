@@ -455,6 +455,9 @@
     "regency_t2_mobile_shield": (
         lore: "A Ward's veil carried on a gravity lift. It rides among the tanks over land and water and folds the prism over them, so they reach the line unmarked.",
     ),
+    "regency_t2_mobile_missile_defense": (
+        lore: "A Rondel's lenses carried on six legs. It walks among the column and folds what is thrown at it out of the sky.",
+    ),
     "regency_t4_nuke_silo": (
         lore: "The Regency kept the warhead from the war that made them an empire, and built the silo round the memory of it.",
     ),

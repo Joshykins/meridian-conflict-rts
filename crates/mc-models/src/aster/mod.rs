@@ -26,6 +26,7 @@ mod limbs;
 mod mechs;
 pub(crate) use mechs::RAIL as COMMANDER_RAIL;
 mod mine;
+mod missile_carrier;
 mod missile_defense;
 mod mobile_shield;
 pub(super) mod naval;
@@ -70,6 +71,12 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("hover_tank", 5.4, 3.2, vehicles::hover_tank),
     ModelDef::new("missile_launcher", 5.2, 4.0, vehicles::missile_launcher),
     ModelDef::new("mobile_shield", 5.4, 6.4, mobile_shield::mobile_shield),
+    ModelDef::new(
+        "missile_carrier",
+        5.0,
+        6.0,
+        missile_carrier::missile_carrier,
+    ),
     ModelDef::new("assault_bot", 6.8, 12.0, mechs::assault_bot),
     ModelDef::new("artillery_heavy", 7.333, 5.333, trebuchet::artillery_heavy),
     ModelDef::new("bore_tank", 8.2, 4.2, bore_tank::bore_tank),

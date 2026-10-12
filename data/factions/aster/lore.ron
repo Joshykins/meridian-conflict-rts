@@ -157,6 +157,9 @@
     "aster_t2_mobile_shield": (
         lore: "An Aegis crystal on treads. It keeps a small dome over the column it drives with, so the tanks reach the line with their armour whole.",
     ),
+    "aster_t2_mobile_missile_defense": (
+        lore: "Two Corona heads on a Testudo's treads. Its crews say it never fires a shot; it only takes the enemy's out of the air before they land.",
+    ),
     "aster_t2_mobile_aa": (
         lore: "Meridian Arms' answer to faster tech-two aircraft, mounted on treads.",
         weapons: {
