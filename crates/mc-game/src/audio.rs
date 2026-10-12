@@ -1113,8 +1113,8 @@ mod tests {
                 assert_clean(&sound.name, frames);
             }
         }
-        // Six survival sounds (the Suppression Lance among them) and the Progenitor's two.
-        assert_eq!(seen, 8);
+        // Nine survival sounds (the Suppression Lance among them) and the Progenitor's two.
+        assert_eq!(seen, 11);
     }
 
     #[test]
