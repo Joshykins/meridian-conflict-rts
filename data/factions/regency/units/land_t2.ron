@@ -89,6 +89,36 @@
         // A stand-in: ARC's hover hum until the Regency has a lift sound of their own.
         sounds: (death: "blast", moving: "aster_hover"),
     ),
+    // The mobile shield: a craft on gravity lift, no legs, so it crosses water as it crosses
+    // land, and on its back a projector that holds a prism veil over the army round it: four
+    // swept plates curling in over the emitter, the jet gathered between their tips. The veil is
+    // kept up while it moves. It draws energy like every shield, and drops with the rest
+    // in a stall. Model: `regency_shield_hover` (`models::regency::shield_hover`).
+    //
+    // Against the Testudo (ARC's tech 2 mobile shield): the same cost, and the Regency way
+    // of the Ward against the Aegis, tighter but denser: 55 m against 63, a sixth more
+    // field. Lighter, for the lift that takes it over water.
+    (
+        key: "regency_t2_mobile_shield",
+        name: "Targe",
+        role: "Mobile Shield Generator", title: "Mobile Shield",
+        tech: 2,
+        categories: ["Land", "Shield"],
+        health: 620,
+        cost: (materials: 260, energy: 2600, time: 1800),
+        radius: 5.4, height: 6.8,
+        vision: 300,
+        motion: (layer: Hover, size: 1, speed: 27, accel: 20, turn: 90),
+        economy: (energy_upkeep: 90),
+        shield: (radius: 55, health: 4200, regen: 42),
+        weapons: [],
+        mesh: "regency_shield_hover", icon: Shield,
+        // The jet leaves from the emitter's crown inside the plates, not a Ward's 16 m.
+        effects: (shield_projector: 5.0),
+        lights: [(kind: Point, at: (0, 0, 0.3), color: (1.0, 0.14, 0.06), intensity: 70, range: 12, night_only: false)],
+        // A stand-in: ARC's hover hum until the Regency has a lift sound of their own.
+        sounds: (death: "blast", moving: "aster_hover"),
+    ),
     // The bombardment walker: a long-range siege walker, the Regency's answer to the Javelin.
     // It strides on two tall forward-kneed legs in armoured boots. A launcher pod rides on
     // its back on a turning ring; it raises the pod to its launch angle and lobs a pair

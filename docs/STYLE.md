@@ -224,7 +224,7 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 | Surge artillery, a low four-legged gun carriage (T4) | Saker |
 | Raider, light tank, mobile anti-air (T1) | Marauder, Sledge, Brazier |
 | Light artillery (T1) | Mattock |
-| Battle tank / mobile anti-air (T2) | Glaive / Vane |
+| Battle tank / mobile anti-air / mobile shield (T2) | Glaive / Vane / Targe |
 | Anti-spaceship gun, heavy artillery (T3) | Spire, Kiln |
 | Land / air / naval factory | Anvil (II, III) / Skyforge (II, III) / Slipway (II, III) |
 | Air staging base (T1 to T3, upgrades in place) | Mews (II, III) |

@@ -442,6 +442,9 @@
             "Gravitic Seeker Battery": "Charges of plasma held in gravity cradles and let go one after another; each steers itself onto an aircraft without motor or exhaust and bursts beside it.",
         },
     ),
+    "regency_t2_mobile_shield": (
+        lore: "A Ward's veil carried on a gravity lift. It rides among the tanks over land and water and folds the prism over them, so they reach the line unmarked.",
+    ),
     "regency_t4_nuke_silo": (
         lore: "The Regency kept the warhead from the war that made them an empire, and built the silo round the memory of it.",
     ),

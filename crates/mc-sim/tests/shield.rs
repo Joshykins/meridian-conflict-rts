@@ -360,6 +360,16 @@ fn a_dome_drops_when_construction_stalls_the_grid() {
 /// the tank break on the glass and the tank is untouched.
 #[test]
 fn a_mobile_shield_covers_the_tank_it_drives_with() {
+    covers_the_tank_it_drives_with("aster_t2_mobile_shield", "aster_t2_tank");
+}
+
+/// The Targe's veil goes with it the same way, over the hovering Glaive.
+#[test]
+fn the_regency_mobile_shield_covers_the_tank_it_drives_with() {
+    covers_the_tank_it_drives_with("regency_t2_mobile_shield", "regency_t2_tank");
+}
+
+fn covers_the_tank_it_drives_with(shield_key: &str, tank_key: &str) {
     let mut w = world();
     let spawn = |w: &mut World, key: &str, owner: u8, x: i32, y: i32| {
         let bp = w.blueprints.id_of(key).unwrap();
@@ -369,8 +379,8 @@ fn a_mobile_shield_covers_the_tank_it_drives_with() {
         w.state.units.id(row)
     };
     w.state.players[0].free_build = true;
-    let shield = spawn(&mut w, "aster_t2_mobile_shield", 0, 500, 500);
-    let tank = spawn(&mut w, "aster_t2_tank", 0, 512, 500);
+    let shield = spawn(&mut w, shield_key, 0, 500, 500);
+    let tank = spawn(&mut w, tank_key, 0, 512, 500);
     for _ in 0..80 {
         w.tick(&[]).unwrap();
     }
@@ -418,7 +428,7 @@ fn a_mobile_shield_covers_the_tank_it_drives_with() {
     let shield_row = w.state.units.row(shield).unwrap();
     assert!(
         (w.state.units.pos[shield_row] - start).length() > mc_core::Fx::from_int(60),
-        "the Testudo did not drive"
+        "the {shield_key} did not drive"
     );
     assert!(on_dome >= 3, "only {on_dome} shells broke on the dome");
     assert_eq!(

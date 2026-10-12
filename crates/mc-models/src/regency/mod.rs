@@ -53,6 +53,7 @@ mod scout;
 mod seeker_hover;
 mod seraph;
 mod shard;
+mod shield_hover;
 mod sonar;
 pub(crate) mod space;
 mod strategic;
@@ -111,6 +112,9 @@ pub(super) const MODELS: &[ModelDef] = &[
     // The tech 2 mobile anti-air: a craft on lift, a Gravitic Seeker Battery on its back
     // (`seeker_hover`).
     ModelDef::new("regency_seeker_hover", 5.0, 5.6, seeker_hover::seeker_hover),
+    // The tech 2 mobile shield: a craft on lift, a crown of plates round a field
+    // projector on its back (`shield_hover`).
+    ModelDef::new("regency_shield_hover", 5.4, 6.8, shield_hover::shield_hover),
     // The tech 3 mobile fusion guns (`fusion_guns`): the anti-spaceship gun raised to the sky, and the
     // howitzer.
     ModelDef::new(
