@@ -4,9 +4,10 @@
 //!
 //! The gun is a faceted, banded core with four plated rails crossed round it like an X,
 //! all ending flush in a closed mouth; it comes out of a mantlet in the casemate's face.
-//! The casemate is a faceted box drawn in toward its roof, lapped in swept plates down its
-//! flanks, a glacis under the mantlet; on its roof the fusion lies in a keeled armoured
-//! hump with vent lids either side. It turns on a low chamfered keep, panelled and
+//! The casemate is a low faceted wedge, an arrowhead in plan, tall cheeks either side
+//! of the gun lapped in plates swept back into spikes, swept plates down its flanks running
+//! past its tail into fins; on its roof the fusion lies in a low keeled spine with vent
+//! lids either side. It turns on a low chamfered keep, panelled and
 //! buttressed at its cut corners.
 //!
 //! The light is the plates' own (`pattern::EMBER_SLOT`), slots let into them, never a lit
@@ -32,13 +33,13 @@ use super::super::parts::inlay;
 use super::{gun_frame, team_patch, Line};
 
 /// The gun's trunnion and the knot of fusion: the unit file's `pivot` and `muzzle`.
-pub(super) const LINE: Line = Line::new(Vec3::new(0.0, 0.0, 19.04), Vec3::new(35.0, 0.0, 19.04));
+pub(super) const LINE: Line = Line::new(Vec3::new(0.0, 0.0, 13.0), Vec3::new(35.0, 0.0, 13.0));
 /// How far down the bore its mouth is, from the trunnion: the knot forms in front of it.
 const MOUTH: f32 = 33.2;
 /// Where the turret's race sits on the keep.
-const DECK: f32 = 7.0;
+const DECK: f32 = 6.0;
 /// The casemate's roof.
-const ROOF: f32 = 23.6;
+const ROOF: f32 = 15.6;
 /// How far round the knot the mouth and the rails' tips stand: none closer than 0.4 of it.
 #[cfg(test)]
 const HOLD: f32 = 4.0;
@@ -64,15 +65,15 @@ fn far(b: &mut MeshBuilder) {
     b.prism(Vec3::ZERO, 4, 21.0, 19.0, DECK);
     b.with_part(part::TURRET, |b| {
         dark_plate(b);
-        b.block(v3(-15.0, -9.0, DECK), v3(10.0, 9.0, ROOF - 1.0));
-        team_patch(b, -10.0, -4.0, 3.0, ROOF - 0.99);
+        b.block(v3(-16.0, -9.0, DECK), v3(10.0, 9.0, ROOF - 0.6));
+        team_patch(b, -10.0, -4.0, 3.0, ROOF - 0.59);
         b.with_limb(rig::ARM_GUN, |b| {
             gun_frame(b, &LINE, |b| {
                 dark_plate(b);
                 b.beam(
                     v3(4.0, 0.0, 0.0),
                     v3(MOUTH, 0.0, 0.0),
-                    Vec2::splat(5.0),
+                    Vec2::splat(4.4),
                     Vec2::splat(3.4),
                 );
             })
@@ -148,7 +149,7 @@ mod tests {
         super::super::super::check_charge(
             "regency_fusion_cannon",
             24.0,
-            24.0,
+            18.0,
             Some(4),
             &[LINE.muzzle.to_array()],
             HOLD,

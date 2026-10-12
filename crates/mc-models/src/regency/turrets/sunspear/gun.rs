@@ -90,24 +90,24 @@ fn taper(x: f32) -> f32 {
 }
 
 /// The mantlet the gun turns in, in the casemate's face: a faceted collar drawn in at
-/// its front, a ridged plate over its top and each side.
+/// its front, a ridged plate over its top and under it.
 fn mantlet(b: &mut MeshBuilder) {
     dark_plate(b);
     sleeve(
         b,
         &[
-            ring(v3(7.0, 0.0, 0.0), Vec3::Z, 4.3, 4.3),
-            ring(v3(11.0, 0.0, 0.0), Vec3::Z, 4.3, 4.3),
-            ring(v3(12.2, 0.0, 0.0), Vec3::Z, 3.6, 3.6),
+            ring(v3(7.5, 0.0, 0.0), Vec3::Z, 3.6, 3.6),
+            ring(v3(11.6, 0.0, 0.0), Vec3::Z, 3.6, 3.6),
+            ring(v3(12.6, 0.0, 0.0), Vec3::Z, 3.0, 3.0),
         ],
         &OCT,
     );
     if b.fine() {
-        for n in [Vec3::Z, Vec3::Y, -Vec3::Y] {
+        for n in [Vec3::Z, -Vec3::Z] {
             ridged(
                 b,
-                &Frame::new(n * 4.32 + Vec3::X * 7.4, Vec3::X, n),
-                &[[0.0, -2.3], [3.4, -1.9], [3.4, 1.9], [0.0, 2.3]],
+                &Frame::new(n * 3.62 + Vec3::X * 7.9, Vec3::X, n),
+                &[[0.0, -1.9], [3.4, -1.5], [3.4, 1.5], [0.0, 1.9]],
                 0.3,
                 [1.2, 0.0],
                 0.25,

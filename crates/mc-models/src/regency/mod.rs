@@ -258,7 +258,7 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("regency_seeker_silo", 12.0, 14.0, turrets::belfry),
     ModelDef::new("regency_pinch_cannon", 10.5, 11.0, turrets::halberd),
     ModelDef::new("regency_basilisk", 10.5, 12.0, turrets::basilisk),
-    ModelDef::new("regency_fusion_cannon", 24.0, 24.0, turrets::sunspear),
+    ModelDef::new("regency_fusion_cannon", 24.0, 18.0, turrets::sunspear),
     ModelDef::new("regency_palisade", 6.0, 5.4, palisade::palisade),
     // Missile defence (`turrets::rondel`): tech 2, upgrading in place to tech 3.
     ModelDef::tiered("regency_missile_defense", RONDEL, turrets::rondel::rondel),
