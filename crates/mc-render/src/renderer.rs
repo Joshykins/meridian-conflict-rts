@@ -136,6 +136,7 @@ mod breadcrumbs;
 mod gpu_timers;
 mod shadow_cascades;
 mod shadow_map;
+mod shaper_growth;
 mod titan_charge;
 mod titan_fx;
 pub use gpu_timers::{to_perf as gpu_scopes_to_perf, DrawStats, GpuScope};
@@ -1019,6 +1020,8 @@ pub struct Renderer {
     sim_units: u32,
     /// The Behemoth's AEB charge on the clock, for its coils' light (`titan_charge`).
     titan_charge: titan_charge::TitanCharge,
+    /// Survival's Shapers drawn by the stage they have grown to (`shaper_growth`).
+    shaper_growth: shaper_growth::ShaperGrowth,
     /// Which units plant ground stakes, for the ground punched where each strikes.
     stake_fx: stake_fx::StakeFx,
     projectile_count: u32,
@@ -1408,6 +1411,23 @@ impl Renderer {
             let model = models::build_model(key).unwrap_or_else(|| fallback_model(key, 6.0, 3.0));
             drawn_as.push((model_list.len(), 13, 0));
             model_list.push((model, 13));
+        }
+        // Then each kind of Shaper's stages (`shaper_growth`), wearing the printing
+        // Shaper's icon.
+        let shaper_icon = bps
+            .id_of("replication_node")
+            .and_then(|id| drawn_as.get(id.index()))
+            .map_or(0, |d| d.1)
+            | crate::gpu_consts::icon::GROWS;
+        let mut shaper_first = [0u32; shaper_growth::KINDS];
+        for (kind, first) in shaper_first.iter_mut().enumerate() {
+            *first = drawn_as.len() as u32;
+            for key in models::shaper::stage_keys(kind as u8) {
+                let model =
+                    models::build_model(key).unwrap_or_else(|| fallback_model(key, 30.0, 60.0));
+                drawn_as.push((model_list.len(), shaper_icon, 0));
+                model_list.push((model, shaper_icon));
+            }
         }
         let mut vertices: Vec<MeshVertex> = Vec::new();
         let mut indices: Vec<u32> = Vec::new();
@@ -2649,6 +2669,7 @@ impl Renderer {
             dynamic_count: 0,
             sim_units: 0,
             titan_charge: titan_charge::TitanCharge::new(coil_models),
+            shaper_growth: shaper_growth::ShaperGrowth::new(shaper_first),
             stake_fx: stake_fx::StakeFx::new(stake_scales),
             projectile_count: 0,
             stain_runs: [0; 2],
@@ -3311,6 +3332,7 @@ impl Renderer {
         let patched = self.titan_charge.patch(units, time);
         let patched = self.capital_fx.swing.patch(&self.blueprints, patched);
         let patched = self.wing_fx.ease(patched);
+        let patched = self.shaper_growth.patch(patched, &frame.shapers);
         let blueprints = &self.blueprints;
         let patched = self.gravitic_engine_fx.patch(
             patched,

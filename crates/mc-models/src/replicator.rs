@@ -1,5 +1,5 @@
-//! Survival mode's hostile machinery: the Replication Engine and the Replication
-//! Nodes it raises, both Precursor work. Not Aster: pale alloy that reads as dressed
+//! Survival mode's Replication Engine, Precursor work (the Shapers it raises are
+//! `shaper/`). Not Aster: pale alloy that reads as dressed
 //! stone (`PRECURSOR`, whose faces the shader cuts into angular panels with light let
 //! into some of the grooves, `pattern::PRECURSOR`), deep dark recesses and joints
 //! between the plates (`PRECURSOR_DARK`), and one colour, the cold blue-white of
@@ -9,10 +9,7 @@
 //! The engine is a monument, grounded: a stepped platform of sector slabs, a dark core
 //! column with light running up its faces, two rings of floating arc plates round it,
 //! eight jointed arms reaching out to the bay projectors, and a hovering crown holding
-//! the ray's crystal, the Suppression Lance on a collar under it. The node is the
-//! engine's engineer: a spine with its light, a crown of C-shaped arcs, four claw arms
-//! hanging from it, a turning hologram disc and a pointed base, all hovering clear of
-//! the ground.
+//! the ray's crystal, the Suppression Lance on a collar under it.
 //!
 //! Contract with the sim (`data/factions/aster/units/survival.ron`; model space:
 //! x forward, y left, z up, origin on the ground at the centre):
@@ -21,8 +18,6 @@
 //!   head at radius [`BAY_PROJECTOR_RADIUS`], height [`BAY_PROJECTOR_Z`]; the
 //!   printed unit stands on the ground at radius [`BAY_PRINT_RADIUS`].
 //! - Lance muzzle (40, 0, 118), turning about the model's z axis.
-//! - Node: ray lands on the crown at [`NODE_RAY_CATCH`]; prints from
-//!   [`NODE_PRINT_EMITTER`] onto the ground at (+50, 0).
 
 use std::f32::consts::{PI, TAU};
 
@@ -33,10 +28,7 @@ use super::library::ModelDef;
 use super::material::*;
 use super::part;
 
-pub(super) const MODELS: &[ModelDef] = &[
-    ModelDef::new("replication_engine", 110.0, 150.0, engine),
-    ModelDef::new("replication_node", 26.0, 46.0, node),
-];
+pub(super) const MODELS: &[ModelDef] = &[ModelDef::new("replication_engine", 110.0, 150.0, engine)];
 
 /// Where the engine's node-raising ray leaves the crown.
 pub(super) const ENGINE_RAY_EMITTER: [f32; 3] = [0.0, 0.0, 140.0];
@@ -50,9 +42,6 @@ const LANCE_MUZZLE: Vec3 = Vec3::new(40.0, 0.0, 118.0);
 /// Full-detail budget: the engine is one 240 m landmark per match.
 #[cfg(test)]
 pub(super) const ENGINE_TRIANGLES: usize = 12000;
-/// Where the ray lands on a node, and where a node prints from.
-pub(super) const NODE_RAY_CATCH: [f32; 3] = [0.0, 0.0, 46.0];
-pub(super) const NODE_PRINT_EMITTER: [f32; 3] = [0.0, 0.0, 40.0];
 
 fn v3(x: f32, y: f32, z: f32) -> Vec3 {
     Vec3::new(x, y, z)
@@ -145,11 +134,6 @@ fn section(b: &MeshBuilder, q: [(f32, f32); 4], c: f32) -> Vec<Vec2> {
         out.push(p + (next - p).normalize() * c);
     }
     out
-}
-
-/// A section in (radius, z) as given, corners and all.
-fn outline(points: &[(f32, f32)]) -> Vec<Vec2> {
-    points.iter().map(|&(r, z)| v2(r, z)).collect()
 }
 
 /// `section` swept round the z axis from `a0` to `a1` in `steps`, its ends dropped by
@@ -672,280 +656,6 @@ fn engine_coarse(b: &mut MeshBuilder) {
     });
 }
 
-// ---- The Replication Node ---------------------------------------------------------
-
-/// Where the node's hologram turns.
-const HOLO_Z: f32 = 12.5;
-
-pub(super) fn node(b: &mut MeshBuilder, _tech: u8) {
-    if b.coarse() {
-        node_coarse(b);
-        return;
-    }
-    b.set_spinner_pivot(v3(0.0, 0.0, HOLO_Z));
-    spine(b);
-    body(b);
-    for k in 0..4 {
-        let m = TAU / 8.0 + k as f32 * TAU / 4.0;
-        node_crown(b, m);
-        b.yawed(Vec3::ZERO, m, claw_arm);
-    }
-    if b.fine() {
-        // Pods floating low between the arms, each on a dark pin.
-        for k in 0..4 {
-            b.yawed(Vec3::ZERO, k as f32 * TAU / 4.0, |b| {
-                pale(b);
-                let plan = [v2(16.0, -1.8), v2(18.4, -1.8), v2(18.4, 1.8), v2(16.0, 1.8)];
-                slab(b, &plan, 8.5, 12.5, 0.45, true);
-                dark(b);
-                b.beam(
-                    v3(13.2, 0.0, 10.5),
-                    v3(16.1, 0.0, 10.5),
-                    v2(0.6, 0.6),
-                    v2(0.6, 0.6),
-                );
-            });
-        }
-    }
-}
-
-/// The spine: dark, a line of light up four faces, pale sheath plates over the rest;
-/// the print band round it, the catch crystal where it opens and the spire over that.
-fn spine(b: &mut MeshBuilder) {
-    let oct = ngon(8, 1.0);
-    dark(b);
-    b.loft_z(&oct, &[Section::new(19.5, 3.4), Section::new(43.5, 2.5)]);
-    light(b);
-    let flat = |z: f32| (3.4 + (2.5 - 3.4) * (z - 19.5) / 24.0) * (TAU / 16.0).cos() + 0.12;
-    for k in 0..4 {
-        b.yawed(Vec3::ZERO, k as f32 * TAU / 4.0, |b| {
-            b.beam(
-                v3(flat(20.5), 0.0, 20.5),
-                v3(flat(43.0), 0.0, 43.0),
-                v2(0.7, 0.3),
-                v2(0.6, 0.3),
-            );
-        });
-    }
-    // The print band: where a node prints from.
-    let print = Vec3::from(NODE_PRINT_EMITTER);
-    b.loft_z(
-        &oct,
-        &[
-            Section::new(print.z - 0.6, 3.2),
-            Section::new(print.z + 0.6, 3.2),
-        ],
-    );
-    pale(b);
-    let sheath = section(b, [(3.0, 30.5), (4.8, 31.0), (4.2, 38.4), (2.9, 38.6)], 0.4);
-    for k in 0..4 {
-        let m = TAU / 8.0 + k as f32 * TAU / 4.0;
-        arc(
-            b,
-            &sheath,
-            m - deg(30.0),
-            m + deg(30.0),
-            if b.fine() { 2 } else { 1 },
-            0.0,
-        );
-    }
-    // The catch, and the spire floating over it.
-    light(b);
-    b.spheroid(Vec3::from(NODE_RAY_CATCH), v3(1.7, 1.7, 2.6), 4, 2);
-    pale(b);
-    b.loft_z(
-        &oct,
-        &[
-            Section::new(49.0, 0.6),
-            Section::new(50.5, 2.2),
-            Section::new(56.0, 0.0),
-        ],
-    );
-}
-
-/// Hat, core, the body pointing down, the turning hologram and the floating base.
-fn body(b: &mut MeshBuilder) {
-    let oct = ngon(8, 1.0);
-    pale(b);
-    slab(b, &octagon(8.0), 26.5, 29.2, 0.8, true);
-    // The owner's colour, let into the hat's top.
-    b.paint(TEAM);
-    for k in 0..4 {
-        b.yawed(Vec3::ZERO, k as f32 * TAU / 4.0, |b| {
-            b.block(v3(4.6, -0.7, 29.15), v3(6.2, 0.7, 29.4))
-        });
-    }
-    dark(b);
-    b.loft_z(&oct, &[Section::new(19.5, 5.5), Section::new(26.0, 6.5)]);
-    light(b);
-    b.loft_z(&oct, &[Section::new(22.4, 6.25), Section::new(23.9, 6.45)]);
-    pale(b);
-    b.loft_z(
-        &oct,
-        &[
-            Section::new(15.0, 1.2),
-            Section::new(17.0, 4.0),
-            Section::new(19.6, 5.3),
-        ],
-    );
-    // The hologram: broken rings of light turning under the body.
-    let rings: &[f32] = if b.fine() { &[4.0, 8.0] } else { &[7.0] };
-    b.with_part(part::SPINNER, |b| {
-        light(b);
-        for (i, &r) in rings.iter().enumerate() {
-            let ring = section(
-                b,
-                [
-                    (r - 0.3, HOLO_Z - 0.1),
-                    (r + 0.3, HOLO_Z - 0.1),
-                    (r + 0.3, HOLO_Z + 0.1),
-                    (r - 0.3, HOLO_Z + 0.1),
-                ],
-                0.0,
-            );
-            for j in 0..3 {
-                let a0 = j as f32 * TAU / 3.0 + i as f32 * 0.6;
-                arc(
-                    b,
-                    &ring,
-                    a0,
-                    a0 + deg(96.0),
-                    if b.fine() { 4 } else { 2 },
-                    0.0,
-                );
-            }
-        }
-    });
-    // The base: a plate, a point under it, hovering.
-    pale(b);
-    slab(b, &octagon(6.5), 8.0, 10.0, 0.5, true);
-    dark(b);
-    b.loft_z(&oct, &[Section::new(2.5, 0.0), Section::new(8.05, 3.6)]);
-}
-
-/// One quarter of the crown at angle `m`: a great arc over the arm, a smaller one over
-/// it, each a C with a line of light along the great one's outer face.
-fn node_crown(b: &mut MeshBuilder, m: f32) {
-    let (great_steps, small_steps) = if b.fine() { (5, 4) } else { (3, 2) };
-    pale(b);
-    // Hooked in section: a top plate running out, a lip turned down at its outer edge.
-    let great = outline(&[
-        (9.5, 31.0),
-        (19.0, 29.6),
-        (20.2, 25.2),
-        (22.6, 24.6),
-        (23.6, 30.4),
-        (21.8, 33.0),
-        (9.5, 34.6),
-    ]);
-    arc(b, &great, m - deg(26.0), m + deg(26.0), great_steps, 3.0);
-    let small = outline(&[
-        (5.5, 41.0),
-        (11.2, 40.0),
-        (11.9, 37.6),
-        (13.4, 37.3),
-        (14.0, 40.6),
-        (12.8, 42.3),
-        (5.5, 44.2),
-    ]);
-    arc(b, &small, m - deg(22.0), m + deg(22.0), small_steps, 1.6);
-    if b.fine() {
-        let strip = section(
-            b,
-            [(23.62, 27.0), (23.9, 27.0), (23.9, 28.4), (23.62, 28.4)],
-            0.0,
-        );
-        arc_light(b, &strip, m, deg(26.0), 0.8, great_steps, 3.0);
-    }
-}
-
-/// A claw arm hanging from under a great arc, facing +x: shoulder, upper arm, elbow,
-/// forearm with its light, and the talons.
-fn claw_arm(b: &mut MeshBuilder) {
-    let sides = if b.fine() { 8 } else { 4 };
-    let (shoulder, elbow, wrist) = (
-        v3(15.8, 0.0, 28.3),
-        v3(21.0, 0.0, 19.6),
-        v3(19.6, 0.0, 11.0),
-    );
-    dark(b);
-    b.cylinder_between(
-        shoulder - Vec3::Y * 1.4,
-        shoulder + Vec3::Y * 1.4,
-        1.6,
-        1.6,
-        sides,
-    );
-    b.cylinder_between(
-        elbow - Vec3::Y * 1.2,
-        elbow + Vec3::Y * 1.2,
-        1.4,
-        1.4,
-        sides,
-    );
-    pale(b);
-    bar(
-        b,
-        v3(16.2, 0.0, 27.4),
-        v3(20.6, 0.0, 20.6),
-        v2(2.6, 2.4),
-        v2(2.3, 2.2),
-    );
-    let fore = v3(21.0, 0.0, 18.6);
-    bar(b, fore, wrist, v2(3.4, 3.0), v2(2.6, 2.4));
-    bar(b, wrist, v3(17.2, 0.0, 5.2), v2(2.4, 2.2), v2(0.25, 0.25));
-    if b.fine() {
-        bar(
-            b,
-            wrist + v3(0.3, 0.0, 0.5),
-            v3(22.4, 0.0, 6.8),
-            v2(1.4, 1.4),
-            v2(0.2, 0.2),
-        );
-        // The light down the forearm's outer face.
-        light(b);
-        let out = (wrist - fore).cross(Vec3::Y).normalize();
-        let out = if out.x < 0.0 { -out } else { out };
-        b.beam(
-            fore.lerp(wrist, 0.12) + out * 1.45,
-            fore.lerp(wrist, 0.85) + out * 1.2,
-            v2(0.7, 0.25),
-            v2(0.6, 0.25),
-        );
-    }
-}
-
-/// A few solids: base point, body and crown, spine, the catch.
-fn node_coarse(b: &mut MeshBuilder) {
-    pale(b);
-    b.frustum(
-        v3(0.0, 0.0, 3.0),
-        v2(1.0, 1.0),
-        v2(10.0, 10.0),
-        7.0,
-        Vec2::ZERO,
-    );
-    b.yawed(Vec3::ZERO, TAU / 8.0, |b| {
-        b.frustum(
-            v3(0.0, 0.0, 12.0),
-            v2(8.0, 8.0),
-            v2(40.0, 40.0),
-            22.0,
-            Vec2::ZERO,
-        );
-    });
-    dark(b);
-    b.frustum(
-        v3(0.0, 0.0, 34.0),
-        v2(6.0, 6.0),
-        v2(1.0, 1.0),
-        20.0,
-        Vec2::ZERO,
-    );
-    light(b);
-    b.spheroid(Vec3::from(NODE_RAY_CATCH), v3(3.0, 3.0, 4.0), 4, 2);
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1030,10 +740,7 @@ mod tests {
             std::env::var("MODEL_DUMP_DIR").unwrap_or_else(|_| "target/model-dump".into()),
         );
         std::fs::create_dir_all(&dir).unwrap();
-        for (key, r, h) in [
-            ("replication_engine", 110.0, 150.0),
-            ("replication_node", 26.0, 46.0),
-        ] {
+        for (key, r, h) in [("replication_engine", 110.0, 150.0)] {
             let m = build_model_scaled(key, r, h, 3).unwrap();
             for az in [-38.0f32, 60.0, 142.0] {
                 crate::preview::render(&m.lods[0], 768, az)
@@ -1059,10 +766,7 @@ mod tests {
     /// first model that fails anywhere in the roster).
     #[test]
     fn meshes_are_sound() {
-        for (key, r, h) in [
-            ("replication_engine", 110.0, 150.0),
-            ("replication_node", 26.0, 46.0),
-        ] {
+        for (key, r, h) in [("replication_engine", 110.0, 150.0)] {
             let m = build_model_scaled(key, r, h, 3).unwrap();
             for (lod, mesh) in m.lods.iter().enumerate() {
                 for v in &mesh.vertices {
@@ -1086,31 +790,5 @@ mod tests {
                 }
             }
         }
-    }
-
-    #[test]
-    fn node_keeps_the_sims_contract() {
-        let m = build_model_scaled("replication_node", 26.0, 46.0, 3).unwrap();
-        for lod in 0..3 {
-            let (top, x, y) = tops(&m, lod);
-            assert!(
-                (46.0 * 0.8..=46.0 * 1.25).contains(&top),
-                "lod{lod} top {top}"
-            );
-            assert!(
-                x <= 30.0 && y <= 30.0 && x >= 16.0,
-                "lod{lod} extent {x} x {y}"
-            );
-        }
-        assert!(nearest(&m, 0, Vec3::from(NODE_RAY_CATCH), GLOW_PRECURSOR) < 4.0);
-        // The library's budgets for an ordinary model (`models::tests`), checked here too.
-        let tris: Vec<usize> = m.lods.iter().map(|l| l.indices.len() / 3).collect();
-        assert!(
-            tris[0] <= 2600 && tris[2] < 60 && tris[1] as f32 <= tris[0] as f32 * 0.45 + 20.0,
-            "{tris:?}"
-        );
-        // It hovers: nothing within two metres of the ground.
-        assert!(m.lods[0].vertices.iter().all(|v| v.pos[2] > 2.0));
-        assert!(nearest(&m, 0, Vec3::from(NODE_PRINT_EMITTER), GLOW_PRECURSOR) < 3.5);
     }
 }

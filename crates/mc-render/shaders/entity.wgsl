@@ -69,6 +69,8 @@ const MAT_VISOR: u32 = 26u;
 
 // The yellow-orange of construction: build beams, build emitters, a refit going up.
 const AMBER: vec3<f32> = vec3<f32>(1.0, 0.6, 0.1);
+// The replication blue a growing Shaper prints in (`replication_tint`'s).
+const SHAPER_PRINT: vec3<f32> = vec3<f32>(0.4, 0.64, 1.0);
 
 const PART_TURRET: u32 = 1u;
 const PART_SPINNER: u32 = 2u;
@@ -2546,6 +2548,11 @@ fn vs_main(in: VsIn) -> VsOut {
             }
         }
     }
+    // A Shaper growing into its stage knows how high it is built (`growth_keeps`).
+    if (model.icon & ICON_GROWS) != 0u && e.drive_swing.y > 0.0 {
+        out.drive = vec4<f32>(mix(e.drive_swing.x, e.drive_swing.y, t), 0.0, 0.0, 0.0);
+        out.drive_at = vec4<f32>(0.0, 0.0, 0.0, GROWTH_DRIVE_TAG);
+    }
     // A charge coil's light knows its stage and the unit's charge (`coil_state`).
     let coil_pat = in.surface & 0xFFu;
     if coil_pat >= PAT_COIL && coil_pat < PAT_COIL_TURN
@@ -2708,6 +2715,38 @@ fn nanite_site(color: vec3<f32>, local: vec3<f32>, build: f32, height: f32, seed
 // Which parts of the hull print first. A function of the model point only,
 // so a new weld never rewrites what is already up, and the site fills in
 // all over rather than as a sphere from the beam.
+// A Shaper growing into its stage (renderer/shaper_growth.rs): the height of its
+// printing line here, metres of the model, and how far the fragment is over it (above
+// zero: not built yet). The line wavers a band either way, so it reads as print, not a cut.
+fn growth_band(line: f32) -> f32 {
+    return max(line * 0.02, 2.0);
+}
+
+fn growth_over(in: VsOut) -> f32 {
+    let band = growth_band(in.drive.x);
+    let waver = value_noise2(in.local.xy * (1.5 / band) + vec2<f32>(in.state.w * 13.0), 1.0) - 0.5;
+    return in.local.z - (in.drive.x + waver * band);
+}
+
+// Whether a growing Shaper's fragment is there: everything under its line, and over it a
+// lattice of replication light reaching a few bands up, rising, where the print is coming.
+fn growth_keeps(in: VsOut) -> bool {
+    if in.drive_at.w != GROWTH_DRIVE_TAG {
+        return true;
+    }
+    let over = growth_over(in);
+    if over <= 0.0 {
+        return true;
+    }
+    let band = growth_band(in.drive.x);
+    if over > band * GROWTH_LATTICE_BANDS {
+        return false;
+    }
+    let rows = step(0.86, fract(in.local.z / (band * 0.6) - globals.camera.w * 0.6));
+    let ribs = step(0.92, fract((in.local.x - in.local.y) / band));
+    return rows + ribs > 0.5;
+}
+
 fn print_order(local: vec3<f32>, seed: f32) -> f32 {
     let id = floor(local / 2.2);
     let chunk = hash21(id.xy + vec2<f32>(id.z * 3.1, seed * 17.0));
@@ -2922,6 +2961,7 @@ fn fs_prepass(in: VsOut) {
         discard;
     }
     if precursor_cutaway(in) { discard; }
+    if !growth_keeps(in) { discard; }
 }
 
 @fragment
@@ -2947,8 +2987,11 @@ fn fs_shadow(in: VsOut) {
             }
         }
     }
-    // Nor does an upgrade piece that is still a hologram.
+    // Nor does an upgrade piece that is still a hologram, nor what a Shaper has still to print.
     if in.refit.x > 0.5 && in.refit.y <= 0.0 {
+        discard;
+    }
+    if in.drive_at.w == GROWTH_DRIVE_TAG && growth_over(in) > 0.0 {
         discard;
     }
 }
@@ -3131,6 +3174,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 fn shade_entity(in: VsOut) -> vec4<f32> {
     if warp_swarm_missing(in.local, in.warp, in.state.w) { discard; }
     if precursor_cutaway(in) { discard; }
+    if !growth_keeps(in) { discard; }
     let flags = in.owner_flags;
 
     let owner = flags & 0xFFu;
@@ -4127,6 +4171,19 @@ fn shade_entity(in: VsOut) -> vec4<f32> {
             // Printed by a replicator (Survival): the same fill in the replication blue.
             let base = select(lit_before, vec3<f32>(0.0), order > grow);
             color = base + replication_tint(color - base);
+        }
+    }
+    if in.drive_at.w == GROWTH_DRIVE_TAG {
+        // A Shaper growing: over its line the lattice of what is coming, in the
+        // replication blue; under it a band still hot from the print, cooling down.
+        let band = growth_band(in.drive.x);
+        let over = growth_over(in);
+        if over > 0.0 {
+            let fade = 1.0 - over / (band * GROWTH_LATTICE_BANDS);
+            color = SHAPER_PRINT * (0.8 + 2.4 * fade);
+        } else {
+            let heat = smoothstep(-band * 2.5, 0.0, over);
+            color = mix(color, SHAPER_PRINT * 2.0, heat * 0.7) + SHAPER_PRINT * heat * heat * 2.5;
         }
     }
     // A Regency refit (`mirror::UNIT_NANITE` on an upgrading unit) is nanite work: its

@@ -34,7 +34,14 @@ pub(super) const TRIANGLES: usize = 60_000;
 /// A section of (r, z) pairs swept round the z axis from `a0` to `a1` in `steps`.
 /// Every side face is a flat trapezoid. Caps both ends when `caps` (a closed ring
 /// sweeps a whole turn without them).
-fn sweep(b: &mut MeshBuilder, section: &[[f32; 2]], a0: f32, a1: f32, steps: usize, caps: bool) {
+pub(super) fn sweep(
+    b: &mut MeshBuilder,
+    section: &[[f32; 2]],
+    a0: f32,
+    a1: f32,
+    steps: usize,
+    caps: bool,
+) {
     let rings: Vec<Vec<Vec3>> = (0..=steps)
         .map(|i| {
             let (s, c) = (a0 + (a1 - a0) * i as f32 / steps as f32).sin_cos();
@@ -48,7 +55,14 @@ fn sweep(b: &mut MeshBuilder, section: &[[f32; 2]], a0: f32, a1: f32, steps: usi
 }
 
 /// An (r, z) box section, its corners cut except at the coarse level.
-fn rz_box(b: &MeshBuilder, r0: f32, r1: f32, z0: f32, z1: f32, chamfer: f32) -> Vec<[f32; 2]> {
+pub(super) fn rz_box(
+    b: &MeshBuilder,
+    r0: f32,
+    r1: f32,
+    z0: f32,
+    z1: f32,
+    chamfer: f32,
+) -> Vec<[f32; 2]> {
     let (mr, mz) = ((r0 + r1) * 0.5, (z0 + z1) * 0.5);
     let half = Vec2::new((r1 - r0) * 0.5, (z1 - z0) * 0.5);
     let plan = if b.coarse() || chamfer <= 0.0 {
@@ -65,7 +79,7 @@ fn rz_box(b: &MeshBuilder, r0: f32, r1: f32, z0: f32, z1: f32, chamfer: f32) -> 
 }
 
 /// How many flat steps an arc of `span` radians at radius `r` is cut into.
-fn arc_steps(b: &MeshBuilder, r: f32, span: f32) -> usize {
+pub(super) fn arc_steps(b: &MeshBuilder, r: f32, span: f32) -> usize {
     let each = if b.fine() {
         34.0
     } else if b.mid() {

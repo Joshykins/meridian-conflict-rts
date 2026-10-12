@@ -850,7 +850,9 @@ fn lods_reduce_and_respect_budgets() {
             model.key
         );
         let over = OVER_BUDGET.iter().find(|o| o.0 == base_key(&model.key));
-        let coarse_cap = if model.key == "nuke_silo" {
+        let coarse_cap = if let Some((coarse, _, _)) = super::shaper::budget(&model.key) {
+            coarse
+        } else if model.key == "nuke_silo" {
             // The open silo's rim and tube mouth (its own test in `strategic.rs`).
             80
         } else {
@@ -909,6 +911,9 @@ fn lods_reduce_and_respect_budgets() {
         } else if let Some(budget) = super::dam_works::triangles(&model.key) {
             // The works round it: its switchyard, its line's towers, its town.
             budget
+        } else if let Some((_, _, full)) = super::shaper::budget(&model.key) {
+            // A Shaper's stage: one to a site, up to a kilometre high.
+            full
         } else if model.key == "replication_engine" {
             // One 240 m landmark per match (Survival).
             super::replicator::ENGINE_TRIANGLES
@@ -1015,6 +1020,7 @@ fn lods_reduce_and_respect_budgets() {
         let share = over
             .and_then(|o| o.2)
             .or_else(|| super::regency::reduced_share(&model.key))
+            .or_else(|| super::shaper::budget(&model.key).map(|b| b.1))
             .unwrap_or(crate::REDUCED_SHARE);
         assert!(
             reduced as f32 <= full as f32 * share + 20.0,

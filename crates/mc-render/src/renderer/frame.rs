@@ -199,7 +199,8 @@ impl Renderer {
                 .chain(fallen)
                 .chain(going)
                 .chain(falling)
-                .chain(torn),
+                .chain(torn)
+                .chain(self.shaper_growth.drawn()),
         );
 
         let z_range = (

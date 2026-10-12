@@ -73,8 +73,8 @@
     ),
     // The auxiliary Shapers (mc-sim survival/artillery.rs, warheads.rs): raised by the
     // Heart's ray on the hidden Artillery and Nuke sites behind the printing ones, with
-    // every Shaper's defences. They print nothing on the ground. The meshes are
-    // placeholders until their own models land.
+    // every Shaper's defences. They print nothing on the ground. Drawn as the stacked
+    // spire (mc-models shaper/auxiliary.rs), grown by level, each with its own crown.
     (
         key: "progenitor_seedcaster",
         name: "Progenitor Seedcaster",
@@ -111,7 +111,7 @@
             interceptor_coverage: (per_level: 80, most: 4000),
             interceptor_round: (percent: -6, least: 6000),
         ),
-        mesh: "precursor_spire", icon: Artillery,
+        mesh: "progenitor_seedcaster", icon: Artillery,
         lights: [],
         sounds: (death: "blast_large"),
     ),
@@ -151,7 +151,7 @@
             interceptor_coverage: (per_level: 80, most: 4000),
             interceptor_round: (percent: -6, least: 6000),
         ),
-        mesh: "precursor_beacon", icon: Silo,
+        mesh: "progenitor_unmaker", icon: Silo,
         lights: [],
         sounds: (death: "blast_large"),
     ),
@@ -184,7 +184,7 @@
             blast_radius: (per_level: 12, most: 900),
             blast_damage: (percent: 6),
         ),
-        mesh: "precursor_shard", icon: Silo,
+        mesh: "progenitor_silo", icon: Silo,
         lights: [],
         sounds: (death: "blast_large"),
     ),

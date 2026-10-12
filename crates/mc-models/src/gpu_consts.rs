@@ -205,6 +205,9 @@ shared! {
         /// `ModelInfo::icon` bit: a tree (a prop kind). A far forest is drawn with fewer,
         /// bigger trees (cull.wgsl `thin_scale`).
         pub const TREE: u32 = 0x4000_0000;
+        /// `ModelInfo::icon` bit: a survival Shaper's stage, drawn built only up to the
+        /// height the renderer hands it (`shaper_growth.rs`; `growth`).
+        pub const GROWS: u32 = 0x8000_0000;
     }
 
     /// How a settled wreck lies (`mc_sim::mirror::WRECK_*`, which a test holds equal;
@@ -1304,6 +1307,18 @@ shared! {
         pub const GLOW_MATERIAL: u32 = 28;
         /// How many times a second the prism's colours run once round.
         pub const RATE: f32 = 0.35;
+    }
+
+    /// A survival Shaper growing into its stage (mc-render `shaper_growth.rs`, entity.wgsl
+    /// `growth_keeps`): on a model with `icon::GROWS`, `UnitInstance::drive_swing` is the
+    /// height it is built up to, last tick and this, in metres of the model; zero when it
+    /// stands whole. Above that line the stage is not there yet but for a lattice of
+    /// replication light where the print is about to come.
+    pub mod growth as "GROWTH_" {
+        /// `VsOut::drive_at.w` on a growing Shaper's faces: `drive.x` is then its line.
+        pub const DRIVE_TAG: f32 = 7.0;
+        /// How far over the line the lattice reaches, in bands (`band`).
+        pub const LATTICE_BANDS: f32 = 6.0;
     }
 
     /// How a strategic missile and a nuclear blast are drawn (`mc_data::strategic::StrategicLook`,

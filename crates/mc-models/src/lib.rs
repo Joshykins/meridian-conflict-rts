@@ -1008,6 +1008,7 @@ mod preview;
 mod props;
 pub mod remote;
 mod replicator;
+pub mod shaper;
 pub mod shell;
 pub mod site;
 pub mod stakes;

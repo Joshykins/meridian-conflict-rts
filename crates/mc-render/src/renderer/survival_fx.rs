@@ -13,6 +13,7 @@ mod survival_shots {
     use mc_data::{BlueprintId, WeaponColor};
     use mc_sim::mirror::*;
     use mc_sim::reclaim::BeamInstance;
+    use mc_sim::survival::ShaperInstance;
     use std::sync::Arc;
 
     const TICK: f32 = 0.1;
@@ -48,7 +49,7 @@ mod survival_shots {
     }
 
     /// Stages the replicators on crosswater and writes PPMs.
-    /// `SURV_SCENES`: veil, ray, print (default all). `SURV_CAMS`: `;`-separated
+    /// `SURV_SCENES`: veil, ray, print, grow (Shapers growing; default all). `SURV_CAMS`: `;`-separated
     /// `dx,dy,dist,yaw,tilt` (metres off the engine, radians); `SURV_TIMES` seconds;
     /// `SURV_OUT` folder; `SURV_RAY` metres from the engine to the node site;
     /// `SURV_BIG` for 2560x1440; `SURV_PLAIN` draws the veil as an ordinary dome;
@@ -117,7 +118,7 @@ mod survival_shots {
         let site_xy = at + Vec2::new(0.8, 0.6) * ray_len;
         let site = site_xy.extend(ground(&renderer, site_xy));
         let overlay = Overlay::default();
-        let scenes = std::env::var("SURV_SCENES").unwrap_or_else(|_| "veil,ray,print".into());
+        let scenes = std::env::var("SURV_SCENES").unwrap_or_else(|_| "veil,ray,print,grow".into());
         let mut base = 100.0f32;
         for scene in scenes.split(',') {
             let captures: Vec<f32> = match std::env::var("SURV_TIMES") {
@@ -128,6 +129,7 @@ mod survival_shots {
                 .unwrap_or_else(|_| match scene {
                     "veil" => "0,0,700,0.6,0.15".into(),
                     "ray" => "0,0,2200,0.9,0".into(),
+                    "grow" => "900,-150,2600,0,0;900,-150,2600,1.57,0".into(),
                     _ => "150,0,260,0.5,0".into(),
                 })
                 .split(';')
@@ -206,6 +208,39 @@ mod survival_shots {
                                 height: raise,
                             });
                             frame.beam_sources.push(1);
+                        }
+                        "grow" => {
+                            // Shapers growing (`shaper_growth.rs`): two printers at level
+                            // 10, one printing up from the ground (reseeded, catching up),
+                            // one printing its top; a whole nuke Shaper at 10 and a whole
+                            // artillery Shaper at 20.
+                            let row = [
+                                (0u8, 10u16, 280.0 + 30.0 * t),
+                                (0, 10, 650.0 + 8.0 * t),
+                                (2, 10, 2000.0),
+                                (1, 20, 2000.0),
+                            ];
+                            for (i, &(kind, level, built)) in row.iter().enumerate() {
+                                let xy = engine_at.truncate()
+                                    + Vec2::new(900.0, -800.0 + 520.0 * i as f32);
+                                let id = 10 + i as u32;
+                                frame.units.push(unit(
+                                    node_bp,
+                                    id,
+                                    xy.extend(ground(&renderer, xy)),
+                                    0.0,
+                                    radius(node_bp),
+                                    0,
+                                ));
+                                frame.shapers.push(ShaperInstance {
+                                    unit: id,
+                                    kind,
+                                    level,
+                                    height: built.min(mc_models::shaper::height(level)),
+                                    raised: 1.0,
+                                    ..Default::default()
+                                });
+                            }
                         }
                         _ => {
                             // Bay 0 prints a Warden; the node beside it prints a bot.
