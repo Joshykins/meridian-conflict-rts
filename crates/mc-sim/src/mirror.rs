@@ -326,24 +326,31 @@ pub enum SimEvent {
         round: u16,
         units: u16,
     },
-    /// Survival: the engine's ray is raising a node at map node site `site`.
+    /// Survival: the engine's ray is raising a Shaper (`shaper`, its blueprint) at map
+    /// node site `site`, a site for `kind`; `product`: the first kind it prints (None for
+    /// an Unmaker, which launches warheads).
     NodeRaising {
         site: u8,
         pos: mc_core::FxVec2,
-        product: BlueprintId,
+        product: Option<BlueprintId>,
+        kind: mc_data::survival::SiteKind,
+        shaper: BlueprintId,
     },
-    /// Survival: the node at `site` is up and printing `product`.
+    /// Survival: the Shaper at `site` is up (and printing `product`, if it prints).
     NodeOnline {
         site: u8,
         pos: mc_core::FxVec2,
-        product: BlueprintId,
+        product: Option<BlueprintId>,
+        kind: mc_data::survival::SiteKind,
+        shaper: BlueprintId,
     },
     /// Survival: the node at `site` was destroyed (`raised`: after it came online);
     /// `wreck`: materials its wreck holds for the defenders to reclaim (0 if it never rose).
     NodeDestroyed {
         site: u8,
         pos: mc_core::FxVec2,
-        product: BlueprintId,
+        product: Option<BlueprintId>,
+        kind: mc_data::survival::SiteKind,
         wreck: u32,
         raised: bool,
     },
@@ -373,6 +380,27 @@ pub enum SimEvent {
         to: mc_core::FxVec3,
         splash: Fx,
         damage: Fx,
+    },
+    /// Survival: a Seedcaster (`source`, on site `site`) fired replication shell `serial`
+    /// from its crown `from` at `to` (the ground at its mark); it lands in `flight_ticks`
+    /// and prints `units` there. `volley`: its place in its volley, 0 the first.
+    ReplicationShellFired {
+        serial: u32,
+        source: UnitId,
+        site: u8,
+        from: FxVec3,
+        to: FxVec3,
+        flight_ticks: u32,
+        units: u16,
+        volley: u8,
+    },
+    /// Survival: replication shell `serial` landed at `at`: a burst `radius` metres
+    /// across, and `units` printing on the spot.
+    ReplicationShellLanded {
+        serial: u32,
+        at: FxVec3,
+        radius: Fx,
+        units: u16,
     },
     /// Survival: the defenders held out through the last round.
     SurvivalWon {
@@ -1601,6 +1629,9 @@ pub struct RenderFrame {
     /// Survival: every Shaper standing or rising, for its model and effects
     /// (`survival::ShaperInstance`). Empty in any other match.
     pub shapers: Vec<crate::survival::ShaperInstance>,
+    /// Survival: every replication shell in the air, mark and all, for every side
+    /// (`survival::ShellInstance`). Empty in any other match.
+    pub shells: Vec<crate::survival::ShellInstance>,
     /// Mobile builders whose construction beam is on this tick, and where it meets the work.
     pub build_sources: Vec<BuildSource>,
     /// Wave origins on construction sites, packed; a unit's `weld_first` /
@@ -2947,6 +2978,7 @@ impl World {
         self.write_dashes(viewer, &mut frame.dashes);
         self.write_lenses(viewer, &mut frame.lenses);
         self.write_shapers(&mut frame.shapers);
+        self.write_shells(&mut frame.shells);
         self.write_wells(viewer, &mut frame.wells);
         self.write_clouds(&mut frame.clouds);
         self.write_destructs(viewer, &mut frame.destructs);

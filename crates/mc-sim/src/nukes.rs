@@ -174,6 +174,9 @@ pub struct StrategicMissile {
     #[serde(default)]
     pub travelled: Fx,
     pub quarry: u32,
+    /// A warhead's blast, as its launcher's level made it when it left (`launcher_spec`).
+    #[serde(default)]
+    pub blast: Option<NuclearBlast>,
 }
 
 /// A detonation whose front is still running out.
@@ -256,6 +259,11 @@ impl Strategic {
                 h.write_i64(v.z.0);
             }
             h.write_i64(m.travelled.0);
+            if let Some(b) = m.blast {
+                for v in [b.radius, b.core, b.damage, b.edge] {
+                    h.write_i64(v.0);
+                }
+            }
         }
         h.write_u64(self.detonations.len() as u64);
         for d in &self.detonations {
@@ -455,6 +463,8 @@ pub struct WarheadTrack {
     pub owner: u8,
     pub path: WarheadPath,
     pub travelled: Fx,
+    /// The blast it will burst with (its launcher's level's, `StrategicMissile::blast`).
+    pub blast: Option<NuclearBlast>,
 }
 
 /// Closest two things come over a tick, each moving in a straight line from `a0` to
@@ -701,6 +711,7 @@ impl World {
                 self.state.units.revealed[row] = crate::naval_arms::LAUNCH_REVEAL;
             }
             let to = target(mark);
+            let blast = self.launcher_spec(row).and_then(|s| s.blast);
             self.state.strategic.missiles.push(StrategicMissile {
                 serial,
                 kind: MissileKind::Warhead,
@@ -715,6 +726,7 @@ impl World {
                 origin: start,
                 travelled: Fx::ZERO,
                 quarry: 0,
+                blast,
             });
             self.events.push(SimEvent::NuclearLaunch {
                 from: start,
@@ -949,6 +961,7 @@ impl World {
                 origin: start,
                 travelled: Fx::ZERO,
                 quarry: serial,
+                blast: None,
             });
             self.events.push(SimEvent::InterceptorLaunch {
                 from: start,
@@ -959,12 +972,16 @@ impl World {
         }
     }
 
-    /// How blueprint `bp`'s strategic missiles and blasts look: its faction's (presentation
-    /// only).
+    /// How blueprint `bp`'s strategic missiles and blasts look: its launcher's own, else its
+    /// faction's (presentation only).
     pub(crate) fn strategic_look(&self, bp: BlueprintId) -> StrategicLook {
+        let unit = self.blueprints.unit(bp);
+        if let Some(look) = unit.strategic.as_ref().and_then(|s| s.look) {
+            return look;
+        }
         self.blueprints
             .factions
-            .get(self.blueprints.unit(bp).faction.0 as usize)
+            .get(unit.faction.0 as usize)
             .map_or(StrategicLook::Fission, |f| f.nuke_look)
     }
 
@@ -997,7 +1014,10 @@ impl World {
         for &i in burst.iter().rev() {
             let m = self.state.strategic.missiles.swap_remove(i);
             let spec = self.blueprints.unit(m.blueprint).strategic.as_ref();
-            let blast = spec.and_then(|s| s.blast).unwrap_or(COMMANDER_BLAST);
+            let blast = m
+                .blast
+                .or_else(|| spec.and_then(|s| s.blast))
+                .unwrap_or(COMMANDER_BLAST);
             let look = self.strategic_look(m.blueprint);
             self.detonate(m.mark, blast, m.owner, m.source, false, look)?;
         }
@@ -1437,11 +1457,13 @@ impl World {
         for m in &self.state.strategic.missiles {
             if m.kind == MissileKind::Warhead {
                 let (path, _) = self.warhead_flight(m);
+                let spec = self.blueprints.unit(m.blueprint).strategic.as_ref();
                 tracks.push(WarheadTrack {
                     serial: m.serial,
                     owner: m.owner,
                     path,
                     travelled: m.travelled,
+                    blast: m.blast.or_else(|| spec.and_then(|s| s.blast)),
                 });
             }
         }

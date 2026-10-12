@@ -31,6 +31,9 @@ pub enum StrategicLook {
     /// The Regency's pinch-fusion warhead: a red plasma nova that leaves a glowing plasma
     /// cloud standing over the ground; dark trails with a hot streak at the missile.
     Plasma = 1,
+    /// Survival's Progenitor (its Unmaker's silos, `look:` on their strategic block). Drawn
+    /// as `Fission` until the Progenitor's own look is made.
+    Progenitor = 2,
 }
 
 /// What one round costs to assemble, like a unit's `cost`.
@@ -78,13 +81,17 @@ pub struct RawStrategic {
     /// None: the silo's one deep tube under the ground (`nukes::warhead_start`).
     #[serde(default)]
     pub tubes: Vec<(f64, f64, f64)>,
+    /// How this launcher's missiles and blasts look, when not its faction's
+    /// (`Faction::nuke_look`). Presentation only.
+    #[serde(default)]
+    pub look: Option<StrategicLook>,
 }
 
 fn one() -> f64 {
     1.0
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct NuclearBlast {
     /// Metres out the blast does damage.
     pub radius: Fx,
@@ -144,6 +151,8 @@ pub struct Strategic {
     pub missile_scale: Fx,
     /// A hull's tube mouths in its own frame (`RawStrategic::tubes`); empty for a silo.
     pub tubes: Vec<FxVec3>,
+    /// Presentation only, and not hashed: its own look over its faction's (`RawStrategic::look`).
+    pub look: Option<StrategicLook>,
 }
 
 impl RawStrategic {
@@ -205,6 +214,7 @@ impl RawStrategic {
                 .iter()
                 .map(|t| FxVec3::new(fx(t.0), fx(t.1), fx(t.2)))
                 .collect(),
+            look: self.look,
         })
     }
 }

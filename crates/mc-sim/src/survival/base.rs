@@ -9,13 +9,13 @@
 //! they stand is here (`slot_at`), inside the site's `room`.
 
 use super::rules::{
-    pylon_feed, shaper_platforms, shaper_pylons, PIECE_GAP_TICKS, PIECE_LOST_TICKS,
+    pylon_feed, shaper_platforms, shaper_pylons, shaper_silos, PIECE_GAP_TICKS, PIECE_LOST_TICKS,
     PIECE_RAISE_TICKS,
 };
 use super::{Node, Piece, PieceKind};
 use crate::SimError;
 use mc_core::{Angle, Fx, FxVec2};
-use mc_data::survival::Domain;
+use mc_data::survival::{Domain, SiteKind};
 use mc_data::BlueprintId;
 
 /// Most slots of one kind round a Shaper: past this the arc has no room. A bound on
@@ -26,24 +26,33 @@ const GAP: i32 = 24;
 /// Angle units per radian (65536 / 2 pi).
 const PER_RADIAN: i64 = 10_430;
 
-/// The blueprints a Shaper's base is made of (`Survival::kit`).
+/// The blueprints the Shapers and their bases are made of (`Survival::kit`).
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Kit {
+    /// The Shaper a site of each `SiteKind` raises, in its numbers' order: the printer
+    /// (`replication_node`), the Seedcaster (artillery) and the Unmaker (nukes).
+    pub shapers: [BlueprintId; 3],
     /// Print platforms on land: ordinary, great.
     pub platform: [BlueprintId; 2],
     /// Print platforms in the water (slips): ordinary, great.
     pub slip: [BlueprintId; 2],
     pub pylon: BlueprintId,
+    /// An Unmaker's silo.
+    pub silo: BlueprintId,
 }
 
 impl Kit {
-    /// Keys of the base's blueprints, in `Kit` order.
-    const KEYS: [&'static str; 5] = [
+    /// Keys of the blueprints, in `Kit` order.
+    const KEYS: [&'static str; 9] = [
+        "replication_node",
+        "progenitor_seedcaster",
+        "progenitor_unmaker",
         "progenitor_platform",
         "progenitor_platform_great",
         "progenitor_slip",
         "progenitor_slip_great",
         "progenitor_pylon",
+        "progenitor_silo",
     ];
 
     pub(super) fn load(bps: &mc_data::Blueprints) -> Result<Kit, SimError> {
@@ -51,12 +60,28 @@ impl Kit {
             bps.id_of(k)
                 .ok_or_else(|| SimError::Setup(format!("survival needs blueprint {k}")))
         };
-        let [a, b, c, d, e] = Kit::KEYS;
+        let [a, b, c, d, e, f, g, h, i] = Kit::KEYS;
         Ok(Kit {
-            platform: [id(a)?, id(b)?],
-            slip: [id(c)?, id(d)?],
-            pylon: id(e)?,
+            shapers: [id(a)?, id(b)?, id(c)?],
+            platform: [id(d)?, id(e)?],
+            slip: [id(f)?, id(g)?],
+            pylon: id(h)?,
+            silo: id(i)?,
         })
+    }
+
+    /// The Shaper a site of `kind` raises.
+    pub(super) fn shaper(&self, kind: SiteKind) -> BlueprintId {
+        self.shapers[kind as usize]
+    }
+
+    /// Every blueprint in it.
+    pub(super) fn blueprints(&self) -> impl Iterator<Item = BlueprintId> {
+        let mut all = self.shapers.to_vec();
+        all.extend(self.platform);
+        all.extend(self.slip);
+        all.extend([self.pylon, self.silo]);
+        all.into_iter()
     }
 
     /// The blueprint a piece of `kind` is at a site of `domain`.
@@ -70,6 +95,7 @@ impl Kit {
             PieceKind::Platform => set[0],
             PieceKind::GreatPlatform => set[1],
             PieceKind::Pylon => self.pylon,
+            PieceKind::Silo => self.silo,
         }
     }
 }
@@ -101,6 +127,7 @@ fn slot_at(
         PieceKind::Platform => (ring(150 + half / 2, 190), 0u16, 0x3555u16),
         PieceKind::GreatPlatform => (ring(260, 340), 0, 0x3555),
         PieceKind::Pylon => (ring(80, 110), 0x8000, 0x4800),
+        PieceKind::Silo => (ring(150 + half / 2, 200), 0x8000, 0x3000),
     };
     let step = ((side + GAP) as i64 * PER_RADIAN / ring.max(1) as i64).min(0x4000) as i32;
     let out = (k as i32 + 1) / 2 * if k % 2 == 1 { 1 } else { -1 };
@@ -162,7 +189,11 @@ impl crate::World {
             }
             if t >= Fx::ONE {
                 self.complete_unit(row)?;
-                self.state.survival.as_mut().unwrap().nodes[i].pieces[k].raised = true;
+                let n = &mut self.state.survival.as_mut().unwrap().nodes[i];
+                n.pieces[k].raised = true;
+                // A silo grows with its Unmaker (its blueprint's `growth`).
+                let level = n.level;
+                self.set_unit_level(row, level);
             }
         }
         Ok(())
@@ -179,10 +210,20 @@ impl crate::World {
         let Some(site) = s.config.node_sites.get(n.site as usize).cloned() else {
             return Ok(());
         };
-        let (small, great) = shaper_platforms(n.level);
+        // A printer raises platforms; an auxiliary Shaper prints nothing on the ground, and
+        // an Unmaker raises its silos instead.
+        let (small, great) = match site.kind {
+            SiteKind::Printer => shaper_platforms(n.level),
+            SiteKind::Artillery | SiteKind::Nuke => (0, 0),
+        };
+        let silos = match site.kind {
+            SiteKind::Nuke => shaper_silos(n.level),
+            SiteKind::Printer | SiteKind::Artillery => 0,
+        };
         let want = [
             (PieceKind::Platform, small),
             (PieceKind::GreatPlatform, great),
+            (PieceKind::Silo, silos),
             (PieceKind::Pylon, shaper_pylons(n.level)),
         ];
         let count = |kind| n.pieces.iter().filter(|p| p.kind == kind).count();
@@ -266,7 +307,9 @@ impl crate::World {
     pub(super) fn shaper_pads(&self, node: &Node) -> Vec<(crate::UnitId, Fx)> {
         node.pieces
             .iter()
-            .filter(|p| p.raised && p.kind != PieceKind::Pylon)
+            .filter(|p| {
+                p.raised && matches!(p.kind, PieceKind::Platform | PieceKind::GreatPlatform)
+            })
             .filter_map(|p| {
                 let row = self.state.units.row(p.unit)?;
                 Some((p.unit, platform_room(self.bp(row))))

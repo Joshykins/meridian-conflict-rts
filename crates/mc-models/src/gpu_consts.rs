@@ -1314,6 +1314,8 @@ shared! {
         pub const FISSION: u32 = 0;
         /// The Regency's: a red plasma nova that leaves a glowing plasma cloud standing.
         pub const PLASMA: u32 = 1;
+        /// Survival's Progenitor: drawn as `FISSION` until its own look is made.
+        pub const PROGENITOR: u32 = 2;
     }
 
     /// How a shield field is drawn: the look bits of a shield's `packed` word (mc-sim

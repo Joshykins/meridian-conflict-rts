@@ -233,13 +233,64 @@ pub fn log_tick(world: &mc_sim::World, tick: u32) {
             SimEvent::RoundLaunched { round, units } => {
                 println!("[{min:5.1} min] round {round} launched, {units} units")
             }
-            SimEvent::NodeRaising { site, product, .. } => println!(
-                "[{min:5.1} min] node rising at site {site} ({})",
-                name(*product)
+            SimEvent::NodeRaising {
+                site,
+                product,
+                shaper,
+                ..
+            } => println!(
+                "[{min:5.1} min] {} rising at site {site}{}",
+                name(*shaper),
+                product.map_or(String::new(), |b| format!(" ({})", name(b)))
             ),
-            SimEvent::NodeOnline { site, product, .. } => println!(
-                "[{min:5.1} min] node online at site {site} ({})",
-                name(*product)
+            SimEvent::NodeOnline {
+                site,
+                product,
+                shaper,
+                ..
+            } => println!(
+                "[{min:5.1} min] {} online at site {site}{}",
+                name(*shaper),
+                product.map_or(String::new(), |b| format!(" ({})", name(b)))
+            ),
+            SimEvent::ReplicationShellFired {
+                site, units, to, ..
+            } => println!(
+                "[{min:5.1} min] shell from site {site} at ({:.0}, {:.0}), {units} units",
+                to.x.to_f32(),
+                to.y.to_f32()
+            ),
+            SimEvent::ReplicationShellLanded { at, units, .. } => println!(
+                "[{min:5.1} min] shell landed at ({:.0}, {:.0}), printing {units}",
+                at.x.to_f32(),
+                at.y.to_f32()
+            ),
+            SimEvent::NuclearLaunch { to, owner, .. }
+                if *owner
+                    == world
+                        .state
+                        .survival
+                        .as_ref()
+                        .map_or(u8::MAX, |s| s.config.engine_player) =>
+            {
+                println!(
+                    "[{min:5.1} min] Progenitor warhead launched at ({:.0}, {:.0})",
+                    to.x.to_f32(),
+                    to.y.to_f32()
+                )
+            }
+            SimEvent::WarheadIntercepted { killed: true, .. } => {
+                println!("[{min:5.1} min] warhead intercepted")
+            }
+            SimEvent::NuclearDetonation {
+                pos,
+                owner,
+                commander: false,
+                ..
+            } => println!(
+                "[{min:5.1} min] warhead of player {owner} burst at ({:.0}, {:.0})",
+                pos.x.to_f32(),
+                pos.y.to_f32()
             ),
             SimEvent::NodeDestroyed { site, wreck, .. } => {
                 println!("[{min:5.1} min] node at site {site} destroyed, wreck {wreck}")

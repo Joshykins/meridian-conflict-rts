@@ -4521,6 +4521,7 @@ impl Game {
                 placing.map(|(bp, at)| (bp, at, self.place_heading(bp))),
             );
             work::draw_tags(&mut ui, &field, alpha, |o| !self.is_enemy(o));
+            crate::replication_marks::draw(&mut ui, &field, alpha);
             crate::titan_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));
             crate::dash_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));
             crate::gravitic_marks::draw(&mut ui, &field, self.ground_under_cursor(renderer));

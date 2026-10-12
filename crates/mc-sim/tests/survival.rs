@@ -38,6 +38,27 @@ fn world_with(rules: SurvivalRules, defenders: u8) -> World {
 
 /// `world_with` on `threads` workers.
 fn world_on(rules: SurvivalRules, defenders: u8, threads: usize) -> World {
+    let sites = SITES
+        .iter()
+        .map(|&(x, y)| NodeSite {
+            at: FxVec2::from_ints(x, y),
+            domain: Domain::Land,
+            facing: Some(mc_core::Angle::from_degrees(225)),
+            kind: SiteKind::Printer,
+            room: Fx::from_int(450),
+            path: vec![FxVec2::from_ints(x - 400, y - 400)],
+        })
+        .collect();
+    world_sites(rules, defenders, threads, sites)
+}
+
+/// `world_on` with Shaper sites `node_sites` (the auxiliary tests' own).
+pub(crate) fn world_sites(
+    rules: SurvivalRules,
+    defenders: u8,
+    threads: usize,
+    node_sites: Vec<NodeSite>,
+) -> World {
     let blueprints = Arc::new(
         Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
     );
@@ -120,24 +141,14 @@ fn world_on(rules: SurvivalRules, defenders: u8, threads: usize) -> World {
                 path: vec![FxVec2::from_ints(4300, 4700), FxVec2::from_ints(2400, 2000)],
             },
         ],
-        node_sites: SITES
-            .iter()
-            .map(|&(x, y)| NodeSite {
-                at: FxVec2::from_ints(x, y),
-                domain: Domain::Land,
-                facing: Some(mc_core::Angle::from_degrees(225)),
-                kind: SiteKind::Printer,
-                room: Fx::from_int(450),
-                path: vec![FxVec2::from_ints(x - 400, y - 400)],
-            })
-            .collect(),
+        node_sites,
         rules,
     })
     .unwrap();
     w
 }
 
-fn rules() -> SurvivalRules {
+pub(crate) fn rules() -> SurvivalRules {
     SurvivalRules {
         rounds: 2,
         grace_secs: 10,
@@ -149,7 +160,12 @@ fn rules() -> SurvivalRules {
     }
 }
 
-fn run(w: &mut World, ticks: u32, commands: &[PlayerCommand], events: &mut Vec<SimEvent>) {
+pub(crate) fn run(
+    w: &mut World,
+    ticks: u32,
+    commands: &[PlayerCommand],
+    events: &mut Vec<SimEvent>,
+) {
     for t in 0..ticks {
         w.tick(if t == 0 { commands } else { &[] }).unwrap();
         events.extend(w.events.iter().cloned());

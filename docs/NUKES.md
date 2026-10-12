@@ -189,6 +189,14 @@ mc-data; presentation only, never hashed). It rides on the events (`NuclearLaunc
 `StrategicInstance::look`, in the blast's fourth vec4 (`.y`) and in the missile word
 (`gpu_consts::missile::PLASMA`). An Exarch's death goes up the same way, smaller.
 
+A launcher's `strategic` block may name its own look over its faction's (`look:
+Some(Progenitor)`): survival's Unmaker silos (`progenitor_silo`) do, `StrategicLook::Progenitor`
+(2, `gpu_consts::nuke_look::PROGENITOR`), drawn as Fission until the Progenitor's own is made.
+A launcher with a `growth` block (`mc_data::growth`) grows by its level: a silo's
+`warhead_stock`, `warhead_round`, `blast_radius` and `blast_damage`, an array's
+`interceptor_*`; a warhead carries the blast its silo's level gave it
+(`StrategicMissile::blast`, `WarheadTrack::blast`, which the marks draw).
+
 - **The blast** (`shaders/nova.wgsl`; the same volume as an ARC blast, its own shapes over
   time in `nova_radius`, which `nuke_fx::Blast` mirrors). Not a mushroom: it
   has no stem and no cap. A white-hot star with a rose limb in granulation cells for its

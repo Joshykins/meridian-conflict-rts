@@ -428,7 +428,7 @@ invulnerable unit, and the mirror marks it `SHIELD_VEIL` so it is drawn apart fr
   facility toward the defenders), and the Shaper sites (`node_sites`: where the Shaper stands, its domain, the
   way its base faces, its `kind` (`SiteKind`: Printer, or the auxiliary Artillery and Nuke), the `room` (m) of level
   clear ground its base grows into (default 450 for a printer, 350 for an auxiliary site) and the `path` its
-  formations take toward the defenders; aircraft fly straight). The ray raises Printer sites only so far.
+  formations take toward the defenders; aircraft fly straight). Auxiliary sites are Land and need no path.
   `maps/last_harvest` ("The Last Harvest", `mc-bake --layout harvest --size-km 24 --seed 41`,
   `crates/mc-map/src/bake/harvest.rs`) is the survival map for four defenders, made for the Shaper sites: the
   defenders' starts at the south of an autumn heartland by the south sea, a river and its fords north of them, a
@@ -511,6 +511,29 @@ invulnerable unit, and the mirror marks it `SHIELD_VEIL` so it is drawn apart fr
   platforms (ships on the sea gate's slips or a naval site's; aircraft anywhere), smallest fit first: one printed on a
   platform musters at its site's first path point and goes with the round down the site's path. A round has a naval
   share only while ships have somewhere to print (a sea front with naval bays, or a naval Shaper's slip).
+- **Auxiliary Shapers** (`survival/artillery.rs`, `survival/warheads.rs`). The ray raises them on the Artillery
+  and Nuke sites like any Shaper (from round `aux_first_round`: 3 and 6), with every Shaper's defences, levelling,
+  catch-up and reseeding; they print nothing on the ground. Kit (`base::Kit`): the `progenitor_seedcaster` and the
+  `progenitor_unmaker` (placeholder meshes). A **Seedcaster** takes on products like a land printer and, on a beat
+  that quickens with its level (`volley_ticks`: 75 s at level 1, 50 s at 10, 37 s at 20, never under 20 s), fires
+  `shells_per_volley` (1, one more every sixth level) **replication shells** from its crown, each at a mark 40-120 m
+  off a defender structure (six in ten) or a unit on the ground, on land a squad can stand on, its own dice
+  (`Shells::rng`). A shell is no projectile: nothing intercepts it (no flak, missile defence or anti-nuke); its arc
+  (`shell_at`, a parabola `apex` = 3/10 of the distance, at least 1200 m, over the line from crown to mark) flies
+  10-20 s (`shell_flight_ticks`: 10 s and one more each 2 km). Landing, it bursts (`shell_blast`: 40 m and 600 at
+  level 1, +2 m a level to 100 m, +10% damage a level; `crush_area`, shields first, aircraft spared) and prints
+  its squad on the spot (`shell_squad`: 3 light and one more every other level, +1 at T1; from level 8 with a
+  heavy product one heavy, one more every sixth level) as construction sites in the replication violet,
+  finished in 6 s (`Spot::Landing`, no beam), which then attack-move at the defenders. A volley the field cap
+  cannot take (hostiles + squads in the air + this squad over `FIELD_CAP`) is held, retried in 5 s, and
+  `SurvivalStatus::held` and the card say so. An **Unmaker** raises `progenitor_silo`s behind itself
+  (`PieceKind::Silo`, `shaper_silos`: one, one more every eighth level), each a nuclear launcher (`nukes.rs`,
+  free for the engine's side) that grows with its Unmaker's level by its `growth` block (stock, round time, blast
+  radius and damage) and looks `StrategicLook::Progenitor`; every `launch_gap_ticks` (30 s at level 1, quicker
+  with level, at least 6 s) the Unmaker gives a silo holding a warhead the densest knot of defender structures
+  (else units on the ground) no warhead of its is bound for. The defenders' anti-nukes stop them as any. Events:
+  `ReplicationShellFired`, `ReplicationShellLanded`; `NodeRaising`/`NodeOnline` carry the site `kind` and the
+  Shaper's blueprint, `product` is an `Option` (None for an Unmaker).
 - **Defences and growth.** Every Shaper has a large shield, a **Lance** and an anti-nuke, all growing with its
   level. A level's worth is data: the `replication_node` blueprint's `growth` block (`mc_data::growth`), where each
   named stat (health, shield radius/health/regen, Lance damage/splash/range/charge/reload, interceptor
@@ -536,15 +559,26 @@ invulnerable unit, and the mirror marks it `SHIELD_VEIL` so it is drawn apart fr
   pieces too. `World::shaper_card(unit)` is the selection card: site, kind, domain, level, tier, the round's catch-up
   level, height and full height, products and formation size, its base (`pieces`), its shield (radius, hit points,
   charge, regen, pylon feed), Lance (charge and reload seconds, strikes a minute, damage, DPS, splash, range, charge
-  now) and anti-nuke (stock, capacity, coverage, seconds a round). `SurvivalStatus::nodes` carries each Shaper's
-  `unit`, site `kind` and `tier` beside the old figures.
+  now) and anti-nuke (stock, capacity, coverage, seconds a round), and for an auxiliary Shaper `artillery`
+  (`ArtilleryCard`: interval and time to the next volley, shells a volley, squad light/heavy and tech, burst,
+  shells in the air, held) or `warheads` (`WarheadCard`: silos standing and wanted, stock and capacity, seconds a
+  round, launch gap and time to the next, blast reach, core and damage, warheads in the air).
+  `ShaperInstance::fire_charge` is 0..1 through an auxiliary's beat. `RenderFrame::shells` lists every
+  replication shell in the air for every side (`ShellInstance`: from, to, apex, pos/prev_pos, age, flight, eta,
+  burst radius and damage, units, tech, level; `ShellInstance::at(t)` is the sim's arc). `SurvivalStatus::nodes`
+  carries each Shaper's `unit`, site `kind` and `tier` beside the old figures; `SurvivalStatus::engine_player`
+  names the Progenitor's side.
 - **Interface.** `SimStatus::survival` (`World::survival_status`) feeds the HUD's survival card under the minimap
   (`hud/survival.rs`, `SurvivalHud`: round, what the engine is doing, the tier chip, what is coming per domain, the
   heavy wave squad by squad or when the next tier comes, the field cap when it holds, reclaim income) and one Shaper
   row per cradle and domain (level, kinds, click to look); a new tier puts a banner across the screen and makes the
   chip pulse. The minimap draws the fronts, the engine and the nodes; toasts and stingers
-  (`data/sounds/survival.ron`) announce rounds, tiers, heavy waves, nodes and the Shaper levels that bring a new kind;
-  the ray and print beams are loops.
+  (`data/sounds/survival.ron`) announce rounds, tiers, heavy waves, nodes and the Shaper levels that bring a new kind,
+  a Seedcaster volley (placeholder sound `survival_launch`) and a Progenitor warhead (toast only: the nuke alarm
+  plays for every launch); the ray and print beams are loops. Every replication shell's mark, burst, squad ring,
+  arc and countdown are drawn in the world and on the minimap for everyone (`replication_marks.rs`); the
+  Progenitor's warheads show their marks and real blast to the defenders (`nuke_marks::progenitor`), unlike any
+  other enemy's.
 - **Headless.** `--scene survival --map maps/last_harvest.mcmap [--observe] --bench N` prints rounds and node events and a
   line a minute (`MERIDIAN_SURVIVAL=rounds:grace:interval:intensity:fronts:tier:nodes`,
   `MERIDIAN_SURVIVAL_SPAWN=i`, `MERIDIAN_SURVIVAL_WHY=1` lists where the hostiles are). Tests: `mc-sim/tests/survival.rs`.

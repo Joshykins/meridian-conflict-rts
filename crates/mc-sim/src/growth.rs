@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 
 use mc_core::{Fx, StateHasher};
 use mc_data::lance::Lance;
-use mc_data::strategic::Strategic;
+use mc_data::strategic::{NuclearBlast, Strategic, StrategicKind};
 use mc_data::Shield;
 use serde::{Deserialize, Serialize};
 
@@ -52,6 +52,8 @@ pub struct GrownStats {
     pub lance: Option<Lance>,
     /// Interceptors held at most, the coverage, and one round's build time (`Strategic`).
     pub interceptors: Option<(u8, Fx, Fx)>,
+    /// A silo's: warheads held at most, one round's build time, and the blast.
+    pub warheads: Option<(u8, Fx, NuclearBlast)>,
 }
 
 impl World {
@@ -144,7 +146,7 @@ impl World {
     }
 
     /// The unit's strategic launcher at its level: an interceptor array's stock,
-    /// coverage and round time grow.
+    /// coverage and round time grow; a silo's stock, round time and blast.
     pub(crate) fn launcher_spec(&self, row: usize) -> Option<Cow<'_, Strategic>> {
         let bp = self.bp(row);
         let base = bp.strategic.as_ref()?;
@@ -155,15 +157,31 @@ impl World {
         if level == 1 {
             return Some(Cow::Borrowed(base));
         }
-        let stock = g
-            .interceptor_stock
+        let (stock, round) = match base.kind {
+            StrategicKind::Interceptor => (g.interceptor_stock, g.interceptor_round),
+            StrategicKind::Nuke => (g.warhead_stock, g.warhead_round),
+        };
+        let stock = stock
             .at(Fx::from_int(base.stock as i32), level)
             .floor_int()
             .clamp(1, u8::MAX as i32) as u8;
+        let blast = base.blast.map(|b| {
+            let radius = g.blast_radius.at(b.radius, level).max(Fx::ONE);
+            let damage = g.blast_damage.at(b.damage, level);
+            NuclearBlast {
+                radius,
+                // The core and the edge keep their share of the radius and the damage.
+                core: b.core * radius / b.radius.max(Fx::ONE),
+                edge: b.edge * damage / b.damage.max(Fx::ONE),
+                damage,
+                ..b
+            }
+        });
         Some(Cow::Owned(Strategic {
             stock,
             coverage: g.interceptor_coverage.at(base.coverage, level),
-            round_time: g.interceptor_round.at(base.round_time, level).max(Fx::ONE),
+            round_time: round.at(base.round_time, level).max(Fx::ONE),
+            blast,
             ..base.clone()
         }))
     }
@@ -177,8 +195,12 @@ impl World {
             lance: self.lance_spec(row),
             interceptors: self
                 .launcher_spec(row)
-                .filter(|s| s.kind == mc_data::strategic::StrategicKind::Interceptor)
+                .filter(|s| s.kind == StrategicKind::Interceptor)
                 .map(|s| (s.stock, s.coverage, s.round_time)),
+            warheads: self
+                .launcher_spec(row)
+                .filter(|s| s.kind == StrategicKind::Nuke)
+                .and_then(|s| Some((s.stock, s.round_time, s.blast?))),
         }
     }
 

@@ -13,7 +13,7 @@
 
 use super::HZ;
 use mc_core::Fx;
-use mc_data::survival::Domain;
+use mc_data::survival::{Domain, SiteKind};
 use serde::{Deserialize, Serialize};
 
 /// What the player chooses on the survival set-up screen.
@@ -290,4 +290,80 @@ pub(super) fn shaper_gains_product(level: u16) -> bool {
 /// Whether a Shaper reaching `level` takes on a heavy product (8, then every four levels).
 pub(super) fn shaper_gains_heavy(level: u16) -> bool {
     level >= 8 && (level - 8).is_multiple_of(4)
+}
+
+/// The first round the ray may raise a Shaper on a site of `kind`: printers from the
+/// first, the auxiliary Seedcasters (artillery) from the third and Unmakers (nukes)
+/// from the sixth, so the defenders have a base to lose before the shells come.
+pub fn aux_first_round(kind: SiteKind) -> u16 {
+    match kind {
+        SiteKind::Printer => 1,
+        SiteKind::Artillery => 3,
+        SiteKind::Nuke => 6,
+    }
+}
+
+/// Shells a Seedcaster of `level` fires in one volley: one, and one more every sixth level.
+pub fn shells_per_volley(level: u16) -> usize {
+    1 + level.max(1) as usize / 6
+}
+
+/// Ticks between a Seedcaster's volleys: 75 s at level 1, quicker as it levels (50 s at
+/// 10, 37 s at 20), never under 20 s.
+pub fn volley_ticks(level: u16) -> u32 {
+    (75 * HZ * 20 / (20 + level.min(1000) as u32)).max(20 * HZ)
+}
+
+/// The units one replication shell prints where it lands: light units (T1-T3), then
+/// heavies. Three light units and one more every other level (one more again when they
+/// are T1); from level 8, with a heavy product, one heavy and one more every sixth level.
+pub fn shell_squad(level: u16, light_tech: u8, has_heavy: bool) -> (usize, usize) {
+    let light = 3 + level as usize / 2 + (light_tech <= 1) as usize;
+    let heavy = if has_heavy && level >= 8 {
+        1 + (level as usize - 8) / 6
+    } else {
+        0
+    };
+    (light, heavy)
+}
+
+/// A replication shell's burst where it lands: (radius in metres, damage over it). A
+/// modest blast, the squad it prints is the threat: 40 m and 600 at level 1, two metres
+/// more a level up to 100 m, and a tenth more damage a level.
+pub fn shell_blast(level: u16) -> (Fx, Fx) {
+    let steps = level.max(1) - 1;
+    let radius = Fx::from_int(40 + 2 * steps.min(30) as i32);
+    let mut damage = Fx::from_int(600);
+    // A bound on the compounding (1.1^200 is past any hull), not on the level.
+    for _ in 0..steps.min(200) {
+        damage = (damage * Fx::ratio(11, 10)).min(Fx::from_int(1_000_000));
+    }
+    (radius, damage)
+}
+
+/// Ticks a replication shell flies `distance` metres: ten seconds, and a second more
+/// every 2 km, up to twenty.
+pub fn shell_flight_ticks(distance: Fx) -> u32 {
+    let km2 = distance.round_int().max(0) as u32 / 200;
+    (10 * HZ + km2).clamp(10 * HZ, 20 * HZ)
+}
+
+/// Metres a replication shell's arc tops out over the line from its Shaper's crown to its
+/// mark: three tenths of the distance, no less than 1200.
+pub fn shell_apex(distance: Fx) -> Fx {
+    (distance * Fx::ratio(3, 10)).max(Fx::from_int(1200))
+}
+
+/// Ticks a squad takes to print where its shell landed: quick, it comes out of the burst.
+pub(super) const SQUAD_PRINT_TICKS: u32 = 6 * HZ;
+
+/// Silos an Unmaker of `level` raises behind itself: one, and one more every eighth level.
+pub fn shaper_silos(level: u16) -> usize {
+    1 + level.max(1).saturating_sub(1) as usize / 8
+}
+
+/// Ticks between two warheads out of one Unmaker's silos: 30 s at level 1, quicker as it
+/// levels, never under 6 s. Its silos' stock and round time grow by their `growth` block.
+pub fn launch_gap_ticks(level: u16) -> u32 {
+    (30 * HZ * 20 / (20 + level.min(1000) as u32)).max(6 * HZ)
 }

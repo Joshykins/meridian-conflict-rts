@@ -32,6 +32,7 @@
 //! carried beside `MatchConfig` in the match options) and the tick: a replay
 //! plays it out the same.
 
+mod artillery;
 mod base;
 mod card;
 mod plan;
@@ -39,20 +40,27 @@ mod print;
 mod rules;
 mod shapers;
 mod view;
+mod warheads;
 
 pub use crate::mirror::NodeStatus;
 use crate::mirror::SimEvent;
 use crate::tables::NO_ORDER;
 use crate::{SimError, UnitId};
+pub use artillery::{shell_at, ShellInstance};
 pub use base::Kit;
-pub use card::{AntiNukeCard, LanceCard, PieceView, ShaperCard, ShaperInstance, ShieldCard};
+pub use card::{
+    AntiNukeCard, ArtilleryCard, LanceCard, PieceView, ShaperCard, ShaperInstance, ShieldCard,
+    WarheadCard,
+};
 use mc_core::{Angle, Fx, FxVec2, FxVec3, Rng, StateHasher};
 use mc_data::survival::{Domain, SiteKind};
 use mc_data::{BlueprintId, MoveLayer};
 use plan::Formation;
 use print::Route;
 pub use rules::{
-    shaper_height, shaper_platforms, shaper_pylons, shaper_tier, HeavyWave, SurvivalRules,
+    aux_first_round, launch_gap_ticks, shaper_height, shaper_platforms, shaper_pylons,
+    shaper_silos, shaper_tier, shell_apex, shell_blast, shell_flight_ticks, shell_squad,
+    shells_per_volley, volley_ticks, HeavyWave, SurvivalRules,
 };
 use serde::{Deserialize, Serialize};
 
@@ -161,6 +169,8 @@ enum Spot {
     Bay(u8),
     /// A Shaper's print platform (the platform's unit).
     Pad(UnitId),
+    /// Where a replication shell landed (`artillery.rs`): its squad prints round `at`.
+    Landing { at: FxVec2, heading: Angle },
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -198,6 +208,8 @@ pub enum PieceKind {
     GreatPlatform = 1,
     /// A pylon at the sides or behind that feeds the Shaper's shield.
     Pylon = 2,
+    /// An Unmaker's silo behind it, where its warheads are assembled and launched.
+    Silo = 3,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -239,6 +251,10 @@ struct Node {
     pieces: Vec<Piece>,
     /// Tick it may start its next piece.
     next_piece_at: u32,
+    /// An auxiliary Shaper's next volley (a Seedcaster) or launch (an Unmaker).
+    next_fire: u32,
+    /// Its last volley was held back by the field cap (`FIELD_CAP`).
+    held: bool,
 }
 
 /// Survival's part of the game state.
@@ -262,6 +278,8 @@ pub struct Survival {
     reseed_from: Vec<u16>,
     /// What a Shaper's base is made of.
     kit: base::Kit,
+    /// Replication shells in the air (`artillery.rs`).
+    shells: artillery::Shells,
     rng: Rng,
     pub nodes_destroyed: u16,
     /// The last formation number handed out.
@@ -313,12 +331,20 @@ pub struct SurvivalStatus {
     pub shapers_next: u8,
     /// Materials per second the defender takes in from wrecks now.
     pub reclaim: f32,
+    /// The facility's side: its warheads' marks are shown to the defenders.
+    pub engine_player: u8,
 }
 
 fn spot_bits(s: Spot) -> u64 {
     match s {
         Spot::Bay(b) => b as u64,
         Spot::Pad(u) => 1 << 40 | u.0 as u64,
+        Spot::Landing { at, heading } => {
+            2 << 40
+                ^ (at.x.raw() as u32 as u64) << 8
+                ^ (at.y.raw() as u32 as u64).rotate_left(29)
+                ^ heading.0 as u64
+        }
     }
 }
 
@@ -384,6 +410,7 @@ impl Survival {
             h.write_i64(n.height.0);
             h.write_u64(n.next_level_at as u64);
             h.write_u64(n.next_piece_at as u64 | (n.pieces.len() as u64) << 32);
+            h.write_u64(n.next_fire as u64 | (n.held as u64) << 32);
             for p in &n.pieces {
                 h.write_u64(
                     p.unit.0 as u64
@@ -397,6 +424,25 @@ impl Survival {
                 h.write_u64(b.0 as u64);
             }
         }
+        self.shells.hash(h);
+    }
+
+    /// What site `site` is for (a printer when there is no such site).
+    fn site_kind(&self, site: u8) -> SiteKind {
+        self.config
+            .node_sites
+            .get(site as usize)
+            .map_or(SiteKind::Printer, |s| s.kind)
+    }
+
+    /// Every blueprint id the survival state holds, for `State::validate_ids`.
+    pub(crate) fn blueprint_ids(&self) -> Vec<BlueprintId> {
+        let mut ids: Vec<BlueprintId> = self.kit.blueprints().collect();
+        ids.extend(self.queue.iter().flat_map(|f| f.units.iter().copied()));
+        ids.extend(self.nodes.iter().flat_map(|n| n.products.iter().copied()));
+        ids.extend(self.incoming_heavy.iter().map(|h| h.0));
+        ids.extend(self.shells.blueprints());
+        ids
     }
 }
 
@@ -409,11 +455,8 @@ impl crate::World {
         if side as usize >= self.state.players.len() {
             return Err(SimError::Setup("survival: no such engine side".into()));
         }
-        if self.blueprints.id_of("replication_node").is_none() {
-            return Err(SimError::Setup(
-                "survival needs blueprint replication_node".into(),
-            ));
-        }
+        // Every Shaper and piece of a base it raises, before anything is changed.
+        let kit = Kit::load(self.blueprints.as_ref())?;
         if !config.bays.iter().any(|b| b.domain == Domain::Land) {
             return Err(SimError::Setup(
                 "survival: the facility has no land print bays".into(),
@@ -442,7 +485,6 @@ impl crate::World {
         }
 
         let first = config.rules.grace_secs as u32 * HZ;
-        let kit = Kit::load(self.blueprints.as_ref())?;
         let seed = self.state.rng.state() ^ 0x5EED_5A1A;
         let sites = config.node_sites.len();
         self.state.survival = Some(Survival {
@@ -456,6 +498,7 @@ impl crate::World {
             waves: Vec::new(),
             reseed_from: vec![0; sites],
             kit,
+            shells: artillery::Shells::new(seed ^ 0xA87_111E),
             nodes: Vec::new(),
             rng: Rng::new(seed),
             nodes_destroyed: 0,
@@ -518,6 +561,8 @@ impl crate::World {
         self.survival_grow(now);
         self.survival_base(now)?;
         self.survival_node_prints(now)?;
+        self.survival_artillery(now)?;
+        self.survival_warheads(now)?;
 
         let s = self.state.survival.as_ref().unwrap();
         let rules = s.config.rules;

@@ -743,6 +743,7 @@ mod tests {
         use mc_data::strategic::StrategicLook;
         assert_eq!(nuke_look::FISSION, StrategicLook::Fission as u32);
         assert_eq!(nuke_look::PLASMA, StrategicLook::Plasma as u32);
+        assert_eq!(nuke_look::PROGENITOR, StrategicLook::Progenitor as u32);
     }
 
     #[test]

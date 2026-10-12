@@ -91,6 +91,8 @@ impl crate::World {
                     let head = FxVec2::new(bay.emitter.x, bay.emitter.y);
                     head.extend(ground(bay.at) + bay.emitter.z)
                 }
+                // A shell's squad prints out of its burst, with no beam.
+                Spot::Landing { .. } => continue,
             };
             if !seen(at) && !seen(from.xy()) {
                 continue;
@@ -98,7 +100,7 @@ impl crate::World {
             // A great bay's projector works with one either side of it, across the bay.
             let great = match p.spot {
                 Spot::Bay(b) => s.config.bays.get(b as usize).filter(|b| b.great()),
-                Spot::Pad(_) => None,
+                Spot::Pad(_) | Spot::Landing { .. } => None,
             };
             if let Some(bay) = great {
                 let bp = self.bp(row);
@@ -283,8 +285,9 @@ impl crate::World {
                 .filter(|u| st.units.row(**u).is_some())
                 .count() as u32,
             hostile: hostile as u32,
-            held: hostile >= super::FIELD_CAP
-                && (!s.queue.is_empty() || s.nodes.iter().any(|n| n.raised)),
+            held: (hostile >= super::FIELD_CAP
+                && (!s.queue.is_empty() || s.nodes.iter().any(|n| n.raised)))
+                || s.nodes.iter().any(|n| n.held),
             engine: s.config.engine.to_f32(),
             activity: self.survival_activity(),
             nodes,
@@ -302,6 +305,7 @@ impl crate::World {
                 .filter(|(p, _)| *p as u8 != side)
                 .map(|(_, pl)| pl.reclaim_income.to_f32())
                 .sum(),
+            engine_player: side,
         })
     }
 }

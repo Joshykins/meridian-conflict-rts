@@ -90,6 +90,11 @@ impl State {
             .or_else(|| {
                 let owners: Vec<_> = self.surges.iter().map(|w| w.owner).collect();
                 bad_owner("surges", &owners)
+            })
+            .or_else(|| {
+                let s = self.survival.as_ref()?;
+                bad_bp("survival", &s.blueprint_ids())
+                    .or_else(|| bad_owner("survival", &[s.config.engine_player]))
             });
         problem.map_or(Ok(()), Err)
     }

@@ -15,6 +15,13 @@
 //!     lance_reload: (percent: -4, least: 1.5),
 //! ),
 //! ```
+//!
+//! A nuclear silo's growth names `warhead_stock`, `warhead_round`, `blast_radius` and
+//! `blast_damage` (an interceptor's `interceptor_*`):
+//!
+//! ```ron
+//! growth: (warhead_stock: (per_level: 0.25), blast_radius: (per_level: 15, most: 900)),
+//! ```
 
 use mc_core::{Fx, StateHasher};
 use serde::Deserialize;
@@ -128,6 +135,14 @@ pub struct RawGrowth {
     pub interceptor_coverage: RawGrow,
     /// Build-time units of one interceptor.
     pub interceptor_round: RawGrow,
+    /// Warheads a silo holds; the figure is rounded down.
+    pub warhead_stock: RawGrow,
+    /// Build-time units of one warhead.
+    pub warhead_round: RawGrow,
+    /// Metres a warhead's blast reaches; its core grows with it.
+    pub blast_radius: RawGrow,
+    /// Damage in a warhead's core; the damage at its edge grows with it.
+    pub blast_damage: RawGrow,
 }
 
 /// What grows with a unit's level (`UnitBlueprint::growth`).
@@ -147,6 +162,10 @@ pub struct Growth {
     pub interceptor_stock: Grow,
     pub interceptor_coverage: Grow,
     pub interceptor_round: Grow,
+    pub warhead_stock: Grow,
+    pub warhead_round: Grow,
+    pub blast_radius: Grow,
+    pub blast_damage: Grow,
 }
 
 /// Which of a blueprint's blocks a growth block may name.
@@ -154,6 +173,8 @@ pub(crate) struct Has {
     pub shield: bool,
     pub lance: bool,
     pub interceptor: bool,
+    /// A nuclear silo (`strategic` of kind Nuke).
+    pub warhead: bool,
 }
 
 impl RawGrowth {
@@ -177,6 +198,10 @@ impl RawGrowth {
             interceptor_stock: self.interceptor_stock.compile(1.0),
             interceptor_coverage: self.interceptor_coverage.compile(1.0),
             interceptor_round: self.interceptor_round.compile(1.0),
+            warhead_stock: self.warhead_stock.compile(1.0),
+            warhead_round: self.warhead_round.compile(1.0),
+            blast_radius: self.blast_radius.compile(1.0),
+            blast_damage: self.blast_damage.compile(1.0),
         };
         let shield = [g.shield_radius, g.shield_health, g.shield_regen];
         let lance = [
@@ -191,6 +216,12 @@ impl RawGrowth {
             g.interceptor_coverage,
             g.interceptor_round,
         ];
+        let warhead = [
+            g.warhead_stock,
+            g.warhead_round,
+            g.blast_radius,
+            g.blast_damage,
+        ];
         let bad = |what: &str| {
             Err(DataError::Invalid(format!(
                 "{key}: growth names {what} stats but the unit has no {what}"
@@ -204,6 +235,9 @@ impl RawGrowth {
         }
         if !has.interceptor && interceptor.iter().any(Grow::grows) {
             return bad("interceptor");
+        }
+        if !has.warhead && warhead.iter().any(Grow::grows) {
+            return bad("warhead");
         }
         Ok(g)
     }
@@ -224,6 +258,10 @@ impl Growth {
             self.interceptor_stock,
             self.interceptor_coverage,
             self.interceptor_round,
+            self.warhead_stock,
+            self.warhead_round,
+            self.blast_radius,
+            self.blast_damage,
         ] {
             g.hash(h);
         }

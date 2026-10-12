@@ -4,7 +4,10 @@
 //! its base, and its shield, Lance and anti-nuke at its level. Presentation
 //! only: nothing here writes back.
 
-use super::rules::{pylon_feed, shaper_batch, shaper_height, shaper_tier};
+use super::rules::{
+    launch_gap_ticks, pylon_feed, shaper_batch, shaper_height, shaper_silos, shaper_tier,
+    shell_blast, shells_per_volley, volley_ticks,
+};
 use super::{Node, PieceKind, RAISE_TICKS};
 use crate::{Handle, UnitId};
 use mc_data::survival::{Domain, SiteKind};
@@ -36,6 +39,9 @@ pub struct ShaperInstance {
     pub lance_target: [f32; 3],
     /// The shield's visual tier, by the Shaper's level.
     pub shield_tier: u8,
+    /// An auxiliary Shaper: 0..1 through the beat to its next volley (a Seedcaster) or
+    /// launch (an Unmaker), for a charge-up look; 0 for a printer.
+    pub fire_charge: f32,
 }
 
 /// A piece of a Shaper's base, for the card and the interface.
@@ -92,6 +98,49 @@ pub struct AntiNukeCard {
     pub round_secs: f32,
 }
 
+/// A Seedcaster's replication artillery at its level (`artillery.rs`).
+#[derive(Clone, Debug)]
+#[expect(clippy::disallowed_types, reason = "presentation: the selection card")]
+pub struct ArtilleryCard {
+    /// Seconds between volleys, and until the next.
+    pub interval_secs: f32,
+    pub next_in_secs: f32,
+    pub shells_per_volley: u16,
+    /// Units one shell prints where it lands: light (T1-T3), heavies; and their highest tech.
+    pub squad: (u16, u16),
+    pub squad_tech: u8,
+    /// Its burst where it lands: reach (m) and damage.
+    pub blast_radius: f32,
+    pub blast_damage: f32,
+    /// Its shells in the air now.
+    pub in_flight: u16,
+    /// Its last volley was held back by the field cap: the field is full.
+    pub held: bool,
+}
+
+/// An Unmaker's warheads at its level (`warheads.rs`): all its silos together.
+#[derive(Clone, Debug)]
+#[expect(clippy::disallowed_types, reason = "presentation: the selection card")]
+pub struct WarheadCard {
+    /// Silos standing (raised), and how many its level calls for.
+    pub silos: u8,
+    pub silos_wanted: u8,
+    /// Warheads ready across its silos, and the most they hold.
+    pub stock: u16,
+    pub capacity: u16,
+    /// Seconds one silo takes to assemble a warhead.
+    pub round_secs: f32,
+    /// Seconds between two of its launches, and until it may launch again.
+    pub gap_secs: f32,
+    pub next_in_secs: f32,
+    /// The blast: reach and core (m), and damage in the core.
+    pub blast_radius: f32,
+    pub blast_core: f32,
+    pub blast_damage: f32,
+    /// Its warheads in the air now.
+    pub in_flight: u16,
+}
+
 /// Everything a Shaper's selection card shows (`World::shaper_card`).
 #[derive(Clone, Debug)]
 #[expect(clippy::disallowed_types, reason = "presentation: the selection card")]
@@ -121,6 +170,10 @@ pub struct ShaperCard {
     pub shield: Option<ShieldCard>,
     pub lance: Option<LanceCard>,
     pub anti_nuke: Option<AntiNukeCard>,
+    /// A Seedcaster's artillery; None for any other Shaper.
+    pub artillery: Option<ArtilleryCard>,
+    /// An Unmaker's warheads; None for any other Shaper.
+    pub warheads: Option<WarheadCard>,
 }
 
 /// 0..1 through the growth step a Shaper `height` metres tall is building at
@@ -202,6 +255,7 @@ impl crate::World {
                 lance_charge: charge,
                 lance_target: target,
                 shield_tier: tier,
+                fire_charge: self.fire_charge(n, kind),
             });
         }
     }
@@ -302,6 +356,129 @@ impl crate::World {
             shield,
             lance,
             anti_nuke,
+            artillery: (site.map(|s| s.kind) == Some(SiteKind::Artillery))
+                .then(|| self.artillery_card(n)),
+            warheads: (site.map(|s| s.kind) == Some(SiteKind::Nuke)).then(|| self.warhead_card(n)),
         })
+    }
+
+    /// 0..1 through an auxiliary Shaper's beat to its next volley or launch.
+    #[expect(
+        clippy::float_arithmetic,
+        clippy::disallowed_types,
+        reason = "presentation: ShaperInstance::fire_charge"
+    )]
+    fn fire_charge(&self, n: &Node, kind: SiteKind) -> f32 {
+        let beat = match kind {
+            SiteKind::Printer => return 0.0,
+            SiteKind::Artillery => volley_ticks(n.level),
+            SiteKind::Nuke => launch_gap_ticks(n.level),
+        };
+        if !n.raised {
+            return 0.0;
+        }
+        let left = n.next_fire.saturating_sub(self.state.tick).min(beat);
+        1.0 - left as f32 / beat.max(1) as f32
+    }
+
+    #[expect(
+        clippy::float_arithmetic,
+        clippy::disallowed_types,
+        clippy::disallowed_methods,
+        reason = "presentation: the Seedcaster's selection card"
+    )]
+    fn artillery_card(&self, n: &Node) -> ArtilleryCard {
+        let s = self.state.survival.as_ref().unwrap();
+        let tps = mc_core::TICKS_PER_SECOND as f32;
+        let i = s.nodes.iter().position(|m| m.unit == n.unit).unwrap_or(0);
+        let squad = self.shell_squad_of(i);
+        let bps = self.blueprints.as_ref();
+        let heavy = squad.iter().filter(|b| bps.unit(**b).tech >= 4).count();
+        let (radius, damage) = shell_blast(n.level);
+        let in_flight = s
+            .shells
+            .flying
+            .iter()
+            .filter(|sh| sh.source == n.unit)
+            .count();
+        ArtilleryCard {
+            interval_secs: volley_ticks(n.level) as f32 / tps,
+            next_in_secs: n.next_fire.saturating_sub(self.state.tick) as f32 / tps,
+            shells_per_volley: shells_per_volley(n.level).min(u16::MAX as usize) as u16,
+            squad: (
+                (squad.len() - heavy).min(u16::MAX as usize) as u16,
+                heavy.min(u16::MAX as usize) as u16,
+            ),
+            squad_tech: squad.iter().map(|b| bps.unit(*b).tech).max().unwrap_or(1),
+            blast_radius: radius.to_f32(),
+            blast_damage: damage.to_f32(),
+            in_flight: in_flight.min(u16::MAX as usize) as u16,
+            held: n.held,
+        }
+    }
+
+    #[expect(
+        clippy::float_arithmetic,
+        clippy::disallowed_types,
+        clippy::disallowed_methods,
+        reason = "presentation: the Unmaker's selection card"
+    )]
+    fn warhead_card(&self, n: &Node) -> WarheadCard {
+        let tps = mc_core::TICKS_PER_SECOND as f32;
+        let silos: Vec<UnitId> = n
+            .pieces
+            .iter()
+            .filter(|p| p.kind == PieceKind::Silo && p.raised)
+            .map(|p| p.unit)
+            .collect();
+        let (mut stock, mut capacity) = (0u16, 0u16);
+        let mut spec = None;
+        for id in &silos {
+            let Some(row) = self.state.units.row(*id) else {
+                continue;
+            };
+            let held = self
+                .state
+                .strategic
+                .launchers
+                .get(id)
+                .map_or(0, |l| l.stock);
+            stock = stock.saturating_add(held as u16);
+            if let Some(s) = self.launcher_spec(row) {
+                capacity = capacity.saturating_add(s.stock as u16);
+                spec = Some(s.into_owned());
+            }
+        }
+        // With no silo standing yet, what one raised at its level would be.
+        let spec = spec.or_else(|| {
+            let s = self.state.survival.as_ref()?;
+            self.blueprints.unit(s.kit.silo).strategic.clone()
+        });
+        let blast = spec.as_ref().and_then(|s| s.blast);
+        let owner = self.state.survival.as_ref().map(|s| s.config.engine_player);
+        let in_flight = self
+            .state
+            .strategic
+            .missiles
+            .iter()
+            .filter(|m| {
+                m.kind == crate::nukes::MissileKind::Warhead
+                    && silos.contains(&m.source)
+                    && Some(m.owner) == owner
+            })
+            .count();
+        WarheadCard {
+            silos: silos.len().min(u8::MAX as usize) as u8,
+            silos_wanted: shaper_silos(n.level).min(u8::MAX as usize) as u8,
+            stock,
+            capacity,
+            round_secs: spec.as_ref().map_or(0.0, |s| s.round_seconds()),
+            gap_secs: launch_gap_ticks(n.level) as f32 / tps,
+            next_in_secs: n.next_fire.saturating_sub(self.state.tick) as f32 / tps,
+            blast_radius: blast.map_or(0.0, |b| b.radius.to_f32()),
+            blast_core: blast.map_or(0.0, |b| b.core.to_f32()),
+            blast_damage: blast.map_or(0.0, |b| b.damage.to_f32()),
+            in_flight: in_flight.min(u16::MAX as usize) as u16,
+        }
     }
 }

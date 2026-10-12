@@ -290,7 +290,9 @@ pub fn draw(
     let t = ui.time;
     let local = view.local;
     let team = |p: u8| view.status.players.get(p as usize).map(|pl| pl.team);
-    let enemy = |p: u8| !view.observing && team(p) != team(local);
+    // Survival's Progenitor hides nothing: its warheads' marks are shown to the defenders
+    // like their own, so they can get out from under them.
+    let enemy = |p: u8| !view.observing && team(p) != team(local) && !progenitor(view, p);
 
     // ---- warheads and interceptors in flight -------------------------------------------
     for m in &view.frame.strategic {
@@ -341,7 +343,15 @@ pub fn draw(
                 );
                 flight(ui, field, &points, 1.5, WARHEAD, 0.6);
             }
-            // The blast's rings where it will land, pulsing faster as it comes.
+            // The blast's rings where it will land, pulsing faster as it comes: the
+            // warhead's own blast (a grown silo's is bigger), else the standard one.
+            let (reach, core) = view
+                .frame
+                .warhead_tracks
+                .iter()
+                .find(|w| w.serial == m.serial)
+                .and_then(|w| w.blast)
+                .map_or(WARHEAD_BLAST, |b| (b.radius.to_f32(), b.core.to_f32()));
             let urgency = (1.0 - m.eta / 40.0).clamp(0.0, 1.0);
             let pulse = 0.5 + 0.5 * (t * (2.0 + 8.0 * urgency)).sin();
             let c = mark.truncate();
@@ -349,7 +359,7 @@ pub fn draw(
                 ui,
                 field,
                 c,
-                WARHEAD_BLAST.0,
+                reach,
                 2.0,
                 rgb(WARHEAD, 0.45 + 0.4 * pulse),
                 true,
@@ -359,7 +369,7 @@ pub fn draw(
                 ui,
                 field,
                 c,
-                WARHEAD_BLAST.1,
+                core,
                 1.6,
                 rgb(WARHEAD, 0.35 + 0.3 * pulse),
                 false,
@@ -373,6 +383,8 @@ pub fn draw(
                 }
                 let who = if owner_of_missile(m.owner) == local {
                     "Our warhead"
+                } else if progenitor(view, m.owner as u8) {
+                    "Progenitor warhead"
                 } else {
                     "Warhead"
                 };
@@ -580,6 +592,14 @@ pub fn draw(
             );
         }
     }
+}
+
+/// Whether `player` is survival's Progenitor, whose warheads' marks everyone sees.
+pub(crate) fn progenitor(view: &crate::game::View, player: u8) -> bool {
+    view.status
+        .survival
+        .as_ref()
+        .is_some_and(|s| s.engine_player == player)
 }
 
 fn owner_of_missile(owner: u32) -> u8 {

@@ -107,6 +107,7 @@ mod stream;
 mod strider;
 mod surge;
 mod survival;
+mod survival_aux;
 mod t2_artillery;
 mod thirty_two;
 mod titan;

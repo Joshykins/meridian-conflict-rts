@@ -42,6 +42,7 @@ mod prefabs;
 mod range;
 mod recorder;
 mod replay;
+mod replication_marks;
 mod rings;
 mod selected;
 mod settings;

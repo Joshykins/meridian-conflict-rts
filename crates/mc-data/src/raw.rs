@@ -2540,17 +2540,23 @@ impl Unit {
                 None => None,
             },
             growth: match &self.growth {
-                Some(g) => Some(g.compile(
-                    key,
-                    crate::growth::Has {
-                        shield: self.shield.is_some(),
-                        lance: self.lance.is_some(),
-                        interceptor: self.strategic.as_ref().is_some_and(|s| {
-                            s.kind == crate::strategic::StrategicKind::Interceptor
-                        }),
-                    },
-                    TICKS_PER_SECOND,
-                )?),
+                Some(g) => {
+                    Some(g.compile(
+                        key,
+                        crate::growth::Has {
+                            shield: self.shield.is_some(),
+                            lance: self.lance.is_some(),
+                            interceptor: self.strategic.as_ref().is_some_and(|s| {
+                                s.kind == crate::strategic::StrategicKind::Interceptor
+                            }),
+                            warhead:
+                                self.strategic.as_ref().is_some_and(|s| {
+                                    s.kind == crate::strategic::StrategicKind::Nuke
+                                }),
+                        },
+                        TICKS_PER_SECOND,
+                    )?)
+                }
                 None => None,
             },
             builder,

@@ -7,6 +7,7 @@ use crate::audio::{Audio, Sfx};
 use crate::hud::survival::VIOLET;
 use crate::ui::palette;
 use glam::Vec3;
+use mc_data::survival::SiteKind;
 use mc_sim::SimEvent;
 
 /// Good news: a node down.
@@ -42,27 +43,80 @@ impl Game {
                 "survival_launch",
             ),
             SimEvent::NodeRaising {
-                site: s, product, ..
+                site: s,
+                product,
+                kind,
+                shaper,
+                ..
             } => (
                 format!(
-                    "Genesis Ray Firing  \u{b7}  {}  \u{b7}  Will Print {}",
+                    "Genesis Ray Firing  \u{b7}  {}  \u{b7}  {}",
                     site(*s),
-                    name(*product)
+                    match (kind, product) {
+                        (SiteKind::Printer, Some(p)) => format!("Will Print {}", name(*p)),
+                        _ => format!("Raising {}", name(*shaper)),
+                    }
                 ),
                 VIOLET,
                 "survival_node_raising",
             ),
             SimEvent::NodeOnline {
-                site: s, product, ..
+                site: s,
+                product,
+                kind,
+                shaper,
+                ..
             } => (
                 format!(
-                    "Shaper Online at {}  \u{b7}  Printing {}  \u{b7}  Bonus Objective",
+                    "{} Online at {}  \u{b7}  {}  \u{b7}  Bonus Objective",
+                    if *kind == SiteKind::Printer {
+                        "Shaper".to_string()
+                    } else {
+                        name(*shaper)
+                    },
                     site(*s),
-                    name(*product)
+                    match (kind, product) {
+                        (SiteKind::Printer, Some(p)) => format!("Printing {}", name(*p)),
+                        (SiteKind::Artillery, _) => "Fires Replication Shells".to_string(),
+                        (SiteKind::Nuke, _) => "Launches Warheads".to_string(),
+                        (SiteKind::Printer, None) => "Printing".to_string(),
+                    }
                 ),
                 VIOLET,
                 "survival_node_online",
             ),
+            // A volley's first shell: the marks themselves are on the map (`replication_marks`).
+            SimEvent::ReplicationShellFired {
+                site: s,
+                units,
+                flight_ticks,
+                volley: 0,
+                ..
+            } => (
+                format!(
+                    "Replication Shells Inbound from {}  \u{b7}  {units} Units Each  \u{b7}  {} s",
+                    site(*s),
+                    flight_ticks / mc_core::TICKS_PER_SECOND
+                ),
+                palette::WARN,
+                // Placeholder until the shell has a sound of its own.
+                "survival_launch",
+            ),
+            // The launch alarm is the nuke's own (`game_nuke_sounds`): a toast only.
+            SimEvent::NuclearLaunch { owner, .. }
+                if self
+                    .view
+                    .status
+                    .survival
+                    .as_ref()
+                    .is_some_and(|s| s.engine_player == *owner) =>
+            {
+                self.hud.toast(
+                    "Progenitor Warhead Launched  \u{b7}  Its Mark Is on the Map".to_string(),
+                    palette::BAD,
+                );
+                return;
+            }
             SimEvent::NodeDestroyed {
                 site: s,
                 wreck,

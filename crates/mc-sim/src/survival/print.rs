@@ -225,7 +225,8 @@ impl crate::World {
     }
 
     /// Starts printing `units` as one block on `spot` (a bay's apron and out
-    /// past its doors, or a Shaper's platform under `source`'s beam). All of it
+    /// past its doors, a Shaper's platform under `source`'s beam, or round where a
+    /// replication shell landed, with no beam). All of it
     /// takes the same time and finishes together, then goes by `route`: with the
     /// round when `round`, else at once.
     pub(super) fn survival_print_formation(
@@ -252,21 +253,26 @@ impl crate::World {
                 };
                 (self.state.units.pos[row], self.state.units.heading[row])
             }
+            Spot::Landing { at, heading } => (at, heading),
         };
         let radius = units
             .iter()
             .map(|b| self.blueprints.unit(*b).radius)
             .max()
             .unwrap_or(Fx::ZERO);
-        let ticks = formation_ticks(self.blueprints.as_ref(), units);
+        // A shell's squad comes out of its burst quickly; a formation takes its time.
+        let ticks = match spot {
+            Spot::Landing { .. } => super::rules::SQUAD_PRINT_TICKS,
+            Spot::Bay(_) | Spot::Pad(_) => formation_ticks(self.blueprints.as_ref(), units),
+        };
         let formation = {
             let s = self.state.survival.as_mut().unwrap();
             s.next_formation = s.next_formation.wrapping_add(1);
             s.next_formation
         };
-        // A platform's block is centred on it; a bay's front row is at its mark.
+        // A platform's (or a landing's) block is centred on it; a bay's front row is at its mark.
         let at = match spot {
-            Spot::Pad(_) => {
+            Spot::Pad(_) | Spot::Landing { .. } => {
                 let spots = block(units.len(), radius, FxVec2::ZERO, heading);
                 let n = spots.len().max(1) as i32;
                 let sum = spots.iter().fold(FxVec2::ZERO, |a, b| a + *b);

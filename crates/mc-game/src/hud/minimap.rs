@@ -293,7 +293,10 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
     let team = |p: u8| view.status.players.get(p as usize).map(|pl| pl.team);
     for m in &view.frame.strategic {
         let at = chart_pos(s, chart, Vec2::new(m.pos[0], m.pos[1]));
-        let enemy = !view.observing && team(m.owner as u8) != team(view.local);
+        // Survival's Progenitor shows where its warheads land (`nuke_marks::progenitor`).
+        let enemy = !view.observing
+            && team(m.owner as u8) != team(view.local)
+            && !crate::nuke_marks::progenitor(view, m.owner as u8);
         if m.kind == mc_sim::mirror::STRATEGIC_WARHEAD && enemy {
             let tone = super::silo::WARHEAD;
             if let Some(track) = view
@@ -378,6 +381,9 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
             );
         }
     }
+
+    // Survival's replication shells: each mark and its burst (`replication_marks.rs`).
+    crate::replication_marks::minimap(ui, view, chart, metres, &|p| chart_pos(s, chart, p));
 
     // Titans and their great bores' strikes (`titan.rs`).
     super::titan::minimap(ui, s, chart, &|p| chart_pos(s, chart, p));
