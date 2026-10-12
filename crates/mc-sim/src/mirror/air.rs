@@ -10,6 +10,9 @@ pub struct FuelView {
     pub unit_id: u32,
     /// Zero (dry) to one (full).
     pub fill: f32,
+    /// Seconds until it runs dry at the pace it burns now; `None` while it is not
+    /// burning (set down, aboard a base) or already dry.
+    pub dry_in: Option<f32>,
 }
 
 impl World {
@@ -28,6 +31,10 @@ impl World {
             out.push(FuelView {
                 unit_id: units.id(row).0,
                 fill: (units.fuel[row] / tank.range.max(Fx::ONE)).to_f32(),
+                dry_in: self
+                    .burn_pace(row)
+                    .filter(|&pace| pace > Fx::ZERO && units.fuel[row] > Fx::ZERO)
+                    .map(|pace| (units.fuel[row] / pace).to_f32()),
             });
         }
     }

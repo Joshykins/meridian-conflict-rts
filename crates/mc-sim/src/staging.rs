@@ -170,21 +170,37 @@ impl World {
     /// Burns this tick's fuel while it is up; set down on the ground, it fills slowly
     /// (`GROUND_REFUEL_TICKS` from empty).
     fn burn(&mut self, row: usize, range: Fx) {
-        let Some(motion) = self.bp(row).motion else {
-            return;
-        };
-        let units = &self.state.units;
-        if units.has_flag(row, flag::IN_FACTORY) {
-            return;
-        }
-        if units.z[row] <= self.ground_z(row, units.pos[row]) + Fx::from_int(2) {
+        if let Some(pace) = self.burn_pace(row) {
+            let fuel = &mut self.state.units.fuel[row];
+            *fuel = (*fuel - pace / TICKS_PER_SECOND as i32).max(Fx::ZERO);
+        } else if self.bp(row).motion.is_some()
+            && !self.state.units.has_flag(row, flag::IN_FACTORY)
+            && self.grounded(row)
+        {
             let fuel = &mut self.state.units.fuel[row];
             *fuel = (*fuel + range / GROUND_REFUEL_TICKS).min(range);
-            return;
         }
-        let pace = units.speed[row].max(motion.speed * IDLE_BURN.0 / IDLE_BURN.1);
-        let fuel = &mut self.state.units.fuel[row];
-        *fuel = (*fuel - pace / TICKS_PER_SECOND as i32).max(Fx::ZERO);
+    }
+
+    /// Metres of fuel a second it burns now: its speed, never less than its idle burn.
+    /// `None` while it is not up: set down, aboard a base, or still in its factory.
+    pub(crate) fn burn_pace(&self, row: usize) -> Option<Fx> {
+        let motion = self.bp(row).motion?;
+        let units = &self.state.units;
+        if units.has_flag(row, flag::IN_FACTORY)
+            || units.hangar[row] != Handle::NONE
+            || !units.is_active(row)
+            || self.grounded(row)
+        {
+            return None;
+        }
+        Some(units.speed[row].max(motion.speed * IDLE_BURN.0 / IDLE_BURN.1))
+    }
+
+    /// Down on the ground (within 2 m of it).
+    fn grounded(&self, row: usize) -> bool {
+        let units = &self.state.units;
+        units.z[row] <= self.ground_z(row, units.pos[row]) + Fx::from_int(2)
     }
 
     /// Free and in need: a `Stage` on the nearest base that will have it.

@@ -147,7 +147,15 @@ fn fuel(
     let reach = if fill <= 0.0 {
         "Dry  \u{b7}  Slowed".to_owned()
     } else {
-        format!("{:.1} km", fill * tank.range.to_f32() / 1000.0)
+        let km = format!("{:.1} km", fill * tank.range.to_f32() / 1000.0);
+        // Up and burning: how long until it is dry at the pace it is flying now.
+        match view.dry_in {
+            Some(t) => format!(
+                "{km}  \u{b7}  Dry in {}",
+                crate::hud::mine::duration(t.ceil())
+            ),
+            None => km,
+        }
     };
     ui.text_right(x + cw, y, type_scale::VALUE, rgb(tone, 1.0), &reach);
     bar(ui, Rect::new(x, y + 10.0, cw, 4.0), fill, tone);
