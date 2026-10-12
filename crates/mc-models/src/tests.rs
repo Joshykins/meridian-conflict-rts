@@ -338,7 +338,7 @@ const BLUEPRINTS: &[Blueprint] = &[
     // Strategic weapons (strategic.ron).
     structure("nuke_silo", 42.5, 26.0, 4, 8, &[]),
     structure("nuke_defense", 18.75, 20.0, 3, 4, &[]),
-    structure("culverin", 30.0, 27.0, 4, 6, &[[74.0, 0.0, 18.0]]),
+    structure("culverin", 42.5, 27.0, 4, 8, &[[74.0, 0.0, 18.0]]),
     // The Regency (data/factions/regency/units): their engineer, scout and tech 1 structures.
     unit("regency_engineer", 4.2, 3.267, 1, &[]),
     unit("regency_engineer", 5.0, 3.889, 2, &[]),

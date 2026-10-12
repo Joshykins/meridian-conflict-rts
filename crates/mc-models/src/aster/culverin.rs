@@ -1,5 +1,5 @@
 //! Culverin (`aster_t4_artillery`, mesh "culverin"): the tech 4 map gun, authored at
-//! blueprint scale (metres, 6x6 lot, radius 30, height 27).
+//! blueprint scale (metres, 8x8 lot like a Reactor III, radius 42.5, height 27).
 //!
 //! A supergun, not a bigger howitzer: one very long plain tube, so long it would sag
 //! under its own weight, held straight by a king-post and a pair of cables over its
@@ -88,17 +88,17 @@ const _: () = assert!(TRUNNION.x + BREECH_BACK - RECOIL > HOUSE_FRONT + 1.0);
 // ---- the base ----------------------------------------------------------------------
 
 /// The slab's half width and top.
-const SLAB: f32 = 29.0;
+const SLAB: f32 = 41.5;
 const SLAB_TOP: f32 = 0.5;
 /// The emplacement: radius to its corners at the foot and the top, and its top.
-const BERM_FOOT: f32 = 26.5;
+const BERM_FOOT: f32 = 34.0;
 const BERM_TOP_R: f32 = 23.0;
 const BERM_TOP: f32 = 3.2;
 /// The turntable's radius, and the dark hub in the middle of its deck.
 const TABLE_R: f32 = 21.0;
 const HUB_R: f32 = 13.0;
 /// The magazine bunkers on the corners: centre (x, ±y), half size, roof.
-const BUNKER: Vec2 = Vec2::new(-23.5, 23.5);
+const BUNKER: Vec2 = Vec2::new(-33.0, 33.0);
 const BUNKER_HW: f32 = 4.2;
 const BUNKER_TOP: f32 = 2.9;
 
@@ -713,7 +713,7 @@ mod tests {
     use crate::{build_model_scaled, part, rig};
 
     /// The unit file's size (`aster_t4_artillery`): radius, height, tech.
-    const SIZE: (f32, f32, u8) = (30.0, 27.0, 4);
+    const SIZE: (f32, f32, u8) = (42.5, 27.0, 4);
 
     /// The unit file's pivot and muzzle are the model's trunnion and barrel tip, and the
     /// gun reaches the muzzle at every level of detail.

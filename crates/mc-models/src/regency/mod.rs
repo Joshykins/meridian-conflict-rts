@@ -422,7 +422,7 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         // Strategic: an 8 x 8 launch complex, and a 4 x 4 array; a few a match.
         "regency_nuke_silo" => 9000,
         "regency_nuke_defense" => 6000,
-        // A 6 x 6 map gun: drum and outriggers, a long turret, its plant, a three-rail gun.
+        // An 8 x 8 map gun: drum and outriggers, a long turret, its plant, a three-rail gun.
         "regency_springald" => 24000,
         // A plinth, a five-stage shaft, and twenty cradles of dish and prongs on arms.
         "regency_carillon" => 5000,

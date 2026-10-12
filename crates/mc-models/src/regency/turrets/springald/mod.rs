@@ -1,4 +1,4 @@
-//! The Springald (`regency_t4_artillery`, a 6 x 6 lot, the Culverin's size): the
+//! The Springald (`regency_t4_artillery`, an 8 x 8 lot, the Culverin's and a Power Generator III's size): the
 //! Regency's map gun, a Triune Pinch-fusion Howitzer. Like the Sunspear it gathers its
 //! charge in front of the bore, here three knots of fusion at once, one at each rail's
 //! lens, and lobs them high as one shell. The `muzzle` is the middle of the charge.
@@ -27,7 +27,7 @@ use crate::{part, rig};
 use super::*;
 
 /// The blueprint's radius and height.
-pub(in crate::regency) const RADIUS: f32 = 30.0;
+pub(in crate::regency) const RADIUS: f32 = 42.5;
 pub(in crate::regency) const HEIGHT: f32 = 48.0;
 /// The gun's line: the trunnion over the turret's middle, the charge 52 m out down the bore
 /// laid 45 degrees up (52 cos 45 = 36.77 out, 52 sin 45 = 36.77 up).
@@ -53,7 +53,7 @@ pub(in crate::regency) fn springald(b: &mut MeshBuilder, _tech: u8) {
             b,
             &LINE,
             &Coarse {
-                base_r: 32.0,
+                base_r: 44.0,
                 base_h: DECK,
                 x0: -22.0,
                 x1: 10.0,
@@ -93,7 +93,7 @@ mod tests {
             "regency_springald",
             RADIUS,
             HEIGHT,
-            Some(6),
+            Some(8),
             &[LINE.muzzle.to_array()],
             HOLD,
         );

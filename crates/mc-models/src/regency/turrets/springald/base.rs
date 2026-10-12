@@ -77,12 +77,20 @@ pub(super) fn draw(b: &mut MeshBuilder) {
 }
 
 /// One outrigger along +x from the drum: a plated arm stepping down from a joint drum at
-/// the drum's shoulder to a spade dug into the ground, feathered plates down its back and
-/// a slot in each flank.
+/// the drum's shoulder to a spade dug into the ground at the 8 x 8 lot's corner, feathered
+/// plates down its back and a slot in each flank.
 fn outrigger(b: &mut MeshBuilder) {
     let fine = b.fine();
-    let reach = 30.4;
-    buttress(b, 13.0, 4.6, 7.4, reach - 2.0, 3.0, 2.4);
+    let reach = 44.0;
+    // The arm: from (ROOT, half width, height) at the drum to (FOOT, ..) by the spade.
+    const ROOT: (f32, f32, f32) = (13.0, 4.6, 7.4);
+    let foot = (reach - 2.0, 3.0, 2.4);
+    buttress(b, ROOT.0, ROOT.1, ROOT.2, foot.0, foot.1, foot.2);
+    // Its top and its flank's half width `x` along it.
+    let along = |x: f32| (x - ROOT.0) / (foot.0 - ROOT.0);
+    let top = |x: f32| ROOT.2 + (foot.2 - ROOT.2) * along(x);
+    let flank = |x: f32| 0.5 * (ROOT.1 + (foot.1 - ROOT.1) * along(x)) - 0.22;
+    let slope = (ROOT.2 - foot.2) / (foot.0 - ROOT.0);
     seam(b);
     b.beam(
         v3(reach - 3.0, 0.0, 0.5),
@@ -107,7 +115,7 @@ fn outrigger(b: &mut MeshBuilder) {
     }
     dark_plate(b);
     Course {
-        count: if fine { 4 } else { 2 },
+        count: if fine { 8 } else { 4 },
         step: 3.1,
         len: 3.8,
         half: 1.3,
@@ -117,17 +125,22 @@ fn outrigger(b: &mut MeshBuilder) {
     }
     .lay(
         b,
-        &Frame::new(v3(16.8, 0.0, 7.2), v3(1.0, 0.0, -0.36), v3(0.36, 0.0, 1.0)),
+        &Frame::new(
+            v3(16.8, 0.0, top(16.8) + 1.0),
+            v3(1.0, 0.0, -slope),
+            v3(slope, 0.0, 1.0),
+        ),
     );
     if fine {
+        let (x0, x1) = (17.0, reach - 5.4);
         b.mirror_y(|b| {
             inlay(
                 b,
                 &[
-                    v3(17.0, 2.08, 3.6),
-                    v3(25.0, 1.72, 2.0),
-                    v3(25.0, 1.72, 2.4),
-                    v3(17.0, 2.08, 4.1),
+                    v3(x0, flank(x0), top(x0) * 0.59),
+                    v3(x1, flank(x1), top(x1) * 0.59),
+                    v3(x1, flank(x1), top(x1) * 0.59 + 0.4),
+                    v3(x0, flank(x0), top(x0) * 0.59 + 0.5),
                 ],
                 Vec3::Y,
                 pattern::EMBER_SLOT,

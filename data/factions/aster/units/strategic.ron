@@ -84,7 +84,7 @@
         categories: ["Land", "Artillery", "Strategic", "Experimental"],
         health: 30000,
         cost: (materials: 10000, energy: 100000, time: 36000),
-        radius: 30, height: 27, footprint: (6, 6),
+        radius: 42.5, height: 27, footprint: (8, 8),
         vision: 300,
         weapons: [(
             name: "Culverin Long Gun",

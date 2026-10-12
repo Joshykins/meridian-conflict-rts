@@ -89,7 +89,7 @@
         categories: ["Land", "Artillery", "Strategic", "Experimental"],
         health: 30000,
         cost: (materials: 10000, energy: 100000, time: 36000),
-        radius: 30, height: 48, footprint: (6, 6),
+        radius: 42.5, height: 48, footprint: (8, 8),
         vision: 300,
         weapons: [(
             name: "Triune Pinch-fusion Howitzer",
