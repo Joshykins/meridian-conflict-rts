@@ -2,7 +2,8 @@
 //! every finished friendly unit within its radius, ground or air, structure or mobile,
 //! the same health a second whatever the unit's size, so it does most for small units.
 //! It heals under fire, costs nothing to run and takes no orders; two fields over the
-//! same unit both mend it. The unit carrying it is left to its own regen.
+//! same unit both mend it. The unit carrying it mends itself too when the field says so
+//! (`mends_self`); otherwise it is left to its own regen.
 
 use crate::spatial::kind;
 use crate::World;
@@ -23,7 +24,7 @@ impl World {
             self.index
                 .query(pos, field.radius, kind::UNIT | kind::AIRCRAFT, |e| {
                     let t = e.row as usize;
-                    if t == row
+                    if (t == row && !field.mends_self)
                         || !self.unit_entry_is_current(e)
                         || !units.is_active(t)
                         || units.health[t] <= Fx::ZERO

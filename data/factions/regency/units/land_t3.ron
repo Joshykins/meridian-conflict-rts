@@ -182,10 +182,10 @@
     ),
     // Field mender: a hover hull carrying no gun, only a nanite emitter that keeps a repair
     // field round it (`repair_field`, mc-sim `repair_field.rs`), the Exarch's Nanite
-    // Repair Field on its own hull. Every finished friend in reach, ground or air, not
-    // itself, gets the same health back a second whatever its size, under fire or not, so
-    // it does most for a crowd of light units and little for one big one. Two fields over
-    // the same unit both mend it.
+    // Repair Field on its own hull. Every finished friend in reach, ground or air, and the
+    // Censer itself (`mends_self`), gets the same health back a second whatever its size,
+    // under fire or not, so it does most for a crowd of light units and little for one big
+    // one. Two fields over the same unit both mend it.
     //
     // Balance: the Exarch's field (180 m, 40 a second) is a 3000-materials refit. This is a
     // smaller one (140 m, 30 a second) for 900, on a hull about a Wake's: twelve Wakes in
@@ -205,7 +205,7 @@
         radius: 6.0, height: 7.0,
         vision: 400,
         motion: (layer: Hover, size: 1, speed: 25, accel: 18, turn: 80),
-        repair_field: (radius: 140, heal: 30),
+        repair_field: (radius: 140, heal: 30, mends_self: true),
         weapons: [],
         mesh: "regency_censer", icon: Shield,
         sounds: (death: "blast_large", moving: "aster_hover"),

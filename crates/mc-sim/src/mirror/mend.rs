@@ -74,7 +74,7 @@ impl World {
                 .query(pos, field.radius, kind::UNIT | kind::AIRCRAFT, |e| {
                     let t = e.row as usize;
                     // As `run_repair_fields` picks them.
-                    if t != row
+                    if (t != row || field.mends_self)
                         && self.unit_entry_is_current(e)
                         && s.units.is_active(t)
                         && s.units.health[t] > Fx::ZERO

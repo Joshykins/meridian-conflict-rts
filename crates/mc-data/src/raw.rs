@@ -901,6 +901,9 @@ pub struct RawRepairField {
     pub radius: f64,
     /// Health a second each friend in reach gets back, the same for every unit.
     pub heal: f64,
+    /// The carrier mends itself by the same amount.
+    #[serde(default)]
+    pub mends_self: bool,
 }
 
 /// An aircraft's tank: `range` kilometres of flight at full speed.
@@ -2607,6 +2610,7 @@ impl Unit {
                 Some(f) => Some(crate::RepairField {
                     radius: fx(f.radius),
                     heal: fx(f.heal),
+                    mends_self: f.mends_self,
                 }),
                 None => None,
             },

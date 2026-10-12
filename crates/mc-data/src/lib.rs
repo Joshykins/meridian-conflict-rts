@@ -635,11 +635,13 @@ impl Warp {
 }
 
 /// A nanite repair field (`mc_sim::repair_field`): every finished friendly unit within
-/// `radius` of it, not itself, heals `heal` health a second, whatever its size.
+/// `radius` of it heals `heal` health a second, whatever its size; the carrier too when
+/// `mends_self`.
 #[derive(Clone, Copy, Debug)]
 pub struct RepairField {
     pub radius: Fx,
     pub heal: Fx,
+    pub mends_self: bool,
 }
 
 /// An aircraft's tank (`mc_sim::staging`): it burns while the aircraft is up and fills
@@ -1823,6 +1825,7 @@ impl Blueprints {
                 Some(f) => {
                     h.write_i64(f.radius.0);
                     h.write_i64(f.heal.0);
+                    h.write_u64(f.mends_self as u64);
                 }
                 None => h.write_u64(u64::MAX),
             }

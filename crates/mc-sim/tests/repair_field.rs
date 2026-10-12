@@ -1,5 +1,6 @@
-//! The Exarch's Nanite Repair Field: friends within its reach heal a flat amount a second;
-//! units out of reach and the enemy's do not.
+//! Nanite repair fields: friends within reach heal a flat amount a second; units out of
+//! reach and the enemy's do not. The Censer's field mends the Censer too, the Exarch's
+//! does not mend the Exarch.
 
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
@@ -99,6 +100,39 @@ fn the_field_mends_friends_in_reach_and_no_one_else() {
     );
     assert_eq!(w.state.units.health[far], Fx::from_int(50));
     assert_eq!(w.state.units.health[foe], Fx::from_int(50));
+}
+
+#[test]
+fn the_censer_mends_itself_and_the_exarch_field_does_not() {
+    let mut w = world();
+    let censer = w.blueprints.id_of("regency_t3_field_mender").unwrap();
+    let censer = w
+        .spawn_unit(censer, 0, FxVec2::from_ints(900, 900), Angle::ZERO, true)
+        .unwrap();
+    let field = w
+        .blueprints
+        .unit(w.state.units.blueprint[censer])
+        .repair_field
+        .unwrap();
+    assert!(field.mends_self);
+    let acu = exarch(&mut w, &["nano_repair", "nano_field"], 1500, 1500);
+    assert!(
+        !w.blueprints
+            .unit(w.state.units.blueprint[acu])
+            .repair_field
+            .unwrap()
+            .mends_self
+    );
+    w.state.units.health[censer] = Fx::from_int(500);
+    for _ in 0..50 {
+        w.tick(&[]).unwrap();
+    }
+    let healed = w.state.units.health[censer] - Fx::from_int(500);
+    let expect = field.heal * 5;
+    assert!(
+        healed >= expect * 9 / 10,
+        "the Censer healed {healed:?} in five seconds, expected at least about {expect:?}"
+    );
 }
 
 #[test]
