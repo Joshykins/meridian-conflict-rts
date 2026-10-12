@@ -139,6 +139,18 @@ fn health_tone(share: f32) -> u32 {
     }
 }
 
+/// A tank's fill: the yellow of the fuel line over units, red once it is nearly dry.
+fn fuel_tone(share: f32) -> u32 {
+    if share > 0.15 {
+        FUEL
+    } else {
+        palette::BAD
+    }
+}
+
+/// The fuel line's yellow, as `icons.wgsl` draws it under a unit's health bar.
+const FUEL: u32 = 0xFFD14D;
+
 /// The missing share stays in the bar's own colour, dimmed, so its length reads.
 fn bar(ui: &mut Ui, r: Rect, share: f32, tone: u32) {
     ui.fill(r, rgb(tone, 0.18));
@@ -285,6 +297,16 @@ pub fn info(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
         health,
         health_tone(health),
     );
+    // The aircraft among them: the emptiest tank, under the health bar, since that one
+    // sets how far the group can go.
+    let low = units
+        .iter()
+        .filter_map(|u| s.view.frame.fuel.iter().find(|f| f.unit_id == u.unit_id))
+        .map(|f| f.fill.clamp(0.0, 1.0))
+        .reduce(f32::min);
+    if let Some(low) = low {
+        bar(ui, Rect::new(x, r.y + 38.0, cw, 3.0), low, fuel_tone(low));
+    }
     // What the whole selection makes and spends, in the same strip as for one unit.
     let (materials, energy) = super::economy::total(s, units);
     let economy = super::economy::strip(

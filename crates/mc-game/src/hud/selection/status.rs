@@ -21,6 +21,7 @@ pub(super) fn status_page(
 ) {
     let (x, cw) = (r.x, r.w);
     let mut y = vitals(ui, s, u, bp, x, r.y, cw);
+    y = fuel(ui, s, u, bp, x, y, cw);
     y = doing(ui, s, u, bp, x, y, cw, on_strip);
     y = crate::hud::warp::band(ui, s, u, bp, x, y, cw);
     let (materials, energy) = economy::flows(s, u, bp);
@@ -113,6 +114,44 @@ fn vitals(
         health_tone(u.health),
     );
     bars + 24.0
+}
+
+/// An aircraft's tank (`mc_sim::staging`), in the yellow of its line under the health
+/// bar: how full, and how far that still takes it at full speed. An enemy's is not told.
+fn fuel(
+    ui: &mut Ui,
+    s: &Scene,
+    u: &UnitInstance,
+    bp: &UnitBlueprint,
+    x: f32,
+    y: f32,
+    cw: f32,
+) -> f32 {
+    let (Some(tank), Some(view)) = (
+        bp.fuel,
+        s.view.frame.fuel.iter().find(|f| f.unit_id == u.unit_id),
+    ) else {
+        return y;
+    };
+    let fill = view.fill.clamp(0.0, 1.0);
+    let tone = fuel_tone(fill);
+    let label_end = ui.text(x, y, type_scale::MICRO, rgb(palette::DIM, 1.0), "Fuel");
+    ui.text(
+        label_end + 8.0,
+        y,
+        type_scale::VALUE,
+        rgb(if fill >= 0.999 { palette::TEXT } else { tone }, 1.0),
+        &format!("{:.0}%", fill * 100.0),
+    );
+    // Dry, it still flies, slower and stiffer, until it reaches a staging base.
+    let reach = if fill <= 0.0 {
+        "Dry  \u{b7}  Slowed".to_owned()
+    } else {
+        format!("{:.1} km", fill * tank.range.to_f32() / 1000.0)
+    };
+    ui.text_right(x + cw, y, type_scale::VALUE, rgb(tone, 1.0), &reach);
+    bar(ui, Rect::new(x, y + 10.0, cw, 4.0), fill, tone);
+    y + 32.0
 }
 
 /// What it is doing, always one line: going up, paused, working (with how far along
