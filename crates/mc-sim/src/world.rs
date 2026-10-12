@@ -146,6 +146,10 @@ pub struct State {
     /// Carriers' air wing queues (`air_wings.rs`).
     #[serde(default)]
     pub wings: crate::air_wings::WingBays,
+    /// Grown units' levels (`growth.rs`): survival's Shapers.
+    pub levels: crate::growth::Levels,
+    /// Lances charging, striking and cooling (`lance.rs`).
+    pub lances: crate::lance::Lances,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -462,6 +466,8 @@ impl World {
             strategic: Default::default(),
             elevators: Default::default(),
             wings: Default::default(),
+            levels: Default::default(),
+            lances: Default::default(),
         };
         let water = terrain.water_level();
         let ore = crate::mines::OreGrid::new(&map.ore, size, |p| terrain.height_at(p) > water);
@@ -855,6 +861,11 @@ impl World {
         if !self.state.surges.is_empty() {
             let _t = mc_core::perf_span!("fn.run_surges");
             self.run_surges();
+        }
+        {
+            let _t = mc_core::perf_span!("fn.run_lances");
+            self.prune_levels();
+            self.run_lances();
         }
         phase(&mut self.timings, "weapons");
 

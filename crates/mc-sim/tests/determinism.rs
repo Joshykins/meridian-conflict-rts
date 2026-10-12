@@ -227,6 +227,9 @@ fn setup(w: &mut World) {
                 add("regency_t4_colossus", 1, 1500, 900);
                 // Its hull field runs on power: a plant for it, or the Courier's warp has none left.
                 add("aster_t3_power", 1, 600, 150);
+                // A survival Shaper (`lance.rs`): its Lance charges on what comes in reach
+                // and strikes; its dome and interceptors are a shield's and an array's.
+                add("replication_node", 1, 1600, 1500);
             }
             _ => {
                 add("aster_t4_assault_tank", 2, 1000, 900);
@@ -603,6 +606,7 @@ fn reference() -> Vec<u64> {
     let mut wing_out = false;
     let mut lens_strikes = 0;
     let mut surging = 0;
+    let mut lanced = 0;
     let hashes = (1..TICKS)
         .map(|t| {
             let commands = script(&mut w, t);
@@ -670,6 +674,7 @@ fn reference() -> Vec<u64> {
                     mc_sim::SimEvent::DashLanded { .. } => dashes += 1,
                     mc_sim::SimEvent::CloudBolt { .. } => bolts += 1,
                     mc_sim::SimEvent::LensStruck { .. } => lens_strikes += 1,
+                    mc_sim::SimEvent::LanceStrike { .. } => lanced += 1,
                     _ => {}
                 }
             }
@@ -695,6 +700,8 @@ fn reference() -> Vec<u64> {
     assert!(dashes > 0, "the Seraph never dashed");
     // The lens's front struck and its well opened.
     assert!(lens_strikes > 0, "the gravitic lens never struck");
+    // The Shaper's Lance struck.
+    assert!(lanced > 0, "the Lance never struck");
     // A surge shell landed and its wake rolled out.
     assert!(surging > 0, "no surge shell's wake rolled out");
     // The elevator's first platform brought its queue down after the snapshot.

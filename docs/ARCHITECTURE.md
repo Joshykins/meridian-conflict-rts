@@ -487,6 +487,19 @@ invulnerable unit, and the mirror marks it `SHIELD_VEIL` so it is drawn apart fr
   `RenderFrame::precursor_activity` and brightens the facility's light (`globals.tree_wind.w` in entity.wgsl).
   Events: `RoundPrinting`, `RoundLaunched`, `TierReached`, `HeavyWave`, `NodeRaising`, `NodeOnline`,
   `ShaperLevelled`, `NodeDestroyed`, `SurvivalWon`.
+- **Defences and growth.** Every Shaper has a large shield, a **Lance** and an anti-nuke, all growing with its
+  level. A level's worth is data: the `replication_node` blueprint's `growth` block (`mc_data::growth`), where each
+  named stat (health, shield radius/health/regen, Lance damage/splash/range/charge/reload, interceptor
+  stock/coverage/round time) grows from the blueprint's own figure as `base * (1 + percent/100)^(L-1) + per_level *
+  (L-1)` within `least`/`most`. The sim keeps only the level (`State::levels`, `growth.rs`; the survival engine
+  sets it with `set_unit_level`, which adds the level's hit points and shield and swells the dome), and every system
+  reads a grown unit through the accessors there: `unit_max_health`, `shield_spec`, `lance_spec`, `launcher_spec`
+  (nukes.rs). `World::grown_stats(row)` gathers them for the interface. The **Lance** (`lance.rs`, the blueprint's
+  `lance` block, any unit may carry one) takes the nearest enemy it may strike in range, charges on it for its charge
+  time, then strikes: its damage over its splash round the target, shields first (`crush_area`), event
+  `LanceStrike`; then it cools for its reload. Its state is `State::lances`. The anti-nuke is an interceptor
+  `strategic` block: the Shaper assembles interceptors like a Parhelion (`nukes.rs`), more held and wider cover as
+  it grows.
 - **Economy.** Nothing is handed out. The engine's rounds are the defenders' materials: every unit it prints dies into a
   wreck worth most of its cost, so reclaim is the economy. The Threshold still carries ore at every spawn and across the
   lowland, and the wreckage of earlier assaults along the road from the Rampart to the spawns (`bake/threshold/wrecks.rs`). The heart, the print bays and the Shapers are always revealed to the defenders

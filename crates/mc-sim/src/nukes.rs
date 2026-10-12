@@ -516,17 +516,14 @@ fn turn_toward(dir: FxVec3, want: FxVec3) -> FxVec3 {
 }
 
 impl World {
-    fn launcher_spec(&self, row: usize) -> Option<&mc_data::strategic::Strategic> {
-        self.bp(row).strategic.as_ref()
-    }
-
     /// Where the warhead the launcher in `row` sends with `left` rounds still aboard after
     /// it starts its path: the bottom of a silo's tube, or the mouth of one of a hull's
     /// tubes (`Strategic::tubes`), the next in turn, as the hull lies now.
     fn tube_start(&self, row: usize, left: u8) -> FxVec3 {
         let units = &self.state.units;
         let base = units.pos[row];
-        match self.launcher_spec(row).map(|s| s.tubes.as_slice()) {
+        // Tubes never grow: the blueprint's own.
+        match self.bp(row).strategic.as_ref().map(|s| s.tubes.as_slice()) {
             Some(tubes) if !tubes.is_empty() => {
                 let t = tubes[left as usize % tubes.len()];
                 (base + t.xy().rotate(units.heading[row])).extend(units.z[row] + t.z)
@@ -835,7 +832,7 @@ impl World {
     /// The economy's answer to `launcher_jobs`: each job gets `efficiency` of its rate.
     pub(crate) fn advance_launchers(&mut self, row: usize, step: Fx) {
         self.flow(row).round += step;
-        let spec = self.launcher_spec(row).cloned().unwrap();
+        let spec = self.launcher_spec(row).unwrap().into_owned();
         let id = self.state.units.id(row);
         let l = self.state.strategic.launchers.entry(id).or_default();
         // A remainder scaled by a stall shrinks for ever and then rounds to nothing: the
@@ -874,7 +871,7 @@ impl World {
             let id = self.state.units.id(row);
             let owner = self.state.units.owner[row];
             let at = self.state.units.pos[row];
-            let spec = self.launcher_spec(row).cloned().unwrap();
+            let spec = self.launcher_spec(row).unwrap().into_owned();
             // Warheads of an enemy bound for somewhere inside the coverage, coming down, not
             // yet hunted, and either inside it already or where an interceptor fired now
             // would meet them inside it (not merely aimed there from afar).

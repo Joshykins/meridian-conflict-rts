@@ -36,7 +36,7 @@ impl World {
     /// Full hit points the unit in `row` can hold, rank included.
     #[inline]
     pub fn unit_max_health(&self, row: usize) -> Fx {
-        veterancy_health(self.bp(row).health, self.state.units.veterancy[row])
+        veterancy_health(self.grown_health(row), self.state.units.veterancy[row])
     }
 
     pub(crate) fn run_regen(&mut self) {
@@ -51,7 +51,7 @@ impl World {
             if regen <= Fx::ZERO {
                 continue;
             }
-            let max = veterancy_health(bp.health, level);
+            let max = veterancy_health(self.grown_health(row), level);
             let health = &mut self.state.units.health[row];
             if *health < max {
                 *health = (*health + regen / DT).min(max);

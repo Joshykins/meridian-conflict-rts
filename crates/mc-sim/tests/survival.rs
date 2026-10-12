@@ -33,6 +33,11 @@ fn world(rules: SurvivalRules) -> World {
 
 /// `defenders` people on team 0 (players 0..), the facility's side after them.
 fn world_with(rules: SurvivalRules, defenders: u8) -> World {
+    world_on(rules, defenders, 1)
+}
+
+/// `world_with` on `threads` workers.
+fn world_on(rules: SurvivalRules, defenders: u8, threads: usize) -> World {
     let blueprints = Arc::new(
         Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
     );
@@ -67,8 +72,14 @@ fn world_with(rules: SurvivalRules, defenders: u8) -> World {
         fog: true,
         spawn_commanders: true,
     };
-    let mut w =
-        World::with_terrain(terrain, map, blueprints, Arc::new(Pool::new(1)), &config).unwrap();
+    let mut w = World::with_terrain(
+        terrain,
+        map,
+        blueprints,
+        Arc::new(Pool::new(threads)),
+        &config,
+    )
+    .unwrap();
     w.begin_survival(SurvivalConfig {
         engine_player: defenders,
         engine: FxVec2::from_ints(ENGINE.0, ENGINE.1),
@@ -762,4 +773,148 @@ fn defenders_hold_out_together_against_one_facility() {
         .any(|e| matches!(e, SimEvent::SurvivalWon { rounds: 2 })));
     assert_eq!(w.state.winner, Some(0));
     assert!(!w.state.players[0].defeated && !w.state.players[1].defeated);
+}
+
+/// The first Shaper online, its row.
+fn first_online(w: &mut World, events: &mut Vec<SimEvent>) -> usize {
+    let mut t = 0;
+    while online(w) == 0 && t < 4000 {
+        run(w, 10, &[], events);
+        t += 10;
+    }
+    let site = w
+        .survival_status()
+        .unwrap()
+        .nodes
+        .iter()
+        .find(|n| n.raised >= 1.0)
+        .expect("a Shaper came online")
+        .site;
+    w.state.units.row(w.shaper_unit(site).unwrap()).unwrap()
+}
+
+#[test]
+fn a_shaper_defends_itself_with_a_shield_a_lance_and_interceptors() {
+    let (mut w, mut events) = guarded(SurvivalRules {
+        rounds: 0,
+        ..rules()
+    });
+    let row = first_online(&mut w, &mut events);
+    let shaper = w.state.units.id(row);
+    let stats = w.grown_stats(row);
+    assert_eq!(stats.level, 1);
+    let shield = stats.shield.expect("a shield");
+    let lance = stats.lance.expect("a Lance");
+    let (stock, coverage, _) = stats.interceptors.expect("an anti-nuke");
+    assert_eq!(stock, 1);
+    assert!(coverage >= Fx::from_int(1000));
+    assert!(w.state.units.shield_hp[row] > Fx::ZERO, "its dome is up");
+    assert_eq!(w.state.units.shield_hp[row], shield.health);
+    // A few of the defender's tanks well inside its reach: the Lance charges and strikes.
+    let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
+    let at = w.state.units.pos[row];
+    for k in 0..4 {
+        let off = FxVec2::from_ints(-300 - 30 * k, -300);
+        w.spawn_unit(tank, 0, at + off, mc_core::Angle::ZERO, true)
+            .unwrap();
+    }
+    events.clear();
+    run(&mut w, lance.charge_ticks + 5, &[], &mut events);
+    let strikes = events
+        .iter()
+        .filter(|e| matches!(e, SimEvent::LanceStrike { unit, .. } if *unit == shaper))
+        .count();
+    assert!(strikes >= 1, "the Lance struck");
+    // It assembles its interceptors by itself.
+    run(&mut w, 1200, &[], &mut events);
+    let held = w
+        .state
+        .strategic
+        .launchers
+        .get(&shaper)
+        .map_or(0, |l| l.stock);
+    assert_eq!(held, 1, "an interceptor ready");
+}
+
+#[test]
+fn a_shapers_defences_grow_with_its_level() {
+    let (mut w, mut events) = guarded(SurvivalRules {
+        rounds: 0,
+        interval_secs: 20,
+        ..rules()
+    });
+    let row = first_online(&mut w, &mut events);
+    let shaper = w.state.units.id(row);
+    let one = w.grown_stats(row);
+    let mut t = 0;
+    while t < 30_000 {
+        run(&mut w, 50, &[], &mut events);
+        t += 50;
+        let Some(r) = w.state.units.row(shaper) else {
+            panic!("the Shaper died");
+        };
+        if w.grown_stats(r).level >= 5 {
+            break;
+        }
+    }
+    let r = w.state.units.row(shaper).unwrap();
+    let five = w.grown_stats(r);
+    assert!(five.level >= 5, "{:?}", five.level);
+    assert!(five.health > one.health);
+    assert!(
+        w.state.units.health[r] > one.health,
+        "the level's hit points were added"
+    );
+    let (s1, s5) = (one.shield.unwrap(), five.shield.unwrap());
+    assert!(s5.radius > s1.radius && s5.health > s1.health && s5.regen > s1.regen);
+    let (l1, l5) = (one.lance.unwrap(), five.lance.unwrap());
+    assert!(l5.damage > l1.damage && l5.splash > l1.splash && l5.range > l1.range);
+    assert!(
+        l5.charge_ticks > l1.charge_ticks,
+        "a bigger Lance charges longer"
+    );
+    assert!(l5.reload_ticks < l1.reload_ticks, "and cools sooner");
+    let (i1, i5) = (one.interceptors.unwrap(), five.interceptors.unwrap());
+    assert!(i5.0 > i1.0 && i5.1 > i1.1 && i5.2 < i1.2);
+}
+
+/// A survival match hashes the same at any worker count and after a restore.
+#[test]
+fn survival_hashes_the_same_at_any_worker_count_and_after_a_restore() {
+    let rules = SurvivalRules {
+        rounds: 0,
+        interval_secs: 20,
+        ..rules()
+    };
+    const TICKS: u32 = 2400;
+    const SNAPSHOT_AT: u32 = 1300;
+    let play = |threads: usize| {
+        let mut w = world_on(rules, 1, threads);
+        (0..TICKS)
+            .map(|_| w.tick(&[]).unwrap())
+            .collect::<Vec<u64>>()
+    };
+    let reference = play(0);
+    for threads in [1, 3] {
+        let hashes = play(threads);
+        let first = reference.iter().zip(&hashes).position(|(a, b)| a != b);
+        assert_eq!(
+            first, None,
+            "desync with {threads} workers at tick {first:?}"
+        );
+    }
+    let mut a = world_on(rules, 1, 2);
+    for _ in 0..SNAPSHOT_AT {
+        a.tick(&[]).unwrap();
+    }
+    assert!(online(&a) > 0, "Shapers stand at the snapshot");
+    let blob = a.snapshot();
+    let mut b = world_on(rules, 1, 3);
+    b.restore(Heightfield::flat(768, 768, Fx::from_int(20)), &blob)
+        .unwrap();
+    assert_eq!(a.hash(), b.hash());
+    let after: Vec<u64> = (SNAPSHOT_AT..TICKS).map(|_| b.tick(&[]).unwrap()).collect();
+    let tail = &reference[SNAPSHOT_AT as usize..];
+    let first = tail.iter().zip(&after).position(|(a, b)| a != b);
+    assert_eq!(first, None, "diverged {first:?} ticks after the snapshot");
 }

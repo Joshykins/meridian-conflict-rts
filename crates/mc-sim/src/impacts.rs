@@ -632,7 +632,9 @@ impl World {
             {
                 continue;
             }
-            let spec = self.bp(row).shield.unwrap();
+            let Some(spec) = self.shield_spec(row) else {
+                continue;
+            };
             if spec.is_hull() {
                 if victim == Some(row) && best.is_none() {
                     best = Some(row);

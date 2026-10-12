@@ -256,6 +256,11 @@ impl crate::World {
             level: n.level,
             added,
         });
+        // What a level is worth in hit points, shield, Lance and interceptors is its
+        // blueprint's growth block.
+        if let Some(row) = self.state.units.row(n.unit) {
+            self.set_unit_level(row, n.level);
+        }
         let s = self.state.survival.as_mut().unwrap();
         s.nodes[i] = n;
         s.rng = rng;

@@ -10,6 +10,8 @@
 pub mod dash;
 pub mod elevator;
 pub mod gravitic;
+pub mod growth;
+pub mod lance;
 mod lot;
 mod raw;
 pub mod refit;
@@ -953,6 +955,10 @@ pub struct UnitBlueprint {
     pub strategic: Option<strategic::Strategic>,
     /// A space elevator: brings down its queue, free, on a platform every period.
     pub elevator: Option<elevator::Elevator>,
+    /// A Lance: a great beam that charges on its target, then strikes.
+    pub lance: Option<lance::Lance>,
+    /// What grows with the unit's level (survival's Shapers).
+    pub growth: Option<growth::Growth>,
     pub builder: Option<Builder>,
     pub reclaimer: Option<Reclaimer>,
     /// A lift ship: carries land units in its hold.
@@ -1676,6 +1682,14 @@ impl Blueprints {
             }
             match &u.elevator {
                 Some(e) => e.hash(&mut h),
+                None => h.write_u64(u64::MAX),
+            }
+            match &u.lance {
+                Some(l) => l.hash(&mut h),
+                None => h.write_u64(u64::MAX),
+            }
+            match &u.growth {
+                Some(g) => g.hash(&mut h),
                 None => h.write_u64(u64::MAX),
             }
             match &u.dash {

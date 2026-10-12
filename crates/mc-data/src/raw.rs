@@ -457,6 +457,12 @@ pub(crate) struct Unit {
     /// A space elevator ([`crate::elevator::Elevator`]).
     #[serde(default)]
     pub elevator: Option<crate::elevator::RawElevator>,
+    /// A Lance: a great beam that charges on its target, then strikes ([`crate::lance::Lance`]).
+    #[serde(default)]
+    pub lance: Option<crate::lance::RawLance>,
+    /// What grows with the unit's level ([`crate::growth::Growth`]).
+    #[serde(default)]
+    pub growth: Option<crate::growth::RawGrowth>,
     #[serde(default)]
     pub builder: Option<RawBuilder>,
     #[serde(default)]
@@ -2522,6 +2528,29 @@ impl Unit {
             },
             elevator: match &self.elevator {
                 Some(e) => Some(e.compile(key, fx, TICKS_PER_SECOND)?),
+                None => None,
+            },
+            lance: match &self.lance {
+                Some(l) => Some(l.compile(
+                    key,
+                    mask(&l.targets, &format!("{key} lance"))?,
+                    fx,
+                    TICKS_PER_SECOND,
+                )?),
+                None => None,
+            },
+            growth: match &self.growth {
+                Some(g) => Some(g.compile(
+                    key,
+                    crate::growth::Has {
+                        shield: self.shield.is_some(),
+                        lance: self.lance.is_some(),
+                        interceptor: self.strategic.as_ref().is_some_and(|s| {
+                            s.kind == crate::strategic::StrategicKind::Interceptor
+                        }),
+                    },
+                    TICKS_PER_SECOND,
+                )?),
                 None => None,
             },
             builder,

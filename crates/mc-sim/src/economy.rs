@@ -356,7 +356,7 @@ impl World {
                 self.work_cost(job.target, job.repair),
             );
             let build_time = tbp.build_time;
-            let shield_max = tbp.shield.map(|s| s.health);
+            let shield_max = self.shield_spec(job.target).map(|s| s.health);
             if job.shield {
                 spent[p].1 += cost_energy * step / build_time;
                 self.flows[job.builder].used[1] += cost_energy * step / build_time;

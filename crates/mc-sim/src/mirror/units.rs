@@ -254,9 +254,7 @@ impl World {
                     0
                 }
                 | contact,
-            health: (s.units.health[row]
-                / crate::veterancy_health(bp.health, s.units.veterancy[row]).max(Fx::ONE))
-            .to_f32(),
+            health: (s.units.health[row] / self.unit_max_health(row).max(Fx::ONE)).to_f32(),
             build,
             turret_yaw: s.units.weapon_yaw[row][0].to_radians_f32(),
             radius: bp.radius.to_f32(),

@@ -31,7 +31,7 @@ pub(crate) const SHIELD_GROW_TICKS: u8 = 25;
 impl World {
     /// A live, mostly-open field that still has hit points.
     pub(crate) fn shield_blocking(&self, row: usize) -> bool {
-        self.bp(row).shield.is_some()
+        self.shield_spec(row).is_some()
             && self.state.units.is_active(row)
             && self.state.units.shield_open[row] >= SHIELD_BLOCKING_OPEN
             && self.state.units.shield_hp[row] > Fx::ZERO
@@ -53,7 +53,7 @@ impl World {
 
     /// [`Self::dome_radius`] with `grow` ticks left, eased at both ends.
     pub(crate) fn dome_radius_at(&self, row: usize, grow: u8) -> Fx {
-        let Some(spec) = self.bp(row).shield else {
+        let Some(spec) = self.shield_spec(row) else {
             return Fx::ZERO;
         };
         if grow == 0 {
@@ -89,7 +89,7 @@ impl World {
     }
 
     fn shield_wants_up(&self, row: usize) -> bool {
-        self.bp(row).shield.is_some()
+        self.shield_spec(row).is_some()
             && self.state.units.is_active(row)
             && self.state.units.shield_recharge[row] == 0
             && !self.shield_off(row)
@@ -98,7 +98,7 @@ impl World {
     /// A live dome that is missing charge: engineers may pump extra regen into
     /// it. A shattered bubble filling while down is not this.
     pub(crate) fn shield_assistable(&self, row: usize) -> bool {
-        let Some(spec) = self.bp(row).shield else {
+        let Some(spec) = self.shield_spec(row) else {
             return false;
         };
         let hp = self.state.units.shield_hp[row];
@@ -114,7 +114,7 @@ impl World {
     /// Build-time units left to restore a live dome, so several engineers share
     /// what remains the same way they share a repair.
     pub(crate) fn shield_work_remaining(&self, row: usize) -> Fx {
-        let Some(spec) = self.bp(row).shield else {
+        let Some(spec) = self.shield_spec(row) else {
             return Fx::ZERO;
         };
         let missing = spec.health - self.state.units.shield_hp[row];
@@ -132,7 +132,7 @@ impl World {
     pub(crate) fn run_shields(&mut self) {
         let rows: Vec<usize> = self.state.units.slots.iter().collect();
         for row in rows {
-            let Some(spec) = self.bp(row).shield else {
+            let Some(spec) = self.shield_spec(row) else {
                 continue;
             };
             if !self.state.units.is_active(row) {
@@ -179,7 +179,7 @@ impl World {
     }
 
     pub(crate) fn arm_shield(&mut self, row: usize, instant: bool) {
-        let Some(spec) = self.bp(row).shield else {
+        let Some(spec) = self.shield_spec(row) else {
             return;
         };
         self.state.units.shield_hp[row] = spec.health;
@@ -192,7 +192,7 @@ impl World {
     /// An upgrade that just finished keeps its parent's bubble: same opening,
     /// same charge delay, hit points scaled onto the new dome.
     pub(crate) fn inherit_shield(&mut self, child: usize) {
-        if self.bp(child).shield.is_none() {
+        if self.shield_spec(child).is_none() {
             return;
         }
         let id = self.state.units.id(child);
@@ -206,11 +206,11 @@ impl World {
             self.arm_shield(child, false);
             return;
         };
-        let Some(old) = self.bp(parent).shield else {
+        let Some(old) = self.shield_spec(parent) else {
             self.arm_shield(child, false);
             return;
         };
-        let spec = self.bp(child).shield.unwrap();
+        let spec = self.shield_spec(child).unwrap();
         let ratio =
             (self.state.units.shield_hp[parent] / old.health.max(Fx::ONE)).clamp(Fx::ZERO, Fx::ONE);
         self.state.units.shield_hp[child] = spec.health * ratio;
@@ -220,7 +220,7 @@ impl World {
     }
 
     pub(crate) fn break_shield(&mut self, row: usize) {
-        let Some(spec) = self.bp(row).shield else {
+        let Some(spec) = self.shield_spec(row) else {
             return;
         };
         let units = &mut self.state.units;

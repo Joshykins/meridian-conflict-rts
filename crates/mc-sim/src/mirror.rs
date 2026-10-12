@@ -365,6 +365,15 @@ pub enum SimEvent {
         level: u16,
         added: Option<BlueprintId>,
     },
+    /// A Lance (`lance.rs`) struck: from `unit` (its own position and height, or a
+    /// Shaper's built height) down onto `to`, `damage` over `splash` metres.
+    LanceStrike {
+        unit: UnitId,
+        owner: u8,
+        to: mc_core::FxVec3,
+        splash: Fx,
+        damage: Fx,
+    },
     /// Survival: the defenders held out through the last round.
     SurvivalWon {
         rounds: u16,
@@ -2823,7 +2832,7 @@ impl World {
 
         frame.shields.clear();
         for row in s.units.slots.iter() {
-            let Some(spec) = self.bp(row).shield else {
+            let Some(spec) = self.shield_spec(row) else {
                 continue;
             };
             if s.units.has_flag(row, crate::tables::flag::UPGRADE) {
