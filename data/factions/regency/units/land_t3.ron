@@ -210,6 +210,52 @@
         mesh: "regency_censer", icon: Shield,
         sounds: (death: "blast_large", moving: "aster_hover"),
     ),
+    // Lance anti-air: a hover hull carrying one long Pinch lance on a high-pitching mount,
+    // the Regency's answer to a rail gun, for the heavy aircraft the repeaters and seekers
+    // cannot stop: strategic bombers and assault craft. Over a short charge a knot of
+    // plasma is squeezed between the lance's tines, then pinched out as one bolt, a red
+    // streak that reaches its plane almost at once (2600 m/s: half a second at full reach,
+    // led onto the plane by the sim). One plane a shot: no burst, no splash worth the name,
+    // no flak. Slow to fire and useless against swarms of light craft; that is the Vane's
+    // and the Gorget's work.
+    //
+    // Balance: the ARC counterpart's baseline (1500 every 4 s at 1300 m, 375 a second on one
+    // plane, 4000 HP, 800 materials). Bent the Regency way: a harder bolt (1800) on a
+    // slower reload (4.8 s), the same 375 a second, on a lighter hull (3800) for the lift
+    // that takes it over water. 1300 m outreaches the Thunderhead's rockets (1280) and a
+    // strategic bomber's release (950), so it shoots first; four bolts bring down an
+    // Eclipse (6000), two of these do it in one pass.
+    //
+    // Model: `regency_lance_aa` (`models::regency::lance_aa`), authored at this size;
+    // `pivot`/`muzzle` are its trunnion and the charge between the tines.
+    (
+        key: "regency_t3_lance_aa",
+        name: "Bardiche",
+        role: "Mobile Lance Anti-Air", title: "Heavy Anti-Air",
+        tech: 3,
+        categories: ["Land", "AntiAir"],
+        health: 3800,
+        cost: (materials: 800, energy: 7000, time: 4000),
+        radius: 7.0, height: 6.0,
+        vision: 1300,
+        motion: (layer: Hover, size: 1, speed: 25, accel: 18, turn: 75),
+        weapons: [(
+            name: "Pinch Lance",
+            damage: 1800, splash: 3, range: 1300, reload: 4.8, speed: 2600, trajectory: Direct,
+            turret_turn: 90, muzzle: (8.6, 0, 3.4), pivot: (0.4, 0, 3.4),
+            targets: ["Air"], color: Orange, red: 1.0,
+            plasma_grade: Some(Pinched),
+            flash: 1.0, impact: 1.4, tracer: 1.6,
+            // Stand-ins: the Halberd's charge, shot and strike until it has its own.
+            sounds: (
+                fire: "regency_halberd_fire", charge: "regency_halberd_charge", charge_time: 0.4,
+                impact: "regency_halberd_hit",
+            ),
+        )],
+        mesh: "regency_lance_aa", icon: AntiAir,
+        lights: [(kind: Point, at: (0, 0, 0.3), color: (1.0, 0.14, 0.06), intensity: 80, range: 14, night_only: false)],
+        sounds: (death: "blast_large", moving: "aster_hover"),
+    ),
     // Executioner: Paladin-class assault tank. 11,400 combined hull/shield versus
     // 10,787; 475 precise DPS plus up to 90 rocket DPS, paid for with 13% more materials
     // and slower movement. Rocket scatter makes the extra damage situational.

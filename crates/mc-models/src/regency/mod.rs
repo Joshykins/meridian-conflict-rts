@@ -36,6 +36,7 @@ mod hatchery;
 mod heart;
 mod hover_tank;
 mod kit;
+mod lance_aa;
 mod lift;
 mod loft;
 mod machine;
@@ -153,6 +154,26 @@ pub(super) const MODELS: &[ModelDef] = &[
         censer::RADIUS,
         censer::HEIGHT,
         censer::censer,
+    ),
+    // The tech 3 lance anti-air: a hover hull, one long Pinch lance on its turret
+    // (`lance_aa`), three designs while one is picked.
+    ModelDef::new(
+        "regency_lance_aa",
+        lance_aa::RADIUS,
+        lance_aa::HEIGHT,
+        lance_aa::split,
+    ),
+    ModelDef::new(
+        "regency_lance_aa~b",
+        lance_aa::RADIUS,
+        lance_aa::HEIGHT,
+        lance_aa::yoke,
+    ),
+    ModelDef::new(
+        "regency_lance_aa~c",
+        lance_aa::RADIUS,
+        lance_aa::HEIGHT,
+        lance_aa::sheath,
     ),
     // The tech 4 assault tripod: a keeled head high on three legs (`strider`).
     ModelDef::new(
@@ -465,6 +486,9 @@ pub(super) fn reduced_share(key: &str) -> Option<f32> {
         "regency_gravitic_lens" => Some(0.55),
         // A faceted hull and slotted emitter plates that keep their sides when reduced.
         "regency_censer" => Some(0.6),
+        // A faceted hull, plated cheeks and lofted lance and tines: armour that keeps its
+        // sides reduced, with few round parts for the full level to spend on.
+        "regency_lance_aa" => Some(0.7),
         // Plated hulls, heads and legs: faceted solids that keep their sides when reduced.
         "regency_strider" | "regency_wake_tank" | "regency_colossus" | "regency_seraph"
         | "regency_saker" => Some(0.5),

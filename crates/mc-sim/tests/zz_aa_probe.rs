@@ -33,6 +33,7 @@ const SHOOTERS: &[&str] = &[
     "aster_t3_battleship",
     "aster_t3_carrier",
     "aster_t4_assault_tank",
+    "regency_t3_lance_aa",
 ];
 
 const TARGETS: &[&str] = &[

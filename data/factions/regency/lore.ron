@@ -60,6 +60,12 @@
         lore: "A hover hull that carries no gun, only a nanite emitter; the haze it lets out drifts over the line behind it and every friendly hull in it is mended a plate at a time, under fire or not.",
         weapons: {},
     ),
+    "regency_t3_lance_aa": (
+        lore: "A hover hull built round one long lance that looks only at the sky. It waits for the heavy aircraft the repeaters cannot stop, and when one comes into reach it pinches out a single bolt of plasma that is on the plane before its crew sees the flash.",
+        weapons: {
+            "Pinch Lance": "A knot of plasma squeezed between the lance's tines and pinched out as one bolt, a red streak fast enough to need no guidance: it strikes the one plane it was fired at.",
+        },
+    ),
     "regency_t3_wake_tank": (
         lore: "A heavy hover tank built round one wide projector; when it lets go, a fan of plasma rolls out over the ground ahead and nothing standing in it is spared.",
         weapons: {
