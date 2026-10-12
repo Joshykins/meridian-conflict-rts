@@ -3,7 +3,7 @@ use super::parts::*;
 mod flak_battery;
 mod floats;
 mod gnat;
-pub(super) mod mistral;
+mod mistral;
 mod skyguard;
 mod squall;
 use crate::builder::MeshBuilder;
@@ -114,6 +114,10 @@ pub(super) fn sam(b: &mut MeshBuilder, _: u8) {
 /// Half the Sparrow's pad and the Barrage's (`platform`).
 const SPARROW_PAD: f32 = 5.5 * 0.85;
 const BARRAGE_PAD: f32 = 9.5 * 0.85;
+/// Mistral: the tech 3 tracked rail AA (`mistral.rs`).
+pub(super) fn rail_mobile(b: &mut MeshBuilder, _: u8) {
+    mistral::build(b);
+}
 /// Tracked AA by tier: the Gnat, then the Squall.
 pub(super) fn mobile(b: &mut MeshBuilder, tech: u8) {
     if tech == 1 {

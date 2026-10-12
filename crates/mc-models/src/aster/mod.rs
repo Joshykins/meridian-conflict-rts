@@ -120,11 +120,8 @@ pub(super) const MODELS: &[ModelDef] = &[
         [(4.0, 4.5), (5.5, 5.5), (5.5, 5.5)],
         aa::mobile,
     ),
-    // The Mistral, tech 3 rail AA (`aa/mistral.rs`); `~b` and `~c` are the other designs
-    // of its round.
-    ModelDef::new("rail_aa", 7.0, 4.5, aa::mistral::yoke),
-    ModelDef::new("rail_aa~b", 7.0, 4.5, aa::mistral::cradle),
-    ModelDef::new("rail_aa~c", 7.0, 4.5, aa::mistral::turntable),
+    // The Mistral, tech 3 rail AA (`aa/mistral.rs`).
+    ModelDef::new("rail_aa", 7.0, 4.5, aa::rail_mobile),
     // Naval units: a hull's origin is its waterline, `height` what stands above it.
     ModelDef::new("attack_boat", 6.0, 4.0, naval::attack_boat),
     ModelDef::new("frigate", 15.0, 10.0, naval::frigate),
