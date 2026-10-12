@@ -23,7 +23,16 @@ fn desert() -> bool {
 // lies bright and wind-sculpted, the sea is dark and rough with ice in it, and
 // what falls from the sky is snow.
 fn polar() -> bool {
-    return globals.climate.x > 2.5;
+    return globals.climate.x > 2.5 && globals.climate.x < 3.5;
+}
+
+// The map's climate is autumn in sandstone karst (`Globals::climate` 4): the
+// temperate look (climate_within counts it temperate) with the broadleaf woods
+// red, orange and gold, leaf litter on the ground, straw-coloured grass, warm grey
+// sandstone, jade water and mist lying in the hollows. What is drawn at a place
+// asks `autumn_at`.
+fn autumn() -> bool {
+    return globals.climate.x > 3.5 && globals.climate.x < 4.5;
 }
 
 // How much of each climate's look the ground or sea at `xy` takes, 0-1: x tropical,
@@ -63,6 +72,29 @@ fn desert_at(xy: vec2<f32>, px: f32) -> f32 {
 // How much of the tropical look `xy` takes: `f32(tropical())` on a map of one climate.
 fn tropical_at(xy: vec2<f32>, px: f32) -> f32 {
     return climate_at(xy, px).x;
+}
+
+// How much of the autumn look `xy` takes, 0-1, handed over across a climate wall
+// within `half` metres as `climate_within` does: `f32(autumn())` on a map of one
+// climate. Drawn over the temperate look by this weight.
+fn autumn_within(xy: vec2<f32>, half: f32) -> f32 {
+    if !has_regions() {
+        return select(0.0, 1.0, autumn());
+    }
+    let shares = region_shares(xy, half);
+    if !shares.mixed {
+        return globals.region_climate[shares.region].w;
+    }
+    var share = 0.0;
+    let regions = u32(atmos.regions.y);
+    for (var r = 0u; r < regions; r++) {
+        share += globals.region_climate[r].w * shares.w[r];
+    }
+    return share;
+}
+
+fn autumn_at(xy: vec2<f32>, px: f32) -> f32 {
+    return autumn_within(xy, max(REGIONS_BLEND_M, px * 1.5));
 }
 
 // How much of the polar look `xy` takes, 0-1, handed over across a climate wall within

@@ -471,7 +471,7 @@ impl MapLook {
         match self.climate_at(x, y) {
             Climate::Polar => true,
             Climate::Temperate => snow_layer && self.climates.len() > 1,
-            Climate::Tropical | Climate::Desert => false,
+            Climate::Tropical | Climate::Desert | Climate::Autumn => false,
         }
     }
 }
@@ -488,6 +488,8 @@ pub enum Biome {
     Wasteland,
     /// A city and its outskirts.
     Urban,
+    /// Broadleaf woods turned red and gold.
+    Autumn,
 }
 
 impl Biome {
@@ -501,6 +503,7 @@ impl Biome {
             Biome::Desert => "Desert",
             Biome::Wasteland => "Wasteland",
             Biome::Urban => "Urban",
+            Biome::Autumn => "Autumn",
         }
     }
 }
@@ -532,7 +535,10 @@ impl MapStyle {
 /// desert (red-rock strata, pale caliche and red sand dotted with dark shrubs,
 /// jade-to-cobalt reservoir water with a bleached bathtub ring), or the polar
 /// south (snow and ice over dark bare rock, nothing green, a dark rough sea with
-/// ice drifting in it, and snow, never rain, from the sky).
+/// ice drifting in it, and snow, never rain, from the sky), or autumn in
+/// sandstone karst (the temperate look with the broadleaf woods red, orange and
+/// gold, leaf litter and straw-coloured grass, warm grey sandstone, jade water and
+/// mist lying in the hollows).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Climate {
     #[default]
@@ -540,6 +546,7 @@ pub enum Climate {
     Tropical,
     Desert,
     Polar,
+    Autumn,
 }
 
 impl Climate {
@@ -550,6 +557,7 @@ impl Climate {
             "tropical" | "tropic" => Some(Climate::Tropical),
             "desert" | "arid" => Some(Climate::Desert),
             "polar" | "antarctic" | "arctic" => Some(Climate::Polar),
+            "autumn" | "fall" => Some(Climate::Autumn),
             _ => None,
         }
     }
@@ -612,6 +620,7 @@ impl MapConfig {
             Climate::Desert => Biome::Desert,
             Climate::Temperate => Biome::Temperate,
             Climate::Polar => Biome::Arctic,
+            Climate::Autumn => Biome::Autumn,
         })
     }
 
@@ -718,6 +727,9 @@ mod tests {
             assert_eq!(Climate::from_name(name), Some(Climate::Polar));
         }
         assert_eq!(Climate::from_name("tundra"), None);
+        let c = MapConfig::parse("(climate: Autumn)").unwrap();
+        assert_eq!((c.climate(), c.biome()), (Climate::Autumn, Biome::Autumn));
+        assert_eq!(Climate::from_name(" Fall "), Some(Climate::Autumn));
     }
 
     #[test]

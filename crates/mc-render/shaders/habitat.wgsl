@@ -55,6 +55,9 @@ struct Habitat {
     // everything but steep rock and wind-scoured ground, which is dark rock, scree
     // and moraine; nothing grows.
     polar: f32,
+    // How much of the autumn look it takes (`autumn_at`), drawn over the
+    // temperate one: leaf litter, straw grass.
+    autumn: f32,
     // A city's made ground (the map's streets layer): the cell, and how much of
     // the ground here is made, 0-1 (roads, pavements, yards, rubble, fields:
     // everything but its lawns and the terrain's own ground). Nothing grows on it.
@@ -106,6 +109,7 @@ fn habitat(xy: vec2<f32>, z: f32, base_n: vec3<f32>, px: f32) -> Habitat {
     h.tropical = climate.x;
     h.desert = climate.y;
     h.polar = polar_at(xy, px);
+    h.autumn = autumn_at(xy, px);
     h.street = street_cell(xy);
     h.made = street_made(h.street);
 
@@ -586,7 +590,8 @@ fn grass_materials(g: vec4<f32>, h: Habitat, tip: f32) -> vec3<f32> {
 
 // How sun-dried the grass is (0 lush, 1 straw): dry ground and dry habitats.
 fn grass_dryness(h: Habitat) -> f32 {
-    return clamp(1.0 - h.wet * 1.3 + (h.broad - 0.5) * 0.6, 0.0, 1.0);
+    // (Autumn has turned it.)
+    return clamp(1.0 - h.wet * 1.3 + (h.broad - 0.5) * 0.6 + h.autumn * 0.5, 0.0, 1.0);
 }
 
 // A well-mixed integer hash (PCG), for per-tuft and per-blade randoms that are

@@ -560,7 +560,7 @@ impl Ambience {
         let (sparse, frogs, swell) = match cues.climate {
             Climate::Desert => (0.45, 0.0, 0.35),
             Climate::Polar => (1.0, 1.0, 1.4),
-            Climate::Temperate | Climate::Tropical => (1.0, 1.0, 1.0),
+            Climate::Temperate | Climate::Tropical | Climate::Autumn => (1.0, 1.0, 1.0),
         };
         let frog_chorus = chorus * frogs;
         // (gain, pan, pitch) of each bed voice, in `BEDS` order.
@@ -659,7 +659,7 @@ impl Ambience {
         let calls = match cues.climate {
             Climate::Tropical => &ids.tropical_birds,
             Climate::Desert => &ids.desert_birds,
-            Climate::Temperate | Climate::Polar => &ids.birds,
+            Climate::Temperate | Climate::Polar | Climate::Autumn => &ids.birds,
         };
         if !calls.is_empty() && dice.chance(birds, dt) {
             let total: f32 = calls

@@ -552,9 +552,9 @@ impl Terrain {
             let rough = 3.0 * self.crag.fbm(q.0 / 17.0, q.1 / 17.0, 2, 0.5);
             let e = d - p.radius - lobes + rough;
             let body = smoothstep(4.0, -6.0, e);
-            let top = p.tall * (1.0 - 0.1 * (d / p.radius).min(1.2).powi(2))
+            let top = p.tall * (1.0 - 0.035 * (d / p.radius).min(1.2).powi(2))
                 + 4.0 * self.detail.fbm(q.0 / 25.0, q.1 / 25.0, 2, 0.5);
-            let skirt = 0.06 * p.tall * smoothstep(p.radius + 35.0, p.radius, d);
+            let skirt = 0.02 * p.tall * smoothstep(p.radius + 25.0, p.radius, d);
             rise = rise.max(top * body).max(skirt);
         }
         (ground + rise).min(PEAK)

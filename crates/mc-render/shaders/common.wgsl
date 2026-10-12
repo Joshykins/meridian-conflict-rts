@@ -69,8 +69,9 @@ struct Globals {
     // xyz and nose heat. Size mirrors nuke_fx::MISSILE_SLOTS * 2.
     strategic: array<vec4<f32>, 128>,
     // x the map's climate (mc_data::weather::Climate), region 0's on a map with
-    // regions: 0 temperate, 1 tropical, 2 desert, 3 polar (`tropical()`, `desert()`,
-    // `polar()`, `climate_at` and `polar_at` in bindings.wgsl); y 1 while grass is grown (renderer/grass.rs);
+    // regions: 0 temperate, 1 tropical, 2 desert, 3 polar, 4 autumn (`tropical()`,
+    // `desert()`, `polar()`, `autumn()`, `climate_at`, `polar_at` and `autumn_at` in
+    // bindings.wgsl); y 1 while grass is grown (renderer/grass.rs);
     // z how far from the eye it grows (`grass::reach`); w how many sim ticks this frame
     // covers (the treads' motion blur, entity.wgsl).
     climate: vec4<f32>,
@@ -86,8 +87,9 @@ struct Globals {
     settle: vec4<f32>,
     // Each region's climate (mc_data::regions; the walls between them are in
     // `Atmosphere`): x 1 where it is tropical, y 1 where it is desert, as `climate_within`
-    // (bindings.wgsl) mixes them; z 1 where it is polar (`polar_within`). Region 0
-    // repeats `climate.x`.
+    // (bindings.wgsl) mixes them; z 1 where it is polar (`polar_within`); w 1 where
+    // it is autumn (`autumn_within`), which is drawn over the temperate look. Region
+    // 0 repeats `climate.x`.
     region_climate: array<vec4<f32>, REGIONS_MAX>,
     // x metres the desert's rock beds are lowered (`MapConfig::strata_lift`, desert.wgsl).
     map_look: vec4<f32>,

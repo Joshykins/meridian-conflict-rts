@@ -8,7 +8,7 @@ use super::*;
 use crate::gpu_consts::regions;
 use mc_data::weather::{Climate, MapLook};
 
-/// `MERIDIAN_CLIMATE=temperate|tropical|desert|polar`: draws any map in that climate, all of
+/// `MERIDIAN_CLIMATE=temperate|tropical|desert|polar|autumn`: draws any map in that climate, all of
 /// it (`Renderer::set_map_look`).
 fn climate_override() -> Option<Climate> {
     std::env::var("MERIDIAN_CLIMATE")
@@ -17,13 +17,14 @@ fn climate_override() -> Option<Climate> {
 }
 
 /// The climate as the shaders read it (`Globals::climate.x`; `tropical()`,
-/// `desert()` and `polar()` in bindings.wgsl).
+/// `desert()`, `polar()` and `autumn()` in bindings.wgsl).
 fn climate_code(climate: Climate) -> f32 {
     match climate {
         Climate::Temperate => 0.0,
         Climate::Tropical => 1.0,
         Climate::Desert => 2.0,
         Climate::Polar => 3.0,
+        Climate::Autumn => 4.0,
     }
 }
 
@@ -43,7 +44,7 @@ pub(super) struct ClimateGlobals {
 impl Renderer {
     /// How the map's ground and sea are drawn (its `MapConfig::look`): the climate's
     /// palette, and on a map with regions each region's, the climate walls between
-    /// them and the light along the walls' foot. `MERIDIAN_CLIMATE=temperate|tropical|desert|polar`
+    /// them and the light along the walls' foot. `MERIDIAN_CLIMATE=temperate|tropical|desert|polar|autumn`
     /// draws the whole map in that climate instead, with no regions, for shots and tests.
     pub fn set_map_look(&mut self, look: &MapLook) {
         self.look = match climate_override() {
@@ -74,7 +75,7 @@ impl Renderer {
                 (*climate == Climate::Tropical) as u32 as f32,
                 (*climate == Climate::Desert) as u32 as f32,
                 (*climate == Climate::Polar) as u32 as f32,
-                0.0,
+                (*climate == Climate::Autumn) as u32 as f32,
             ];
         }
         ClimateGlobals {

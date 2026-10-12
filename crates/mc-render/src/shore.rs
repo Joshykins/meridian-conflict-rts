@@ -38,7 +38,7 @@ pub fn climate_scale(climate: mc_data::weather::Climate, wind: f32) -> f32 {
         Climate::Desert => surf::DESERT,
         Climate::Tropical => surf::TROPICAL,
         Climate::Polar => surf::POLAR,
-        Climate::Temperate => 1.0,
+        Climate::Temperate | Climate::Autumn => 1.0,
     };
     base * (0.4 + wind * surf::WIND_GAIN).clamp(0.6, 1.5)
 }

@@ -192,6 +192,31 @@ fn tropical_albedo(p: TerrainPatch, m: i32, temperate: vec3<f32>) -> vec3<f32> {
     return hue * lum * 1.15;
 }
 
+// The autumn palette (`Habitat::autumn`), over the temperate one: the grass
+// turned straw and olive-gold, the leaf litter under the woods rust and orange,
+// the needle floor warmer. `temperate` is `ground_albedo`'s colour; other
+// materials (rock, dirt, sand, mud) keep it.
+fn autumn_albedo(p: TerrainPatch, m: i32, temperate: vec3<f32>) -> vec3<f32> {
+    let luma = vec3<f32>(0.2126, 0.7152, 0.0722);
+    var turned = vec3<f32>(0.0);
+    var bright = 1.0;
+    switch m {
+        case 1: { turned = vec3<f32>(1.45, 1.08, 0.36); }  // leafy grass
+        case 2: { turned = vec3<f32>(1.40, 1.10, 0.42); }  // aerial meadow
+        case 3: {
+            // Fallen leaves: rust, orange and brown in drifts.
+            let drift = grad_noise2(p.color.rg * 40.0, 1.0);
+            turned = mix(vec3<f32>(2.3, 0.85, 0.28), vec3<f32>(1.6, 0.95, 0.5), drift);
+            bright = 1.25;
+        }
+        case 4: { turned = vec3<f32>(1.5, 1.0, 0.6); }  // needle floor
+        default: { return temperate; }
+    }
+    let lum = max(dot(temperate, luma), 1e-5);
+    let hue = mix(temperate / lum, turned / dot(turned, luma), 0.75);
+    return hue * lum * bright;
+}
+
 // One ground material seen from above: three rotated patches of the scan
 // (terrain_projection), so no tile repeats. `d` is the pixel footprint
 // derivative of world xy.
@@ -713,6 +738,11 @@ fn shade_ground(world: vec3<f32>, crag: vec4<f32>, pixel: vec2<f32>, dpx: vec3<f
         ground_color = side_mix3(ground_color, tropical_albedo(ga, a, ground_albedo(ga, a)) * bw.x
             + tropical_albedo(gb, b, ground_albedo(gb, b)) * bw.y
             + tropical_albedo(gc, c, ground_albedo(gc, c)) * bw.z, tropic);
+    }
+    if hab.autumn > 0.0 {
+        ground_color = side_mix3(ground_color, autumn_albedo(ga, a, ground_albedo(ga, a)) * bw.x
+            + autumn_albedo(gb, b, ground_albedo(gb, b)) * bw.y
+            + autumn_albedo(gc, c, ground_albedo(gc, c)) * bw.z, hab.autumn);
     }
     // Canyon country (desert.wgsl): the beds, their soils, talus and sand.
     let dz = max(abs(dpx.z), abs(dpy.z));

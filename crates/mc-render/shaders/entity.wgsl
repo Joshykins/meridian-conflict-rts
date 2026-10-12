@@ -3477,6 +3477,21 @@ fn shade_entity(in: VsOut) -> vec4<f32> {
             facing *= select(-1.0, 1.0, dot(facing, v) > 0.0);
         }
         n = normalize(n * 0.78 + facing * 0.22);
+        // Autumn (`autumn_at`): a broadleaf crown turns, each tree its own colour,
+        // most orange and rust, some crimson, some gold, a few still green; card by
+        // card a little apart. Conifers stay green.
+        let atlas = (in.model_class >> 16u) & 0xFFu;
+        let broadleaf = (tag & LEAF_CONIFER) == 0u && atlas != LEAF_TROPICAL && atlas != SCENERY_LEAF_DESERT;
+        let fall = select(0.0, autumn_at(in.world.xy, 0.0), broadleaf);
+        if fall > 0.0 {
+            let lum = dot(m.albedo, vec3<f32>(0.2126, 0.7152, 0.0722));
+            let pick = fract(tree * 7.31 + card * 0.13);
+            var turned = mix(vec3<f32>(0.62, 0.05, 0.03), vec3<f32>(0.80, 0.24, 0.035), smoothstep(0.08, 0.3, pick));
+            turned = mix(turned, vec3<f32>(0.85, 0.52, 0.06), smoothstep(0.55, 0.75, pick));
+            let green = smoothstep(0.93, 0.97, fract(tree * 3.77));
+            let lit = turned / dot(turned, vec3<f32>(0.2126, 0.7152, 0.0722)) * lum * 1.35;
+            m.albedo = mix(m.albedo, lit, fall * (1.0 - green));
+        }
         let hue = tree - 0.5;
         m.albedo *= (0.8 + 0.4 * tree) * (0.86 + 0.28 * card);
         m.albedo *= vec3<f32>(1.0 + hue * 0.45, 1.0, 1.0 - hue * 0.35);
@@ -3486,7 +3501,8 @@ fn shade_entity(in: VsOut) -> vec4<f32> {
         let sun = globals.sun.xyz;
         let behind = max(-dot(facing, sun), 0.0);
         let into_sun = pow(max(-dot(v, sun), 0.0), 4.0);
-        leaf_through = m.albedo * vec3<f32>(0.9, 1.1, 0.45) * 2.7 * (behind * 0.22 + into_sun * 0.4) * leaf_occlusion;
+        let glow = mix(vec3<f32>(0.9, 1.1, 0.45), vec3<f32>(1.25, 0.95, 0.5), fall);
+        leaf_through = m.albedo * glow * 2.7 * (behind * 0.22 + into_sun * 0.4) * leaf_occlusion;
     }
     if in.material == MAT_BARK {
         // Scanned bark: along and around a trunk's own frame where it has one

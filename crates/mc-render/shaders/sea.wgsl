@@ -505,7 +505,12 @@ fn water_optics(column: f32, lit: f32, climate: vec3<f32>) -> Optics {
     if temperate > 0.0 {
         // Clear, lightly green coastal water: red is gone in a few metres, and
         // the seabed reads through a dozen metres or so of it.
-        scatter += mix(vec3<f32>(0.010, 0.050, 0.052), vec3<f32>(0.0045, 0.020, 0.036), smoothstep(2.0, 30.0, column)) * temperate;
+        var hue = mix(vec3<f32>(0.010, 0.050, 0.052), vec3<f32>(0.0045, 0.020, 0.036), smoothstep(2.0, 30.0, column));
+        // Autumn karst water: the jade of limestone and sandstone country.
+        if autumn() {
+            hue = mix(DESERT_JADE, DESERT_TEAL, smoothstep(3.0, 30.0, column)) * 0.85;
+        }
+        scatter += hue * temperate;
     }
     o.scatter = scatter * lit;
     return o;

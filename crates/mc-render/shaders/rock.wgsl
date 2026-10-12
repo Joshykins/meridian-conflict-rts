@@ -10,8 +10,22 @@
 // are bedded: ledges catching the light over darker bands, broken by cracks.
 fn cliff_stone(xy: vec2<f32>, z: f32, slope: f32, scan: vec3<f32>, broad: f32, patchy: f32, mountain: bool) -> vec3<f32> {
     let mineral = dot(scan, vec3<f32>(0.2126, 0.7152, 0.0722));
-    let stone = mix(vec3<f32>(mineral) * vec3<f32>(0.95, 0.96, 0.98), scan, 0.3)
+    var stone = mix(vec3<f32>(mineral) * vec3<f32>(0.95, 0.96, 0.98), scan, 0.3)
         * (1.05 + broad * 0.5 + patchy * 0.25);
+    // Autumn karst: quartz sandstone, warm grey-buff, laid in thin courses, the
+    // walls streaked dark where water runs down them (a streak varies along a
+    // wall and not down it) and greened with moss low down.
+    let fall = autumn_at(xy, 0.0);
+    if fall > 0.0 {
+        let course = sin(z * 0.85 + grad_noise2(xy + 3.0, 60.0) * 7.0);
+        let bed = 0.9 + 0.16 * smoothstep(0.2, 0.9, course) - 0.12 * (1.0 - smoothstep(0.0, 0.12, abs(course + 0.4)));
+        let wet = smoothstep(0.55, 0.8, grad_noise2(xy + 17.0, 3.5)) * smoothstep(0.45, 0.6, grad_noise2(xy - 41.0, 22.0));
+        let moss = smoothstep(0.55, 0.75, grad_noise2(xy * 1.3 + 9.0, 14.0)) * smoothstep(0.6, 1.0, slope);
+        let grain = clamp(pow(mineral / 0.07, 0.45), 0.6, 1.4);
+        var karst = vec3<f32>(0.33, 0.31, 0.27) * grain * bed * (1.0 - 0.45 * wet);
+        karst = mix(karst, vec3<f32>(0.055, 0.07, 0.035), moss * 0.35);
+        stone = mix(stone, karst, fall);
+    }
     if !mountain {
         return stone;
     }

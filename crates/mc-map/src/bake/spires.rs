@@ -211,14 +211,20 @@ impl Terrain {
         let mut habitable = smoothstep(2.0, 5.0, height) * (1.0 - smoothstep(0.45, 0.8, slope));
         let q = design((x, y));
         let r = q.0.hypot(q.1);
-        // Thin woods on the lowland by the sea; thick from the terrace up.
+        // Open broadleaf woods over most of the land, thinner on the lowland by
+        // the sea; thick on the tops of the pillars and the massif, the woods
+        // the mist lies under. (Half density in the open woods: the budget of
+        // trees covers twice the ground, and half is canopy enough.)
         let lush = smoothstep(14.0, 40.0, height);
         let forest = smoothstep(
-            self.forest_edge - 0.25 * lush,
-            self.forest_edge + 0.2 - 0.25 * lush,
+            self.forest_edge - 0.3 * lush,
+            self.forest_edge + 0.25 - 0.3 * lush,
             broad,
         );
-        let density = (forest * (1.0 - 0.75 * clearing)).max(smoothstep(0.42, 0.62, copse) * 0.7);
+        let open =
+            0.5 * (forest * (1.0 - 0.75 * clearing)).max(smoothstep(0.42, 0.62, copse) * 0.7);
+        let tops = 0.85 * smoothstep(TABLE + 50.0, TABLE + 120.0, height);
+        let density = open.max(tops);
         // The island and the fords stay open.
         if r < ISLAND.0 + 200.0 {
             habitable = 0.0;

@@ -100,6 +100,28 @@ const TROPICAL: Palette = Palette {
     snowbound: false,
 };
 
+/// Autumn karst: jade water, straw-coloured open ground, warm grey sandstone up
+/// high, the woods rust and gold.
+const AUTUMN: Palette = Palette {
+    sea: [
+        (0.0, rgb(140, 148, 140)),
+        (2.0, rgb(120, 146, 138)),
+        (4.5, rgb(92, 140, 132)),
+        (8.0, rgb(64, 128, 124)),
+        (12.5, rgb(48, 118, 120)),
+        (20.0, rgb(38, 104, 116)),
+        (32.0, rgb(34, 92, 112)),
+        (50.0, rgb(32, 84, 108)),
+    ],
+    sand: rgb(150, 142, 128),
+    sand_to: (2.0, 9.5),
+    open: rgb(112, 110, 92),
+    upland: rgb(116, 110, 102),
+    forest: rgb(104, 74, 58),
+    strata: false,
+    snowbound: false,
+};
+
 /// Reservoir water: jade over the pale shallows, teal, cobalt in the old
 /// channel. Ground by height (`desert_land`). Measured like the others, from a
 /// whole-map shot of Vermilion Gorge.
@@ -263,6 +285,7 @@ fn palette_of(climate: Climate) -> &'static Palette {
         Climate::Tropical => &TROPICAL,
         Climate::Desert => &DESERT,
         Climate::Polar => &POLAR,
+        Climate::Autumn => &AUTUMN,
     }
 }
 
