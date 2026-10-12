@@ -88,6 +88,9 @@ pub enum Refusal {
     OutOfReach,
     /// A carrier queues at most `air_wings::MAX_WING_QUEUE` wings.
     WingQueueFull,
+    /// A finished unit's lot could not be laid again on Repeat: built over, or blocked
+    /// longer than `site_repeat::MOST_WAIT`.
+    RepeatBlocked,
 }
 
 impl Refusal {
@@ -114,6 +117,7 @@ impl Refusal {
                 "A carrier queues at most {} wings",
                 crate::air_wings::MAX_WING_QUEUE
             ),
+            Refusal::RepeatBlocked => "Repeat stopped: the lot is blocked".to_owned(),
         }
     }
 }
@@ -1026,6 +1030,10 @@ pub const UNIT_DIVE_MASK: u32 = 0xFF;
 pub const UNIT_DIVE_GOAL: u32 = 1 << 8;
 /// Units' `status[0]`: the player paused this unit's work (`Command::SetPaused`).
 pub const UNIT_PAUSED: u32 = 1 << 9;
+/// Units' `status[0]`: a half-built unit on its own lot, set to Repeat (`site_repeat.rs`).
+/// Sent to its own side, allies and observers. `mc_models::gpu_consts::unit_repeat`; a
+/// test holds them equal.
+pub const UNIT_REPEAT: u32 = 1 << 27;
 /// Units' `status[0]` bits 25..27: the unit's own priority in a stall
 /// (`Command::SetPriority`), as `focus::Priority` numbers it: 0 Even, 1 First, 2 Last.
 /// Sent to its own side, allies and observers. `mc_models::gpu_consts::unit_priority`;

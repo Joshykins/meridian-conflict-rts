@@ -13,12 +13,46 @@ use mc_data::BlueprintId;
 const STEP_CLEAR: i32 = 3;
 
 impl World {
-    /// Sends `builder`'s side's units standing on a `lot` (turned, in build cells) at
-    /// `pos` off it. Units already on their way somewhere are left to go.
+    /// Whether a mobile unit other than `except` stands on a `lot` (turned, in build
+    /// cells) at `pos`.
+    pub(crate) fn mobile_units_in_footprint(
+        &self,
+        lot: (u8, u8),
+        pos: FxVec2,
+        except: usize,
+        blueprint: BlueprintId,
+    ) -> bool {
+        // The lot is a rectangle: a unit beside a long, narrow lot is not on it.
+        let half = FxVec2::from_ints(
+            lot.0 as i32 * mc_map::BUILD_CELL_M / 2,
+            lot.1 as i32 * mc_map::BUILD_CELL_M / 2,
+        );
+        let mut found = false;
+        self.index.query(pos, half.x.max(half.y), kind::UNIT, |e| {
+            let r = e.row as usize;
+            if r != except
+                && self.unit_entry_is_current(e)
+                && self.bp(r).is_mobile()
+                && !self.building_this_site(r, blueprint, pos)
+            {
+                let d = e.pos - pos;
+                if d.x.abs() < half.x && d.y.abs() < half.y {
+                    found = true;
+                    return false;
+                }
+            }
+            true
+        });
+        found
+    }
+
+    /// Sends `owner`'s units standing on a `lot` (turned, in build cells) at `pos` off
+    /// it, all but `builder`. Units already on their way somewhere are left to go.
     pub(crate) fn send_off_site(
         &mut self,
         lot: (u8, u8),
         pos: FxVec2,
+        owner: u8,
         builder: usize,
         blueprint: BlueprintId,
     ) -> Result<(), SimError> {
@@ -26,7 +60,6 @@ impl World {
             lot.0 as i32 * mc_map::BUILD_CELL_M / 2,
             lot.1 as i32 * mc_map::BUILD_CELL_M / 2,
         );
-        let owner = self.state.units.owner[builder];
         let mut off = Vec::new();
         self.index.query(pos, half.x.max(half.y), kind::UNIT, |e| {
             let r = e.row as usize;

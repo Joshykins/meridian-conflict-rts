@@ -2142,6 +2142,15 @@ fn riding_bit_matches_the_mirror() {
     );
 }
 
+/// The icon's repeat mark reads the bit the mirror sets.
+#[test]
+fn repeat_bit_matches_the_mirror() {
+    assert_eq!(
+        crate::gpu_consts::unit_repeat::MARK,
+        mc_sim::mirror::UNIT_REPEAT
+    );
+}
+
 /// The icon's priority chevron reads the bits the mirror sets.
 #[test]
 fn priority_bits_match_the_mirror() {

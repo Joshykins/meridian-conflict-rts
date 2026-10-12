@@ -92,6 +92,12 @@ impl State {
                 bad_owner("surges", &owners)
             })
             .or_else(|| {
+                let repeats = &self.site_repeats.waiting;
+                let ids: Vec<_> = repeats.iter().map(|r| r.blueprint).collect();
+                let owners: Vec<_> = repeats.iter().map(|r| r.owner).collect();
+                bad_bp("site repeats", &ids).or_else(|| bad_owner("site repeats", &owners))
+            })
+            .or_else(|| {
                 let s = self.survival.as_ref()?;
                 bad_bp("survival", &s.blueprint_ids())
                     .or_else(|| bad_owner("survival", &[s.config.engine_player]))

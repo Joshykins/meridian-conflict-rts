@@ -583,6 +583,9 @@ impl World {
         // An experimental raised on a lot drives off it: the lot is free again.
         if bp.is_site_built_unit() {
             self.release_lot(row, &bp, pos, heading);
+            if self.state.units.has_flag(row, flag::REPEAT) {
+                self.queue_site_repeat(row, pos, heading);
+            }
         }
         if self.state.units.has_flag(row, flag::UPGRADE) {
             self.inherit_shield(row);

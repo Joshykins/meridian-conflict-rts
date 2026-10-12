@@ -3,7 +3,8 @@
 //! curving charges, a wake tank's cone, a warp into a dampener and the stun it leaves, wrecks worn down by
 //! blasts, two factories' linked batch forming up, a self-destruct counting down across
 //! the snapshot, city blocks shot, set alight and brought down, a space elevator's cable
-//! clamped and its first platform docked) must hash identically at every worker count and after a snapshot is
+//! clamped and its first platform docked, a Fulgur raised on Repeat and its lot laid
+//! again) must hash identically at every worker count and after a snapshot is
 //! restored mid-match.
 //!
 //! `battle.rs` covers a land-only battle the same way; this is the one to extend
@@ -17,7 +18,7 @@ use mc_data::Blueprints;
 use mc_jobs::Pool;
 use mc_map::Heightfield;
 use mc_sim::focus::{Focus, Priority};
-use mc_sim::tables::Controller;
+use mc_sim::tables::{flag, Controller};
 use mc_sim::world::MapData;
 use mc_sim::{Command, MatchConfig, PlayerCommand, PlayerSetup, UnitId, World};
 use std::path::Path;
@@ -187,6 +188,7 @@ fn setup(w: &mut World) {
         }
         if player == 0 {
             add("aster_t1_tank", 1, GUNNER.0, GUNNER.1);
+            add("aster_t3_engineer", 1, REPEAT_LOT.0 + 60, REPEAT_LOT.1);
         }
         // Room for what the Reclaimers bring in.
         add("aster_materials_storage", 1, 500, 150);
@@ -291,6 +293,10 @@ fn setup(w: &mut World) {
 /// A tank of the south's that, from tick 3, shoots at the ground behind a house.
 const GUNNER: (i32, i32) = (300, 1000);
 
+/// Where the south's engineer raises a Fulgur on Repeat (`site_repeat.rs`).
+const REPEAT_LOT: (i32, i32) = (180, 800);
+const FULGUR: &str = "aster_t4_assault_tank";
+
 /// Where the warhead lands, and a field of wrecks lies.
 const WRECK_FIELD: FxVec2 = FxVec2::from_ints(900, 3300);
 
@@ -387,9 +393,63 @@ fn factories(w: &World) -> Vec<UnitId> {
         .collect()
 }
 
+/// The south's Fulgur site while it is not yet on Repeat.
+fn unrepeated_fulgur(w: &World) -> Option<UnitId> {
+    let bp = w.blueprints.id_of(FULGUR).unwrap();
+    let u = &w.state.units;
+    u.slots
+        .iter()
+        .find(|&r| {
+            u.owner[r] == 0
+                && u.blueprint[r] == bp
+                && u.has_flag(r, flag::UNDER_CONSTRUCTION)
+                && !u.has_flag(r, flag::REPEAT)
+        })
+        .map(|r| u.id(r))
+}
+
 /// The commands given on `tick`, the same in every run.
 fn script(w: &mut World, tick: u32) -> Vec<PlayerCommand> {
     match tick {
+        // The south's engineer lays a Fulgur's lot; once the site stands it is put on
+        // Repeat and all but finished, so it drives off and the lot is laid again.
+        7 => {
+            let engineer = w.blueprints.id_of("aster_t3_engineer").unwrap();
+            let fulgur = w.blueprints.id_of(FULGUR).unwrap();
+            let u = &w.state.units;
+            let units = u
+                .slots
+                .iter()
+                .filter(|&r| u.owner[r] == 0 && u.blueprint[r] == engineer)
+                .map(|r| u.id(r))
+                .collect();
+            vec![PlayerCommand {
+                player: 0,
+                command: Command::Build {
+                    units,
+                    blueprint: fulgur,
+                    pos: FxVec2::from_ints(REPEAT_LOT.0, REPEAT_LOT.1),
+                    heading: w.blueprints.unit(fulgur).build_heading(),
+                    queue: false,
+                },
+            }]
+        }
+        t if t > 7 && t < SNAPSHOT_AT && unrepeated_fulgur(w).is_some() => {
+            let site = vec![unrepeated_fulgur(w).unwrap()];
+            [
+                Command::SetRepeat {
+                    factories: site.clone(),
+                    repeat: true,
+                },
+                Command::DebugSetBuild {
+                    units: site,
+                    permille: 997,
+                },
+            ]
+            .into_iter()
+            .map(|command| PlayerCommand { player: 0, command })
+            .collect()
+        }
         1 => [(0u8, 3600), (1u8, 500)]
             .into_iter()
             .map(|(player, y)| PlayerCommand {
@@ -607,6 +667,8 @@ fn reference() -> Vec<u64> {
     let mut lens_strikes = 0;
     let mut surging = 0;
     let mut lanced = 0;
+    let fulgur = w.blueprints.id_of(FULGUR).unwrap();
+    let mut relaid = false;
     let hashes = (1..TICKS)
         .map(|t| {
             let commands = script(&mut w, t);
@@ -679,6 +741,18 @@ fn reference() -> Vec<u64> {
                 }
             }
             surging += usize::from(!w.state.surges.is_empty());
+            // A finished Fulgur of the south's, and its lot laid again on Repeat.
+            let u = &w.state.units;
+            let of_south = |r: usize| u.owner[r] == 0 && u.blueprint[r] == fulgur;
+            relaid |= u
+                .slots
+                .iter()
+                .any(|r| of_south(r) && !u.has_flag(r, flag::UNDER_CONSTRUCTION))
+                && u.slots.iter().any(|r| {
+                    of_south(r)
+                        && u.has_flag(r, flag::UNDER_CONSTRUCTION)
+                        && u.has_flag(r, flag::REPEAT)
+                });
             split += w
                 .events
                 .iter()
@@ -700,6 +774,8 @@ fn reference() -> Vec<u64> {
     assert!(dashes > 0, "the Seraph never dashed");
     // The lens's front struck and its well opened.
     assert!(lens_strikes > 0, "the gravitic lens never struck");
+    // The Fulgur raised on Repeat drove off and its lot was laid again.
+    assert!(relaid, "no lot was laid again on Repeat");
     // The Shaper's Lance struck.
     assert!(lanced > 0, "the Lance never struck");
     // A surge shell landed and its wake rolled out.

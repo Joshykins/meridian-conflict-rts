@@ -77,10 +77,12 @@ fn vs_icon(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     // symbol. A priority of its own: out to the left, for a chevron.
     let marked = (e.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST | STATE_UNIDENTIFIED)) == 0u;
     let paused = (e.status[0] & UNIT_PAUSED) != 0u && marked;
+    // A site on Repeat: a loop mark below the pause mark's place, on the same side.
+    let repeat = (e.status[0] & UNIT_REPEAT_MARK) != 0u && marked;
     let priority = select(0u, (e.status[0] >> UNIT_PRIORITY_SHIFT) & UNIT_PRIORITY_MASK, marked);
     var c = corner;
     let left = select(1.0, 2.0 * PAUSE_REACH - 1.0, priority != 0u);
-    let right = select(1.0, 2.0 * PAUSE_REACH - 1.0, paused);
+    let right = select(1.0, 2.0 * PAUSE_REACH - 1.0, paused || repeat);
     c.x = mix(-left, right, corner.x * 0.5 + 0.5);
     let ndc = center.xy / center.w + c * size_px * globals.viewport.zw;
     // Icons ignore depth; keep w so clipping behind the camera still works.
@@ -89,13 +91,16 @@ fn vs_icon(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     // Only the shape and tech bytes of the model's icon word are read past here.
     out.icon = (select(model.icon, 31u, (e.owner_flags & STATE_UNIDENTIFIED) != 0u) & 0xFFFFu)
         | priority << ICON_PRIORITY_SHIFT
-        | select(0u, ICON_PAUSED, paused);
+        | select(0u, ICON_PAUSED, paused)
+        | select(0u, ICON_REPEAT, repeat);
     out.owner_flags = e.owner_flags;
     return out;
 }
 
 // `IconOut::icon` bit: draw the pause mark. Clear of the shape and tech bytes.
 const ICON_PAUSED: u32 = 0x80000000u;
+// `IconOut::icon` bit: draw the repeat mark. Clear of the shape, tech and priority bits.
+const ICON_REPEAT: u32 = 0x40000000u;
 // `IconOut::icon` bits 16..18: the unit's own priority, as `UNIT_PRIORITY_*` numbers it.
 const ICON_PRIORITY_SHIFT: u32 = 16u;
 // A paused icon's quad runs from -1 to 2 * PAUSE_REACH - 1 across; the mark sits in the
@@ -107,6 +112,30 @@ fn sd_chevron(p: vec2<f32>, up: bool) -> f32 {
     let q = vec2<f32>(p.x, select(-p.y, p.y, up));
     let tip = vec2<f32>(0.0, 0.17);
     return min(sd_segment(q, vec2<f32>(-0.3, -0.15), tip), sd_segment(q, tip, vec2<f32>(0.3, -0.15))) - 0.1;
+}
+
+// A loop with its head on the right, turning anticlockwise: the repeat mark, centred on
+// the origin.
+fn sd_repeat(p: vec2<f32>) -> f32 {
+    let r = 0.26;
+    let w = 0.07;
+    // The loop is open between these two angles, at the upper right.
+    let a0 = 0.2;
+    let a1 = 1.3;
+    let a = atan2(p.y, p.x);
+    let e0 = r * vec2<f32>(cos(a0), sin(a0));
+    let e1 = r * vec2<f32>(cos(a1), sin(a1));
+    var d = abs(length(p) - r) - w;
+    if a > a0 && a < a1 {
+        d = min(length(p - e0), length(p - e1)) - w;
+    }
+    // The head, at the loop's end on the right, pointing the way round (up).
+    let along = vec2<f32>(-sin(a0), cos(a0));
+    let out = vec2<f32>(cos(a0), sin(a0));
+    let tip = e0 + along * 0.13;
+    let back = e0 - along * 0.05;
+    let head = min(sd_segment(p, back + out * 0.15, tip), sd_segment(p, back - out * 0.15, tip)) - w;
+    return min(d, head);
 }
 
 // Two upright bars: the pause mark, centred on the origin.
@@ -593,6 +622,15 @@ fn fs_icon(in: IconOut) -> @location(0) vec4<f32> {
         mark_fill = 1.0 - smoothstep(-aam, aam, m);
         mark_edge = 1.0 - smoothstep(-aam, aam, m - 0.16);
     }
+    // A site on Repeat: a pale loop below where the pause mark sits.
+    var loop_fill = 0.0;
+    var loop_edge = 0.0;
+    if (in.icon & ICON_REPEAT) != 0u {
+        let m = sd_repeat(in.uv - vec2<f32>(2.0 * PAUSE_REACH - 1.0 - 0.52, -0.38));
+        let aam = fwidth(m) * 1.2;
+        loop_fill = 1.0 - smoothstep(-aam, aam, m);
+        loop_edge = 1.0 - smoothstep(-aam, aam, m - 0.16);
+    }
     // A priority of its own: a chevron up beside the symbol on the other side, amber
     // pointing up for First, grey pointing down for Last.
     let priority = (in.icon >> ICON_PRIORITY_SHIFT) & UNIT_PRIORITY_MASK;
@@ -604,7 +642,7 @@ fn fs_icon(in: IconOut) -> @location(0) vec4<f32> {
         chev_fill = 1.0 - smoothstep(-aam, aam, m);
         chev_edge = 1.0 - smoothstep(-aam, aam, m - 0.16);
     }
-    if outline <= 0.01 && mark_edge <= 0.01 && chev_edge <= 0.01 {
+    if outline <= 0.01 && mark_edge <= 0.01 && chev_edge <= 0.01 && loop_edge <= 0.01 {
         discard;
     }
     var color = globals.team_colors[in.owner_flags & OWNER_MASK].rgb;
@@ -619,7 +657,9 @@ fn fs_icon(in: IconOut) -> @location(0) vec4<f32> {
     let chev = select(vec3<f32>(0.62, 0.65, 0.70), amber, priority == UNIT_PRIORITY_FIRST);
     var rgb = mix(icon * outline, mix(vec3<f32>(0.0), amber, mark_fill), mark_edge);
     rgb = mix(rgb, mix(vec3<f32>(0.0), chev, chev_fill), chev_edge);
-    let alpha = max(max(outline, mark_edge), chev_edge);
+    let pale = vec3<f32>(0.78, 0.94, 1.0) * 1.25;
+    rgb = mix(rgb, mix(vec3<f32>(0.0), pale, loop_fill), loop_edge);
+    let alpha = max(max(max(outline, mark_edge), chev_edge), loop_edge);
     return vec4<f32>(rgb / max(alpha, 1e-4), alpha);
 }
 

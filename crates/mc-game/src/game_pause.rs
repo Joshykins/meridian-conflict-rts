@@ -1,6 +1,7 @@
 //! The selection's work switches: Pause (Z) holds its spending, Priority says when its
 //! work is paid in a stall (`mc_sim::focus`), and Repeat (L) has factories and carriers
-//! build their queues over and over. The buttons are the HUD's
+//! build their queues over and over, and a unit raised on its own lot raised there again
+//! once done (`mc_sim::site_repeat`). The buttons are the HUD's
 //! (`hud/selection/pause_order.rs`, `hud/build/queue.rs`, `hud/priority.rs`).
 
 use super::Game;
@@ -12,15 +13,26 @@ use mc_sim::tables::flag;
 use mc_sim::{Command, Handle};
 
 impl Game {
-    /// The selection's units that can repeat their queues: factories and carriers.
+    /// The selection's units that can repeat: factories and carriers their queues, and
+    /// half-built units on their own lots themselves.
     pub(super) fn repeaters(&self) -> impl Iterator<Item = &UnitInstance> {
         self.selected_units().filter(|u| {
             let bp = self.blueprints.unit(BlueprintId(u.blueprint as u16));
-            bp.has(cat::FACTORY) || bp.air_wings.is_some()
+            bp.has(cat::FACTORY) || bp.air_wings.is_some() || hud::repeat_site(bp, u)
         })
     }
 
-    /// L, as the Repeat button: off if every factory and carrier repeats, all on otherwise.
+    /// The whole selection is half-built units on their own lots: L is their Repeat, not
+    /// a lift ship's Load.
+    pub(super) fn selection_repeat_sites(&self) -> bool {
+        self.selected_units().next().is_some()
+            && self
+                .selected_units()
+                .all(|u| hud::repeat_site(self.blueprints.unit(BlueprintId(u.blueprint as u16)), u))
+    }
+
+    /// L, as the Repeat button: off if every factory, carrier and site repeats, all on
+    /// otherwise.
     pub(super) fn toggle_repeat(&mut self) {
         let all = self.repeaters().all(|u| hud::has_flag(u, flag::REPEAT));
         self.send(Command::SetRepeat {

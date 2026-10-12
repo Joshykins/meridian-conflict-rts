@@ -92,6 +92,7 @@ mod seabed;
 mod shields;
 pub mod sinking;
 mod site_clearing;
+pub mod site_repeat;
 pub mod slots;
 pub mod spatial;
 mod staging;

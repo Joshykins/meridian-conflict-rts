@@ -366,9 +366,11 @@ impl World {
                 Ok(())
             }
             Command::SetRepeat { factories, repeat } => {
-                // A carrier repeats its air wings (`air_wings.rs`).
+                // A carrier repeats its air wings (`air_wings.rs`), a unit raised on its
+                // own lot is raised there again once done (`site_repeat.rs`).
                 let mut rows = self.owned_factories(player, factories);
                 rows.extend(self.owned_carriers(player, factories));
+                rows.extend(self.owned_repeat_sites(player, factories));
                 for row in rows {
                     let f = &mut self.state.units.flags[row];
                     *f = if *repeat {
@@ -2522,7 +2524,8 @@ impl World {
         if self.mobile_units_in_footprint(lot, o.pos, row, o.blueprint) {
             // Friendly units standing on the site get a moment to clear off; the
             // builder's own side's are sent off it (`site_clearing.rs`).
-            self.send_off_site(lot, o.pos, row, o.blueprint)?;
+            let owner = self.state.units.owner[row];
+            self.send_off_site(lot, o.pos, owner, row, o.blueprint)?;
             if self.state.units.stuck_ticks[row] < 50 {
                 self.state.units.stuck_ticks[row] += 1;
                 return Ok(());
@@ -2608,39 +2611,6 @@ impl World {
             .slots
             .iter()
             .find(|&r| r != builder && self.site_is_joinable(builder, r, blueprint, pos))
-    }
-
-    /// Whether a mobile unit other than `except` stands on a `lot` (turned, in build
-    /// cells) at `pos`.
-    fn mobile_units_in_footprint(
-        &self,
-        lot: (u8, u8),
-        pos: FxVec2,
-        except: usize,
-        blueprint: BlueprintId,
-    ) -> bool {
-        // The lot is a rectangle: a unit beside a long, narrow lot is not on it.
-        let half = FxVec2::from_ints(
-            lot.0 as i32 * mc_map::BUILD_CELL_M / 2,
-            lot.1 as i32 * mc_map::BUILD_CELL_M / 2,
-        );
-        let mut found = false;
-        self.index.query(pos, half.x.max(half.y), kind::UNIT, |e| {
-            let r = e.row as usize;
-            if r != except
-                && self.unit_entry_is_current(e)
-                && self.bp(r).is_mobile()
-                && !self.building_this_site(r, blueprint, pos)
-            {
-                let d = e.pos - pos;
-                if d.x.abs() < half.x && d.y.abs() < half.y {
-                    found = true;
-                    return false;
-                }
-            }
-            true
-        });
-        found
     }
 
     /// `row` can start a `blueprint` itself, as it is now.

@@ -150,6 +150,9 @@ pub struct State {
     pub levels: crate::growth::Levels,
     /// Lances charging, striking and cooling (`lance.rs`).
     pub lances: crate::lance::Lances,
+    /// Finished units' lots waiting to be laid again on Repeat (`site_repeat.rs`).
+    #[serde(default)]
+    pub site_repeats: crate::site_repeat::SiteRepeats,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -468,6 +471,7 @@ impl World {
             wings: Default::default(),
             levels: Default::default(),
             lances: Default::default(),
+            site_repeats: Default::default(),
         };
         let water = terrain.water_level();
         let ore = crate::mines::OreGrid::new(&map.ore, size, |p| terrain.height_at(p) > water);
@@ -741,6 +745,10 @@ impl World {
         {
             let _t = mc_core::perf_span!("fn.run_orders");
             self.run_orders()?;
+        }
+        {
+            let _t = mc_core::perf_span!("fn.run_site_repeats");
+            self.run_site_repeats()?;
         }
         {
             let _t = mc_core::perf_span!("fn.run_elevators");

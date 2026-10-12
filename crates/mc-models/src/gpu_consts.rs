@@ -1681,6 +1681,13 @@ shared! {
         pub const LAST: u32 = 2;
     }
 
+    /// A half-built unit on its own lot set to Repeat (`mc_sim::mirror::UNIT_REPEAT` in
+    /// `UnitInstance::status[0]`; a test holds them equal): drawn as a loop mark on its
+    /// strategic icon (icons.wgsl).
+    pub mod unit_repeat as "UNIT_REPEAT_" {
+        pub const MARK: u32 = 0x8000000;
+    }
+
     /// The metal scans the plate is finished with (metal.wgsl): two layers each in
     /// the terrain material array, after the ground and foliage layers
     /// (`mc_render::textures::terrain_materials`, a test holds the indices).

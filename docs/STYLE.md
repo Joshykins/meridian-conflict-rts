@@ -703,7 +703,12 @@ and a report that holds and rolls back as thunder.
 
 Tech 4 machines are too big for any factory: Mason IIIs raise them on a lot of
 their own, like a structure (`footprint` on a mobile unit), and the finished
-machine drives off it. The Fulgur is the first: a super-heavy assault tank,
+machine drives off it. A half-built one can be put on Repeat (L, the order card's
+Repeat, a pale loop on its strategic icon): once it is done and off its lot, the
+lot is laid again with the same machine, taken up by the builders that had nothing
+else queued, or left to wait with none on it. It goes round until switched off or
+until the site is killed; a lot still blocked after 30 s is given up, and the HUD
+says so (`site_repeat.rs`). The Fulgur is the first: a super-heavy assault tank,
 four tracks, a hull field, the AEB-2 on the main turret and gun houses of its
 own on the hull (`hull_mounts`: a Paladin-pattern bolt rifle on each sponson and a
 rotary AA gun, the Sparrow's gatling, on the engine deck that rests facing aft,

@@ -133,6 +133,7 @@ impl World {
                 s.wings.hash(h);
                 s.levels.hash(h);
                 s.lances.hash(h);
+                s.site_repeats.hash(h);
             },
             &|h| {
                 if let Some(survival) = &s.survival {

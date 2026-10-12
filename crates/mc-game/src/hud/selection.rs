@@ -20,11 +20,13 @@ use mc_sim::{veterancy_health, FireState, VETERANCY_MAX};
 mod details;
 mod formation;
 mod pause_order;
+mod repeat_order;
 mod shaper;
 mod status;
 
 use details::details_card;
 use formation::formation_panel;
+pub use repeat_order::repeat_site;
 use status::status_page;
 
 pub const ORDER_W: f32 = 104.0;
@@ -1207,6 +1209,8 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
     }
     // Builders, factories and anything that upgrades can pause their work.
     work.extend(pause_order::pause_order(s, units));
+    // A unit raised on its own lot can be raised there again and again.
+    work.extend(repeat_order::repeat_order(s, units));
     work.push(Order { glyph: Glyph::Stop, label: "Stop", key: "X",
  hint: "Drop every order. A factory clears its queue and forgets the orders it hands its units.", action: HudAction::Stop, lit: false });
     out.push((

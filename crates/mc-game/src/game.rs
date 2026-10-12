@@ -3039,6 +3039,7 @@ impl Game {
             KeyCode::KeyU => self.send(Command::Upgrade {
                 units: self.selected_ids(),
             }),
+            KeyCode::KeyL if self.selection_repeat_sites() => self.toggle_repeat(),
             KeyCode::KeyL if self.selection_lands() && self.shift => self.take_off(),
             KeyCode::KeyL if self.selection_lands() => self.arm(Targeting::Land),
             // As the Batch button: off if the factories are all in one batch, else linked into one.

@@ -123,6 +123,12 @@ impl World {
             0
         };
         let batch_mark = own_view && self.batching(row);
+        // A half-built unit on its own lot that is raised there again once done.
+        let repeat_mark = own_view
+            && s.units.has_flag(row, crate::tables::flag::REPEAT)
+            && s.units
+                .has_flag(row, crate::tables::flag::UNDER_CONSTRUCTION)
+            && bp.is_site_built_unit();
         let site = self.structure_upgrade(row);
         // The modules it is being refitted with show on it as the work goes on.
         let refit = s
@@ -352,6 +358,7 @@ impl World {
                         0
                     }
                     | if paused_mark { UNIT_PAUSED } else { 0 }
+                    | if repeat_mark { UNIT_REPEAT } else { 0 }
                     | priority_mark << UNIT_PRIORITY_SHIFT
                     | if batch_mark { UNIT_BATCH } else { 0 }
                     | if stored { UNIT_STORED } else { 0 }

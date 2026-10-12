@@ -47,7 +47,7 @@ mod selection;
 pub mod silo;
 pub mod survival;
 pub(crate) use build::batch::batch_linked;
-pub use selection::ordered_as;
+pub use selection::{ordered_as, repeat_site};
 mod match_state;
 mod real_clock;
 pub mod style;
