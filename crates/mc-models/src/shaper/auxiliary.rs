@@ -98,7 +98,12 @@ pub(super) fn draw_nuke(b: &mut MeshBuilder, g: Growth) {
 /// Where the Lens and its halo stand on the auxiliary Shaper `g` of `kind` (1 artillery,
 /// else nuke; also `shaper::lens_height` and `shaper::halo_slot`).
 pub(super) fn mount(g: Growth, kind: u8) -> Mount {
-    let crown = if kind == 1 { Crown::Bore } else { Crown::Silo };
+    // The Gatewright wears the Seedcaster's spire (`stage_set`).
+    let crown = if super::stage_set(kind) == 1 {
+        Crown::Bore
+    } else {
+        Crown::Silo
+    };
     let h = g.height;
     let (lens_h, lens_floor) = lens(h, crown);
     let lens_r = 0.1 * h + 6.0;

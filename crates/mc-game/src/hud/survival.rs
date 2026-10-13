@@ -406,6 +406,19 @@ pub fn draw(
             rgb(palette::WARN, pulse),
             &format!("Field full ({}): printing waits", status.hostile),
         );
+    } else if status.dampened {
+        // A Seedcaster holds: every target lies in a warp dampening field.
+        let pulse = 0.6 + 0.4 * (t * 3.0).sin().abs();
+        ui.text_right(
+            rx,
+            y - 6.0,
+            type_scale::MICRO,
+            rgb(super::HEALTHY, pulse),
+            &format!(
+                "Dampened: warp-ins held  \u{b7}  {} in the field",
+                status.hostile
+            ),
+        );
     } else {
         ui.text_right(
             rx,
@@ -518,8 +531,10 @@ enum Site<'a> {
 fn kind_word(kind: SiteKind) -> &'static str {
     match kind {
         SiteKind::Printer => "Printer",
-        SiteKind::Artillery => "Artillery",
+        SiteKind::Artillery => "Warp-In",
         SiteKind::Nuke => "Nuke",
+        SiteKind::Fleet => "Fleet",
+        SiteKind::Auxiliary => "Auxiliary",
     }
 }
 
@@ -572,6 +587,7 @@ fn site_row(hud: &mut Hud, ui: &mut Ui, s: &Scene, site: &Site, catch_up: u16, t
         Some((SiteKind::Printer, mc_data::survival::Domain::Air)) => AIR,
         Some((SiteKind::Printer, mc_data::survival::Domain::Naval)) => NAVY,
         Some((SiteKind::Nuke, _)) => HEAVY,
+        Some((SiteKind::Fleet, _)) => AIR,
         _ => VIOLET,
     };
     let c = Vec2::new(tr.x + 13.0, tr.y + 13.0);
@@ -776,7 +792,7 @@ mod tests {
         let behind = node(3, 1.0, SiteKind::Artillery);
         assert_eq!(
             site_line(&Site::Standing(&behind), 6),
-            "Level 3 \u{2192} 6  \u{b7}  T1  \u{b7}  Artillery"
+            "Level 3 \u{2192} 6  \u{b7}  T1  \u{b7}  Warp-In"
         );
         assert_eq!(
             site_line(&Site::Empty { site: 1, round: 9 }, 6),

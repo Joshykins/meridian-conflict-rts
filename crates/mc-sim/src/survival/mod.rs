@@ -32,38 +32,43 @@
 //! carried beside `MatchConfig` in the match options) and the tick: a replay
 //! plays it out the same.
 
-mod artillery;
 mod base;
 mod card;
+mod fleet;
 mod foot;
+mod marks;
 mod plan;
 mod print;
 mod rules;
 mod shapers;
 mod view;
 mod warheads;
+mod warp_in;
 
 pub use crate::mirror::NodeStatus;
 use crate::mirror::SimEvent;
 use crate::tables::NO_ORDER;
 use crate::{SimError, UnitId};
-pub use artillery::{shell_at, ShellInstance};
 pub use base::Kit;
 pub use card::{
-    AntiNukeCard, ArtilleryCard, LanceCard, PieceView, ShaperCard, ShaperInstance, ShieldCard,
-    WarheadCard,
+    AntiNukeCard, ArtilleryCard, FleetCard, LanceCard, PieceView, ShaperCard, ShaperInstance,
+    ShieldCard, WarheadCard,
 };
+pub use fleet::FleetStage;
+pub use marks::{WarpInInstance, WarpInKind};
 use mc_core::{Angle, Fx, FxVec2, FxVec3, Rng, StateHasher};
 use mc_data::survival::{Domain, SiteKind};
 use mc_data::{BlueprintId, MoveLayer};
 use plan::Formation;
 use print::Route;
 pub use rules::{
-    aux_first_round, launch_gap_ticks, shaper_foot, shaper_height, shaper_platforms, shaper_pylons,
-    shaper_silos, shaper_tier, shell_apex, shell_blast, shell_flight_ticks, shell_squad,
-    shells_per_volley, volley_ticks, HeavyWave, SurvivalRules,
+    arrival_shock, aux_first_round, fleet_classes, fleet_gap_ticks, fleet_size, launch_gap_ticks,
+    shaper_foot, shaper_height, shaper_platforms, shaper_pylons, shaper_silos, shaper_tier,
+    squad_size, squads_per_volley, volley_ticks, warp_in_ticks, HeavyWave, SurvivalRules,
+    FLEET_LEAD_TICKS,
 };
 use serde::{Deserialize, Serialize};
+pub use warp_in::WARP_REACH;
 
 /// Ticks per second.
 const HZ: u32 = 10;
@@ -170,8 +175,23 @@ enum Spot {
     Bay(u8),
     /// A Shaper's print platform (the platform's unit).
     Pad(UnitId),
-    /// Where a replication shell landed (`artillery.rs`): its squad prints round `at`.
-    Landing { at: FxVec2, heading: Angle },
+    /// Where a Seedcaster's squad warps in (`warp_in.rs`): it prints round `at`, no beam.
+    WarpIn { at: FxVec2, heading: Angle },
+    /// A Gatewright's berth in front of it (`fleet.rs`): its fleet prints in the air
+    /// round `at`.
+    Berth { at: FxVec2, heading: Angle },
+}
+
+/// Why an auxiliary Shaper's last volley or fleet was held back. The numbers may reach
+/// the interface: never renumber one.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Hold {
+    #[default]
+    None = 0,
+    /// The field cap (`FIELD_CAP`): it waits for room.
+    FieldFull = 1,
+    /// Every target lies in the defenders' warp dampening fields (`warp_in.rs`).
+    Dampened = 2,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -228,6 +248,9 @@ struct Piece {
 struct Node {
     unit: UnitId,
     site: u8,
+    /// What it is: a printer, or the auxiliary kind its site raised
+    /// (`shapers::raise_kind`; never `Auxiliary`).
+    kind: SiteKind,
     /// Where it stands: on its site, one Shaper to a site.
     pos: FxVec2,
     /// What it prints for: its products are all of this domain.
@@ -252,10 +275,11 @@ struct Node {
     pieces: Vec<Piece>,
     /// Tick it may start its next piece.
     next_piece_at: u32,
-    /// An auxiliary Shaper's next volley (a Seedcaster) or launch (an Unmaker).
+    /// An auxiliary Shaper's next volley (a Seedcaster), launch (an Unmaker) or fleet
+    /// (a Gatewright).
     next_fire: u32,
-    /// Its last volley was held back by the field cap (`FIELD_CAP`).
-    held: bool,
+    /// Why its last volley or fleet was held back, if it was.
+    hold: Hold,
     /// Metres out its foot is blocked now (`foot.rs`), growing with its height.
     foot: Fx,
 }
@@ -281,8 +305,10 @@ pub struct Survival {
     reseed_from: Vec<u16>,
     /// What a Shaper's base is made of.
     kit: base::Kit,
-    /// Replication shells in the air (`artillery.rs`).
-    shells: artillery::Shells,
+    /// Squads marked to warp in (`warp_in.rs`), and the auxiliary Shapers' dice.
+    warp_ins: warp_in::WarpIns,
+    /// The Gatewrights' fleets (`fleet.rs`).
+    fleets: Vec<fleet::Fleet>,
     rng: Rng,
     pub nodes_destroyed: u16,
     /// The last formation number handed out.
@@ -321,6 +347,9 @@ pub struct SurvivalStatus {
     pub hostile: u32,
     /// The field is full (`FIELD_CAP`): printing waits for room.
     pub held: bool,
+    /// A Seedcaster's volley is held: every target lies in the defenders' warp
+    /// dampening fields.
+    pub dampened: bool,
     /// Units of the rounds sent that are still alive (the final phase ends at zero).
     pub remaining: u32,
     pub engine: [f32; 2],
@@ -347,8 +376,8 @@ fn spot_bits(s: Spot) -> u64 {
     match s {
         Spot::Bay(b) => b as u64,
         Spot::Pad(u) => 1 << 40 | u.0 as u64,
-        Spot::Landing { at, heading } => {
-            2 << 40
+        Spot::WarpIn { at, heading } | Spot::Berth { at, heading } => {
+            (2 + matches!(s, Spot::Berth { .. }) as u64) << 40
                 ^ (at.x.raw() as u32 as u64) << 8
                 ^ (at.y.raw() as u32 as u64).rotate_left(29)
                 ^ heading.0 as u64
@@ -361,6 +390,7 @@ fn route_bits(r: Route) -> u64 {
         Route::Front(f) => f as u64,
         Route::Site(i) => 1 << 40 | i as u64,
         Route::Free => 2 << 40,
+        Route::Held => 3 << 40,
     }
 }
 
@@ -411,14 +441,15 @@ impl Survival {
                 n.unit.0 as u64
                     | (n.site as u64) << 32
                     | (n.raised as u64) << 40
-                    | (n.level as u64) << 48,
+                    | (n.level as u64) << 48
+                    | (n.kind as u64) << 41,
             );
             h.write_u64(n.pos.x.raw() as u32 as u64 | (n.pos.y.raw() as u32 as u64) << 32);
             h.write_u64(n.next_print as u64 | (n.printed as u64) << 32);
             h.write_i64(n.height.0);
             h.write_u64(n.next_level_at as u64);
             h.write_u64(n.next_piece_at as u64 | (n.pieces.len() as u64) << 32);
-            h.write_u64(n.next_fire as u64 | (n.held as u64) << 32);
+            h.write_u64(n.next_fire as u64 | (n.hold as u64) << 32);
             h.write_i64(n.foot.0);
             for p in &n.pieces {
                 h.write_u64(
@@ -433,15 +464,11 @@ impl Survival {
                 h.write_u64(b.0 as u64);
             }
         }
-        self.shells.hash(h);
-    }
-
-    /// What site `site` is for (a printer when there is no such site).
-    fn site_kind(&self, site: u8) -> SiteKind {
-        self.config
-            .node_sites
-            .get(site as usize)
-            .map_or(SiteKind::Printer, |s| s.kind)
+        self.warp_ins.hash(h);
+        h.write_u64(self.fleets.len() as u64);
+        for f in &self.fleets {
+            f.hash(h);
+        }
     }
 
     /// Every blueprint id the survival state holds, for `State::validate_ids`.
@@ -450,7 +477,7 @@ impl Survival {
         ids.extend(self.queue.iter().flat_map(|f| f.units.iter().copied()));
         ids.extend(self.nodes.iter().flat_map(|n| n.products.iter().copied()));
         ids.extend(self.incoming_heavy.iter().map(|h| h.0));
-        ids.extend(self.shells.blueprints());
+        ids.extend(self.warp_ins.blueprints());
         ids
     }
 }
@@ -507,7 +534,8 @@ impl crate::World {
             waves: Vec::new(),
             reseed_from: vec![0; sites],
             kit,
-            shells: artillery::Shells::new(seed ^ 0xA87_111E),
+            warp_ins: warp_in::WarpIns::new(seed ^ 0xA87_111E),
+            fleets: Vec::new(),
             nodes: Vec::new(),
             rng: Rng::new(seed),
             nodes_destroyed: 0,
@@ -579,8 +607,9 @@ impl crate::World {
         self.survival_feet();
         self.survival_base(now)?;
         self.survival_node_prints(now)?;
-        self.survival_artillery(now)?;
+        self.survival_warp_ins(now)?;
         self.survival_warheads(now)?;
+        self.survival_fleets(now)?;
 
         let s = self.state.survival.as_ref().unwrap();
         let rules = s.config.rules;
@@ -659,6 +688,7 @@ impl crate::World {
                     && u.is_active(r)
                     && self.blueprints.unit(u.blueprint[r]).is_mobile()
                     && !s.mustered.iter().any(|m| m.unit == u.id(r))
+                    && !s.fleets.iter().any(|f| f.holds(u.id(r)))
             })
             .map(|r| u.id(r))
             .collect();

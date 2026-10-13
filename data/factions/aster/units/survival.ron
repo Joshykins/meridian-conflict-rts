@@ -75,14 +75,17 @@
         lights: [],
         sounds: (death: "blast_large"),
     ),
-    // The auxiliary Shapers (mc-sim survival/artillery.rs, warheads.rs): raised by the
-    // Heart's ray on the hidden Artillery and Nuke sites behind the printing ones, with
-    // every Shaper's defences. They print nothing on the ground. Drawn as the stacked
-    // spire (mc-models shaper/auxiliary.rs), grown by level, each with its own crown.
+    // The auxiliary Shapers (mc-sim survival/warp_in.rs, warheads.rs, fleet.rs): raised
+    // by the Heart's ray on the hidden auxiliary sites behind the printing ones, with
+    // every Shaper's defences. They print nothing on the ground: the Seedcaster warps
+    // squads in beside the defenders, the Unmaker launches warheads, the Gatewright
+    // builds fleets of warships and warps them in over the defenders. Drawn as the
+    // stacked spire (mc-models shaper/auxiliary.rs), grown by level, each with its own
+    // crown.
     (
         key: "progenitor_seedcaster",
         name: "Progenitor Seedcaster",
-        role: "Precursor Replication Artillery",
+        role: "Precursor Warp-In Shaper",
         tech: 3,
         categories: ["Structure", "Land", "Replicator"],
         health: 14000,
@@ -164,6 +167,51 @@
             interceptor_round: (percent: -6, least: 6000),
         ),
         mesh: "progenitor_unmaker", icon: Silo,
+        lights: [],
+        sounds: (death: "blast_large"),
+    ),
+    (
+        key: "progenitor_gatewright",
+        name: "Progenitor Gatewright",
+        role: "Precursor Fleet Shaper",
+        tech: 3,
+        categories: ["Structure", "Land", "Replicator"],
+        health: 14000,
+        cost: (materials: 4000, energy: 40000, time: 2000),
+        radius: 26, height: 46, footprint: (5, 5),
+        vision: 500,
+        // Its defences, at level 1, as every Shaper's; `growth` says what each level adds.
+        economy: (energy_upkeep: 50),
+        shield: (radius: 180, health: 6000, regen: 60),
+        // Panes of hard light, more courses and rings with its tier.
+        effects: (shield_look: Some(Progenitor)),
+        lance: (charge: 3, reload: 6, damage: 1500, splash: 14, range: 800, targets: ["Land", "Naval", "Air"]),
+        strategic: (
+            kind: Interceptor,
+            missile: (materials: 1500, energy: 30000, time: 60000),
+            power: 600,
+            stock: 1,
+            speed: 900,
+            coverage: 1600,
+            // A shard of hard light that unmakes the warhead it meets.
+            look: Some(Progenitor),
+        ),
+        growth: (
+            health: (percent: 15),
+            shield_radius: (per_level: 22, most: 900),
+            shield_health: (percent: 18),
+            shield_regen: (percent: 18),
+            lance_damage: (percent: 20),
+            lance_splash: (per_level: 3, most: 120),
+            lance_range: (per_level: 35, most: 2200),
+            lance_charge: (per_level: 0.15, most: 8),
+            lance_reload: (percent: -4, least: 1.5),
+            interceptor_stock: (per_level: 0.34),
+            interceptor_coverage: (per_level: 80, most: 4000),
+            interceptor_round: (percent: -6, least: 6000),
+        ),
+        // The Seedcaster's spire until the Gatewright's own crown is chosen.
+        mesh: "progenitor_seedcaster", icon: Warship,
         lights: [],
         sounds: (death: "blast_large"),
     ),

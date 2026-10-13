@@ -382,8 +382,8 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
         }
     }
 
-    // Survival's replication shells: each mark and its burst (`replication_marks.rs`).
-    crate::replication_marks::minimap(ui, view, chart, metres, &|p| chart_pos(s, chart, p));
+    // Survival's warp-ins: each mark, its squad's ring and its Shaper's line (`warp_in_marks.rs`).
+    crate::warp_in_marks::minimap(ui, view, chart, metres, &|p| chart_pos(s, chart, p));
 
     // Titans and their great bores' strikes (`titan.rs`).
     super::titan::minimap(ui, s, chart, &|p| chart_pos(s, chart, p));

@@ -385,26 +385,45 @@ pub enum SimEvent {
         splash: Fx,
         damage: Fx,
     },
-    /// Survival: a Seedcaster (`source`, on site `site`) fired replication shell `serial`
-    /// from its crown `from` at `to` (the ground at its mark); it lands in `flight_ticks`
-    /// and prints `units` there. `volley`: its place in its volley, 0 the first.
-    ReplicationShellFired {
+    /// Survival: a Seedcaster (`source`, on site `site`) marked squad `serial` to warp in
+    /// at `at` (the ground at its mark) in `ticks`, `units` strong. `volley`: its place in
+    /// its volley, 0 the first.
+    WarpInMarked {
         serial: u32,
         source: UnitId,
         site: u8,
-        from: FxVec3,
-        to: FxVec3,
-        flight_ticks: u32,
+        at: FxVec3,
+        ticks: u32,
         units: u16,
         volley: u8,
     },
-    /// Survival: replication shell `serial` landed at `at`: a burst `radius` metres
-    /// across, and `units` printing on the spot.
-    ReplicationShellLanded {
+    /// Survival: squad `serial` warped in at `at`: a shock `radius` metres across, and its
+    /// `units` coming out of the warp on the spot.
+    WarpInArrived {
         serial: u32,
         at: FxVec3,
         radius: Fx,
         units: u16,
+    },
+    /// Survival: the defenders' warp dampening field (its dampener `by`) came up over the
+    /// mark of squad `serial` (from site `site`, `units` strong) at `at`: it is lost.
+    WarpInCancelled {
+        serial: u32,
+        site: u8,
+        at: FxVec3,
+        by: UnitId,
+        units: u16,
+    },
+    /// Survival: a Gatewright (`source`, on site `site`) gave its fleet of `ships` the mark
+    /// `at` (the ground under its middle, serial `serial`); its ships spool their drives
+    /// in `ticks` and jump there (their warps are any ship's, `WarpSpooling` on).
+    FleetMarked {
+        serial: u32,
+        source: UnitId,
+        site: u8,
+        at: FxVec3,
+        ships: u16,
+        ticks: u32,
     },
     /// Survival: the defenders held out through the last round.
     SurvivalWon {
@@ -1642,9 +1661,9 @@ pub struct RenderFrame {
     /// Survival: every Shaper standing or rising, for its model and effects
     /// (`survival::ShaperInstance`). Empty in any other match.
     pub shapers: Vec<crate::survival::ShaperInstance>,
-    /// Survival: every replication shell in the air, mark and all, for every side
-    /// (`survival::ShellInstance`). Empty in any other match.
-    pub shells: Vec<crate::survival::ShellInstance>,
+    /// Survival: every squad and fleet marked to warp in, mark and countdown, for every
+    /// side (`survival::WarpInInstance`). Empty in any other match.
+    pub warp_ins: Vec<crate::survival::WarpInInstance>,
     /// Mobile builders whose construction beam is on this tick, and where it meets the work.
     pub build_sources: Vec<BuildSource>,
     /// Wave origins on construction sites, packed; a unit's `weld_first` /
@@ -3003,7 +3022,7 @@ impl World {
         self.write_dashes(viewer, &mut frame.dashes);
         self.write_lenses(viewer, &mut frame.lenses);
         self.write_shapers(&mut frame.shapers);
-        self.write_shells(&mut frame.shells);
+        self.write_warp_ins(&mut frame.warp_ins);
         self.write_wells(viewer, &mut frame.wells);
         self.write_clouds(&mut frame.clouds);
         self.write_destructs(viewer, &mut frame.destructs);

@@ -1,14 +1,14 @@
 //! The Progenitor's hard light staged without the sim and rendered through the real
 //! renderer: a Shaper's Lance, its dome under fire, its anti-nuke meeting a warhead, a
-//! replication shell landing and the Unmaker's warhead going off, each at any tier.
+//! Seedcaster's squad warping in and the Unmaker's warhead going off, each at any tier.
 //!
 //! `cargo test --profile shot -p mc-render --lib progenitor_shots -- --ignored --nocapture`
 //! on the machine with the GPU (it needs Vulkan and maps/crosswater.mcmap). It writes
 //! PPMs to `PROG_OUT` (default artifacts/progenitor):
 //!
-//! - `PROG_SCENES`: lance, shield, antinuke, shell, warhead (default all), and
-//!   lance-close, antinuke-close, shell-close, warhead-close (the camera close on the
-//!   beam or the body in flight);
+//! - `PROG_SCENES`: lance, shield, antinuke, warpin, warhead (default all), and
+//!   lance-close, antinuke-close, warpin-close, warhead-close (the camera close on the
+//!   beam, the body in flight or the mark);
 //! - `PROG_TIERS`: the Shaper's tiers, comma-separated (default `1,5`);
 //! - `PROG_TIMES`: seconds into each scene to capture (default per scene);
 //! - `PROG_CAM`: `dx,dy,dz,dist,yaw,pitch` (metres off the Shaper's foot, radians), else
@@ -24,7 +24,7 @@ use mc_core::{Fx, FxVec3};
 use mc_data::strategic::StrategicLook;
 use mc_data::{BlueprintId, WeaponColor};
 use mc_sim::mirror::*;
-use mc_sim::survival::{shaper_height, shell_blast, ShaperInstance, ShellInstance};
+use mc_sim::survival::{arrival_shock, shaper_height, ShaperInstance, WarpInInstance};
 use std::sync::Arc;
 
 const TICK: f32 = 0.1;
@@ -126,22 +126,21 @@ impl Stage {
         self.target + Vec3::Z * 20.0 + Vec3::new(-250.0, 150.0, -1100.0) * (t - 3.0)
     }
 
-    /// The replication shell, six seconds from the Seedcaster's crown to the target.
-    fn shell(&self) -> ShellInstance {
+    /// A Seedcaster's squad marked at the target, coming in six seconds on.
+    fn warp_in(&self) -> WarpInInstance {
         let level = self.level();
-        let (radius, _) = shell_blast(level);
-        ShellInstance {
+        let (radius, _) = arrival_shock(level);
+        WarpInInstance {
             serial: 3,
             source: 1,
             site: 0,
             from: (self.site + Vec3::Z * shaper_height(level).to_f32()).to_array(),
-            to: self.target.to_array(),
-            apex: 900.0,
-            flight: 6.0,
+            at: self.target.to_array(),
             radius: radius.to_f32(),
+            reach: 60.0,
             units: 4 + level,
             level,
-            ..ShellInstance::default()
+            ..WarpInInstance::default()
         }
     }
 
@@ -149,7 +148,7 @@ impl Stage {
     fn body_at(&self, t: f32) -> Vec3 {
         match self.scene.as_str() {
             "antinuke" => self.shard_at(t),
-            "shell" => Vec3::from(self.shell().at(t / 6.0)),
+            "warpin" => self.target + Vec3::Z * 20.0 * t,
             // Along the Lance's beam, two thirds of the way down.
             "lance" => {
                 let lens =
@@ -164,7 +163,7 @@ impl Stage {
         let t = k as f32 * TICK;
         let mut f = RenderFrame::default();
         let level = self.level();
-        let kind = if self.scene == "shell" { 1 } else { 0 };
+        let kind = if self.scene == "warpin" { 1 } else { 0 };
         let bp = if kind == 1 {
             self.seed_bp
         } else {
@@ -282,33 +281,18 @@ impl Stage {
                     });
                 }
             }
-            "shell" => {
+            "warpin" => {
                 f.shapers.push(self.shaper(1, 0.0));
-                let mut s = self.shell();
-                let (from, to, flight) = (Vec3::from(s.from), self.target, s.flight);
-                let (radius, _) = shell_blast(level);
-                if k == 0 {
-                    f.events.push(SimEvent::ReplicationShellFired {
-                        serial: 3,
-                        source: mc_sim::Handle(1),
-                        site: 0,
-                        from: fx3(from),
-                        to: fx3(to),
-                        flight_ticks: 60,
-                        units: s.units,
-                        volley: 0,
-                    });
-                }
-                if t < flight {
+                let mut s = self.warp_in();
+                let (radius, _) = arrival_shock(level);
+                if t < 6.0 {
                     s.age = t;
-                    s.eta = flight - t;
-                    s.pos = s.at(t / flight);
-                    s.prev_pos = s.at(((t - TICK) / flight).max(0.0));
-                    f.shells.push(s);
+                    s.eta = 6.0 - t;
+                    f.warp_ins.push(s);
                 } else if k == 60 {
-                    f.events.push(SimEvent::ReplicationShellLanded {
+                    f.events.push(SimEvent::WarpInArrived {
                         serial: 3,
-                        at: fx3(to),
+                        at: fx3(self.target),
                         radius,
                         units: s.units,
                     });
@@ -404,7 +388,7 @@ fn progenitor_shots() {
     };
     let overlay = Overlay::default();
     let mut base = 100.0f32;
-    for scene in list("PROG_SCENES", "lance,shield,antinuke,shell,warhead") {
+    for scene in list("PROG_SCENES", "lance,shield,antinuke,warpin,warhead") {
         for tier in list("PROG_TIERS", "1,5") {
             let tier: u8 = tier.parse().unwrap();
             let ground = |p: Vec2| renderer.ground_height(p).max(water);
@@ -437,7 +421,7 @@ fn progenitor_shots() {
                 ),
                 _ if close => {
                     let t = match staged.as_str() {
-                        "shell" => 4.0,
+                        "warpin" => 4.0,
                         "lance" => 3.08,
                         _ => 2.0,
                     };
@@ -460,7 +444,7 @@ fn progenitor_shots() {
                     2600.0,
                     0.05,
                 ),
-                "shell" => (
+                "warpin" => (
                     vec![4.8, 6.15, 7.5],
                     stage.target + Vec3::Z * 40.0,
                     650.0,

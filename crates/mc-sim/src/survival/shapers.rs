@@ -10,10 +10,11 @@
 
 use super::print::Route;
 use super::rules::{
-    aux_first_round, launch_gap_ticks, reseed_round, shaper_batch, shaper_gains_heavy,
-    shaper_gains_product, shaper_height, volley_ticks, CATCH_UP_TICKS, CLIMB_PER_TICK,
+    aux_first_round, fleet_gap_ticks, launch_gap_ticks, reseed_round, shaper_batch,
+    shaper_gains_heavy, shaper_gains_product, shaper_height, volley_ticks, CATCH_UP_TICKS,
+    CLIMB_PER_TICK,
 };
-use super::{Node, NodeSite, Spot, HZ, RAISE_TICKS};
+use super::{Hold, Node, NodeSite, Spot, Survival, HZ, RAISE_TICKS};
 use crate::mirror::SimEvent;
 use crate::SimError;
 use mc_core::{Angle, Fx};
@@ -29,38 +30,29 @@ impl crate::World {
         if s.nodes.len() >= rules.node_limit() {
             return Ok(());
         }
-        let free: Vec<usize> = s
+        let tier = rules.tier_at(s.round);
+        let free: Vec<(usize, SiteKind)> = s
             .config
             .node_sites
             .iter()
             .enumerate()
-            .filter(|(i, site)| {
+            .filter(|(i, _)| {
                 !s.nodes.iter().any(|n| n.site as usize == *i)
                     && s.reseed_from.get(*i).is_none_or(|r| *r <= s.round)
-                    && s.round >= aux_first_round(site.kind)
-                    && match (site.kind, site.domain) {
-                        // A Seedcaster's shells print land units; an Unmaker needs no front.
-                        (SiteKind::Artillery, _) => rules.has(Domain::Land),
-                        (SiteKind::Nuke, _) => true,
-                        (SiteKind::Printer, Domain::Naval) => {
-                            rules.has(Domain::Naval) || rules.has(Domain::Air)
-                        }
-                        (SiteKind::Printer, _) => rules.has(Domain::Land) || rules.has(Domain::Air),
-                    }
             })
-            .map(|(i, _)| i)
+            .filter_map(|(i, site)| Some((i, self.raise_kind(s, site, tier)?)))
             .collect();
         if free.is_empty() {
             return Ok(());
         }
-        let tier = rules.tier_at(s.round);
         let mut rng = s.rng;
-        let site_i = free[rng.below(free.len() as u32) as usize];
+        let (site_i, kind) = free[rng.below(free.len() as u32) as usize];
         let site = s.config.node_sites[site_i].clone();
         // A land site raises land Shapers, a sea site naval ones; either may raise air.
-        // A Seedcaster's shells print land units; an Unmaker prints nothing.
+        // A Seedcaster's squads are land units; an Unmaker prints nothing, and a
+        // Gatewright's fleets are its own.
         let mut kinds = Vec::new();
-        match site.kind {
+        match kind {
             SiteKind::Printer => {
                 if rules.has(site.domain) && site.domain != Domain::Air {
                     kinds.push(site.domain);
@@ -69,15 +61,17 @@ impl crate::World {
                     kinds.push(Domain::Air);
                 }
             }
-            SiteKind::Artillery | SiteKind::Nuke => kinds.push(Domain::Land),
+            SiteKind::Fleet => kinds.push(Domain::Air),
+            SiteKind::Artillery | SiteKind::Nuke | SiteKind::Auxiliary => kinds.push(Domain::Land),
         }
         if kinds.is_empty() {
             return Ok(());
         }
         let side = s.config.engine_player;
         let domain = kinds[rng.below(kinds.len() as u32) as usize];
-        let products = match site.kind {
-            SiteKind::Nuke => Vec::new(),
+        let products = match kind {
+            SiteKind::Nuke | SiteKind::Auxiliary => Vec::new(),
+            SiteKind::Fleet => self.fleet_classes_of(1, tier),
             SiteKind::Printer | SiteKind::Artillery => {
                 let Some(p) = newest_new(&self.roster_ids(domain, tier), &[], &mut rng) else {
                     return Ok(());
@@ -85,7 +79,7 @@ impl crate::World {
                 vec![p]
             }
         };
-        let node_bp = s.kit.shaper(site.kind);
+        let node_bp = s.kit.shaper(kind);
         self.state.survival.as_mut().unwrap().rng = rng;
 
         let nbp = self.blueprints.unit(node_bp);
@@ -101,6 +95,7 @@ impl crate::World {
         s.nodes.push(Node {
             unit,
             site: site_i as u8,
+            kind,
             pos,
             domain,
             products: products.clone(),
@@ -115,17 +110,51 @@ impl crate::World {
             pieces: Vec::new(),
             next_piece_at: 0,
             next_fire: 0,
-            held: false,
+            hold: Hold::None,
             foot: Fx::ZERO,
         });
         self.events.push(SimEvent::NodeRaising {
             site: site_i as u8,
             pos,
             product: products.first().copied(),
-            kind: site.kind,
+            kind,
             shaper: node_bp,
         });
         Ok(())
+    }
+
+    /// The kind of Shaper the ray would raise on `site` now (the round's tier `tier`),
+    /// if any. A printing site raises a printer while it has a front to print for; a
+    /// site naming an auxiliary kind raises that once its first round has come; an
+    /// `Auxiliary` site raises the auxiliary kind fewest of the Shapers standing (or
+    /// rising) are, of those whose first round has come and that have something to
+    /// do: a tie goes to the first in `SiteKind::AUXILIARY`.
+    fn raise_kind(&self, s: &Survival, site: &NodeSite, tier: u8) -> Option<SiteKind> {
+        let rules = s.config.rules;
+        let can = |kind: SiteKind| {
+            s.round >= aux_first_round(kind)
+                && match kind {
+                    SiteKind::Printer if site.domain == Domain::Naval => {
+                        rules.has(Domain::Naval) || rules.has(Domain::Air)
+                    }
+                    SiteKind::Printer => rules.has(Domain::Land) || rules.has(Domain::Air),
+                    // A Seedcaster's squads are land units; an Unmaker needs no front.
+                    SiteKind::Artillery => rules.has(Domain::Land),
+                    SiteKind::Nuke => true,
+                    // A Gatewright needs warships at the round's tier.
+                    SiteKind::Fleet => !self.fleet_roster(tier).is_empty(),
+                    SiteKind::Auxiliary => false,
+                }
+        };
+        if site.kind != SiteKind::Auxiliary {
+            return can(site.kind).then_some(site.kind);
+        }
+        SiteKind::AUXILIARY
+            .iter()
+            .enumerate()
+            .filter(|(_, k)| can(**k))
+            .min_by_key(|(order, k)| (s.nodes.iter().filter(|n| n.kind == **k).count(), *order))
+            .map(|(_, k)| *k)
     }
 
     /// The way site `site`'s base faces: its own facing, else toward the first
@@ -149,11 +178,16 @@ impl crate::World {
         let rising: Vec<usize> = (0..s.nodes.len()).filter(|i| !s.nodes[*i].raised).collect();
         for i in rising {
             let s = self.state.survival.as_ref().unwrap();
-            let (unit, started, site, product) = {
+            let (unit, started, site, product, kind) = {
                 let n = &s.nodes[i];
-                (n.unit, n.started, n.site, n.products.first().copied())
+                (
+                    n.unit,
+                    n.started,
+                    n.site,
+                    n.products.first().copied(),
+                    n.kind,
+                )
             };
-            let kind = s.site_kind(site);
             let Some(row) = self.state.units.row(unit) else {
                 continue;
             };
@@ -177,12 +211,13 @@ impl crate::World {
                 s.nodes[i].born = s.round;
                 s.nodes[i].next_print = now + 3 * HZ;
                 s.nodes[i].next_level_at = now + CATCH_UP_TICKS;
-                // An auxiliary Shaper's first volley or launch comes after half a beat.
+                // An auxiliary Shaper's first volley, launch or fleet comes after half a beat.
                 s.nodes[i].next_fire = now
                     + match kind {
                         SiteKind::Artillery => volley_ticks(1) / 2,
                         SiteKind::Nuke => launch_gap_ticks(1),
-                        SiteKind::Printer => 0,
+                        SiteKind::Fleet => fleet_gap_ticks(1) / 2,
+                        SiteKind::Printer | SiteKind::Auxiliary => 0,
                     };
                 let shaper = self.state.units.blueprint[row];
                 self.events.push(SimEvent::NodeOnline {
@@ -240,10 +275,16 @@ impl crate::World {
         let s = self.state.survival.as_ref().unwrap();
         let mut rng = s.rng;
         let mut n = s.nodes[i].clone();
-        // An Unmaker prints nothing: its levels grow its defences and its silos.
-        let prints = s.site_kind(n.site) != SiteKind::Nuke;
+        // An Unmaker prints nothing: its levels grow its defences and its silos. A
+        // Gatewright's levels open bigger classes of warship to its fleets.
+        let prints = matches!(n.kind, SiteKind::Printer | SiteKind::Artillery);
         n.level = n.level.saturating_add(1);
         let mut added = None;
+        if n.kind == SiteKind::Fleet {
+            let classes = self.fleet_classes_of(n.level, tier);
+            added = classes.iter().copied().find(|c| !n.products.contains(c));
+            n.products = classes;
+        }
         if prints && shaper_gains_product(n.level) {
             let light: Vec<(BlueprintId, u8)> = self.roster_ids(n.domain, tier);
             added = newest_new(&light, &n.products, &mut rng);
@@ -319,7 +360,7 @@ impl crate::World {
         let ready: Vec<usize> = (0..s.nodes.len())
             .filter(|i| {
                 let n = &s.nodes[*i];
-                n.raised && now >= n.next_print && s.site_kind(n.site) == SiteKind::Printer
+                n.raised && now >= n.next_print && n.kind == SiteKind::Printer
             })
             .collect();
         for i in ready {
@@ -403,7 +444,7 @@ impl crate::World {
             self.survival_unravel(&n)?;
             self.survival_release_foot(n.pos, n.foot);
             let s = self.state.survival.as_ref().unwrap();
-            let kind = s.site_kind(n.site);
+            let kind = n.kind;
             let bp = self.blueprints.unit(s.kit.shaper(kind));
             let wreck = if n.raised {
                 (bp.cost_materials * bp.wreck_fraction).round_int().max(0) as u32

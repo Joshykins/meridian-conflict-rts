@@ -20,6 +20,23 @@ pub(super) enum Route {
     Site(usize),
     /// Straight at them (ships: down the nearest sea front).
     Free,
+    /// Nowhere yet: a Gatewright's fleet, which it sends itself (`fleet.rs`).
+    Held,
+}
+
+/// How a formation is printed (`survival_print_at`).
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Job {
+    pub(super) spot: Spot,
+    /// The Shaper whose beam prints it; `Handle::NONE` on a bay or out of a warp.
+    pub(super) source: UnitId,
+    pub(super) route: Route,
+    /// Printed for the round: it musters and goes with it.
+    pub(super) round: bool,
+    /// Ticks the whole print takes, and how many of them are done as it starts (a squad
+    /// warped in comes out all but whole).
+    pub(super) ticks: u32,
+    pub(super) done: u32,
 }
 
 /// A place a round's formation may be printed (`survival_spots`).
@@ -224,11 +241,10 @@ impl crate::World {
         out
     }
 
-    /// Starts printing `units` as one block on `spot` (a bay's apron and out
-    /// past its doors, a Shaper's platform under `source`'s beam, or round where a
-    /// replication shell landed, with no beam). All of it
-    /// takes the same time and finishes together, then goes by `route`: with the
-    /// round when `round`, else at once.
+    /// Starts printing `units` as one block on `spot` (a bay's apron and out past its
+    /// doors, or a Shaper's platform under `source`'s beam). All of it takes the same time
+    /// and finishes together, then goes by `route`: with the round when `round`, else at
+    /// once.
     pub(super) fn survival_print_formation(
         &mut self,
         units: &[BlueprintId],
@@ -239,7 +255,6 @@ impl crate::World {
         now: u32,
     ) -> Result<(), SimError> {
         let s = self.state.survival.as_ref().unwrap();
-        let side = s.config.engine_player;
         let (at, heading) = match spot {
             Spot::Bay(b) => {
                 let Some(b) = s.config.bays.get(b as usize) else {
@@ -253,55 +268,129 @@ impl crate::World {
                 };
                 (self.state.units.pos[row], self.state.units.heading[row])
             }
-            Spot::Landing { at, heading } => (at, heading),
+            Spot::WarpIn { at, heading } | Spot::Berth { at, heading } => (at, heading),
         };
+        let places = match spot {
+            // A bay's front row is at its mark.
+            Spot::Bay(_) => {
+                let radius = units
+                    .iter()
+                    .map(|b| self.blueprints.unit(*b).radius)
+                    .max()
+                    .unwrap_or(Fx::ZERO);
+                let spots = block(units.len(), radius, at, heading);
+                self.passable_places(units, spots)
+            }
+            _ => self.formation_places(units, at, heading),
+        };
+        let job = Job {
+            spot,
+            source,
+            route,
+            round,
+            ticks: formation_ticks(self.blueprints.as_ref(), units),
+            done: 0,
+        };
+        self.survival_print_at(units, &places, heading, job, now)?;
+        Ok(())
+    }
+
+    /// Where `units` stand as a block centred on `at`, facing `heading`, each on the
+    /// nearest ground (or water, or air) it can be on.
+    pub(super) fn formation_places(
+        &self,
+        units: &[BlueprintId],
+        at: FxVec2,
+        heading: Angle,
+    ) -> Vec<FxVec2> {
         let radius = units
             .iter()
             .map(|b| self.blueprints.unit(*b).radius)
             .max()
             .unwrap_or(Fx::ZERO);
-        // A shell's squad comes out of its burst quickly; a formation takes its time.
-        let ticks = match spot {
-            Spot::Landing { .. } => super::rules::SQUAD_PRINT_TICKS,
-            Spot::Bay(_) | Spot::Pad(_) => formation_ticks(self.blueprints.as_ref(), units),
-        };
+        let spots = block(units.len(), radius, FxVec2::ZERO, heading);
+        let n = spots.len().max(1) as i32;
+        let sum = spots.iter().fold(FxVec2::ZERO, |a, b| a + *b);
+        let at = at - FxVec2::new(sum.x / n, sum.y / n);
+        let spots = block(units.len(), radius, at, heading);
+        self.passable_places(units, spots)
+    }
+
+    /// Each of `spots` moved to the nearest place its unit of `units` can be.
+    fn passable_places(&self, units: &[BlueprintId], spots: Vec<FxVec2>) -> Vec<FxVec2> {
+        units
+            .iter()
+            .zip(spots)
+            .map(|(bp, place)| {
+                self.blueprints
+                    .unit(*bp)
+                    .motion
+                    .and_then(|m| self.nav.nearest_passable(m.layer, m.size_class, place))
+                    .unwrap_or(place)
+            })
+            .collect()
+    }
+
+    /// Starts printing `units` at `places`, facing `heading`, as one formation by `job`;
+    /// the units it started. At a Gatewright's berth they are printed in the air, never
+    /// on a lot.
+    pub(super) fn survival_print_at(
+        &mut self,
+        units: &[BlueprintId],
+        places: &[FxVec2],
+        heading: Angle,
+        job: Job,
+        now: u32,
+    ) -> Result<Vec<UnitId>, SimError> {
+        let side = self.state.survival.as_ref().unwrap().config.engine_player;
         let formation = {
             let s = self.state.survival.as_mut().unwrap();
             s.next_formation = s.next_formation.wrapping_add(1);
             s.next_formation
         };
-        // A platform's (or a landing's) block is centred on it; a bay's front row is at its mark.
-        let at = match spot {
-            Spot::Pad(_) | Spot::Landing { .. } => {
-                let spots = block(units.len(), radius, FxVec2::ZERO, heading);
-                let n = spots.len().max(1) as i32;
-                let sum = spots.iter().fold(FxVec2::ZERO, |a, b| a + *b);
-                at - FxVec2::new(sum.x / n, sum.y / n)
-            }
-            Spot::Bay(_) => at,
-        };
-        for (bp, place) in units.iter().zip(block(units.len(), radius, at, heading)) {
-            let Some(motion) = self.blueprints.unit(*bp).motion else {
+        let aloft = matches!(job.spot, Spot::Berth { .. });
+        let mut started = Vec::with_capacity(units.len());
+        for (bp, place) in units.iter().zip(places) {
+            if self.blueprints.unit(*bp).motion.is_none() {
                 continue;
+            }
+            let row = if aloft {
+                self.spawn_aloft(*bp, side, *place, heading)?
+            } else {
+                self.spawn_unit(*bp, side, *place, heading, false)?
             };
-            let place = self
-                .nav
-                .nearest_passable(motion.layer, motion.size_class, place)
-                .unwrap_or(place);
-            let row = self.spawn_unit(*bp, side, place, heading, false)?;
             let unit = self.state.units.id(row);
+            started.push(unit);
             self.state.survival.as_mut().unwrap().printing.push(Print {
                 unit,
-                spot,
-                source,
-                route,
-                round,
+                spot: job.spot,
+                source: job.source,
+                route: job.route,
+                round: job.round,
                 formation,
-                started: now,
-                ticks,
+                started: now.saturating_sub(job.done),
+                ticks: job.ticks,
             });
         }
-        Ok(())
+        Ok(started)
+    }
+
+    /// A unit printed in the air at a Gatewright's berth: at its cruise height, a
+    /// construction site with no lot (a warship built by engineers stands on one).
+    fn spawn_aloft(
+        &mut self,
+        bp: BlueprintId,
+        side: u8,
+        at: FxVec2,
+        heading: Angle,
+    ) -> Result<usize, SimError> {
+        let row = self.spawn_unit(bp, side, at, heading, true)?;
+        let full = self.unit_max_health(row);
+        let units = &mut self.state.units;
+        units.flags[row] |= crate::tables::flag::UNDER_CONSTRUCTION;
+        units.build_progress[row] = Fx::ZERO;
+        units.health[row] = full / 10;
+        Ok(row)
     }
 
     /// A formation still standing on its spot keeps it.
@@ -345,7 +434,11 @@ impl crate::World {
                 self.state.units.health[row] = want.min(full);
             }
             if t >= Fx::ONE {
-                self.complete_unit(row)?;
+                if matches!(p.spot, Spot::Berth { .. }) {
+                    self.complete_unit_aloft(row)?;
+                } else {
+                    self.complete_unit(row)?;
+                }
                 done.push(p);
             } else {
                 keep.push(p);
@@ -358,6 +451,10 @@ impl crate::World {
         for f in formations {
             let group: Vec<&Print> = done.iter().filter(|p| p.formation == f).collect();
             let units: Vec<UnitId> = group.iter().map(|p| p.unit).collect();
+            if group[0].route == Route::Held {
+                // A Gatewright's fleet: it gives the orders (`fleet.rs`).
+                continue;
+            }
             if group[0].round {
                 self.survival_muster(&units, group[0].route, f)?;
             } else {
@@ -386,7 +483,7 @@ impl crate::World {
                     site.at + ahead * (site.room + Fx::from_int(100))
                 })
             }),
-            Route::Free => None,
+            Route::Free | Route::Held => None,
         };
         let Some(head) = head else {
             return self.survival_send(units, Route::Free, true);
@@ -493,7 +590,7 @@ impl crate::World {
                 .node_sites
                 .get(i)
                 .map_or(Vec::new(), |n| n.path.clone()),
-            Route::Free => Vec::new(),
+            Route::Free | Route::Held => Vec::new(),
         };
         let mut legs: Vec<(Vec<UnitId>, Vec<FxVec2>)> = Vec::new();
         if !rest.is_empty() {

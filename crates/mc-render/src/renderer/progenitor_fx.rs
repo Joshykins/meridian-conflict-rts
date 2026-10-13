@@ -15,9 +15,10 @@
 //!   cage round the warhead it meets and unmakes it into lines of light. The Unmaker's
 //!   warhead is a solid body seamed with light, pushed by a spear of it, and goes off as
 //!   a cold sphere of hard light that opens and falls in again over a burnt mark.
-//! - **Replication shells** (`shells.rs`): a solid body seamed with light on a ribbon of
-//!   it; its mark turning on the ground where it will land; landing, a burst ring, a
-//!   column the squad is printed in and a mark left burnt into the ground.
+//! - **Warp-ins** (`warp_ins.rs`): a Seedcaster's squad or a Gatewright's fleet marked
+//!   to come in: a pulse at the Shaper's crown, its mark turning on the ground where it
+//!   will come in; a squad arriving, a burst ring, a column it comes out in and a mark
+//!   left burnt into the ground.
 //!
 //! The dome is the shield's own look (progenitor_glass.wgsl). Presentation only; the
 //! renderer's own clock.
@@ -25,10 +26,10 @@
 pub(crate) mod pass;
 
 mod lance;
-mod shells;
 #[cfg(test)]
 mod shots;
 mod strategic;
+mod warp_ins;
 
 use super::Renderer;
 use crate::camera::Camera;
@@ -40,7 +41,7 @@ use crate::pipelines::{Layouts, Passes};
 use bytemuck::Zeroable;
 use glam::Vec3;
 use mc_sim::mirror::{RenderFrame, SimEvent, StrategicInstance};
-use mc_sim::survival::{ShaperInstance, ShellInstance};
+use mc_sim::survival::{ShaperInstance, WarpInInstance};
 use pass::{GpuPiece, ProgenitorPass};
 
 /// The Progenitor's light, and its white-hot (gpu_consts `progenitor_fx`).
@@ -175,10 +176,9 @@ pub(super) struct ProgenitorFx {
     launches: Vec<strategic::Launch>,
     /// The splash each Lance last struck with, by unit (its mark's size while it charges).
     splashes: Vec<(u32, f32)>,
-    /// Replication shells in the air, and each one's Seedcaster's level by serial (kept
-    /// to its landing).
-    shells: Vec<ShellInstance>,
-    shell_levels: Vec<(u32, u16)>,
+    /// Warp-ins marked, and each one's Shaper's level by serial (kept to its arrival).
+    warp_ins: Vec<WarpInInstance>,
+    warp_in_levels: Vec<(u32, u16)>,
     /// The Progenitor's missiles in flight, and where each one's trail was last laid to.
     missiles: Vec<StrategicInstance>,
     trails: Vec<(u32, Vec3)>,
@@ -196,8 +196,8 @@ impl ProgenitorFx {
             flashes: Vec::new(),
             shapers: Vec::new(),
             splashes: Vec::new(),
-            shells: Vec::new(),
-            shell_levels: Vec::new(),
+            warp_ins: Vec::new(),
+            warp_in_levels: Vec::new(),
             missiles: Vec::new(),
             trails: Vec::new(),
             heard: Vec::new(),
@@ -273,24 +273,13 @@ impl Renderer {
                 self.lance_strike(unit.0, Vec3::from(to.to_f32()), splash.to_f32(), time);
                 true
             }
-            SimEvent::ReplicationShellFired {
-                serial, from, to, ..
-            } => {
-                self.shell_fired(
-                    *serial,
-                    Vec3::from(from.to_f32()),
-                    Vec3::from(to.to_f32()),
-                    time,
-                );
-                true
-            }
-            SimEvent::ReplicationShellLanded {
+            SimEvent::WarpInArrived {
                 serial,
                 at,
                 radius,
                 units,
             } => {
-                self.shell_landed(
+                self.warp_in_arrived(
                     *serial,
                     Vec3::from(at.to_f32()),
                     radius.to_f32(),
@@ -358,15 +347,20 @@ impl Renderer {
                 fx.halos.push((s.unit, u.heading, u.status[2]));
             }
         }
-        fx.shells.clone_from(&frame.shells);
-        for s in &frame.shells {
-            if !fx.shell_levels.iter().any(|l| l.0 == s.serial) {
-                fx.shell_levels.push((s.serial, s.level));
+        fx.warp_ins.clone_from(&frame.warp_ins);
+        let mut marked = Vec::new();
+        for s in &frame.warp_ins {
+            if !fx.warp_in_levels.iter().any(|l| l.0 == s.serial) {
+                fx.warp_in_levels.push((s.serial, s.level));
+                marked.push((s.level, Vec3::from(s.from), Vec3::from(s.at)));
             }
         }
-        // Forgotten a while after it lands (its landing reads it the tick it lands).
-        if fx.shell_levels.len() > 256 {
-            fx.shell_levels.drain(..128);
+        // Forgotten a while after it comes in (its arrival reads it the tick it does).
+        if fx.warp_in_levels.len() > 256 {
+            fx.warp_in_levels.drain(..128);
+        }
+        for (level, from, to) in marked {
+            self.warp_in_marked(level, from, to, time);
         }
         self.progenitor_missiles(frame, time);
     }
@@ -380,7 +374,7 @@ impl Renderer {
         fx.heard.retain(|h| time - h.1 < 1.0);
         let mut frame: Vec<Piece> = Vec::new();
         self.lance_charges(&mut frame, time);
-        self.shells_in_flight(&mut frame, time, alpha);
+        self.warp_in_marks(&mut frame, time, alpha);
         self.missiles_in_flight(&mut frame, time, alpha);
         let mut all: Vec<GpuPiece> = self
             .progenitor_fx

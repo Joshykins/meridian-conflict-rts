@@ -78,10 +78,9 @@
                 Roll(at: 1.17, from: 700, to: 120, glide: 2.8, attack: 0.03, decay: 1.0, gain: 0.8, swell: 4, depth: 0.6),
             ],
         ),
-        // A Seedcaster's volley leaving, heard by every defender (the toast's sound): a
-        // deep hollow thoom, the shell's glass struck once as it goes, and air torn after
-        // it, climbing away.
-        "progenitor_shell_fired": (
+        // A Seedcaster's volley marked, heard by every defender (the toast's sound): a
+        // deep hollow thoom, glass struck once, and air torn after it, climbing away.
+        "progenitor_volley": (
             length: 3.0, peak: 0.55, room: 0.6,
             layers: [
                 Burst(low: 40, high: 300, attack: 0.003, decay: 0.2, gain: 4),
@@ -91,21 +90,10 @@
                 Drive(1.25),
             ],
         ),
-        // A replication shell coming down, held from three seconds out, louder and lower
-        // the nearer it is to landing (game_survival.rs): air torn by a hard body, a hiss
-        // over a low flutter. No whistling tone.
-        "progenitor_shell_whistle": (
-            length: 2.0, peak: 0.4, room: 0.3, looped: true,
-            layers: [
-                Wind(freq: 900, q: 2.5, gain: 1.5, swell: 6, depth: 0.5, sway: 0.4),
-                Wind(freq: 260, q: 1.2, gain: 1.2, swell: 3, depth: 0.6, sway: 0.3),
-                Drone(freq: 98, gain: 0.03, wobble: 4, depth: 0.5),
-            ],
-        ),
-        // A replication shell landing: glass breaking once over a deep blow, the ground
-        // knocked and rolling, and then the print column's cold hum swelling up out of it
-        // and settling as the squad is made.
-        "progenitor_shell_landed": (
+        // A Seedcaster's squad warping in: glass breaking once over a deep blow, the
+        // ground knocked and rolling, and then the print column's cold hum swelling up out
+        // of it and settling as the squad comes out whole.
+        "progenitor_warp_in": (
             length: 4.0, peak: 0.75, room: 0.6,
             layers: [
                 Burst(low: 300, high: 1800, attack: 0.0004, decay: 0.015, gain: 2.0),

@@ -4,11 +4,12 @@
 //! its base, and its shield, Lance and anti-nuke at its level. Presentation
 //! only: nothing here writes back.
 
+use super::fleet::FleetStage;
 use super::rules::{
-    launch_gap_ticks, pylon_feed, shaper_batch, shaper_height, shaper_silos, shaper_tier,
-    shell_blast, shells_per_volley, volley_ticks,
+    arrival_shock, fleet_gap_ticks, fleet_size, launch_gap_ticks, pylon_feed, shaper_batch,
+    shaper_height, shaper_silos, shaper_tier, squads_per_volley, volley_ticks, warp_in_ticks,
 };
-use super::{Node, PieceKind, RAISE_TICKS};
+use super::{Hold, Node, PieceKind, RAISE_TICKS};
 use crate::{Handle, UnitId};
 use mc_data::survival::{Domain, SiteKind};
 use mc_data::BlueprintId;
@@ -22,7 +23,8 @@ use mc_data::BlueprintId;
 )]
 pub struct ShaperInstance {
     pub unit: u32,
-    /// `SiteKind` as a number: 0 printer, 1 artillery, 2 nuke.
+    /// `SiteKind` as a number: 0 printer, 1 artillery (Seedcaster), 2 nuke (Unmaker),
+    /// 3 fleet (Gatewright).
     pub kind: u8,
     pub level: u16,
     /// Visual tier (`shaper_tier`): a stage, collar or ring more each.
@@ -40,7 +42,8 @@ pub struct ShaperInstance {
     /// The shield's visual tier, by the Shaper's level.
     pub shield_tier: u8,
     /// An auxiliary Shaper: 0..1 through the beat to its next volley (a Seedcaster) or
-    /// launch (an Unmaker), for a charge-up look; 0 for a printer.
+    /// launch (an Unmaker), or through printing its fleet (a Gatewright, 1 once built), for
+    /// a charge-up look; 0 for a printer.
     pub fire_charge: f32,
     /// Metres from its middle to the edge of its foot, as the sim blocks it now
     /// (`rules::shaper_foot` of its built height, whole path cells; it waits on a
@@ -102,24 +105,53 @@ pub struct AntiNukeCard {
     pub round_secs: f32,
 }
 
-/// A Seedcaster's replication artillery at its level (`artillery.rs`).
+/// A Seedcaster's warp-ins at its level (`warp_in.rs`).
 #[derive(Clone, Debug)]
 #[expect(clippy::disallowed_types, reason = "presentation: the selection card")]
 pub struct ArtilleryCard {
     /// Seconds between volleys, and until the next.
     pub interval_secs: f32,
     pub next_in_secs: f32,
-    pub shells_per_volley: u16,
-    /// Units one shell prints where it lands: light (T1-T3), heavies; and their highest tech.
+    pub squads_per_volley: u16,
+    /// Units one squad brings: light (T1-T3), heavies; and their highest tech.
     pub squad: (u16, u16),
     pub squad_tech: u8,
-    /// Its burst where it lands: reach (m) and damage.
-    pub blast_radius: f32,
-    pub blast_damage: f32,
-    /// Its shells in the air now.
-    pub in_flight: u16,
-    /// Its last volley was held back by the field cap: the field is full.
-    pub held: bool,
+    /// Seconds from a squad's mark being shown to its warping in.
+    pub warp_in_secs: f32,
+    /// The shock where a squad comes in: reach (m) and damage.
+    pub shock_radius: f32,
+    pub shock_damage: f32,
+    /// Its squads marked and not yet in.
+    pub marked: u16,
+    /// Why its last volley was held back, if it was: the field full, or every target in
+    /// the defenders' dampening fields.
+    pub hold: Hold,
+}
+
+/// A Gatewright's fleets at its level (`fleet.rs`).
+#[derive(Clone, Debug)]
+#[expect(clippy::disallowed_types, reason = "presentation: the selection card")]
+pub struct FleetCard {
+    pub stage: FleetStage,
+    /// Ships one fleet holds at its level: light, capital.
+    pub size: (u16, u16),
+    /// The classes it builds from, the cheapest first.
+    pub classes: Vec<BlueprintId>,
+    /// Ships of the fleet being built or about to warp in.
+    pub ships: u16,
+    /// 0..1 through printing the fleet (1 once built; 0 resting).
+    pub build: f32,
+    /// Seconds until its next fleet starts printing (resting), or until the fleet warps
+    /// in (marked or warping: the countdown, the jump's spool and transit reckoned in).
+    pub next_in_secs: f32,
+    /// Seconds it rests between fleets, and a fleet's mark is shown before its ships
+    /// spool.
+    pub gap_secs: f32,
+    pub lead_secs: f32,
+    /// Its ships sent at the defenders and still alive.
+    pub in_field: u16,
+    /// Why its next fleet waits, if it does: the field full.
+    pub hold: Hold,
 }
 
 /// An Unmaker's warheads at its level (`warheads.rs`): all its silos together.
@@ -178,10 +210,12 @@ pub struct ShaperCard {
     pub shield: Option<ShieldCard>,
     pub lance: Option<LanceCard>,
     pub anti_nuke: Option<AntiNukeCard>,
-    /// A Seedcaster's artillery; None for any other Shaper.
+    /// A Seedcaster's warp-ins; None for any other Shaper.
     pub artillery: Option<ArtilleryCard>,
     /// An Unmaker's warheads; None for any other Shaper.
     pub warheads: Option<WarheadCard>,
+    /// A Gatewright's fleets; None for any other Shaper.
+    pub fleet: Option<FleetCard>,
 }
 
 /// 0..1 through the growth step a Shaper `height` metres tall is building at
@@ -246,11 +280,7 @@ impl crate::World {
             let Some(row) = self.state.units.row(n.unit) else {
                 continue;
             };
-            let kind = s
-                .config
-                .node_sites
-                .get(n.site as usize)
-                .map_or(SiteKind::Printer, |site| site.kind);
+            let kind = n.kind;
             let lance = self.state.lances.by_unit.get(&n.unit);
             let spec = self.lance_spec(row);
             let (charge, target) = match (lance, spec) {
@@ -289,7 +319,6 @@ impl crate::World {
         let s = self.state.survival.as_ref()?;
         let n = s.nodes.iter().find(|n| n.unit == unit)?;
         let row = self.state.units.row(unit)?;
-        let site = s.config.node_sites.get(n.site as usize);
         let bps = self.blueprints.as_ref();
         let light = n.products.iter().filter(|p| bps.unit(**p).tech < 4);
         let light_tech = light.clone().map(|p| bps.unit(*p).tech).max().unwrap_or(1);
@@ -348,7 +377,7 @@ impl crate::World {
         Some(ShaperCard {
             unit,
             site: n.site,
-            kind: site.map_or(SiteKind::Printer, |s| s.kind),
+            kind: n.kind,
             domain: n.domain,
             level: n.level,
             tier: shaper_tier(n.level),
@@ -376,9 +405,9 @@ impl crate::World {
             shield,
             lance,
             anti_nuke,
-            artillery: (site.map(|s| s.kind) == Some(SiteKind::Artillery))
-                .then(|| self.artillery_card(n)),
-            warheads: (site.map(|s| s.kind) == Some(SiteKind::Nuke)).then(|| self.warhead_card(n)),
+            artillery: (n.kind == SiteKind::Artillery).then(|| self.artillery_card(n)),
+            warheads: (n.kind == SiteKind::Nuke).then(|| self.warhead_card(n)),
+            fleet: (n.kind == SiteKind::Fleet).then(|| self.fleet_card(n)),
         })
     }
 
@@ -389,14 +418,15 @@ impl crate::World {
         reason = "presentation: ShaperInstance::fire_charge"
     )]
     fn fire_charge(&self, n: &Node, kind: SiteKind) -> f32 {
-        let beat = match kind {
-            SiteKind::Printer => return 0.0,
-            SiteKind::Artillery => volley_ticks(n.level),
-            SiteKind::Nuke => launch_gap_ticks(n.level),
-        };
         if !n.raised {
             return 0.0;
         }
+        let beat = match kind {
+            SiteKind::Printer | SiteKind::Auxiliary => return 0.0,
+            SiteKind::Artillery => volley_ticks(n.level),
+            SiteKind::Nuke => launch_gap_ticks(n.level),
+            SiteKind::Fleet => return self.fleet_build_share(n),
+        };
         let left = n.next_fire.saturating_sub(self.state.tick).min(beat);
         1.0 - left as f32 / beat.max(1) as f32
     }
@@ -411,29 +441,90 @@ impl crate::World {
         let s = self.state.survival.as_ref().unwrap();
         let tps = mc_core::TICKS_PER_SECOND as f32;
         let i = s.nodes.iter().position(|m| m.unit == n.unit).unwrap_or(0);
-        let squad = self.shell_squad_of(i);
+        let squad = self.squad_of(i);
         let bps = self.blueprints.as_ref();
         let heavy = squad.iter().filter(|b| bps.unit(**b).tech >= 4).count();
-        let (radius, damage) = shell_blast(n.level);
-        let in_flight = s
-            .shells
-            .flying
+        let (radius, damage) = arrival_shock(n.level);
+        let marked = s
+            .warp_ins
+            .pending
             .iter()
-            .filter(|sh| sh.source == n.unit)
+            .filter(|w| w.source == n.unit)
             .count();
         ArtilleryCard {
             interval_secs: volley_ticks(n.level) as f32 / tps,
             next_in_secs: n.next_fire.saturating_sub(self.state.tick) as f32 / tps,
-            shells_per_volley: shells_per_volley(n.level).min(u16::MAX as usize) as u16,
+            squads_per_volley: squads_per_volley(n.level).min(u16::MAX as usize) as u16,
             squad: (
                 (squad.len() - heavy).min(u16::MAX as usize) as u16,
                 heavy.min(u16::MAX as usize) as u16,
             ),
             squad_tech: squad.iter().map(|b| bps.unit(*b).tech).max().unwrap_or(1),
-            blast_radius: radius.to_f32(),
-            blast_damage: damage.to_f32(),
-            in_flight: in_flight.min(u16::MAX as usize) as u16,
-            held: n.held,
+            warp_in_secs: warp_in_ticks(n.level) as f32 / tps,
+            shock_radius: radius.to_f32(),
+            shock_damage: damage.to_f32(),
+            marked: marked.min(u16::MAX as usize) as u16,
+            hold: n.hold,
+        }
+    }
+
+    /// 0..1 through printing Gatewright `n`'s fleet (1 once built, 0 resting).
+    #[expect(
+        clippy::float_arithmetic,
+        clippy::disallowed_types,
+        reason = "presentation: the Gatewright's instance and card"
+    )]
+    fn fleet_build_share(&self, n: &Node) -> f32 {
+        let Some(f) = self
+            .state
+            .survival
+            .as_ref()
+            .and_then(|s| s.fleets.iter().find(|f| f.shaper == n.unit))
+        else {
+            return 0.0;
+        };
+        match f.stage {
+            FleetStage::Resting => 0.0,
+            FleetStage::Building => {
+                let done = self.state.tick.saturating_sub(f.started);
+                (done as f32 / f.build_ticks.max(1) as f32).min(0.999)
+            }
+            FleetStage::Marked | FleetStage::Warping => 1.0,
+        }
+    }
+
+    #[expect(
+        clippy::float_arithmetic,
+        clippy::disallowed_types,
+        reason = "presentation: the Gatewright's selection card"
+    )]
+    fn fleet_card(&self, n: &Node) -> FleetCard {
+        let s = self.state.survival.as_ref().unwrap();
+        let tps = mc_core::TICKS_PER_SECOND as f32;
+        let fleet = s.fleets.iter().find(|f| f.shaper == n.unit);
+        let (light, capital) = fleet_size(n.level);
+        let stage = fleet.map_or(FleetStage::Resting, |f| f.stage);
+        let next_in = match (stage, fleet) {
+            (FleetStage::Marked | FleetStage::Warping, Some(f)) => self.fleet_eta(f),
+            (FleetStage::Building, Some(f)) => {
+                (f.started + f.build_ticks).saturating_sub(self.state.tick) as f32 / tps
+            }
+            _ => n.next_fire.saturating_sub(self.state.tick) as f32 / tps,
+        };
+        FleetCard {
+            stage,
+            size: (
+                light.min(u16::MAX as usize) as u16,
+                capital.min(u16::MAX as usize) as u16,
+            ),
+            classes: n.products.clone(),
+            ships: fleet.map_or(0, |f| f.ships.len().min(u16::MAX as usize) as u16),
+            build: self.fleet_build_share(n),
+            next_in_secs: next_in,
+            gap_secs: fleet_gap_ticks(n.level) as f32 / tps,
+            lead_secs: super::rules::FLEET_LEAD_TICKS as f32 / tps,
+            in_field: fleet.map_or(0, |f| f.field.len().min(u16::MAX as usize) as u16),
+            hold: n.hold,
         }
     }
 

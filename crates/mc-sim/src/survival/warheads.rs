@@ -29,7 +29,7 @@ impl crate::World {
         let due: Vec<usize> = (0..s.nodes.len())
             .filter(|&i| {
                 let n = &s.nodes[i];
-                n.raised && now >= n.next_fire && s.site_kind(n.site) == SiteKind::Nuke
+                n.raised && now >= n.next_fire && n.kind == SiteKind::Nuke
             })
             .collect();
         for i in due {
@@ -42,9 +42,9 @@ impl crate::World {
             let Some((silo, radius)) = silo else {
                 continue;
             };
-            let mut rng = self.state.survival.as_ref().unwrap().shells.rng;
+            let mut rng = self.state.survival.as_ref().unwrap().warp_ins.rng;
             let mark = self.warhead_mark(&mut rng, radius);
-            self.state.survival.as_mut().unwrap().shells.rng = rng;
+            self.state.survival.as_mut().unwrap().warp_ins.rng = rng;
             let Some(mark) = mark else {
                 continue;
             };

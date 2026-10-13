@@ -278,9 +278,10 @@ pub(super) fn pylon_feed(regen: Fx, pylons: usize) -> Fx {
 /// (mc-models `shaper::reach`, a test in mc-render holds the two equal).
 pub fn shaper_foot(kind: SiteKind, height: Fx) -> Fx {
     let grown = ((height - Fx::from_int(60)) / 1100).clamp(Fx::ZERO, Fx::ONE);
-    let (least, spread, most) = match kind {
-        SiteKind::Printer => (30, 170, 200),
-        SiteKind::Artillery | SiteKind::Nuke => (28, 150, 180),
+    let (least, spread, most) = if kind.is_auxiliary() {
+        (28, 150, 180)
+    } else {
+        (30, 170, 200)
     };
     (Fx::from_int(least) + grown * spread).min(Fx::from_int(most))
 }
@@ -313,19 +314,21 @@ pub(super) fn shaper_gains_heavy(level: u16) -> bool {
     level >= 8 && (level - 8).is_multiple_of(4)
 }
 
-/// The first round the ray may raise a Shaper on a site of `kind`: printers from the
-/// first, the auxiliary Seedcasters (artillery) from the third and Unmakers (nukes)
-/// from the sixth, so the defenders have a base to lose before the shells come.
+/// The first round the ray may raise a Shaper of `kind`: printers from the first, the
+/// auxiliary Seedcasters (warp-ins) from the third, Unmakers (nukes) from the sixth and
+/// Gatewrights (fleets) from the eighth, so the defenders have a base to lose before the
+/// squads come. An `Auxiliary` site may raise from the earliest of them.
 pub fn aux_first_round(kind: SiteKind) -> u16 {
     match kind {
         SiteKind::Printer => 1,
-        SiteKind::Artillery => 3,
+        SiteKind::Artillery | SiteKind::Auxiliary => 3,
         SiteKind::Nuke => 6,
+        SiteKind::Fleet => 8,
     }
 }
 
-/// Shells a Seedcaster of `level` fires in one volley: one, and one more every sixth level.
-pub fn shells_per_volley(level: u16) -> usize {
+/// Squads a Seedcaster of `level` warps in a volley: one, and one more every sixth level.
+pub fn squads_per_volley(level: u16) -> usize {
     1 + level.max(1) as usize / 6
 }
 
@@ -335,10 +338,17 @@ pub fn volley_ticks(level: u16) -> u32 {
     (75 * HZ * 20 / (20 + level.min(1000) as u32)).max(20 * HZ)
 }
 
-/// The units one replication shell prints where it lands: light units (T1-T3), then
-/// heavies. Three light units and one more every other level (one more again when they
-/// are T1); from level 8, with a heavy product, one heavy and one more every sixth level.
-pub fn shell_squad(level: u16, light_tech: u8, has_heavy: bool) -> (usize, usize) {
+/// Ticks from a squad's mark being announced to its warping in: 16 s shortened as the
+/// Seedcaster levels (15 s at level 1, 12 s at 7), never under 10 s, so the defenders
+/// always have time to see it coming.
+pub fn warp_in_ticks(level: u16) -> u32 {
+    (16 * HZ * 20 / (20 + level.min(1000) as u32)).max(10 * HZ)
+}
+
+/// The units one warp-in brings: light units (T1-T3), then heavies. Three light units and
+/// one more every other level (one more again when they are T1); from level 8, with a
+/// heavy product, one heavy and one more every sixth level.
+pub fn squad_size(level: u16, light_tech: u8, has_heavy: bool) -> (usize, usize) {
     let light = 3 + level as usize / 2 + (light_tech <= 1) as usize;
     let heavy = if has_heavy && level >= 8 {
         1 + (level as usize - 8) / 6
@@ -348,10 +358,10 @@ pub fn shell_squad(level: u16, light_tech: u8, has_heavy: bool) -> (usize, usize
     (light, heavy)
 }
 
-/// A replication shell's burst where it lands: (radius in metres, damage over it). A
-/// modest blast, the squad it prints is the threat: 40 m and 600 at level 1, two metres
-/// more a level up to 100 m, and a tenth more damage a level.
-pub fn shell_blast(level: u16) -> (Fx, Fx) {
+/// The shock where a squad warps in: (radius in metres, damage over it). Modest, the squad
+/// is the threat: 40 m and 600 at level 1, two metres more a level up to 100 m, and a
+/// tenth more damage a level.
+pub fn arrival_shock(level: u16) -> (Fx, Fx) {
     let steps = level.max(1) - 1;
     let radius = Fx::from_int(40 + 2 * steps.min(30) as i32);
     let mut damage = Fx::from_int(600);
@@ -362,21 +372,10 @@ pub fn shell_blast(level: u16) -> (Fx, Fx) {
     (radius, damage)
 }
 
-/// Ticks a replication shell flies `distance` metres: ten seconds, and a second more
-/// every 2 km, up to twenty.
-pub fn shell_flight_ticks(distance: Fx) -> u32 {
-    let km2 = distance.round_int().max(0) as u32 / 200;
-    (10 * HZ + km2).clamp(10 * HZ, 20 * HZ)
-}
-
-/// Metres a replication shell's arc tops out over the line from its Shaper's crown to its
-/// mark: three tenths of the distance, no less than 1200.
-pub fn shell_apex(distance: Fx) -> Fx {
-    (distance * Fx::ratio(3, 10)).max(Fx::from_int(1200))
-}
-
-/// Ticks a squad takes to print where its shell landed: quick, it comes out of the burst.
-pub(super) const SQUAD_PRINT_TICKS: u32 = 6 * HZ;
+/// Ticks a squad's print takes as it warps in, and the share of it already done as it
+/// comes out: it arrives two thirds whole and is finished a second later.
+pub(super) const WARP_IN_PRINT_TICKS: u32 = 3 * HZ;
+pub(super) const WARP_IN_WHOLE: (u32, u32) = (2, 3);
 
 /// Silos an Unmaker of `level` raises behind itself: one, and one more every eighth level.
 pub fn shaper_silos(level: u16) -> usize {
@@ -388,3 +387,39 @@ pub fn shaper_silos(level: u16) -> usize {
 pub fn launch_gap_ticks(level: u16) -> u32 {
     (30 * HZ * 20 / (20 + level.min(1000) as u32)).max(6 * HZ)
 }
+
+/// Warships one fleet of a Gatewright of `level` holds: (light, capital). Two light ships
+/// and one more every fourth level; from level 10 a capital ship, one more every eighth
+/// level (capitals only once the rounds print at T4: none is in its roster before).
+pub fn fleet_size(level: u16) -> (usize, usize) {
+    let light = 2 + level as usize / 4;
+    let capital = if level >= 10 {
+        1 + (level as usize - 10) / 8
+    } else {
+        0
+    };
+    (light, capital)
+}
+
+/// Classes a Gatewright of `level` builds from, the cheapest first: (light, capital). The
+/// cheapest light class, one bigger every fifth level; from level 10 the cheapest capital
+/// class, one bigger every tenth.
+pub fn fleet_classes(level: u16) -> (usize, usize) {
+    let light = 1 + level as usize / 5;
+    let capital = if level >= 10 {
+        1 + (level as usize - 10) / 10
+    } else {
+        0
+    };
+    (light, capital)
+}
+
+/// Ticks a Gatewright rests between one fleet warping in and the next starting to print:
+/// 90 s at level 1, quicker as it levels (60 s at 10), never under 40 s.
+pub fn fleet_gap_ticks(level: u16) -> u32 {
+    (90 * HZ * 20 / (20 + level.min(1000) as u32)).max(40 * HZ)
+}
+
+/// Ticks a fleet's mark is announced before its ships start to spool their drives. The
+/// spool and the jump follow (`warp.rs`), so the whole warning is longer.
+pub const FLEET_LEAD_TICKS: u32 = 20 * HZ;

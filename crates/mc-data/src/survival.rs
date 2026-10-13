@@ -31,7 +31,7 @@
 //!     node_sites: [
 //!         (name: "Cinder Ridge", at: (9800, 11800), domain: Land, facing: Some(180),
 //!          room: 450, path: [(9000, 11000), (7000, 10000)]),
-//!         (name: "Hollow Battery", at: (14000, 13000), kind: Artillery),
+//!         (name: "Hollow Battery", at: (14000, 13000), kind: Auxiliary),
 //!     ],
 //! )
 //! ```
@@ -90,26 +90,46 @@ pub struct FrontLayout {
     pub path: Vec<(f32, f32)>,
 }
 
-/// What a Shaper site is for. The numbers cross into the render frame
-/// (`ShaperInstance::kind`): never renumber one.
+/// What a Shaper site is for, and what kind a Shaper is. The numbers cross into the
+/// render frame (`ShaperInstance::kind`): never renumber one.
+///
+/// A map gives a printing site `Printer` and an auxiliary site `Auxiliary`: the sim
+/// raises there whichever auxiliary kind is least represented among those standing
+/// (mc-sim `survival::shapers`). A site may instead name one auxiliary kind
+/// (`Artillery`, `Nuke`, `Fleet`), and then raises only that.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum SiteKind {
     /// Prints formations on its platforms and sends them down its path.
     #[default]
     Printer = 0,
-    /// An auxiliary Shaper behind the lines that fires replication artillery.
+    /// An auxiliary Shaper behind the lines that warps squads in beside the defenders
+    /// (the Seedcaster).
     Artillery = 1,
-    /// An auxiliary Shaper that launches Progenitor nukes.
+    /// An auxiliary Shaper that launches Progenitor nukes (the Unmaker).
     Nuke = 2,
+    /// An auxiliary Shaper that builds fleets of warships and warps them in over the
+    /// defenders (the Gatewright).
+    Fleet = 3,
+    /// A map's auxiliary site, for any auxiliary kind. Never a Shaper's own kind.
+    Auxiliary = 4,
 }
 
 impl SiteKind {
+    /// The kinds an `Auxiliary` site may raise, in the order a tie is settled.
+    pub const AUXILIARY: [SiteKind; 3] = [SiteKind::Artillery, SiteKind::Nuke, SiteKind::Fleet];
+
+    /// Whether this is an auxiliary site or Shaper (anything but a printer).
+    pub fn is_auxiliary(self) -> bool {
+        self != SiteKind::Printer
+    }
+
     /// Radius (m) of level, clear ground a site of this kind grows into when
     /// the layout gives none.
     pub fn default_room(self) -> f32 {
-        match self {
-            SiteKind::Printer => 450.0,
-            SiteKind::Artillery | SiteKind::Nuke => 350.0,
+        if self.is_auxiliary() {
+            350.0
+        } else {
+            450.0
         }
     }
 }
@@ -224,7 +244,7 @@ impl SurvivalLayout {
         if self
             .node_sites
             .iter()
-            .any(|n| n.kind != SiteKind::Printer && n.domain != Domain::Land)
+            .any(|n| n.kind.is_auxiliary() && n.domain != Domain::Land)
         {
             return Some("survival: an auxiliary site must be Land".into());
         }
@@ -256,5 +276,8 @@ mod tests {
         assert_eq!(aux.path, vec![(5.0, 6.0), (7.0, 8.0)]);
         let bare: NodeSiteLayout = ron::from_str("(kind: Nuke)").unwrap();
         assert_eq!(bare.room_or_default(), 350.0);
+        let any: NodeSiteLayout = ron::from_str("(kind: Auxiliary)").unwrap();
+        assert!(any.kind.is_auxiliary());
+        assert_eq!(any.room_or_default(), 350.0);
     }
 }

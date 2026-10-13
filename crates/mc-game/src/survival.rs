@@ -257,18 +257,61 @@ pub fn log_tick(world: &mc_sim::World, tick: u32) {
                 name(*shaper),
                 product.map_or(String::new(), |b| format!(" ({})", name(b)))
             ),
-            SimEvent::ReplicationShellFired {
-                site, units, to, ..
+            SimEvent::WarpInMarked {
+                site,
+                units,
+                at,
+                ticks,
+                ..
             } => println!(
-                "[{min:5.1} min] shell from site {site} at ({:.0}, {:.0}), {units} units",
-                to.x.to_f32(),
-                to.y.to_f32()
+                "[{min:5.1} min] warp-in from site {site} marked at ({:.0}, {:.0}), {units} units in {} s",
+                at.x.to_f32(),
+                at.y.to_f32(),
+                ticks / mc_core::TICKS_PER_SECOND
             ),
-            SimEvent::ReplicationShellLanded { at, units, .. } => println!(
-                "[{min:5.1} min] shell landed at ({:.0}, {:.0}), printing {units}",
+            SimEvent::WarpInArrived { at, units, .. } => println!(
+                "[{min:5.1} min] squad warped in at ({:.0}, {:.0}), {units} units",
                 at.x.to_f32(),
                 at.y.to_f32()
             ),
+            SimEvent::WarpInCancelled { at, units, .. } => println!(
+                "[{min:5.1} min] warp-in at ({:.0}, {:.0}) dampened, {units} units lost",
+                at.x.to_f32(),
+                at.y.to_f32()
+            ),
+            SimEvent::FleetMarked {
+                site,
+                ships,
+                at,
+                ticks,
+                ..
+            } => println!(
+                "[{min:5.1} min] fleet of {ships} from site {site} marked at ({:.0}, {:.0}), spools in {} s",
+                at.x.to_f32(),
+                at.y.to_f32(),
+                ticks / mc_core::TICKS_PER_SECOND
+            ),
+            SimEvent::WarpArrived {
+                owner,
+                at,
+                dampened,
+                blueprint,
+                ..
+            } if *owner
+                == world
+                    .state
+                    .survival
+                    .as_ref()
+                    .map_or(u8::MAX, |s| s.config.engine_player) =>
+            {
+                println!(
+                    "[{min:5.1} min] {} warped in at ({:.0}, {:.0}){}",
+                    name(*blueprint),
+                    at.x.to_f32(),
+                    at.y.to_f32(),
+                    if *dampened { ", dampened" } else { "" }
+                )
+            }
             SimEvent::NuclearLaunch { to, owner, .. }
                 if *owner
                     == world

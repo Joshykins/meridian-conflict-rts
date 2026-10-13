@@ -91,8 +91,15 @@ impl crate::World {
                     let head = FxVec2::new(bay.emitter.x, bay.emitter.y);
                     head.extend(ground(bay.at) + bay.emitter.z)
                 }
-                // A shell's squad prints out of its burst, with no beam.
-                Spot::Landing { .. } => continue,
+                // A Gatewright's fleet prints in the air under its beam.
+                Spot::Berth { .. } => {
+                    let Some(from) = self.shaper_emitter(p.source) else {
+                        continue;
+                    };
+                    from
+                }
+                // A squad comes out of its warp all but whole, with no beam.
+                Spot::WarpIn { .. } => continue,
             };
             if !seen(at) && !seen(from.xy()) {
                 continue;
@@ -100,7 +107,7 @@ impl crate::World {
             // A great bay's projector works with one either side of it, across the bay.
             let great = match p.spot {
                 Spot::Bay(b) => s.config.bays.get(b as usize).filter(|b| b.great()),
-                Spot::Pad(_) | Spot::Landing { .. } => None,
+                Spot::Pad(_) | Spot::WarpIn { .. } | Spot::Berth { .. } => None,
             };
             if let Some(bay) = great {
                 let bp = self.bp(row);
@@ -260,11 +267,7 @@ impl crate::World {
                 Some(NodeStatus {
                     unit: n.unit,
                     site: n.site,
-                    kind: s
-                        .config
-                        .node_sites
-                        .get(n.site as usize)
-                        .map_or(mc_data::survival::SiteKind::Printer, |site| site.kind),
+                    kind: n.kind,
                     tier: super::shaper_tier(n.level),
                     pos: st.units.pos[row].to_f32(),
                     domain: n.domain,
@@ -303,7 +306,8 @@ impl crate::World {
             hostile: hostile as u32,
             held: (hostile >= super::FIELD_CAP
                 && (!s.queue.is_empty() || s.nodes.iter().any(|n| n.raised)))
-                || s.nodes.iter().any(|n| n.held),
+                || s.nodes.iter().any(|n| n.hold == super::Hold::FieldFull),
+            dampened: s.nodes.iter().any(|n| n.hold == super::Hold::Dampened),
             engine: s.config.engine.to_f32(),
             activity: self.survival_activity(),
             nodes,

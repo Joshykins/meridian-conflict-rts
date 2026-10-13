@@ -5,7 +5,9 @@
 //!   core telescoping up between leaning slab blades, the Lens on its head.
 //! - `progenitor_seedcaster` and `progenitor_unmaker`, the auxiliary Shapers: the stacked
 //!   spire (`auxiliary.rs`), stages hovering over each other on necks with collars round
-//!   them, the Lens near the top, under an artillery bore or a silo crown.
+//!   them, the Lens near the top, under an artillery bore or a silo crown. The
+//!   Gatewright (`progenitor_gatewright`, fleets) wears the Seedcaster's spire until its
+//!   own crown is chosen (`stage_set`).
 //!
 //! Every one carries its anti-nuke as the halo round its Lens (`halo.rs`), a blade to an
 //! interceptor held.
@@ -125,7 +127,17 @@ pub fn stage(level: u16) -> usize {
         .unwrap_or(0)
 }
 
-/// The stage meshes' keys of a Shaper of `kind` (`ShaperInstance::kind`: 0 printer,
+/// The set of stage meshes a Shaper of `kind` (`ShaperInstance::kind`: 0 printer,
+/// 1 artillery, 2 nuke, 3 fleet) is drawn with: its own, but a Gatewright (3) the
+/// Seedcaster's until its crown is chosen.
+pub fn stage_set(kind: u8) -> u8 {
+    match kind {
+        3 => 1,
+        k => k.min(2),
+    }
+}
+
+/// The stage meshes' keys of the stage set `kind` ([`stage_set`]: 0 printer,
 /// 1 artillery, 2 nuke), in [`STAGE_LEVELS`] order.
 pub fn stage_keys(kind: u8) -> &'static [&'static str; STAGES] {
     match kind {

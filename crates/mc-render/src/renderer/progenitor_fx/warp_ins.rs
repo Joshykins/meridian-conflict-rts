@@ -1,84 +1,43 @@
-//! Replication shells (`mc_sim::survival` artillery, `RenderFrame::shells`): a
-//! Seedcaster's shell that prints a squad where it lands. Bigger and brighter the higher
-//! the Seedcaster's level when it fired.
+//! The Progenitor's warp-ins (`mc_sim::survival`, `RenderFrame::warp_ins`): a
+//! Seedcaster's squad or a Gatewright's fleet marked to come in beside the defenders.
+//! Bigger and brighter the higher its Shaper's level.
 //!
-//! - **Fired**: a ring of arcs kicked out round the Seedcaster's crown and a few lines
-//!   of light thrown up.
-//! - **In flight**: a solid body of pale alloy seamed with light, nose cut on a slant,
-//!   on a ribbon of hard light along the arc it has flown; drawn every frame where the
-//!   sim's arc puts it (`ShellInstance::at`). Its mark turns on the ground where it will
-//!   land, its radius the burst's, beating faster and brighter as it comes down, and in
-//!   its last seconds a line of light stands up out of the mark to meet it.
-//! - **Landed**: a flash, a burst ring of arcs out to its radius and a fainter one past
-//!   it, a column of light the squad is printed in with bands climbing it, lines of
-//!   light rising off the ground inside it, and a mark burnt into the ground.
+//! - **Marked**: a ring of arcs kicked out round its Shaper's crown and a few lines of
+//!   light thrown up toward the mark.
+//! - **Coming**: its mark turns on the ground where it will come in, its radius the
+//!   shock's (the fleet's reach for a fleet), beating faster and brighter as it comes,
+//!   and in its last seconds a line of light stands up out of the mark.
+//! - **Arrived** (a squad): a flash, a ring of arcs out to the shock's radius and a
+//!   fainter one past it, a column of light the squad comes out in with bands climbing
+//!   it, lines of light rising off the ground inside it, and a mark burnt into the
+//!   ground. A fleet's jump is a warp's own (`warp_fx.rs`).
+//!
+//! The warp exit itself is still to be drawn.
 
 use super::{Piece, HOT, LIGHT};
 use crate::gpu_consts::progenitor_fx::{ARCS, DRAPE, LINE, MARK, PRINT, TARGET};
 use crate::renderer::Renderer;
 use glam::Vec3;
+use mc_sim::survival::WarpInKind;
 use std::f32::consts::TAU;
 
-/// Seconds of its flight its ribbon reaches back, and the steps it is drawn in.
-const RIBBON: f32 = 1.2;
-const RIBBON_STEPS: usize = 10;
-
-/// A shell's body length at `level`.
-fn shell_length(level: u16) -> f32 {
-    (9.0 + 0.5 * f32::from(level)).min(28.0)
-}
-
 impl Renderer {
-    /// Every frame: each shell in the air, its ribbon and its mark.
-    pub(super) fn shells_in_flight(&mut self, out: &mut Vec<Piece>, time: f32, alpha: f32) {
+    /// Every frame: each warp-in's mark.
+    pub(super) fn warp_in_marks(&mut self, out: &mut Vec<Piece>, time: f32, alpha: f32) {
         let tick = self.tick_seconds.max(0.02);
-        for s in &self.progenitor_fx.shells {
-            let flight = s.flight.max(0.1);
-            let now = s.age + alpha * tick;
-            let t = (now / flight).clamp(0.0, 1.0);
-            let at = Vec3::from(s.at(t));
-            let ahead = Vec3::from(s.at((t + 0.002).min(1.0)));
-            let behind = Vec3::from(s.at((t - 0.002).max(0.0)));
-            let axis = (ahead - behind).normalize_or(Vec3::NEG_Z);
-            let side = axis.cross(Vec3::Z).normalize_or(Vec3::X);
-            let up = side.cross(axis);
-            let len = shell_length(s.level);
-            let level = f32::from(s.level);
-            out.push(
-                Piece::body(at + axis * len * 0.5, axis, up)
-                    .size(len * 0.2, len)
-                    .power(1.0 + level * 0.05)
-                    .now(time),
-            );
-            // The ribbon along the arc it has flown.
-            let width = len * 0.12;
-            for k in 0..RIBBON_STEPS {
-                let s0 = (now - RIBBON * (k + 1) as f32 / RIBBON_STEPS as f32) / flight;
-                let s1 = (now - RIBBON * k as f32 / RIBBON_STEPS as f32) / flight;
-                if s1 <= 0.0 {
-                    break;
-                }
-                let fade = 1.0 - k as f32 / RIBBON_STEPS as f32;
-                let fade0 = 1.0 - (k + 1) as f32 / RIBBON_STEPS as f32;
-                let mut to = Vec3::from(s.at(s1.max(0.0)));
-                if k == 0 {
-                    to = at - axis * len * 0.5;
-                }
-                out.push(
-                    Piece::beam(Vec3::from(s.at(s0.max(0.0))), to)
-                        .size(width * fade0, width * fade)
-                        .power(0.9 * fade)
-                        .now(time),
-                );
-            }
-            // Its mark, beating faster and brighter as it comes down.
+        for s in &self.progenitor_fx.warp_ins {
+            let whole = (s.age + s.eta).max(0.1);
             let left = (s.eta - alpha * tick).max(0.0);
-            let near = 1.0 - (left / flight).clamp(0.0, 1.0);
+            let near = 1.0 - (left / whole).clamp(0.0, 1.0);
             let beat = 0.75 + 0.25 * (time * (3.0 + 12.0 * near * near)).sin();
-            let mark = Vec3::from(s.to);
+            let mark = Vec3::from(s.at);
+            let r = match s.kind {
+                WarpInKind::Squad => s.radius,
+                WarpInKind::Fleet => s.reach,
+            };
             out.push(
                 Piece::ring(mark, Vec3::Z)
-                    .size(s.radius, s.radius)
+                    .size(r, r)
                     .power((0.6 + 1.8 * near * near) * beat)
                     .flags(DRAPE | TARGET)
                     .now(time),
@@ -97,9 +56,10 @@ impl Renderer {
         }
     }
 
-    /// Shell `serial` left the Seedcaster's crown `from` for `to`.
-    pub(super) fn shell_fired(&mut self, serial: u32, from: Vec3, to: Vec3, time: f32) {
-        let level = self.shell_level(serial);
+    /// A warp-in was marked by the Shaper whose crown is `from`, at `to`, its Shaper at
+    /// `level`.
+    pub(super) fn warp_in_marked(&mut self, level: u16, from: Vec3, to: Vec3, time: f32) {
+        let level = f32::from(level);
         let seed = self.scatter.unit();
         let big = 1.0 + level * 0.04;
         self.lay_progenitor(
@@ -128,8 +88,8 @@ impl Renderer {
             .flash(from, HOT * 1.5e5 * big, 220.0 * big, time, 0.5);
     }
 
-    /// Shell `serial` landed at `at`, its burst `radius` metres, printing `units`.
-    pub(super) fn shell_landed(
+    /// Squad `serial` warped in at `at`, its shock `radius` metres, `units` coming out.
+    pub(super) fn warp_in_arrived(
         &mut self,
         serial: u32,
         at: Vec3,
@@ -137,7 +97,7 @@ impl Renderer {
         units: u16,
         time: f32,
     ) {
-        let level = self.shell_level(serial);
+        let level = self.warp_in_level(serial);
         let big = 1.0 + level * 0.04;
         let r = radius.max(10.0);
         let ground = Vec3::new(at.x, at.y, self.progenitor_ground(at));
@@ -161,7 +121,7 @@ impl Renderer {
                 .power(1.2 * big)
                 .flags(DRAPE),
         );
-        // The column the squad is printed in.
+        // The column the squad comes out in.
         self.lay_progenitor(
             Piece::prism(ground, Vec3::Z * (30.0 + r * 0.8 + level * 2.0))
                 .size(r * 0.45, r * 0.3)
@@ -211,10 +171,10 @@ impl Renderer {
         );
     }
 
-    /// The level shell `serial`'s Seedcaster was at when it fired (zero unknown).
-    fn shell_level(&self, serial: u32) -> f32 {
+    /// The level warp-in `serial`'s Shaper was at when it marked it (zero unknown).
+    fn warp_in_level(&self, serial: u32) -> f32 {
         self.progenitor_fx
-            .shell_levels
+            .warp_in_levels
             .iter()
             .find(|l| l.0 == serial)
             .map_or(0.0, |l| f32::from(l.1))

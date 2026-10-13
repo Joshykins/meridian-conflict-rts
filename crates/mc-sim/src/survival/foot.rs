@@ -57,9 +57,8 @@ impl crate::World {
             .enumerate()
             .filter(|(_, n)| n.raised)
             .filter_map(|(i, n)| {
-                let kind = s.config.node_sites.get(n.site as usize)?.kind;
                 // Whole cells only, so it re-blocks as a cell's worth comes, not every tick.
-                let want = Fx::from_int((shaper_foot(kind, n.height) / cell).floor_int()) * cell;
+                let want = Fx::from_int((shaper_foot(n.kind, n.height) / cell).floor_int()) * cell;
                 (want > n.foot).then_some((i, want))
             })
             .collect();

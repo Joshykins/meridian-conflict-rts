@@ -565,6 +565,16 @@ impl World {
     /// A unit finished construction: it becomes active. Factory products and
     /// upgrades are released by their parent's order logic on the next tick.
     pub(crate) fn complete_unit(&mut self, row: usize) -> Result<(), SimError> {
+        self.finish_unit(row, true)
+    }
+
+    /// `complete_unit` for a unit built in the air, never on a lot (a survival
+    /// Gatewright's warships): nothing to give back under it.
+    pub(crate) fn complete_unit_aloft(&mut self, row: usize) -> Result<(), SimError> {
+        self.finish_unit(row, false)
+    }
+
+    fn finish_unit(&mut self, row: usize, on_lot: bool) -> Result<(), SimError> {
         self.state.units.flags[row] &= !flag::UNDER_CONSTRUCTION;
         self.state.units.health[row] = self.unit_max_health(row);
         self.settle_priority(row);
@@ -581,7 +591,7 @@ impl World {
         let (pos, heading) = (self.state.units.pos[row], self.state.units.heading[row]);
         self.remember_structure_pad(&bp, pos, heading, owner)?;
         // An experimental raised on a lot drives off it: the lot is free again.
-        if bp.is_site_built_unit() {
+        if on_lot && bp.is_site_built_unit() {
             self.release_lot(row, &bp, pos, heading);
             if self.state.units.has_flag(row, flag::REPEAT) {
                 self.queue_site_repeat(row, pos, heading);

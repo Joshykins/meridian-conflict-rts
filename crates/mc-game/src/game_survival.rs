@@ -1,7 +1,7 @@
 //! What the match says and plays about survival: the rounds, the engine's
 //! ray, and the replication nodes it raises (bonus objectives), and the
 //! Progenitor's own sounds (data/sounds/progenitor.ron): its Lances charging
-//! and striking, its domes struck, its shells coming down and landing.
+//! and striking, its domes struck, its squads and fleets warping in.
 //! Everything here reads the sim's survival events and status; nothing is
 //! decided here.
 
@@ -80,29 +80,53 @@ impl Game {
                     site(*s),
                     match (kind, product) {
                         (SiteKind::Printer, Some(p)) => format!("Printing {}", name(*p)),
-                        (SiteKind::Artillery, _) => "Fires Replication Shells".to_string(),
+                        (SiteKind::Artillery, _) => "Warps Squads In".to_string(),
                         (SiteKind::Nuke, _) => "Launches Warheads".to_string(),
-                        (SiteKind::Printer, None) => "Printing".to_string(),
+                        (SiteKind::Fleet, _) => "Warps Fleets In".to_string(),
+                        (SiteKind::Printer | SiteKind::Auxiliary, _) => "Printing".to_string(),
                     }
                 ),
                 VIOLET,
                 "survival_node_online",
             ),
-            // A volley's first shell: the marks themselves are on the map (`replication_marks`).
-            SimEvent::ReplicationShellFired {
+            // A volley's first squad: the marks themselves are on the map (`warp_in_marks`).
+            SimEvent::WarpInMarked {
                 site: s,
                 units,
-                flight_ticks,
+                ticks,
                 volley: 0,
                 ..
             } => (
                 format!(
-                    "Replication Shells Inbound from {}  \u{b7}  {units} Units Each  \u{b7}  {} s",
+                    "Progenitor Warp-In from {}  \u{b7}  {units} Units Each  \u{b7}  {} s",
                     site(*s),
-                    flight_ticks / mc_core::TICKS_PER_SECOND
+                    ticks / mc_core::TICKS_PER_SECOND
                 ),
                 palette::WARN,
-                "progenitor_shell_fired",
+                "progenitor_volley",
+            ),
+            SimEvent::WarpInCancelled { site: s, units, .. } => (
+                format!(
+                    "Warp-In from {} Dampened  \u{b7}  {units} Units Lost in the Field",
+                    site(*s)
+                ),
+                GOOD,
+                "warp_snag",
+            ),
+            // The marks are on the map; the fleet's jump sounds as any warp's.
+            SimEvent::FleetMarked {
+                site: s,
+                ships,
+                ticks,
+                ..
+            } => (
+                format!(
+                    "Progenitor Fleet Warping In from {}  \u{b7}  {ships} Ships  \u{b7}  Spools in {} s",
+                    site(*s),
+                    ticks / mc_core::TICKS_PER_SECOND
+                ),
+                palette::BAD,
+                "warp_spool",
             ),
             // The launch alarm is the nuke's own (`game_nuke_sounds`): a toast only.
             SimEvent::NuclearLaunch { owner, .. }
@@ -186,7 +210,7 @@ impl Game {
         }
     }
 
-    /// The ray and the print beams, the Lances charging and the shells coming down, as
+    /// The ray and the print beams, the Lances charging and the warp-ins coming, as
     /// loops: (sound, gain, pan, pitch). The ray is heard wherever the camera is; it
     /// crosses the map.
     pub(super) fn survival_loops(&self, audio: &Audio) -> Vec<(mc_data::SoundId, f32, f32, f32)> {
@@ -228,8 +252,9 @@ impl Game {
 
 impl Game {
     /// Every Lance charging in earshot as one hum, louder and leaning a little higher the
-    /// fuller the loudest is; every shell under three seconds from landing as one rush of
-    /// air, louder and lower the nearer it is.
+    /// fuller the loudest is; every squad under three seconds from warping in as one
+    /// rift's hum at its mark (the warp's own, a placeholder), louder and lower the nearer
+    /// it is.
     fn progenitor_loops(
         &self,
         library: &mc_data::SoundLibrary,
@@ -261,12 +286,16 @@ impl Game {
                 ));
             }
         }
-        if let Some(sound) = library.id_of("progenitor_shell_whistle") {
+        if let Some(sound) = library.id_of("warp_rift") {
             let mut sum = (0.0f32, 0.0f32);
             let mut nearest = 0.0f32;
-            for s in frame.shells.iter().filter(|s| s.eta < 3.0) {
+            let squads = frame
+                .warp_ins
+                .iter()
+                .filter(|s| s.kind == mc_sim::survival::WarpInKind::Squad && s.eta < 3.0);
+            for s in squads {
                 let near = 1.0 - s.eta / 3.0;
-                let (gain, pan) = self.hear(Vec3::from(s.pos));
+                let (gain, pan) = self.hear(Vec3::from(s.at));
                 let gain = gain * (0.3 + 0.7 * near);
                 sum = (sum.0 + gain * gain, sum.1 + gain * gain * pan);
                 nearest = nearest.max(near);
@@ -283,19 +312,19 @@ impl Game {
         out
     }
 
-    /// The Progenitor's strikes and landings this tick, each heard where it happens.
+    /// The Progenitor's strikes and warp-ins this tick, each heard where it happens.
     pub(super) fn progenitor_sounds(&self, audio: &Audio) {
         if self.view.status.survival.is_none() {
             return;
         }
         let (library, _) = audio.library();
         let strike = library.id_of("progenitor_lance_strike");
-        let landed = library.id_of("progenitor_shell_landed");
+        let landed = library.id_of("progenitor_warp_in");
         for event in &self.view.frame.events {
             let (sound, at, floor) = match event {
                 SimEvent::LanceStrike { to, .. } => (strike, to.to_f32(), 0.0),
-                // A squad landing is news wherever the camera is.
-                SimEvent::ReplicationShellLanded { at, .. } => (landed, at.to_f32(), 0.15),
+                // A squad warping in is news wherever the camera is.
+                SimEvent::WarpInArrived { at, .. } => (landed, at.to_f32(), 0.15),
                 _ => continue,
             };
             let Some(sound) = sound else { continue };

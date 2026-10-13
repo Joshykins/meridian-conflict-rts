@@ -6,8 +6,8 @@
 //! from the Shaper's blueprint (`mc_sim::growth::grown_*`).
 //!
 //! The card is a list of blocks laid into two columns (`Block`): a new kind of
-//! Shaper's section (an artillery Shaper's shell, a nuke Shaper's stock) is one
-//! more block.
+//! Shaper's section (a Seedcaster's warp-ins, an Unmaker's stock, a Gatewright's
+//! fleet) is one more block.
 
 use super::*;
 use crate::hud::survival::VIOLET;
@@ -15,8 +15,9 @@ use crate::rings::{SHAPER_COVER, SHAPER_LANCE, SHAPER_SHIELD};
 use crate::sim_thread::ShaperPick;
 use mc_data::survival::{Domain as SiteDomain, SiteKind};
 use mc_sim::survival::{
-    launch_gap_ticks, shaper_platforms, shaper_pylons, shaper_silos, shell_blast,
-    shells_per_volley, volley_ticks, ArtilleryCard, PieceKind, ShaperCard, WarheadCard,
+    arrival_shock, fleet_gap_ticks, fleet_size, launch_gap_ticks, shaper_platforms, shaper_pylons,
+    shaper_silos, squads_per_volley, volley_ticks, warp_in_ticks, ArtilleryCard, FleetCard,
+    FleetStage, Hold, PieceKind, ShaperCard, WarheadCard,
 };
 
 const W: f32 = 540.0;
@@ -135,8 +136,10 @@ fn gain(now: f32, next: f32, tenths: bool) -> Option<String> {
 fn kind_label(kind: SiteKind) -> &'static str {
     match kind {
         SiteKind::Printer => "Printer",
-        SiteKind::Artillery => "Artillery",
+        SiteKind::Artillery => "Warp-In",
         SiteKind::Nuke => "Nuke",
+        SiteKind::Fleet => "Fleet",
+        SiteKind::Auxiliary => "Auxiliary",
     }
 }
 
@@ -188,8 +191,8 @@ fn pace(charge: f32, reload: f32, damage: f32) -> (f32, f32) {
     (60.0 / cycle, damage / cycle)
 }
 
-/// The card's blocks, in order: an auxiliary Shaper's weapon (artillery or
-/// warheads), the Lance, the shield, the anti-nuke, the base. `bp` is the Shaper's
+/// The card's blocks, in order: an auxiliary Shaper's weapon (warp-ins, warheads or
+/// fleets), the Lance, the shield, the anti-nuke, the base. `bp` is the Shaper's
 /// blueprint, for what a level adds; `next_round` how far its next interceptor is
 /// assembled, 0..1.
 fn blocks(card: &ShaperCard, bp: Option<&UnitBlueprint>, next_round: f32) -> Vec<Block> {
@@ -200,6 +203,7 @@ fn blocks(card: &ShaperCard, bp: Option<&UnitBlueprint>, next_round: f32) -> Vec
             .map(|a| artillery_block(a, card.level)),
     );
     out.extend(card.warheads.as_ref().map(|w| warhead_block(w, card.level)));
+    out.extend(card.fleet.as_ref().map(|f| fleet_block(f, card.level)));
     out.push(lance_block(card, bp));
     out.push(shield_block(card, bp));
     out.push(anti_nuke_block(card, bp, next_round));
@@ -307,13 +311,23 @@ fn anti_nuke_block(card: &ShaperCard, bp: Option<&UnitBlueprint>, next_round: f3
     }
 }
 
-/// A Seedcaster's replication artillery: its volley charging, and what a shell is.
+/// What holds an auxiliary Shaper's volley or fleet, for the bar over its block.
+fn hold_text(hold: Hold) -> Option<&'static str> {
+    match hold {
+        Hold::None => None,
+        Hold::FieldFull => Some("Held: field full"),
+        Hold::Dampened => Some("Dampened: every target in a warp field"),
+    }
+}
+
+/// A Seedcaster's warp-ins: its volley charging, and what a squad is.
 fn artillery_block(a: &ArtilleryCard, level: u16) -> Block {
     let next = level.saturating_add(1);
     let tps = mc_core::TICKS_PER_SECOND as f32;
     let every = |l| volley_ticks(l) as f32 / tps;
-    let (r0, d0) = shell_blast(level);
-    let (r1, d1) = shell_blast(next);
+    let warning = |l| warp_in_ticks(l) as f32 / tps;
+    let (r0, d0) = arrival_shock(level);
+    let (r1, d1) = arrival_shock(next);
     let heavy = if a.squad.1 > 0 {
         format!(" + {} heavy", a.squad.1)
     } else {
@@ -326,47 +340,102 @@ fn artillery_block(a: &ArtilleryCard, level: u16) -> Block {
             gain(every(level), every(next), true),
         ),
         row(
-            "Shells / Volley",
-            a.shells_per_volley.to_string(),
+            "Squads / Volley",
+            a.squads_per_volley.to_string(),
             gain(
-                shells_per_volley(level) as f32,
-                shells_per_volley(next) as f32,
+                squads_per_volley(level) as f32,
+                squads_per_volley(next) as f32,
                 false,
             ),
         ),
         row(
-            "Squad / Shell",
+            "Squad",
             format!("{}{heavy}  T{}", a.squad.0, a.squad_tech),
             None,
         ),
         row(
-            "Burst",
-            format!("{:.0} m", a.blast_radius),
+            "Warp-In After",
+            secs(a.warp_in_secs),
+            gain(warning(level), warning(next), true),
+        ),
+        row(
+            "Arrival Shock",
+            format!("{:.0} m", a.shock_radius),
             gain(r0.to_f32(), r1.to_f32(), false),
         ),
         row(
-            "Burst Damage",
-            amount(a.blast_damage),
+            "Shock Damage",
+            amount(a.shock_damage),
             gain(d0.to_f32(), d1.to_f32(), false),
         ),
     ];
-    if a.in_flight > 0 {
-        rows.push(row("In Flight", a.in_flight.to_string(), None));
+    if a.marked > 0 {
+        rows.push(row("Marked", a.marked.to_string(), None));
     }
     Block {
-        title: "Replication Artillery",
+        title: "Warp-Ins",
         tone: VIOLET,
         ring: 0,
         gadget: Gadget::Bar {
             share: 1.0 - a.next_in_secs / a.interval_secs.max(0.1),
-            text: if a.held {
-                "Held: field full".to_string()
-            } else if a.next_in_secs < 0.05 {
-                "Volley now".to_string()
-            } else {
-                format!("Volley in {}", secs(a.next_in_secs))
+            text: match hold_text(a.hold) {
+                Some(why) => why.to_string(),
+                None if a.next_in_secs < 0.05 => "Volley now".to_string(),
+                None => format!("Volley in {}", secs(a.next_in_secs)),
             },
         },
+        rows,
+    }
+}
+
+/// A Gatewright's fleets: the one printing or coming, and what a fleet is.
+fn fleet_block(f: &FleetCard, level: u16) -> Block {
+    let next = level.saturating_add(1);
+    let tps = mc_core::TICKS_PER_SECOND as f32;
+    let gap = |l| fleet_gap_ticks(l) as f32 / tps;
+    let (light, capital) = fleet_size(level);
+    let (light1, capital1) = fleet_size(next);
+    let mut rows = vec![
+        row(
+            "Fleet",
+            if f.size.1 > 0 {
+                format!("{} + {} capital", f.size.0, f.size.1)
+            } else {
+                f.size.0.to_string()
+            },
+            gain((light + capital) as f32, (light1 + capital1) as f32, false),
+        ),
+        row("Classes", f.classes.len().to_string(), None),
+        row("Rests", secs(f.gap_secs), gain(gap(level), gap(next), true)),
+        row("Mark Shown", secs(f.lead_secs), None),
+        row("In the Field", f.in_field.to_string(), None),
+    ];
+    if f.ships > 0 {
+        rows.insert(2, row("Ships Now", f.ships.to_string(), None));
+    }
+    let (share, text) = match (hold_text(f.hold), f.stage) {
+        (Some(why), FleetStage::Resting) => (0.0, why.to_string()),
+        (_, FleetStage::Resting) if f.next_in_secs < 0.05 => (0.0, "Printing now".to_string()),
+        (_, FleetStage::Resting) => (
+            1.0 - f.next_in_secs / f.gap_secs.max(0.1),
+            format!("Next fleet in {}", secs(f.next_in_secs)),
+        ),
+        (_, FleetStage::Building) => (
+            f.build,
+            format!(
+                "Printing  {:.0}%  \u{b7}  {}",
+                f.build * 100.0,
+                secs(f.next_in_secs)
+            ),
+        ),
+        (_, FleetStage::Marked) => (1.0, format!("Warp in {}", secs(f.next_in_secs))),
+        (_, FleetStage::Warping) => (1.0, format!("Warping  {}", secs(f.next_in_secs))),
+    };
+    Block {
+        title: "Fleet",
+        tone: crate::hud::style::AIR,
+        ring: 0,
+        gadget: Gadget::Bar { share, text },
         rows,
     }
 }
@@ -691,7 +760,8 @@ fn builds(
     let cw = W - 2.0 * PAD;
     let lines = chips.last().map_or(0, |c| c.1 + 1);
     // What it builds: its products, then the formation and the next print (a
-    // Seedcaster's products are what its shells print).
+    // Seedcaster's products are what its squads are made of, a Gatewright's the classes
+    // of its fleets).
     ui.section(x, y, cw - 180.0, "Builds");
     let heavy = if c.batch.1 > 0 {
         format!(" + {} heavy", c.batch.1)
@@ -703,10 +773,10 @@ fn builds(
         y,
         type_scale::MICRO,
         rgb(palette::DIM, 1.0),
-        &if c.kind == SiteKind::Printer {
-            format!("Formation of {}{heavy}", c.batch.0)
-        } else {
-            "Its shells print them".to_string()
+        &match c.kind {
+            SiteKind::Printer => format!("Formation of {}{heavy}", c.batch.0),
+            SiteKind::Fleet => "Its fleets warp in over you".to_string(),
+            _ => "Its squads warp in beside you".to_string(),
         },
     );
     let y = y + 18.0;

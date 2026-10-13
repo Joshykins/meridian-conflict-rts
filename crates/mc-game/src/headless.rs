@@ -1014,7 +1014,7 @@ pub fn screenshot(
         });
         crate::nuke_marks::draw(&mut ui, &field, 1.0, pointer, site);
         crate::cover_marks::draw(&mut ui, &field, site);
-        crate::replication_marks::draw(&mut ui, &field, 1.0);
+        crate::warp_in_marks::draw(&mut ui, &field);
         crate::titan_marks::draw(&mut ui, &field, 1.0, pointer);
         crate::dash_marks::draw(&mut ui, &field, 1.0, pointer);
         crate::gravitic_marks::draw(&mut ui, &field, pointer);

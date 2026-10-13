@@ -29,9 +29,10 @@ const PER_RADIAN: i64 = 10_430;
 /// The blueprints the Shapers and their bases are made of (`Survival::kit`).
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Kit {
-    /// The Shaper a site of each `SiteKind` raises, in its numbers' order: the printer
-    /// (`replication_node`), the Seedcaster (artillery) and the Unmaker (nukes).
-    pub shapers: [BlueprintId; 3],
+    /// The Shaper of each kind, in `SiteKind`'s numbers' order: the printer
+    /// (`replication_node`), the Seedcaster (warp-ins), the Unmaker (nukes) and the
+    /// Gatewright (fleets).
+    pub shapers: [BlueprintId; 4],
     /// Print platforms on land: ordinary, great.
     pub platform: [BlueprintId; 2],
     /// Print platforms in the water (slips): ordinary, great.
@@ -43,10 +44,11 @@ pub struct Kit {
 
 impl Kit {
     /// Keys of the blueprints, in `Kit` order.
-    const KEYS: [&'static str; 9] = [
+    const KEYS: [&'static str; 10] = [
         "replication_node",
         "progenitor_seedcaster",
         "progenitor_unmaker",
+        "progenitor_gatewright",
         "progenitor_platform",
         "progenitor_platform_great",
         "progenitor_slip",
@@ -60,9 +62,9 @@ impl Kit {
             bps.id_of(k)
                 .ok_or_else(|| SimError::Setup(format!("survival needs blueprint {k}")))
         };
-        let [a, b, c, d, e, f, g, h, i] = Kit::KEYS;
+        let [a, b, c, j, d, e, f, g, h, i] = Kit::KEYS;
         Ok(Kit {
-            shapers: [id(a)?, id(b)?, id(c)?],
+            shapers: [id(a)?, id(b)?, id(c)?, id(j)?],
             platform: [id(d)?, id(e)?],
             slip: [id(f)?, id(g)?],
             pylon: id(h)?,
@@ -70,9 +72,15 @@ impl Kit {
         })
     }
 
-    /// The Shaper a site of `kind` raises.
+    /// The Shaper of `kind` (an `Auxiliary` site's kind is chosen before it is raised:
+    /// never asked for, the Seedcaster).
     pub(super) fn shaper(&self, kind: SiteKind) -> BlueprintId {
-        self.shapers[kind as usize]
+        match kind {
+            SiteKind::Printer => self.shapers[0],
+            SiteKind::Artillery | SiteKind::Auxiliary => self.shapers[1],
+            SiteKind::Nuke => self.shapers[2],
+            SiteKind::Fleet => self.shapers[3],
+        }
     }
 
     /// Every blueprint in it.
@@ -220,13 +228,13 @@ impl crate::World {
         };
         // A printer raises platforms; an auxiliary Shaper prints nothing on the ground, and
         // an Unmaker raises its silos instead.
-        let (small, great) = match site.kind {
+        let (small, great) = match n.kind {
             SiteKind::Printer => shaper_platforms(n.level),
-            SiteKind::Artillery | SiteKind::Nuke => (0, 0),
+            _ => (0, 0),
         };
-        let silos = match site.kind {
+        let silos = match n.kind {
             SiteKind::Nuke => shaper_silos(n.level),
-            SiteKind::Printer | SiteKind::Artillery => 0,
+            _ => 0,
         };
         let want = [
             (PieceKind::Platform, small),
@@ -250,7 +258,7 @@ impl crate::World {
         };
         let heading = self.state.units.heading[row];
         // Clear of the foot the Shaper's level will spread it to.
-        let foot = super::rules::shaper_foot(site.kind, super::rules::shaper_height(n.level));
+        let foot = super::rules::shaper_foot(n.kind, super::rules::shaper_height(n.level));
         let bp_id = kit.blueprint(kind, site.domain);
         let bp = self.blueprints.unit(bp_id);
         let across = bp.footprint.0.max(bp.footprint.1) as i32 * mc_map::BUILD_CELL_M;

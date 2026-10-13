@@ -24,7 +24,7 @@ use mc_sim::survival::ShaperInstance;
 use crate::models::gpu_consts::halo::LIFT_TICKS;
 use crate::models::shaper::{self, STAGES, STAGE_LEVELS};
 
-/// The kinds of Shaper (`ShaperInstance::kind`): printer, artillery, nuke.
+/// The stage sets Shapers are drawn with (`shaper::stage_set`): printer, artillery, nuke.
 pub(super) const KINDS: usize = 3;
 
 pub(super) struct ShaperGrowth {
@@ -121,7 +121,7 @@ impl ShaperGrowth {
             else {
                 continue;
             };
-            let kind = usize::from(s.kind).min(KINDS - 1);
+            let kind = usize::from(shaper::stage_set(s.kind)).min(KINDS - 1);
             let stage = shaper::stage(s.level);
             u.blueprint = self.first[kind] + stage as u32;
             if u.status[2] & LAUNCHER_MARK != 0 {
@@ -179,6 +179,7 @@ mod tests {
                 (0u8, SiteKind::Printer),
                 (1, SiteKind::Artillery),
                 (2, SiteKind::Nuke),
+                (3, SiteKind::Fleet),
             ] {
                 let foot =
                     mc_sim::survival::shaper_foot(site, mc_sim::survival::shaper_height(level))

@@ -63,10 +63,9 @@ const BASE_H: f64 = 62.0;
 enum Kind {
     /// Prints units onto platforms in front of it.
     Printer,
-    /// Fires replication shells.
-    Artillery,
-    /// Launches the Progenitor's nukes.
-    Nuke,
+    /// Raises an auxiliary Shaper (whichever kind the sim picks): hidden behind
+    /// the printers.
+    Auxiliary,
 }
 
 /// Where a site's Shaper stands: on dry ground, or on an islet or shore pad
@@ -226,7 +225,7 @@ const SITES: &[Site] = &[
     Site {
         name: "The Hollow",
         at: (1_800.0, 22_800.0),
-        kind: Kind::Artillery,
+        kind: Kind::Auxiliary,
         ground: Ground::Land,
         level: 118.0,
         way: &[
@@ -237,7 +236,7 @@ const SITES: &[Site] = &[
         cut: 0.3,
     },
     // The alpine country: two high basins, a valley down from each; the
-    // nukes in a cirque above the higher, over a pass.
+    // auxiliary site in a cirque above the higher, over a pass.
     Site {
         name: "Glass Tarn",
         at: (18_900.0, 15_300.0),
@@ -282,7 +281,7 @@ const SITES: &[Site] = &[
     Site {
         name: "Crown Cirque",
         at: (22_800.0, 22_850.0),
-        kind: Kind::Nuke,
+        kind: Kind::Auxiliary,
         ground: Ground::Land,
         level: 600.0,
         way: &[
@@ -333,7 +332,7 @@ const SITES: &[Site] = &[
     Site {
         name: "Far Atoll",
         at: (1_250.0, 10_000.0),
-        kind: Kind::Artillery,
+        kind: Kind::Auxiliary,
         ground: Ground::Land,
         level: 18.0,
         way: &[(650.0, 10_050.0), (330.0, 10_080.0)],
@@ -380,7 +379,7 @@ const SITES: &[Site] = &[
     Site {
         name: "Frostvault",
         at: (23_500.0, 7_600.0),
-        kind: Kind::Nuke,
+        kind: Kind::Auxiliary,
         ground: Ground::Land,
         level: 170.0,
         way: &[
@@ -719,8 +718,7 @@ impl Terrain {
 fn site_line(s: &Site, way: &[(f64, f64)]) -> String {
     let kind = match s.kind {
         Kind::Printer => "Printer",
-        Kind::Artillery => "Artillery",
-        Kind::Nuke => "Nuke",
+        Kind::Auxiliary => "Auxiliary",
     };
     let domain = match s.ground {
         Ground::Land => "Land",
