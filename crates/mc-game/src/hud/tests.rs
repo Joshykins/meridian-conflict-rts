@@ -436,10 +436,11 @@ fn range_browser_picks_t4_t5_and_space() {
         );
         assert!(!rig.hud.unit_picker_open());
     }
-    // Space and tech intersect; clearing an empty combination restores the catalog.
+    // Space and tech intersect (there is no tech 1 spacecraft); clearing an empty
+    // combination restores the catalog.
     rig.hud.unit_picker = Some(unit_picker::Picker::new());
     rig.click(Vec2::new(1128.0, 242.0));
-    rig.click(Vec2::new(844.0, 283.0));
+    rig.click(Vec2::new(500.0, 283.0));
     assert!(rig
         .frame(&Input {
             keys: vec![Key::Enter],

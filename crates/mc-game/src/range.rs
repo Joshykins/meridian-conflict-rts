@@ -1367,10 +1367,20 @@ const LINE_UP_WIDTH: f32 = 900.0;
 fn line_up_half(bp: &UnitBlueprint) -> f32 {
     if bp.footprint.0 > 0 {
         bp.footprint.0.max(bp.footprint.1) as f32 * mc_map::BUILD_CELL_M as f32 * 0.5
+    } else if bp
+        .motion
+        .is_some_and(|m| m.layer == mc_data::MoveLayer::Air)
+    {
+        // A flyer hangs above the rest: past a few hundred metres (a capital ship) it
+        // may overhang its neighbours rather than push the block off the map.
+        bp.radius.to_f32().min(LINE_UP_AIR_HALF)
     } else {
         bp.radius.to_f32()
     }
 }
+
+/// The most ground a flyer keeps clear in the line-up, either side of its middle.
+const LINE_UP_AIR_HALF: f32 = 400.0;
 
 /// [`line_up_block`] with rows wide enough that the block stands no taller than `tall`
 /// metres (while it fits the map's width, `wide`): a long roster runs wider rows.
