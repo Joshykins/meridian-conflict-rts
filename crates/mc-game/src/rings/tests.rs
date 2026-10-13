@@ -62,11 +62,11 @@ fn rings_follow_the_data() {
     );
     assert_eq!(
         of(&b, "aster_t2_radar"),
-        vec![(Reach::Radar, 0, 0.0, 6000.0)]
+        vec![(Reach::Radar, 0, 0.0, 9000.0)]
     );
     assert_eq!(
         of(&b, "aster_t3_radar"),
-        vec![(Reach::Radar, 0, 0.0, 12000.0)]
+        vec![(Reach::Radar, 0, 0.0, 18000.0)]
     );
     assert_eq!(
         of(&b, "aster_t2_shield"),
