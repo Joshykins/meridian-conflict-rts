@@ -493,7 +493,7 @@ impl World {
                         .motion
                         .is_some_and(|m| m.layer == MoveLayer::Air)
                     || self.state.units.has_flag(other, flag::IN_FACTORY)
-                    || self.hulls_pass(row, other)
+                    || self.apart(row, other)
                     || self.give_way(row, other) <= Fx::ratio(7, 8)
                 {
                     return true;
@@ -614,7 +614,7 @@ impl World {
                         return true;
                     }
                     if units.has_flag(other, flag::IN_FACTORY)
-                        || self.hulls_pass(row, other)
+                        || self.apart(row, other)
                         || self.steps_over(row, other)
                     {
                         return true;

@@ -7,6 +7,7 @@ use super::{
     MAX_MAP_WRECKS, MAX_ORE_CORNERS, MAX_ORE_REGIONS, MAX_WRECK_KEY, TILE_OVERVIEW_SAMPLES,
     WRECK_RECORD_LEN,
 };
+use crate::deck::{Deck, DECK_RECORD_LEN, MAX_DECKS};
 use crate::{MapFile, MAX_PROPS, MAX_START_POSITIONS};
 use mc_core::{Fx, FxVec2};
 use std::fs::File;
@@ -25,6 +26,7 @@ pub struct MapWriter {
     wrecks: Vec<MapWreck>,
     ways: Vec<u8>,
     streets: Vec<u8>,
+    decks: Vec<Deck>,
     pos: u64,
 }
 
@@ -45,6 +47,7 @@ impl MapWriter {
             wrecks: Vec::new(),
             ways: Vec::new(),
             streets: Vec::new(),
+            decks: Vec::new(),
             pos: reserved as u64,
             info,
         })
@@ -110,6 +113,9 @@ impl MapWriter {
         if let Some(streets) = file.streets() {
             self.set_streets(streets.to_vec())?;
         }
+        if !file.decks().is_empty() {
+            self.set_decks(file.decks().to_vec())?;
+        }
         Ok(())
     }
 
@@ -137,6 +143,22 @@ impl MapWriter {
             }
         }
         self.wrecks = wrecks;
+        Ok(())
+    }
+
+    /// Gives the map decks (`crate::deck`): at most [`MAX_DECKS`], each inside the map.
+    pub fn set_decks(&mut self, decks: Vec<Deck>) -> Result<(), MapError> {
+        if decks.len() > MAX_DECKS {
+            return Err(MapError::Invalid(format!(
+                "{} decks; the limit is {MAX_DECKS}",
+                decks.len()
+            )));
+        }
+        let size = self.info.size_metres();
+        if let Some(d) = decks.iter().find(|d| !d.valid(size)) {
+            return Err(MapError::Invalid(format!("deck {d:?}")));
+        }
+        self.decks = decks;
         Ok(())
     }
 
@@ -310,6 +332,16 @@ impl MapWriter {
         if !self.streets.is_empty() {
             layout.streets_offset = at;
             self.out.write_all(&self.streets)?;
+            at += self.streets.len() as u64;
+        }
+        if !self.decks.is_empty() {
+            let mut bytes = Vec::with_capacity(self.decks.len() * DECK_RECORD_LEN);
+            for d in &self.decks {
+                d.write(&mut bytes);
+            }
+            layout.decks_offset = at;
+            layout.deck_count = self.decks.len() as u32;
+            self.out.write_all(&bytes)?;
         }
 
         let id = content_id(
@@ -323,6 +355,7 @@ impl MapWriter {
             &self.wrecks,
             &self.ways,
             &self.streets,
+            &self.decks,
         );
         self.out.seek(SeekFrom::Start(0))?;
         self.out.write_all(&write_header(&info, id, &layout))?;

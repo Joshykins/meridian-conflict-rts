@@ -10,6 +10,7 @@
 //! not hash 200 MB per tick; it keeps the [`FlattenRecord`]s in a table and
 //! hashes those. A snapshot restores terrain by replaying them in order.
 
+use crate::deck::{Deck, Decks};
 use crate::file::MapFile;
 use crate::format::{MapError, MapInfo};
 use crate::{
@@ -99,6 +100,8 @@ pub struct Heightfield {
     min_z: Fx,
     z_step: Fx,
     water_level: Fx,
+    /// Bridges' roads over the ground (`crate::deck`); the samples go on under them.
+    decks: Decks,
 }
 
 /// A position resolved to a cell and the fraction inside it (`0..=CELL_RAW`).
@@ -172,7 +175,20 @@ impl Heightfield {
             info.min_z,
             info.z_step,
             info.water_level,
-        ))
+        )
+        .with_decks(map.decks().to_vec()))
+    }
+
+    /// The same ground with `decks` over it.
+    pub fn with_decks(mut self, decks: Vec<Deck>) -> Heightfield {
+        self.decks = Decks::new(decks);
+        self
+    }
+
+    /// The decks over the ground: where land units walk over water.
+    #[inline]
+    pub fn decks(&self) -> &Decks {
+        &self.decks
     }
 
     /// Builds a heightfield from samples in memory: `(w_cells + 1) * (h_cells + 1)`
@@ -258,6 +274,7 @@ impl Heightfield {
             min_z,
             z_step,
             water_level,
+            decks: Decks::default(),
         }
     }
 

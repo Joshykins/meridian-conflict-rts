@@ -96,6 +96,8 @@ pub struct NavSnapshot {
 
 /// A cell's terrain class (`mc_path::terrain`) from the heightfield alone:
 /// land, shallow or deep water by its lowest corner, and steep past `MAX_SLOPE`.
+/// A deck over the cell (`decks.rs`) makes it level land too, over whatever water
+/// is under it.
 pub fn cell_class(terrain: &Heightfield, water: Fx, cx: u32, cy: u32) -> u8 {
     let low = terrain
         .sample_height(cx, cy)
@@ -112,6 +114,9 @@ pub fn cell_class(terrain: &Heightfield, water: Fx, cx: u32, cy: u32) -> u8 {
     };
     if terrain.cell_slope(cx, cy) > MAX_SLOPE {
         c |= terrain::STEEP;
+    }
+    if terrain.decks().covers_cell(cx, cy) {
+        c = (c | terrain::LAND) & !terrain::STEEP;
     }
     c
 }

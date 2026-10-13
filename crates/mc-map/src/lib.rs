@@ -15,6 +15,7 @@
 
 pub mod bake;
 pub mod city;
+pub mod deck;
 pub mod file;
 pub mod format;
 pub mod heightfield;
@@ -25,6 +26,7 @@ mod test_util;
 pub mod wreckage;
 
 pub use bake::{bake, BakeParams, BakeReport, Layout};
+pub use deck::{Deck, Decks};
 pub use file::MapFile;
 pub use format::{
     encode_tile, EncodedTile, Ground, MapError, MapInfo, MapWreck, MapWriter, OreRegion, Prop,

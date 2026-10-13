@@ -462,8 +462,12 @@ impl World {
     /// afloat or dived is measured to the nearest point between its keel and its top, so a
     /// burst on the water over a dived submarine reaches down the few metres to it: no gun
     /// aims at a dived hull, but a blast is not aimed. A torpedo still takes only what
-    /// `weapon_reaches`.
+    /// `weapon_reaches`. A bridge's deck between the burst and the unit takes it
+    /// (`deck_shields`).
     pub(crate) fn blast_reaches(&self, point: FxVec3, row: usize, weapon: &Weapon) -> bool {
+        if self.deck_shields(point, row) {
+            return false;
+        }
         let units = &self.state.units;
         let bp = self.bp(row);
         let reach = weapon.splash + bp.radius;

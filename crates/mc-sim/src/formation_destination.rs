@@ -66,8 +66,9 @@ impl World {
             {
                 return true;
             }
-            // Ships and dived submarines may share a spot, one under the other.
-            if rows.iter().all(|&r| self.hulls_pass(r, other)) {
+            // Ships and dived submarines may share a spot, one under the other, and
+            // so may a unit on a deck and one under it.
+            if rows.iter().all(|&r| self.apart(r, other)) {
                 return true;
             }
             if air && (m.altitude - first.altitude).abs() > self.bp(other).height + Fx::ONE {

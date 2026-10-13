@@ -204,10 +204,12 @@ impl World {
                             let Some((_, other_naval, other_over)) = hulls[j] else {
                                 return true;
                             };
-                            // A dived submarine slips under a floating hull, and it over it.
+                            // A dived submarine slips under a floating hull, and it over it;
+                            // a unit on a bridge's deck passes over one under it.
                             if j > i
                                 && !over.passes(other_over)
-                                && !(naval && other_naval && self.hulls_pass(rows[i], rows[j]))
+                                && !((naval && other_naval && self.hulls_pass(rows[i], rows[j]))
+                                    || self.apart(rows[i], rows[j]))
                             {
                                 pairs.push((i, j));
                             }

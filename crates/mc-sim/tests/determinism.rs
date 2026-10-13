@@ -4,7 +4,7 @@
 //! blasts, two factories' linked batch forming up, a self-destruct counting down across
 //! the snapshot, city blocks shot, set alight and brought down, a space elevator's cable
 //! clamped and its first platform docked, a Fulgur raised on Repeat and its lot laid
-//! again) must hash identically at every worker count and after a snapshot is
+//! again, tanks on a bridge's deck over the sea while the fleets pass under it) must hash identically at every worker count and after a snapshot is
 //! restored mid-match.
 //!
 //! `battle.rs` covers a land-only battle the same way; this is the one to extend
@@ -16,7 +16,7 @@
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
 use mc_jobs::Pool;
-use mc_map::Heightfield;
+use mc_map::{Deck, Heightfield};
 use mc_sim::focus::{Focus, Priority};
 use mc_sim::tables::{flag, Controller};
 use mc_sim::world::MapData;
@@ -24,7 +24,8 @@ use mc_sim::{Command, MatchConfig, PlayerCommand, PlayerSetup, UnitId, World};
 use std::path::Path;
 use std::sync::Arc;
 
-/// 4 km square: land in the west, sea (20 m deep) in the east.
+/// 4 km square: land in the west, sea (20 m deep) in the east; a bridge's deck
+/// (`decks.rs`) runs out from the shore over the sea across the middle, 20 m over the water.
 const CELLS: u32 = 512;
 const SHORE_CELL: usize = 200;
 const TICKS: u32 = 550;
@@ -39,6 +40,12 @@ fn terrain() -> Heightfield {
         }
     }
     Heightfield::from_samples(CELLS, CELLS, samples, Fx::ZERO, Fx::ONE, Fx::from_int(20))
+        .with_decks(vec![Deck {
+            a: FxVec2::from_ints(1_500, 2_048),
+            b: FxVec2::from_ints(3_000, 2_048),
+            half: Fx::from_int(60),
+            top: Fx::from_int(40),
+        }])
 }
 
 fn world(threads: usize) -> World {
@@ -188,6 +195,8 @@ fn setup(w: &mut World) {
         }
         if player == 0 {
             add("aster_t1_tank", 1, GUNNER.0, GUNNER.1);
+            // Tanks out on the deck over the sea, the fleets fighting under it.
+            add("aster_t1_tank", 3, 2_400, 2_048);
             add("aster_t3_engineer", 1, REPEAT_LOT.0 + 60, REPEAT_LOT.1);
         }
         // Room for what the Reclaimers bring in.

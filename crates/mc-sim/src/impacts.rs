@@ -224,6 +224,25 @@ impl World {
                 seen: point,
             });
         }
+        // A shot coming down onto a bridge's deck stops on it, unless it was fired
+        // from on the deck (`decks.rs`).
+        if let Some((point, t)) = self
+            .terrain
+            .decks()
+            .crossing(from, to, p.origin[i])
+            .filter(|d| d.1 < best_t)
+        {
+            best_t = t;
+            best = Some(Hit {
+                projectile: i,
+                point,
+                unit: None,
+                shield: None,
+                structure: None,
+                after: t.clamp(Fx::ZERO, Fx::ONE),
+                seen: point,
+            });
+        }
         // Shots stop on the water; nothing carries on down to the bed. An air-dropped
         // torpedo goes in and runs on (`naval.rs`).
         let water = self.terrain.water_level();

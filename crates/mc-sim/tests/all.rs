@@ -33,6 +33,7 @@ mod corvette;
 mod crowd;
 mod culverin;
 mod deck_up;
+mod decks;
 mod determinism;
 mod determinism_gate;
 mod dreadnought;

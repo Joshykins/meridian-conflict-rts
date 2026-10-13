@@ -5,6 +5,7 @@
 //! one `MapFile` can be shared by the streaming thread, the heightfield loader
 //! and anyone else without a lock or a seek cursor to fight over.
 
+use crate::deck::{Deck, DECK_RECORD_LEN};
 use crate::format::{
     self, bytes_to_samples, decode_tile, hash_samples, parse_dir_entry, parse_header, parse_prop,
     parse_wreck, DirEntry, MapError, MapInfo, MapWreck, OreRegion, Prop, Reader, DIR_ENTRY_LEN,
@@ -29,6 +30,7 @@ pub struct MapFile {
     ways: Vec<u8>,
     streets: Vec<u8>,
     wrecks: Vec<MapWreck>,
+    decks: Vec<Deck>,
 }
 
 impl MapFile {
@@ -142,6 +144,21 @@ impl MapFile {
             }
         };
 
+        let decks = match layout.decks_offset {
+            0 => Vec::new(),
+            at => {
+                let bytes = section(at, layout.deck_count as usize * DECK_RECORD_LEN)?;
+                let mut r = Reader::new(&bytes);
+                let decks = (0..layout.deck_count)
+                    .map(|_| Deck::parse(&mut r))
+                    .collect::<Result<Vec<_>, _>>()?;
+                if decks.iter().any(|d| !d.valid(info.size_metres())) {
+                    return Err(MapError::Corrupt("a deck lies outside the map"));
+                }
+                decks
+            }
+        };
+
         Ok(MapFile {
             file,
             info,
@@ -155,6 +172,7 @@ impl MapFile {
             ways,
             streets,
             wrecks,
+            decks,
         })
     }
 
@@ -259,6 +277,11 @@ impl MapFile {
         (!self.streets.is_empty()).then_some(&self.streets[..])
     }
 
+    /// The map's decks (`crate::deck`); empty for a map without any.
+    pub fn decks(&self) -> &[Deck] {
+        &self.decks
+    }
+
     /// Wreckage the map starts with; empty for a map without any.
     pub fn wrecks(&self) -> &[MapWreck] {
         &self.wrecks
@@ -286,6 +309,7 @@ impl MapFile {
             &self.wrecks,
             &self.ways,
             &self.streets,
+            &self.decks,
         );
         if computed == self.content_id {
             Ok(())
@@ -414,6 +438,50 @@ mod tests {
             ..wrecks[0].clone()
         };
         assert!(w.set_wrecks(vec![long]).is_err());
+    }
+
+    #[test]
+    fn decks_round_trip_reach_the_heightfield_and_are_optional() {
+        let write = |name: &str, decks: Vec<crate::Deck>| {
+            let path = temp_path(name);
+            let mut w = MapWriter::create(&path, info(1, 1)).unwrap();
+            let samples: Vec<u16> = (0..TILE_SAMPLE_COUNT as u32)
+                .map(|i| synthetic(i % TILE_SAMPLES, i / TILE_SAMPLES))
+                .collect();
+            w.push_tile(&encode_tile(&samples)).unwrap();
+            w.set_decks(decks).unwrap();
+            let id = w
+                .finish(Vec::new(), &[FxVec2::from_ints(512, 512)], &[])
+                .unwrap();
+            (MapFile::open(&path).unwrap(), id)
+        };
+        let decks = vec![crate::Deck {
+            a: FxVec2::from_ints(100, 400),
+            b: FxVec2::from_ints(1_500, 420),
+            half: Fx::from_int(60),
+            top: Fx::from_int(52),
+        }];
+        let (with, id_with) = write("decked", decks.clone());
+        assert_eq!(with.decks(), &decks[..]);
+        with.verify().unwrap();
+        let hf = crate::Heightfield::load(&with).unwrap();
+        assert_eq!(
+            hf.decks().top_at(FxVec2::from_ints(800, 410)),
+            Some(Fx::from_int(52))
+        );
+        let (without, id_without) = write("undecked", Vec::new());
+        assert!(without.decks().is_empty());
+        assert_ne!(
+            id_with, id_without,
+            "the decks are part of the map's content"
+        );
+
+        let mut w = MapWriter::create(&temp_path("bad_deck"), info(1, 1)).unwrap();
+        let outside = crate::Deck {
+            b: FxVec2::from_ints(5_000, 420),
+            ..decks[0]
+        };
+        assert!(w.set_decks(vec![outside]).is_err());
     }
 
     #[test]

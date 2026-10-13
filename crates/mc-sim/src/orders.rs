@@ -3017,6 +3017,9 @@ impl World {
             return z;
         }
         let ground = self.terrain.height_at(pos);
+        if let Some(top) = self.deck_under(row, pos) {
+            return ground.max(top);
+        }
         if self.bp(row).water_build {
             return ground.max(self.terrain.water_level());
         }

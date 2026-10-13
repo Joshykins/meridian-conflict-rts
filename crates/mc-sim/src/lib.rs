@@ -41,6 +41,7 @@ mod contacts;
 mod curve;
 pub mod dash;
 mod debug;
+mod decks;
 mod destruct;
 mod dogfight;
 pub mod economy;
