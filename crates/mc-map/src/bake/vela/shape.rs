@@ -41,6 +41,15 @@ const COAST: &[P] = &[
     (950.0, 6_110.0),
 ];
 
+/// The coast rounded into a curve through its points: no corner on a beach.
+static SHORE: std::sync::LazyLock<Vec<P>> = std::sync::LazyLock::new(|| {
+    let mut ring: Vec<P> = COAST.to_vec();
+    ring.extend_from_slice(&COAST[..3]);
+    let curve = super::super::canyon::smooth_open(&ring, 6);
+    // From the first point's piece round to the same point again.
+    curve[6..6 + 6 * COAST.len()].to_vec()
+});
+
 /// The beach where the Company lands: the stretch of the north shore that
 /// shelves gently into the sea.
 const BEACH: (f64, f64) = (900.0, 1_650.0);
@@ -102,7 +111,7 @@ pub(super) const ATOLL: (P, f64, f64) = ((4_600.0, 7_560.0), 420.0, 70.0);
 impl Terrain {
     /// How far inland `p` is from the sea, metres (negative out at sea).
     pub(super) fn vl_inland(&self, p: P) -> f64 {
-        let d = signed_distance(p, COAST);
+        let d = signed_distance(p, &SHORE);
         // The shore wanders, a little along the beach, not at all at the quay.
         let calm = (0.6 * beachness(p)).max(quayness(p));
         d + 45.0 * self.coast.fbm(p.0 / 420.0, p.1 / 420.0, 3, 0.5) * (1.0 - calm)
