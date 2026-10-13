@@ -117,12 +117,17 @@ type Neck = (&'static [(f64, f64)], f64, f64);
 
 const NECKS: [Neck; 1] = [(&CAUSEWAY, 620.0, 9.0)];
 
-/// A bridge's landing: level at the deck's height from this far out over its
-/// shore to this far inland, then a ramp down to the ground at this grade
-/// (gentler than a way's), its sides falling away over this many metres.
-const LANDING: (f64, f64) = (220.0, 120.0);
+/// A bridge's landing: level at the deck's height for this far inland of the
+/// deck's end, then a ramp down to the ground at this grade (gentler than a
+/// way's), its sides falling away over this many metres.
+const LANDING: f64 = 120.0;
 const RAMP: f64 = 0.08;
 const LANDING_SIDE: f64 = 140.0;
+/// Under the deck the ground falls away from its end at this grade, too gentle
+/// for a crag (the terrain's rock relief would stand up through the glass), and
+/// keeps at least this far under the deck.
+const BANK: f64 = 0.35;
+const UNDER_DECK: f64 = 8.0;
 
 /// A skerry or the atoll: centre, half lengths, the angle its long axis lies
 /// at, how high it stands; an atoll's hills stand in a ring.
@@ -523,7 +528,7 @@ impl Terrain {
         let w = smoothstep(-20.0, run, s);
         let mut h = sea.min(0.2) * (1.0 - w) + land * w;
         let landing = self.rh_landings(p, h);
-        let raised = landing > h;
+        let raised = landing != h;
         h = landing.max(self.rh_bergs(p));
         if h < SEA_ICE_H {
             h = self.rh_on_sea_ice(p, &c, h);
@@ -541,25 +546,29 @@ impl Terrain {
     }
 
     /// The bridges' landings over the ground `h`: at each end a level pad at the
-    /// deck's height reaching out over the shore, a ramp down inland at [`RAMP`],
-    /// steep sides.
+    /// deck's height inland of it and a ramp down inland at [`RAMP`]; under the
+    /// deck a bank falling away at [`BANK`] and nothing nearer the glass than
+    /// [`UNDER_DECK`]; steep sides.
     fn rh_landings(&self, p: (f64, f64), mut h: f64) -> f64 {
         for b in &BRIDGES {
             let (along, off) = b.frame(p);
+            if off > b.half() + LANDING_SIDE {
+                continue;
+            }
+            let side = 1.0 - smoothstep(b.half() + 10.0, b.half() + LANDING_SIDE, off);
             let len = b.length();
-            // Inland of each landing, metres: past the hold's end backward, past the far one forward.
-            for inland in [-along, along - len] {
-                let (lip, pad) = LANDING;
-                if inland < -lip - 10.0 || off > b.half() + LANDING_SIDE {
-                    continue;
-                }
-                let top = DECK_TOP - RAMP * (inland - pad).max(0.0);
-                if top <= h {
-                    continue;
-                }
-                let side = 1.0 - smoothstep(b.half() + 10.0, b.half() + LANDING_SIDE, off);
-                let front = smoothstep(-lip - 10.0, -lip, inland);
-                h += (top - h) * side * front;
+            if (0.0..=len).contains(&along) {
+                // Under the deck: the bank down from the nearer end.
+                let under = along.min(len - along);
+                let shaped = h.min(DECK_TOP - UNDER_DECK).max(DECK_TOP - BANK * under);
+                h += (shaped - h) * side;
+                continue;
+            }
+            // Inland of the landing, metres: past the hold's end backward, past the far one forward.
+            let inland = if along < 0.0 { -along } else { along - len };
+            let top = DECK_TOP - RAMP * (inland - LANDING).max(0.0);
+            if top > h {
+                h += (top - h) * side;
             }
         }
         h
