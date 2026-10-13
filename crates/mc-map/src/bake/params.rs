@@ -1,7 +1,7 @@
 //! The layouts a map can be baked to, the parameters of a bake, and what
 //! each layout asks of them.
 
-use super::{antarctic, crosswater, frostline, harvest, siege, spires, tripoint};
+use super::{antarctic, crosswater, frostline, harvest, rimehold, siege, spires, tripoint};
 use crate::format::MapError;
 use crate::{MAX_START_POSITIONS, TILE_SIZE_M};
 
@@ -86,6 +86,14 @@ pub enum Layout {
     /// the Shaper sites the rounds come from. Five starts: the defenders' four,
     /// then the Heart's. Exactly 24 km.
     Harvest,
+    /// "Rimehold": a survival map for four defenders, all of it arctic (see
+    /// `rimehold.rs`). The defenders' starts close together on a hold in the
+    /// middle-west, open water round it crossed by four necks; the
+    /// Progenitor's base east of it at grade, highlands north, fells south,
+    /// Wester Isle in the ocean west, each with the Shaper sites the rounds
+    /// come from. Five starts: the defenders' four, then the Heart's.
+    /// Exactly 20 km.
+    Rimehold,
 }
 
 #[derive(Clone, Debug)]
@@ -239,6 +247,15 @@ impl BakeParams {
         }
     }
 
+    /// A square [`Layout::Rimehold`] map: four defender starts and the Heart's.
+    pub fn rimehold(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
+        BakeParams {
+            players: 5,
+            layout: Layout::Rimehold,
+            ..BakeParams::square(name, size_tiles, seed)
+        }
+    }
+
     /// A square [`Layout::Threshold`] map: three defender starts and the facility's.
     pub fn threshold(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
         BakeParams {
@@ -346,6 +363,16 @@ impl BakeParams {
         {
             return Err(MapError::Invalid(
                 "the Harvest layout has exactly 5 starts (4 defenders and the Heart) on a 24 km map"
+                    .into(),
+            ));
+        }
+        if self.layout == Layout::Rimehold
+            && (self.players != 5
+                || (self.tiles_w as i32 * TILE_SIZE_M) as f64 != rimehold::SIZE
+                || self.tiles_h != self.tiles_w)
+        {
+            return Err(MapError::Invalid(
+                "the Rimehold layout has exactly 5 starts (4 defenders and the Heart) on a 20 km map"
                     .into(),
             ));
         }

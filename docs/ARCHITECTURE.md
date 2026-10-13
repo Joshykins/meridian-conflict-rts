@@ -444,6 +444,17 @@ invulnerable unit, and the mirror marks it `SHIELD_VEIL` so it is drawn apart fr
   (`cargo test -p mc-map --lib harvest_block -- --nocapture`), and `crates/mc-map/tests/last_harvest.rs` checks the
   rooms, bays and guns level and clear, the paths drivable or sailable, every site reaching the defenders and the
   auxiliary ones only by their narrow ways, the ore and the regions.
+  `maps/rimehold` ("Rimehold", `mc-bake --layout rimehold --size-km 20 --seed 43`,
+  `crates/mc-map/src/bake/rimehold.rs`) is the arctic survival map for four defenders, all of it `Polar`: their starts
+  close together on the hold, an upland of tundra ringed by open water that four necks of land cross (the Causeway
+  east from the base, which stands at grade on the mainland facing west; a spit north from the highlands; a neck
+  south from the fells; a tombolo west from Wester Isle), so walls across the necks hold every land way. The necks
+  part the sea ring into three basins (the west and the north and south lagoons), each with its own Shaper slips,
+  and the base has a sea gate with three slips on each lagoon. The base's installation is the same as The Last
+  Harvest's (`bake/facility.rs`, laid facing south or west), and both maps cut their Shaper sites' rooms, ways and
+  slips the same way (`bake/sites.rs`). `crates/mc-map/tests/rimehold.rs` checks the rooms, bays, slips and guns, the
+  paths, that the hold reaches the rest of the land only over its necks (each opening its own sites), that every
+  start has ships' water within 2 km, the auxiliary sites' narrow ways and the ore.
   The older survival map is `maps/threshold` ("The Threshold", `mc-bake --layout threshold --size-km 16 --seed 31`,
   `crates/mc-map/src/bake/threshold.rs`): one road along a coast between mountains and the sea, the defenders' lowland
   in the west, a single pass, and the east half one Precursor facility on a plateau behind the Rampart, one ramp up

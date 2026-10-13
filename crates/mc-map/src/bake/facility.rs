@@ -184,11 +184,6 @@ impl Facility {
         BASTIONS.map(|(at, heading, scale)| (self.at(at), self.turn(heading), scale))
     }
 
-    /// The Gate on the map, and its scale.
-    pub(super) fn gate(&self) -> ((f64, f64), f64) {
-        (self.at(GATE), GATE_SCALE)
-    }
-
     /// The aeries: each pad, and its projector head.
     fn aeries(&self) -> Vec<Aerie> {
         RING.iter()

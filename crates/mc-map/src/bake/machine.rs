@@ -435,7 +435,7 @@ impl Terrain {
         if self.layout == Layout::Threshold {
             return self.threshold_clear(x, y);
         }
-        if self.layout == Layout::Harvest {
+        if matches!(self.layout, Layout::Harvest | Layout::Rimehold) {
             return !self.in_precursor_solid(x, y, 12.0);
         }
         // Tripoint's wall towers stand in the woods without a bench.
@@ -467,6 +467,7 @@ impl Terrain {
                 Layout::Frostline => self.machine_wall(),
                 Layout::Tripoint => self.machine_tripoint(),
                 Layout::Harvest => self.machine_harvest(),
+                Layout::Rimehold => self.machine_rimehold(),
                 _ => return,
             };
             (m.sites, m.benches)
@@ -525,15 +526,16 @@ mod tests {
     #[test]
     fn spans_clear_the_ground() {
         use crate::bake::test_maps::{
-            HARVEST, SERAC_DIVIDE, SERAC_SOUND, THE_AXIS, THRESHOLD, TRIPOINT,
+            HARVEST, RIMEHOLD, SERAC_DIVIDE, SERAC_SOUND, THE_AXIS, THRESHOLD, TRIPOINT,
         };
-        let maps: [(&str, &Terrain); 6] = [
+        let maps: [(&str, &Terrain); 7] = [
             ("Serac Divide", &SERAC_DIVIDE),
             ("Serac Sound", &SERAC_SOUND),
             ("The Threshold", &THRESHOLD),
             ("The Axis", &THE_AXIS),
             ("Tripoint", &TRIPOINT),
             ("The Last Harvest", &HARVEST),
+            ("Rimehold", &RIMEHOLD),
         ];
         let mut problems = Vec::new();
         for (name, t) in maps {

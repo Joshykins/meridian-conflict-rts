@@ -70,6 +70,7 @@ mod machine;
 mod params;
 mod planned_wrecks;
 mod props;
+mod rimehold;
 mod siege;
 mod sites;
 mod spires;
@@ -221,6 +222,7 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
         Layout::Siege => terrain.siege_wrecks(),
         Layout::Threshold => terrain.threshold_wrecks(),
         Layout::Harvest => terrain.harvest_wrecks(),
+        Layout::Rimehold => terrain.rimehold_wrecks(),
         _ => Vec::new(),
     };
     if !wrecks.is_empty() {
@@ -283,7 +285,9 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
 fn z_range(layout: Layout) -> (Fx, Fx) {
     match layout {
         // Peaks well over the clouds: -256 m to +1791 m in 1/32 m steps.
-        Layout::Threshold | Layout::Harvest => (Fx::from_int(-256), Fx::ratio(1, 32)),
+        Layout::Threshold | Layout::Harvest | Layout::Rimehold => {
+            (Fx::from_int(-256), Fx::ratio(1, 32))
+        }
         _ => (DEFAULT_MIN_Z, DEFAULT_Z_STEP),
     }
 }
@@ -434,6 +438,8 @@ struct Terrain {
     sp: spires::Spires,
     /// Harvest layout only: what it works out at set-up (`harvest.rs`).
     hv: harvest::Harvest,
+    /// Rimehold layout only: what it works out at set-up (`rimehold.rs`).
+    rh: rimehold::Rimehold,
     /// Siege layout only: the city's plan (`siege.rs`).
     siege: siege::Siege,
     /// The machine's benches: ground cut level for its nodes (`machine.rs`).
@@ -521,6 +527,7 @@ impl Terrain {
             tp: tripoint::Tripoint::default(),
             sp: spires::Spires::default(),
             hv: harvest::Harvest::default(),
+            rh: rimehold::Rimehold::default(),
             benches: Vec::new(),
         };
 
@@ -550,6 +557,10 @@ impl Terrain {
         }
         if params.layout == Layout::Harvest {
             t.setup_harvest();
+            return t;
+        }
+        if params.layout == Layout::Rimehold {
+            t.setup_rimehold();
             return t;
         }
         if t.is_alpine() {
@@ -651,7 +662,7 @@ impl Terrain {
         // The survival map and the siege are not symmetric: nothing folds.
         if matches!(
             self.layout,
-            Layout::Threshold | Layout::Siege | Layout::Harvest
+            Layout::Threshold | Layout::Siege | Layout::Harvest | Layout::Rimehold
         ) {
             return (vx, vy, r);
         }
@@ -735,6 +746,7 @@ impl Terrain {
             Layout::Antarctic => self.natural_antarctic(x, y),
             Layout::Spires => self.natural_spires(x, y),
             Layout::Harvest => self.natural_harvest(x, y),
+            Layout::Rimehold => self.natural_rimehold(x, y),
         };
         if self.benches.is_empty() {
             h
@@ -753,6 +765,7 @@ impl Terrain {
                     | Layout::Tripoint
                     | Layout::Antarctic
                     | Layout::Harvest
+                    | Layout::Rimehold
             )
     }
 
@@ -1333,6 +1346,7 @@ impl Terrain {
                     Layout::Tripoint => self.tripoint_snow(x, y, z(i, j), gx, gy),
                     Layout::Antarctic => self.antarctic_snow(x, y, z(i, j), gx, gy),
                     Layout::Harvest => self.harvest_snow(x, y, z(i, j), gx, gy),
+                    Layout::Rimehold => self.rimehold_snow(x, y, z(i, j), gx, gy),
                     _ => self.alpine_snow(x, y, z(i, j), gx, gy),
                 };
                 // No glacier ice on the machine's benches or their cut faces.
@@ -1399,4 +1413,6 @@ mod test_maps {
         LazyLock::new(|| Terrain::new(&BakeParams::spires("t", 6, 17)));
     pub(super) static HARVEST: LazyLock<Terrain> =
         LazyLock::new(|| Terrain::new(&BakeParams::harvest("t", 12, 41)));
+    pub(super) static RIMEHOLD: LazyLock<Terrain> =
+        LazyLock::new(|| Terrain::new(&BakeParams::rimehold("t", 10, 43)));
 }

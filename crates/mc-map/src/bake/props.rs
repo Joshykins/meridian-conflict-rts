@@ -32,8 +32,8 @@ impl Terrain {
                 Layout::Spires => self.spires_forest(x, y, height, slope),
                 Layout::Harvest => self.harvest_forest(x, y, height, slope),
                 Layout::Crosswater => self.cw_forest(x, y, height, slope),
-                // Nothing grows on Antarctica.
-                Layout::Antarctic => (0.0, 0.0),
+                // Nothing grows on Antarctica, nor on Rimehold.
+                Layout::Antarctic | Layout::Rimehold => (0.0, 0.0),
                 Layout::Siege => (
                     self.siege_forest(x, y) * (1.0 - smoothstep(0.3, 0.5, slope)),
                     0.0,
@@ -245,6 +245,9 @@ impl Terrain {
             if self.layout == Layout::Harvest && !self.harvest_clear(x, y) {
                 return true;
             }
+            if self.layout == Layout::Rimehold && !self.rimehold_clear(x, y) {
+                return true;
+            }
             // Starts sit in ragged glades (`start_clearing`), not drawn circles;
             // town pads keep their streets clear.
             self.start_clearing(x, y) < 0.02
@@ -256,8 +259,8 @@ impl Terrain {
         let mut props = Vec::new();
         // The alpine map is rockier, and its woods climb steeper ground.
         let alpine = self.is_alpine() || matches!(self.layout, Layout::Threshold | Layout::Harvest);
-        // Antarctica's rock is its ground's, under the snow: no boulders.
-        let arctic = self.layout == Layout::Antarctic;
+        // Antarctica's and Rimehold's rock is their ground's, under the snow: no boulders.
+        let arctic = matches!(self.layout, Layout::Antarctic | Layout::Rimehold);
 
         let (rock_slope, rock_roll) = if alpine { (0.18, 0.8) } else { (0.3, 0.93) };
         // (So do Tripoint's jungle's, up its mountains.)
