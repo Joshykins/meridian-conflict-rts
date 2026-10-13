@@ -38,13 +38,9 @@ pub(crate) const MODELS: &[ModelDef] = &[
     ),
     def("colony_hangar", PropKind::ColonyHangar, hangar::hangar),
     def("colony_dig", PropKind::ColonyDig, dig::dig),
-    def("colony_bridge", PropKind::ColonyBridge, bridge::girder),
-    def("colony_bridge~b", PropKind::ColonyBridge, bridge::haunched),
-    def("colony_bridge~c", PropKind::ColonyBridge, bridge::through),
+    def("colony_bridge", PropKind::ColonyBridge, bridge::bridge),
     def("colony_fence", PropKind::ColonyFence, fence::fence),
-    def("colony_fence~b", PropKind::ColonyFence, fence::palisade),
-    def("colony_gun_pit", PropKind::ColonyGunPit, pit::sandbags),
-    def("colony_gun_pit~b", PropKind::ColonyGunPit, pit::blocks),
+    def("colony_gun_pit", PropKind::ColonyGunPit, pit::pit),
 ];
 
 /// The outline of `r` at height `z` with its upright corners cut back `cut` metres in

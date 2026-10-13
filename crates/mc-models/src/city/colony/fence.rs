@@ -15,74 +15,10 @@ const HALF: f32 = FENCE_SEGMENT_M as f32 * 0.5;
 /// The fence's top over the ground.
 const TOP: f32 = 3.0;
 
-/// Weld-mesh panels between steel posts on a concrete kerb, Y-arms at the posts'
-/// heads strung with barbed wire.
-pub(super) fn fence(b: &mut MeshBuilder, _tech: u8) {
-    let posts = pitch(3.0);
-    let head = 2.55;
-    kerb(b, 0.32, 0.3);
-    if !b.mid() {
-        rail(b, 0.0, head, 0.1);
-        for &x in posts.iter().step_by(2) {
-            strand(b, v3(x, 0.0, 0.3), v3(x, 0.0, TOP), Vec2::splat(0.16));
-        }
-        return;
-    }
-    for &x in &posts {
-        post(b, x, 0.3, head + 0.05, 0.16);
-        // The Y-arm, its two limbs leaning out to the strands.
-        paint(b, pat::STEEL);
-        for s in [-1.0f32, 1.0] {
-            b.beam(
-                v3(x, 0.0, head),
-                v3(x, s * 0.45, TOP),
-                Vec2::splat(0.08),
-                Vec2::splat(0.07),
-            );
-        }
-    }
-    for z in [0.45, 1.5, head] {
-        rail(b, 0.0, z, 0.07);
-    }
-    // The mesh: upright wires on a close pitch, laced through with level ones.
-    let wire = 0.035;
-    let step = if b.fine() { 0.2 } else { 0.8 };
-    for x in cells(-HALF, 2.0 * HALF, step) {
-        strand(
-            b,
-            v3(x, 0.0, 0.4),
-            v3(x, 0.0, head),
-            Vec2::new(wire, wire * 0.6),
-        );
-    }
-    if b.fine() {
-        for z in cells(0.45, head - 0.45, 0.4) {
-            strand(
-                b,
-                v3(-HALF, 0.0, z),
-                v3(HALF, 0.0, z),
-                Vec2::splat(wire * 0.6),
-            );
-        }
-        // Barbed strands along the arms.
-        for s in [-1.0f32, 1.0] {
-            for k in [0.45, 1.0] {
-                let p = v3(0.0, s * 0.45 * k, head + (TOP - head) * k);
-                strand(
-                    b,
-                    v3(-HALF, p.y, p.z),
-                    v3(HALF, p.y, p.z),
-                    Vec2::splat(0.04),
-                );
-            }
-        }
-    }
-}
-
 /// A palisade: heavy prefab piers banded in the colony's accent, a blank prefab
 /// panel to chest height between them, flat steel pales over it and a coil of razor
 /// wire along the top.
-pub(super) fn palisade(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn fence(b: &mut MeshBuilder, _tech: u8) {
     let piers = pitch(6.0);
     let panel_top = 1.3;
     let pales = 2.55;
@@ -187,19 +123,6 @@ fn kerb(b: &mut MeshBuilder, half: f32, top: f32) {
     } else {
         b.loft(&[r.ring(-0.8), r.ring(top)], false, true);
     }
-}
-
-/// A post at `x` from `z0` to `z1`, `w` square.
-fn post(b: &mut MeshBuilder, x: f32, z0: f32, z1: f32, w: f32) {
-    paint(b, pat::STEEL);
-    b.loft(
-        &[
-            Rect::centred(x, 0.0, w * 0.5, w * 0.5).ring(z0),
-            Rect::centred(x, 0.0, w * 0.5, w * 0.5).ring(z1),
-        ],
-        false,
-        true,
-    );
 }
 
 /// A rail the run's whole length at height `z`, `y` across, `w` thick.

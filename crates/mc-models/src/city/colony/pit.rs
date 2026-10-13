@@ -17,7 +17,7 @@ const BACK: f32 = -7.0;
 
 /// A ring of sandbags in three stepped courses round prefab panels lining its inside,
 /// a course of bags along its top, ammunition crates behind it.
-pub(super) fn sandbags(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn pit(b: &mut MeshBuilder, _tech: u8) {
     if !b.mid() {
         sweep(b, &line(0.0), -0.4, 1.95, 2.8, 1.5, pat::SANDBAG);
         return;
@@ -77,102 +77,6 @@ pub(super) fn sandbags(b: &mut MeshBuilder, _tech: u8) {
     }
     bag_course(b, &ring, 1.95, 0.95);
     crates(b);
-}
-
-/// Walls of cast concrete blocks in two staggered courses, faced outside with
-/// salvaged prefab panels leant against them, sandbags along their top, ammunition
-/// crates behind.
-pub(super) fn blocks(b: &mut MeshBuilder, _tech: u8) {
-    if !b.mid() {
-        sweep(b, &line(0.0), -0.3, 2.05, 1.4, 1.1, pat::CONCRETE);
-        return;
-    }
-    let thick = 1.1;
-    let h = thick * 0.5;
-    // The runs of block: up the west side, across the front over both corners, down
-    // the east side.
-    let runs = [
-        (v3(-SIDE, BACK, 0.0), v3(-SIDE, FRONT - h, 0.0)),
-        (v3(-SIDE - h, FRONT, 0.0), v3(SIDE + h, FRONT, 0.0)),
-        (v3(SIDE, FRONT - h, 0.0), v3(SIDE, BACK, 0.0)),
-    ];
-    for (course, (z0, z1)) in [(-0.3, 0.6), (0.6, 1.45)].into_iter().enumerate() {
-        for (a, c) in runs {
-            let len = (c - a).length();
-            let along = (c - a) / len;
-            let across = v3(-along.y, along.x, 0.0);
-            if !b.fine() {
-                slab(
-                    b,
-                    (a + c) * 0.5 + Vec3::Z * z0,
-                    (a + c) * 0.5 + Vec3::Z * z1,
-                    along,
-                    len * 0.5,
-                    thick,
-                    pat::CONCRETE,
-                );
-                continue;
-            }
-            // Blocks 1.9 m long, the upper course half a block along.
-            let shift: f32 = if course == 1 { 0.95 } else { 0.0 };
-            let mut t = 0.0f32;
-            while t < len - 0.05 {
-                let first = if t == 0.0 { 1.9 - shift } else { 1.9 };
-                let l = first.min(len - t);
-                let mid = a + along * (t + l * 0.5);
-                let half = (along * (l - 0.1) + across * thick).abs() * 0.5;
-                let c = mid + Vec3::Z * z0;
-                boxed(
-                    b,
-                    c - v3(half.x, half.y, 0.0),
-                    c + v3(half.x, half.y, z1 - z0),
-                    pat::CONCRETE,
-                );
-                t += l;
-            }
-        }
-    }
-    let top = line(1.0);
-    sweep(b, &top, 1.45, 1.85, 1.25, 1.05, pat::SANDBAG);
-    if b.fine() {
-        bag_course(b, &top, 1.85, 0.8);
-    }
-    // Salvaged panels leant against the outside, some in an accent colour, at odd
-    // leans.
-    let mut k = 0;
-    for (a, c) in runs {
-        let len = (c - a).length();
-        let along = (c - a) / len;
-        let out = v3(-along.y, along.x, 0.0);
-        let face = h + 0.08;
-        for t in cells(0.4, len - 0.8, 2.2) {
-            if hash_unit(41, k) < 0.15 {
-                k += 1;
-                continue;
-            }
-            let at = a + along * t;
-            let lean = 0.35 + 0.35 * hash_unit(43, k);
-            let tall = 1.7 + 0.35 * hash_unit(47, k);
-            let look = if hash_unit(53, k) > 0.7 {
-                pat::ACCENT
-            } else {
-                pat::PREFAB
-            };
-            slab(
-                b,
-                at + out * (face + lean) + Vec3::Z * -0.2,
-                at + out * face + Vec3::Z * tall,
-                along,
-                0.98,
-                0.14,
-                look,
-            );
-            k += 1;
-        }
-    }
-    if b.fine() {
-        crates(b);
-    }
 }
 
 /// The walls' middle line, from the back of the west side round the front to the back
