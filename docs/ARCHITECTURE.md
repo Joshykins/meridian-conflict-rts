@@ -562,7 +562,9 @@ invulnerable unit, and the mirror marks it `SHIELD_VEIL` so it is drawn apart fr
   Unmaker gives a silo holding a warhead the densest knot of defender structures (else units on the ground) no
   warhead of its is bound for. The defenders' anti-nukes stop them as any.
   A **Gatewright** (`SiteKind::Fleet`, 3) prints a fleet of warships in the air in front of itself under its beam
-  (`Spot::Berth`, past the widest its foot grows; `spawn_aloft`, finished by `complete_unit_aloft`, no lot): every
+  (`Spot::Berth`, past the widest its foot grows; `spawn_aloft`, finished by `complete_unit_aloft`, no lot;
+  its print beams leave from five segment middles of its gate ring: the sim lists `GATE_EMITTERS` beams a ship at
+  its foot tagged `BEAM_FROM_GATE`, and the renderer moves the n-th to `shaper::gate_emitters`' n-th point): every
   listed `Space` unit with a warp drive and guns, no transport, up to the round's tier, cheapest class first
   (`fleet_roster`); `fleet_size` (2 light and one more every fourth level; from level 10 a capital ship, one more
   every eighth) of the classes open to its level (`fleet_classes`: the cheapest light one and one bigger every fifth

@@ -2,7 +2,8 @@
 //! the status the HUD reads. Presentation only: nothing here writes back.
 
 use super::{
-    Phase, Spot, SurvivalStatus, BEAM_FROM_LENS, BEAM_PRINT, BEAM_REPLICATION_RAY, RAISE_TICKS,
+    Phase, Spot, SurvivalStatus, BEAM_FROM_GATE, BEAM_FROM_LENS, BEAM_PRINT, BEAM_REPLICATION_RAY,
+    GATE_EMITTERS, RAISE_TICKS,
 };
 use crate::mirror::NodeStatus;
 use crate::reclaim::BeamInstance;
@@ -176,12 +177,29 @@ impl crate::World {
                     let head = FxVec2::new(bay.emitter.x, bay.emitter.y);
                     head.extend(ground(bay.at) + bay.emitter.z)
                 }
-                // A Gatewright's fleet prints in the air under its beam.
+                // A Gatewright's fleet prints in the air under the beams from its gate:
+                // put at its foot, moved to the ring by the renderer (`BEAM_FROM_GATE`).
                 Spot::Berth { .. } => {
-                    let Some(from) = self.shaper_emitter(p.source) else {
+                    let Some(gate) = st.units.row(p.source) else {
                         continue;
                     };
-                    from
+                    let foot = st.units.pos[gate];
+                    if !seen(at) && !seen(foot) {
+                        continue;
+                    }
+                    let bp = self.bp(row);
+                    for _ in 0..GATE_EMITTERS {
+                        sources.push(p.source.0 | BEAM_FROM_GATE);
+                        out.push(BeamInstance {
+                            from: foot.extend(st.units.z[gate]).to_f32(),
+                            kind: BEAM_PRINT,
+                            to_prev: st.units.prev_pos[row].extend(st.units.prev_z[row]).to_f32(),
+                            radius: bp.radius.to_f32(),
+                            to: at.extend(st.units.z[row]).to_f32(),
+                            height: bp.height.to_f32(),
+                        });
+                    }
+                    continue;
                 }
                 // A squad comes out of its warp all but whole, with no beam.
                 Spot::WarpIn { .. } => continue,
@@ -222,14 +240,6 @@ impl crate::World {
                 height: bp.height.to_f32(),
             });
         }
-    }
-
-    /// Where a Gatewright's fleet print beams leave from: half way up it as it stands built.
-    fn shaper_emitter(&self, shaper: crate::UnitId) -> Option<mc_core::FxVec3> {
-        let s = self.state.survival.as_ref()?;
-        let row = self.state.units.row(shaper)?;
-        let built = s.nodes.iter().find(|n| n.unit == shaper)?.height;
-        Some(self.state.units.pos[row].extend(self.state.units.z[row] + built / 2))
     }
 
     /// Where the replication nodes stand, raised or rising.

@@ -6,7 +6,7 @@
 use bytemuck::{Pod, Zeroable};
 use glam::Vec3;
 use mc_sim::mirror::{RenderFrame, KIND_GHOST, KIND_PROP, KIND_WRECK};
-use mc_sim::survival::{BEAM_FROM_LENS, BEAM_PRINT};
+use mc_sim::survival::{BEAM_FROM_GATE, BEAM_FROM_LENS, BEAM_PRINT};
 use std::collections::HashMap;
 
 /// Beams drawn at once, each `gpu_consts::beam::QUADS` quads.
@@ -127,7 +127,22 @@ impl WorkBeams {
                 (s.unit, lens.min(s.height))
             })
             .collect();
+        // A Gatewright's gate points, turned to its heading, for the fleet print beams it
+        // casts from there (`survival::BEAM_FROM_GATE`): no higher than it is built yet.
+        let gates: HashMap<u32, (Vec<[f32; 3]>, f32, f32)> = frame
+            .shapers
+            .iter()
+            .filter(|s| s.kind == 3)
+            .filter_map(|s| {
+                let u = frame.units.iter().find(|u| u.unit_id == s.unit)?;
+                let points = crate::models::shaper::gate_emitters(s.level);
+                Some((s.unit, (points, u.heading, s.height)))
+            })
+            .collect();
         for (&source, beam) in frame.beam_sources.iter().zip(&frame.beams) {
+            let head = heads.entry(source).or_insert(0);
+            let key = (source, *head);
+            *head += 1;
             let lifted;
             let beam = if beam.kind == BEAM_PRINT && source & BEAM_FROM_LENS != 0 {
                 let mut b = *beam;
@@ -137,12 +152,23 @@ impl WorkBeams {
                     .unwrap_or(0.0);
                 lifted = b;
                 &lifted
+            } else if beam.kind == BEAM_PRINT && source & BEAM_FROM_GATE != 0 {
+                let mut b = *beam;
+                if let Some((points, heading, built)) = gates.get(&(source & !BEAM_FROM_GATE)) {
+                    if !points.is_empty() {
+                        // The n-th beam under the source from the n-th point, in turn.
+                        let p = points[key.1 as usize % points.len()];
+                        let (sin, cos) = heading.sin_cos();
+                        b.from[0] += p[0] * cos - p[1] * sin;
+                        b.from[1] += p[0] * sin + p[1] * cos;
+                        b.from[2] += p[2].min(*built);
+                    }
+                }
+                lifted = b;
+                &lifted
             } else {
                 beam
             };
-            let head = heads.entry(source).or_insert(0);
-            let key = (source, *head);
-            *head += 1;
             let mut start = on_since;
             let mut from_prev = beam.from;
             let mut trip_len = length_of(beam);

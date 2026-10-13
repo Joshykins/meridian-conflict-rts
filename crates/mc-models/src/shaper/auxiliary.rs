@@ -281,6 +281,34 @@ fn spire(b: &mut MeshBuilder, g: Growth, crown: Crown) {
     }
 }
 
+/// A gate from `z0` to `z1`: the top of its stem, the ring's middle and its radius.
+fn gate_ring(z0: f32, z1: f32) -> (f32, f32, f32) {
+    let base = z0 + (z1 - z0) * 0.12;
+    let r = (z1 - base) * 0.5;
+    (base, base + r * 1.02, r)
+}
+
+/// Where a Gatewright of growth `g` casts its fleet's print beams from: the middles of
+/// every other segment of its gate ring (odd multiples of 36 degrees round from the
+/// bottom, so none by the stem), on the ring's inner face at its front, in model space
+/// (`shaper::gate_emitters`). The ring's ten segments are centred on multiples of 36
+/// degrees from the bottom (`gate`: `turn` PI/10).
+pub(super) fn gate_emitters(g: Growth) -> Vec<[f32; 3]> {
+    let h = g.height;
+    let (lens_h, lens_floor) = lens(h, Crown::Gate);
+    let neck = 0.014 * h + 1.5;
+    let (_, zc, r) = gate_ring(lens_floor + lens_h + neck, h);
+    (0..GATE_EMITTERS)
+        .map(|k| {
+            let a = (36.0 + 72.0 * k as f32).to_radians();
+            [r * 0.13, r * 0.8 * a.sin(), zc - r * 0.8 * a.cos()]
+        })
+        .collect()
+}
+
+/// Print beam emitters round a Gatewright's gate (mc-sim `survival::GATE_EMITTERS`).
+pub(super) const GATE_EMITTERS: usize = 5;
+
 /// The Gatewright's gate from `z0` to `z1` over a roof `half` across: a great ring of
 /// segments standing upright on a stem over a plinth, clear of the halo, facing forward
 /// (x), the way its fleets come out, held between two braced arms leaning out from the
@@ -292,7 +320,7 @@ fn gate(b: &mut MeshBuilder, z0: f32, z1: f32, half: f32) {
     let plinth = cut_rect(b, half * 1.1, half * 1.3, half * 0.3);
     b.loft_z(&plinth, &[Section::new(z0, 0.85), Section::new(deck, 1.0)]);
     // A short dark stem lifting the ring clear of the roof.
-    let base = z0 + len * 0.12;
+    let (base, zc, r) = gate_ring(z0, z1);
     dark(b);
     let stem = cut_rect(b, half * 0.4, half * 0.55, half * 0.12);
     b.loft_z(
@@ -303,8 +331,6 @@ fn gate(b: &mut MeshBuilder, z0: f32, z1: f32, half: f32) {
         ],
     );
     // The ring, its foot just clear of the plinth.
-    let r = (z1 - base) * 0.5;
-    let zc = base + r * 1.02;
     b.with(
         Affine3A::from_translation(v3(0.0, 0.0, zc)) * Affine3A::from_rotation_y(FRAC_PI_2),
         |b| {

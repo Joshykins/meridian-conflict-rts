@@ -102,6 +102,14 @@ pub fn halo_slot(kind: u8, level: u16, k: usize) -> [f32; 3] {
     halo::slot_middle(&mount(kind, level), k).to_array()
 }
 
+/// Where a Gatewright of `level` casts its fleet's print beams from: points round the
+/// inner face of its gate ring, on its front, in its model space (x forward, y left, z up
+/// from its foot), as its stage is drawn. The renderer puts the beams there (mc-sim
+/// `survival::BEAM_FROM_GATE`).
+pub fn gate_emitters(level: u16) -> Vec<[f32; 3]> {
+    auxiliary::gate_emitters(Growth::at(3, STAGE_LEVELS[stage(level)]))
+}
+
 /// Interceptors a Shaper of `level` may hold: its blueprint's `interceptor_stock`, 1
 /// and 0.34 a level, rounded down (mc-sim `growth::grown_launcher`; a test in mc-render
 /// holds the two equal).

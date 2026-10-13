@@ -82,6 +82,13 @@ pub const BEAM_PRINT: u32 = 5;
 /// foot, and the renderer lifts it to the Lens, where the Shaper's mesh carries it
 /// (mc-models `shaper::lens_height`). A Shaper raising a piece of its base casts it.
 pub const BEAM_FROM_LENS: u32 = 1 << 29;
+/// A print beam whose source is a Gatewright's unit id with this bit leaves from its gate
+/// ring: the sim puts it at the Gatewright's foot, `GATE_EMITTERS` beams a ship in turn,
+/// and the renderer moves the n-th of them to the n-th point round the ring (mc-models
+/// `shaper::gate_emitters`), no higher than it is built.
+pub const BEAM_FROM_GATE: u32 = 1 << 28;
+/// Beams a ship of a Gatewright's fleet is printed by, one from each point round its gate.
+pub const GATE_EMITTERS: usize = 5;
 /// How long the ray takes to raise a node.
 const RAISE_TICKS: u32 = 20 * HZ;
 /// The engine stops printing while it has this many units in the field, so a

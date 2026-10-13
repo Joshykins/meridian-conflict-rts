@@ -86,3 +86,18 @@ fn the_sims_print_beams_leave_from_the_pieces_emitters() {
         }
     }
 }
+
+#[test]
+fn a_gatewrights_print_beams_leave_from_its_gate_ring() {
+    for &level in &STAGE_LEVELS {
+        let points = gate_emitters(level);
+        assert_eq!(points.len(), mc_sim::survival::GATE_EMITTERS);
+        let lens = lens_height(3, level);
+        for p in points {
+            assert!(
+                p[2] > lens && p[2] <= height(level) + 0.5,
+                "level {level}: {p:?} not in the crown over the Lens at {lens}"
+            );
+        }
+    }
+}
