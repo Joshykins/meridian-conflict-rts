@@ -115,10 +115,10 @@ const WESTER: [(f64, f64); 12] = [
 type Neck = (&'static [(f64, f64)], f64, f64);
 
 const NECKS: [Neck; 4] = [
-    (&NORTH_NECK, 190.0, 7.0),
-    (&SOUTH_NECK, 230.0, 8.0),
-    (&WEST_NECK, 150.0, 6.0),
-    (&CAUSEWAY, 330.0, 9.0),
+    (&NORTH_NECK, 340.0, 7.0),
+    (&SOUTH_NECK, 380.0, 8.0),
+    (&WEST_NECK, 300.0, 6.0),
+    (&CAUSEWAY, 620.0, 9.0),
 ];
 
 /// A skerry or the atoll: centre, half lengths, the angle its long axis lies

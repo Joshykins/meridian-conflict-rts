@@ -60,7 +60,7 @@ const NECKS: [(&str, Throat, &[&str]); 4] = [
     ("west neck", ((4_500.0, 10_200.0), 480.0), &["Wester Isle"]),
     (
         "the Causeway",
-        ((11_600.0, 10_190.0), 700.0),
+        ((11_600.0, 10_190.0), 760.0),
         &["The Forecourt", "North Court", "South Court"],
     ),
 ];
