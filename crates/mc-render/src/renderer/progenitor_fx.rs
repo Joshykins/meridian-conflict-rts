@@ -19,6 +19,9 @@
 //!   light blades raised round its mark, each unit out of a tear of light; a dampening
 //!   field shatters the gate. A Gatewright's fleet is printed aloft in cradles of light,
 //!   marked by a gate in the sky, and goes into and out of its warp through ring gates.
+//! - **Bridges**: every deck the map lays (`mc_map::deck`) is a road of hard light
+//!   between its bridge's girders (the model, `precursor_bridge.rs`): clear panes the
+//!   sea shows through, faceted, light running along them.
 //!
 //! The dome is the shield's own look (progenitor_glass.wgsl). Presentation only; the
 //! renderer's own clock.
@@ -35,7 +38,8 @@ use super::Renderer;
 use crate::camera::Camera;
 use crate::gpu::{Gpu, GpuError};
 use crate::gpu_consts::progenitor_fx::{
-    BEAM, BODY, HOT_B, HOT_G, HOT_R, LIGHT_B, LIGHT_G, LIGHT_R, MAX_PIECES, PRISM, RING, SHELL,
+    BEAM, BODY, DECK, HOT_B, HOT_G, HOT_R, LIGHT_B, LIGHT_G, LIGHT_R, MAX_PIECES, PRISM, RING,
+    SHELL,
 };
 use crate::pipelines::{Layouts, Passes};
 use bytemuck::Zeroable;
@@ -52,6 +56,10 @@ pub(super) const HOT: Vec3 = Vec3::new(HOT_R, HOT_G, HOT_B);
 const MOST_LAID: usize = MAX_PIECES as usize * 3 / 4;
 /// Seconds a piece drawn fresh each frame is given: it never fades in that time.
 const HELD: f32 = 1.0e5;
+/// A deck's pane of light stands this far over its walking surface (so a landing's
+/// ground, level with it, never shows through), and its second pane this far under.
+const DECK_LIFT: f32 = 0.4;
+const DECK_UNDER: f32 = 3.5;
 
 /// One piece of hard light being built (`GpuPiece`; progenitor_fx.wgsl says what each
 /// field is to each kind).
@@ -90,6 +98,21 @@ impl Piece {
         let mut p = Self::of(BODY, nose, axis);
         p.0.c = up.to_array();
         p
+    }
+
+    /// A bridge's road of hard light over `deck`, between its girders.
+    fn deck(deck: &mc_map::Deck, seed: f32) -> Self {
+        let plan = mc_map::landmark::HARDLIGHT_BRIDGE;
+        let top = deck.top.to_f32() + DECK_LIFT;
+        let end = |p: mc_core::FxVec2| {
+            let [x, y] = p.to_f32();
+            Vec3::new(x, y, top)
+        };
+        let half = deck.half.to_f32();
+        let inner = half * (1.0 - (plan.girder / plan.half) as f32);
+        Self::of(DECK, end(deck.a), end(deck.b))
+            .size(inner, DECK_UNDER)
+            .seed(seed)
     }
 
     /// A sphere round `at`, `squash` of its height (1 round).
@@ -185,11 +208,23 @@ pub(super) struct ProgenitorFx {
     heard: Vec<(Vec3, f32)>,
     /// When the last tick came, for easing between ticks.
     tick_time: f32,
+    /// The map's bridges, drawn every frame.
+    decks: Vec<Piece>,
 }
 
 impl ProgenitorFx {
-    pub(super) fn new(gpu: &Gpu, layouts: &Layouts, passes: &Passes) -> Result<Self, GpuError> {
+    pub(super) fn new(
+        gpu: &Gpu,
+        layouts: &Layouts,
+        passes: &Passes,
+        decks: &[mc_map::Deck],
+    ) -> Result<Self, GpuError> {
         Ok(Self {
+            decks: decks
+                .iter()
+                .enumerate()
+                .map(|(i, d)| Piece::deck(d, i as f32 * 0.37))
+                .collect(),
             pass: ProgenitorPass::new(gpu, layouts, passes)?,
             laid: Vec::new(),
             flashes: Vec::new(),
@@ -356,16 +391,20 @@ impl Renderer {
             .chain(frame.iter())
             .map(|p| p.0)
             .collect();
-        if all.len() > MAX_PIECES as usize {
-            // Too many at once: the furthest from the eye are left out.
+        let decks = &self.progenitor_fx.decks;
+        let room = MAX_PIECES as usize - decks.len();
+        if all.len() > room {
+            // Too many at once: the furthest from the eye are left out (never a bridge).
             let eye = camera.eye();
             all.sort_by(|a, b| {
                 Vec3::from(a.a)
                     .distance_squared(eye)
                     .total_cmp(&Vec3::from(b.a).distance_squared(eye))
             });
-            all.truncate(MAX_PIECES as usize);
+            all.truncate(room);
         }
+        // The bridges are lit from now on: their light is the renderer's clock's.
+        all.extend(decks.iter().map(|d| d.now(time).0));
         all.sort_by_key(|p| p.kind);
         self.progenitor_fx.pass.upload(&all);
     }

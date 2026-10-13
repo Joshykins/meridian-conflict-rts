@@ -10,8 +10,8 @@ use bytemuck::{Pod, Zeroable};
 use crate::descriptors::SetPool;
 use crate::gpu::{Buffer, Gpu, GpuError};
 use crate::gpu_consts::progenitor_fx::{
-    BEAM_STEPS, BODY_SIDES, BODY_STATIONS, KINDS, MAX_PIECES, PRISM_BANDS, PRISM_SIDES, RING_BANDS,
-    RING_SEGMENTS, SHELL_BANDS, SHELL_SEGMENTS,
+    BEAM_STEPS, BODY_SIDES, BODY_STATIONS, DECK_STEPS, KINDS, MAX_PIECES, PRISM_BANDS, PRISM_SIDES,
+    RING_BANDS, RING_SEGMENTS, SHELL_BANDS, SHELL_SEGMENTS,
 };
 use crate::pipelines::{self, Blend, Depth, Layouts, Passes, PipelineDesc, VertexKind, PASS_SET};
 use crate::shader_reload::spirv;
@@ -44,6 +44,7 @@ const VERTICES: [u32; KINDS as usize] = [
     PRISM_SIDES * PRISM_BANDS * 6,
     BODY_SIDES * BODY_STATIONS * 6,
     SHELL_SEGMENTS * SHELL_BANDS * 6,
+    DECK_STEPS * 2 * 6,
 ];
 
 pub(super) struct ProgenitorPass {
@@ -111,6 +112,7 @@ impl ProgenitorPass {
                 // `scene_over` writes depth. A shard of light adds itself (alpha zero).
                 pipeline(c"vs_body", c"fs_body")?,
                 pipeline(c"vs_shell", c"fs_shell")?,
+                pipeline(c"vs_deck", c"fs_deck")?,
             ],
             buffer,
             pool,
@@ -137,7 +139,8 @@ impl ProgenitorPass {
     }
 
     /// Inside `scene_over` with the scene's set 0 bound: every kind's pieces, the solid
-    /// bodies first so the light is laid over them.
+    /// bodies first so the light is laid over them, then the decks, whose glass dims
+    /// what lies under it, so the rest of the light lands over them.
     pub(super) fn draw(
         &self,
         device: &ash::Device,
@@ -147,7 +150,7 @@ impl ProgenitorPass {
         if self.runs.iter().all(|r| r.1 == 0) {
             return;
         }
-        let order = [3usize, 4, 2, 1, 0];
+        let order = [3usize, 5, 4, 2, 1, 0];
         // SAFETY: the renderer calls this inside `scene_over` while `cmd` is recording;
         // every pipeline was made for that pass with the scene layout `layout`, and `set`
         // holds the live piece buffer; each run lies inside what `upload` wrote.

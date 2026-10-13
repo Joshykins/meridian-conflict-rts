@@ -2123,7 +2123,8 @@ impl Renderer {
         let wake_shells = wake_shell::WakeShells::new(&gpu, &layouts, &passes)?;
         let lens_fx = lens_fx::LensFx::new(&gpu, &layouts, &passes)?;
         let surge_fx = surge_fx::SurgeFx::new(&gpu, &layouts, &passes)?;
-        let progenitor_fx = progenitor_fx::ProgenitorFx::new(&gpu, &layouts, &passes)?;
+        let progenitor_fx =
+            progenitor_fx::ProgenitorFx::new(&gpu, &layouts, &passes, scene.map.decks())?;
         let post = post::Post::new(&gpu, passes.present, layouts.screen)?;
         let shafts = shafts::Shafts::new(&gpu, &layouts, &passes)?;
 

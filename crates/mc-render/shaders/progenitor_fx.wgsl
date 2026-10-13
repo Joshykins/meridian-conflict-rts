@@ -31,6 +31,11 @@
 // - **Shell**: a sphere of hard light round `a` (its upper half, `DOME`), its radius
 //   running from `size_from` to `size_to` over its `grow` share, squashed to `c.x` of its
 //   height (zero: round): a lattice of lines with its triangles lit faintly.
+// - **Deck**: a bridge's road of hard light, level from `a` to `b`, `size_from` either
+//   side: a clear pane the sea shows through (clearer looked down on, glassier at a
+//   slant), faceted in triangles that wake and dim, edged with lines of light, light
+//   running along it both ways and a wave sweeping it end to end; a fainter pane
+//   `size_to` under it, its facets drifting against the top's, gives it depth.
 //
 // A piece is lit from `start` (renderer time) for `life` seconds at `power`. Light is
 // added onto the scene (premultiplied, alpha only where a mark darkens the ground).
@@ -536,4 +541,117 @@ fn fs_shell(in: PieceOut) -> @location(0) vec4<f32> {
     // Its lines cold blue going white where it is seen edge-on.
     let rgb = mix(LIGHT, HOT, graze) * line * (0.5 + graze * 0.8) + LIGHT * pane;
     return finish(rgb * k, 0.0, in.clip);
+}
+
+// ---- Decks ------------------------------------------------------------------------
+
+// Metres a deck's facets run on a side, on its top pane and the one under it.
+const DECK_FACET: f32 = 34.0;
+
+@vertex
+fn vs_deck(@builtin(vertex_index) vid: u32, @builtin(instance_index) inst: u32) -> PieceOut {
+    let p = pieces[inst];
+    if !alive(p) {
+        return hidden();
+    }
+    let step_i = vid / 12u;
+    let pane = (vid / 6u) % 2u;
+    let corner = QUAD[vid % 6u];
+    let s = f32(step_i + select(0u, 1u, corner == 1u || corner == 2u)) / f32(PROGENITOR_FX_DECK_STEPS);
+    let side = select(-1.0, 1.0, corner >= 2u);
+    let run = p.b.xy - p.a.xy;
+    let len = max(length(run), 1e-3);
+    let dir = run / len;
+    let left = vec3<f32>(-dir.y, dir.x, 0.0);
+    var at = mix(p.a, p.b, s) + left * side * p.size_from;
+    at.z -= f32(pane) * p.size_to;
+    var out: PieceOut;
+    out.world = at;
+    out.clip = globals.view_proj * vec4<f32>(at, 1.0);
+    // Metres along it from `a`, and across from its middle (left positive).
+    out.uv = vec2<f32>(s * len, side * p.size_from);
+    out.piece = inst;
+    out.normal = vec3<f32>(0.0, 0.0, 1.0);
+    // Which pane, and the deck's length.
+    out.metres = vec2<f32>(f32(pane), len);
+    return out;
+}
+
+// A line `w` metres wide (soft over `px`) at distance `d` metres from it.
+fn deck_line(d: f32, w: f32, px: f32) -> f32 {
+    let soft = max(px, 0.05);
+    return (1.0 - smoothstep(w * 0.5, w * 0.5 + soft, abs(d))) * saturate(w / soft);
+}
+
+@fragment
+fn fs_deck(in: PieceOut) -> @location(0) vec4<f32> {
+    let p = pieces[in.piece];
+    let t = globals.camera.w + p.seed * 17.0;
+    let along = in.uv.x;
+    let across = in.uv.y;
+    let half = max(p.size_from, 1.0);
+    let len = in.metres.y;
+    let under = in.metres.x > 0.5;
+    let px = pixel_m(in.world);
+    let eye = normalize(globals.camera.xyz - in.world);
+    // Looked down on it is clear; at a slant it turns to glass.
+    let slant = pow(1.0 - abs(eye.z), 3.0);
+    // Lines thinner than a pixel fade rather than flicker; far off the lattice goes.
+    let near = 1.0 - smoothstep(DECK_FACET * 0.04, DECK_FACET * 0.15, px);
+
+    // The facets: the under pane's drift the other way, a little larger.
+    let drift = select(1.0, -1.3, under) * t * 1.6;
+    let side_m = select(DECK_FACET, DECK_FACET * 1.27, under);
+    let st = vec2<f32>(along + drift, across + select(0.0, side_m * 0.5, under));
+    let tri = tri_lattice(st, side_m);
+    let seam_m = (1.0 - tri.x) / 3.0 * side_m * 0.8660254;
+    let seam = deck_line(seam_m, 0.7, px) * near;
+    // Facets wake one by one and dim again.
+    let wake = pow(0.5 + 0.5 * sin(t * 0.7 + tri.y * 6.2831855 * 3.0), 12.0);
+    let node = tri.z * near;
+
+    // Light running along the top in lanes, each way on either side of the middle:
+    // thin chevrons pointing the way they run, a short glow trailing each.
+    let lane_w = half * 0.5;
+    let lane = floor((across + half) / lane_w);
+    let lane_mid = (lane + 0.5) * lane_w - half;
+    let way = select(-1.0, 1.0, across > 0.0);
+    let lane_off = abs(across - lane_mid) / (lane_w * 0.5);
+    let spacing = 180.0 + 53.0 * fract(lane * 0.618);
+    let speed = 38.0 + 6.0 * lane;
+    let run_m = along * way - lane_off * lane_w * 0.3 - t * speed + lane * 61.0;
+    let ahead = run_m - spacing * round(run_m / spacing);
+    let in_lane = 1.0 - smoothstep(0.55, 0.8, lane_off);
+    let chevron = (deck_line(ahead, 2.0, px) + select(0.0, exp(ahead / 14.0) * 0.2, ahead < 0.0)) * in_lane;
+    // A wave sweeping it end to end every few seconds, from either end in turn.
+    let period = 7.0;
+    let cycle = t / period;
+    let from_a = (i32(floor(cycle)) & 1) == 0;
+    let front = fract(cycle) * (len + 400.0) - 200.0;
+    let wave_at = select(len - front, front, from_a);
+    // Metres behind its front: a bright line, light fading out behind it.
+    let behind = (wave_at - along) * select(-1.0, 1.0, from_a);
+    let wave = select(0.0, exp(-behind / 80.0) * 0.6, behind >= 0.0) + deck_line(behind, 2.0, px) * 1.5;
+
+    // The edges: a line along each side and a fainter one inside it; the ends' sills.
+    let edge_d = half - abs(across);
+    let edges = deck_line(edge_d - 1.2, 2.0, px) * 1.4 + deck_line(edge_d - 9.0, 0.8, px) * 0.6 * near;
+    let end_d = min(along, len - along);
+    let sills = deck_line(end_d - 6.0, 2.0, px) + deck_line(end_d - 16.0, 1.0, px) * 0.6;
+    // A breath through the whole of it.
+    let breath = 0.85 + 0.15 * sin(t * 0.9);
+
+    var light = 0.0;
+    var hot = 0.0;
+    if under {
+        light = seam * 0.12 + wave * 0.12;
+    } else {
+        light = seam * (0.16 + wake * 0.8) + wake * 0.1 + node * 0.2 + edges + sills * 1.2 + chevron * 0.9 + wave * 0.4;
+        hot = edges * 0.3 + chevron * 0.6 + wave * 0.5 + node * wake * 0.4;
+    }
+    // The pane itself: a faint cold fill, glassier at a slant, dimming what lies under.
+    let fill = select(0.035, 0.02, under) + slant * select(0.18, 0.06, under);
+    let a = select(0.1, 0.05, under) + slant * select(0.45, 0.15, under);
+    let rgb = (LIGHT * (light * breath + fill) + HOT * hot) * p.power;
+    return finish(rgb, a, in.clip);
 }

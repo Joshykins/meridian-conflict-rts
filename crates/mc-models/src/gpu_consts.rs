@@ -1761,7 +1761,10 @@ shared! {
         pub const BODY: u32 = 3;
         /// A sphere of hard light round `a` (or its upper half, `DOME`).
         pub const SHELL: u32 = 4;
-        pub const KINDS: u32 = 5;
+        /// A bridge's deck of hard light, level from `a` to `b`, `size_from` either side
+        /// between its girders, a fainter pane `size_to` under it.
+        pub const DECK: u32 = 5;
+        pub const KINDS: u32 = 6;
         /// A beam's quads along it (it bends nowhere; they carry its pulses).
         pub const BEAM_STEPS: u32 = 16;
         /// A ring's segments round it, and its bands across (inside to out).
@@ -1776,6 +1779,8 @@ shared! {
         /// A sphere's bands pole to pole and segments round it.
         pub const SHELL_BANDS: u32 = 14;
         pub const SHELL_SEGMENTS: u32 = 36;
+        /// A deck's lengths along it, each with its two panes across.
+        pub const DECK_STEPS: u32 = 8;
         /// Flags (`GpuPiece::flags`). A beam: pulses run down it (a warhead's drive); it
         /// fades from `a` back (a trail); it is a thin thread (a Lance's core, an unmaking).
         pub const PULSES: u32 = 0x1;
