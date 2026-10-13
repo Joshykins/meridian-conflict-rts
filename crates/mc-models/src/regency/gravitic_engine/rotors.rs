@@ -22,22 +22,22 @@ use super::super::machine::{armour, hoop, swept, Frame};
 /// One ring: its foot and top, outer and inner radius, the plated vanes standing on it,
 /// and how fast it turns (rad/s; the sign is the way).
 #[derive(Clone, Copy, Debug)]
-pub(super) struct Rotor {
-    pub(super) z0: f32,
-    pub(super) z1: f32,
-    pub(super) outer: f32,
-    pub(super) inner: f32,
-    pub(super) vanes: usize,
-    pub(super) rate: f32,
+pub(in crate::regency) struct Rotor {
+    pub(in crate::regency) z0: f32,
+    pub(in crate::regency) z1: f32,
+    pub(in crate::regency) outer: f32,
+    pub(in crate::regency) inner: f32,
+    pub(in crate::regency) vanes: usize,
+    pub(in crate::regency) rate: f32,
     /// Its drum's faces are rimmed in violet (`pattern::NANITE_RIM`), so it reads turning
     /// through the gaps; it is drawn in fewer, broader panels.
-    pub(super) lit: bool,
+    pub(in crate::regency) lit: bool,
 }
 
 /// A stack of `count` rotors rising out of a well of radius `r` to `top`, each a step
 /// smaller and higher, the lowest turning at `rate`, every other one the other way and a
 /// little quicker.
-pub(super) fn stack(count: usize, r: f32, top: f32, rate: f32) -> Vec<Rotor> {
+pub(in crate::regency) fn stack(count: usize, r: f32, top: f32, rate: f32) -> Vec<Rotor> {
     let rise = top / count as f32;
     (0..count)
         .map(|k| {
@@ -56,7 +56,7 @@ pub(super) fn stack(count: usize, r: f32, top: f32, rate: f32) -> Vec<Rotor> {
 }
 
 /// Builds the rotors, and sets the axis they turn about.
-pub(super) fn build(b: &mut MeshBuilder, rotors: &[Rotor]) {
+pub(in crate::regency) fn build(b: &mut MeshBuilder, rotors: &[Rotor]) {
     b.set_spinner_pivot(Vec3::ZERO);
     for (k, r) in rotors.iter().enumerate() {
         b.with_orbit(Vec3::Z, r.rate, |b| ring(b, r, k));

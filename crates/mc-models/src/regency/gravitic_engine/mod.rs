@@ -26,11 +26,11 @@
 //! optics in the shards' boots, light only in the plates (`pattern::NANITE_SLOT`,
 //! `NANITE_RIM`, `EMBER_RIM`, `EMBER_SLOT`), never a lit piece of mesh.
 
-mod rotors;
+pub(super) mod rotors;
 mod site;
 #[cfg(test)]
 mod tests;
-mod works;
+pub(super) mod works;
 
 use glam::{Vec2, Vec3};
 
@@ -57,7 +57,7 @@ pub(super) const CORE_CLEAR: f32 = 20.0;
 
 /// A block on the ground from `a` to `c` (their heights ignored), `half` its half width,
 /// standing `h.0` high at `a` and `h.1` at `c`: footings and anchor blocks.
-fn footing(b: &mut MeshBuilder, a: Vec3, c: Vec3, half: f32, h: (f32, f32)) {
+pub(in crate::regency) fn footing(b: &mut MeshBuilder, a: Vec3, c: Vec3, half: f32, h: (f32, f32)) {
     let d = (c - a).with_z(0.0).normalize_or(Vec3::X);
     let side = d.cross(Vec3::Z) * half;
     let end = |p: Vec3, h: f32| {

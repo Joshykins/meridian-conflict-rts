@@ -70,7 +70,7 @@ pub(super) fn span(b: &mut MeshBuilder, a: &Shard, c: &Shard, levels: &[f32]) {
 
 /// A coil drum lying between two boots: graphite, plated over its top, collared at its
 /// ends.
-pub(super) fn coil(b: &mut MeshBuilder, at: Vec3, axis: Vec3, r: f32, len: f32) {
+pub(in crate::regency) fn coil(b: &mut MeshBuilder, at: Vec3, axis: Vec3, r: f32, len: f32) {
     if b.coarse() {
         return;
     }
@@ -105,7 +105,7 @@ pub(super) fn coil(b: &mut MeshBuilder, at: Vec3, axis: Vec3, r: f32, len: f32) 
 }
 
 /// A conduit run of `n` graphite pipes from `a` to `c` on the ground, on plated trestles.
-pub(super) fn conduit(b: &mut MeshBuilder, a: Vec3, c: Vec3, n: usize, r: f32) {
+pub(in crate::regency) fn conduit(b: &mut MeshBuilder, a: Vec3, c: Vec3, n: usize, r: f32) {
     if b.coarse() {
         return;
     }
@@ -145,7 +145,7 @@ pub(super) fn conduit(b: &mut MeshBuilder, a: Vec3, c: Vec3, n: usize, r: f32) {
 /// toward the top, braced at every stage, a plated housing a third of the way up, and a
 /// point of two swept plates back to back. Gives where its stays tie on: its top and its
 /// housing.
-pub(super) fn mast(
+pub(in crate::regency) fn mast(
     b: &mut MeshBuilder,
     foot: Vec3,
     top: Vec3,
@@ -227,7 +227,7 @@ pub(super) fn mast(
 }
 
 /// A stay from `a` to `c`, hanging `sag` metres at its middle. Close up only.
-pub(super) fn stay(b: &mut MeshBuilder, a: Vec3, c: Vec3, sag: f32, r: f32) {
+pub(in crate::regency) fn stay(b: &mut MeshBuilder, a: Vec3, c: Vec3, sag: f32, r: f32) {
     if !b.fine() {
         return;
     }
@@ -242,7 +242,7 @@ pub(super) fn stay(b: &mut MeshBuilder, a: Vec3, c: Vec3, sag: f32, r: f32) {
 }
 
 /// Where a stay is made fast in the ground: a plated block with a graphite eye.
-pub(super) fn anchor(b: &mut MeshBuilder, at: Vec3, toward: Vec3) {
+pub(in crate::regency) fn anchor(b: &mut MeshBuilder, at: Vec3, toward: Vec3) {
     if b.coarse() {
         return;
     }

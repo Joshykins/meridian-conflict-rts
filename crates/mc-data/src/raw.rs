@@ -807,6 +807,9 @@ pub(crate) struct RawBuilder {
     /// Where the gear carrying `emitters` pitches to point at the work, like the arm's elbow.
     #[serde(default)]
     pub hinge: Option<(f64, f64, f64)>,
+    /// Builds its products in the sky over it (`Builder::aloft`).
+    #[serde(default)]
+    pub aloft: bool,
 }
 
 #[derive(Deserialize, Clone)]
@@ -1857,6 +1860,7 @@ impl Unit {
                         .collect(),
                     unfold_ticks: ticks(b.unfold).clamp(0, 600) as u16,
                     hinge: b.hinge.map(|p| FxVec3::new(fx(p.0), fx(p.1), fx(p.2))),
+                    aloft: b.aloft,
                 })
             }
             None => None,
@@ -2568,6 +2572,7 @@ impl Unit {
                 None => None,
             },
             builder,
+            built_aloft: false,
             reclaimer: match &self.reclaimer {
                 Some(r) => Some(compile_reclaimer(key, r, self.weapons.len())?),
                 None => None,
