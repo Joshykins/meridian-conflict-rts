@@ -73,7 +73,7 @@ impl SetupState {
     /// Opens every map in `maps/` (skirmish maps and survival theatres) on
     /// the map picked last time, in `mode`.
     pub fn new(settings: &Settings, mode: Mode, blueprint_hash: u64) -> SetupState {
-        Self::with_catalog(Catalog::load(true), settings, mode, blueprint_hash)
+        Self::with_catalog(Catalog::load(), settings, mode, blueprint_hash)
     }
 
     /// [`Self::new`] over maps already read.

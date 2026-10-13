@@ -13,7 +13,7 @@ fn state() -> SetupState {
 }
 
 fn in_mode(mode: Mode) -> SetupState {
-    let catalog = Catalog::load_from(crate::ui::test_maps::paths(), true);
+    let catalog = Catalog::load_from(crate::ui::test_maps::paths());
     let settings = Settings {
         player_name: "Tester".into(),
         ..Settings::default()

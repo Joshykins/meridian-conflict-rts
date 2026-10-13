@@ -103,14 +103,14 @@ pub struct Catalog {
 }
 
 impl Catalog {
-    /// Every map in `maps/`; survival theatres too when `survival`.
-    pub fn load(survival: bool) -> Catalog {
-        Catalog::load_from(crate::setup::list_maps(), survival)
+    /// Every map in `maps/`: the skirmish maps, and the survival theatres apart.
+    pub fn load() -> Catalog {
+        Catalog::load_from(crate::setup::list_maps())
     }
 
     /// [`Self::load`] over the maps at `paths`. Each map's settings file is read
-    /// once: a survival block makes it a theatre, and only theatres are opened then.
-    pub(crate) fn load_from(paths: Vec<std::path::PathBuf>, survival: bool) -> Catalog {
+    /// once: a survival block makes it a theatre.
+    pub(crate) fn load_from(paths: Vec<std::path::PathBuf>) -> Catalog {
         let mut maps: Vec<MapCard> = Vec::new();
         let mut found = Vec::new();
         for path in paths {
@@ -120,7 +120,7 @@ impl Catalog {
             });
             if config.survival.is_none() {
                 maps.extend(maps::open_card(&path, &config));
-            } else if survival {
+            } else {
                 found.extend(super::survival::theatre_of(&path, config));
             }
         }
@@ -130,6 +130,23 @@ impl Catalog {
             .sort_by_key(|(t, _): &(Theatre, MapCard)| (t.map.info().tile_count(), t.stem.clone()));
         let (theatres, theatre_cards) = found.into_iter().unzip();
         Catalog::new(maps, theatres, theatre_cards)
+    }
+
+    /// Every map at `paths` as a plain card, survival theatres too, none of them a
+    /// theatre: the test range looks over a map's ground, it plays no rules on it.
+    pub(crate) fn every_map(paths: Vec<std::path::PathBuf>) -> Catalog {
+        let mut maps: Vec<MapCard> = paths
+            .iter()
+            .filter_map(|path| {
+                let config = mc_data::weather::MapConfig::for_map(path).unwrap_or_else(|e| {
+                    log::warn!("{e}");
+                    Default::default()
+                });
+                maps::open_card(path, &config)
+            })
+            .collect();
+        maps.sort_by_key(|m| (m.map.info().tile_count(), m.stem.clone()));
+        Catalog::new(maps, Vec::new(), Vec::new())
     }
 
     pub fn new(maps: Vec<MapCard>, theatres: Vec<Theatre>, theatre_cards: Vec<MapCard>) -> Catalog {
@@ -185,7 +202,7 @@ impl ReadAhead {
             .name("map-catalog".into())
             .spawn(move || {
                 faction::races();
-                let _ = tx.send(Catalog::load(true));
+                let _ = tx.send(Catalog::load());
             });
         match spawned {
             Ok(_) => ReadAhead(Some(rx)),
@@ -202,7 +219,7 @@ impl ReadAhead {
     pub fn take(&mut self) -> Catalog {
         let read = self.0.take().and_then(|rx| rx.recv().ok());
         *self = ReadAhead::start();
-        read.unwrap_or_else(|| Catalog::load(true))
+        read.unwrap_or_else(Catalog::load)
     }
 
     /// The maps read ahead if they have been read; `None` while they are still

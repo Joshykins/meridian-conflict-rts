@@ -638,6 +638,11 @@ fn the_range_map_browser_picks_another_map_and_gives_the_pictures_back() {
         "the battlefield takes no clicks under the browser"
     );
     let browser = rig.hud.range_maps.browser().unwrap();
+    assert_eq!(
+        browser.cards.len(),
+        crate::ui::test_maps::paths().len(),
+        "every map is listed, the survival theatre too"
+    );
     let (_, other) = browser.cards[1];
     let choose = browser.select_at;
     assert!(rig.tap(other).is_empty(), "one click only picks the card");

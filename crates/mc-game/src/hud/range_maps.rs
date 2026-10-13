@@ -1,6 +1,8 @@
-//! The test range's map browser: the skirmish maps as cards with their charts,
-//! the one under the pointer drawn large, so a map is picked by sight. Picking
-//! one stands the range back up there with the same subject.
+//! The test range's map browser: every map as a card with its chart, the
+//! survival maps too (the range only looks over their ground and what stands on
+//! it; no survival rules run), the one under the pointer drawn large, so a map
+//! is picked by sight. Picking one stands the range back up there with the same
+//! subject.
 //!
 //! The maps are read on a worker the first time the Range tab is shown. While
 //! the browser is up it borrows two of the unit pictures' image slots (its
@@ -33,7 +35,7 @@ impl RangeMaps {
         let spawned = std::thread::Builder::new()
             .name("range-maps".into())
             .spawn(move || {
-                let _ = tx.send(Catalog::load(false));
+                let _ = tx.send(Catalog::every_map(crate::setup::list_maps()));
             });
         match spawned {
             Ok(_) => self.loading = Some(rx),
@@ -43,7 +45,7 @@ impl RangeMaps {
 
     /// Reads the maps at `paths` at once, their thumbnails drawn (shots and tests).
     pub(super) fn load_now(&mut self, paths: Vec<std::path::PathBuf>) {
-        let mut catalog = Catalog::load_from(paths, false);
+        let mut catalog = Catalog::every_map(paths);
         catalog.browser.wait_for_thumbs();
         self.catalog = Some(catalog);
     }
