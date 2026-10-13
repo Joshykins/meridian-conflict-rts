@@ -112,14 +112,14 @@ fn every_kind() -> Vec<PropKind> {
             | PrecursorForge | PrecursorCradle | PrecursorHeart | PrecursorHalo
             | PrecursorMonolith | PrecursorSeaGate | PrecursorPlatform | PrecursorGate
             | PrecursorNeedle | PrecursorRampart | PrecursorFloor | PrecursorSeaway
-            | PrecursorCitadel | Dam | DamSwitchyard | DamPylon | DamTown | DamSpan | CityHouse
-            | CityRowhouses | CityShops | CityFarmstead | CityWarehouse | CityFactory
-            | CityTankFarm | CityTenement | CityCourtyard | CityApartments | CityOffice
-            | CityHighrise | CitySkyscraper | CitySpire | CitySlab | CityCivic | CityStation
-            | CityGarage | CityMall | CityChurch | CityRuin | CityWall | CityWallTower
-            | CityGate | CityRubble | CityStreetLight | CityTransit | CityTransitStation
-            | CityBillboard | CityCar | CityBarricade | CityWindTurbine | CitySolarArray
-            | CityMast | CityMonument => {}
+            | PrecursorCitadel | PrecursorBridge | Dam | DamSwitchyard | DamPylon | DamTown
+            | DamSpan | CityHouse | CityRowhouses | CityShops | CityFarmstead | CityWarehouse
+            | CityFactory | CityTankFarm | CityTenement | CityCourtyard | CityApartments
+            | CityOffice | CityHighrise | CitySkyscraper | CitySpire | CitySlab | CityCivic
+            | CityStation | CityGarage | CityMall | CityChurch | CityRuin | CityWall
+            | CityWallTower | CityGate | CityRubble | CityStreetLight | CityTransit
+            | CityTransitStation | CityBillboard | CityCar | CityBarricade | CityWindTurbine
+            | CitySolarArray | CityMast | CityMonument => {}
         }
     }
     all
