@@ -23,8 +23,7 @@
 //   scorched).
 // - **Prism**: an open column of `PRISM_SIDES` faces standing from `a` up `b`,
 //   `size_from` across at its foot and `size_to` at its head, rising over its `grow`
-//   share. Lit at its corners; a print column (`PRINT`) has bands of light climbing it,
-//   a pillar streaks of light running up.
+//   share: a pillar, lit at its corners, streaks of light running up it.
 // - **Body**: a solid Precursor body, nose at `a`, flying along `b`, its back toward
 //   `c`: a flattened six-faced hull with its nose cut on a slant, a waist where the dark
 //   core shows, pale alloy lit by the sun with seams of cold light. `size_from` its
@@ -369,19 +368,12 @@ fn fs_prism(in: PieceOut) -> @location(0) vec4<f32> {
     let corner_l = 1.0 - smoothstep(w * 0.5, w * 1.3, c);
     let view = normalize(globals.camera.xyz - in.world);
     let graze = 1.0 - abs(dot(normalize(in.normal), view));
-    var fill = 0.08 + graze * 0.25;
-    var lines = corner_l;
-    if has(p, PROGENITOR_FX_PRINT) {
-        // Bands of light climbing it as it prints.
-        let b = fract(h * tall / 9.0 - age * 1.4);
-        lines += (1.0 - smoothstep(0.0, max(w / 9.0, 0.06), abs(b - 0.5))) * 0.9;
-        fill += 0.08;
-    } else {
-        // A pillar: streaks running up it.
-        let lane = floor(in.uv.x * 5.0);
-        let streak = fract(h * tall / 60.0 - age * 2.2 + hash11(lane + p.seed * 13.0));
-        lines += smoothstep(0.7, 0.98, streak) * 0.7 * step(0.4, hash11(lane * 1.7 + p.seed));
-    }
+    let fill = 0.08 + graze * 0.25;
+    // Streaks running up it.
+    let lane = floor(in.uv.x * 5.0);
+    let streak = fract(h * tall / 60.0 - age * 2.2 + hash11(lane + p.seed * 13.0));
+    let lines = corner_l
+        + smoothstep(0.7, 0.98, streak) * 0.7 * step(0.4, hash11(lane * 1.7 + p.seed));
     // Faded into the air at its head, sharp at its foot.
     let top = pow(1.0 - h, 1.3) * smoothstep(0.0, 0.03, h + 0.02);
     let k = light_of(p) * top;

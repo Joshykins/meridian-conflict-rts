@@ -6,7 +6,9 @@
 //! on the machine with the GPU (it needs Vulkan and maps/crosswater.mcmap). It writes
 //! PPMs to `PROG_OUT` (default artifacts/progenitor):
 //!
-//! - `PROG_SCENES`: lance, shield, antinuke, warpin, warhead (default all), and
+//! - `PROG_SCENES`: lance, shield, antinuke, warpin, warpcancel (a dampening field kills
+//!   the mark at 4 s), fleetprint and fleet (a Gatewright's fleet printed aloft, marked,
+//!   jumping at 8 s and out at 9.5 s), warhead (default all but the fleet's), and
 //!   lance-close, antinuke-close, warpin-close, warhead-close (the camera close on the
 //!   beam, the body in flight or the mark);
 //! - `PROG_TIERS`: the Shaper's tiers, comma-separated (default `1,5`);
@@ -24,10 +26,13 @@ use mc_core::{Fx, FxVec3};
 use mc_data::strategic::StrategicLook;
 use mc_data::{BlueprintId, WeaponColor};
 use mc_sim::mirror::*;
-use mc_sim::survival::{arrival_shock, shaper_height, ShaperInstance, WarpInInstance};
+use mc_sim::reclaim::BeamInstance;
+use mc_sim::survival::{arrival_shock, shaper_height, ShaperInstance, WarpInInstance, WarpInKind};
 use std::sync::Arc;
 
 const TICK: f32 = 0.1;
+/// `owner_flags` of a unit being printed (the sim's flags sit from bit 8).
+const UNDER_CONSTRUCTION: u32 = 1 << 8;
 
 fn fx3(v: Vec3) -> FxVec3 {
     FxVec3::new(Fx::from_f32(v.x), Fx::from_f32(v.y), Fx::from_f32(v.z))
@@ -69,7 +74,21 @@ struct Stage {
     target: Vec3,
     shaper_bp: BlueprintId,
     seed_bp: BlueprintId,
+    gate_bp: BlueprintId,
     tank_bp: BlueprintId,
+    /// The fleet's warships: corvettes at a low tier, frigates at a high.
+    ship_bp: BlueprintId,
+}
+
+/// The fleet scene's ships: how many, and where each stands off the fleet's middle.
+const SHIPS: usize = 6;
+
+fn ship_off(k: usize) -> Vec3 {
+    Vec3::new(
+        (k % 3) as f32 * 70.0 - 70.0,
+        (k / 3) as f32 * 70.0 - 35.0,
+        0.0,
+    )
 }
 
 impl Stage {
@@ -137,9 +156,51 @@ impl Stage {
             from: (self.site + Vec3::Z * shaper_height(level).to_f32()).to_array(),
             at: self.target.to_array(),
             radius: radius.to_f32(),
-            reach: 60.0,
+            reach: 40.0 + 2.0 * f32::from(level),
+            spots: self.squad_spots(),
             units: 4 + level,
             level,
+            ..WarpInInstance::default()
+        }
+    }
+
+    /// Where the squad's units come out: rings round the mark.
+    fn squad_spots(&self) -> Vec<[f32; 3]> {
+        let n = 4 + usize::from(self.level());
+        let reach = 40.0 + 2.0 * f32::from(self.level());
+        (0..n)
+            .map(|k| {
+                let ring = 1 + k / 6;
+                let a = k as f32 * 2.399;
+                let r = (ring as f32 * 14.0).min(reach * 0.85);
+                (self.target + Vec3::new(a.cos() * r, a.sin() * r, 0.0)).to_array()
+            })
+            .collect()
+    }
+
+    /// Where the fleet is printed, in front of the Gatewright.
+    fn berth(&self) -> Vec3 {
+        self.site + Vec3::new(260.0, 0.0, 220.0)
+    }
+
+    /// The fleet's mark over the target: on the ground, and its ships' spots aloft.
+    fn fleet_mark(&self, t: f32) -> WarpInInstance {
+        let spots = (0..SHIPS)
+            .map(|k| (self.target + Vec3::Z * 260.0 + ship_off(k)).to_array())
+            .collect();
+        WarpInInstance {
+            serial: 4,
+            kind: WarpInKind::Fleet,
+            source: 1,
+            from: self.berth().to_array(),
+            at: self.target.to_array(),
+            reach: 160.0,
+            spots,
+            age: t - 3.0,
+            eta: (8.0 - t).max(0.0),
+            jumping: t >= 8.0,
+            units: SHIPS as u16,
+            level: self.level(),
             ..WarpInInstance::default()
         }
     }
@@ -148,7 +209,7 @@ impl Stage {
     fn body_at(&self, t: f32) -> Vec3 {
         match self.scene.as_str() {
             "antinuke" => self.shard_at(t),
-            "warpin" => self.target + Vec3::Z * 20.0 * t,
+            "warpin" | "warpcancel" => self.target + Vec3::Z * 20.0 * t,
             // Along the Lance's beam, two thirds of the way down.
             "lance" => {
                 let lens =
@@ -163,11 +224,10 @@ impl Stage {
         let t = k as f32 * TICK;
         let mut f = RenderFrame::default();
         let level = self.level();
-        let kind = if self.scene == "warpin" { 1 } else { 0 };
-        let bp = if kind == 1 {
-            self.seed_bp
-        } else {
-            self.shaper_bp
+        let bp = match self.scene.as_str() {
+            "warpin" | "warpcancel" => self.seed_bp,
+            "fleet" | "fleetprint" => self.gate_bp,
+            _ => self.shaper_bp,
         };
         let mut shaper = unit(bp, 1, self.site, 1);
         // Its halo's launcher word: every interceptor held, but the one the anti-nuke
@@ -281,21 +341,98 @@ impl Stage {
                     });
                 }
             }
-            "warpin" => {
+            "warpin" | "warpcancel" => {
                 f.shapers.push(self.shaper(1, 0.0));
                 let mut s = self.warp_in();
                 let (radius, _) = arrival_shock(level);
-                if t < 6.0 {
+                let cancel = self.scene == "warpcancel";
+                if t < 6.0 && !(cancel && t >= 4.0) {
                     s.age = t;
                     s.eta = 6.0 - t;
-                    f.warp_ins.push(s);
-                } else if k == 60 {
+                    f.warp_ins.push(s.clone());
+                } else if k == 40 && cancel {
+                    f.events.push(SimEvent::WarpInCancelled {
+                        serial: 3,
+                        site: 0,
+                        at: fx3(self.target),
+                        by: mc_sim::Handle(99),
+                        units: s.units,
+                    });
+                } else if k == 60 && !cancel {
                     f.events.push(SimEvent::WarpInArrived {
                         serial: 3,
                         at: fx3(self.target),
                         radius,
                         units: s.units,
                     });
+                }
+                if t >= 6.0 && !cancel {
+                    // The squad unfolding: two thirds whole, whole a second on.
+                    for (i, spot) in s.spots.iter().enumerate() {
+                        let at = Vec3::from(*spot);
+                        let at = at.truncate().extend(ground(at.truncate()));
+                        let mut u = unit(self.tank_bp, 100 + i as u32, at, 1 | UNDER_CONSTRUCTION);
+                        u.build = (0.66 + (t - 6.0) * 0.34).min(1.0);
+                        if u.build < 1.0 {
+                            u.status[1] = UNIT_REPLICATING;
+                        } else {
+                            u.owner_flags = 1;
+                        }
+                        f.units.push(u);
+                    }
+                }
+            }
+            "fleet" | "fleetprint" => {
+                f.shapers.push(self.shaper(3, 0.0));
+                let emitter = self.site + Vec3::Z * height * 0.5;
+                // Printed aloft before it for three seconds, marked, jumping at 8 s and out
+                // of the warp at 9.5 s.
+                for n in 0..SHIPS {
+                    let id = 200 + n as u32;
+                    let berth = self.berth() + ship_off(n);
+                    let spot = self.target + Vec3::Z * 260.0 + ship_off(n);
+                    if t < 8.0 {
+                        let mut u = unit(self.ship_bp, id, berth, 1);
+                        if t < 3.0 {
+                            u.owner_flags |= UNDER_CONSTRUCTION;
+                            u.build = 0.2 + t * 0.25;
+                            u.status[1] = UNIT_REPLICATING;
+                            f.beams.push(BeamInstance {
+                                from: emitter.to_array(),
+                                kind: mc_sim::survival::BEAM_PRINT,
+                                to_prev: berth.to_array(),
+                                radius: 18.0,
+                                to: berth.to_array(),
+                                height: 12.0,
+                            });
+                            f.beam_sources.push(id | 1 << 31);
+                        }
+                        f.units.push(u);
+                    } else if t >= 9.5 {
+                        f.units.push(unit(self.ship_bp, id, spot, 1));
+                    }
+                    if k == 80 {
+                        f.events.push(SimEvent::WarpJumped {
+                            unit: mc_sim::Handle(id),
+                            from: fx3(berth),
+                            to: fx3(spot),
+                            ticks: 15,
+                            dampened: false,
+                            blueprint: self.ship_bp,
+                            owner: 1,
+                        });
+                    } else if k == 95 {
+                        f.events.push(SimEvent::WarpArrived {
+                            unit: mc_sim::Handle(id),
+                            at: fx3(spot),
+                            dampened: false,
+                            blueprint: self.ship_bp,
+                            owner: 1,
+                        });
+                    }
+                }
+                if (3.0..9.5).contains(&t) {
+                    f.warp_ins.push(self.fleet_mark(t));
                 }
             }
             _ => {
@@ -393,7 +530,13 @@ fn progenitor_shots() {
             let tier: u8 = tier.parse().unwrap();
             let ground = |p: Vec2| renderer.ground_height(p).max(water);
             let site = at.extend(ground(at));
-            let target_xy = at + Vec2::new(380.0, -220.0);
+            // A fleet comes in well away from its Gatewright.
+            let target_xy = at
+                + if scene.starts_with("fleet") {
+                    Vec2::new(1700.0, -900.0)
+                } else {
+                    Vec2::new(380.0, -220.0)
+                };
             // `-close`: the same staging, the camera close on the body in flight.
             let (staged, close) = match scene.strip_suffix("-close") {
                 Some(s) => (s.to_string(), true),
@@ -406,7 +549,13 @@ fn progenitor_shots() {
                 target: target_xy.extend(ground(target_xy)),
                 shaper_bp: id("replication_node"),
                 seed_bp: id("progenitor_seedcaster"),
+                gate_bp: id("progenitor_gatewright"),
                 tank_bp: id("aster_t1_tank"),
+                ship_bp: id(if tier >= 4 {
+                    "aster_t4_frigate"
+                } else {
+                    "aster_t3_corvette"
+                }),
             };
             let lens = crate::models::shaper::lens_height(0, stage.level());
             let mid = stage.site.lerp(stage.target, 0.5);
@@ -445,10 +594,25 @@ fn progenitor_shots() {
                     0.05,
                 ),
                 "warpin" => (
-                    vec![4.8, 6.15, 7.5],
-                    stage.target + Vec3::Z * 40.0,
-                    650.0,
-                    0.3,
+                    vec![1.5, 4.5, 5.6, 6.15, 6.6, 7.5],
+                    stage.target + Vec3::Z * 25.0,
+                    (stage.warp_in().reach * 6.0).max(420.0),
+                    0.28,
+                ),
+                "warpcancel" => (
+                    vec![3.6, 4.15, 4.6],
+                    stage.target + Vec3::Z * 25.0,
+                    (stage.warp_in().reach * 6.0).max(420.0),
+                    0.28,
+                ),
+                // The fleet printed aloft before its Gatewright.
+                "fleetprint" => (vec![1.0, 2.5], stage.berth(), 900.0, 0.12),
+                // Its sky gate over the target, the jump and the arrival.
+                "fleet" => (
+                    vec![5.0, 7.9, 9.55, 9.9, 10.6],
+                    stage.target + Vec3::Z * 180.0,
+                    1300.0,
+                    0.12,
                 ),
                 _ => (
                     vec![2.6, 3.4, 4.6, 8.0],

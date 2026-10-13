@@ -111,7 +111,7 @@ impl Game {
                     site(*s)
                 ),
                 GOOD,
-                "warp_snag",
+                "progenitor_warp_cancel",
             ),
             // The marks are on the map; the fleet's jump sounds as any warp's.
             SimEvent::FleetMarked {
@@ -126,7 +126,7 @@ impl Game {
                     ticks / mc_core::TICKS_PER_SECOND
                 ),
                 palette::BAD,
-                "warp_spool",
+                "progenitor_fleet_mark",
             ),
             // The launch alarm is the nuke's own (`game_nuke_sounds`): a toast only.
             SimEvent::NuclearLaunch { owner, .. }
@@ -286,17 +286,18 @@ impl Game {
                 ));
             }
         }
-        if let Some(sound) = library.id_of("warp_rift") {
+        if let Some(sound) = library.id_of("progenitor_warp_gate") {
+            // Every squad's gate through its whole countdown, swelling as it comes due.
             let mut sum = (0.0f32, 0.0f32);
             let mut nearest = 0.0f32;
             let squads = frame
                 .warp_ins
                 .iter()
-                .filter(|s| s.kind == mc_sim::survival::WarpInKind::Squad && s.eta < 3.0);
+                .filter(|s| s.kind == mc_sim::survival::WarpInKind::Squad);
             for s in squads {
-                let near = 1.0 - s.eta / 3.0;
+                let near = 1.0 - (s.eta / (s.age + s.eta).max(0.1)).clamp(0.0, 1.0);
                 let (gain, pan) = self.hear(Vec3::from(s.at));
-                let gain = gain * (0.3 + 0.7 * near);
+                let gain = gain * (0.15 + 0.85 * near * near);
                 sum = (sum.0 + gain * gain, sum.1 + gain * gain * pan);
                 nearest = nearest.max(near);
             }
@@ -305,7 +306,7 @@ impl Game {
                     sound,
                     (sum.0.sqrt() * 0.8).min(0.9),
                     sum.1 / sum.0.max(1e-9),
-                    1.15 - 0.3 * nearest,
+                    0.9 + 0.2 * nearest,
                 ));
             }
         }
@@ -320,11 +321,22 @@ impl Game {
         let (library, _) = audio.library();
         let strike = library.id_of("progenitor_lance_strike");
         let landed = library.id_of("progenitor_warp_in");
+        let fleet = library.id_of("progenitor_fleet_arrival");
+        let engine = self.view.status.survival.as_ref().map(|s| s.engine_player);
+        // A fleet comes out together: one gate sound a tick, from the loudest ship.
+        let mut ship: Option<(f32, f32)> = None;
         for event in &self.view.frame.events {
             let (sound, at, floor) = match event {
                 SimEvent::LanceStrike { to, .. } => (strike, to.to_f32(), 0.0),
                 // A squad warping in is news wherever the camera is.
                 SimEvent::WarpInArrived { at, .. } => (landed, at.to_f32(), 0.15),
+                SimEvent::WarpArrived { at, owner, .. } if Some(*owner) == engine => {
+                    let heard = self.hear(Vec3::from(at.to_f32()));
+                    if ship.is_none_or(|s| heard.0 > s.0) {
+                        ship = Some(heard);
+                    }
+                    continue;
+                }
                 _ => continue,
             };
             let Some(sound) = sound else { continue };
@@ -333,6 +345,9 @@ impl Game {
             if gain > 0.01 {
                 audio.play_world(sound, gain, pan, 1.0);
             }
+        }
+        if let (Some(sound), Some((gain, pan))) = (fleet, ship) {
+            audio.play_world(sound, gain.max(0.2), pan, 1.0);
         }
     }
 

@@ -1675,8 +1675,7 @@ shared! {
         pub const MARK: u32 = 0x20;
         pub const TARGET: u32 = 0x40;
         pub const ARCS: u32 = 0x80;
-        /// A column that prints (light rising in bands), or a pillar.
-        pub const PRINT: u32 = 0x100;
+        // retired: 0x100 (a column that printed, light rising in bands)
         /// A body of hard light rather than alloy (an interceptor's shard, a Lens' crystal).
         pub const LIGHT: u32 = 0x200;
         /// A sphere's upper half.
