@@ -31,8 +31,10 @@ pub enum StrategicLook {
     /// The Regency's pinch-fusion warhead: a red plasma nova that leaves a glowing plasma
     /// cloud standing over the ground; dark trails with a hot streak at the missile.
     Plasma = 1,
-    /// Survival's Progenitor (its Unmaker's silos, `look:` on their strategic block). Drawn
-    /// as `Fission` until the Progenitor's own look is made.
+    /// Survival's Progenitor (its Unmaker's silos and every Shaper's anti-nuke, `look:` on
+    /// their strategic blocks): solid pale bodies seamed with cold light that leave lines of
+    /// hard light behind them, interceptors that are shards of hard light, a kill that
+    /// unmakes the warhead into lines of light, and a cold blue-white unmaking blast.
     Progenitor = 2,
 }
 

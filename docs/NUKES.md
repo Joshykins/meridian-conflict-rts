@@ -191,7 +191,15 @@ mc-data; presentation only, never hashed). It rides on the events (`NuclearLaunc
 
 A launcher's `strategic` block may name its own look over its faction's (`look:
 Some(Progenitor)`): survival's Unmaker silos (`progenitor_silo`) do, `StrategicLook::Progenitor`
-(2, `gpu_consts::nuke_look::PROGENITOR`), drawn as Fission until the Progenitor's own is made.
+(2, `gpu_consts::nuke_look::PROGENITOR`), as does every Shaper's anti-nuke. Their missiles,
+launches, kills and blasts are drawn in hard light by `renderer/progenitor_fx/strategic.rs`
+(not by `nuke_fx`): a shard of light for an interceptor that closes a cage round a warhead
+and unmakes it into lines of light (`WarheadIntercepted::by` names the interceptor's look),
+a solid seamed body pushed by a spear of light for a warhead, and an unmaking for a blast:
+a cold sphere of hard light opening to the blast radius and falling in again, a pillar, a
+ring of arcs far out and a burnt mark, no fireball and no smoke. Its sounds are
+`progenitor_` and the ARC name (data/sounds/progenitor.ron). Shots: mc-render
+`progenitor_shots` (`renderer/progenitor_fx/shots.rs`).
 A launcher with a `growth` block (`mc_data::growth`) grows by its level: a silo's
 `warhead_stock`, `warhead_round`, `blast_radius` and `blast_damage`, an array's
 `interceptor_*`; a warhead carries the blast its silo's level gave it

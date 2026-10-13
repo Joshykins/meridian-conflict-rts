@@ -1,4 +1,5 @@
 //!use bindings
+//!use progenitor_glass
 // Projected shield membranes. Same-team bubbles are a CSG union: overlapping
 // Aegises fuse into one glass surface, with a plasma seam where they meet.
 // One fullscreen triangle traces every dome — the cube is not instanced,
@@ -22,6 +23,9 @@
 // way in pinch fusion's light: white-hot glass with the prism drifting over it and folds
 // of colour hanging in it like a curtain, on a lattice of red-tinged triangles; a
 // white-hot jet for the shaft, and hits that flash white and ring out red.
+//
+// A Progenitor Shaper's (`shield_look::PROGENITOR`) is panes of hard light, drawn in
+// progenitor_glass.wgsl; it has no shaft.
 
 struct ShieldPush {
     // The domes: the list's hull fields come after them and are not this pass's
@@ -730,7 +734,7 @@ fn column_hi(s: Shield) -> f32 {
 }
 
 fn column_live(s: Shield) -> bool {
-    if is_hull(s) || stalled(s) || is_veil(s) {
+    if is_hull(s) || stalled(s) || is_veil(s) || is_progenitor_field(s) {
         return false;
     }
     return shield_open(s) > 0.08 || collapsing(s);
@@ -1066,6 +1070,14 @@ fn fs_shield_lit(in: ShieldOut) -> ShieldFrag {
         if reveal >= 0.0 && is_veil(s) {
             // The veil: its own glass, laid over whatever columns were met on the way.
             let glass = veil_glass(p, s, dir, owner, time, reveal);
+            let shaft_a = saturate(alpha);
+            let pre = glass.rgb * glass.a + color * shaft_a * (1.0 - glass.a);
+            alpha = glass.a + shaft_a * (1.0 - glass.a);
+            color = pre / max(alpha, 1e-5);
+            depth_t = min(depth_t, surf.x);
+        } else if reveal >= 0.0 && is_progenitor_field(s) {
+            // A Shaper's panes, laid over the columns met on the way the same way.
+            let glass = progenitor_glass(p, s, dir, owner, time, reveal);
             let shaft_a = saturate(alpha);
             let pre = glass.rgb * glass.a + color * shaft_a * (1.0 - glass.a);
             alpha = glass.a + shaft_a * (1.0 - glass.a);

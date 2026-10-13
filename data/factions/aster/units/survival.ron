@@ -43,6 +43,8 @@
         // Its defences, at level 1; `growth` says what each level adds.
         economy: (energy_upkeep: 50),
         shield: (radius: 180, health: 6000, regen: 60),
+        // Panes of hard light, more courses and rings with its tier.
+        effects: (shield_look: Some(Progenitor)),
         lance: (charge: 3, reload: 6, damage: 1500, splash: 14, range: 800, targets: ["Land", "Naval", "Air"]),
         // Its anti-nuke: interceptors assembled one at a time, like an array's.
         strategic: (
@@ -52,6 +54,8 @@
             stock: 1,
             speed: 900,
             coverage: 1600,
+            // A shard of hard light that unmakes the warhead it meets.
+            look: Some(Progenitor),
         ),
         growth: (
             health: (percent: 15),
@@ -88,6 +92,8 @@
         // Its defences, at level 1, as every Shaper's; `growth` says what each level adds.
         economy: (energy_upkeep: 50),
         shield: (radius: 180, health: 6000, regen: 60),
+        // Panes of hard light, more courses and rings with its tier.
+        effects: (shield_look: Some(Progenitor)),
         lance: (charge: 3, reload: 6, damage: 1500, splash: 14, range: 800, targets: ["Land", "Naval", "Air"]),
         strategic: (
             kind: Interceptor,
@@ -96,6 +102,8 @@
             stock: 1,
             speed: 900,
             coverage: 1600,
+            // A shard of hard light that unmakes the warhead it meets.
+            look: Some(Progenitor),
         ),
         growth: (
             health: (percent: 15),
@@ -128,6 +136,8 @@
         // Its defences, at level 1, as every Shaper's; `growth` says what each level adds.
         economy: (energy_upkeep: 50),
         shield: (radius: 180, health: 6000, regen: 60),
+        // Panes of hard light, more courses and rings with its tier.
+        effects: (shield_look: Some(Progenitor)),
         lance: (charge: 3, reload: 6, damage: 1500, splash: 14, range: 800, targets: ["Land", "Naval", "Air"]),
         strategic: (
             kind: Interceptor,
@@ -136,6 +146,8 @@
             stock: 1,
             speed: 900,
             coverage: 1600,
+            // A shard of hard light that unmakes the warhead it meets.
+            look: Some(Progenitor),
         ),
         growth: (
             health: (percent: 15),

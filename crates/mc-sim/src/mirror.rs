@@ -565,6 +565,8 @@ pub enum SimEvent {
         killed: bool,
         /// The warhead's look when `killed` (its containment breaking), else the interceptor's.
         look: mc_data::strategic::StrategicLook,
+        /// The interceptor's own look: how the kill is dealt (presentation only).
+        by: mc_data::strategic::StrategicLook,
     },
     /// A nuclear blast: `radius` is how far it does damage; its front runs out over
     /// seconds after this. `commander`: a commander's reactor, not a warhead.
@@ -1552,7 +1554,8 @@ pub struct ShieldInstance {
     /// Hit-point share, zero to one.
     pub health: f32,
     /// `owner | team << 8 | tech << 16 | collapsing << 24 | hull << 25 | stalling << 26 |
-    /// veil << 27 | look << 28` (`SHIELD_VEIL`, `SHIELD_LOOK_SHIFT`).
+    /// veil << 27 | look << 28` (`SHIELD_VEIL`, `SHIELD_LOOK_SHIFT`). A Progenitor field
+    /// (`ShieldLook::Progenitor`) carries its Shaper's tier in place of the tech.
     /// Collapsing is a shattered dome filling while it peels — not low health.
     /// Stalling is a dry grid: the projector goes dark with the bubble.
     pub packed: u32,
@@ -1954,12 +1957,15 @@ impl World {
         f32::from(look as u8)
     }
 
-    /// How unit `row`'s shield field is drawn: its faction's look.
+    /// How unit `row`'s shield field is drawn: its own look, else its faction's.
     fn shield_look(&self, row: usize) -> mc_data::ShieldLook {
-        self.blueprints
-            .factions
-            .get(self.bp(row).faction.0 as usize)
-            .map_or(mc_data::ShieldLook::Honeycomb, |f| f.shield_look)
+        let bp = self.bp(row);
+        bp.visual.effects.shield_look.unwrap_or_else(|| {
+            self.blueprints
+                .factions
+                .get(bp.faction.0 as usize)
+                .map_or(mc_data::ShieldLook::Honeycomb, |f| f.shield_look)
+        })
     }
 
     /// Where a construction beam leaves this builder.
@@ -2909,6 +2915,15 @@ impl World {
             } else {
                 self.dome_radius_at(row, grow + 1).to_f32()
             };
+            // A Progenitor field carries its Shaper's tier where others carry their tech:
+            // its panes gather courses and layers with it (shields.wgsl `progenitor_glass`).
+            let look = self.shield_look(row);
+            let tech = match look {
+                mc_data::ShieldLook::Progenitor => {
+                    self.shaper_tier_of(s.units.id(row)).unwrap_or(1)
+                }
+                _ => self.bp(row).tech,
+            };
             frame.shields.push(ShieldInstance {
                 pos: s.units.pos[row].extend(s.units.z[row]).to_f32(),
                 radius,
@@ -2917,7 +2932,7 @@ impl World {
                 health: (s.units.shield_hp[row] / max).to_f32(),
                 packed: owner as u32
                     | (team as u32) << 8
-                    | (self.bp(row).tech as u32) << 16
+                    | (tech as u32) << 16
                     | u32::from(s.units.shield_recharge[row] > 0) << 24
                     | kind << 25
                     | u32::from(self.shield_off(row)) << 26
@@ -2926,7 +2941,7 @@ impl World {
                     } else {
                         0
                     }
-                    | (self.shield_look(row) as u32) << SHIELD_LOOK_SHIFT,
+                    | (look as u32) << SHIELD_LOOK_SHIFT,
                 unit_id: s.units.id(row).0,
                 projector: if spec.is_hull() {
                     0.0

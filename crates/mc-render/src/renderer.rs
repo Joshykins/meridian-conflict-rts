@@ -96,6 +96,7 @@ mod ore_fields;
 mod plasma_drive_fx;
 mod plasma_fx;
 mod post;
+pub(crate) mod progenitor_fx;
 mod quality;
 mod rail_fx;
 mod reactor_blast;
@@ -989,6 +990,9 @@ pub struct Renderer {
     lens_fx: lens_fx::LensFx,
     /// Surge shells' wakes: the swell and the burn it leaves (surge_fx.rs, surge_fx.wgsl).
     surge_fx: surge_fx::SurgeFx,
+    /// Survival's Progenitor in hard light: Lances, shards, warheads, replication shells
+    /// (progenitor_fx.rs, progenitor_fx.wgsl).
+    progenitor_fx: progenitor_fx::ProgenitorFx,
     pad_footprints: Image,
     hull_plans: Image,
     font: Image,
@@ -2111,6 +2115,7 @@ impl Renderer {
         let wake_shells = wake_shell::WakeShells::new(&gpu, &layouts, &passes)?;
         let lens_fx = lens_fx::LensFx::new(&gpu, &layouts, &passes)?;
         let surge_fx = surge_fx::SurgeFx::new(&gpu, &layouts, &passes)?;
+        let progenitor_fx = progenitor_fx::ProgenitorFx::new(&gpu, &layouts, &passes)?;
         let post = post::Post::new(&gpu, passes.present, layouts.screen)?;
         let shafts = shafts::Shafts::new(&gpu, &layouts, &passes)?;
 
@@ -2645,6 +2650,7 @@ impl Renderer {
             wake_shells,
             lens_fx,
             surge_fx,
+            progenitor_fx,
             pad_footprints,
             hull_plans,
             font,
@@ -3458,8 +3464,11 @@ impl Renderer {
         self.construction(frame, time, camera);
         self.nanite_site_glints(frame, time, camera.eye());
         // A blast is known before the trees it kills are looked at (`nuke_fx::tree_fate`).
+        // (The Progenitor's unmaking is not a blast of fire: `progenitor_event` draws it.)
         for event in &frame.events {
-            if matches!(event, SimEvent::NuclearDetonation { .. }) {
+            if matches!(event, SimEvent::NuclearDetonation { look, .. }
+                if *look != mc_data::strategic::StrategicLook::Progenitor)
+            {
                 self.nuke_event(event, time);
             }
         }
@@ -3467,6 +3476,8 @@ impl Renderer {
         self.city_events(frame, time, camera);
         self.trample_trees(frame, time);
         self.clear_lots(frame, time);
+        // Before the events: a Lance's strike and a shell's landing read this tick's Shapers.
+        self.progenitor_tick(frame, time);
         for event in &frame.events {
             self.effects_of(event, time);
             self.stir_clouds(event, time);
@@ -3638,6 +3649,7 @@ impl Renderer {
         self.gravitic_engine_lights();
         self.elevator_lights(time, alpha);
         self.lance_core_lights(time);
+        self.progenitor_lights(time);
         self.heavy_rail_lights(time);
         self.emp_lights(time);
         self.bolt_rifle_lights(time);
@@ -4687,6 +4699,7 @@ impl Renderer {
             && !self.arc_howitzer_event(event, time)
             && !self.storm_cloud_event(event, time)
             && !self.lens_event(event, time)
+            && !self.progenitor_event(event, time)
         {
             self.effects_of_inner(event, time);
         }
@@ -5755,6 +5768,7 @@ impl Drop for Renderer {
         self.wake_shells.destroy(&self.gpu);
         self.lens_fx.destroy(&self.gpu);
         self.surge_fx.destroy(&self.gpu);
+        self.progenitor_fx.destroy(&self.gpu);
         self.post.destroy(&self.gpu);
         self.gtao.destroy(&self.gpu);
         self.terrain_lit.destroy(&self.gpu);
@@ -6206,6 +6220,7 @@ mod shockwave_tests {
                 dust_color,
                 dust_brightness: brightness,
                 shield_projector: None,
+                shield_look: None,
             };
             renderer.push_shockwave(center.to_array(), 10.0, 112.0, 1.25, 1.0, 0.0, Vec3::ZERO);
             for (step, age) in [0.12, 0.28, 0.48, 0.72, 1.15, 2.2, 4.5]

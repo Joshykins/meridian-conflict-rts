@@ -1,6 +1,9 @@
 //! What the match says and plays about survival: the rounds, the engine's
-//! ray, and the replication nodes it raises (bonus objectives). Everything
-//! here reads the sim's survival events and status; nothing is decided here.
+//! ray, and the replication nodes it raises (bonus objectives), and the
+//! Progenitor's own sounds (data/sounds/progenitor.ron): its Lances charging
+//! and striking, its domes struck, its shells coming down and landing.
+//! Everything here reads the sim's survival events and status; nothing is
+//! decided here.
 
 use super::Game;
 use crate::audio::{Audio, Sfx};
@@ -99,8 +102,7 @@ impl Game {
                     flight_ticks / mc_core::TICKS_PER_SECOND
                 ),
                 palette::WARN,
-                // Placeholder until the shell has a sound of its own.
-                "survival_launch",
+                "progenitor_shell_fired",
             ),
             // The launch alarm is the nuke's own (`game_nuke_sounds`): a toast only.
             SimEvent::NuclearLaunch { owner, .. }
@@ -184,14 +186,16 @@ impl Game {
         }
     }
 
-    /// The ray and the print beams, as loops: (sound, gain, pan, pitch).
-    /// The ray is heard wherever the camera is; it crosses the map.
+    /// The ray and the print beams, the Lances charging and the shells coming down, as
+    /// loops: (sound, gain, pan, pitch). The ray is heard wherever the camera is; it
+    /// crosses the map.
     pub(super) fn survival_loops(&self, audio: &Audio) -> Vec<(mc_data::SoundId, f32, f32, f32)> {
         let mut out = Vec::new();
         if self.view.status.survival.is_none() {
             return out;
         }
         let (library, _) = audio.library();
+        out.extend(self.progenitor_loops(&library));
         let ray = mc_sim::survival::BEAM_REPLICATION_RAY;
         let print = mc_sim::survival::BEAM_PRINT;
         for (kind, name, floor) in [
@@ -219,5 +223,97 @@ impl Game {
             }
         }
         out
+    }
+}
+
+impl Game {
+    /// Every Lance charging in earshot as one hum, louder and leaning a little higher the
+    /// fuller the loudest is; every shell under three seconds from landing as one rush of
+    /// air, louder and lower the nearer it is.
+    fn progenitor_loops(
+        &self,
+        library: &mc_data::SoundLibrary,
+    ) -> Vec<(mc_data::SoundId, f32, f32, f32)> {
+        let mut out = Vec::new();
+        let frame = &self.view.frame;
+        if let Some(sound) = library.id_of("progenitor_lance_charge") {
+            let mut sum = (0.0f32, 0.0f32);
+            let mut fullest = (0.0f32, 0.0f32);
+            for s in frame.shapers.iter().filter(|s| s.lance_charge > 0.0) {
+                let Some(u) = frame.units.iter().find(|u| u.unit_id == s.unit) else {
+                    continue;
+                };
+                let lens = Vec3::from(u.pos) + Vec3::Z * s.lens_height();
+                let (gain, pan) = self.hear(lens);
+                let gain = gain * (0.35 + 0.65 * s.lance_charge);
+                sum = (sum.0 + gain * gain, sum.1 + gain * gain * pan);
+                if gain > fullest.0 {
+                    fullest = (gain, s.lance_charge);
+                }
+            }
+            if sum.0 > 0.0 {
+                out.push((
+                    sound,
+                    (sum.0.sqrt() * 0.8).min(0.9),
+                    sum.1 / sum.0.max(1e-9),
+                    0.92 + 0.16 * fullest.1,
+                ));
+            }
+        }
+        if let Some(sound) = library.id_of("progenitor_shell_whistle") {
+            let mut sum = (0.0f32, 0.0f32);
+            let mut nearest = 0.0f32;
+            for s in frame.shells.iter().filter(|s| s.eta < 3.0) {
+                let near = 1.0 - s.eta / 3.0;
+                let (gain, pan) = self.hear(Vec3::from(s.pos));
+                let gain = gain * (0.3 + 0.7 * near);
+                sum = (sum.0 + gain * gain, sum.1 + gain * gain * pan);
+                nearest = nearest.max(near);
+            }
+            if sum.0 > 0.0 {
+                out.push((
+                    sound,
+                    (sum.0.sqrt() * 0.8).min(0.9),
+                    sum.1 / sum.0.max(1e-9),
+                    1.15 - 0.3 * nearest,
+                ));
+            }
+        }
+        out
+    }
+
+    /// The Progenitor's strikes and landings this tick, each heard where it happens.
+    pub(super) fn progenitor_sounds(&self, audio: &Audio) {
+        if self.view.status.survival.is_none() {
+            return;
+        }
+        let (library, _) = audio.library();
+        let strike = library.id_of("progenitor_lance_strike");
+        let landed = library.id_of("progenitor_shell_landed");
+        for event in &self.view.frame.events {
+            let (sound, at, floor) = match event {
+                SimEvent::LanceStrike { to, .. } => (strike, to.to_f32(), 0.0),
+                // A squad landing is news wherever the camera is.
+                SimEvent::ReplicationShellLanded { at, .. } => (landed, at.to_f32(), 0.15),
+                _ => continue,
+            };
+            let Some(sound) = sound else { continue };
+            let (gain, pan) = self.hear(Vec3::from(at));
+            let gain = gain.max(floor);
+            if gain > 0.01 {
+                audio.play_world(sound, gain, pan, 1.0);
+            }
+        }
+    }
+
+    /// Whether a shot that struck a dome at `pos` struck a Progenitor Shaper's (its own
+    /// sound, `progenitor_shield_hit`).
+    pub(super) fn on_progenitor_dome(&self, pos: Vec3) -> bool {
+        use mc_sim::mirror::SHIELD_LOOK_SHIFT;
+        let look = mc_data::ShieldLook::Progenitor as u32;
+        self.view.frame.shields.iter().any(|s| {
+            (s.packed >> SHIELD_LOOK_SHIFT) & 3 == look
+                && pos.truncate().distance(Vec3::from(s.pos).truncate()) <= s.radius * 1.05
+        })
     }
 }

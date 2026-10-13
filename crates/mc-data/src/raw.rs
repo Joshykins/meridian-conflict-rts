@@ -216,6 +216,10 @@ pub enum ShieldLook {
     /// A veil in pinch fusion's prism: white-hot glass with pastel colour drifting over
     /// it like a curtain, on a lattice of red-tinged triangles (the Regency).
     Prism = 1,
+    /// Survival's Progenitor (a Shaper's dome, `effects: (shield_look: Some(Progenitor))`):
+    /// panes of hard light with lit seams that flash and knit again where struck, more
+    /// courses and rings round it the higher its Shaper's tier.
+    Progenitor = 2,
 }
 
 /// How a faction's missile defence (`anti_missile`) is drawn taking a missile down

@@ -10,10 +10,11 @@
 //! shader that binds the atmosphere itself and says `//!use regions`); then `shore`, `habitat`, `streets`, `desert`, `rock`, `scars`, `surface`,
 //! `metal`, `regency`, `scenery`, `warp_hull`, `warp_puffs`, `plasma_puffs` and `gravity_puffs` for their own `//!use` lines, in that order,
 //! then `emp` (an EMP stun's look on a model), `wreck` (how a wreck lies and looks) and
-//! `flight` (a winged flier's rig) and `crawl` (a many-legged walker's legs).
+//! `flight` (a winged flier's rig) and `crawl` (a many-legged walker's legs), and
+//! `progenitor_glass` (a Progenitor Shaper's dome, after shields.wgsl's own helpers).
 
 /// Files put in front of shaders, never compiled on their own.
-pub(crate) const PRELUDES: [&str; 28] = [
+pub(crate) const PRELUDES: [&str; 29] = [
     "common",
     "bindings",
     "regions",
@@ -42,6 +43,7 @@ pub(crate) const PRELUDES: [&str; 28] = [
     "flight",
     "crawl",
     "props",
+    "progenitor_glass",
 ];
 
 /// The prelude files' text.
@@ -72,6 +74,7 @@ pub(crate) struct Preludes {
     flight: String,
     crawl: String,
     props: String,
+    progenitor_glass: String,
 }
 
 impl Preludes {
@@ -112,6 +115,7 @@ impl Preludes {
             flight: read("flight"),
             crawl: read("crawl"),
             props: read("props"),
+            progenitor_glass: read("progenitor_glass"),
         }
     }
 
@@ -219,6 +223,10 @@ impl Preludes {
         // Trees' and rocks' vertex stages (entity.wgsl; needs bindings).
         if uses("props") {
             prelude = format!("{prelude}\n{}", self.props);
+        }
+        // A Progenitor Shaper's dome (shields.wgsl; uses its shield helpers).
+        if uses("progenitor_glass") {
+            prelude = format!("{prelude}\n{}", self.progenitor_glass);
         }
         let lines = prelude.lines().count() + 1;
         (format!("{prelude}\n{body}"), lines)

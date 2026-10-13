@@ -238,6 +238,10 @@ first when no record was kept.
 MERIDIAN_GROUPS=KEY,KEY,... with --screenshot: control groups 2, 3, ... hold player 0's
 units whose blueprint key contains each KEY (group 1 is the selection).
 
+MERIDIAN_PROGENITOR_LANCE=a|b|c: how a survival Shaper's Lance strikes, while the look is
+chosen: a a spear of hard light with chevrons running down it (the default), b three
+strands wound round a thin core, c a thin core run through rings flying down it.
+
 MERIDIAN_BUILD=NAME at compile time names the build in the replays it records
 (default: the package version with -dev).
 ";

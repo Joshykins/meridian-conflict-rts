@@ -393,6 +393,7 @@ impl Renderer {
             self.upload_wake_shells(input.time);
             self.lens_fx.upload(input.time, input.alpha.clamp(0.0, 1.0));
             self.surge_fx.upload();
+            self.progenitor_frame(input.time, input.alpha.clamp(0.0, 1.0), camera);
             self.lens_flares.upload(input.time, camera);
             self.upload_lights(input.time, input.alpha.clamp(0.0, 1.0), camera);
         }
@@ -1041,6 +1042,11 @@ impl Renderer {
             // Surge shells' wakes, the swell and its burn added onto the scene (surge_fx.wgsl).
             self.timers.draws(&device, cmd, "scene.surges");
             self.surge_fx.draw(&device, cmd, self.layouts.scene);
+            self.timers.end(&device, cmd);
+
+            // The Progenitor's hard light (progenitor_fx.wgsl).
+            self.timers.draws(&device, cmd, "scene.progenitor");
+            self.progenitor_fx.draw(&device, cmd, self.layouts.scene);
             self.timers.end(&device, cmd);
 
             // Gravitic lenses, bending the scene the water sees through (lens_fx.wgsl).

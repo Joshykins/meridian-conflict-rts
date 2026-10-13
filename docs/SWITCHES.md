@@ -90,6 +90,7 @@ reports and never wait on a window.
 | `MERIDIAN_SURVIVAL` | `rounds:grace:interval:intensity:fronts:tier:nodes` | The rules a `--scene survival` run plays (rounds 0 is endless; seconds; intensity in thousandths; fronts as land 1 + air 2 + naval 4; tech ceiling; nodes 0-3). |
 | `MERIDIAN_SURVIVAL_SPAWN` | defender spawn index | Which of the map's spawns the defender takes. |
 | `MERIDIAN_SURVIVAL_WHY` | `1`, or `pos` | Headless runs list where the hostiles are each minute; `pos` prints every hostile's position, motion, printing and order. |
+| `MERIDIAN_PROGENITOR_LANCE` | `a`, `b`, `c` | How a Shaper's Lance strikes, while the look is chosen (renderer/progenitor_fx.rs): `a` a spear of hard light with chevrons running down it (the default), `b` three strands wound round a thin core, `c` a thin core run through rings flying down it. |
 
 ## AI probes and tournaments
 

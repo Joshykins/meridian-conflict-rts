@@ -800,6 +800,8 @@ pub struct EffectSettings {
     /// Metres above the unit's feet where its dome's shaft is born, inside its
     /// crystal. `None`: an Aegis pad's (`SHIELD_PROJECTOR_HEIGHT`).
     pub shield_projector: Option<f32>,
+    /// How its shield field is drawn, when not its faction's (`Faction::shield_look`).
+    pub shield_look: Option<ShieldLook>,
 }
 impl Default for EffectSettings {
     fn default() -> Self {
@@ -810,6 +812,7 @@ impl Default for EffectSettings {
             dust_lifetime: 1.0,
             shockwave_color: None,
             shield_projector: None,
+            shield_look: None,
         }
     }
 }

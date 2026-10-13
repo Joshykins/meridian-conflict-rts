@@ -1,20 +1,27 @@
 //! How strategic missiles are heard (docs/NUKES.md "Sound"): a warhead's flight and fall
 //! loops, launches, detonations, interceptors. A side's own look (`nuke_look`) picks its
 //! sounds: the Regency's are `regency_` and the same name (data/factions/regency/sounds.ron),
-//! ARC's the plain names (data/sounds/nuke.ron).
+//! survival's Progenitor's `progenitor_` (data/sounds/progenitor.ron), ARC's the plain
+//! names (data/sounds/nuke.ron).
 
 use super::Game;
 use crate::audio::Audio;
 use glam::Vec3;
 use mc_data::{SoundId, SoundLibrary};
 
-/// The sound `name` in look `look` (`gpu_consts::nuke_look` numbers): the Regency's own
-/// where the library has it, else ARC's.
+/// The sound `name` in look `look` (`gpu_consts::nuke_look` numbers): the Regency's or
+/// the Progenitor's own where the library has it, else ARC's.
 fn nuke_sound(library: &SoundLibrary, name: &str, look: u32) -> Option<SoundId> {
-    if look == mc_data::strategic::StrategicLook::Plasma as u32 {
-        if let Some(id) = library.id_of(&format!("regency_{name}")) {
-            return Some(id);
-        }
+    use mc_data::strategic::StrategicLook;
+    let own = if look == StrategicLook::Plasma as u32 {
+        Some("regency")
+    } else if look == StrategicLook::Progenitor as u32 {
+        Some("progenitor")
+    } else {
+        None
+    };
+    if let Some(id) = own.and_then(|o| library.id_of(&format!("{o}_{name}"))) {
+        return Some(id);
     }
     library.id_of(name)
 }
@@ -92,7 +99,7 @@ impl Game {
         let mut small: [Vec<(f32, f32)>; 3] = Default::default();
         // Whose sounds each kind plays (`nuke_look`): the faction of the most launches, and
         // of the loudest burst and small sound of a kind, this tick.
-        let mut launch_looks = [0u32; 2];
+        let mut launch_looks = [0u32; 3];
         let mut burst_look = (0.0, 0);
         let mut small_look = [(0.0f32, 0u32); 3];
         for event in &self.view.frame.events {
@@ -116,7 +123,7 @@ impl Game {
                 }
                 SimEvent::NuclearLaunch { look, .. } => {
                     launches += 1;
-                    launch_looks[(*look as usize).min(1)] += 1;
+                    launch_looks[(*look as usize).min(2)] += 1;
                     continue;
                 }
                 SimEvent::InterceptorLaunch { from, look, .. } => {
@@ -162,7 +169,11 @@ impl Game {
                 audio.play_response(alarm, 0.8);
             }
         }
-        let launch_look = u32::from(launch_looks[1] > launch_looks[0]);
+        // The look most of this tick's launches have (the first of a tie).
+        let launch_look = (0..3u32)
+            .rev()
+            .max_by_key(|&l| launch_looks[l as usize])
+            .unwrap_or(0);
         if let Some(roar) = nuke_sound(&library, "nuke_launch", launch_look) {
             for p in salvo.roar(t, launches) {
                 audio.play_world_after(roar, p.gain, p.pan, p.pitch, p.delay);

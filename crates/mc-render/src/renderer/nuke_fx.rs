@@ -641,11 +641,17 @@ impl Renderer {
     /// through the clouds, lightning).
     pub(super) fn nuke_tick(&mut self, frame: &RenderFrame, time: f32, camera: &Camera) {
         self.settle_blasts(time);
-        self.nuke_fx.missiles.clone_from(&frame.strategic);
-        self.sea_launch_tick(&frame.strategic, time);
+        // The Progenitor's are drawn in its own hard light (`progenitor_fx`).
+        let missiles: Vec<StrategicInstance> = frame
+            .strategic
+            .iter()
+            .filter(|m| m.look != nuke_look::PROGENITOR)
+            .copied()
+            .collect();
+        self.nuke_fx.missiles.clone_from(&missiles);
+        self.sea_launch_tick(&missiles, time);
         // Trails: a ribbon puff every stretch of the path since the last one, all alike
         // from the silo to the end, so the trail reads as one line.
-        let missiles = frame.strategic.clone();
         self.nuke_fx
             .laid
             .retain(|(s, _)| missiles.iter().any(|m| m.serial == *s));

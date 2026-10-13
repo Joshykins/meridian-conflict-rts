@@ -338,6 +338,8 @@ struct SoundTable {
     /// the shared `build_beam`, `build_start`, `build_end`.
     build: Vec<[Option<mc_data::SoundId>; 3]>,
     shield_hit: Option<mc_data::SoundId>,
+    /// A Progenitor Shaper's dome's own (`Game::on_progenitor_dome`).
+    progenitor_shield_hit: Option<mc_data::SoundId>,
     shield_break: Option<mc_data::SoundId>,
     /// Missile defence's shots and kills, by look (audio/intercept.rs).
     intercept: crate::audio::intercept::Sounds,
@@ -3249,6 +3251,7 @@ impl Game {
                 })
                 .collect(),
             shield_hit: library.id_of("shield_hit"),
+            progenitor_shield_hit: library.id_of("progenitor_shield_hit"),
             shield_break: library.id_of("shield_break"),
             intercept: crate::audio::intercept::Sounds::new(&library),
             cold_eject: library.id_of("cold_eject"),
@@ -3479,7 +3482,9 @@ impl Game {
                     let w = &bps.unit(*blueprint).weapons[*weapon as usize];
                     // Shots stop on the sea's surface, so one that ends exactly there went in the water.
                     let in_water = (pos.z - water).abs() < mc_core::Fx::milli(50);
-                    let sound = if *on_shield {
+                    let sound = if *on_shield && self.on_progenitor_dome(Vec3::from(pos.to_f32())) {
+                        table.progenitor_shield_hit.or(table.shield_hit)
+                    } else if *on_shield {
                         table.shield_hit
                     } else if *on_unit {
                         ids.impact
@@ -4026,6 +4031,7 @@ impl Game {
         );
         self.stake_sounds = stakes;
         self.nuke_sounds(audio);
+        self.progenitor_sounds(audio);
         let survival: Vec<mc_sim::SimEvent> = self
             .view
             .frame

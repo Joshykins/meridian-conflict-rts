@@ -24,7 +24,8 @@
 //! gravitic engine's held energy) for `//!use gravity_puffs`; `shaders/scars.wgsl`
 //! (craters, melt and rifts in the ground) for `//!use scars`; `shaders/emp.wgsl` and
 //! `shaders/wreck.wgsl` (how a wreck lies and burns out) and `shaders/nova.wgsl` (a
-//! Regency warhead's plasma nova, after the rest) for their own. In front of
+//! Regency warhead's plasma nova, after the rest) and `shaders/progenitor_glass.wgsl`
+//! (a Progenitor Shaper's dome, for shields.wgsl) for their own. In front of
 //! all of it go the numbers the CPU shares with the shaders, generated from
 //! `mc-models/src/gpu_consts.rs`.
 //!

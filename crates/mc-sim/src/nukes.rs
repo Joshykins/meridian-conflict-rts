@@ -1114,6 +1114,7 @@ impl World {
                     owner,
                     killed: false,
                     look: own_look,
+                    by: own_look,
                 });
                 continue;
             }
@@ -1147,6 +1148,7 @@ impl World {
                         owner,
                         killed: true,
                         look,
+                        by: own_look,
                     });
                 }
             }

@@ -734,7 +734,11 @@ mod tests {
             mc_data::ShieldLook::Honeycomb as u32
         );
         assert_eq!(shield_look::PRISM, mc_data::ShieldLook::Prism as u32);
-        assert!(mc_data::ShieldLook::Prism as u32 <= shield_look::MASK);
+        assert_eq!(
+            shield_look::PROGENITOR,
+            mc_data::ShieldLook::Progenitor as u32
+        );
+        assert!(mc_data::ShieldLook::Progenitor as u32 <= shield_look::MASK);
     }
 
     #[test]

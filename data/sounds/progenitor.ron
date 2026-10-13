@@ -1,0 +1,167 @@
+// Survival's Progenitor in hard light (renderer/progenitor_fx): its Shapers' Lances,
+// domes and anti-nukes, the Seedcasters' replication shells and the Unmakers' warheads.
+// Glass and stone, not fire and metal: struck panes that stop at once, a cold resonance
+// held and let go, air drawn in before it is pushed out. The game asks for these by name
+// (game_survival.rs; game_nuke_sounds.rs plays `progenitor_` and the ARC name for a
+// Progenitor missile).
+(
+    sounds: {
+        // A Lance charging, held while a Shaper in earshot charges, louder and leaning a
+        // little higher the fuller it is (game_survival.rs): a deep cold hum with a slow
+        // beat in it, a sour fifth above, and a faint ionising hiss. Never a climbing whine.
+        "progenitor_lance_charge": (
+            length: 2.0, peak: 0.42, room: 0.4, looped: true,
+            layers: [
+                Drone(freq: 73.5, gain: 0.07, wobble: 2.5, depth: 0.3),
+                Drone(freq: 110, gain: 0.05, wobble: 3.5, depth: 0.45),
+                Drone(freq: 155.5, gain: 0.035, wobble: 4.5, depth: 0.55),
+                Drone(freq: 294, gain: 0.018, wobble: 6, depth: 0.6),
+                Drive(1.2),
+                Rumble(freq: 420, q: 1.5, gain: 1.4, wobble: 5, depth: 0.5),
+                Rumble(freq: 1400, q: 3.0, gain: 0.9, wobble: 11, depth: 0.7),
+            ],
+        ),
+        // A Lance striking, heard from its mark: a hard glassy crack and a deep blow
+        // together, a struck pane's clink that stops at once (metal, nothing left ringing),
+        // a rough drop under it, and the air rolling back in after.
+        "progenitor_lance_strike": (
+            length: 2.4, peak: 0.75, room: 0.55,
+            layers: [
+                Burst(low: 500, high: 2200, attack: 0.0003, decay: 0.012, gain: 1.4),
+                Burst(low: 60, high: 600, attack: 0.001, decay: 0.09, gain: 2.2),
+                Fm(from: 880, to: 840, glide: 0.2, ratio: 2.76, index: 1.6, fade: 0.08, attack: 0.001, decay: 0.12, gain: 0.3),
+                Fm(from: 196, to: 98, glide: 0.35, ratio: 0.5, index: 2.2, fade: 0.3, attack: 0.002, decay: 0.42, gain: 0.8),
+                Tone(from: 82, to: 33, glide: 0.4, attack: 0.002, decay: 0.5, gain: 1.2),
+                Drive(1.3),
+                Roll(at: 0.03, from: 900, to: 160, glide: 1.4, attack: 0.02, decay: 0.6, gain: 0.7, swell: 5, depth: 0.5),
+                Sweep(at: 0.05, from: 1600, to: 300, glide: 0.9, q: 1.2, attack: 0.01, decay: 0.35, gain: 0.35),
+            ],
+        ),
+        // A pane of a Shaper's dome struck: a short clink of glass and a soft knock under
+        // it, then the pane knitting again, a quiet band of noise drawn up. Short: a dome
+        // under fire plays dozens of these.
+        "progenitor_shield_hit": (
+            length: 1.4, peak: 0.5, room: 0.4,
+            layers: [
+                Burst(low: 700, high: 2000, attack: 0.0004, decay: 0.01, gain: 0.9),
+                Fm(from: 1180, to: 1150, glide: 0.1, ratio: 3.5, index: 1.0, fade: 0.05, attack: 0.001, decay: 0.07, gain: 0.22),
+                Burst(low: 90, high: 500, attack: 0.001, decay: 0.05, gain: 1.4),
+                Tone(from: 140, to: 90, glide: 0.12, attack: 0.002, decay: 0.15, gain: 0.5),
+                Sweep(at: 0.12, from: 400, to: 1300, glide: 0.7, q: 4, attack: 0.35, decay: 0.15, gain: 0.35),
+            ],
+        ),
+        // A shard of the anti-nuke lifting out of its column: a soft deep push, a glassy
+        // shimmer swelling and gone, and air drawn up after it.
+        "progenitor_interceptor_launch": (
+            length: 2.6, peak: 0.6, room: 0.5,
+            layers: [
+                Burst(low: 50, high: 400, attack: 0.004, decay: 0.12, gain: 2.0),
+                Fm(from: 98, to: 147, glide: 0.5, ratio: 0.5, index: 1.8, fade: 0.4, attack: 0.01, decay: 0.45, gain: 0.7),
+                Fm(at: 0.05, from: 587, to: 622, glide: 0.6, ratio: 1.41, index: 0.9, fade: 0.4, attack: 0.08, decay: 0.3, gain: 0.16),
+                Sweep(at: 0.02, from: 300, to: 1500, glide: 1.0, q: 1.5, attack: 0.15, decay: 0.5, gain: 0.6),
+                Drive(1.15),
+            ],
+        ),
+        // A warhead unmade by a shard: the cage closing, air drawn in and swelling; then a
+        // white crack and a deep blow, and the lines of light flung out heard as a fizz
+        // that sinks away under a rolling tail.
+        "progenitor_warhead_intercepted": (
+            length: 4.0, peak: 0.75, room: 0.8,
+            layers: [
+                Sweep(from: 1400, to: 400, glide: 0.55, q: 0.8, attack: 0.5, decay: 0.05, gain: 1.0),
+                Fm(from: 130, to: 196, glide: 0.55, ratio: 1.41, index: 1.2, fade: 0.5, attack: 0.5, decay: 0.06, gain: 0.4),
+                Burst(at: 0.55, low: 400, high: 2400, attack: 0.0004, decay: 0.015, gain: 3),
+                Burst(at: 0.55, low: 40, high: 400, attack: 0.002, decay: 0.3, gain: 6),
+                Tone(at: 0.55, from: 90, to: 36, glide: 0.6, attack: 0.003, decay: 0.8, gain: 1.6),
+                Drive(1.4),
+                Foam(at: 0.56, from: 1500, to: 450, glide: 1.6, q: 1.0, attack: 0.01, decay: 0.7, gain: 0.5, swell: 30, depth: 0.8),
+                Roll(at: 0.57, from: 700, to: 120, glide: 2.5, attack: 0.03, decay: 0.9, gain: 0.8, swell: 4, depth: 0.6),
+            ],
+        ),
+        // A Seedcaster's volley leaving, heard by every defender (the toast's sound): a
+        // deep hollow thoom, the shell's glass struck once as it goes, and air torn after
+        // it, climbing away.
+        "progenitor_shell_fired": (
+            length: 3.0, peak: 0.55, room: 0.6,
+            layers: [
+                Burst(low: 40, high: 300, attack: 0.003, decay: 0.2, gain: 4),
+                Fm(from: 73, to: 49, glide: 0.5, ratio: 0.5, index: 2.0, fade: 0.5, attack: 0.004, decay: 0.6, gain: 1.0),
+                Fm(at: 0.02, from: 466, to: 440, glide: 0.3, ratio: 2.76, index: 0.9, fade: 0.2, attack: 0.002, decay: 0.2, gain: 0.2),
+                Sweep(at: 0.05, from: 300, to: 1100, glide: 1.6, q: 1.2, attack: 0.2, decay: 0.6, gain: 0.7),
+                Drive(1.25),
+            ],
+        ),
+        // A replication shell coming down, held from three seconds out, louder and lower
+        // the nearer it is to landing (game_survival.rs): air torn by a hard body, a hiss
+        // over a low flutter. No whistling tone.
+        "progenitor_shell_whistle": (
+            length: 2.0, peak: 0.4, room: 0.3, looped: true,
+            layers: [
+                Wind(freq: 900, q: 2.5, gain: 1.5, swell: 6, depth: 0.5, sway: 0.4),
+                Wind(freq: 260, q: 1.2, gain: 1.2, swell: 3, depth: 0.6, sway: 0.3),
+                Drone(freq: 98, gain: 0.03, wobble: 4, depth: 0.5),
+            ],
+        ),
+        // A replication shell landing: glass breaking once over a deep blow, the ground
+        // knocked and rolling, and then the print column's cold hum swelling up out of it
+        // and settling as the squad is made.
+        "progenitor_shell_landed": (
+            length: 4.0, peak: 0.75, room: 0.6,
+            layers: [
+                Burst(low: 300, high: 1800, attack: 0.0004, decay: 0.015, gain: 2.0),
+                Burst(low: 35, high: 300, attack: 0.002, decay: 0.3, gain: 7),
+                Tone(from: 70, to: 32, glide: 0.5, attack: 0.003, decay: 0.7, gain: 1.6),
+                Fm(at: 0.01, from: 740, to: 700, glide: 0.2, ratio: 3.5, index: 1.2, fade: 0.08, attack: 0.001, decay: 0.15, gain: 0.25),
+                Drive(1.35),
+                Roll(at: 0.02, from: 600, to: 120, glide: 1.5, attack: 0.02, decay: 0.8, gain: 0.7, swell: 3, depth: 0.5),
+                Fm(at: 0.3, from: 110, to: 123, glide: 1.5, ratio: 1.5, index: 1.2, fade: 1.2, attack: 0.6, decay: 0.6, gain: 0.45),
+                Sweep(at: 0.4, from: 500, to: 1400, glide: 1.8, q: 3, attack: 0.7, decay: 0.5, gain: 0.35),
+            ],
+        ),
+        // An Unmaker's warhead leaving its silo: the pillar of light charging, a cold
+        // swell rising out of the ground, then a hollow slam and the air dragged up after
+        // the warhead, going away. No motor: nothing burns.
+        "progenitor_nuke_launch": (
+            length: 7.0, peak: 0.9, room: 0.9,
+            layers: [
+                Fm(from: 55, to: 82, glide: 1.4, ratio: 1.5, index: 1.6, fade: 1.2, attack: 1.2, decay: 0.3, gain: 0.8),
+                Sweep(from: 200, to: 900, glide: 1.4, q: 2, attack: 1.2, decay: 0.2, gain: 0.8),
+                Burst(at: 1.4, low: 30, high: 260, attack: 0.003, decay: 0.35, gain: 9),
+                Burst(at: 1.4, low: 300, high: 1800, attack: 0.0005, decay: 0.02, gain: 2),
+                Tone(at: 1.4, from: 72, to: 30, glide: 0.8, attack: 0.004, decay: 1.0, gain: 1.8),
+                Drive(1.4),
+                Roll(at: 1.45, from: 260, to: 900, glide: 3.5, attack: 0.3, decay: 1.6, gain: 1.0, swell: 6, depth: 0.5),
+                Sweep(at: 1.5, from: 400, to: 1600, glide: 3.5, q: 1.5, attack: 0.5, decay: 1.4, gain: 0.5),
+            ],
+        ),
+        // An Unmaker's warhead going off, heard over the whole map: the air pulled in for
+        // half a second, a white crack and a sub blow that takes seconds to let go, a cold
+        // roar of glass and air turning over itself (no fire, no crackle), then at 1.6 s
+        // the sphere falling in: a second, deeper suck and slam, and a long rolling tail.
+        "progenitor_nuke_detonation": (
+            length: 20.0, peak: 0.85, room: 1.0,
+            layers: [
+                Sweep(from: 1600, to: 300, glide: 0.45, q: 0.6, attack: 0.42, decay: 0.03, gain: 1.4, seed: 9301),
+                Tone(from: 40, to: 33, glide: 0.45, attack: 0.4, decay: 0.05, gain: 0.7),
+                Burst(at: 0.45, low: 400, high: 2600, attack: 0.0004, decay: 0.02, gain: 7),
+                Burst(at: 0.452, low: 35, high: 380, attack: 0.002, decay: 0.4, gain: 15),
+                Burst(at: 0.455, low: 28, high: 200, attack: 0.008, decay: 1.0, gain: 12),
+                Tone(at: 0.45, from: 120, to: 48, glide: 0.4, attack: 0.002, decay: 0.8, gain: 2.0),
+                Tone(at: 0.45, from: 70, to: 32, glide: 1.4, attack: 0.004, decay: 1.8, gain: 2.4),
+                Fm(at: 0.46, from: 147, to: 110, glide: 3.0, ratio: 1.41, index: 1.4, fade: 2.0, attack: 0.05, decay: 2.5, gain: 0.35),
+                Drive(1.7),
+                // The cold roar: glass and air turning over, a slow beat in it.
+                Roll(at: 0.5, from: 700, to: 200, glide: 6.0, attack: 0.3, decay: 3.5, gain: 0.9, swell: 2.5, depth: 0.6, seed: 9302),
+                Foam(at: 0.6, from: 1200, to: 400, glide: 5.0, q: 0.8, attack: 0.6, decay: 2.5, gain: 0.45, swell: 18, depth: 0.7, seed: 9303),
+                // The sphere falling in: a second suck, and a deeper slam.
+                Sweep(at: 1.6, from: 1300, to: 260, glide: 0.5, q: 0.7, attack: 0.45, decay: 0.04, gain: 1.0, seed: 9304),
+                Burst(at: 2.1, low: 26, high: 220, attack: 0.004, decay: 0.6, gain: 12),
+                Tone(at: 2.1, from: 60, to: 26, glide: 1.6, attack: 0.004, decay: 2.2, gain: 2.0),
+                // The roll going away every way, lower and further, and the ground under it.
+                Roll(at: 2.2, from: 260, to: 80, glide: 8.0, attack: 0.6, decay: 4.0, gain: 0.8, swell: 0.8, depth: 0.8, pan: -0.5),
+                Roll(at: 2.4, from: 240, to: 74, glide: 9.0, attack: 0.8, decay: 4.2, gain: 0.8, swell: 0.7, depth: 0.8, pan: 0.5),
+                Roll(at: 0.8, from: 95, to: 46, glide: 10.0, attack: 1.0, decay: 4.5, gain: 0.85, swell: 0.35, depth: 0.7),
+            ],
+        ),
+    },
+)

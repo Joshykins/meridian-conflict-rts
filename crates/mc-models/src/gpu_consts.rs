@@ -1329,7 +1329,7 @@ shared! {
         pub const FISSION: u32 = 0;
         /// The Regency's: a red plasma nova that leaves a glowing plasma cloud standing.
         pub const PLASMA: u32 = 1;
-        /// Survival's Progenitor: drawn as `FISSION` until its own look is made.
+        /// Survival's Progenitor: a cold blue-white unmaking (renderer `progenitor_fx`).
         pub const PROGENITOR: u32 = 2;
     }
 
@@ -1345,6 +1345,10 @@ shared! {
         /// The Regency's: a veil in pinch fusion's prism (`prism`) over a lattice of
         /// red-tinged triangles.
         pub const PRISM: u32 = 1;
+        /// Survival's Progenitor: panes of hard light with lit seams that flash and knit
+        /// again where struck (progenitor_glass.wgsl), more courses and layers the higher
+        /// its Shaper's tier, which it carries in place of its tech.
+        pub const PROGENITOR: u32 = 2;
         /// Metres along a side of one triangle of a dome's lattice, and of a personal
         /// field's (drawn on the hull, so much finer).
         pub const CELL: f32 = 9.0;
@@ -1596,6 +1600,72 @@ shared! {
         pub const PRINT: f32 = 8.0;
         /// Metres of rippled air left behind a running front at most.
         pub const CORRIDOR: f32 = 70.0;
+    }
+
+    /// Survival's Progenitor in hard light (renderer/progenitor_fx, progenitor_fx.wgsl): a
+    /// Shaper's Lance, its anti-nuke's shards, replication shells and the Unmaker's
+    /// warheads. Everything is built of a few pieces, each one instance of its kind's
+    /// mesh, drawn kind by kind.
+    pub mod progenitor_fx as "PROGENITOR_FX_" {
+        /// Pieces drawn at once; past it the furthest from the eye are left out.
+        pub const MAX_PIECES: u32 = 2048;
+        /// A line of hard light from `a` to `b`, turned to the eye: a beam, a seam, a trail.
+        pub const BEAM: u32 = 0;
+        /// A ring round `a` in the plane facing `b` (or laid on the ground, `DRAPE`).
+        pub const RING: u32 = 1;
+        /// An open column of `SIDES` faces standing from `a` along `b`.
+        pub const PRISM: u32 = 2;
+        /// A solid body, nose at `a`, along `b`, its back toward `c`: a shell, a warhead.
+        pub const BODY: u32 = 3;
+        /// A sphere of hard light round `a` (or its upper half, `DOME`).
+        pub const SHELL: u32 = 4;
+        pub const KINDS: u32 = 5;
+        /// A beam's quads along it (it bends nowhere; they carry its pulses).
+        pub const BEAM_STEPS: u32 = 16;
+        /// A ring's segments round it, and its bands across (inside to out).
+        pub const RING_SEGMENTS: u32 = 96;
+        pub const RING_BANDS: u32 = 6;
+        /// A column's faces round it and bands up it.
+        pub const PRISM_SIDES: u32 = 6;
+        pub const PRISM_BANDS: u32 = 8;
+        /// A body's faces round it and stations nose to tail.
+        pub const BODY_SIDES: u32 = 6;
+        pub const BODY_STATIONS: u32 = 7;
+        /// A sphere's bands pole to pole and segments round it.
+        pub const SHELL_BANDS: u32 = 14;
+        pub const SHELL_SEGMENTS: u32 = 36;
+        /// Flags (`GpuPiece::flags`). A beam: pulses run down it (a strike); it fades from
+        /// `a` back (a trail); it is a thin unmaking line; a braid of light round it.
+        pub const PULSES: u32 = 0x1;
+        pub const TRAIL: u32 = 0x2;
+        pub const LINE: u32 = 0x4;
+        pub const BRAID: u32 = 0x8;
+        /// A ring laid on the ground (`a` the middle, `b` unused): a mark that stays and
+        /// cools, a target, broken into arcs.
+        pub const DRAPE: u32 = 0x10;
+        pub const MARK: u32 = 0x20;
+        pub const TARGET: u32 = 0x40;
+        pub const ARCS: u32 = 0x80;
+        /// A column that prints (light rising in bands), or a pillar.
+        pub const PRINT: u32 = 0x100;
+        /// A body of hard light rather than alloy (an interceptor's shard, a Lens' crystal).
+        pub const LIGHT: u32 = 0x200;
+        /// A sphere's upper half.
+        pub const DOME: u32 = 0x400;
+        /// The Progenitor's light: cold blue-white, and white-hot.
+        pub const LIGHT_R: f32 = 0.56;
+        pub const LIGHT_G: f32 = 0.74;
+        pub const LIGHT_B: f32 = 1.0;
+        pub const HOT_R: f32 = 0.86;
+        pub const HOT_G: f32 = 0.94;
+        pub const HOT_B: f32 = 1.0;
+        /// Pale alloy, and the dark core under it.
+        pub const ALLOY_R: f32 = 0.74;
+        pub const ALLOY_G: f32 = 0.76;
+        pub const ALLOY_B: f32 = 0.79;
+        pub const CORE_R: f32 = 0.06;
+        pub const CORE_G: f32 = 0.07;
+        pub const CORE_B: f32 = 0.09;
     }
 
     /// A twin gun on a walker's arm that kicks on its own shots (`mc_sim::mirror::UNIT_TWIN_*`
