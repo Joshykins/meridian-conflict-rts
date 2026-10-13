@@ -10,8 +10,8 @@ use bytemuck::{Pod, Zeroable};
 use crate::descriptors::SetPool;
 use crate::gpu::{Buffer, Gpu, GpuError};
 use crate::gpu_consts::progenitor_fx::{
-    BEAM_STEPS, BODY_SIDES, BODY_STATIONS, DECK_STEPS, KINDS, MAX_PIECES, PRISM_BANDS, PRISM_SIDES,
-    RING_BANDS, RING_SEGMENTS, SHELL_BANDS, SHELL_SEGMENTS,
+    BEAM_STEPS, BODY_SIDES, BODY_STATIONS, DECK_PANES, DECK_STEPS, KINDS, MAX_PIECES, PRISM_BANDS,
+    PRISM_SIDES, RING_BANDS, RING_SEGMENTS, SHELL_BANDS, SHELL_SEGMENTS,
 };
 use crate::pipelines::{self, Blend, Depth, Layouts, Passes, PipelineDesc, VertexKind, PASS_SET};
 use crate::shader_reload::spirv;
@@ -44,7 +44,7 @@ const VERTICES: [u32; KINDS as usize] = [
     PRISM_SIDES * PRISM_BANDS * 6,
     BODY_SIDES * BODY_STATIONS * 6,
     SHELL_SEGMENTS * SHELL_BANDS * 6,
-    DECK_STEPS * 2 * 6,
+    DECK_STEPS * DECK_PANES * 6,
 ];
 
 pub(super) struct ProgenitorPass {

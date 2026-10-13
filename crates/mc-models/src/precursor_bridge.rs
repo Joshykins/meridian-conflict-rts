@@ -7,87 +7,107 @@
 //!
 //! The road itself is not modelled: it is hard light, drawn by the renderer over the
 //! map's deck (`progenitor_fx`'s deck pieces, progenitor_fx.wgsl), clear enough to see
-//! the sea through. Here is what holds it: pale alloy, a girder along each edge, a
-//! flat span with nothing over it (the user's pick A of three, 2026-10-13), and at
-//! each landing a portal of two steles marking the way on.
+//! the sea through, its sides thin rails of light. Here is what projects it: at each
+//! landing a platform of pale alloy plates on a dark core, flush with the road, a
+//! dark projector along its lip. Nothing stands over the span.
 //!
 //! Model space as for every prop: x along the heading, y left, z up, the origin on
 //! the ground (the near landing).
 
-use super::builder::MeshBuilder;
+use std::f32::consts::PI;
+
+use glam::Affine3A;
+
+use super::builder::{MeshBuilder, Section};
 use super::library::ModelDef;
-use super::precursor::{key_seam, pale, v3};
+use super::precursor::{cut_rect, dark, pale, panel, v3};
 use mc_map::landmark::HARDLIGHT_BRIDGE as PLAN;
 
-pub(super) const MODELS: &[ModelDef] =
-    &[ModelDef::new("precursor_bridge", RADIUS, STELE.1, bridge)];
+pub(super) const MODELS: &[ModelDef] = &[ModelDef::new(
+    "precursor_bridge",
+    RADIUS,
+    PLATFORM.2,
+    bridge,
+)];
 
 /// The span and half its width, as the map lays the deck.
 const SPAN: f32 = PLAN.span as f32;
 const HALF: f32 = PLAN.half as f32;
-/// The authored radius: the span's half diagonal.
-const RADIUS: f32 = 850.0;
-/// Each edge girder: its width, its top over the road and its foot under it.
-const GIRDER: (f32, f32, f32) = (PLAN.girder as f32, 5.0, 12.0);
-/// A landing's stele: its foot half size, its top, how far in from the edge.
-const STELE: (f32, f32) = (9.0, 64.0);
+/// The authored radius: the half diagonal, platforms included.
+const RADIUS: f32 = 940.0;
+/// A platform: how far inland of the deck's end it runs (inside the level landing
+/// the map raises, `rimehold/shape.rs`, at any bridge's scale), how far past the
+/// road either side, its top over the road (a step too low to see a unit sink) and
+/// its foot.
+const PLATFORM: (f32, f32, f32, f32) = (90.0, 8.0, 0.25, -30.0);
+/// A platform's plates: the dark border left round them, and the joint between.
+const PLATES: (f32, f32) = (5.0, 2.5);
+/// The projector across a platform's lip, metres inland.
+const LIP: f32 = 6.0;
 
-/// The girders along both edges, `[x0, x1]`, a working line of light along each
-/// one's inner top edge.
-fn girders(b: &mut MeshBuilder, x0: f32, x1: f32) {
-    let (w, top, foot) = GIRDER;
-    let mid = (x0 + x1) * 0.5;
+/// A platform in its own frame: the road leaves its lip at x = 0 along +x, the
+/// platform inland toward -x.
+fn platform(b: &mut MeshBuilder) {
+    let (depth, past, top, foot) = PLATFORM;
+    let half_y = HALF + past;
+    let lip = LIP;
+
+    // The slab's dark core, its corners cut, buried well below the landing.
+    dark(b);
+    let slab = cut_rect(b, (depth - lip) * 0.5, half_y, 10.0);
+    let back = -(depth + lip) * 0.5;
+    b.loft_z(
+        &slab,
+        &[
+            Section::new(foot, 1.0).shifted(back, 0.0),
+            Section::new(top, 1.0).shifted(back, 0.0),
+        ],
+    );
+    // Pale plates laid on it, a dark joint between each and round the edge, so the
+    // platform reads on snow as well as on rock.
     pale(b);
-    for side in [-1.0f32, 1.0] {
-        let y = side * (HALF - w * 0.5);
-        b.chamfered_box(
-            v3(mid, y, (top - foot) * 0.5),
-            v3(x1 - x0, w, top + foot),
-            if b.coarse() { 0.0 } else { 2.0 },
-        );
-        if b.fine() {
-            let inner = side * (HALF - w - 0.2);
-            key_seam(
+    let (rows, cols) = match b.lod() {
+        0 => (2, 6),
+        1 => (1, 3),
+        _ => (1, 2),
+    };
+    let (border, joint) = PLATES;
+    let (x0, x1) = (-depth + border, -lip - joint);
+    let (y0, y1) = (-half_y + border, half_y - border);
+    let plate_x = (x1 - x0 - joint * (rows - 1) as f32) / rows as f32;
+    let plate_y = (y1 - y0 - joint * (cols - 1) as f32) / cols as f32;
+    for r in 0..rows {
+        for c in 0..cols {
+            let px = x0 + r as f32 * (plate_x + joint);
+            let py = y0 + c as f32 * (plate_y + joint);
+            panel(
                 b,
-                v3(x0 + 4.0, inner, top - 1.2),
-                v3(x1 - 4.0, inner, top - 1.2),
-                v3(0.0, -side, 0.0),
-                1.2,
+                &[
+                    v3(px, py, top),
+                    v3(px + plate_x, py, top),
+                    v3(px + plate_x, py + plate_y, top),
+                    v3(px, py + plate_y, top),
+                ],
+                v3(0.0, 0.0, 1.0),
+                0.12,
+                0.5,
             );
         }
     }
+
+    // The projector: a dark bar across the lip, flush with the slab. The light it
+    // projects, the road's bright edge along it, is the renderer's (the deck's).
+    dark(b);
+    b.chamfered_box(
+        v3(-lip * 0.5, 0.0, (top + foot) * 0.5),
+        v3(lip, half_y * 2.0, top - foot),
+        0.0,
+    );
 }
 
-/// A landing's portal at `x`: a stele at each edge, tapering, a lens of live
-/// light near its top facing along the road.
-fn portal(b: &mut MeshBuilder, x: f32) {
-    let (half, top) = STELE;
-    for side in [-1.0f32, 1.0] {
-        let y = side * (HALF - GIRDER.0 * 0.5);
-        pale(b);
-        b.prism(
-            v3(x, y, -GIRDER.2),
-            4,
-            half * 1.41,
-            half * 0.6,
-            top + GIRDER.2,
-        );
-        if b.fine() {
-            let face = if x < SPAN * 0.5 { 1.0 } else { -1.0 };
-            key_seam(
-                b,
-                v3(x + face * half * 0.62, y, top * 0.55),
-                v3(x + face * half * 0.45, y, top * 0.85),
-                v3(face, 0.0, 0.0),
-                2.0,
-            );
-        }
-    }
-}
-
-/// The span's girders, and a portal at each landing.
+/// A platform at each landing, the far one turned back along the road.
 fn bridge(b: &mut MeshBuilder, _tech: u8) {
-    girders(b, 0.0, SPAN);
-    portal(b, 0.0);
-    portal(b, SPAN);
+    platform(b);
+    let far = Affine3A::from_translation(v3(SPAN, 0.0, 0.0)) * Affine3A::from_rotation_z(PI);
+    b.with(far, platform);
 }

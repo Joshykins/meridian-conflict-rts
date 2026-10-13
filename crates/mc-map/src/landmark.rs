@@ -102,14 +102,11 @@ pub struct PowerLine {
 pub struct BridgePlan {
     pub span: f64,
     pub half: f64,
-    /// The girder along each edge, metres across: the light runs between them.
-    pub girder: f64,
 }
 
 pub const HARDLIGHT_BRIDGE: BridgePlan = BridgePlan {
     span: 1_600.0,
     half: 280.0,
-    girder: 16.0,
 };
 
 /// The dam's lines.

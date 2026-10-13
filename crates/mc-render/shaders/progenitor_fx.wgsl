@@ -33,9 +33,9 @@
 //   height (zero: round): a lattice of lines with its triangles lit faintly.
 // - **Deck**: a bridge's road of hard light, level from `a` to `b`, `size_from` either
 //   side: a clear pane the sea shows through (clearer looked down on, glassier at a
-//   slant), faceted in triangles that wake and dim, edged with lines of light, light
-//   running along it both ways and a wave sweeping it end to end; a fainter pane
-//   `size_to` under it, its facets drifting against the top's, gives it depth.
+//   slant), bands of light flowing out across it from the platforms at both ends and a
+//   wave sweeping it end to end; a thin bright rail of light `size_to` high down each
+//   side, dashes running out along it from either end.
 //
 // A piece is lit from `start` (renderer time) for `life` seconds at `power`. Light is
 // added onto the scene (premultiplied, alpha only where a mark darkens the ground).
@@ -545,8 +545,11 @@ fn fs_shell(in: PieceOut) -> @location(0) vec4<f32> {
 
 // ---- Decks ------------------------------------------------------------------------
 
-// Metres a deck's facets run on a side, on its top pane and the one under it.
-const DECK_FACET: f32 = 34.0;
+// Metres a second the light flows out from the platforms, and metres between its
+// bands across the road and its dashes down the rails.
+const DECK_FLOW: f32 = 46.0;
+const DECK_BANDS: f32 = 150.0;
+const DECK_DASHES: f32 = 64.0;
 
 @vertex
 fn vs_deck(@builtin(vertex_index) vid: u32, @builtin(instance_index) inst: u32) -> PieceOut {
@@ -554,24 +557,35 @@ fn vs_deck(@builtin(vertex_index) vid: u32, @builtin(instance_index) inst: u32) 
     if !alive(p) {
         return hidden();
     }
-    let step_i = vid / 12u;
-    let pane = (vid / 6u) % 2u;
+    let step_i = vid / (6u * PROGENITOR_FX_DECK_PANES);
+    // The road, or the rail on its right (1) or left (2).
+    let pane = (vid / 6u) % PROGENITOR_FX_DECK_PANES;
     let corner = QUAD[vid % 6u];
     let s = f32(step_i + select(0u, 1u, corner == 1u || corner == 2u)) / f32(PROGENITOR_FX_DECK_STEPS);
-    let side = select(-1.0, 1.0, corner >= 2u);
+    let far_side = corner >= 2u;
     let run = p.b.xy - p.a.xy;
     let len = max(length(run), 1e-3);
     let dir = run / len;
     let left = vec3<f32>(-dir.y, dir.x, 0.0);
-    var at = mix(p.a, p.b, s) + left * side * p.size_from;
-    at.z -= f32(pane) * p.size_to;
+    var at = mix(p.a, p.b, s);
     var out: PieceOut;
+    if pane == 0u {
+        let side = select(-1.0, 1.0, far_side);
+        at += left * side * p.size_from;
+        // Metres along it from `a`, and across from its middle (left positive).
+        out.uv = vec2<f32>(s * len, side * p.size_from);
+        out.normal = vec3<f32>(0.0, 0.0, 1.0);
+    } else {
+        let side = select(-1.0, 1.0, pane == 2u);
+        let up = select(0.0, p.size_to, far_side);
+        at += left * side * p.size_from + vec3<f32>(0.0, 0.0, up);
+        // Metres along it from `a`, and up it.
+        out.uv = vec2<f32>(s * len, up);
+        out.normal = left * side;
+    }
     out.world = at;
     out.clip = globals.view_proj * vec4<f32>(at, 1.0);
-    // Metres along it from `a`, and across from its middle (left positive).
-    out.uv = vec2<f32>(s * len, side * p.size_from);
     out.piece = inst;
-    out.normal = vec3<f32>(0.0, 0.0, 1.0);
     // Which pane, and the deck's length.
     out.metres = vec2<f32>(f32(pane), len);
     return out;
@@ -583,75 +597,77 @@ fn deck_line(d: f32, w: f32, px: f32) -> f32 {
     return (1.0 - smoothstep(w * 0.5, w * 0.5 + soft, abs(d))) * saturate(w / soft);
 }
 
+// Where the light flowing out from the nearer platform is, `out` metres from it: the
+// distance to the nearest of its marks `every` metres apart, positive past it.
+fn deck_flow(out: f32, t: f32, every: f32) -> f32 {
+    let m = out - t * DECK_FLOW;
+    return m - every * round(m / every);
+}
+
 @fragment
 fn fs_deck(in: PieceOut) -> @location(0) vec4<f32> {
     let p = pieces[in.piece];
     let t = globals.camera.w + p.seed * 17.0;
     let along = in.uv.x;
+    let len = in.metres.y;
+    let px = pixel_m(in.world);
+    // Metres from the nearer platform, and how far toward the middle (0 at a
+    // platform, 1 at the middle): what it projects is brightest near it.
+    let out_m = min(along, len - along);
+    let reach = saturate(out_m / max(len * 0.5, 1.0));
+    // A breath through the whole of it.
+    let breath = 0.85 + 0.15 * sin(t * 0.9);
+    // The dashes running out along the rails and the road's edges.
+    let dash_d = deck_flow(out_m, t * 1.6, DECK_DASHES);
+    let dash = 1.0 - smoothstep(5.0, 5.0 + max(px, 0.5), abs(dash_d));
+
+    if in.metres.x > 0.5 {
+        // A rail: a bright line along its top and a fainter one at its foot, a faint
+        // pane between, dashes running out along it. Far off it is a line of light.
+        let h = in.uv.y;
+        let tall = max(p.size_to, 0.5);
+        let lines = deck_line(tall - h - 0.3, 0.6, px) * 3.0 + deck_line(h - 0.25, 0.5, px) * 1.2;
+        let far = smoothstep(tall * 0.2, tall * 0.8, px);
+        let shimmer = 0.75 + 0.25 * sin(along * 0.07 - t * 3.1);
+        let body = mix(lines + 0.35, 3.2, far) * shimmer;
+        let light = body + dash * 2.5;
+        let hot = lines * 1.2 + dash * 3.0 + far * 1.5;
+        let rgb = (LIGHT * light * breath + HOT * hot) * p.power;
+        return finish(rgb, 0.06 + far * 0.15, in.clip);
+    }
+
     let across = in.uv.y;
     let half = max(p.size_from, 1.0);
-    let len = in.metres.y;
-    let under = in.metres.x > 0.5;
-    let px = pixel_m(in.world);
     let eye = normalize(globals.camera.xyz - in.world);
     // Looked down on it is clear; at a slant it turns to glass.
     let slant = pow(1.0 - abs(eye.z), 3.0);
-    // Lines thinner than a pixel fade rather than flicker; far off the lattice goes.
-    let near = 1.0 - smoothstep(DECK_FACET * 0.04, DECK_FACET * 0.15, px);
 
-    // The facets: the under pane's drift the other way, a little larger.
-    let drift = select(1.0, -1.3, under) * t * 1.6;
-    let side_m = select(DECK_FACET, DECK_FACET * 1.27, under);
-    let st = vec2<f32>(along + drift, across + select(0.0, side_m * 0.5, under));
-    let tri = tri_lattice(st, side_m);
-    let seam_m = (1.0 - tri.x) / 3.0 * side_m * 0.8660254;
-    let seam = deck_line(seam_m, 0.7, px) * near;
-    // Facets wake one by one and dim again.
-    let wake = pow(0.5 + 0.5 * sin(t * 0.7 + tri.y * 6.2831855 * 3.0), 12.0);
-    let node = tri.z * near;
-
-    // Light running along the top in lanes, each way on either side of the middle:
-    // thin chevrons pointing the way they run, a short glow trailing each.
-    let lane_w = half * 0.5;
-    let lane = floor((across + half) / lane_w);
-    let lane_mid = (lane + 0.5) * lane_w - half;
-    let way = select(-1.0, 1.0, across > 0.0);
-    let lane_off = abs(across - lane_mid) / (lane_w * 0.5);
-    let spacing = 180.0 + 53.0 * fract(lane * 0.618);
-    let speed = 38.0 + 6.0 * lane;
-    let run_m = along * way - lane_off * lane_w * 0.3 - t * speed + lane * 61.0;
-    let ahead = run_m - spacing * round(run_m / spacing);
-    let in_lane = 1.0 - smoothstep(0.55, 0.8, lane_off);
-    let chevron = (deck_line(ahead, 2.0, px) + select(0.0, exp(ahead / 14.0) * 0.2, ahead < 0.0)) * in_lane;
+    // Bands of light across the road flowing out from both platforms, dimming as
+    // they near the middle, a short glow trailing each back toward its platform.
+    let band_d = deck_flow(out_m, t, DECK_BANDS);
+    let band = (deck_line(band_d, 1.5, px) + select(0.0, exp(band_d / 22.0) * 0.18, band_d < 0.0)) * (1.0 - reach * 0.7);
     // A wave sweeping it end to end every few seconds, from either end in turn.
     let period = 7.0;
     let cycle = t / period;
     let from_a = (i32(floor(cycle)) & 1) == 0;
     let front = fract(cycle) * (len + 400.0) - 200.0;
     let wave_at = select(len - front, front, from_a);
-    // Metres behind its front: a bright line, light fading out behind it.
+    // Metres behind its front: a soft line, light fading out behind it.
     let behind = (wave_at - along) * select(-1.0, 1.0, from_a);
-    let wave = select(0.0, exp(-behind / 80.0) * 0.6, behind >= 0.0) + deck_line(behind, 2.0, px) * 1.5;
+    let wave = select(0.0, exp(-behind / 90.0) * 0.4, behind >= 0.0) + deck_line(behind, 2.0, px) * 0.6;
 
-    // The edges: a line along each side and a fainter one inside it; the ends' sills.
+    // The edges, where the rails stand: a bright line their dashes run down, light
+    // spilling a little way in; the lips where the platforms project it.
     let edge_d = half - abs(across);
-    let edges = deck_line(edge_d - 1.2, 2.0, px) * 1.4 + deck_line(edge_d - 9.0, 0.8, px) * 0.6 * near;
-    let end_d = min(along, len - along);
-    let sills = deck_line(end_d - 6.0, 2.0, px) + deck_line(end_d - 16.0, 1.0, px) * 0.6;
-    // A breath through the whole of it.
-    let breath = 0.85 + 0.15 * sin(t * 0.9);
+    let edge = deck_line(edge_d - 1.0, 2.0, px) * (3.2 + dash * 3.0);
+    let spill = exp(-edge_d / 8.0) * (0.7 + dash * 0.5);
+    let lips = deck_line(out_m - 1.0, 2.0, px) * 1.4 + exp(-out_m / 18.0) * 0.3;
 
-    var light = 0.0;
-    var hot = 0.0;
-    if under {
-        light = seam * 0.12 + wave * 0.12;
-    } else {
-        light = seam * (0.16 + wake * 0.8) + wake * 0.1 + node * 0.2 + edges + sills * 1.2 + chevron * 0.9 + wave * 0.4;
-        hot = edges * 0.3 + chevron * 0.6 + wave * 0.5 + node * wake * 0.4;
-    }
+    let light = band * 0.8 + wave + edge + spill + lips;
+    let hot = edge * 0.5 + band * 0.3 + lips * 0.5 + wave * 0.3;
     // The pane itself: a faint cold fill, glassier at a slant, dimming what lies under.
-    let fill = select(0.035, 0.02, under) + slant * select(0.18, 0.06, under);
-    let a = select(0.1, 0.05, under) + slant * select(0.45, 0.15, under);
+    let fill = 0.03 + slant * 0.16;
+    let a = 0.08 + slant * 0.4;
     let rgb = (LIGHT * (light * breath + fill) + HOT * hot) * p.power;
     return finish(rgb, a, in.clip);
 }

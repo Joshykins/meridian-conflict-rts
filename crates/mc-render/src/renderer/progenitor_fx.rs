@@ -20,8 +20,9 @@
 //!   field shatters the gate. A Gatewright's fleet is printed aloft in cradles of light,
 //!   marked by a gate in the sky, and goes into and out of its warp through ring gates.
 //! - **Bridges**: every deck the map lays (`mc_map::deck`) is a road of hard light
-//!   between its bridge's girders (the model, `precursor_bridge.rs`): clear panes the
-//!   sea shows through, faceted, light running along them.
+//!   projected from its bridge's platforms (the model, `precursor_bridge.rs`): a clear
+//!   pane the sea shows through, light flowing out along it from both ends, a thin
+//!   rail of light down each side.
 //!
 //! The dome is the shield's own look (progenitor_glass.wgsl). Presentation only; the
 //! renderer's own clock.
@@ -57,9 +58,9 @@ const MOST_LAID: usize = MAX_PIECES as usize * 3 / 4;
 /// Seconds a piece drawn fresh each frame is given: it never fades in that time.
 const HELD: f32 = 1.0e5;
 /// A deck's pane of light stands this far over its walking surface (so a landing's
-/// ground, level with it, never shows through), and its second pane this far under.
+/// ground, level with it, never shows through), and its rails this high over it.
 const DECK_LIFT: f32 = 0.4;
-const DECK_UNDER: f32 = 3.5;
+const DECK_RAIL: f32 = 2.4;
 
 /// One piece of hard light being built (`GpuPiece`; progenitor_fx.wgsl says what each
 /// field is to each kind).
@@ -100,18 +101,15 @@ impl Piece {
         p
     }
 
-    /// A bridge's road of hard light over `deck`, between its girders.
+    /// A bridge's road of hard light over `deck`, railed with light.
     fn deck(deck: &mc_map::Deck, seed: f32) -> Self {
-        let plan = mc_map::landmark::HARDLIGHT_BRIDGE;
         let top = deck.top.to_f32() + DECK_LIFT;
         let end = |p: mc_core::FxVec2| {
             let [x, y] = p.to_f32();
             Vec3::new(x, y, top)
         };
-        let half = deck.half.to_f32();
-        let inner = half * (1.0 - (plan.girder / plan.half) as f32);
         Self::of(DECK, end(deck.a), end(deck.b))
-            .size(inner, DECK_UNDER)
+            .size(deck.half.to_f32(), DECK_RAIL)
             .seed(seed)
     }
 

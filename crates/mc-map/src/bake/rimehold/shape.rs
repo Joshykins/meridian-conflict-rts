@@ -123,9 +123,11 @@ const NECKS: [Neck; 1] = [(&CAUSEWAY, 620.0, 9.0)];
 const LANDING: f64 = 120.0;
 const RAMP: f64 = 0.08;
 const LANDING_SIDE: f64 = 140.0;
-/// Under the deck the ground falls away from its end at this grade, too gentle
-/// for a crag (the terrain's rock relief would stand up through the glass), and
-/// keeps at least this far under the deck.
+/// Under the deck the ground keeps level for this far past its end (so the
+/// bridge's model, set on the ground at the end, stands at the deck's height),
+/// then falls away at this grade, too gentle for a crag (the terrain's rock relief
+/// would stand up through the glass), and keeps at least this far under the deck.
+const LEVEL_UNDER: f64 = 12.0;
 const BANK: f64 = 0.35;
 const UNDER_DECK: f64 = 8.0;
 
@@ -546,9 +548,9 @@ impl Terrain {
     }
 
     /// The bridges' landings over the ground `h`: at each end a level pad at the
-    /// deck's height inland of it and a ramp down inland at [`RAMP`]; under the
-    /// deck a bank falling away at [`BANK`] and nothing nearer the glass than
-    /// [`UNDER_DECK`]; steep sides.
+    /// deck's height inland of it (cut and filled) and a ramp down inland at
+    /// [`RAMP`]; under the deck, past [`LEVEL_UNDER`], a bank falling away at
+    /// [`BANK`] and nothing nearer the glass than [`UNDER_DECK`]; steep sides.
     fn rh_landings(&self, p: (f64, f64), mut h: f64) -> f64 {
         for b in &BRIDGES {
             let (along, off) = b.frame(p);
@@ -559,15 +561,17 @@ impl Terrain {
             let len = b.length();
             if (0.0..=len).contains(&along) {
                 // Under the deck: the bank down from the nearer end.
-                let under = along.min(len - along);
+                let under = (along.min(len - along) - LEVEL_UNDER).max(0.0);
                 let shaped = h.min(DECK_TOP - UNDER_DECK).max(DECK_TOP - BANK * under);
                 h += (shaped - h) * side;
                 continue;
             }
             // Inland of the landing, metres: past the hold's end backward, past the far one forward.
             let inland = if along < 0.0 { -along } else { along - len };
+            // The pad is level, cut down where the ground stands higher, so the
+            // bridge's platform lies flush on it; the ramp beyond only builds up.
             let top = DECK_TOP - RAMP * (inland - LANDING).max(0.0);
-            if top > h {
+            if top > h || inland <= LANDING {
                 h += (top - h) * side;
             }
         }
