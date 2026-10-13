@@ -122,3 +122,21 @@ fn the_coast_is_where_the_script_wants_it() {
         "the sea south of the island is shallow"
     );
 }
+
+/// The spaceport has its terminal and hangars, the quarry its dig, the rise its
+/// guns, and the camp its fence; nothing the script needs was refused a place.
+#[test]
+fn the_set_pieces_stand() {
+    let t = &*VELA;
+    let count = |kind| t.vela.lots.iter().filter(|l| l.kind == kind).count();
+    assert_eq!(count(PropKind::ColonyPortControl), 1);
+    assert_eq!(count(PropKind::ColonyHangar), 2);
+    assert_eq!(count(PropKind::ColonyDig), 1);
+    assert!(count(PropKind::ColonyGunPit) >= 9);
+    assert!(count(PropKind::ColonyFence) >= 18);
+    assert_eq!(
+        count(PropKind::ColonyTower),
+        1,
+        "the ops tower over the square"
+    );
+}

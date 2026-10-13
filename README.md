@@ -97,6 +97,7 @@ cargo run --release -p mc-map --bin mc-bake -- --layout antarctic --size-km 12 -
 cargo run --release -p mc-map --bin mc-bake -- --layout spires --size-km 12 --seed 17 --name "Thousand Spires" -o maps/thousand_spires.mcmap
 cargo run --release -p mc-map --bin mc-bake -- --layout harvest --size-km 24 --seed 41 --name "The Last Harvest" -o maps/last_harvest.mcmap
 cargo run --release -p mc-map --bin mc-bake -- --layout rimehold --size-km 20 --seed 43 --name "Rimehold" -o maps/rimehold.mcmap
+cargo run --release -p mc-map --bin mc-bake -- --layout vela --size-km 8 --seed 5 --name "Vela" -o maps/vela.mcmap
 ```
 
 Every layout but the survival ones comes out with starting wreckage (`mc_map::wreckage`; the siege lays its own with its plan). To lay it on a map already

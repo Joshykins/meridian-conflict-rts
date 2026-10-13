@@ -175,6 +175,12 @@ impl Terrain {
         if dist(p, QUARRY.0) < QUARRY.1 + 60.0 {
             return (0.0, 0.0);
         }
+        // Cleared ground round the miners' camp, and the guns' field of fire
+        // down the rise to the bridge.
+        let ((cx, cy), chx, chy) = plan::CAMP;
+        let camp = ((x - cx).abs() - chx - 90.0).max((y - cy).abs() - chy - 90.0);
+        let rise = dist(p, shape::RISE) - 260.0;
+        let open = smoothstep(0.0, 60.0, camp.min(rise));
         let wander = 4.0
             * self
                 .forest_kind
@@ -193,7 +199,7 @@ impl Terrain {
             .max(0.8 * creek)
             * (1.0 - smoothstep(0.35, 0.6, slope));
         let palms = (1.0 - inland) + inland * 0.2;
-        (density, palms.clamp(0.0, 1.0))
+        (density * open, palms.clamp(0.0, 1.0))
     }
 
     /// Whether the plan keeps trees and rocks off this point.
