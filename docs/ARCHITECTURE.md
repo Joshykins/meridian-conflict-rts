@@ -127,6 +127,17 @@ loadout's look bits and `UnitInstance::refit_modules` the loadout being fitted, 
 shader shows, raises or fades each piece. The HUD's refit tab (`hud/refit.rs`) is drawn from
 the data alone: any unit given `refits` gets it.
 
+**Production aloft** (`mc_sim::sky_yard`, `mc_data::Builder::aloft`). A hull too big for
+any lot (the Regent) is built by a yard that raises it in the sky over itself, at the
+hull's cruise height under the yard's heading, out in the open (never `IN_FACTORY`); the
+build economy finishes it through the yard's `build_target` as for any factory, and it sets
+off as an aircraft leaving its factory does. Builders helping go to the yard
+(`work_anchor`) and their streams pour into its intakes (its `emitters` after the first);
+the yard casts one great beam (`BEAM_SKY_LIFT`) up from its first emitter. Such a hull
+condenses along its keel from the middle out (`ModelInfo::nanite_order`,
+`nanite_site.wgsl`). If its yard goes, it falls half built (`AircraftCrash::built`), its
+wreck worth what was built; nothing else can build it (a load check).
+
 ## Frame / tick decoupling
 
 The sim runs on its own job-graph thread group. At the end of a tick it publishes a compact

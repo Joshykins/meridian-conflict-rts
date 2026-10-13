@@ -292,7 +292,9 @@ struct ModelInfo {
     // 1: its orbit pieces turn by the instance's phase (`deploy`, renderer
     // gravitic_engine_fx), not the clock: a gravitic engine's machinery (`Model::gravity_core`).
     orbit_driven: u32,
-    _skin_pad2: u32,
+    // How a site of it condenses: 0 from the ground up, `NANITE_ORDER_KEEL` along its
+    // keel from the middle out (a hull raised aloft).
+    nanite_order: u32,
 }
 
 // A gun house of a model's (`mc_models::House`): where it turns, how far its recoiling

@@ -1033,30 +1033,7 @@ fn stage(
             ))
         }
         // The rest are orders to the subject itself, which is already standing on the pad.
-        Scenario::AtWork => {
-            let first = bp
-                .builder
-                .as_ref()
-                .filter(|_| bp.works_in_field())
-                .and_then(|b| b.builds.first())
-                .ok_or("This Unit Builds Nothing")?;
-            // An engineering station builds well off its own lot, to show its reach.
-            let off = if bp.is_station() {
-                FxVec2::from_ints(120, 80)
-            } else {
-                FxVec2::from_ints(36, 44)
-            };
-            Ok((
-                Vec::new(),
-                Some((
-                    subject,
-                    PendingOrder::Build {
-                        blueprint: *first,
-                        pos: pad + off,
-                    },
-                )),
-            ))
-        }
+        Scenario::AtWork => at_work::at_work(bp, pad, subject),
         // A unit with refit slots fits its first module; any other takes its next tier.
         Scenario::Refit => match blueprints.refit_set(bp.id) {
             Some(set) => set
@@ -1527,6 +1504,7 @@ pub fn step_subject(blueprints: &Blueprints, from: BlueprintId, step: i32) -> Bl
     ids[(at as i32 + step).rem_euclid(n.max(1)) as usize]
 }
 
+mod at_work;
 mod batches;
 #[cfg(test)]
 mod tests;

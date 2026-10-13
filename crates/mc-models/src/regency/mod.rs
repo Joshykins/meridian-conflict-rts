@@ -748,9 +748,9 @@ mod tests {
     #[test]
     fn the_entity_shader_reads_the_nanite_bit_the_mirror_sets() {
         // Until the shaders get generated constants, the one number is pinned here.
-        let src = include_str!("../../../mc-render/shaders/entity.wgsl");
+        let src = include_str!("../../../mc-render/shaders/nanite_site.wgsl");
         let line = format!("const UNIT_NANITE: u32 = {}u;", mc_sim::mirror::UNIT_NANITE);
-        assert!(src.contains(&line), "entity.wgsl should say {line}");
+        assert!(src.contains(&line), "nanite_site.wgsl should say {line}");
     }
 
     #[test]
@@ -784,5 +784,6 @@ mod tests {
         assert_eq!(beam::NANITE, mc_sim::reclaim::BEAM_NANITE);
         assert_eq!(beam::NANITE_SITE, mc_sim::reclaim::BEAM_NANITE_SITE);
         assert_eq!(beam::NANITE_RECLAIM, mc_sim::reclaim::BEAM_NANITE_RECLAIM);
+        assert_eq!(beam::SKY_LIFT, mc_sim::reclaim::BEAM_SKY_LIFT);
     }
 }

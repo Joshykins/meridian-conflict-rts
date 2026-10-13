@@ -1286,6 +1286,9 @@ shared! {
         /// A nanite faction's reclaim: their stream reaching out to what it takes apart,
         /// the matter riding home down its strands (`reclaim::BEAM_NANITE_RECLAIM`).
         pub const NANITE_RECLAIM: u32 = 8;
+        /// The great beam a yard casts up to the hull it raises aloft
+        /// (`reclaim::BEAM_SKY_LIFT`): a column of strands and swarm, every quad its own.
+        pub const SKY_LIFT: u32 = 9;
         /// Quads drawn per beam (renderer `work_beams`, beams.wgsl `vs_beam`). A reclaim or
         /// repair beam uses as many of them for its bits as its length asks for.
         pub const QUADS: u32 = 64;
@@ -1317,6 +1320,10 @@ shared! {
         pub const WORK_FLOW_SPEED: f32 = 6.0;
         pub const WORK_GLOW: f32 = 6.0;
         pub const WORK_BEAT: f32 = 7.0;
+        /// `ModelInfo::nanite_order`: a site of it condenses along its keel from the
+        /// middle out (a hull raised aloft, `UnitBlueprint::built_aloft`), not from the
+        /// ground up (0).
+        pub const ORDER_KEEL: u32 = 1;
     }
 
     /// Materials as a light: the HUD's Materials red-orange

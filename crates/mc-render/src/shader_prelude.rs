@@ -9,12 +9,13 @@
 //! front of those containing the line `//!use bindings` (`regions` alone for a
 //! shader that binds the atmosphere itself and says `//!use regions`); then `shore`, `habitat`, `streets`, `desert`, `rock`, `scars`, `surface`,
 //! `metal`, `regency`, `scenery`, `warp_hull`, `warp_puffs`, `plasma_puffs` and `gravity_puffs` for their own `//!use` lines, in that order,
-//! then `emp` (an EMP stun's look on a model), `wreck` (how a wreck lies and looks) and
+//! then `emp` (an EMP stun's look on a model), `wreck` (how a wreck lies and looks),
+//! `nanite_site` (how a Regency site condenses) and
 //! `flight` (a winged flier's rig) and `crawl` (a many-legged walker's legs), and
 //! `progenitor_glass` (a Progenitor Shaper's dome, after shields.wgsl's own helpers).
 
 /// Files put in front of shaders, never compiled on their own.
-pub(crate) const PRELUDES: [&str; 29] = [
+pub(crate) const PRELUDES: [&str; 30] = [
     "common",
     "bindings",
     "regions",
@@ -39,6 +40,7 @@ pub(crate) const PRELUDES: [&str; 29] = [
     "gravity_puffs",
     "emp",
     "wreck",
+    "nanite_site",
     "nova",
     "flight",
     "crawl",
@@ -70,6 +72,7 @@ pub(crate) struct Preludes {
     gravity_puffs: String,
     emp: String,
     wreck: String,
+    nanite_site: String,
     nova: String,
     flight: String,
     crawl: String,
@@ -111,6 +114,7 @@ impl Preludes {
             gravity_puffs: read("gravity_puffs"),
             emp: read("emp"),
             wreck: read("wreck"),
+            nanite_site: read("nanite_site"),
             nova: read("nova"),
             flight: read("flight"),
             crawl: read("crawl"),
@@ -207,6 +211,10 @@ impl Preludes {
         // How a wreck lies, breaks up and burns out (entity.wgsl; needs bindings).
         if uses("wreck") {
             prelude = format!("{prelude}\n{}", self.wreck);
+        }
+        // How a Regency site condenses out of its swarm (entity.wgsl; needs common).
+        if uses("nanite_site") {
+            prelude = format!("{prelude}\n{}", self.nanite_site);
         }
         // A Regency warhead's plasma nova (nuke.wgsl; uses its types and billows).
         if uses("nova") {

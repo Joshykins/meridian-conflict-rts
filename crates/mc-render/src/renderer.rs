@@ -479,7 +479,9 @@ pub(crate) struct ModelInfo {
     /// 1: its orbit pieces turn by the instance's phase (`UnitInstance::deploy`, set by
     /// renderer/gravitic_engine_fx), not the clock (`Model::gravity_core`).
     pub(crate) orbit_driven: u32,
-    pub(crate) _skin_pad2: u32,
+    /// How a site of it condenses (`gpu_consts::nanite::ORDER_KEEL` for a hull raised
+    /// aloft, `UnitBlueprint::built_aloft`; 0 from the ground up).
+    pub(crate) nanite_order: u32,
 }
 
 const _: () = assert!(std::mem::size_of::<ModelInfo>() == 1136);
@@ -1525,7 +1527,11 @@ impl Renderer {
                 skin,
                 marks: surface_marks.add(&model.marks),
                 orbit_driven: u32::from(model.gravity_core.is_some()),
-                _skin_pad2: 0,
+                nanite_order: bps
+                    .units
+                    .get(infos.len())
+                    .filter(|bp| bp.built_aloft)
+                    .map_or(0, |_| crate::gpu_consts::nanite::ORDER_KEEL),
                 slot: first_slot[at],
                 icon: *icon,
                 bounds_radius: model.bounds_radius,
