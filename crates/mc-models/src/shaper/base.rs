@@ -18,7 +18,7 @@
 
 use std::f32::consts::{PI, TAU};
 
-use glam::Affine3A;
+use glam::{Affine3A, Vec3};
 
 use super::super::builder::{MeshBuilder, Section};
 use super::super::library::ModelDef;
@@ -110,9 +110,31 @@ fn deck(b: &mut MeshBuilder, p: Pad) {
 
 /// A slab blade in a frame whose x runs out from the middle: its foot on the rim at
 /// `rim`, `foot` wide, rising `tall` and leaning `lean` in over the middle, its tip
-/// cut on a slant. Pale up to `sheath` of its height, a dark core above it where the
-/// light comes from; `t` its half thickness.
-fn blade(b: &mut MeshBuilder, rim: f32, foot: f32, tall: f32, lean: f32, t: f32, sheath: f32) {
+/// cut on a slant.
+#[derive(Clone, Copy)]
+struct Blade {
+    rim: f32,
+    foot: f32,
+    tall: f32,
+    lean: f32,
+}
+
+impl Blade {
+    /// The middle of its slanted tip, (x, z) in its frame: where its light leaves from.
+    fn tip(&self) -> (f32, f32) {
+        (self.rim - self.lean - self.foot * 0.275, self.tall * 0.92)
+    }
+}
+
+/// `bl` drawn: pale up to `sheath` of its height, a dark core above it where the light
+/// comes from; `t` its half thickness.
+fn blade(b: &mut MeshBuilder, bl: Blade, t: f32, sheath: f32) {
+    let Blade {
+        rim,
+        foot,
+        tall,
+        lean,
+    } = bl;
     let profile = [
         [rim - foot, 0.0],
         [rim, 0.0],
@@ -144,36 +166,81 @@ fn blade(b: &mut MeshBuilder, rim: f32, foot: f32, tall: f32, lean: f32, t: f32,
 /// lesser pair from its front corners, leaning in over the deck, the rear pair braced
 /// across the back by a lintel.
 fn blades(b: &mut MeshBuilder, p: Pad) {
-    let h = p.half;
-    let t = 2.4;
-    let rim = h * 1.25;
-    let corners = [
-        (PI - 0.62, 1.0f32),
-        (PI + 0.62, 1.0),
-        (0.66, 0.62),
-        (-0.66, 0.62),
-    ];
-    for (heading, size) in corners {
+    for (heading, bl) in great_blades(p) {
         b.with(Affine3A::from_rotation_z(heading), |b| {
-            blade(
-                b,
-                rim,
-                h * 0.26 * size,
-                p.tall * size,
-                h * 0.62 * size,
-                t,
-                0.58,
-            );
+            blade(b, bl, 2.4, 0.58)
         });
     }
     // The lintel across the back, between the rear blades' feet.
     pale(b);
-    let y = rim * (PI - 0.62f32).sin().abs() - h * 0.1;
+    let h = p.half;
+    let y = h * 1.25 * (PI - 0.62f32).sin().abs() - h * 0.1;
+    let top = lintel_top(p);
     b.chamfered_box(
-        v3(-h * 0.98, 0.0, p.tall * 0.09),
-        v3(h * 0.08, y * 2.0, p.tall * 0.18),
+        v3(top.x, 0.0, top.z * 0.5),
+        v3(h * 0.08, y * 2.0, top.z),
         h * 0.02,
     );
+}
+
+/// The great pad's blades: each one's heading round its middle, and its shape.
+fn great_blades(p: Pad) -> [(f32, Blade); 4] {
+    let h = p.half;
+    [
+        (PI - 0.62, 1.0f32),
+        (PI + 0.62, 1.0),
+        (0.66, 0.62),
+        (-0.66, 0.62),
+    ]
+    .map(|(heading, size)| {
+        (
+            heading,
+            Blade {
+                rim: h * 1.25,
+                foot: h * 0.26 * size,
+                tall: p.tall * size,
+                lean: h * 0.62 * size,
+            },
+        )
+    })
+}
+
+/// The middle of the top of the great pad's lintel.
+fn lintel_top(p: Pad) -> Vec3 {
+    v3(-p.half * 0.98, 0.0, p.tall * 0.18)
+}
+
+/// A projector arm: across the pad at `y`, its tip `reach` along x, its top at `z`
+/// and its depth `th`.
+#[derive(Clone, Copy)]
+struct Arm {
+    y: f32,
+    reach: f32,
+    z: f32,
+    th: f32,
+}
+
+impl Arm {
+    /// The tip of its dark underside, where its light leaves from.
+    fn emitter(&self) -> Vec3 {
+        v3(self.reach, self.y, self.z - self.th * 0.4)
+    }
+}
+
+/// How far across the pad the spine's leaves reach either side of its middle.
+fn spine_span(p: Pad) -> f32 {
+    p.half * 0.46
+}
+
+/// The platform's three arms, the middle reaching furthest.
+fn platform_arms(p: Pad) -> [Arm; 3] {
+    let h = p.half;
+    [-1.0f32, 0.0, 1.0].map(|f| Arm {
+        y: f * spine_span(p) * 0.78,
+        reach: h * (0.15 - 0.3 * f.abs()),
+        z: p.tall * (0.72 - 0.08 * f.abs()),
+        th: p.tall * 0.08,
+    })
 }
 
 /// A split spine at the pad's rear edge with projector arms reaching out over the deck
@@ -191,7 +258,7 @@ fn arms(b: &mut MeshBuilder, p: Pad) {
         [x0 + spine_w * 0.8, tall * 0.92],
         [x0, tall],
     ];
-    let span = h * 0.46;
+    let span = spine_span(p);
     // Two leaves with a slot of sky between them, as the Shaper's spine.
     let leaf = span * 0.46;
     for y in [-1.0f32, 1.0] {
@@ -199,15 +266,8 @@ fn arms(b: &mut MeshBuilder, p: Pad) {
             b.extrude_y_chamfered(&spine, leaf, spine_w * 0.15);
         });
     }
-    let n = 3;
     let t = 1.4;
-    for k in 0..n {
-        let f = k as f32 / (n - 1) as f32 * 2.0 - 1.0;
-        let y = f * span * 0.78;
-        // The middle reaches furthest.
-        let reach = h * (0.15 - 0.3 * f.abs());
-        let z = p.tall * (0.72 - 0.08 * f.abs());
-        let th = p.tall * 0.08;
+    for Arm { y, reach, z, th } in platform_arms(p) {
         b.at(v3(0.0, y, 0.0), |b| {
             dark(b);
             let under = [
@@ -243,21 +303,74 @@ fn arms(b: &mut MeshBuilder, p: Pad) {
 /// (+x) where the ships leave.
 fn fins(b: &mut MeshBuilder, p: Pad) {
     let h = p.half;
-    let n = if p.great { 12 } else { 8 };
     let t = if p.great { 1.8 } else { 1.1 };
-    let rim = h * 1.02;
-    let open = 0.55f32;
-    let span = (TAU - 2.0 * open) / n as f32;
-    for k in 0..n {
-        let a = open + span * (k as f32 + 0.5);
+    for (a, bl) in slip_fins(p) {
         b.with(Affine3A::from_rotation_z(a), |b| {
             pale(b);
-            b.chamfered_box(v3(rim - h * 0.09, 0.0, 0.7), v3(h * 0.2, t * 5.0, 1.4), t);
-            b.at(v3(0.0, 0.0, 1.4), |b| {
-                blade(b, rim, h * 0.16, p.tall * 0.55, h * 0.22, t, 0.5);
-            });
+            b.chamfered_box(
+                v3(bl.rim - h * 0.09, 0.0, 0.7),
+                v3(h * 0.2, t * 5.0, 1.4),
+                t,
+            );
+            b.at(v3(0.0, 0.0, FIN_FLOAT), |b| blade(b, bl, t, 0.5));
         });
     }
+}
+
+/// How high a fin stands on its float.
+const FIN_FLOAT: f32 = 1.4;
+
+/// A slip's fins: each one's heading round its middle, and its shape.
+fn slip_fins(p: Pad) -> Vec<(f32, Blade)> {
+    let h = p.half;
+    let n = if p.great { 12 } else { 8 };
+    let open = 0.55f32;
+    let span = (TAU - 2.0 * open) / n as f32;
+    (0..n)
+        .map(|k| {
+            (
+                open + span * (k as f32 + 0.5),
+                Blade {
+                    rim: h * 1.02,
+                    foot: h * 0.16,
+                    tall: p.tall * 0.55,
+                    lean: h * 0.22,
+                },
+            )
+        })
+        .collect()
+}
+
+/// Where a blade at `heading` round the piece's middle, standing `z` up, lets its
+/// light go, in the piece's frame.
+fn tip_at(heading: f32, bl: Blade, z: f32) -> Vec3 {
+    let (x, tz) = bl.tip();
+    let (s, c) = heading.sin_cos();
+    v3(x * c, x * s, z + tz)
+}
+
+/// Where a print platform's or slip's print beams leave from, in its own frame (x along
+/// its heading, y left, z up from its foot), by mc-sim's `Kit` order: the platform's
+/// arm tips, the great platform's blade tips and lintel, a slip's fin tips. mc-sim
+/// `survival::PAD_EMITTERS` is the sim's copy, held equal by a test here.
+pub fn pad_emitters(piece: usize) -> Vec<[f32; 3]> {
+    let points: Vec<Vec3> = match piece {
+        0 => platform_arms(PAD).iter().map(Arm::emitter).collect(),
+        1 => great_blades(GREAT)
+            .iter()
+            .map(|&(a, bl)| tip_at(a, bl, 0.0))
+            .chain([lintel_top(GREAT)])
+            .collect(),
+        2 => slip_fins(PAD)
+            .iter()
+            .map(|&(a, bl)| tip_at(a, bl, FIN_FLOAT))
+            .collect(),
+        _ => slip_fins(GREAT)
+            .iter()
+            .map(|&(a, bl)| tip_at(a, bl, FIN_FLOAT))
+            .collect(),
+    };
+    points.iter().map(|p| p.to_array()).collect()
 }
 
 /// The pier at the pad's middle (the hull the sim blocks): a battered plinth with a

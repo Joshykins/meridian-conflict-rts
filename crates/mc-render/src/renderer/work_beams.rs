@@ -6,6 +6,7 @@
 use bytemuck::{Pod, Zeroable};
 use glam::Vec3;
 use mc_sim::mirror::{RenderFrame, KIND_GHOST, KIND_PROP, KIND_WRECK};
+use mc_sim::survival::{BEAM_FROM_LENS, BEAM_PRINT};
 use std::collections::HashMap;
 
 /// Beams drawn at once, each `gpu_consts::beam::QUADS` quads.
@@ -116,7 +117,29 @@ impl WorkBeams {
         // A reclaimer with several heads lists a beam per head under the same source, in
         // the same order every tick: the n-th of them carries on the n-th of last tick's.
         let mut heads: HashMap<u32, u32> = HashMap::new();
+        // A Shaper's Lens over its foot, for the beams it casts from there
+        // (`survival::BEAM_FROM_LENS`): no higher than it is built yet.
+        let lenses: HashMap<u32, f32> = frame
+            .shapers
+            .iter()
+            .map(|s| {
+                let lens = crate::models::shaper::lens_height(s.kind, s.level);
+                (s.unit, lens.min(s.height))
+            })
+            .collect();
         for (&source, beam) in frame.beam_sources.iter().zip(&frame.beams) {
+            let lifted;
+            let beam = if beam.kind == BEAM_PRINT && source & BEAM_FROM_LENS != 0 {
+                let mut b = *beam;
+                b.from[2] += lenses
+                    .get(&(source & !BEAM_FROM_LENS))
+                    .copied()
+                    .unwrap_or(0.0);
+                lifted = b;
+                &lifted
+            } else {
+                beam
+            };
             let head = heads.entry(source).or_insert(0);
             let key = (source, *head);
             *head += 1;

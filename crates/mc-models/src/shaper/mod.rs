@@ -195,6 +195,7 @@ macro_rules! stage_set {
 
 mod auxiliary;
 mod base;
+pub use base::pad_emitters;
 mod halo;
 mod kit;
 mod printer;

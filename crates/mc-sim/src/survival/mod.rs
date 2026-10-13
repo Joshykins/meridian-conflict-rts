@@ -68,6 +68,7 @@ pub use rules::{
     FLEET_LEAD_TICKS,
 };
 use serde::{Deserialize, Serialize};
+pub use view::PAD_EMITTERS;
 pub use warp_in::WARP_REACH;
 
 /// Ticks per second.
@@ -76,6 +77,11 @@ const HZ: u32 = 10;
 pub const BEAM_REPLICATION_RAY: u32 = 4;
 /// `BeamInstance::kind` of a print beam building a unit up.
 pub const BEAM_PRINT: u32 = 5;
+/// A print beam whose source (`RenderFrame::beam_sources`) is a Shaper's unit id with
+/// this bit leaves from that Shaper's Lens: the sim puts its emitter at the Shaper's
+/// foot, and the renderer lifts it to the Lens, where the Shaper's mesh carries it
+/// (mc-models `shaper::lens_height`). A Shaper raising a piece of its base casts it.
+pub const BEAM_FROM_LENS: u32 = 1 << 29;
 /// How long the ray takes to raise a node.
 const RAISE_TICKS: u32 = 20 * HZ;
 /// The engine stops printing while it has this many units in the field, so a

@@ -1,10 +1,60 @@
 //! What survival shows: the ray and the print beams for the renderer, and
 //! the status the HUD reads. Presentation only: nothing here writes back.
 
-use super::{Phase, Spot, SurvivalStatus, BEAM_PRINT, BEAM_REPLICATION_RAY, RAISE_TICKS};
+use super::{
+    Phase, Spot, SurvivalStatus, BEAM_FROM_LENS, BEAM_PRINT, BEAM_REPLICATION_RAY, RAISE_TICKS,
+};
 use crate::mirror::NodeStatus;
 use crate::reclaim::BeamInstance;
 use mc_core::{Angle, FxVec2};
+
+/// Where a print platform's or slip's print beams leave from, in its own frame (x along
+/// its heading, y left, z up from its foot), in `Kit` order: the platform's projector arm
+/// tips, the great platform's blade tips and lintel, a slip's fin tips, a great slip's.
+/// The meshes carry them there (mc-models `shaper::pad_emitters`, whose test holds the
+/// two equal).
+#[expect(
+    clippy::disallowed_types,
+    reason = "presentation: the print beams' emitters"
+)]
+pub const PAD_EMITTERS: [&[[f32; 3]]; 4] = [
+    &[
+        [-6.90, -16.50, 15.81],
+        [6.90, 0.00, 17.89],
+        [-6.90, 16.50, 15.81],
+    ],
+    &[
+        [-42.73, 30.50, 40.48],
+        [-42.73, -30.50, 40.48],
+        [60.99, 47.33, 25.10],
+        [60.99, -47.33, 25.10],
+        [-92.12, 0.00, 7.92],
+    ],
+    &[
+        [22.32, 26.67, 14.56],
+        [1.70, 34.73, 14.56],
+        [-19.61, 28.72, 14.56],
+        [-32.97, 11.07, 14.56],
+        [-32.97, -11.07, 14.56],
+        [-19.61, -28.72, 14.56],
+        [1.70, -34.73, 14.56],
+        [22.32, -26.67, 14.56],
+    ],
+    &[
+        [51.22, 49.26, 23.66],
+        [25.89, 66.18, 23.66],
+        [-4.19, 70.94, 23.66],
+        [-33.51, 62.67, 23.66],
+        [-56.66, 42.89, 23.66],
+        [-69.41, 15.23, 23.66],
+        [-69.41, -15.23, 23.66],
+        [-56.66, -42.89, 23.66],
+        [-33.51, -62.67, 23.66],
+        [-4.19, -70.94, 23.66],
+        [25.89, -66.18, 23.66],
+        [51.22, -49.26, 23.66],
+    ],
+];
 
 impl crate::World {
     /// The ray and the print beams, for the renderer. The ray is always
@@ -48,12 +98,15 @@ impl crate::World {
                 height: t,
             });
         }
-        // Each Shaper's beam on the piece of its base it is printing.
+        // Each Shaper's beam from its Lens on the piece of its base it is printing (the
+        // renderer lifts it from the Shaper's foot to its Lens: `BEAM_FROM_LENS`).
         for n in &s.nodes {
+            let Some(shaper) = st.units.row(n.unit) else {
+                continue;
+            };
+            let from = st.units.pos[shaper].extend(st.units.z[shaper]);
             for piece in n.pieces.iter().filter(|p| !p.raised) {
-                let (Some(row), Some(from)) =
-                    (st.units.row(piece.unit), self.shaper_emitter(n.unit))
-                else {
+                let Some(row) = st.units.row(piece.unit) else {
                     continue;
                 };
                 let at = st.units.pos[row];
@@ -61,7 +114,7 @@ impl crate::World {
                     continue;
                 }
                 let bp = self.bp(row);
-                sources.push(piece.unit.0 | 1 << 31);
+                sources.push(n.unit.0 | BEAM_FROM_LENS);
                 out.push(BeamInstance {
                     from: from.to_f32(),
                     kind: BEAM_PRINT,
@@ -78,11 +131,43 @@ impl crate::World {
             };
             let at = st.units.pos[row];
             let from = match p.spot {
-                Spot::Pad(_) => {
-                    let Some(from) = self.shaper_emitter(p.source) else {
+                // A platform's or slip's beams leave from its emitters, a beam from each.
+                Spot::Pad(pad) => {
+                    let Some(pad_row) = st.units.row(pad) else {
                         continue;
                     };
-                    from
+                    let bp = self.bp(row);
+                    let to = at.extend(st.units.z[row]).to_f32();
+                    let to_prev = st.units.prev_pos[row].extend(st.units.prev_z[row]).to_f32();
+                    let [x, y] = st.units.pos[pad_row].to_f32();
+                    let z = st.units.z[pad_row].to_f32();
+                    let (sin, cos) = st.units.heading[pad_row].to_radians_f32().sin_cos();
+                    let id = st.units.blueprint[pad_row];
+                    let kit = &s.kit;
+                    let piece = [kit.platform[0], kit.platform[1], kit.slip[0], kit.slip[1]]
+                        .iter()
+                        .position(|&b| b == id)
+                        .unwrap_or(0);
+                    let pad_seen = seen(st.units.pos[pad_row]);
+                    if !seen(at) && !pad_seen {
+                        continue;
+                    }
+                    for e in PAD_EMITTERS[piece] {
+                        sources.push(p.unit.0 | 1 << 31);
+                        out.push(BeamInstance {
+                            from: [
+                                x + e[0] * cos - e[1] * sin,
+                                y + e[0] * sin + e[1] * cos,
+                                z + e[2],
+                            ],
+                            kind: BEAM_PRINT,
+                            to_prev,
+                            radius: bp.radius.to_f32(),
+                            to,
+                            height: bp.height.to_f32(),
+                        });
+                    }
+                    continue;
                 }
                 Spot::Bay(b) => {
                     let Some(bay) = s.config.bays.get(b as usize) else {
@@ -139,7 +224,7 @@ impl crate::World {
         }
     }
 
-    /// Where a Shaper's print beams leave from: half way up it as it stands built.
+    /// Where a Gatewright's fleet print beams leave from: half way up it as it stands built.
     fn shaper_emitter(&self, shaper: crate::UnitId) -> Option<mc_core::FxVec3> {
         let s = self.state.survival.as_ref()?;
         let row = self.state.units.row(shaper)?;

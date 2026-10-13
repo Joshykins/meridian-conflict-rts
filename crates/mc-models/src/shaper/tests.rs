@@ -72,3 +72,17 @@ fn every_stage_hangs_a_blade_and_clamp_in_each_halo_slot() {
         }
     }
 }
+
+#[test]
+fn the_sims_print_beams_leave_from_the_pieces_emitters() {
+    for (k, sim) in mc_sim::survival::PAD_EMITTERS.iter().enumerate() {
+        let model = pad_emitters(k);
+        assert_eq!(model.len(), sim.len(), "piece {k}");
+        for (m, s) in model.iter().zip(sim.iter()) {
+            assert!(
+                m.iter().zip(s).all(|(a, b)| (a - b).abs() < 0.05),
+                "piece {k}: the model's {m:?} against the sim's {s:?}"
+            );
+        }
+    }
+}
