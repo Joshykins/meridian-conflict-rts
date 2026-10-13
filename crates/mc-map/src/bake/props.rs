@@ -38,7 +38,7 @@ impl Terrain {
                     self.siege_forest(x, y) * (1.0 - smoothstep(0.3, 0.5, slope)),
                     0.0,
                 ),
-                Layout::Vela => (self.vela_forest(x, y, slope), 0.25),
+                Layout::Vela => self.vela_forest(x, y, height, slope),
                 _ => self.basin_forest(x, y, height, slope),
             }
         };
@@ -160,8 +160,8 @@ impl Terrain {
     }
 
     pub(super) fn tree_kind(&self, x: f64, y: f64, conifer: f64, hash: u64) -> PropKind {
-        // The archipelago's `conifer` share is its palms.
-        if self.layout == Layout::Archipelago {
+        // The archipelago's and Vela's `conifer` share is their palms.
+        if matches!(self.layout, Layout::Archipelago | Layout::Vela) {
             return self.archipelago_tree(conifer, hash);
         }
         // The canyon's `conifer` slot carries the ground's height.

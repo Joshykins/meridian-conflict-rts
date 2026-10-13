@@ -41,9 +41,9 @@ pub(super) const BRIDGE_HALF_SPAN: f64 = crate::city::COLONY_BRIDGE_M as f64 / 2
 pub(super) const DECK_TOP: f64 = 9.0;
 
 /// The starts: the beach landing zone, then the spaceport's apron.
-pub(super) const BEACH_START: P = (1_260.0, 6_050.0);
-pub(super) const PORT_START: P = (7_180.0, 4_560.0);
-const START_CORE: f64 = 80.0;
+pub(super) const BEACH_START: P = (1_320.0, 5_940.0);
+pub(super) const PORT_START: P = (6_930.0, 4_560.0);
+const START_CORE: f64 = 60.0;
 
 /// What the Vela layout works out at set-up: its plan, as Halcyon's.
 #[derive(Default)]
@@ -152,35 +152,48 @@ impl Terrain {
         }
     }
 
-    /// How thickly trees grow: woods on the hills and along the river, copses
-    /// in the farmland; never on the plan's ground, the beach or in the town.
-    pub(super) fn vela_forest(&self, x: f64, y: f64, slope: f64) -> f64 {
+    /// How thickly trees grow, and how much of it is palm: palms along the
+    /// top of the beaches, jungle inland and on the hills, mangrove-thick
+    /// along the creek; never on the plan's ground or in the town.
+    pub(super) fn vela_forest(&self, x: f64, y: f64, height: f64, slope: f64) -> (f64, f64) {
         let p = (x, y);
-        if !self.vela_clear(x, y) || self.vela_area(p).is_some() {
-            return 0.0;
+        if !self.vela_clear(x, y) || self.vela_area(p).is_some() || self.vl_farmed(p) {
+            return (0.0, 0.0);
         }
+        // The town: palms here and there between the plots.
         let ((tx, ty), rx, ry) = shape::TOWN;
-        if ((x - tx) / (rx + 150.0)).hypot((y - ty) / (ry + 150.0)) < 1.0 {
-            return 0.0;
+        if ((x - tx) / (rx + 120.0)).hypot((y - ty) / (ry + 120.0)) < 1.0 {
+            return (0.12, 1.0);
         }
-        if shape::beachness(p) > 0.2 && self.vl_inland(p) < 450.0 {
-            return 0.0;
+        if shape::beachness(p) > 0.2 && self.vl_inland(p) < 380.0 {
+            return (0.0, 0.0);
         }
         let ((px, py), hx, hy) = PLATEAU;
-        if (x - px).abs() < hx + 120.0 && (y - py).abs() < hy + 120.0 {
-            return 0.0;
+        if (x - px).abs() < hx + 100.0 && (y - py).abs() < hy + 100.0 {
+            return (0.0, 0.0);
         }
         if dist(p, QUARRY.0) < QUARRY.1 + 60.0 {
-            return 0.0;
+            return (0.0, 0.0);
         }
-        if self.vl_farmed(p) {
-            return 0.0;
-        }
-        let wood = self.forest.fbm(x / 900.0, y / 900.0, 4, 0.5);
-        let hills = smoothstep(5_000.0, 2_600.0, y);
-        let river = 1.0 - smoothstep(60.0, 220.0, shape::river_distance(p));
-        let k = smoothstep(0.05 - 0.3 * hills, 0.35 - 0.25 * hills, wood).max(0.7 * river);
-        k * (1.0 - smoothstep(0.35, 0.6, slope))
+        let wander = 4.0
+            * self
+                .forest_kind
+                .fbm(x / 260.0 + 7.3, y / 260.0 - 3.1, 3, 0.5);
+        let h = height + wander;
+        let strand = smoothstep(1.6, 2.6, height) * (1.0 - smoothstep(8.0, 14.0, h));
+        let inland = smoothstep(5.0, 13.0, h);
+        let jungle = smoothstep(-0.15, 0.25, self.forest.fbm(x / 900.0, y / 900.0, 3, 0.5));
+        let clearing = smoothstep(
+            0.35,
+            0.6,
+            self.forest.fbm(x / 90.0 - 33.7, y / 90.0 + 57.2, 2, 0.5),
+        );
+        let creek = 1.0 - smoothstep(40.0, 160.0, shape::river_distance(p));
+        let density = (strand * 0.45 + inland * (0.4 + 0.6 * jungle) * (1.0 - 0.7 * clearing))
+            .max(0.8 * creek)
+            * (1.0 - smoothstep(0.35, 0.6, slope));
+        let palms = (1.0 - inland) + inland * 0.2;
+        (density, palms.clamp(0.0, 1.0))
     }
 
     /// Whether the plan keeps trees and rocks off this point.

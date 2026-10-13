@@ -1,4 +1,4 @@
-use super::shape::{in_harbour, HARBOUR, ISLANDS};
+use super::shape::{in_harbour, ATOLL, HARBOUR, ISLANDS};
 use super::*;
 use crate::bake::test_maps::VELA;
 
@@ -110,4 +110,15 @@ fn the_coast_is_where_the_script_wants_it() {
         );
     }
     assert!(t.height(BEACH_START.0, BEACH_START.1) > 1.0);
+    // The atoll's lagoon is shallow water, and the sea off the island deep.
+    let (c, _, _) = ATOLL;
+    let lagoon = t.height(c.0, c.1);
+    assert!(
+        (-7.0..-1.0).contains(&lagoon),
+        "the lagoon is {lagoon:.1} m"
+    );
+    assert!(
+        t.height(4_000.0, 120.0) < -20.0,
+        "the sea south of the island is shallow"
+    );
 }

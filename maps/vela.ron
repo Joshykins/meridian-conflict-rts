@@ -1,12 +1,14 @@
-// Vela: the campaign's first mission, The Contract, on the ocean colony. A
-// coast road from the beach where the Company lands, over the bridge and past
-// the miners' camp, into Port Calder; its spaceport on the plateau behind the
-// town and the quarry beside it. Farms, woods and fishing islands round them.
-// A grey sea morning, wet and windy.
+// Vela: the campaign's first mission, The Contract, on the ocean colony: one
+// island in a warm sea. A coast road from the beach where the Company lands,
+// over the creek and past the miners' camp, into Port Calder on its harbour;
+// the spaceport on the plateau behind the town and the quarry beside it.
+// Palms on the strand, jungle on the hills, an atoll out to the north. A
+// bright, breezy morning: white sand, turquoise shallows, deep blue beyond.
 (
-    biome: Coastal,
+    biome: Tropical,
     style: Duel,
-    weather: Cloudy,
-    tweaks: (rain: 0.2, wind: 11),
+    weather: Fair,
+    tweaks: (rain: 0.0, wind: 14),
     time: Morning,
+    climate: Tropical,
 )

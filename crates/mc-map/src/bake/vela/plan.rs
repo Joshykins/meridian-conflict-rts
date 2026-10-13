@@ -46,9 +46,8 @@ const SOUTH_WEST: &[P] = &[
     (2_330.0, 4_900.0),
     (2_280.0, 4_000.0),
     (2_450.0, 3_000.0),
-    (2_700.0, 2_000.0),
-    (2_850.0, 1_000.0),
-    (2_900.0, 40.0),
+    (2_700.0, 2_100.0),
+    (2_760.0, 1_700.0),
 ];
 /// The town's road south, through the eastern farms.
 const SOUTH_EAST: &[P] = &[
@@ -57,22 +56,21 @@ const SOUTH_EAST: &[P] = &[
     (5_200.0, 4_000.0),
     (4_900.0, 3_000.0),
     (4_700.0, 2_000.0),
-    (4_650.0, 1_000.0),
-    (4_700.0, 40.0),
+    (4_720.0, 1_500.0),
 ];
-/// The harbour road: out of the town's south-east corner and up to the apron.
+/// The harbour road: out of the town's south-east and up to the apron.
 const HARBOUR_ROAD: &[P] = &[
     (5_760.0, 5_900.0),
     (5_930.0, 5_820.0),
     (6_175.0, 5_650.0),
-    (6_380.0, 5_330.0),
-    (6_600.0, 5_150.0),
-    (6_680.0, 5_090.0),
+    (6_330.0, 5_400.0),
+    (6_430.0, 5_200.0),
+    (6_460.0, 5_110.0),
 ];
-/// The way from the apron down to the quarry's rim.
+/// The way from the apron down to the quarry's rim and into it.
 const QUARRY_ROAD: &[P] = &[
-    (7_320.0, 4_200.0),
-    (7_320.0, 3_960.0),
+    (7_000.0, 4_310.0),
+    (7_000.0, 3_900.0),
     QUARRY_RAMP.0,
     QUARRY_RAMP.1,
 ];
@@ -177,27 +175,25 @@ const CHECKPOINTS: [P; 4] = [
 ];
 
 /// Farmsteads: by the roads through the farms, the side of the road they stand.
-const FARMSTEADS: [(P, f64); 10] = [
+const FARMSTEADS: [(P, f64); 8] = [
     ((2_330.0, 4_600.0), 1.0),
     ((2_290.0, 3_700.0), -1.0),
     ((2_420.0, 3_100.0), 1.0),
     ((2_600.0, 2_350.0), -1.0),
-    ((2_820.0, 1_400.0), 1.0),
     ((5_420.0, 4_600.0), -1.0),
     ((5_300.0, 4_200.0), 1.0),
     ((5_030.0, 3_400.0), -1.0),
     ((4_780.0, 2_500.0), 1.0),
-    ((4_660.0, 1_500.0), -1.0),
 ];
 
 /// Wind turbines on the southern hills.
 const TURBINES: [P; 6] = [
-    (1_500.0, 2_300.0),
-    (1_760.0, 2_050.0),
-    (2_000.0, 1_800.0),
-    (6_100.0, 1_900.0),
-    (6_420.0, 2_150.0),
-    (6_760.0, 1_750.0),
+    (2_900.0, 2_700.0),
+    (3_150.0, 2_450.0),
+    (4_200.0, 2_200.0),
+    (5_700.0, 2_300.0),
+    (6_000.0, 2_050.0),
+    (6_300.0, 2_550.0),
 ];
 
 struct Planner {
@@ -266,8 +262,8 @@ impl Terrain {
     /// the river, off the hills' woods, the river's banks, the town, the
     /// spaceport and the quarry.
     pub(super) fn vl_farmed(&self, p: P) -> bool {
-        let west = p.0 > 1_150.0 && p.0 < 3_150.0 && p.1 > 1_100.0 && p.1 < 5_300.0;
-        let east = p.0 > 3_850.0 && p.0 < 6_300.0 && p.1 > 800.0 && p.1 < 4_950.0;
+        let west = p.0 > 1_700.0 && p.0 < 3_100.0 && p.1 > 2_600.0 && p.1 < 5_200.0;
+        let east = p.0 > 3_900.0 && p.0 < 6_000.0 && p.1 > 2_300.0 && p.1 < 4_900.0;
         if !(west || east) || river_distance(p) < 180.0 {
             return false;
         }
@@ -283,7 +279,7 @@ impl Terrain {
             return false;
         }
         // Woods break the farms up.
-        self.forest.fbm(p.0 / 900.0, p.1 / 900.0, 4, 0.5) < 0.12
+        self.vl_inland(p) > 400.0 && self.forest.fbm(p.0 / 900.0, p.1 / 900.0, 4, 0.5) < 0.0
     }
 }
 
@@ -684,7 +680,7 @@ impl Planner {
     fn spaceport(&mut self) {
         // The apron, the Bastion's berth its east half; the terminal north of
         // it facing the town, hangars along its west side, stores south.
-        let (ax, ay, hx, hy) = (7_060.0, 4_620.0, 430.0, 300.0);
+        let (ax, ay, hx, hy) = (6_810.0, 4_620.0, 430.0, 300.0);
         self.area(square((ax, ay), hx, hy), Ground::Apron);
         let put = |plan: &mut Planner, kind, c: P, heading: f64| {
             plan.place(kind, origin_for(kind, c, heading, 1.0), heading);
@@ -703,7 +699,7 @@ impl Planner {
                 -FRAC_PI_2,
             );
         }
-        for x in [ax - 160.0, ax + 200.0] {
+        for x in [ax - 200.0, ax + 60.0] {
             put(self, PropKind::ColonyDepot, (x, ay - hy - 55.0), PI);
         }
         // Shuttle pads in the apron's west half.
@@ -852,18 +848,19 @@ impl Planner {
         }
     }
 
-    /// A fishing hamlet on the big island, a mast on the far one.
+    /// A fishing hamlet on the big cay, a mast on the next, a turbine on the
+    /// last.
     fn islands(&mut self) {
-        let (c, r, _) = ISLANDS[1];
-        self.dress(PropKind::ColonyPad, (c.0 + 60.0, c.1 - 40.0), 0.0, 1.0);
+        let (c, r, _) = ISLANDS[0];
+        self.dress(PropKind::ColonyPad, (c.0 + 50.0, c.1 - 30.0), 0.0, 1.0);
         for k in 0..6 {
             let a = k as f64 / 6.0 * std::f64::consts::TAU + 0.4;
             let at = (c.0 + 0.55 * r * a.cos(), c.1 + 0.55 * r * a.sin());
             self.try_place(PropKind::ColonyHab, at, a - FRAC_PI_2);
         }
-        let (c, _, _) = ISLANDS[3];
+        let (c, _, _) = ISLANDS[1];
         self.dress(PropKind::CityMast, c, 0.0, 0.6);
-        let (c, _, _) = ISLANDS[0];
+        let (c, _, _) = ISLANDS[2];
         self.dress(PropKind::CityWindTurbine, c, 0.0, 1.0);
     }
 
