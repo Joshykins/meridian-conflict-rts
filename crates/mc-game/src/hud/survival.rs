@@ -171,7 +171,8 @@ pub fn draw(
     let t = ui.time;
 
     // One row per site: its Shaper, in the order they rose, then the sites
-    // standing empty until the ray reseeds them.
+    // standing empty until the ray reseeds them, then the sites kept for a kind whose
+    // round or tier has not come.
     let sites: Vec<Site> = status
         .nodes
         .iter()
@@ -182,8 +183,10 @@ pub fn draw(
                 .iter()
                 .map(|&(site, round)| Site::Empty { site, round }),
         )
+        .chain(status.dormant.iter().map(Site::Dormant))
         .collect();
-    let show_shapers = !status.nodes.is_empty() || status.nodes_destroyed > 0;
+    let show_shapers =
+        !status.nodes.is_empty() || status.nodes_destroyed > 0 || !status.dormant.is_empty();
     let fixed = HEAD_H + FORECAST_H + if show_shapers { 30.0 } else { 0.0 } + PAD;
     let room = ((bottom - top - fixed) / (ROW_H + ROW_GAP))
         .floor()
@@ -525,6 +528,8 @@ enum Site<'a> {
         site: u8,
         round: u16,
     },
+    /// Kept for one auxiliary kind whose round or tier has not come.
+    Dormant(&'a mc_sim::survival::Dormant),
 }
 
 /// What a site kind's Shaper does, short.
@@ -560,6 +565,14 @@ fn site_line(site: &Site, catch_up: u16) -> String {
             line
         }
         Site::Empty { round, .. } => format!("Empty  \u{b7}  reseeds round {round}"),
+        Site::Dormant(d) => {
+            let kind = kind_word(d.kind);
+            match (d.round, d.tier) {
+                (None, t) => format!("Dormant  \u{b7}  {kind}  \u{b7}  no T{t} this match"),
+                (Some(r), 0) => format!("Dormant until round {r}  \u{b7}  {kind}"),
+                (Some(r), t) => format!("Dormant until T{t}  \u{b7}  {kind}  \u{b7}  round {r}"),
+            }
+        }
     }
 }
 
@@ -570,6 +583,7 @@ fn site_row(hud: &mut Hud, ui: &mut Ui, s: &Scene, site: &Site, catch_up: u16, t
     let (index, node) = match site {
         Site::Standing(n) => (n.site, Some(*n)),
         Site::Empty { site, .. } => (*site, None),
+        Site::Dormant(d) => (d.site, None),
     };
     let tile = hud.tile(ui, id("survival-site", index as usize), tr, false, true);
     let raising = node.is_some_and(|n| n.raised < 1.0);
@@ -797,6 +811,16 @@ mod tests {
         assert_eq!(
             site_line(&Site::Empty { site: 1, round: 9 }, 6),
             "Empty  \u{b7}  reseeds round 9"
+        );
+        let waiting = mc_sim::survival::Dormant {
+            site: 2,
+            kind: SiteKind::Fleet,
+            round: Some(11),
+            tier: 3,
+        };
+        assert_eq!(
+            site_line(&Site::Dormant(&waiting), 6),
+            "Dormant until T3  \u{b7}  Fleet  \u{b7}  round 11"
         );
     }
 }

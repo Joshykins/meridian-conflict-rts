@@ -66,6 +66,9 @@ enum Kind {
     /// Raises an auxiliary Shaper (whichever kind the sim picks): hidden behind
     /// the printers.
     Auxiliary,
+    /// Kept for the Gatewright, whose fleets come by air: always raises one once its
+    /// tier comes.
+    Fleet,
 }
 
 /// Where a site's Shaper stands: on dry ground, or on an islet or shore pad
@@ -332,7 +335,7 @@ const SITES: &[Site] = &[
     Site {
         name: "Far Atoll",
         at: (1_250.0, 10_000.0),
-        kind: Kind::Auxiliary,
+        kind: Kind::Fleet,
         ground: Ground::Land,
         level: 18.0,
         way: &[(650.0, 10_050.0), (330.0, 10_080.0)],
@@ -719,6 +722,7 @@ fn site_line(s: &Site, way: &[(f64, f64)]) -> String {
     let kind = match s.kind {
         Kind::Printer => "Printer",
         Kind::Auxiliary => "Auxiliary",
+        Kind::Fleet => "Fleet",
     };
     let domain = match s.ground {
         Ground::Land => "Land",

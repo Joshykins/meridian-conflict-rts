@@ -325,6 +325,19 @@ pub struct Survival {
     incoming_heavy: Vec<(BlueprintId, u16)>,
 }
 
+/// A site kept for one auxiliary kind, waiting for that kind's round or tier
+/// (`SurvivalStatus::dormant`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Dormant {
+    pub site: u8,
+    pub kind: SiteKind,
+    /// The first round its Shaper may rise in; None when this match never reaches it.
+    pub round: Option<u16>,
+    /// The tech it waits for (a Gatewright's cheapest warship's); 0 when it waits for its
+    /// round alone.
+    pub tier: u8,
+}
+
 /// What the HUD shows of survival; published with the sim status.
 #[derive(Clone, Debug, Default)]
 #[expect(
@@ -366,6 +379,9 @@ pub struct SurvivalStatus {
     /// Sites whose Shaper was destroyed, standing empty: (site, the first round
     /// the ray may reseed it in).
     pub reseeding: Vec<(u8, u16)>,
+    /// Sites kept for one auxiliary kind (the map names it) whose Shaper cannot rise
+    /// yet: its first round or tier has not come.
+    pub dormant: Vec<Dormant>,
     /// The level a Shaper raised now evolves to (`SurvivalRules::catch_up_level`).
     pub catch_up: u16,
     pub nodes_destroyed: u16,

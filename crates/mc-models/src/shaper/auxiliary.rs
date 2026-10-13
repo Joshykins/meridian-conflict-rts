@@ -1,4 +1,5 @@
-//! The auxiliary Shapers (`progenitor_seedcaster`, `progenitor_unmaker`), the stacked
+//! The auxiliary Shapers (`progenitor_seedcaster`, `progenitor_unmaker`,
+//! `progenitor_gatewright`), the stacked
 //! spire: stepped courses (a course every two tiers), four blades out of the foot's
 //! corners leaning in to the shaft, the shaft in one stage per tier, each hovering over
 //! the one below on a dark neck with a collar of segments floating round it, the Lens
@@ -8,7 +9,7 @@
 //! anti-nuke is the halo round the Lens (`halo.rs`), as on every Shaper; the shield's
 //! ward is four plates over the foot.
 
-use std::f32::consts::{FRAC_PI_4, PI};
+use std::f32::consts::{FRAC_PI_2, FRAC_PI_4, PI};
 
 use glam::Affine3A;
 
@@ -59,6 +60,26 @@ stage_set! {
     n40 "progenitor_unmaker@40" 40,
 }
 
+stage_set! {
+    3, FLEET_KEYS, FLEET_MODELS, draw_fleet;
+    g1 "progenitor_gatewright" 1,
+    g2 "progenitor_gatewright@2" 2,
+    g3 "progenitor_gatewright@3" 3,
+    g4 "progenitor_gatewright@4" 4,
+    g5 "progenitor_gatewright@5" 5,
+    g6 "progenitor_gatewright@6" 6,
+    g7 "progenitor_gatewright@7" 7,
+    g8 "progenitor_gatewright@8" 8,
+    g10 "progenitor_gatewright@10" 10,
+    g12 "progenitor_gatewright@12" 12,
+    g14 "progenitor_gatewright@14" 14,
+    g16 "progenitor_gatewright@16" 16,
+    g20 "progenitor_gatewright@20" 20,
+    g25 "progenitor_gatewright@25" 25,
+    g30 "progenitor_gatewright@30" 30,
+    g40 "progenitor_gatewright@40" 40,
+}
+
 /// An Unmaker's silo (`progenitor_silo`), a small piece of its spire: a battered
 /// course, a short stage with a collar floating round its neck, and the silo crown
 /// thrown open over it, where the warhead leaves.
@@ -85,6 +106,8 @@ enum Crown {
     Bore,
     /// The nuke's silo.
     Silo,
+    /// The fleet's gate: a great ring standing upright, facing forward.
+    Gate,
 }
 
 pub(super) fn draw_artillery(b: &mut MeshBuilder, g: Growth) {
@@ -95,14 +118,17 @@ pub(super) fn draw_nuke(b: &mut MeshBuilder, g: Growth) {
     spire(b, g, Crown::Silo);
 }
 
+pub(super) fn draw_fleet(b: &mut MeshBuilder, g: Growth) {
+    spire(b, g, Crown::Gate);
+}
+
 /// Where the Lens and its halo stand on the auxiliary Shaper `g` of `kind` (1 artillery,
 /// else nuke; also `shaper::lens_height` and `shaper::halo_slot`).
 pub(super) fn mount(g: Growth, kind: u8) -> Mount {
-    // The Gatewright wears the Seedcaster's spire (`stage_set`).
-    let crown = if super::stage_set(kind) == 1 {
-        Crown::Bore
-    } else {
-        Crown::Silo
+    let crown = match kind {
+        1 => Crown::Bore,
+        3 => Crown::Gate,
+        _ => Crown::Silo,
     };
     let h = g.height;
     let (lens_h, lens_floor) = lens(h, crown);
@@ -122,6 +148,7 @@ fn lens(h: f32, crown: Crown) -> (f32, f32) {
     let crown_h = match crown {
         Crown::Bore => 0.12 * h + 6.0,
         Crown::Silo => 0.07 * h + 4.0,
+        Crown::Gate => 0.34 * h + 4.0,
     };
     (lens_h, h - crown_h - lens_h)
 }
@@ -217,7 +244,12 @@ fn spire(b: &mut MeshBuilder, g: Growth, crown: Crown) {
             b.extrude_y_chamfered(&pillar, top * 0.16, top * 0.04);
         });
     });
-    let m = mount(g, if crown == Crown::Bore { 1 } else { 2 });
+    let kind = match crown {
+        Crown::Bore => 1,
+        Crown::Silo => 2,
+        Crown::Gate => 3,
+    };
+    let m = mount(g, kind);
     let lens_r = m.lens_r;
     super::kit::lens(
         b,
@@ -245,6 +277,78 @@ fn spire(b: &mut MeshBuilder, g: Growth, crown: Crown) {
     match crown {
         Crown::Bore => bore(b, roof + neck, h, top),
         Crown::Silo => silo(b, roof + neck, h, top),
+        Crown::Gate => gate(b, roof + neck, h, top),
+    }
+}
+
+/// The Gatewright's gate from `z0` to `z1` over a roof `half` across: a great ring of
+/// segments standing upright on a stem over a plinth, clear of the halo, facing forward
+/// (x), the way its fleets come out, held between two braced arms leaning out from the
+/// plinth to its flanks.
+fn gate(b: &mut MeshBuilder, z0: f32, z1: f32, half: f32) {
+    let len = z1 - z0;
+    let deck = z0 + len * 0.05;
+    pale(b);
+    let plinth = cut_rect(b, half * 1.1, half * 1.3, half * 0.3);
+    b.loft_z(&plinth, &[Section::new(z0, 0.85), Section::new(deck, 1.0)]);
+    // A short dark stem lifting the ring clear of the roof.
+    let base = z0 + len * 0.12;
+    dark(b);
+    let stem = cut_rect(b, half * 0.4, half * 0.55, half * 0.12);
+    b.loft_z(
+        &stem,
+        &[
+            Section::new(deck - 0.3, 1.0),
+            Section::new(base + len * 0.02, 0.8),
+        ],
+    );
+    // The ring, its foot just clear of the plinth.
+    let r = (z1 - base) * 0.5;
+    let zc = base + r * 1.02;
+    b.with(
+        Affine3A::from_translation(v3(0.0, 0.0, zc)) * Affine3A::from_rotation_y(FRAC_PI_2),
+        |b| {
+            ring(
+                b,
+                Ring {
+                    r0: r * 0.8,
+                    r1: r,
+                    z: 0.0,
+                    h: r * 0.13,
+                    pieces: 10,
+                    gap: r * 0.07,
+                    turn: PI / 10.0,
+                },
+            );
+            if !b.coarse() {
+                // A thin inner course of segments, set back, so the ring reads deep.
+                ring(
+                    b,
+                    Ring {
+                        r0: r * 0.68,
+                        r1: r * 0.74,
+                        z: -r * 0.06,
+                        h: r * 0.05,
+                        pieces: 20,
+                        gap: r * 0.05,
+                        turn: 0.0,
+                    },
+                );
+            }
+        },
+    );
+    // The arms: braced slabs from the plinth's sides out and up to the ring's flanks.
+    let arm = [
+        [half * 0.9, deck],
+        [half * 1.45, deck],
+        [r * 1.03, zc + r * 0.12],
+        [r * 0.84, zc + r * 0.02],
+    ];
+    for turn in [FRAC_PI_2, -FRAC_PI_2] {
+        b.with(Affine3A::from_rotation_z(turn), |b| {
+            pale(b);
+            b.extrude_y_chamfered(&arm, r * 0.09, r * 0.025);
+        });
     }
 }
 

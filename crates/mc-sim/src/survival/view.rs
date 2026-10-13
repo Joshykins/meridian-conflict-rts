@@ -403,6 +403,28 @@ impl crate::World {
                 .filter(|(i, r)| **r > s.round && !s.nodes.iter().any(|n| n.site as usize == *i))
                 .map(|(i, r)| (i.min(u8::MAX as usize) as u8, *r))
                 .collect(),
+            dormant: s
+                .config
+                .node_sites
+                .iter()
+                .enumerate()
+                .filter(|(i, site)| {
+                    site.kind.is_auxiliary()
+                        && site.kind != mc_data::survival::SiteKind::Auxiliary
+                        && !s.nodes.iter().any(|n| n.site as usize == *i)
+                        && s.reseed_from.get(*i).is_none_or(|r| *r <= s.round)
+                })
+                .filter_map(|(i, site)| {
+                    let wake = self.wake_round(s, site.kind);
+                    let round = wake.map(|w| w.0);
+                    (round.is_none_or(|r| s.round < r)).then(|| super::Dormant {
+                        site: i.min(u8::MAX as usize) as u8,
+                        kind: site.kind,
+                        round,
+                        tier: wake.map_or(0, |w| w.1),
+                    })
+                })
+                .collect(),
             catch_up: rules.catch_up_level(now_round),
             nodes_destroyed: s.nodes_destroyed,
             shapers_next: match s.phase {

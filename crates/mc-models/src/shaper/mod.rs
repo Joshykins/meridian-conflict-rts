@@ -5,9 +5,8 @@
 //!   core telescoping up between leaning slab blades, the Lens on its head.
 //! - `progenitor_seedcaster` and `progenitor_unmaker`, the auxiliary Shapers: the stacked
 //!   spire (`auxiliary.rs`), stages hovering over each other on necks with collars round
-//!   them, the Lens near the top, under an artillery bore or a silo crown. The
-//!   Gatewright (`progenitor_gatewright`, fleets) wears the Seedcaster's spire until its
-//!   own crown is chosen (`stage_set`).
+//!   them, the Lens near the top, under an artillery bore, a silo crown or, for the
+//!   Gatewright (`progenitor_gatewright`, fleets), a great upright gate ring.
 //!
 //! Round them stand the pieces of their bases (`base.rs`): print platforms and slips,
 //! shield pylons.
@@ -130,32 +129,24 @@ pub fn stage(level: u16) -> usize {
         .unwrap_or(0)
 }
 
-/// The set of stage meshes a Shaper of `kind` (`ShaperInstance::kind`: 0 printer,
-/// 1 artillery, 2 nuke, 3 fleet) is drawn with: its own, but a Gatewright (3) the
-/// Seedcaster's until its crown is chosen.
-pub fn stage_set(kind: u8) -> u8 {
-    match kind {
-        3 => 1,
-        k => k.min(2),
-    }
-}
-
-/// The stage meshes' keys of the stage set `kind` ([`stage_set`]: 0 printer,
-/// 1 artillery, 2 nuke), in [`STAGE_LEVELS`] order.
+/// The stage meshes' keys of a Shaper of `kind` (`ShaperInstance::kind`: 0 printer,
+/// 1 artillery, 2 nuke, 3 fleet), in [`STAGE_LEVELS`] order.
 pub fn stage_keys(kind: u8) -> &'static [&'static str; STAGES] {
     match kind {
         1 => &auxiliary::ARTILLERY_KEYS,
         2 => &auxiliary::NUKE_KEYS,
+        3 => &auxiliary::FLEET_KEYS,
         _ => &printer::KEYS,
     }
 }
 
-pub(super) const MODELS: [&[ModelDef]; 5] = [
+pub(super) const MODELS: [&[ModelDef]; 6] = [
     &[auxiliary::SILO],
     &printer::MODELS,
     &auxiliary::ARTILLERY_MODELS,
     &auxiliary::NUKE_MODELS,
     &base::MODELS,
+    &auxiliary::FLEET_MODELS,
 ];
 
 /// How far a Shaper has grown, as its meshes are drawn.
@@ -211,6 +202,9 @@ pub(super) fn budget(key: &str) -> Option<(usize, f32, usize)> {
     } else if key.starts_with("replication_node") {
         // Its halo hangs a blade to each interceptor even far off: the stock reads.
         Some((2_000, 0.56, 12_000))
+    } else if key.starts_with("progenitor_gatewright") {
+        // The Seedcaster's spire under a great gate ring, its segments far off too.
+        Some((3_400, 0.56, 28_000))
     } else if key.starts_with("progenitor_seedcaster") || key.starts_with("progenitor_unmaker") {
         // Collars round every neck, and a halo as broad as its Lens.
         Some((3_000, 0.56, 28_000))

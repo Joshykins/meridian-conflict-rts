@@ -533,7 +533,10 @@ invulnerable unit, and the mirror marks it `SHIELD_VEIL` so it is drawn apart fr
   Fleet). A site naming one kind (`Artillery`, `Nuke`, `Fleet`) raises only that. `Node::kind` is the Shaper's own
   kind, never `Auxiliary`. Auxiliary Shapers have every Shaper's defences, levelling, catch-up and reseeding, and
   print nothing on the ground. Kit (`base::Kit`): `progenitor_seedcaster`, `progenitor_unmaker`,
-  `progenitor_gatewright` (the Gatewright wears the Seedcaster's spire until its crown is chosen).
+  `progenitor_gatewright` (the stacked spire under a great upright gate ring, its own stage set, kind 3). The
+  Last Harvest keeps Far Atoll, the sea-and-air-only island, for the Gatewright (`kind: Fleet`), so fleets come
+  once T3 does; until then `SurvivalStatus::dormant` lists such a site (`Dormant`: its kind, the round and tier it
+  waits for, None if the match never reaches it) and the card shows "Dormant until T3".
   A **Seedcaster** (`SiteKind::Artillery`, 1) takes on products like a land printer and, on a beat that quickens with
   its level (`volley_ticks`: 75 s at level 1, 50 s at 10, 37 s at 20, never under 20 s), marks `squads_per_volley`
   (1, one more every sixth level) **warp-ins**, each 40-120 m off a defender structure (six in ten) or a unit on the

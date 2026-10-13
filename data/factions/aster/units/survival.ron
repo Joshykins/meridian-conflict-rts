@@ -210,8 +210,7 @@
             interceptor_coverage: (per_level: 80, most: 4000),
             interceptor_round: (percent: -6, least: 6000),
         ),
-        // The Seedcaster's spire until the Gatewright's own crown is chosen.
-        mesh: "progenitor_seedcaster", icon: Warship,
+        mesh: "progenitor_gatewright", icon: Warship,
         lights: [],
         sounds: (death: "blast_large"),
     ),

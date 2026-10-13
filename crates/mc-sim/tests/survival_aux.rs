@@ -602,6 +602,34 @@ fn auxiliary_sites_raise_the_kind_fewest_of_them_stand() {
     assert_eq!(aux_first_round(SiteKind::Auxiliary), 3);
 }
 
+/// A site kept for the Gatewright stands dormant, and says until when, until its tier
+/// comes; then the ray raises a Gatewright there and nothing else.
+#[test]
+fn a_site_kept_for_fleets_waits_dormant_for_its_tier() {
+    let (mut w, mut events) = fleet_world(vec![site(SiteKind::Fleet)], 1);
+    let dormant = w.survival_status().unwrap().dormant;
+    assert_eq!(dormant.len(), 1, "{dormant:?}");
+    assert_eq!(dormant[0].kind, SiteKind::Fleet);
+    assert_eq!((dormant[0].round, dormant[0].tier), (Some(8), 3));
+    assert!(until(&mut w, &mut events, 3000, |e| matches!(
+        e,
+        SimEvent::NodeRaising {
+            kind: SiteKind::Fleet,
+            ..
+        }
+    )));
+    assert!(w.survival_status().unwrap().dormant.is_empty());
+    // At a tier cap with no warship, it never wakes, and says so.
+    let rules = SurvivalRules {
+        tier_cap: 2,
+        ..aux_rules()
+    };
+    let (w, _) = aux_world_with(rules, vec![site(SiteKind::Fleet)], 1);
+    let dormant = w.survival_status().unwrap().dormant;
+    assert_eq!(dormant.len(), 1);
+    assert_eq!(dormant[0].round, None);
+}
+
 #[test]
 fn auxiliary_shapers_grow_with_their_level() {
     // The warp-ins: more squads, bigger with heavies, a quicker beat, a shorter but never

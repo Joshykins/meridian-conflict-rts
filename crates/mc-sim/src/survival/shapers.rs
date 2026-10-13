@@ -123,6 +123,24 @@ impl crate::World {
         Ok(())
     }
 
+    /// The first round a Shaper of auxiliary `kind` may rise in this match, and the
+    /// tech it waits for (a Gatewright's cheapest warship's, else 0); None when the
+    /// match never reaches it (no warship at its tier cap).
+    pub(super) fn wake_round(&self, s: &Survival, kind: SiteKind) -> Option<(u16, u8)> {
+        let first = aux_first_round(kind);
+        if kind != SiteKind::Fleet {
+            return Some((first, 0));
+        }
+        let bps = self.blueprints.as_ref();
+        let tech = self
+            .fleet_roster(mc_data::MAX_TECH)
+            .iter()
+            .map(|b| bps.unit(*b).tech)
+            .min()?;
+        let round = s.config.rules.first_round_of(tech)?;
+        Some((round.max(first), tech))
+    }
+
     /// The kind of Shaper the ray would raise on `site` now (the round's tier `tier`),
     /// if any. A printing site raises a printer while it has a front to print for; a
     /// site naming an auxiliary kind raises that once its first round has come; an
