@@ -122,7 +122,7 @@ const ISLAND_ORE: f64 = 130.0;
 
 /// A design vector turned `k` half turns about the middle.
 fn turn((x, y): (f64, f64), k: usize) -> (f64, f64) {
-    if k % 2 == 0 {
+    if k.is_multiple_of(2) {
         (x, y)
     } else {
         (-x, -y)
