@@ -19,7 +19,7 @@ pub(in crate::bake) struct Buckets {
 }
 
 impl Buckets {
-    pub(super) fn new(size: f64) -> Buckets {
+    pub(in crate::bake) fn new(size: f64) -> Buckets {
         let n = (size / BUCKET).ceil() as usize + 1;
         Buckets {
             w: n,
@@ -35,7 +35,7 @@ impl Buckets {
     }
 
     /// Files item `id` under every bucket its bounds `(lo, hi)` touch.
-    pub(super) fn insert(&mut self, id: u32, lo: P, hi: P) {
+    pub(in crate::bake) fn insert(&mut self, id: u32, lo: P, hi: P) {
         for j in self.range(lo.1, hi.1, self.h) {
             for i in self.range(lo.0, hi.0, self.w) {
                 self.cells[j * self.w + i].push(id);
@@ -44,7 +44,7 @@ impl Buckets {
     }
 
     /// Every item filed in a bucket within `reach` of `p` (some more than once).
-    pub(super) fn near(&self, p: P, reach: f64) -> impl Iterator<Item = u32> + '_ {
+    pub(in crate::bake) fn near(&self, p: P, reach: f64) -> impl Iterator<Item = u32> + '_ {
         let xs = self.range(p.0 - reach, p.0 + reach, self.w);
         let ys = self.range(p.1 - reach, p.1 + reach, self.h);
         ys.flat_map(move |j| {
@@ -111,7 +111,7 @@ pub(in crate::bake) struct Rect {
 
 impl Rect {
     /// `p` in the rectangle's own frame.
-    pub(super) fn local(&self, p: P) -> P {
+    pub(in crate::bake) fn local(&self, p: P) -> P {
         let (s, c) = self.heading.sin_cos();
         let (dx, dy) = (p.0 - self.c.0, p.1 - self.c.1);
         (dx * c + dy * s, dy * c - dx * s)
@@ -134,7 +134,7 @@ impl Rect {
     }
 
     /// Axis-aligned bounds.
-    pub(super) fn bounds(&self) -> (P, P) {
+    pub(in crate::bake) fn bounds(&self) -> (P, P) {
         let cs = self.corners();
         let lo = cs
             .iter()
@@ -147,7 +147,7 @@ impl Rect {
 
     /// The shortest distance between the rectangle and a segment (0 when
     /// they cross).
-    pub(super) fn distance_to_segment(&self, a: P, b: P) -> f64 {
+    pub(in crate::bake) fn distance_to_segment(&self, a: P, b: P) -> f64 {
         let cs = self.corners();
         if self.outside(a) <= 0.0 || self.outside(b) <= 0.0 {
             return 0.0;
@@ -167,7 +167,7 @@ impl Rect {
     }
 
     /// Whether two rectangles come within `gap` of each other.
-    pub(super) fn near(&self, other: &Rect, gap: f64) -> bool {
+    pub(in crate::bake) fn near(&self, other: &Rect, gap: f64) -> bool {
         let reach = self.hx.hypot(self.hy) + other.hx.hypot(other.hy) + gap;
         if dist(self.c, other.c) > reach {
             return false;

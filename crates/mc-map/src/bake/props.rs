@@ -38,6 +38,7 @@ impl Terrain {
                     self.siege_forest(x, y) * (1.0 - smoothstep(0.3, 0.5, slope)),
                     0.0,
                 ),
+                Layout::Vela => (self.vela_forest(x, y, slope), 0.25),
                 _ => self.basin_forest(x, y, height, slope),
             }
         };
@@ -240,6 +241,9 @@ impl Terrain {
                 return true;
             }
             if self.layout == Layout::Siege && !self.siege_clear(x, y) {
+                return true;
+            }
+            if self.layout == Layout::Vela && !self.vela_clear(x, y) {
                 return true;
             }
             if self.layout == Layout::Harvest && !self.harvest_clear(x, y) {

@@ -76,6 +76,7 @@ mod sites;
 mod spires;
 mod threshold;
 mod tripoint;
+mod vela;
 
 /// Every wreck key the layouts that plan their own wreckage can lay.
 pub(crate) fn planned_wreck_keys() -> impl Iterator<Item = &'static str> {
@@ -215,6 +216,9 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
     if terrain.layout == Layout::Siege {
         terrain.siege_props(&mut props);
     }
+    if terrain.layout == Layout::Vela {
+        terrain.vela_props(&mut props);
+    }
     // The siege and the survival map lay their own wreckage, with their plans
     // (`siege/wrecks.rs`, `threshold/wrecks.rs`); the trees and small rocks
     // under a wreck are gone.
@@ -265,6 +269,10 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
     // Rimehold's bridges carry decks the simulation reads (`crate::deck`).
     if terrain.layout == Layout::Rimehold {
         writer.set_decks(terrain.rimehold_decks())?;
+    }
+    // Vela's bridge carries the coast road over the river.
+    if terrain.layout == Layout::Vela {
+        writer.set_decks(terrain.vela_decks())?;
     }
     let content_id = writer.finish(props, &starts, &ore)?;
 
@@ -446,6 +454,8 @@ struct Terrain {
     rh: rimehold::Rimehold,
     /// Siege layout only: the city's plan (`siege.rs`).
     siege: siege::Siege,
+    /// Vela layout only: its plan (`vela.rs`).
+    vela: vela::Vela,
     /// The machine's benches: ground cut level for its nodes (`machine.rs`).
     /// Empty until the machine is laid, so what is designed before it sees the landscape.
     benches: Vec<machine::Bench>,
@@ -528,6 +538,7 @@ impl Terrain {
             canyon: canyon::Canyon::default(),
             frost: frostline::Frostline::default(),
             siege: siege::Siege::default(),
+            vela: vela::Vela::default(),
             tp: tripoint::Tripoint::default(),
             sp: spires::Spires::default(),
             hv: harvest::Harvest::default(),
@@ -593,6 +604,10 @@ impl Terrain {
         }
         if params.layout == Layout::Siege {
             t.setup_siege();
+            return t;
+        }
+        if params.layout == Layout::Vela {
+            t.setup_vela();
             return t;
         }
         if params.layout == Layout::Antarctic {
@@ -666,7 +681,7 @@ impl Terrain {
         // The survival map and the siege are not symmetric: nothing folds.
         if matches!(
             self.layout,
-            Layout::Threshold | Layout::Siege | Layout::Harvest | Layout::Rimehold
+            Layout::Threshold | Layout::Siege | Layout::Harvest | Layout::Rimehold | Layout::Vela
         ) {
             return (vx, vy, r);
         }
@@ -751,6 +766,7 @@ impl Terrain {
             Layout::Spires => self.natural_spires(x, y),
             Layout::Harvest => self.natural_harvest(x, y),
             Layout::Rimehold => self.natural_rimehold(x, y),
+            Layout::Vela => self.natural_vela(x, y),
         };
         if self.benches.is_empty() {
             h
@@ -775,7 +791,7 @@ impl Terrain {
 
     /// Whether the map carries a streets layer: the siege's city.
     fn has_streets(&self) -> bool {
-        self.layout == Layout::Siege
+        matches!(self.layout, Layout::Siege | Layout::Vela)
     }
 
     /// Whether the map carries a ways layer: the canyon's trails.
@@ -1310,7 +1326,9 @@ impl Terrain {
         } else {
             Vec::new()
         };
-        let streets = if self.has_streets() {
+        let streets = if self.layout == Layout::Vela {
+            self.vela_streets(x0, y0)
+        } else if self.has_streets() {
             self.tile_streets(x0, y0)
         } else {
             Vec::new()
@@ -1419,4 +1437,6 @@ mod test_maps {
         LazyLock::new(|| Terrain::new(&BakeParams::harvest("t", 12, 41)));
     pub(super) static RIMEHOLD: LazyLock<Terrain> =
         LazyLock::new(|| Terrain::new(&BakeParams::rimehold("t", 10, 43)));
+    pub(super) static VELA: LazyLock<Terrain> =
+        LazyLock::new(|| Terrain::new(&BakeParams::vela("t", 4, 5)));
 }

@@ -164,7 +164,7 @@ impl Terrain {
 
 /// The footprint a kind covers at `at`, turned `heading`, at `scale`: the
 /// box round all its solid parts.
-fn footprint(kind: PropKind, at: P, heading: f64, scale: f64) -> Rect {
+pub(in crate::bake) fn footprint(kind: PropKind, at: P, heading: f64, scale: f64) -> Rect {
     let plan = city::structure(kind).map_or(&[][..], |s| s.plan);
     let (mut lo, mut hi) = ((f64::MAX, f64::MAX), (f64::MIN, f64::MIN));
     for &(cx, cy, hx, hy) in plan {
@@ -192,7 +192,7 @@ fn size_of(kind: PropKind) -> (f64, f64) {
 }
 
 /// Where a prop's origin goes so its footprint's middle lands on `c`.
-fn origin_for(kind: PropKind, c: P, heading: f64, scale: f64) -> P {
+pub(in crate::bake) fn origin_for(kind: PropKind, c: P, heading: f64, scale: f64) -> P {
     let r = footprint(kind, (0.0, 0.0), heading, scale);
     (c.0 - r.c.0, c.1 - r.c.1)
 }

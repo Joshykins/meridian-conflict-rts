@@ -1,7 +1,7 @@
 //! The layouts a map can be baked to, the parameters of a bake, and what
 //! each layout asks of them.
 
-use super::{antarctic, crosswater, frostline, harvest, rimehold, siege, spires, tripoint};
+use super::{antarctic, crosswater, frostline, harvest, rimehold, siege, spires, tripoint, vela};
 use crate::format::MapError;
 use crate::{MAX_START_POSITIONS, TILE_SIZE_M};
 
@@ -94,6 +94,12 @@ pub enum Layout {
     /// come from. Five starts: the defenders' four, then the Heart's.
     /// Exactly 20 km.
     Rimehold,
+    /// "Vela": the campaign's first mission on the ocean colony (see
+    /// `vela.rs`): a coast road from a beach to the town of Port Calder, its
+    /// spaceport on the plateau behind and the quarry beside it; farms,
+    /// woods and islands round them. Not mirrored. Two starts: the beach,
+    /// then the spaceport. Exactly 8 km.
+    Vela,
 }
 
 #[derive(Clone, Debug)]
@@ -256,6 +262,15 @@ impl BakeParams {
         }
     }
 
+    /// A square two-start [`Layout::Vela`] map.
+    pub fn vela(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
+        BakeParams {
+            players: 2,
+            layout: Layout::Vela,
+            ..BakeParams::square(name, size_tiles, seed)
+        }
+    }
+
     /// A square [`Layout::Threshold`] map: three defender starts and the facility's.
     pub fn threshold(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
         BakeParams {
@@ -373,6 +388,16 @@ impl BakeParams {
         {
             return Err(MapError::Invalid(
                 "the Rimehold layout has exactly 5 starts (4 defenders and the Heart) on a 20 km map"
+                    .into(),
+            ));
+        }
+        if self.layout == Layout::Vela
+            && (self.players != 2
+                || (self.tiles_w as i32 * TILE_SIZE_M) as f64 != vela::SIZE
+                || self.tiles_h != self.tiles_w)
+        {
+            return Err(MapError::Invalid(
+                "the Vela layout has exactly 2 starts (the beach and the spaceport) on an 8 km map"
                     .into(),
             ));
         }

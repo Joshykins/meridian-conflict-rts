@@ -66,7 +66,11 @@ impl Symmetry {
             Layout::Crosswater => Some(Symmetry::QuarterTurn),
             Layout::Tripoint => Some(Symmetry::Thirds),
             // These lay their own wreckage with their plans (`bake.rs`).
-            Layout::Threshold | Layout::Siege | Layout::Harvest | Layout::Rimehold => None,
+            Layout::Threshold
+            | Layout::Siege
+            | Layout::Harvest
+            | Layout::Rimehold
+            | Layout::Vela => None,
         }
     }
 

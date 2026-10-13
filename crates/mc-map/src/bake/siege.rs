@@ -42,9 +42,9 @@ use crate::noise::{bump, smoothstep, unit};
 use crate::BUILD_CELL_M;
 use grid::{dist, y_at, Buckets, Rect, Seg, P};
 
-mod fields;
-mod grid;
-mod plan;
+pub(super) mod fields;
+pub(super) mod grid;
+pub(super) mod plan;
 mod shape;
 #[cfg(test)]
 mod tests;

@@ -17,6 +17,7 @@
 //! mc-bake --layout spires --size-km 12 --seed 17 --name "Thousand Spires" -o maps/thousand_spires.mcmap
 //! mc-bake --layout harvest --size-km 24 --seed 41 --name "The Last Harvest" -o maps/last_harvest.mcmap
 //! mc-bake --layout rimehold --size-km 20 --seed 43 --name "Rimehold" -o maps/rimehold.mcmap
+//! mc-bake --layout vela --size-km 8 --seed 5 --name "Vela" -o maps/vela.mcmap
 //! ```
 //!
 //! Every layout but the survival and siege ones (each lays its own with its plan) is then
@@ -87,10 +88,14 @@ usage: mc-bake -o <file.mcmap> [options]
                    by sea, four necks across it, the Progenitor's base east,
                    highlands, fells and Wester Isle round it with the Shaper
                    sites; 4 defender starts and the Heart's; exactly 20 km
+                   vela: \"Vela\", the campaign's first mission: a coast road
+                   from a beach to Port Calder, its spaceport and quarry,
+                   farms and islands; 2 starts (the beach, the spaceport);
+                   exactly 8 km
   --players <n>    start positions, 1-32 (default: 2 up to 8 km, 4 up to 24 km,
                    else 8; islands and alpine: always 2; the 8-player layouts
                    take exactly 8, crosswater and antarctic 4, tripoint 3, siege
-                   and spires 2, harvest and rimehold 5)
+                   spires and vela 2, harvest and rimehold 5)
   --threads <n>    worker threads (default: all cores; does not change the result)
   --preview <ppm>  also write a shaded overview image with markers
   --verify         re-read the file and check its content id
@@ -157,9 +162,10 @@ fn parse_args() -> Result<Args, String> {
                     "spires" => Layout::Spires,
                     "harvest" => Layout::Harvest,
                     "rimehold" => Layout::Rimehold,
+                    "vela" => Layout::Vela,
                     other => {
                         return Err(format!(
-                            "unknown layout '{other}' (basin, islands, alpine, alpine-teams, archipelago, twin-bays, threshold, canyon, frostline, crosswater, tripoint, siege, antarctic, spires, harvest or rimehold)"
+                            "unknown layout '{other}' (basin, islands, alpine, alpine-teams, archipelago, twin-bays, threshold, canyon, frostline, crosswater, tripoint, siege, antarctic, spires, harvest, rimehold or vela)"
                         ))
                     }
                 }
@@ -228,6 +234,12 @@ fn parse_args() -> Result<Args, String> {
     if args.layout == Layout::Rimehold && args.size_km != 20 {
         return Err("--layout rimehold is exactly 20 km (--size-km 20)".into());
     }
+    if args.layout == Layout::Vela && args.players.is_some_and(|n| n != 2) {
+        return Err("--layout vela has exactly 2 starts (--players 2)".into());
+    }
+    if args.layout == Layout::Vela && args.size_km != 8 {
+        return Err("--layout vela is exactly 8 km (--size-km 8)".into());
+    }
     if args.layout == Layout::Threshold && args.players.is_some_and(|n| n != 4) {
         return Err("--layout threshold has exactly 4 starts (--players 4)".into());
     }
@@ -278,6 +290,7 @@ fn run(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
         Layout::Spires => BakeParams::spires(&name, args.size_km / 2, args.seed),
         Layout::Harvest => BakeParams::harvest(&name, args.size_km / 2, args.seed),
         Layout::Rimehold => BakeParams::rimehold(&name, args.size_km / 2, args.seed),
+        Layout::Vela => BakeParams::vela(&name, args.size_km / 2, args.seed),
     };
     params.threads = args.threads;
     if let Some(players) = args.players {
