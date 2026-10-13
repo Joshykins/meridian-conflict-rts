@@ -11,7 +11,7 @@
 // - Picket, Halberd, Sunspear: point defence of the Sentinel's, Redoubt's and Citadel's
 //   reach and weight; the Halberd and Sunspear trade some damage for a wider burst.
 // - Canopy: a repeater of bursting bolts that hurts a whole flight, not one plane.
-// - Orrery: a shorter radar that sees far more; its floating rings add a tier each.
+// - Orrery: a short mast that reaches as far as a Watchtower; a floating ring a tier.
 // - Palisade: slow to build, very hard to cut; sections join into one wall as ARC's do.
 // - Ward: a tighter shield than the Aegis, but denser; a prism veil.
 //
@@ -801,9 +801,9 @@
         mesh: "regency_palisade", icon: Wall,
     ),
     // ---- Intel --------------------------------------------------------------------------
-    // A sensor mast crowned with turning rings held floating by gravity: its radar reaches
-    // less far than a Watchtower's at every tier, but its optics see twice as far. It
-    // upgrades in place like the Watchtower, a ring a tier (`models::regency::eye`).
+    // A sensor mast crowned with turning rings held floating by gravity: its radar and eyes
+    // reach as far as a Watchtower's at every tier. It upgrades in place like the
+    // Watchtower, a ring a tier (`models::regency::eye`).
     (
         key: "regency_t1_radar",
         name: "Orrery",
@@ -813,7 +813,7 @@
         health: 300,
         cost: (materials: 90, energy: 700, time: 90),
         radius: 7, height: 24, footprint: (2, 2),
-        vision: 500, radar: 3000,
+        vision: 500, radar: 4500,
         economy: (energy_upkeep: 20),
         upgrades_to: "regency_t2_radar",
         mesh: "regency_eye", icon: Intel,
@@ -827,7 +827,7 @@
         health: 900,
         cost: (materials: 200, energy: 3600, time: 780),
         radius: 7, height: 28, footprint: (2, 2),
-        vision: 600, radar: 6000,
+        vision: 600, radar: 9000,
         economy: (energy_upkeep: 100),
         upgrades_to: "regency_t3_radar",
         mesh: "regency_eye", icon: Intel,
@@ -841,7 +841,7 @@
         health: 2600,
         cost: (materials: 800, energy: 11000, time: 2400),
         radius: 7, height: 32, footprint: (2, 2),
-        vision: 720, radar: 12000,
+        vision: 720, radar: 18000,
         economy: (energy_upkeep: 1000),
         mesh: "regency_eye", icon: Intel,
     ),

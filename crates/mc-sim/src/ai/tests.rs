@@ -1041,11 +1041,12 @@ fn one_watchtower_covers_the_base_and_its_near_mines() {
     spawn(&mut w, "aster_t1_radar", 0, 380, 420);
     let census = w.survey_own(0);
     let planned = w.plan_counts(0, &census);
-    // It sees 2 km: a mine a kilometre out is covered, one two out is not.
+    // It sees 4.5 km and covers half that: a mine a kilometre out is covered,
+    // one three out is not.
     assert!(radar_covers(&planned.radars, FxVec2::from_ints(1100, 1000)));
     assert!(!radar_covers(
         &planned.radars,
-        FxVec2::from_ints(1900, 1900)
+        FxVec2::from_ints(2500, 2600)
     ));
 }
 
