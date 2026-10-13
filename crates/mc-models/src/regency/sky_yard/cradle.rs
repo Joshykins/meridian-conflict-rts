@@ -1,6 +1,7 @@
-//! Design B, the cradle: four great plated arms rise from the lot's corners and bend in
-//! over the middle, their claws holding a lens ring that turns, lit violet, round the
-//! emitter's crown, which their inner fingers carry; the beam leaves up through it. In
+//! Design B, the cradle: four great plated arms rise from the lot's corners and lean in,
+//! their points standing apart, their claws holding a wide lens ring that turns, lit
+//! violet, round the emitter's crown, which their fingers carry in over it; the beam
+//! leaves up through it. In
 //! the bed under it a stack of rotor drums turns, the intakes' conduits running in.
 
 use glam::Vec3;
@@ -17,11 +18,11 @@ use super::EMITTER;
 
 /// The lens ring the claws hold.
 const LENS: Rotor = Rotor {
-    z0: 274.0,
-    z1: 283.0,
-    outer: 33.0,
-    inner: 24.0,
-    vanes: 12,
+    z0: 266.0,
+    z1: 276.0,
+    outer: 60.0,
+    inner: 48.0,
+    vanes: 16,
     rate: 0.18,
     lit: true,
 };
@@ -36,11 +37,11 @@ pub(in crate::regency) fn cradle(b: &mut MeshBuilder, _tech: u8) {
             b,
             &[
                 (d * 120.0 + Vec3::Z * 0.5, 13.0),
-                (d * 126.0 + Vec3::Z * 80.0, 11.5),
-                (d * 114.0 + Vec3::Z * 165.0, 10.0),
-                (d * 88.0 + Vec3::Z * 234.0, 8.0),
-                (d * 56.0 + Vec3::Z * 274.0, 6.0),
-                (d * 41.0 + Vec3::Z * 282.0, 3.5),
+                (d * 125.0 + Vec3::Z * 90.0, 11.5),
+                (d * 114.0 + Vec3::Z * 180.0, 10.0),
+                (d * 92.0 + Vec3::Z * 248.0, 8.0),
+                (d * 76.0 + Vec3::Z * 288.0, 5.5),
+                (d * 72.0 + Vec3::Z * 304.0, 3.0),
             ],
             d + Vec3::Z * 0.6,
         );
@@ -54,7 +55,7 @@ pub(in crate::regency) fn cradle(b: &mut MeshBuilder, _tech: u8) {
         for s in [-1.0f32, 1.0] {
             dark_plate(b);
             let f = Frame::new(
-                d * 52.0 + side * (s * 5.0) + Vec3::Z * 279.0,
+                d * 74.0 + side * (s * 5.0) + Vec3::Z * 270.0,
                 -d + Vec3::Z * 0.1 * s,
                 side * s + Vec3::Z * 0.3,
             );
@@ -63,7 +64,7 @@ pub(in crate::regency) fn cradle(b: &mut MeshBuilder, _tech: u8) {
         // Its finger in over the ring to the crown, above the ring's top.
         strut(
             b,
-            d * 44.0 + Vec3::Z * 289.0,
+            d * 80.0 + Vec3::Z * 284.0,
             d * 15.0 + EMITTER - Vec3::Z * 5.0,
             1.8,
         );
@@ -71,14 +72,6 @@ pub(in crate::regency) fn cradle(b: &mut MeshBuilder, _tech: u8) {
             b.paint(PLATING_DARK).pattern(pattern::EMBER_SLOT);
             let f = Frame::new(d * 135.0 + Vec3::Z * 2.0, Vec3::Z + d * 0.3, d);
             armour(b, &f, &swept(10.0, 4.5, 0.0, 0.7), 0.5);
-            // A brace from each arm's knee to its neighbour's, low: plated struts.
-            let n = dir(a + 90.0);
-            strut(
-                b,
-                d * 124.0 + Vec3::Z * 60.0,
-                n * 124.0 + Vec3::Z * 60.0,
-                2.4,
-            );
         }
     }
     if b.coarse() {
@@ -91,7 +84,7 @@ pub(in crate::regency) fn cradle(b: &mut MeshBuilder, _tech: u8) {
     // The ring's bearing blocks in the claws.
     for k in 0..4 {
         let d = dir(45.0 + 90.0 * k as f32);
-        collar(b, d * 36.0 + Vec3::Z * 278.5, d, 3.2, 3.0);
+        collar(b, d * 63.0 + Vec3::Z * 271.0, d, 3.2, 3.0);
     }
     emitter_crown(b, 6, 13.0);
 }
