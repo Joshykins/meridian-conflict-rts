@@ -26,9 +26,9 @@ impl World {
                 if bp.weapons.is_empty() {
                     continue;
                 }
-                // Holding fire, or stunned: let go of whatever it was aiming at, a
+                // Holding fire, or silent (stunned, or gathering an Edict): let go of whatever it was aiming at, a
                 // group's guns too.
-                if units.has_flag(row, flag::PASSIVE) || this.stunned(row) {
+                if units.has_flag(row, flag::PASSIVE) || this.weapons_silent(row) {
                     let released = this.mounts_released(row);
                     if units.weapon_target[row] != [Handle::NONE; MAX_WEAPONS] || released.is_some()
                     {

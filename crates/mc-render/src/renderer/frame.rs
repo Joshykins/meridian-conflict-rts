@@ -384,12 +384,17 @@ impl Renderer {
                 self.ground_melt.upload();
             }
             self.gravitic_engine_frame(input.time, camera);
-            self.heat_haze.upload(
-                input.time,
-                input.alpha.clamp(0.0, 1.0),
-                camera,
-                &self.gravitic_engine_fx.lenses,
-            );
+            self.edict_frame(input.time, camera);
+            // The engines' lenses, then the shimmer round an Edict's column.
+            let lenses: Vec<_> = self
+                .gravitic_engine_fx
+                .lenses
+                .iter()
+                .chain(&self.edict_fx.shimmer)
+                .copied()
+                .collect();
+            self.heat_haze
+                .upload(input.time, input.alpha.clamp(0.0, 1.0), camera, &lenses);
             self.upload_wake_shells(input.time);
             self.lens_fx.upload(input.time, input.alpha.clamp(0.0, 1.0));
             self.surge_fx.upload();
@@ -1403,7 +1408,8 @@ impl Renderer {
                     device.cmd_draw(cmd, 3, 1, 0, 0);
                     device.cmd_end_render_pass(cmd);
                 };
-                glass_pass(self.pipelines.glass_source, 0, self.screen_set, TONEMAP);
+                let exposed = [TONEMAP[0] * self.edict_fx.exposure.value(), TONEMAP[1]];
+                glass_pass(self.pipelines.glass_source, 0, self.screen_set, exposed);
                 glass_pass(self.pipelines.glass_blur, 1, self.glass_sets[0], [1.0, 0.0]);
                 glass_pass(self.pipelines.glass_blur, 0, self.glass_sets[1], [0.0, 1.0]);
             }
@@ -1419,7 +1425,8 @@ impl Renderer {
             .filter(|(_, &end)| input.time < end)
             .fold(0u64, |mask, (i, _)| mask | 1 << i);
         let tonemap_push = [
-            TONEMAP[0],
+            // The Edict's white-out and the dark after it (renderer/edict_fx).
+            TONEMAP[0] * self.edict_fx.exposure.value(),
             TONEMAP[1],
             f32::from_bits(live_waves as u32),
             f32::from_bits((live_waves >> 32) as u32),

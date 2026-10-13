@@ -444,7 +444,8 @@ session is as deterministic as any match, and the same code stages it headless
 (`--range --scenario NAME --screenshot ...`). Scenarios either stand something around the subject
 (`under-fire`, `close`, `targets`, `build`) or are an order to the subject itself (`work`, `upgrade`,
 `march`, `destruct`, `fracture`: a gravitic engine turned on a red camp 2 km off, and
-`fracture-release`, which then falters and lets its well go, `setup::late_orders`).
+`fracture-release`, which then falters and lets its well go, `setup::late_orders`; `edict`: a
+Regent's Edict fired at once on a red camp 5 km off).
 
 A scenario that needs a builder (BUILD IT) spawns it and keeps the order it owes in
 `Range::pending` until the unit shows up in the render mirror. RELOAD DATA/ is an application

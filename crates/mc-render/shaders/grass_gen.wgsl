@@ -584,10 +584,13 @@ fn cs_tufts(@builtin(global_invocation_id) id: vec3<u32>) {
     for (var i = 0u; i < ground_craters.count.x; i++) {
         let c = ground_craters.items[i];
         let d = distance(xy, c.at.xy) / max(c.at.z, 1.0);
-        if d < 1.05 {
+        // The Edict's glass ends about its radius and its scorch soon after.
+        let edict = c.style == CRATER_EDICT;
+        let bare = select(1.05, 0.95, edict);
+        if d < bare {
             return;
         }
-        charred = max(charred, 1.0 - smoothstep(1.05, 1.9, d));
+        charred = max(charred, 1.0 - smoothstep(bare, select(1.9, 1.35, edict), d));
     }
     // Nothing grows on molten ground or glass (renderer/ground_melt.rs), and what grows
     // round it is burnt black.

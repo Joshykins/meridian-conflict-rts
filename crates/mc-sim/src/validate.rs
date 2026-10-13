@@ -92,6 +92,11 @@ impl State {
                 bad_owner("surges", &owners)
             })
             .or_else(|| {
+                let ids: Vec<_> = self.edicts.iter().map(|e| e.blueprint).collect();
+                let owners: Vec<_> = self.edicts.iter().map(|e| e.owner).collect();
+                bad_bp("edicts", &ids).or_else(|| bad_owner("edicts", &owners))
+            })
+            .or_else(|| {
                 let repeats = &self.site_repeats.waiting;
                 let ids: Vec<_> = repeats.iter().map(|r| r.blueprint).collect();
                 let owners: Vec<_> = repeats.iter().map(|r| r.owner).collect();

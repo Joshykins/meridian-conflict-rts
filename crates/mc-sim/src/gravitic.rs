@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::spatial::kind;
 use crate::tables::UnitId;
-use crate::well_area::{Aircraft, WellArea};
+use crate::well_area::{Aircraft, Sides, WellArea};
 use crate::{SimError, SimEvent, World};
 
 const DT: i32 = TICKS_PER_SECOND as i32;
@@ -211,6 +211,8 @@ impl World {
                 source: w.source,
                 per_tick: Fx::ZERO,
                 aircraft: Aircraft::Crushed(g.air_damage),
+                edge: Fx::ONE,
+                sides: Sides::Enemies,
             };
             if self.well_catches(&area, row, pos) {
                 keep = keep.min(g.slow);
@@ -349,6 +351,8 @@ impl World {
             source: w.source,
             per_tick: g.damage / DT,
             aircraft: Aircraft::Crushed(g.air_damage),
+            edge: Fx::ONE,
+            sides: Sides::Enemies,
         });
         let age = match w.phase {
             WellPhase::Holding { age } => age,

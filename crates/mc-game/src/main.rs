@@ -20,6 +20,7 @@ mod cover_marks;
 mod crash;
 mod dash_marks;
 mod destruct_marks;
+mod edict_marks;
 mod formation_drag;
 mod game;
 mod gravitic_marks;
@@ -105,6 +106,8 @@ straight into a match instead.
                          down the range: tanks, power plants and gunships)
                          | fracture-release (the same, then the engine falters for 3 s
                          and is stopped, letting its well go)
+                         | edict (a ship with an Edict, the Regent, fired at once on a red
+                         camp 5 km down the range: rings of tanks, a dome, power plants)
   --players N            player slots, 1-32 (default 2; slot 0 is you, the rest are AI)
   --teams N              split the players into N sides by where their zones lie (default: all alone)
   --observe              watch an all-AI match (no human slot; the camera opens on the whole map)
@@ -227,7 +230,8 @@ MERIDIAN_GPU_CRUMBS=1 turns it on for other GPUs whose driver can mark (NVIDIA).
 MERIDIAN_AIM=MODE with --screenshot: an order being aimed at --cursor, with the selection:
 1 a warhead launch, ground a titan's strike, reclaim the Reclaim order, warp a warp jump
 (each ship's exit in formation and the energy card), dash a dash by hand (the wave where
-it would come down), fracture a gravitic engine's rift (its path and the well at the point).
+it would come down), fracture a gravitic engine's rift (its path and the well at the point),
+edict a ship's Edict (its 6 km reach, the firing point on the hull and the blast and wave rings).
 
 MERIDIAN_SURVIVAL=rounds:grace:interval:intensity:fronts:tier:nodes with --scene survival:
 the rules it plays (docs/SWITCHES.md, with MERIDIAN_SURVIVAL_SPAWN and MERIDIAN_SURVIVAL_WHY);
@@ -375,7 +379,7 @@ fn run() -> Result<(), String> {
             a if unit_shot::flag(&mut unit_shot, a, &mut value)? => {}
             "--afloat" => opts.afloat = true,
             "--hurt" => opts.hurt = value("--hurt")?.parse::<i16>().ok().filter(|p| (0..100).contains(p)).ok_or("--hurt takes a percentage under 100")? * 10,
-            "--scenario" => opts.scenario = Some(range::Scenario::parse(&value("--scenario")?).ok_or("--scenario takes under-fire, close, targets, build, work, salvage, upgrade, march, turn, destruct, lift, warp, warp-dampened, pause, short, elevator, dash, pack, fracture or fracture-release")?),
+            "--scenario" => opts.scenario = Some(range::Scenario::parse(&value("--scenario")?).ok_or("--scenario takes under-fire, close, targets, build, work, salvage, upgrade, march, turn, destruct, lift, warp, warp-dampened, pause, short, elevator, dash, pack, fracture, fracture-release or edict")?),
             "--players" => opts.players = value("--players")?.parse().map_err(|_| "--players takes a number")?,
             "--teams" => opts.teams = value("--teams")?.parse().map_err(|_| "--teams takes a number")?,
             "--army" => opts.army = value("--army")?.parse().map_err(|_| "--army takes a number")?,

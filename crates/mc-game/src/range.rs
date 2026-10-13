@@ -13,7 +13,7 @@ use mc_sim::tables::flag;
 use mc_sim::{Command, Handle};
 use std::collections::HashSet;
 
-use batches::{elevator_batch, fracture_camp, FRACTURE_RANGE};
+use batches::{elevator_batch, fracture_camp, EDICT_RANGE, FRACTURE_RANGE};
 
 pub const BLUE: u8 = 0;
 pub const RED: u8 = 1;
@@ -137,6 +137,9 @@ pub enum Scenario {
     /// `Fracture`, then the well held a while: the engine falters (paused, `FALTER_AT`),
     /// takes up again, and is stopped (`LET_GO_AT`), letting the well go.
     FractureLetGo,
+    /// A ship with an Edict (`UnitBlueprint::edict`, the Regent) ordered at once on a red
+    /// camp `range::batches::EDICT_RANGE` down the range: tanks, a dome, a few buildings.
+    Edict,
 }
 
 /// `Scenario::FractureLetGo`'s ticks: the engine paused, taken up again, stopped.
@@ -145,7 +148,7 @@ pub const RESUME_AT: u32 = 260;
 pub const LET_GO_AT: u32 = 300;
 
 impl Scenario {
-    pub const ALL: [Scenario; 20] = [
+    pub const ALL: [Scenario; 21] = [
         Scenario::UnderFire,
         Scenario::PointBlank,
         Scenario::Targets,
@@ -166,6 +169,7 @@ impl Scenario {
         Scenario::Pack,
         Scenario::Fracture,
         Scenario::FractureLetGo,
+        Scenario::Edict,
     ];
 
     pub fn label(self) -> &'static str {
@@ -190,6 +194,7 @@ impl Scenario {
             Scenario::Pack => "Pack",
             Scenario::Fracture => "Fracture",
             Scenario::FractureLetGo => "Let Go",
+            Scenario::Edict => "Edict",
         }
     }
 
@@ -215,6 +220,7 @@ impl Scenario {
             "pack" => Scenario::Pack,
             "fracture" => Scenario::Fracture,
             "fracture-release" => Scenario::FractureLetGo,
+            "edict" => Scenario::Edict,
             _ => return None,
         })
     }
@@ -330,6 +336,10 @@ enum PendingOrder {
     Fracture {
         pos: FxVec2,
     },
+    /// A ship fires its Edict here.
+    Edict {
+        pos: FxVec2,
+    },
     Pause,
     /// Queue each of these, so many of each, in order (a space elevator's batch).
     ProduceMix {
@@ -402,6 +412,11 @@ impl PendingOrder {
                 queue: false,
             }],
             PendingOrder::Fracture { pos } => vec![Command::Fracture { units: who, pos }],
+            PendingOrder::Edict { pos } => vec![Command::Edict {
+                units: who,
+                pos,
+                queue: false,
+            }],
             PendingOrder::Pause => vec![Command::SetPaused {
                 units: who,
                 paused: true,
@@ -1152,6 +1167,7 @@ fn stage(
         Scenario::Fracture | Scenario::FractureLetGo => {
             fracture_camp(blueprints, bp, east(Fx::from_int(FRACTURE_RANGE), 0))
         }
+        Scenario::Edict => batches::edict_camp(blueprints, bp, east(Fx::from_int(EDICT_RANGE), 0)),
         Scenario::Short => {
             let upkeep = bp.economy.energy_upkeep;
             let plant = blueprints

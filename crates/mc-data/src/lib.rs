@@ -8,6 +8,7 @@
 //! match starts.
 
 pub mod dash;
+pub mod edict;
 pub mod elevator;
 pub mod gravitic;
 pub mod growth;
@@ -951,6 +952,8 @@ pub struct UnitBlueprint {
     pub dash: Option<dash::Dash>,
     /// Tears a rift to any point and holds a gravity well there.
     pub gravitic: Option<gravitic::Gravitic>,
+    /// The Edict: a main gun with no barrel, fired from the hull nearest its mark.
+    pub edict: Option<edict::Edict>,
     pub motion: Option<Motion>,
     pub economy: Economy,
     /// A core mine: makes materials out of the ground around it.
@@ -1758,6 +1761,10 @@ impl Blueprints {
             match &u.gravitic {
                 Some(g) => g.hash(&mut h),
                 None => h.write_u64(u64::MAX),
+            }
+            // Hashed only where there is one, so no other blueprint's hash moves.
+            if let Some(e) = &u.edict {
+                e.hash(&mut h);
             }
             h.write_u64(u.water_build as u64);
             h.write_u64(u.seabed as u64);

@@ -108,6 +108,9 @@ pub struct State {
     /// Surge shells' wakes rolling out from where they landed (`surge.rs`).
     #[serde(default)]
     pub surges: Vec<crate::surge::SurgeWake>,
+    /// The Regent's Edicts gathering, burning and reloading (`edict.rs`).
+    #[serde(default)]
+    pub edicts: Vec<crate::edict::EdictCharge>,
     /// Poured lots under structures. They stay after the building dies.
     #[serde(default)]
     pub pads: Pads,
@@ -455,6 +458,7 @@ impl World {
             wakes: Vec::new(),
             lenses: Vec::new(),
             surges: Vec::new(),
+            edicts: Vec::new(),
             pads: Pads::default(),
             terrain_edits: Vec::new(),
             props_dead: vec![0; map.props.len().div_ceil(64)],
@@ -872,6 +876,10 @@ impl World {
         if !self.state.surges.is_empty() {
             let _t = mc_core::perf_span!("fn.run_surges");
             self.run_surges();
+        }
+        if !self.state.edicts.is_empty() {
+            let _t = mc_core::perf_span!("fn.run_edicts");
+            self.run_edicts();
         }
         {
             let _t = mc_core::perf_span!("fn.run_lances");

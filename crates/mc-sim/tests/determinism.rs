@@ -9,6 +9,9 @@
 //! gathering across the snapshot on a moving hull and firing, a third raised aloft over
 //! its yard across the snapshot and getting under way after it) must hash identically at
 //! every worker count and after a snapshot is restored mid-match.
+//! gathering across the snapshot on a moving hull and firing, a third raised aloft over
+//! its yard across the snapshot and getting under way after it) must hash identically at
+//! every worker count and after a snapshot is restored mid-match.
 //!
 //! `battle.rs` covers a land-only battle the same way; this is the one to extend
 //! when a new domain or system arrives (CLAUDE.md, section 3).
@@ -20,6 +23,7 @@ use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
 use mc_jobs::Pool;
 use mc_map::{Deck, Heightfield};
+use mc_sim::edict::EdictPhase;
 use mc_sim::focus::{Focus, Priority};
 use mc_sim::tables::{flag, Controller};
 use mc_sim::world::MapData;
@@ -246,6 +250,10 @@ fn setup(w: &mut World) {
                 // A survival Shaper (`lance.rs`): its Lance charges on what comes in reach
                 // and strikes; its dome and interceptors are a shield's and an array's.
                 add("replication_node", 1, 1600, 1500);
+                // The Regent: its Edict gathers along the hull across the snapshot while the
+                // ship moves on, every other gun silent, then fires on the empty sea to the
+                // east, its wave burning out after (`edict.rs`).
+                add(REGENT, 1, EDICT_SHIP.0, EDICT_SHIP.1);
             }
             _ => {
                 add("aster_t4_assault_tank", 2, 1000, 900);
@@ -309,6 +317,10 @@ fn setup(w: &mut World) {
         },
     });
     w.tick(&spawns).unwrap();
+    // The south's store pays for the Edict's gather.
+    let south = &mut w.state.players[0];
+    south.bonus_storage[1] += Fx::from_int(1_200_000);
+    south.energy += Fx::from_int(1_200_000);
     // The north's store pays the gravitic engine's upkeep, past what its plants make.
     let north = &mut w.state.players[1];
     north.bonus_storage[1] += Fx::from_int(600_000);
@@ -327,6 +339,36 @@ fn setup(w: &mut World) {
     }
 }
 
+/// The Regent, and where its Edict strikes: the open sea on the east edge, the fleets
+/// clear of it when it fires.
+const REGENT: &str = "regency_t5_super_destroyer";
+const EDICT_MARK: (i32, i32) = (4050, 1400);
+/// When it is ordered: its 15 s gather spans the snapshot.
+const EDICT_AT: u32 = 110;
+
+fn edict_regent(w: &World) -> Vec<UnitId> {
+    let bp = w.blueprints.id_of(REGENT).unwrap();
+    let u = &w.state.units;
+    u.slots
+        .iter()
+        .filter(|&r| u.blueprint[r] == bp && u.owner[r] == 0 && !gunnery_regent(u.pos[r]))
+        .map(|r| u.id(r))
+        .collect()
+}
+
+/// Whether a Regent of the south's at `pos` is the one shelling `REGENT_MARK` (the other
+/// gathers the Edict, far from it, so their guns' shots can be told apart).
+fn gunnery_regent(pos: FxVec2) -> bool {
+    (pos - REGENT_AT).length_sq() < Fx::from_int(EDICT_APART) * Fx::from_int(EDICT_APART)
+}
+
+/// Where the Edict's Regent starts (south's frame); how far from the gunnery Regent a
+/// Regent counts as the other one; and how far from its middle its own guns' shots leave
+/// (its farthest muzzle is ~1.7 km out; the gunnery Regent's are over 2 km away).
+const EDICT_SHIP: (i32, i32) = (300, 3000);
+const EDICT_APART: i32 = 2000;
+const EDICT_GUNS: i32 = 1850;
+
 /// A tank of the south's that, from tick 3, shoots at the ground behind a house.
 const GUNNER: (i32, i32) = (300, 1000);
 
@@ -336,7 +378,6 @@ const FULGUR: &str = "aster_t4_assault_tank";
 
 /// The Regent, where it hangs, and the point at sea ahead to starboard it shells, holding
 /// its fire for anything else (its groups' guns that take the ground and bear on it).
-const REGENT: &str = "regency_t5_super_destroyer";
 const REGENT_AT: FxVec2 = FxVec2::from_ints(3600, 1700);
 const REGENT_MARK: FxVec2 = FxVec2::from_ints(3950, 2800);
 
@@ -347,14 +388,18 @@ fn regent_on(w: &World) -> Vec<PlayerCommand> {
     let units: Vec<UnitId> = u
         .slots
         .iter()
-        .filter(|&r| u.blueprint[r] == bp && u.owner[r] == 0)
+        .filter(|&r| u.blueprint[r] == bp && u.owner[r] == 0 && gunnery_regent(u.pos[r]))
         .map(|r| u.id(r))
         .collect();
+    // The Edict's Regent holds its fire too: its guns would otherwise take the north's
+    // base apart before the Edict is ordered.
+    let mut holding = units.clone();
+    holding.extend(edict_regent(w));
     vec![
         PlayerCommand {
             player: 0,
             command: Command::SetFireState {
-                units: units.clone(),
+                units: holding,
                 state: mc_sim::FireState::HoldFire,
             },
         },
@@ -740,6 +785,24 @@ fn script(w: &mut World, tick: u32) -> Vec<PlayerCommand> {
                 permille: 975,
             },
         }],
+        // The Regent's Edict, then a move: the hull, and its firing point, go on moving
+        // while it gathers.
+        EDICT_AT => vec![PlayerCommand {
+            player: 0,
+            command: Command::Edict {
+                units: edict_regent(w),
+                pos: FxVec2::from_ints(EDICT_MARK.0, EDICT_MARK.1),
+                queue: false,
+            },
+        }],
+        t if t == EDICT_AT + 1 => vec![PlayerCommand {
+            player: 0,
+            command: Command::Move {
+                units: edict_regent(w),
+                target: FxVec2::from_ints(EDICT_SHIP.0 - 200, EDICT_SHIP.1 - 200),
+                queue: false,
+            },
+        }],
         // A timed self-destruct still counting down when the snapshot is taken.
         t if t == SNAPSHOT_AT - 20 => vec![PlayerCommand {
             player: 1,
@@ -785,6 +848,9 @@ fn reference() -> Vec<u64> {
     let mut lens_strikes = 0;
     let mut surging = 0;
     let mut lanced = 0;
+    let regent_bp = w.blueprints.id_of(REGENT).unwrap();
+    let (mut gathering_at_snapshot, mut edicts_fired, mut wave_out) = (false, 0, false);
+    let mut shots_in_gather = 0;
     let fulgur = w.blueprints.id_of(FULGUR).unwrap();
     let mut relaid = false;
     let regent = w.blueprints.id_of(REGENT).unwrap();
@@ -845,7 +911,40 @@ fn reference() -> Vec<u64> {
                     .wells
                     .iter()
                     .any(|x| matches!(x.phase, mc_sim::gravitic::WellPhase::Holding { .. }));
+                gathering_at_snapshot = w
+                    .state
+                    .edicts
+                    .iter()
+                    .any(|e| matches!(e.phase, EdictPhase::Gathering { .. }));
             }
+            let gathering = w
+                .state
+                .edicts
+                .iter()
+                .any(|e| matches!(e.phase, EdictPhase::Gathering { .. }));
+            if gathering {
+                // The Edict's own ship: its guns' shots leave within its reach of its middle.
+                let near = |at: mc_core::FxVec3| {
+                    edict_regent(&w).iter().filter_map(|&id| w.state.units.row(id)).any(|r| {
+                        (at.xy() - w.state.units.pos[r]).length_sq()
+                            < Fx::from_int(EDICT_GUNS) * Fx::from_int(EDICT_GUNS)
+                    })
+                };
+                shots_in_gather += w
+                    .events
+                    .iter()
+                    .filter(|e| {
+                        matches!(e, mc_sim::SimEvent::ShotFired { blueprint, pos, .. }
+                            if *blueprint == regent_bp && near(*pos))
+                    })
+                    .count();
+            }
+            let roll = w.blueprints.unit(regent_bp).edict.as_ref().unwrap().wave.roll_ticks;
+            wave_out |= w
+                .state
+                .edicts
+                .iter()
+                .any(|e| matches!(e.phase, EdictPhase::Fired { age } if age > roll));
             intercepted += w
                 .events
                 .iter()
@@ -871,6 +970,7 @@ fn reference() -> Vec<u64> {
                     mc_sim::SimEvent::CloudBolt { .. } => bolts += 1,
                     mc_sim::SimEvent::LensStruck { .. } => lens_strikes += 1,
                     mc_sim::SimEvent::LanceStrike { .. } => lanced += 1,
+                    mc_sim::SimEvent::EdictFired { .. } => edicts_fired += 1,
                     _ => {}
                 }
             }
@@ -922,6 +1022,18 @@ fn reference() -> Vec<u64> {
     assert!(regent_done, "the Regent was never finished and sent off");
     // The gravitic engine's well struck before the snapshot and holds across it.
     assert!(well_at_snapshot, "no gravity well held at the snapshot");
+    // The Regent's Edict gathered across the snapshot with its guns silent, fired, and its
+    // wave rolled out to its full reach.
+    assert!(
+        gathering_at_snapshot,
+        "the Edict was not gathering at the snapshot"
+    );
+    assert_eq!(edicts_fired, 1, "the Edict did not fire once");
+    assert!(wave_out, "the Edict's wave never rolled out");
+    assert_eq!(
+        shots_in_gather, 0,
+        "the Regent's guns fired while it gathered"
+    );
     // The storm bomber's clouds struck down.
     assert!(bolts > 0, "no storm cloud let a bolt fall");
     // A carrier's wing came aboard and went off its deck.

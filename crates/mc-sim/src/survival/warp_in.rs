@@ -28,7 +28,7 @@ use super::rules::{
 };
 use super::{Hold, Spot, FIELD_CAP, HZ};
 use crate::mirror::SimEvent;
-use crate::well_area::{Aircraft, WellArea};
+use crate::well_area::{Aircraft, Sides, WellArea};
 use crate::{SimError, UnitId};
 use mc_core::{Angle, Fx, FxVec2, FxVec3, Rng, StateHasher};
 use mc_data::survival::SiteKind;
@@ -513,6 +513,8 @@ impl crate::World {
                 source: w.source,
                 per_tick: damage,
                 aircraft: Aircraft::Spared,
+                edge: Fx::ONE,
+                sides: Sides::Enemies,
             });
             self.events.push(SimEvent::WarpInArrived {
                 serial: w.serial,

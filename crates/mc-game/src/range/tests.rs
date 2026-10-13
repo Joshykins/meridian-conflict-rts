@@ -40,7 +40,8 @@ fn every_unit_can_be_the_subject() {
             Scenario::Dash,
             Scenario::Pack,
             Scenario::Fracture,
-            Scenario::FractureLetGo
+            Scenario::FractureLetGo,
+            Scenario::Edict
         ],
         "the default subject supports everything a tank can do"
     );
@@ -61,7 +62,8 @@ fn every_unit_can_be_the_subject() {
             Scenario::Dash,
             Scenario::Pack,
             Scenario::Fracture,
-            Scenario::FractureLetGo
+            Scenario::FractureLetGo,
+            Scenario::Edict
         ],
         "nothing builds a commander, and it draws no energy; it does everything else"
     );

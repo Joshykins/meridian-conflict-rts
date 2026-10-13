@@ -821,7 +821,7 @@ impl World {
         for row in 0..rows {
             if !self.state.units.slots.is_alive(row)
                 || !self.state.units.is_active(row)
-                || self.stunned(row)
+                || self.weapons_silent(row)
             {
                 continue;
             }

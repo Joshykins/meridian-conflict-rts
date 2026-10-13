@@ -508,6 +508,9 @@ impl SoundLibrary {
             for name in u.gravitic.iter().flat_map(|g| g.sound_names()) {
                 self.require(name, &u.key)?;
             }
+            for name in u.edict.iter().flat_map(|e| e.sound_names()) {
+                self.require(name, &u.key)?;
+            }
             for w in &u.weapons {
                 let s = &w.sounds;
                 for name in [

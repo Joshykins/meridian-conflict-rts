@@ -252,7 +252,9 @@ struct VsOut {
     // y how full its warp drive's charge is while it spools (warp_hull.wgsl), 0 to 1.
     // A wreck instead: x the share reclaim has taken (past 1, the last of it going:
     // `wreck_going`), y seconds since it last worked it (`wreck_reclaim`).
-    @location(16) @interpolate(flat) crackle: vec2<f32>,
+    // z, w: its Edict gathering in the hull (`edict_state`) and where it fires from, metres
+    // along model x (`EDICT_*`, regency.wgsl `reg_edict`); zero on anything without one.
+    @location(16) @interpolate(flat) crackle: vec4<f32>,
     // A settled wreck's section (wreck.wgsl): the stretch of the hull it keeps along model
     // x (metres), 1 when it draws the hull's inside, 1 when it is posed at all.
     @location(17) @interpolate(flat) wreck: vec4<f32>,
@@ -409,6 +411,27 @@ fn pipe_offset(part: u32, beat: f32, model: ModelInfo) -> vec3<f32> {
 const PAT_COIL: u32 = 19u;
 const PAT_COIL_TURN: u32 = 27u;
 const CHARGE_RECORD: f32 = -1000.0;
+
+// A ship's Edict from its record in `mount` (`EDICT_*`, renderer/edict_fx): the share of the
+// gather (0 to 1) under power, minus it while stalled or let go (falling to nothing over
+// `EDICT_FADE`), or 2 plus the seconds since the shot; 0 on anything without one.
+fn edict_state(m: vec4<f32>, time: f32) -> f32 {
+    if m.w <= EDICT_GATHERING && m.w > EDICT_GATHERING - 1.0 {
+        let rate = EDICT_GATHERING - m.w;
+        return clamp(m.x + clamp(time - m.y, 0.0, EDICT_TICK_REACH) * rate, 0.001, 1.0);
+    }
+    if m.w == EDICT_STALLED {
+        return -clamp(m.x, 0.001, 1.0);
+    }
+    if m.w == EDICT_FIRED {
+        return 2.0 + max(time - m.x, 0.0);
+    }
+    if m.w == EDICT_CANCELLED {
+        let left = 1.0 - (time - m.y) / EDICT_FADE;
+        return select(0.0, -clamp(m.x, 0.001, 1.0) * left, left > 0.0);
+    }
+    return 0.0;
+}
 
 // The charge a vertex's gear and coils move with, as `mount` carries it (x start, y due,
 // z last shot, w CHARGE_RECORD): its own gun's for a piece of a gun house of its own whose
@@ -2663,9 +2686,9 @@ fn vs_main(in: VsIn) -> VsOut {
     }
     out.dust = select(0.62, model.surface.y / max(model.height, 0.1), model.surface.y > 0.0);
     let crackles = (e.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST)) == 0u;
-    out.crackle = select(vec2<f32>(0.0), vec2<f32>(mix(e.fx.z, e.fx.w, t), warp_charge(e.fx, t)), crackles);
+    out.crackle = select(vec4<f32>(0.0), vec4<f32>(mix(e.fx.z, e.fx.w, t), warp_charge(e.fx, t), edict_state(e.mount, time), e.mount.z), crackles);
     if (e.owner_flags & KIND_WRECK) != 0u {
-        out.crackle = e.fx.zw;
+        out.crackle = vec4<f32>(e.fx.zw, 0.0, 0.0);
     }
     // Pieces go up one after another over the first four fifths of the refit, each taking a fifth.
     // What is coming off turns to a hologram at the start.
@@ -3400,6 +3423,7 @@ fn shade_entity(in: VsOut) -> vec4<f32> {
         ri.unit = in.state.w;
         ri.working = select(0.0, 1.0, (flags & FLAG_BUILDING) != 0u && in.refit.z <= 0.0
             && (flags & (FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) == 0u);
+        ri.edict = vec3<f32>(in.crackle.zw, in.weld.z);
         regency = regency_look(ri, works);
         // A flier's feathers burn with what it does (`flight_glow`), whiter the harder.
         if in.drive_at.w == FLIGHT_DRIVE_TAG {

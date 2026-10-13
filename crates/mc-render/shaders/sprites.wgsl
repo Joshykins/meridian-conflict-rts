@@ -527,10 +527,13 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
             var look = select(6.0, 6.3, p.aim.w == FADE_BEAM_HELD_FUSION);
             look = select(look, 6.45, p.aim.w == FADE_BEAM_HELD_STAR);
             look = select(look, 6.52, p.aim.w == FADE_BEAM_HELD_STAR_HALO);
+            look = select(look, 6.45, p.aim.w == FADE_BEAM_HELD_EDICT);
             out.shape = vec2<f32>(-distance(head, tail), look);
             // Its width in metres (green), to swell out of the muzzle rather than start as a
-            // flat edge (`fs_sprite`).
+            // flat edge (`fs_sprite`); blue one for the Edict's column, drawn in the star's
+            // branch.
             out.color.g = p.size;
+            out.color.b = select(0.0, 1.0, p.aim.w == FADE_BEAM_HELD_EDICT);
         } else if (p.color & 0xFu) == 4u {
             let envelope = smoothstep(0.0, 0.035, age) * (1.0 - smoothstep(0.82, 1.0, age));
             out.color = vec3<f32>(envelope);
@@ -842,6 +845,11 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
         if (p.color & 0xFu) == 5u {
             // Where a rail slug struck: a white-hot point.
             out.color = vec3<f32>(2.2, 2.12, 2.0) * fade;
+        }
+        if (p.color & 0xFu) == 7u && p.aim.w == FADE_BEAM_HELD_EDICT {
+            // The Edict's column has no bite of its own: its strike is the ground's.
+            out.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
+            return out;
         }
         if (p.color & 0xFu) == 7u || (p.color & 0xFu) == 8u {
             // A held beam's bite, and a charge: white-hot in red.
@@ -1204,6 +1212,41 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
             let body = pow(1.0 - y, 2.2);
             let haze = mix(vec3<f32>(0.62, 0.42, 1.0), hue, 0.6);
             return vec4<f32>(haze * body * (0.2 + 0.7 * veil) * flare * in.color.r, 1.0);
+        }
+        if in.shape.y > 6.4 && in.color.b > 0.5 {
+            // The Edict's column (renderer/edict_fx/shot.rs): the star let go down its line,
+            // swelling from the firing point to its full width at the ground. A white-hot
+            // core, widening where it meets the ground, in a roiling sheath of plasma:
+            // the prism's pink next to the core going to the Regency's red at its torn,
+            // flickering edge, pulses of light running down it from the hull.
+            let run = (in.uv.x * 0.5 + 0.5) * -in.shape.x;
+            let u = in.uv.x * 0.5 + 0.5;
+            let t = globals.camera.w;
+            let prof = mix(0.3, 1.0, smoothstep(0.0, 0.8, u));
+            // The sheath boils: its edge torn by noise running down the column.
+            let churn = value_noise2(vec2<f32>(run * 0.006 - t * 22.0, in.uv.y * 2.5 + t * 3.0), 1.0);
+            let lick = value_noise2(vec2<f32>(run * 0.02 - t * 40.0, in.uv.y * 6.0), 1.0);
+            let edge = prof * (0.72 + 0.2 * churn + 0.08 * lick);
+            let y = abs(in.uv.y) / edge;
+            if y >= 1.0 {
+                discard;
+            }
+            // The core: a third of the width, half where it meets the ground.
+            let core_w = mix(0.24, 0.45, smoothstep(0.75, 1.0, u)) * (0.95 + 0.1 * lick);
+            let core = 1.0 - smoothstep(core_w * 0.75, core_w, y);
+            let pulse = exp(-pow(fract(run * 0.0015 - t * 2.6) - 0.5, 2.0) * 30.0);
+            let hue = prism(run * 0.004 + churn * 0.6 - t * PRISM_RATE * 4.0);
+            let pink = mix(vec3<f32>(1.0, 0.3, 0.5), hue, 0.35);
+            let crimson = vec3<f32>(1.0, 0.04, 0.03);
+            // Out through the sheath: pink, then red, cells of it brighter and darker.
+            let out_t = smoothstep(core_w, 1.0, y);
+            let cells = 0.3 + 1.4 * churn * (0.6 + 0.4 * lick);
+            let flicker = 0.85 + 0.15 * sin(t * 37.0 + run * 0.01);
+            let sheath = mix(pink * 4.0, crimson * 3.2, smoothstep(0.0, 0.3, out_t))
+                * cells * flicker * (1.0 - smoothstep(0.85, 1.0, y) * 0.5);
+            let white = vec3<f32>(1.0, 0.97, 0.98) * (30.0 + 24.0 * pulse);
+            let rgb = mix(sheath, white, core);
+            return vec4<f32>(rgb * in.color.r, 1.0);
         }
         if in.shape.y > 6.4 {
             // The star (`Weapon::star_beam`): pinch fusion held as one beam, drawn as the

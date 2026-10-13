@@ -216,6 +216,7 @@ pub fn activity(kind: OrderKind) -> &'static str {
         OrderKind::Warp => "Warping",
         OrderKind::Dash => "Dashing",
         OrderKind::Stage => "Refuelling",
+        OrderKind::Edict => "Closing to Fire the Edict",
     }
 }
 

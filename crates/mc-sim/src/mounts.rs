@@ -356,7 +356,7 @@ impl World {
         }
     }
 
-    /// Every gun of `row` let go of its mark: hold fire, or stunned. `None` when none has one.
+    /// Every gun of `row` let go of its mark: hold fire, or silent. `None` when none has one.
     pub(crate) fn mounts_released(&self, row: usize) -> Option<Vec<MountPick>> {
         let mounts = &self.state.units.mounts[row];
         mounts.iter().any(|m| m.target != Handle::NONE).then(|| {

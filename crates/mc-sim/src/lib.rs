@@ -46,6 +46,7 @@ mod decks;
 mod destruct;
 mod dogfight;
 pub mod economy;
+pub mod edict;
 pub mod elevator;
 pub mod fed_reload;
 mod fight_line;

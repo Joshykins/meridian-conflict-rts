@@ -1084,17 +1084,22 @@ fn shade_pbr_vis(m: Pbr, n: vec3<f32>, v: vec3<f32>, l: vec3<f32>, shadow: f32, 
 }
 
 // Craters big blasts leave in the ground (renderer/craters.rs), shaded by terrain.wgsl.
+//!rust crate::renderer::craters::GpuCrater
 struct Crater {
     // x, y, radius (metres), the time it was made.
     at: vec4<f32>,
     // heat (0-1), seconds it takes to cool, pool share of the radius, seed.
     look: vec4<f32>,
+    // CRATER_* style.
+    style: u32,
+    _pad0: u32,
+    _pad1: u32,
+    _pad2: u32,
 }
 struct CraterList {
     // x how many are in use.
     count: vec4<u32>,
-    // Size mirrors craters::MAX_CRATERS.
-    items: array<Crater, 48>,
+    items: array<Crater, CRATER_MAX>,
 }
 @group(0) @binding(29) var<storage, read> ground_craters: CraterList;
 

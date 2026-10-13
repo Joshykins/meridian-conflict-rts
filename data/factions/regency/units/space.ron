@@ -278,6 +278,20 @@
         body: (fore: 1900, aft: -1550, beam: 450),
         motion: (layer: Air, size: 0, speed: 40, accel: 2, turn: 3, altitude: 1500, hover: true, hangs: true),
         hull_mounts: true,
+        // The Edict: no gun of its own. The ship gathers along its whole hull, every other gun
+        // silent, and fires from the point on it nearest the mark: a total kill within 300 m,
+        // falling off to 1.2 km, then a molten wave burning out over it for 10 s.
+        edict: (
+            gather: 15, range: 6000, reload: 150, energy: 500000, quiet: 3,
+            blast: (radius: 1200, core: 300, damage: 400000, edge: 4000, front: 1.6),
+            wave: (radius: 1200, speed: 300, damage: 4000, edge: 0.1, linger: 6),
+            sounds: (
+                gather: "regency_edict_gather", peak: "regency_edict_peak",
+                fire: "regency_edict_fire", fire_far: "regency_edict_fire_far",
+                impact: "regency_edict_impact", impact_far: "regency_edict_impact_far",
+                cancel: "regency_edict_cancel",
+            ),
+        ),
         // Eight Rondel crush lenses, four a side, each reaching 900 m round it.
         anti_missile: 900, anti_missile_lasers: 8,
         anti_missile_mounts: [

@@ -1,0 +1,329 @@
+// The Edict: the main gun of the Regent, the Regency's flying super destroyer. Every other
+// gun on the ship falls silent, the whole hull gathers power for 15 s into one point on
+// the keel, and a column of pinch-fusion plasma comes down to the ground, glassing a disc
+// 2.4 km across. A hull-wide charge held in containment: everything is low and tonal,
+// rough growls and a buzzing stack; not the Fallen's grinding rock and rings, not the
+// warhead's pinch and seethe. Nothing beeps, whines or rings on a note.
+(
+    sounds: {
+        // The gather, 15 s at the ship, played once as the Edict is ordered to fire, as long as the
+        // gather. A heavy contactor drops the ship's other guns off the bus; then the
+        // whole hull draws power: a sub swell climbing slowly, a choir of rough growls from end to
+        // end of the hull starting at bow and stern and running in to the middle, the hull's plates
+        // groaning and ticking under the load, a deep pulse coming quicker, plasma seething low in
+        // its containment. Over the last three seconds the air is drawn in; then it all lets go at
+        // once and leaves a held breath, nearly silent, for the shot. No beeps, no whine, nothing
+        // rings on a note; nothing above 2.5 kHz but the first milliseconds of the clicks.
+        "regency_edict_gather": (
+            length: 15, peak: 0.72, room: 0.4,
+            layers: [
+                // The contactor: a heavy clunk deep in the hull and a felt drop as the guns go cold,
+                // the guns' buses sinking away to either side.
+                Burst(low: 35, high: 380, attack: 0.001, decay: 0.07, gain: 5, seed: 47001),
+                Burst(at: 0.002, low: 26, high: 170, attack: 0.004, decay: 0.35, gain: 3.5, seed: 47002),
+                Tone(from: 66, to: 28, glide: 0.7, attack: 0.003, decay: 0.8, gain: 1),
+                Fm(at: 0.02, from: 150, to: 46, glide: 1.6, ratio: 0.5, index: 1.6, fade: 1, attack: 0.01, decay: 0.8, gain: 0.22, pan: -0.45),
+                Fm(at: 0.06, from: 128, to: 40, glide: 1.8, ratio: 0.5, index: 1.6, fade: 1, attack: 0.01, decay: 0.9, gain: 0.22, pan: 0.45),
+                // The ship drawing power: a sub swell climbing slowly from 26 Hz toward 70, its
+                // harmonics carrying it on small speakers.
+                Stack(at: 0.6, from: 26, to: 76, glide: 27, attack: 13.5, decay: 0.05, gain: 0.42, detune: 1.006, width: 0.3, partials: [(1, 1), (2, 0.7), (3, 0.4), (4, 0.2)]),
+                // The charge running in along the plates: rough growls from all along the hull, the
+                // ends first (wide), then nearer and nearer the middle, each pair a little out of tune.
+                // The outer voices fade as the charge leaves them for the point on the keel.
+                Fm(at: 0.8, from: 44, to: 84.92, glide: 26.6, ratio: 0.5, index: 2.2, fade: 1000, attack: 8.8, decay: 2.4, gain: 0.26, pan: -0.92),
+                Fm(at: 1.05, from: 45.364, to: 87.553, glide: 26.1, ratio: 0.5, index: 2.2, fade: 1000, attack: 8.55, decay: 2.4, gain: 0.26, pan: 0.92),
+                Fm(at: 2.4, from: 52, to: 100.36, glide: 23.4, ratio: 0.5, index: 2, fade: 1000, attack: 8.2, decay: 1.8, gain: 0.26, pan: -0.7),
+                Fm(at: 2.65, from: 53.612, to: 103.471, glide: 22.9, ratio: 0.5, index: 2, fade: 1000, attack: 7.95, decay: 1.8, gain: 0.26, pan: 0.7),
+                Fm(at: 4.2, from: 60, to: 115.8, glide: 19.8, ratio: 0.5, index: 1.8, fade: 1000, attack: 7.6, decay: 1.2, gain: 0.26, pan: -0.48),
+                Fm(at: 4.45, from: 61.86, to: 119.39, glide: 19.3, ratio: 0.5, index: 1.8, fade: 1000, attack: 7.35, decay: 1.2, gain: 0.26, pan: 0.48),
+                Fm(at: 6.2, from: 68, to: 131.24, glide: 15.8, ratio: 0.5, index: 1.6, fade: 1000, attack: 7.9, decay: 0.05, gain: 0.26, pan: -0.26),
+                Fm(at: 6.45, from: 70.108, to: 135.308, glide: 15.3, ratio: 0.5, index: 1.6, fade: 1000, attack: 7.65, decay: 0.05, gain: 0.26, pan: 0.26),
+                Fm(at: 8.4, from: 76, to: 146.68, glide: 11.4, ratio: 0.5, index: 1.4, fade: 1000, attack: 5.7, decay: 0.05, gain: 0.26, pan: -0.08),
+                Fm(at: 8.65, from: 78.356, to: 151.227, glide: 10.9, ratio: 0.5, index: 1.4, fade: 1000, attack: 5.45, decay: 0.05, gain: 0.26, pan: 0.08),
+                // The pulse of the hull taking the charge: a deep throb, slow at first and quicker,
+                // higher and harder as it fills.
+                Tone(at: 2, from: 47.5, to: 38, glide: 0.12, attack: 0.05, decay: 0.3, gain: 0.22),
+                Tone(at: 2, from: 95, to: 76, glide: 0.12, attack: 0.04, decay: 0.22, gain: 0.077),
+                Tone(at: 3.6, from: 48.75, to: 39, glide: 0.12, attack: 0.05, decay: 0.295, gain: 0.235),
+                Tone(at: 3.6, from: 97.5, to: 78, glide: 0.12, attack: 0.04, decay: 0.216, gain: 0.082),
+                Tone(at: 4.912, from: 50, to: 40, glide: 0.12, attack: 0.05, decay: 0.291, gain: 0.251),
+                Tone(at: 4.912, from: 100, to: 80, glide: 0.12, attack: 0.04, decay: 0.212, gain: 0.088),
+                Tone(at: 5.988, from: 51.25, to: 41, glide: 0.12, attack: 0.05, decay: 0.286, gain: 0.266),
+                Tone(at: 5.988, from: 102.5, to: 82, glide: 0.12, attack: 0.04, decay: 0.208, gain: 0.093),
+                Tone(at: 6.87, from: 52.5, to: 42, glide: 0.12, attack: 0.05, decay: 0.282, gain: 0.282),
+                Tone(at: 6.87, from: 105, to: 84, glide: 0.12, attack: 0.04, decay: 0.205, gain: 0.099),
+                Tone(at: 7.593, from: 53.75, to: 43, glide: 0.12, attack: 0.05, decay: 0.277, gain: 0.297),
+                Tone(at: 7.593, from: 107.5, to: 86, glide: 0.12, attack: 0.04, decay: 0.201, gain: 0.104),
+                Tone(at: 8.187, from: 55, to: 44, glide: 0.12, attack: 0.05, decay: 0.272, gain: 0.312),
+                Tone(at: 8.187, from: 110, to: 88, glide: 0.12, attack: 0.04, decay: 0.197, gain: 0.109),
+                Tone(at: 8.673, from: 56.25, to: 45, glide: 0.12, attack: 0.05, decay: 0.268, gain: 0.328),
+                Tone(at: 8.673, from: 112.5, to: 90, glide: 0.12, attack: 0.04, decay: 0.193, gain: 0.115),
+                Tone(at: 9.072, from: 57.5, to: 46, glide: 0.12, attack: 0.05, decay: 0.263, gain: 0.343),
+                Tone(at: 9.072, from: 115, to: 92, glide: 0.12, attack: 0.04, decay: 0.189, gain: 0.12),
+                Tone(at: 9.399, from: 58.75, to: 47, glide: 0.12, attack: 0.05, decay: 0.258, gain: 0.358),
+                Tone(at: 9.399, from: 117.5, to: 94, glide: 0.12, attack: 0.04, decay: 0.185, gain: 0.125),
+                Tone(at: 9.667, from: 60, to: 48, glide: 0.12, attack: 0.05, decay: 0.254, gain: 0.374),
+                Tone(at: 9.667, from: 120, to: 96, glide: 0.12, attack: 0.04, decay: 0.182, gain: 0.131),
+                Tone(at: 9.907, from: 61.25, to: 49, glide: 0.12, attack: 0.05, decay: 0.249, gain: 0.389),
+                Tone(at: 9.907, from: 122.5, to: 98, glide: 0.12, attack: 0.04, decay: 0.178, gain: 0.136),
+                Tone(at: 10.147, from: 62.5, to: 50, glide: 0.12, attack: 0.05, decay: 0.245, gain: 0.405),
+                Tone(at: 10.147, from: 125, to: 100, glide: 0.12, attack: 0.04, decay: 0.174, gain: 0.142),
+                Tone(at: 10.387, from: 63.75, to: 51, glide: 0.12, attack: 0.05, decay: 0.24, gain: 0.42),
+                Tone(at: 10.387, from: 127.5, to: 102, glide: 0.12, attack: 0.04, decay: 0.17, gain: 0.147),
+                Tone(at: 10.627, from: 65, to: 52, glide: 0.12, attack: 0.05, decay: 0.235, gain: 0.435),
+                Tone(at: 10.627, from: 130, to: 104, glide: 0.12, attack: 0.04, decay: 0.166, gain: 0.152),
+                Tone(at: 10.867, from: 66.25, to: 53, glide: 0.12, attack: 0.05, decay: 0.231, gain: 0.451),
+                Tone(at: 10.867, from: 132.5, to: 106, glide: 0.12, attack: 0.04, decay: 0.162, gain: 0.158),
+                Tone(at: 11.107, from: 67.5, to: 54, glide: 0.12, attack: 0.05, decay: 0.226, gain: 0.466),
+                Tone(at: 11.107, from: 135, to: 108, glide: 0.12, attack: 0.04, decay: 0.158, gain: 0.163),
+                Tone(at: 11.347, from: 68.75, to: 55, glide: 0.12, attack: 0.05, decay: 0.222, gain: 0.482),
+                Tone(at: 11.347, from: 137.5, to: 110, glide: 0.12, attack: 0.04, decay: 0.155, gain: 0.169),
+                Tone(at: 11.587, from: 70, to: 56, glide: 0.12, attack: 0.05, decay: 0.217, gain: 0.497),
+                Tone(at: 11.587, from: 140, to: 112, glide: 0.12, attack: 0.04, decay: 0.151, gain: 0.174),
+                Tone(at: 11.827, from: 71.25, to: 57, glide: 0.12, attack: 0.05, decay: 0.212, gain: 0.512),
+                Tone(at: 11.827, from: 142.5, to: 114, glide: 0.12, attack: 0.04, decay: 0.147, gain: 0.179),
+                Tone(at: 12.067, from: 72.5, to: 58, glide: 0.12, attack: 0.05, decay: 0.208, gain: 0.528),
+                Tone(at: 12.067, from: 145, to: 116, glide: 0.12, attack: 0.04, decay: 0.143, gain: 0.185),
+                Tone(at: 12.307, from: 73.75, to: 59, glide: 0.12, attack: 0.05, decay: 0.203, gain: 0.543),
+                Tone(at: 12.307, from: 147.5, to: 118, glide: 0.12, attack: 0.04, decay: 0.139, gain: 0.19),
+                Tone(at: 12.547, from: 75, to: 60, glide: 0.12, attack: 0.05, decay: 0.198, gain: 0.558),
+                Tone(at: 12.547, from: 150, to: 120, glide: 0.12, attack: 0.04, decay: 0.135, gain: 0.195),
+                Tone(at: 12.787, from: 76.25, to: 61, glide: 0.12, attack: 0.05, decay: 0.194, gain: 0.574),
+                Tone(at: 12.787, from: 152.5, to: 122, glide: 0.12, attack: 0.04, decay: 0.132, gain: 0.201),
+                Tone(at: 13.027, from: 77.5, to: 62, glide: 0.12, attack: 0.05, decay: 0.189, gain: 0.589),
+                Tone(at: 13.027, from: 155, to: 124, glide: 0.12, attack: 0.04, decay: 0.128, gain: 0.206),
+                Tone(at: 13.267, from: 78.75, to: 63, glide: 0.12, attack: 0.05, decay: 0.185, gain: 0.605),
+                Tone(at: 13.267, from: 157.5, to: 126, glide: 0.12, attack: 0.04, decay: 0.124, gain: 0.212),
+                Tone(at: 13.507, from: 80, to: 64, glide: 0.12, attack: 0.05, decay: 0.18, gain: 0.62),
+                Tone(at: 13.507, from: 160, to: 128, glide: 0.12, attack: 0.04, decay: 0.12, gain: 0.217),
+                // The hull's metal taking the load: long low groans, each a little higher and nearer
+                // the last.
+                Fm(at: 1.9, from: 55.012, to: 49.511, glide: 1.3, ratio: 1.41, index: 1.3, fade: 0.9, attack: 0.45, decay: 0.9, gain: 0.1, pan: -0.268),
+                Fm(at: 3.8, from: 64.587, to: 58.128, glide: 1.3, ratio: 1.41, index: 1.3, fade: 0.9, attack: 0.428, decay: 0.856, gain: 0.109, pan: 0.571),
+                Fm(at: 5.5, from: 60.812, to: 54.731, glide: 1.3, ratio: 1.41, index: 1.3, fade: 0.9, attack: 0.406, decay: 0.811, gain: 0.118, pan: 0.404),
+                Fm(at: 7, from: 72.081, to: 64.873, glide: 1.3, ratio: 1.41, index: 1.3, fade: 0.9, attack: 0.383, decay: 0.767, gain: 0.127, pan: -0.319),
+                Fm(at: 8.4, from: 74.296, to: 66.866, glide: 1.3, ratio: 1.41, index: 1.3, fade: 0.9, attack: 0.361, decay: 0.722, gain: 0.136, pan: 0.529),
+                Fm(at: 9.6, from: 73.574, to: 66.216, glide: 1.3, ratio: 1.41, index: 1.3, fade: 0.9, attack: 0.339, decay: 0.678, gain: 0.144, pan: 0.072),
+                Fm(at: 10.7, from: 81.446, to: 73.302, glide: 1.3, ratio: 1.41, index: 1.3, fade: 0.9, attack: 0.317, decay: 0.633, gain: 0.153, pan: 0.118),
+                Fm(at: 11.7, from: 79.04, to: 71.136, glide: 1.3, ratio: 1.41, index: 1.3, fade: 0.9, attack: 0.294, decay: 0.589, gain: 0.162, pan: -0.038),
+                Fm(at: 12.6, from: 84.577, to: 76.12, glide: 1.3, ratio: 1.41, index: 1.3, fade: 0.9, attack: 0.272, decay: 0.544, gain: 0.171, pan: -0.231),
+                Fm(at: 13.4, from: 85.259, to: 76.733, glide: 1.3, ratio: 1.41, index: 1.3, fade: 0.9, attack: 0.25, decay: 0.5, gain: 0.18, pan: 0.18),
+                Drive(1.4),
+                // Plates ticking as they take the strain: dull knocks, few and far off, then nearer.
+                Burst(at: 2.811, low: 145.408, high: 922.549, attack: 0.0004, decay: 0.009, gain: 0.525, pan: 0.138, seed: 47003),
+                Burst(at: 2.812, low: 40, high: 320, attack: 0.002, decay: 0.04, gain: 0.627, pan: 0.138, seed: 47004),
+                Burst(at: 4.384, low: 140.889, high: 1230.739, attack: 0.0004, decay: 0.0069, gain: 0.649, pan: -0.31, seed: 47005),
+                Burst(at: 4.385, low: 40, high: 320, attack: 0.002, decay: 0.04, gain: 0.765, pan: -0.31, seed: 47006),
+                Burst(at: 5.463, low: 159.039, high: 1378.84, attack: 0.0004, decay: 0.011, gain: 0.734, pan: 0.465, seed: 47007),
+                Burst(at: 5.464, low: 40, high: 320, attack: 0.002, decay: 0.04, gain: 0.86, pan: 0.465, seed: 47008),
+                Burst(at: 7.019, low: 120.773, high: 960.793, attack: 0.0004, decay: 0.0071, gain: 0.857, pan: 0.228, seed: 47009),
+                Burst(at: 7.02, low: 40, high: 320, attack: 0.002, decay: 0.04, gain: 0.996, pan: 0.228, seed: 47010),
+                Burst(at: 8.775, low: 115.619, high: 1142.779, attack: 0.0004, decay: 0.011, gain: 0.995, pan: 0.667, seed: 47011),
+                Burst(at: 8.776, low: 40, high: 320, attack: 0.002, decay: 0.04, gain: 1.15, pan: 0.667, seed: 47012),
+                Burst(at: 8.926, low: 140.283, high: 1149.791, attack: 0.0004, decay: 0.0081, gain: 1.007, pan: -0.84, seed: 47013),
+                Burst(at: 8.927, low: 40, high: 320, attack: 0.002, decay: 0.04, gain: 1.164, pan: -0.84, seed: 47014),
+                Burst(at: 9.724, low: 97.103, high: 1298.263, attack: 0.0004, decay: 0.0063, gain: 1.07, pan: 0.157, seed: 47015),
+                Burst(at: 9.725, low: 40, high: 320, attack: 0.002, decay: 0.04, gain: 1.234, pan: 0.157, seed: 47016),
+                Burst(at: 9.979, low: 104.752, high: 1218.723, attack: 0.0004, decay: 0.011, gain: 1.09, pan: -0.729, seed: 47017),
+                Burst(at: 9.98, low: 40, high: 320, attack: 0.002, decay: 0.04, gain: 1.256, pan: -0.729, seed: 47018),
+                Burst(at: 10.103, low: 153.702, high: 930.896, attack: 0.0004, decay: 0.0075, gain: 1.1, pan: -0.198, seed: 47019),
+                Burst(at: 10.104, low: 40, high: 320, attack: 0.002, decay: 0.04, gain: 1.267, pan: -0.198, seed: 47020),
+                Burst(at: 11.124, low: 149.627, high: 1397.093, attack: 0.0004, decay: 0.011, gain: 1.181, pan: -0.072, seed: 47021),
+                Burst(at: 11.125, low: 40, high: 320, attack: 0.002, decay: 0.04, gain: 1.357, pan: -0.072, seed: 47022),
+                Burst(at: 12.375, low: 122.448, high: 1375.935, attack: 0.0004, decay: 0.01, gain: 1.28, pan: -0.369, seed: 47023),
+                Burst(at: 12.376, low: 40, high: 320, attack: 0.002, decay: 0.04, gain: 1.466, pan: -0.369, seed: 47024),
+                Burst(at: 13.866, low: 140.187, high: 881.425, attack: 0.0004, decay: 0.0063, gain: 1.397, pan: -0.837, seed: 47025),
+                Burst(at: 13.867, low: 40, high: 320, attack: 0.002, decay: 0.04, gain: 1.597, pan: -0.837, seed: 47026),
+                // Plasma seething in its containment: a low power rumble swelling and sagging, a
+                // faint fizz inside it, and a rough tonal beating out of tune between the ears.
+                Roll(at: 1.5, from: 120, to: 260, glide: 24, attack: 12.6, decay: 0.05, gain: 0.55, swell: 2.5, depth: 0.6, seed: 47027),
+                Foam(at: 3, from: 160, to: 380, glide: 22, q: 1.1, attack: 11.1, decay: 0.05, gain: 0.3, swell: 22, depth: 0.75, seed: 47028),
+                Stack(at: 4, from: 82, to: 150, glide: 20.2, attack: 10.1, decay: 0.05, gain: 0.16, detune: 1.017, width: 0.6, partials: [(1, 1), (1.5, 0.5), (2, 0.6), (3, 0.3)]),
+                // The last three seconds: the air drawn in toward the point, its band pulled tight.
+                Roll(at: 11, from: 150, to: 520, glide: 3.2, attack: 3.1, decay: 0.03, gain: 0.9, swell: 7, depth: 0.5, seed: 47029),
+                Sweep(at: 11.4, from: 900, to: 280, glide: 2.8, q: 0.7, attack: 2.7, decay: 0.03, gain: 0.45, seed: 47030),
+                Fm(at: 11, from: 92, to: 150, glide: 3.1, ratio: 0.5, index: 1.4, fade: 1000, attack: 3.1, decay: 0.04, gain: 0.18),
+                // And it lets go: a held breath, nearly silent, for the shot.
+                Tone(at: 14.1, from: 36, to: 32, glide: 0.8, attack: 0.72, decay: 0.03, gain: 0.15),
+                Roll(at: 14.12, from: 150, to: 95, glide: 0.8, attack: 0.7, decay: 0.025, gain: 0.1, swell: 5, depth: 0.4, seed: 47031),
+            ],
+        ),
+        // The point on the keel going brighter than the sun, played 2.5 s before the shot over the
+        // end of the gather: a very deep tightening, a pressure swell, and plasma straining at its
+        // containment as a shimmer that beats quicker as it climbs (nothing above 1.5 kHz). It stops
+        // dead 0.4 s before the shot, leaving the gather's held breath; the shot covers the cut.
+        "regency_edict_peak": (
+            length: 2.5, peak: 0.6, room: 0.3,
+            layers: [
+                // The tightening: a sub drawn up, and its harmonics.
+                Tone(from: 30, to: 44, glide: 2.1, attack: 2.1, decay: 0.012, gain: 1),
+                Tone(at: 0.1, from: 60, to: 90, glide: 2, attack: 2, decay: 0.012, gain: 0.45),
+                Fm(at: 0.2, from: 120, to: 170, glide: 1.9, ratio: 0.5, index: 1.8, fade: 1000, attack: 1.9, decay: 0.012, gain: 0.3),
+                // The plasma straining: two stacks a little out of tune, so they beat, quicker as they climb.
+                Stack(at: 0.2, from: 240, to: 330, glide: 1.9, attack: 1.9, decay: 0.012, gain: 0.4, detune: 1.03, width: 0, partials: [(1, 1), (2, 0.55), (3, 0.3), (4, 0.15)]),
+                Stack(at: 0.5, from: 300, to: 410, glide: 1.6, attack: 1.6, decay: 0.012, gain: 0.25, detune: 1.021, width: 0.7, partials: [(1, 1), (2, 0.4), (3, 0.2)]),
+                // The pressure swelling round it.
+                Roll(from: 80, to: 260, glide: 2.1, attack: 2.1, decay: 0.012, gain: 0.8, swell: 6, depth: 0.5, seed: 47032),
+                Foam(at: 0.6, from: 260, to: 600, glide: 1.5, q: 1, attack: 1.5, decay: 0.012, gain: 0.18, swell: 26, depth: 0.7, seed: 47033),
+            ],
+        ),
+        // The shot, at the ship: the gravity pinch (a short suck, pulled tight), then the crack and
+        // a chest-deep slam together, a sub-bass shove, and the column's roar, a deep buzzing stack
+        // of plasma falling away over seconds, then a low roll. Nothing whines.
+        "regency_edict_fire": (
+            length: 6, peak: 0.9, room: 0.9,
+            layers: [
+                // The pinch: the air pulled in for a twelfth of a second, its band falling as it tightens.
+                Sweep(from: 800, to: 260, glide: 0.08, q: 0.6, attack: 0.078, decay: 0.008, gain: 1.2, seed: 47034),
+                Roll(from: 260, to: 110, glide: 0.08, attack: 0.078, decay: 0.008, gain: 1.2, swell: 6, depth: 0.4, seed: 47035),
+                Tone(from: 34, to: 30, glide: 0.08, attack: 0.075, decay: 0.012, gain: 0.6),
+                // The release: a plasmeric crack, a slam, and the sub-bass shove under it.
+                Burst(at: 0.08, low: 250, high: 2400, attack: 0.0003, decay: 0.015, gain: 10, seed: 47036),
+                Burst(at: 0.08, low: 100, high: 1100, attack: 0.0005, decay: 0.04, gain: 7, seed: 47037),
+                Burst(at: 0.081, low: 35, high: 400, attack: 0.002, decay: 0.3, gain: 16, seed: 47038),
+                Burst(at: 0.083, low: 28, high: 190, attack: 0.006, decay: 0.9, gain: 13, seed: 47039),
+                Tone(at: 0.08, from: 140, to: 48, glide: 0.2, attack: 0.002, decay: 0.5, gain: 2.4),
+                Tone(at: 0.08, from: 76, to: 30, glide: 1.2, attack: 0.004, decay: 1.4, gain: 2.6),
+                Tone(at: 0.08, from: 44, to: 26, glide: 2.5, attack: 0.01, decay: 2, gain: 1.2),
+                // The column: a deep buzzing roar of plasma, falling, and a rough growl inside it.
+                Stack(at: 0.085, from: 92, to: 46, glide: 4, attack: 0.03, decay: 2.2, gain: 0.5, detune: 1.012, width: 0.5, partials: [(1, 1), (2, 0.7), (3, 0.5), (4, 0.35), (5, 0.25), (6, 0.18), (8, 0.1)]),
+                Fm(at: 0.085, from: 112, to: 46, glide: 3, ratio: 0.5, index: 2.4, fade: 2, attack: 0.01, decay: 2, gain: 0.9),
+                Drive(2.2),
+                // The roar fluttering, and the report rolling off low in both ears.
+                Roll(at: 0.09, from: 420, to: 150, glide: 3, attack: 0.03, decay: 1.2, gain: 0.8, swell: 14, depth: 0.6, seed: 47040),
+                Roll(at: 0.25, from: 220, to: 70, glide: 4, attack: 0.4, decay: 1.3, gain: 0.7, swell: 1, depth: 0.75, pan: -0.5, seed: 47041),
+                Roll(at: 0.35, from: 210, to: 66, glide: 4, attack: 0.5, decay: 1.3, gain: 0.7, swell: 0.9, depth: 0.75, pan: 0.5, seed: 47042),
+                Roll(at: 0.15, from: 95, to: 45, glide: 5, attack: 0.4, decay: 1.4, gain: 0.8, swell: 0.5, depth: 0.7, seed: 47043),
+            ],
+        ),
+        // The shot heard from far off: a soft-edged boom, the column's roar muffled, a long roll.
+        "regency_edict_fire_far": (
+            length: 9, peak: 0.85, room: 1,
+            layers: [
+                Roll(from: 90, to: 60, glide: 0.1, attack: 0.1, decay: 0.015, gain: 0.5, swell: 4, depth: 0.3, seed: 47044),
+                Burst(at: 0.1, low: 26, high: 200, attack: 0.012, decay: 0.7, gain: 16, seed: 47045),
+                Burst(at: 0.1, low: 60, high: 500, attack: 0.004, decay: 0.06, gain: 3, seed: 47046),
+                Tone(at: 0.1, from: 80, to: 30, glide: 0.7, attack: 0.01, decay: 1, gain: 2.2),
+                Tone(at: 0.1, from: 50, to: 32, glide: 2, attack: 0.02, decay: 1.6, gain: 1.1),
+                Stack(at: 0.12, from: 80, to: 48, glide: 4, attack: 0.1, decay: 2, gain: 0.45, detune: 1.01, width: 0.4, partials: [(1, 1), (2, 0.5), (3, 0.25), (4, 0.12)]),
+                Drive(1.5),
+                Roll(at: 0.15, from: 260, to: 95, glide: 5, attack: 0.5, decay: 2.4, gain: 2, swell: 1, depth: 0.5, seed: 47047),
+                Roll(at: 0.6, from: 170, to: 70, glide: 7, attack: 1.6, decay: 2.6, gain: 2.2, swell: 0.5, depth: 0.55, pan: -0.4, seed: 47048),
+                Roll(at: 0.9, from: 165, to: 66, glide: 7, attack: 1.8, decay: 2.6, gain: 2.1, swell: 0.45, depth: 0.55, pan: 0.4, seed: 47049),
+            ],
+        ),
+        // The column striking the ground, heard at the strike: the crack and slam of its arrival and a
+        // sub that holds while it presses down, the column's buzz driven into the ground, the ground
+        // heaving as the disc glasses; then the molten wave rolling out to both sides, the glass
+        // seething for ten seconds (a low roar swelling and sagging, a soft sizzle under 2 kHz, a
+        // rough growl sinking), the ground cracking as it cools, and thunder rolling away.
+        "regency_edict_impact": (
+            length: 16, peak: 0.9, room: 1,
+            layers: [
+                // Arrival: crack, slam, sub thump.
+                Burst(low: 220, high: 2200, attack: 0.0004, decay: 0.02, gain: 8, seed: 47050),
+                Burst(at: 0.001, low: 90, high: 1000, attack: 0.0005, decay: 0.05, gain: 6, seed: 47051),
+                Burst(at: 0.002, low: 35, high: 380, attack: 0.002, decay: 0.4, gain: 16, seed: 47052),
+                Burst(at: 0.004, low: 26, high: 190, attack: 0.01, decay: 1.2, gain: 14, seed: 47053),
+                Tone(from: 120, to: 46, glide: 0.3, attack: 0.002, decay: 0.7, gain: 2.2),
+                Tone(from: 72, to: 30, glide: 1.2, attack: 0.004, decay: 1.8, gain: 2.6),
+                // The column pressing down: a sub that holds, its buzz driven into the ground, a growl.
+                Tone(at: 0.02, from: 40, to: 33, glide: 3, attack: 0.3, decay: 3, gain: 1.2),
+                Stack(at: 0.03, from: 66, to: 40, glide: 3.5, attack: 0.2, decay: 2.2, gain: 0.5, detune: 1.01, width: 0.4, partials: [(1, 1), (2, 0.6), (3, 0.4), (4, 0.25), (6, 0.12)]),
+                Fm(at: 0.02, from: 110, to: 40, glide: 2, ratio: 0.5, index: 2.4, fade: 1.5, attack: 0.005, decay: 1.8, gain: 0.9),
+                // The ground heaving as the disc glasses, and again as the wave goes out.
+                Burst(at: 0.7, low: 30, high: 240, attack: 0.01, decay: 0.6, gain: 9, pan: -0.2, seed: 47054),
+                Tone(at: 0.7, from: 88, to: 36, glide: 1, attack: 0.008, decay: 1.3, gain: 1.5, pan: -0.2),
+                Burst(at: 2.1, low: 28, high: 200, attack: 0.015, decay: 0.7, gain: 6, pan: 0.3, seed: 47055),
+                Tone(at: 2.1, from: 76, to: 34, glide: 1.2, attack: 0.01, decay: 1.5, gain: 1.1, pan: 0.3),
+                Drive(1.8),
+                // The molten wave rolling out: a roar swelling from the middle and running out both sides.
+                Roll(at: 0.3, from: 380, to: 140, glide: 3, attack: 0.9, decay: 2.2, gain: 1.4, swell: 2.5, depth: 0.5, seed: 47056),
+                Roll(at: 0.9, from: 340, to: 120, glide: 3.5, attack: 1.4, decay: 2.6, gain: 1, swell: 2, depth: 0.6, pan: -0.65, seed: 47057),
+                Roll(at: 1.1, from: 330, to: 115, glide: 3.5, attack: 1.4, decay: 2.6, gain: 1, swell: 2, depth: 0.6, pan: 0.65, seed: 47058),
+                // The glass seething: a low roar swelling and sagging, a soft sizzle, a growl sinking.
+                Roll(at: 1.5, from: 260, to: 120, glide: 11, attack: 2, decay: 5, gain: 0.7, swell: 3.5, depth: 0.75, seed: 47059),
+                Foam(at: 1.2, from: 1300, to: 380, glide: 10, q: 0.8, attack: 1.6, decay: 4.5, gain: 0.45, swell: 24, depth: 0.85, seed: 47060),
+                Foam(at: 2, from: 600, to: 220, glide: 10, q: 1, attack: 2, decay: 4.5, gain: 0.4, swell: 9, depth: 0.7, pan: -0.4, seed: 47061),
+                Foam(at: 2.3, from: 580, to: 210, glide: 10, q: 1, attack: 2, decay: 4.5, gain: 0.4, swell: 8, depth: 0.7, pan: 0.4, seed: 47062),
+                Fm(at: 1.5, from: 72, to: 40, glide: 10, ratio: 0.5, index: 1.8, fade: 6, attack: 1.5, decay: 4.5, gain: 0.35),
+                Stack(at: 1.5, from: 58, to: 38, glide: 10, attack: 2, decay: 4.5, gain: 0.2, detune: 1.015, width: 0.6, partials: [(1, 1), (2, 0.5), (3, 0.3)]),
+                // The glass cracking as it cools: dull splits at random, thinning out.
+                Burst(at: 3.948, low: 166.149, high: 1344.577, attack: 0.0005, decay: 0.013, gain: 0.97, pan: 0.248, seed: 47063),
+                Burst(at: 3.95, low: 40, high: 300, attack: 0.002, decay: 0.05, gain: 1.165, pan: 0.248, seed: 47064),
+                Burst(at: 4.31, low: 153.168, high: 1126.876, attack: 0.0005, decay: 0.017, gain: 0.946, pan: 0.476, seed: 47065),
+                Burst(at: 4.312, low: 40, high: 300, attack: 0.002, decay: 0.05, gain: 1.137, pan: 0.476, seed: 47066),
+                Burst(at: 5.597, low: 167.391, high: 1268.081, attack: 0.0005, decay: 0.019, gain: 0.86, pan: -0.542, seed: 47067),
+                Burst(at: 5.599, low: 40, high: 300, attack: 0.002, decay: 0.05, gain: 1.037, pan: -0.542, seed: 47068),
+                Burst(at: 6.317, low: 122.906, high: 1024.968, attack: 0.0005, decay: 0.02, gain: 0.812, pan: -0.662, seed: 47069),
+                Burst(at: 6.319, low: 40, high: 300, attack: 0.002, decay: 0.05, gain: 0.981, pan: -0.662, seed: 47070),
+                Burst(at: 6.879, low: 121.938, high: 1056.032, attack: 0.0005, decay: 0.018, gain: 0.775, pan: 0.409, seed: 47071),
+                Burst(at: 6.881, low: 40, high: 300, attack: 0.002, decay: 0.05, gain: 0.937, pan: 0.409, seed: 47072),
+                Burst(at: 6.979, low: 135.518, high: 1266.256, attack: 0.0005, decay: 0.016, gain: 0.768, pan: -0.721, seed: 47073),
+                Burst(at: 6.981, low: 40, high: 300, attack: 0.002, decay: 0.05, gain: 0.929, pan: -0.721, seed: 47074),
+                Burst(at: 7.443, low: 168.493, high: 1053.672, attack: 0.0005, decay: 0.018, gain: 0.737, pan: 0.089, seed: 47075),
+                Burst(at: 7.445, low: 40, high: 300, attack: 0.002, decay: 0.05, gain: 0.893, pan: 0.089, seed: 47076),
+                Burst(at: 7.555, low: 165.243, high: 1031.404, attack: 0.0005, decay: 0.015, gain: 0.73, pan: 0.11, seed: 47077),
+                Burst(at: 7.557, low: 40, high: 300, attack: 0.002, decay: 0.05, gain: 0.885, pan: 0.11, seed: 47078),
+                Burst(at: 8.225, low: 181.423, high: 1484.627, attack: 0.0005, decay: 0.018, gain: 0.685, pan: 0.072, seed: 47079),
+                Burst(at: 8.227, low: 40, high: 300, attack: 0.002, decay: 0.05, gain: 0.832, pan: 0.072, seed: 47080),
+                Burst(at: 8.756, low: 163.433, high: 1006.822, attack: 0.0005, decay: 0.013, gain: 0.65, pan: -0.13, seed: 47081),
+                Burst(at: 8.758, low: 40, high: 300, attack: 0.002, decay: 0.05, gain: 0.791, pan: -0.13, seed: 47082),
+                Burst(at: 8.874, low: 169.94, high: 1408.039, attack: 0.0005, decay: 0.018, gain: 0.642, pan: 0.165, seed: 47083),
+                Burst(at: 8.876, low: 40, high: 300, attack: 0.002, decay: 0.05, gain: 0.782, pan: 0.165, seed: 47084),
+                Burst(at: 9.212, low: 180.029, high: 1135.535, attack: 0.0005, decay: 0.016, gain: 0.619, pan: -0.088, seed: 47085),
+                Burst(at: 9.214, low: 40, high: 300, attack: 0.002, decay: 0.05, gain: 0.756, pan: -0.088, seed: 47086),
+                Burst(at: 10.02, low: 161.26, high: 1281.733, attack: 0.0005, decay: 0.015, gain: 0.565, pan: 0.369, seed: 47087),
+                Burst(at: 10.022, low: 40, high: 300, attack: 0.002, decay: 0.05, gain: 0.693, pan: 0.369, seed: 47088),
+                Burst(at: 11.211, low: 121.269, high: 1480.928, attack: 0.0005, decay: 0.018, gain: 0.486, pan: -0.334, seed: 47089),
+                Burst(at: 11.213, low: 40, high: 300, attack: 0.002, decay: 0.05, gain: 0.6, pan: -0.334, seed: 47090),
+                Burst(at: 12.28, low: 187.87, high: 1423.519, attack: 0.0005, decay: 0.015, gain: 0.415, pan: 0.049, seed: 47091),
+                Burst(at: 12.282, low: 40, high: 300, attack: 0.002, decay: 0.05, gain: 0.517, pan: 0.049, seed: 47092),
+                Burst(at: 12.478, low: 193.169, high: 1337.123, attack: 0.0005, decay: 0.019, gain: 0.401, pan: 0.447, seed: 47093),
+                Burst(at: 12.48, low: 40, high: 300, attack: 0.002, decay: 0.05, gain: 0.502, pan: 0.447, seed: 47094),
+                // The ground shaking under it all, and thunder rolling away at the end.
+                Roll(at: 0.3, from: 95, to: 45, glide: 12, attack: 1, decay: 3.5, gain: 0.8, swell: 0.35, depth: 0.7, seed: 47095),
+                Roll(at: 6, from: 170, to: 55, glide: 8, attack: 2.5, decay: 2.1, gain: 0.6, swell: 0.6, depth: 0.85, pan: -0.5, seed: 47096),
+                Roll(at: 6.4, from: 160, to: 52, glide: 8, attack: 2.5, decay: 2.1, gain: 0.6, swell: 0.55, depth: 0.85, pan: 0.5, seed: 47097),
+            ],
+        ),
+        // The strike heard from far off: a low boom with a soft edge, the ground heaving, the
+        // glass's roar muffled, and a long low roll.
+        "regency_edict_impact_far": (
+            length: 18, peak: 0.85, room: 1,
+            layers: [
+                Burst(low: 24, high: 170, attack: 0.02, decay: 1, gain: 16, seed: 47098),
+                Tone(from: 70, to: 28, glide: 0.8, attack: 0.015, decay: 1.2, gain: 2),
+                Tone(from: 44, to: 24, glide: 2, attack: 0.03, decay: 2.4, gain: 1.8),
+                Stack(at: 0.05, from: 50, to: 34, glide: 3.5, attack: 0.3, decay: 2, gain: 0.35, detune: 1.01, width: 0.4, partials: [(1, 1), (2, 0.4)]),
+                Burst(at: 1, low: 22, high: 150, attack: 0.02, decay: 0.6, gain: 7, pan: -0.25, seed: 47099),
+                Tone(at: 1, from: 62, to: 30, glide: 1.2, attack: 0.02, decay: 1.4, gain: 1, pan: -0.25),
+                Drive(1.5),
+                Roll(at: 0.4, from: 180, to: 70, glide: 4, attack: 1.5, decay: 3, gain: 1, swell: 1.5, depth: 0.6, seed: 47100),
+                Roll(at: 1.5, from: 140, to: 70, glide: 10, attack: 2.5, decay: 5, gain: 0.7, swell: 2.5, depth: 0.7, seed: 47101),
+                Foam(at: 2, from: 420, to: 180, glide: 10, q: 1, attack: 2.5, decay: 4, gain: 0.22, swell: 12, depth: 0.7, seed: 47102),
+                Roll(at: 1, from: 120, to: 45, glide: 10, attack: 2.5, decay: 3.5, gain: 0.7, swell: 0.6, depth: 0.85, pan: -0.4, seed: 47103),
+                Roll(at: 1.3, from: 115, to: 42, glide: 10, attack: 2.5, decay: 3.5, gain: 0.7, swell: 0.55, depth: 0.85, pan: 0.4, seed: 47104),
+                Roll(at: 7, from: 100, to: 40, glide: 9, attack: 3, decay: 2.8, gain: 0.5, swell: 0.4, depth: 0.85, seed: 47105),
+            ],
+        ),
+        // The gather let go before the shot (the ship lost, stopped or out of power): the charge
+        // bleeding away, the sub sighing down and the hull's growls sinking under it, and the
+        // contactor dropping out.
+        "regency_edict_cancel": (
+            length: 3, peak: 0.55, room: 0.4,
+            layers: [
+                Tone(from: 62, to: 24, glide: 2.4, attack: 0.02, decay: 0.75, gain: 0.8),
+                Stack(from: 124, to: 50, glide: 2.2, attack: 0.02, decay: 0.8, gain: 0.3, detune: 1.006, width: 0.3, partials: [(1, 1), (1.5, 0.4), (2, 0.3)]),
+                Fm(at: 0, from: 132, to: 44, glide: 2, ratio: 0.5, index: 2, fade: 1.2, attack: 0.02, decay: 0.75, gain: 0.35, pan: -0.7),
+                Fm(at: 0.06, from: 110, to: 38, glide: 2, ratio: 0.5, index: 2, fade: 1.2, attack: 0.02, decay: 0.75, gain: 0.35, pan: 0.7),
+                Fm(at: 0.12, from: 96, to: 34, glide: 2, ratio: 0.5, index: 2, fade: 1.2, attack: 0.02, decay: 0.75, gain: 0.35, pan: -0.3),
+                Fm(at: 0.18, from: 150, to: 50, glide: 2, ratio: 0.5, index: 2, fade: 1.2, attack: 0.02, decay: 0.75, gain: 0.35, pan: 0.3),
+                Burst(at: 1.6, low: 35, high: 400, attack: 0.001, decay: 0.06, gain: 4, seed: 47106),
+                Tone(at: 1.6, from: 70, to: 34, glide: 0.3, attack: 0.003, decay: 0.35, gain: 0.8),
+                Drive(1.3),
+                Roll(from: 400, to: 90, glide: 2, attack: 0.05, decay: 0.8, gain: 0.6, swell: 4, depth: 0.5, seed: 47107),
+            ],
+        ),
+    },
+)

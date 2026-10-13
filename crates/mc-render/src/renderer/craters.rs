@@ -14,14 +14,15 @@
 use super::Renderer;
 use crate::camera::Camera;
 use crate::gpu::{Buffer, Gpu, GpuError};
+use crate::gpu_consts::crater;
 use ash::vk;
 use bytemuck::{Pod, Zeroable};
 use glam::{Vec2, Vec3};
 use std::mem::size_of;
 
-/// Craters kept, at most (mirrors `CraterList` in bindings.wgsl). Past that the oldest
-/// cold one goes first.
-pub(super) const MAX_CRATERS: usize = 48;
+/// Craters kept, at most (`CraterList` in bindings.wgsl). Past that the oldest cold one
+/// goes first.
+const MAX_CRATERS: usize = crater::MAX as usize;
 
 /// How a crater looks.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -31,8 +32,12 @@ pub(super) enum CraterStyle {
     /// A big conventional blast: bowl, lip and scorch, no glass.
     Blast,
     /// A Regency nova: glassed as a nuclear blast, its melt glowing red and its glass
-    /// black-crimson (the seed goes to the shader negated).
+    /// black-crimson.
     Plasma,
+    /// The Edict's strike (`nuke_fx/edict.rs`): the whole blast radius glassed, red-hot
+    /// at first and cooling over minutes to black glass with a crimson depth, the
+    /// molten wave's last ripples frozen in it, charcoal feathering out past its shore.
+    Edict,
 }
 
 impl CraterStyle {
@@ -40,18 +45,45 @@ impl CraterStyle {
     fn pool(self) -> f32 {
         match self {
             CraterStyle::Glassed | CraterStyle::Plasma => 0.19,
-            CraterStyle::Blast => 0.0,
+            CraterStyle::Edict | CraterStyle::Blast => 0.0,
+        }
+    }
+
+    /// Its number in the shader (`gpu_consts::crater`).
+    fn gpu(self) -> u32 {
+        match self {
+            CraterStyle::Glassed => crater::GLASSED,
+            CraterStyle::Blast => crater::BLAST,
+            CraterStyle::Plasma => crater::PLASMA,
+            CraterStyle::Edict => crater::EDICT,
+        }
+    }
+
+    /// Seconds a pool `heat` hot takes to go black: a warhead's about six minutes, a
+    /// commander's four, the Edict's eight.
+    fn cool(self, heat: f32) -> f32 {
+        match self {
+            CraterStyle::Glassed | CraterStyle::Plasma => 120.0 + 240.0 * heat,
+            CraterStyle::Edict => 200.0 + 280.0 * heat,
+            CraterStyle::Blast => 60.0 + 60.0 * heat,
         }
     }
 }
 
+/// One crater (`Crater` in bindings.wgsl).
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
-struct GpuCrater {
+pub(crate) struct GpuCrater {
     /// x, y, radius, the time it was made.
-    at: [f32; 4],
-    /// heat (0-1), seconds it takes to cool, pool share of the radius, seed.
-    look: [f32; 4],
+    pub(crate) at: [f32; 4],
+    /// heat (0-1), seconds it takes to cool, pool share of the radius (the Edict's:
+    /// seconds its wave takes to roll out to the radius), seed.
+    pub(crate) look: [f32; 4],
+    /// `gpu_consts::crater` style.
+    pub(crate) style: u32,
+    pub(crate) _pad0: u32,
+    pub(crate) _pad1: u32,
+    pub(crate) _pad2: u32,
 }
 
 #[derive(Clone, Copy)]
@@ -111,30 +143,21 @@ impl Craters {
         self.list.clear();
     }
 
-    fn add(&mut self, at: Vec2, radius: f32, heat: f32, time: f32, style: CraterStyle) {
+    /// A crater; `shape` is its pool share of the radius (`CraterStyle::pool`), or the
+    /// Edict's wave's seconds to roll out.
+    fn add(&mut self, at: Vec2, radius: f32, heat: f32, time: f32, style: CraterStyle, shape: f32) {
         if radius < 1.0 {
             return;
         }
         self.seed = self.seed.wrapping_mul(1_103_515_245).wrapping_add(12_345);
         let seed = (self.seed >> 9) as f32 / (1u32 << 23) as f32;
         let heat = heat.clamp(0.0, 1.0);
-        // A warhead's pool takes about six minutes to go black; a commander's four.
-        let cool = if style != CraterStyle::Blast {
-            120.0 + 240.0 * heat
-        } else {
-            60.0 + 60.0 * heat
-        };
+        let cool = style.cool(heat);
         // Another burst on one already here (a salvo on one mark): the pool is heated
         // again and widens a little, instead of a copy laid over it that crowds older
         // craters out of the list.
-        let sign = if style == CraterStyle::Plasma {
-            -1.0
-        } else {
-            1.0
-        };
         if let Some(c) = self.list.iter_mut().find(|c| {
-            c.gpu.look[2] == style.pool()
-                && c.gpu.look[3].signum() == sign
+            c.gpu.style == style.gpu()
                 && Vec2::new(c.gpu.at[0], c.gpu.at[1]).distance(at) < 0.35 * radius.max(c.gpu.at[2])
         }) {
             let r = c.gpu.at[2].max(radius);
@@ -148,8 +171,11 @@ impl Craters {
         let crater = Crater {
             gpu: GpuCrater {
                 at: [at.x, at.y, radius, time],
-                // Never zero, so the sign always says the style.
-                look: [heat, cool, style.pool(), (seed * 997.0 + 0.5) * sign],
+                look: [heat, cool, shape, seed * 997.0 + 0.5],
+                style: style.gpu(),
+                _pad0: 0,
+                _pad1: 0,
+                _pad2: 0,
             },
         };
         if self.list.len() >= MAX_CRATERS {
@@ -217,7 +243,15 @@ impl Renderer {
         time: f32,
         style: CraterStyle,
     ) {
-        self.craters.add(at, radius, heat, time, style);
+        self.craters
+            .add(at, radius, heat, time, style, style.pool());
+    }
+
+    /// Leaves the Edict's scar: `radius` its blast's damage radius, glassed as its molten
+    /// wave rolls over it in `roll` seconds.
+    pub(super) fn add_edict_scar(&mut self, at: Vec2, radius: f32, time: f32, roll: f32) {
+        self.craters
+            .add(at, radius, 1.0, time, CraterStyle::Edict, roll.max(0.1));
     }
 
     /// Sends this frame's craters to the GPU and lets the hot ones warm the country
@@ -241,7 +275,7 @@ impl Renderer {
             let t = heat * (1.0 - age / cool).clamp(0.0, 1.0).powf(2.2);
             let r = c.at[2];
             let scale = (r / 520.0).powi(2);
-            let tint = if c.look[3] < 0.0 {
+            let tint = if c.style != crater::GLASSED {
                 Vec3::new(1.0, 0.08 + 0.3 * t, 0.07 + 0.25 * t)
             } else {
                 Vec3::new(1.0, 0.3 + 0.3 * t, 0.06 + 0.1 * t)

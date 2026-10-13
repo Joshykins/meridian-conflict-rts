@@ -27,6 +27,7 @@ pub mod city;
 mod clouds;
 mod dash;
 mod destruct;
+mod edict;
 mod elevator;
 mod fog;
 mod gravitic;
@@ -44,6 +45,7 @@ pub use batch::{BatchView, UNIT_BATCH};
 pub use clouds::CloudView;
 pub use dash::{DashStage, DashView};
 pub use destruct::DestructView;
+pub use edict::{EdictStage, EdictView};
 pub use elevator::{crate_load, ElevatorPhase, ElevatorView};
 pub use fog::VisionDisc;
 pub use gravitic::{WellStage, WellView};
@@ -92,6 +94,10 @@ pub enum Refusal {
     /// A finished unit's lot could not be laid again on Repeat: built over, or blocked
     /// longer than `site_repeat::MOST_WAIT`.
     RepeatBlocked,
+    /// The Edict is aimed only on the map.
+    EdictOffMap,
+    /// The Edict cannot fire again until it has reloaded (`Edict::reload_ticks`).
+    EdictNotReady,
 }
 
 impl Refusal {
@@ -119,6 +125,8 @@ impl Refusal {
                 crate::air_wings::MAX_WING_QUEUE
             ),
             Refusal::RepeatBlocked => "Repeat stopped: the lot is blocked".to_owned(),
+            Refusal::EdictOffMap => "The Edict can only be aimed on the map".to_owned(),
+            Refusal::EdictNotReady => "The Edict is not ready: it is still reloading".to_owned(),
         }
     }
 }
@@ -520,6 +528,33 @@ pub enum SimEvent {
         unit: UnitId,
         pos: FxVec3,
         radius: Fx,
+    },
+    /// A ship's Edict began to gather (or turned on a new mark while it gathers): it fires
+    /// from `from`, the hull's keel nearest the mark (it follows the hull), at `mark` in
+    /// `ticks` while its side pays for it.
+    EdictGathering {
+        unit: UnitId,
+        owner: u8,
+        blueprint: BlueprintId,
+        from: FxVec3,
+        mark: FxVec3,
+        ticks: u16,
+    },
+    /// The Edict fired from `from` on `mark`: a blast `radius` round it, then the molten
+    /// wave rolling out to `wave`.
+    EdictFired {
+        unit: UnitId,
+        owner: u8,
+        blueprint: BlueprintId,
+        from: FxVec3,
+        mark: FxVec3,
+        radius: Fx,
+        wave: Fx,
+    },
+    /// A gather was let go before it fired (stopped, or its ship gone).
+    EdictCancelled {
+        unit: UnitId,
+        from: FxVec3,
     },
     /// The engine let go (aimed elsewhere, stopped, or gone): its well at `pos` collapses
     /// (`radius`), or its rift or gathering dies there (radius zero).
@@ -1714,6 +1749,8 @@ pub struct RenderFrame {
     pub lenses: Vec<LensView>,
     /// Gravitic engines' work that the viewer may see (`crate::gravitic`, `mirror/gravitic.rs`).
     pub wells: Vec<WellView>,
+    /// The Edicts at work that the viewer may see (`crate::edict`, `mirror/edict.rs`).
+    pub edicts: Vec<EdictView>,
     /// Storm seeds in the air (`mirror::clouds`).
     pub clouds: Vec<CloudView>,
     /// Timed self-destructs counting down that the viewer may see (`crate::destruct`).
@@ -2821,6 +2858,7 @@ impl World {
         self.write_shapers(&mut frame.shapers);
         self.write_warp_ins(&mut frame.warp_ins);
         self.write_wells(viewer, &mut frame.wells);
+        self.write_edicts(viewer, &mut frame.edicts);
         self.write_clouds(&mut frame.clouds);
         self.write_destructs(viewer, &mut frame.destructs);
         self.write_fuel(viewer, &mut frame.fuel);

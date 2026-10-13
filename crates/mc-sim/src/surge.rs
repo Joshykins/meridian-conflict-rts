@@ -24,7 +24,7 @@ use mc_data::BlueprintId;
 use serde::{Deserialize, Serialize};
 
 use crate::tables::UnitId;
-use crate::well_area::{Aircraft, WellArea};
+use crate::well_area::{Aircraft, Sides, WellArea};
 use crate::world::State;
 use crate::World;
 
@@ -100,6 +100,8 @@ impl World {
                 source: wake.source,
                 per_tick: surge.damage / Fx::from_int(TICKS_PER_SECOND as i32),
                 aircraft: Aircraft::Spared,
+                edge: Fx::ONE,
+                sides: Sides::Enemies,
             };
             self.crush_area(&area);
             if wake.age < surge.life_ticks() {

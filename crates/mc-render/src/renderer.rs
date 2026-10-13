@@ -55,9 +55,10 @@ mod city_fx;
 mod clearing;
 mod cliff_rocks;
 mod cluster_fx;
-mod craters;
+pub(crate) mod craters;
 mod crush_fx;
 mod cull_lists;
+mod edict_fx;
 mod effect_barriers;
 mod elevator_fx;
 mod fallen_trees;
@@ -941,6 +942,9 @@ pub struct Renderer {
     /// Gravitic engines at work: their light, their rifts and wells, the ground they break
     /// (renderer/gravitic_engine_fx.rs, scene set 39).
     gravitic_engine_fx: gravitic_engine_fx::GraviticEngineFx,
+    /// The Edict on its ship and in the sky: the hull's gather, the star, the shot, the
+    /// light and the cut clouds (renderer/edict_fx.rs).
+    edict_fx: edict_fx::EdictFx,
     /// Arcs on running reactors, and reactors going up (renderer/reactor_fx.rs).
     reactor_fx: reactor_fx::ReactorFx,
     /// Capital ships' drives, lift jets and lamps (renderer/capital_fx.rs).
@@ -1455,6 +1459,8 @@ impl Renderer {
         let mut flight_models: Vec<Option<models::Flight>> = Vec::new();
         // Each model slot's held gravity (`gravitic_engine_fx`).
         let mut gravity_cores: Vec<Option<[f32; 4]>> = Vec::new();
+        // Each model slot's keel, where it carries an Edict (`edict_fx`).
+        let mut keels: Vec<Option<edict_fx::Keel>> = Vec::new();
         // Each model slot's held charge (`reactor_fx`).
         let mut discharge_models: Vec<Option<models::Discharge>> = Vec::new();
         // Per blueprint: its ground stakes' scale, if it plants any (`stake_fx`).
@@ -1492,6 +1498,12 @@ impl Renderer {
             lift_models.push(model.lifts.clone());
             flight_models.push(model.flight);
             gravity_cores.push(model.gravity_core);
+            keels.push(
+                bps.units
+                    .get(keels.len())
+                    .filter(|bp| bp.edict.is_some())
+                    .and_then(|_| edict_fx::Keel::of(model)),
+            );
             discharge_models.push(model.discharge.clone());
             stake_scales.push(models::stakes::stake_scale(model));
             coil_models.push(
@@ -2592,6 +2604,7 @@ impl Renderer {
             lift_fx: lift_fx::LiftFx::new(lift_models),
             // With each rig its top speed, as its `ModelInfo` carries it.
             gravitic_engine_fx,
+            edict_fx: edict_fx::EdictFx::new(keels),
             wing_fx: wing_fx::WingFx::new(
                 flight_models
                     .into_iter()
@@ -3363,6 +3376,7 @@ impl Renderer {
             },
             self.tick_seconds,
         );
+        let patched = self.edict_fx.patch(patched, &frame.edicts, time);
         self.dynamic.write(0, bytemuck::cast_slice(&patched));
         self.sim_units = units.len() as u32;
         // A deliberate cap (`MAX_HOUSES`, cosmetic): past it the last units' houses are
@@ -3407,6 +3421,7 @@ impl Renderer {
             self.craters.clear();
             self.ground_melt.clear();
             self.gravitic_engine_fx.clear();
+            self.edict_fx.clear();
         }
         self.impact_craters.land(time);
         let craters = self.impact_craters.craters();
@@ -3471,11 +3486,13 @@ impl Renderer {
         let part = mc_core::perf_span!("cpu.upload.events");
         self.construction(frame, time, camera);
         self.nanite_site_glints(frame, time, camera.eye());
-        // A blast is known before the trees it kills are looked at (`nuke_fx::tree_fate`).
+        // A blast (or an Edict's strike) is known before the trees it kills are looked at
+        // (`nuke_fx::tree_fate`).
         // (The Progenitor's unmaking is not a blast of fire: `progenitor_event` draws it.)
         for event in &frame.events {
             if matches!(event, SimEvent::NuclearDetonation { look, .. }
                 if *look != mc_data::strategic::StrategicLook::Progenitor)
+                || matches!(event, SimEvent::EdictFired { .. })
             {
                 self.nuke_event(event, time);
             }
@@ -3547,6 +3564,7 @@ impl Renderer {
         self.missile_trails(projectiles, time, camera);
         self.nuke_tick(frame, time, camera);
         self.write_regency_trails(time);
+        self.edict_tick(frame, time, camera);
         self.lens_tick(frame, time);
         self.surge_tick(time);
         self.stream_bursts(projectiles, time, camera);
@@ -3655,6 +3673,7 @@ impl Renderer {
         self.gravitic_lights(time);
         self.star_core_lights(time);
         self.gravitic_engine_lights();
+        self.edict_lights();
         self.elevator_lights(time, alpha);
         self.lance_core_lights(time);
         self.progenitor_lights(time);
@@ -4859,6 +4878,7 @@ impl Renderer {
         self.giant_event(event, time);
         self.dash_event(event, time);
         self.gravitic_engine_event(event, time);
+        self.edict_event(event, time);
         self.titan_charge
             .note(event, self.tick_seconds, &self.blueprints);
         match event {

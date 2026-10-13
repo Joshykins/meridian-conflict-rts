@@ -138,8 +138,6 @@ fn dash_crossing(d: &DashView, p: f32) -> (Vec3, f32, f32) {
 pub struct WarpSounds {
     ids: HashMap<u32, Ids>,
     dash_ids: HashMap<u32, DashIds>,
-    /// The duck last asked of the mixer, so a quiet battle is not asked every tick.
-    duck: f32,
     damper_hum: Option<SoundId>,
     damper_surge: Option<SoundId>,
     generation: Option<u32>,
@@ -366,9 +364,8 @@ impl WarpSounds {
                 want(di.gone, at, r, loud, pitch);
             }
         }
-        if duck > 0.0 || self.duck > 0.0 {
+        if duck > 0.0 {
             audio.duck_world(duck, &spared);
-            self.duck = duck;
         }
         // Stunned hulls arcing, and their systems coming back.
         let now = self.tick;

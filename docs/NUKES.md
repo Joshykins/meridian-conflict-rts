@@ -87,8 +87,10 @@ under the player's control; and the commander's death a nuke too.
 - **Size**: everything is drawn for the damage radius over 520 m (`scale`, 1.15 for a
   warhead's 598 m); widths go with `scale`, heights with `rise` = scale^0.6 above 1 (a real cloud's
   top rises far slower with yield than it spreads), fire times with `slow` = sqrt(scale). Nothing
-  whites out the screen: the flash is the fireball itself, far too bright to look at, and the
-  light it throws over the country. The shock runs out fast along the ground (the sim's
+  whites out the screen (the one exception is the Regent's Edict, approved 2026-10-13: a
+  white-out of a third of a second at its shot, then the day dark for six,
+  `renderer/edict_fx/exposure.rs`): the flash is the fireball itself, far too bright to
+  look at, and the light it throws over the country. The shock runs out fast along the ground (the sim's
   damage front, 1 s to the damage radius, then on at 330 m/s) with a thin curtain of dust on
   it, bending trees as it passes; a Wilson cloud, a faint shell of condensation, blooms round
   the fireball a moment behind it and breaks up within four seconds. The fireball hangs on
@@ -154,8 +156,8 @@ under the player's control; and the commander's death a nuke too.
   dust curtain stands (8 s). The joint march never takes more than 80 steps. Missiles: up
   to 64 drawn (nearest first); a salvo lays its trails in longer steps (up to 3 times) so
   every trail fits the reserved puff slots.
-- **Clouds** are disturbed, never cleared: a blast swirls them round it with a little shove
-  outward (clouds_sim.wgsl `KIND_BLAST`) and thins them only very slightly.
+- **Clouds** are disturbed, never cleared (only the Regent's Edict cuts them, sky/cut.rs): a
+  blast swirls them round it with a little shove outward (clouds_sim.wgsl `KIND_BLAST`) and thins them only very slightly.
 - **Lightning in the cloud** while it forms (3-45 s): jagged strokes through the cap and
   down to the ground, each lighting the volume from inside and, through the sky's flash
   system, the clouds and country round it, with thunder.
@@ -227,7 +229,7 @@ A launcher with a `growth` block (`mc_data::growth`) grows by its level: a silo'
   nova streamers (`NOVA_WISP`) and globs of plasma are flung out of it
   (`renderer/nuke_fx/nova.rs`).
 - **The crater** glows red and cools to black glass with a crimson depth
-  (`CraterStyle::Plasma`; the shader reads the negated seed).
+  (`CraterStyle::Plasma`, `gpu_consts::crater::PLASMA` in the crater's `style`).
 - **Missiles** (`nova_missile_vertex`): the Mangonel's vault round flying, an eight-faceted
   graphite body in steel courses under a faceted prow, chines down its sides and four
   wings swept forward at its tail (stowed narrower in the silo's well). Violet line work is

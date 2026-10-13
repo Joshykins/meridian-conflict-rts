@@ -423,6 +423,12 @@ pub enum Command {
         units: Vec<UnitId>,
         pos: FxVec2,
     },
+    /// Ships among these with an Edict close on `pos` and fire it there (`edict.rs`).
+    Edict {
+        units: Vec<UnitId>,
+        pos: FxVec2,
+        queue: bool,
+    },
     /// Test range: `player`'s builders work at these thousandths of their build power
     /// (`Player::build_permille`; 1000 is normal).
     DebugBuildRate {
@@ -506,7 +512,8 @@ impl Command {
             | Command::QueueRounds { units, .. }
             | Command::Warp { units, .. }
             | Command::Dash { units, .. }
-            | Command::Fracture { units, .. } => units.len(),
+            | Command::Fracture { units, .. }
+            | Command::Edict { units, .. } => units.len(),
 
             Command::Produce { factories, .. }
             | Command::CancelProduce { factories, .. }

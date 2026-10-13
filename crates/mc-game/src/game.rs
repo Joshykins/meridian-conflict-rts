@@ -157,6 +157,9 @@ pub enum Targeting {
     /// Gravitic engines tear a rift to the point and hold a well there
     /// (`gravitic_marks.rs`, `hud/gravitic.rs`).
     Fracture,
+    /// Ships with an Edict close on the point and fire it there (`edict_marks.rs`,
+    /// `hud/edict.rs`).
+    Edict,
 }
 
 impl Targeting {
@@ -176,6 +179,7 @@ impl Targeting {
             Targeting::Warp => "Warp",
             Targeting::Dash => "Dash",
             Targeting::Fracture => "Fracture",
+            Targeting::Edict => "Edict",
         }
     }
 }
@@ -1854,6 +1858,7 @@ impl Game {
             Targeting::Warp => point.map(|pos| Command::Warp { units, pos, queue }),
             Targeting::Dash => point.map(|pos| Command::Dash { units, pos, queue }),
             Targeting::Fracture => point.map(|pos| Command::Fracture { units, pos }),
+            Targeting::Edict => point.map(|pos| Command::Edict { units, pos, queue }),
             // One warhead a click; the sim gives it to the silo with the most free.
             Targeting::Nuke => point.and_then(|pos| {
                 let silos = self.armed_silos();
@@ -2807,6 +2812,7 @@ impl Game {
             Targeting::Warp => self.selection_warps(),
             Targeting::Dash => self.selection_takers().any(|b| b.dash.is_some()),
             Targeting::Fracture => self.selection_takers().any(|b| b.gravitic.is_some()),
+            Targeting::Edict => self.selection_takers().any(|b| b.edict.is_some()),
         };
         if able {
             self.view.patrol_posts.clear();
@@ -3006,6 +3012,9 @@ impl Game {
             }
             KeyCode::KeyJ if self.selection_takers().any(|b| b.gravitic.is_some()) => {
                 self.arm(Targeting::Fracture)
+            }
+            KeyCode::KeyJ if self.selection_takers().any(|b| b.edict.is_some()) => {
+                self.arm(Targeting::Edict)
             }
             KeyCode::KeyJ => self.arm(Targeting::Strike),
             KeyCode::KeyZ => self.toggle_paused(),
@@ -3794,6 +3803,8 @@ impl Game {
             |p| self.hear(p),
         ));
         self.gravitic_sounds = gravitic;
+        // Every asker of the battle's duck has asked (warp's dashes, the Edicts).
+        audio.settle_duck();
         // Giant rotary guns' barrels turning (audio/titan.rs).
         loops.extend(self.giant_sounds.loops());
         // Reclaim beams: one loop for all of them, heard from where they bite.
@@ -4538,6 +4549,7 @@ impl Game {
             crate::titan_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));
             crate::dash_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));
             crate::gravitic_marks::draw(&mut ui, &field, self.ground_under_cursor(renderer));
+            crate::edict_marks::draw(&mut ui, &field, self.ground_under_cursor(renderer));
             crate::warp_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));
             crate::destruct_marks::draw(&mut ui, &field, alpha);
             self.draw_mind_map(&mut ui, &field, renderer);

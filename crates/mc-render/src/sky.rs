@@ -17,6 +17,7 @@
 //! Everything here is cosmetic and client-side: nothing feeds back into the sim.
 
 mod blast;
+mod cut;
 mod regions;
 mod seed;
 pub(crate) use seed::SeedCell;
@@ -69,7 +70,7 @@ const MARCH_HALF: usize = 3;
 
 const SHADE_RES: u32 = 512;
 const NOISE_RES: u32 = 128;
-pub const MAX_DISTURBERS: usize = 128 + seed::MOST_SEEDS;
+pub const MAX_DISTURBERS: usize = 128 + seed::MOST_SEEDS + cut::MOST_CUTS;
 const MAX_STORMS: usize = 8;
 const MAX_CLEARS: usize = 8;
 const MAX_FLASHES: usize = 4;
@@ -543,6 +544,8 @@ pub struct Sky {
     blasts: Vec<(Vec2, f32, f32, f32)>,
     /// The Nimbus's storm clouds in the weather (`seed.rs`).
     seeds: Vec<SeedCell>,
+    /// The Edict's cuts through the deck (`cut.rs`).
+    cuts: Vec<cut::Cut>,
     /// Over the cloud floor, the height seeded clouds are drawn at (`Atmosphere::seeded`).
     seeded: f32,
     clears: Vec<Vec4>,
@@ -990,6 +993,7 @@ impl Sky {
             units: Vec::new(),
             blasts: Vec::new(),
             seeds: Vec::new(),
+            cuts: Vec::new(),
             seeded: 0.0,
             clears: Vec::new(),
             clear_strength: 0.0,
@@ -1582,8 +1586,10 @@ impl Sky {
 
         // Stirrers: aircraft carried forward between ticks, blasts, hulls.
         let mut disturbers: Vec<Disturber> = Vec::with_capacity(MAX_DISTURBERS);
-        // The storm clouds first, with room of their own (`seed::MOST_SEEDS`).
+        // The storm clouds first, with room of their own (`seed::MOST_SEEDS`), then the
+        // Edict's cuts, with theirs (`cut::MOST_CUTS`).
         disturbers.extend(self.seed_disturbers());
+        disturbers.extend(self.cut_disturbers(now));
         let tick = frame.tick_seconds.max(0.02);
         for f in &self.flyers {
             let pos = f.prev.lerp(f.pos, frame.alpha);

@@ -161,6 +161,7 @@ impl World {
                 for row in self.owned_or_rising(player, units) {
                     self.clear_orders(row)?;
                     self.release_well(row);
+                    self.cancel_edict(row);
                 }
                 Ok(())
             }
@@ -560,6 +561,7 @@ impl World {
                 self.order_fracture(player, units, *pos);
                 Ok(())
             }
+            Command::Edict { units, pos, queue } => self.order_edict(player, units, *pos, *queue),
             Command::LaunchNuke { units, pos } => {
                 self.launch_nuke(player, units, *pos);
                 Ok(())
@@ -1387,6 +1389,7 @@ impl World {
                 OrderKind::Land | OrderKind::Unload => self.run_land(row, &o)?,
                 OrderKind::Warp => self.run_warp_order(row, &o)?,
                 OrderKind::Dash => self.run_dash_order(row, &o)?,
+                OrderKind::Edict => self.run_edict_order(row, &o)?,
                 OrderKind::ReclaimArea => self.run_reclaim_area(row, &o)?,
                 OrderKind::Stage => self.run_stage(row, &o)?,
             }

@@ -440,6 +440,9 @@ pub(crate) struct Unit {
     /// ([`crate::gravitic::Gravitic`]).
     #[serde(default)]
     pub gravitic: Option<crate::gravitic::RawGravitic>,
+    /// The Edict, a barrel-less main gun fired from the hull ([`crate::edict::Edict`]).
+    #[serde(default)]
+    pub edict: Option<crate::edict::RawEdict>,
     #[serde(default)]
     pub motion: Option<RawMotion>,
     #[serde(default)]
@@ -2536,6 +2539,15 @@ impl Unit {
                     )));
                 }
                 Some(g) => Some(g.compile(key, fx, TICKS_PER_SECOND)?),
+                None => None,
+            },
+            edict: match &self.edict {
+                Some(_) if self.motion.is_none() => {
+                    return Err(DataError::Invalid(format!(
+                        "{key}: the Edict is fired from a ship's hull"
+                    )));
+                }
+                Some(e) => Some(e.compile(key, fx, TICKS_PER_SECOND)?),
                 None => None,
             },
             elevator: match &self.elevator {
