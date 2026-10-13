@@ -58,6 +58,7 @@ fn every_kind() -> Vec<PropKind> {
         PrecursorFloor,
         PrecursorSeaway,
         PrecursorCitadel,
+        PrecursorBridge,
         Dam,
         DamSwitchyard,
         DamPylon,

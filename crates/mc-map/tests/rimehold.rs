@@ -3,8 +3,9 @@
 //! starts, print bays, slips, guns and every Shaper site's room stand on
 //! level, open ground (a naval site's slips and the sea gates' in deep
 //! water), every site's path runs where its forces can go; the starts stand
-//! close together on the hold, which only its four necks join to the rest of
-//! the land (each opening the way from its own sites), the auxiliary sites
+//! close together on the hold, which only its three bridges and the Causeway
+//! join to the rest of the land (each opening the way from its own sites), the
+//! sea one ring under the bridges, the auxiliary sites
 //! are reachable only by their narrow ways (or by sea and air), every start
 //! has ships of its sea basin at its shore; each start has its ore. Maps are
 //! not checked in; without the file the test says so and passes.
@@ -44,20 +45,25 @@ const THROATS: [(&str, Option<Throat>); 4] = [
     ("Far Skerry", None),
 ];
 
-/// The necks across the hold's sea: a point at each one's middle, how much
-/// round it shuts the neck, and the sites whose land ways cross it.
+/// The ways across the hold's sea, the bridges and the Causeway: a point at each
+/// one's middle, how much round it shuts the way, and the sites whose land ways
+/// cross it.
 const NECKS: [(&str, Throat, &[&str]); 4] = [
     (
-        "north neck",
-        ((7_650.0, 13_700.0), 520.0),
+        "the north bridge",
+        ((7_752.0, 13_675.0), 560.0),
         &["Hoarfrost", "Whitecap"],
     ),
     (
-        "south neck",
-        ((8_450.0, 6_600.0), 560.0),
+        "the south bridge",
+        ((8_400.0, 6_700.0), 560.0),
         &["Scarfell", "Blackwater"],
     ),
-    ("west neck", ((4_500.0, 10_200.0), 480.0), &["Wester Isle"]),
+    (
+        "the west bridge",
+        ((4_526.0, 10_152.0), 480.0),
+        &["Wester Isle"],
+    ),
     (
         "the Causeway",
         ((11_600.0, 10_190.0), 760.0),
@@ -106,10 +112,11 @@ impl Map {
         let (cx, cy) = self.hf.cell_at(fx(p));
         self.solid_cell(cx, cy)
     }
-    /// A land unit can stand in the cell (the sim's rule: dry, slope <= 1/2, nothing built on it).
+    /// A land unit can stand in the cell (the sim's rule: dry, slope <= 1/2, nothing
+    /// built on it; or a bridge's deck over it).
     fn land_cell(&self, cx: u32, cy: u32) -> bool {
-        self.cell_low(cx, cy) > 0.0
-            && self.hf.cell_slope(cx, cy) <= Fx::ratio(1, 2)
+        (self.hf.decks().covers_cell(cx, cy)
+            || (self.cell_low(cx, cy) > 0.0 && self.hf.cell_slope(cx, cy) <= Fx::ratio(1, 2)))
             && !self.solid_cell(cx, cy)
     }
     /// A ship can sail the cell (the sim's rule: 6 m or deeper, nothing standing in it).
@@ -269,6 +276,8 @@ fn check_path(
                     problems.push(format!("{name} runs into a precursor artifact at {p:?}"));
                 }
                 match domain {
+                    // A bridge's deck is level road, whatever lies under it.
+                    Domain::Land if map.hf.decks().top_at(fx(p)).is_some() => {}
                     Domain::Land => {
                         let (z, s) = (map.z(p), map.cell_slope(p));
                         if z <= 0.5 || s > 0.5 {
@@ -637,9 +646,9 @@ fn check_reach(
     }
 }
 
-/// The sea ring: three basins (the west, the north lagoon, the south
-/// lagoon), each with its own slips, and every start has water of a basin
-/// that ships are printed in within 2 km. The atoll can be sailed to.
+/// The sea ring: one sea, under the bridges, round to either side of the
+/// Causeway, every start with water of it within 2 km. The atoll can be
+/// sailed to.
 fn check_seas(
     map: &Map,
     layout: &SurvivalLayout,
@@ -677,8 +686,8 @@ fn check_seas(
         }
     }
     println!("{} sea basins with slips", basins.len());
-    if basins.len() != 3 {
-        problems.push(format!("{} sea basins have slips, not 3", basins.len()));
+    if basins.len() != 1 {
+        problems.push(format!("the slips lie on {} seas, not one", basins.len()));
     }
     for (i, c) in covered.iter().enumerate() {
         if !c {

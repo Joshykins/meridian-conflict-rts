@@ -379,10 +379,16 @@ pub enum PropKind {
     CityMast = 129,
     /// A square's monument over a fountain basin.
     CityMonument = 130,
+    /// The Progenitor's second range (the first is full).
+    /// A hard-light bridge (`crate::landmark::HARDLIGHT_BRIDGE`): its deck from the
+    /// origin along +x, its walking surface at the origin's height, which the map
+    /// raises its landing to; the deck itself is a map's deck (`crate::deck`), so
+    /// it has no solid plan.
+    PrecursorBridge = 160,
 }
 
 impl PropKind {
-    pub const ALL: [PropKind; 88] = [
+    pub const ALL: [PropKind; 89] = [
         PropKind::TreeBroadleaf,
         PropKind::TreeConifer,
         PropKind::TreePine,
@@ -471,6 +477,7 @@ impl PropKind {
         PropKind::CitySolarArray,
         PropKind::CityMast,
         PropKind::CityMonument,
+        PropKind::PrecursorBridge,
     ];
 
     pub fn from_raw(raw: u16) -> Option<PropKind> {
@@ -499,7 +506,7 @@ impl PropKind {
 
     #[inline]
     pub fn is_precursor(self) -> bool {
-        (48..80).contains(&(self as u16))
+        (48..80).contains(&(self as u16)) || (160..176).contains(&(self as u16))
     }
 
     #[inline]

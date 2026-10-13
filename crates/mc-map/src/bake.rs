@@ -262,6 +262,10 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
     if !wrecks.is_empty() {
         writer.set_wrecks(wrecks)?;
     }
+    // Rimehold's bridges carry decks the simulation reads (`crate::deck`).
+    if terrain.layout == Layout::Rimehold {
+        writer.set_decks(terrain.rimehold_decks())?;
+    }
     let content_id = writer.finish(props, &starts, &ore)?;
 
     Ok(BakeReport {

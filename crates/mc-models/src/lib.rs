@@ -998,6 +998,7 @@ mod footprint;
 pub mod gpu_consts;
 mod library;
 mod precursor;
+mod precursor_bridge;
 mod precursor_citadel;
 mod precursor_forge;
 mod precursor_gate;

@@ -37,6 +37,20 @@ impl Terrain {
             .collect()
     }
 
+    /// The hard-light bridges, each at its hold landing turned to its far one.
+    pub(super) fn rh_bridges(&self) -> Vec<PrecursorSite> {
+        BRIDGES
+            .iter()
+            .map(|b| PrecursorSite {
+                kind: PropKind::PrecursorBridge,
+                x: b.hold.0,
+                y: b.hold.1,
+                heading: (b.far.1 - b.hold.1).atan2(b.far.0 - b.hold.0),
+                scale: b.scale(),
+            })
+            .collect()
+    }
+
     /// The machine: the tower ring round the Heart, the bastions either side.
     pub(in crate::bake) fn machine_rimehold(&self) -> Machine<'_> {
         self.facility_machine(&FACILITY)

@@ -35,7 +35,12 @@ fn rooms_are_level_and_ways_gentle() {
         if s.ground == Ground::Naval {
             continue;
         }
-        let pts = way.points(16.0);
+        // (Over a bridge it runs on the deck, not the ground.)
+        let pts: Vec<_> = way
+            .points(16.0)
+            .into_iter()
+            .filter(|&p| !BRIDGES.iter().any(|b| b.under(p, 40.0)))
+            .collect();
         let (worst, at) = pts
             .iter()
             .map(|&p| (t.slope(p.0, p.1), p))
@@ -58,7 +63,8 @@ fn rimehold_block() {
 }
 
 /// `RIMEHOLD_RELIEF=x0,y0,span,px,out.ppm cargo test --profile gate -p mc-map --lib rimehold_relief -- --ignored`:
-/// a hillshade (sun from the north-west), sea ice and bergs pale blue, water blue,
+/// a hillshade (sun from the north-west), the bridges' decks bright blue, sea ice and
+/// bergs pale blue, water blue,
 /// ground a unit cannot climb grey, the starts red, the sites' rooms yellow
 /// (auxiliary ones orange), to judge the land without the game.
 #[test]
@@ -107,6 +113,8 @@ fn rimehold_relief() {
                 (40.0, 70.0 + h.max(-45.0), 120.0 + h.max(-45.0))
             } else if slope > 0.5 {
                 (150.0, 140.0, 130.0)
+            } else if BRIDGES.iter().any(|b| b.under((x, y), 0.0)) {
+                (120.0, 190.0, 255.0)
             } else if t.rh_ice((x, y), h) > 0.5 {
                 (200.0, 225.0, 240.0)
             } else {

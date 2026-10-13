@@ -1,13 +1,13 @@
 // Rimehold: a survival map for four defenders, all of it arctic. The
 // defenders' starts stand close together on the hold, an upland of snowbound
-// tundra ringed by open water; four necks of land cross the water, one from
-// each side: the Causeway east from the Progenitor's base, which stands at
-// grade on the mainland facing west down it; a gravel spit north from the
-// highlands; a rocky neck south from the fells; a tombolo west from Wester
-// Isle. The necks part the sea ring into the west (the ocean and the
-// straits' western reaches) and the north and south lagoons either side of
-// the Causeway, each with its own slips, and the base has a sea gate on each
-// lagoon. Shaper sites in every region, the auxiliary Shapers hidden behind
+// tundra ringed by open water; four ways cross the water, one from each
+// side: the Causeway, a neck of land, east from the Progenitor's base, which
+// stands at grade on the mainland facing west down it; and three hard-light
+// bridges, north from the highlands, south from the fells and west from Wester
+// Isle, their decks high enough for ships to sail under (the map's decks). The
+// sea runs round the hold but for the Causeway; Shaper slips in the ocean and
+// on both lagoons either side of the Causeway, and a sea gate of the base's on
+// each lagoon. Shaper sites in every region, the auxiliary Shapers hidden behind
 // them. Nothing grows.
 // Positions are metres, x east, y north, from the south-west corner. They
 // match crates/mc-map/src/bake/rimehold.rs (its `rimehold_block` test prints
@@ -90,15 +90,15 @@
             (name: "The Forecourt", at: (15406, 10240), domain: Land, facing: None, kind: Printer, room: 450, path: [(14946, 10240), (14554, 10240), (14162, 10239), (13771, 10243), (13379, 10249), (12987, 10250), (12596, 10245), (12205, 10222), (11814, 10189), (11423, 10184), (11032, 10212), (10641, 10239), (10250, 10260)]),
             (name: "North Court", at: (16956, 12590), domain: Land, facing: None, kind: Printer, room: 450, path: [(16514, 12464), (16140, 12358), (15767, 12251), (15394, 12143), (15021, 12038), (14651, 11919), (14290, 11778), (13952, 11589), (13670, 11323), (13418, 11028), (13146, 10752), (12851, 10500), (12524, 10292), (12150, 10199), (11762, 10197), (11374, 10199), (10987, 10217), (10618, 10328), (10300, 10550)]),
             (name: "South Court", at: (17106, 7840), domain: Land, facing: None, kind: Printer, room: 450, path: [(16660, 7953), (16276, 8050), (15892, 8149), (15509, 8253), (15128, 8366), (14752, 8492), (14383, 8635), (14028, 8810), (13725, 9065), (13466, 9365), (13195, 9654), (12904, 9924), (12586, 10159), (12205, 10244), (11814, 10182), (11419, 10170), (11025, 10213), (10637, 10158), (10300, 9950)]),
-            (name: "Hoarfrost", at: (5000, 17300), domain: Land, facing: None, kind: Printer, room: 450, path: [(5268, 16926), (5518, 16632), (5800, 16370), (6095, 16121), (6393, 15874), (6699, 15640), (6999, 15397), (7267, 15120), (7506, 14817), (7669, 14471), (7620, 14090), (7634, 13709), (7741, 13339), (7814, 12960), (7881, 12580), (7950, 12200)]),
-            (name: "Whitecap", at: (10500, 18000), domain: Land, facing: None, kind: Printer, room: 450, path: [(10242, 17619), (10010, 17312), (9749, 17030), (9473, 16762), (9190, 16501), (8897, 16253), (8606, 16001), (8333, 15730), (8078, 15443), (7857, 15128), (7709, 14774), (7621, 14400), (7595, 14016), (7653, 13638), (7756, 13267), (7812, 12887), (7955, 12531), (8150, 12200)]),
+            (name: "Hoarfrost", at: (5000, 17300), domain: Land, facing: None, kind: Printer, room: 450, path: [(5267, 16925), (5518, 16633), (5805, 16375), (6109, 16137), (6426, 15916), (6759, 15720), (7104, 15548), (7480, 15465), (7788, 15275), (7764, 14893), (7752, 14507), (7752, 14121), (7752, 13735), (7752, 13349), (7752, 12963), (7751, 12576), (7742, 12191), (7900, 11850)]),
+            (name: "Whitecap", at: (10500, 18000), domain: Land, facing: None, kind: Printer, room: 450, path: [(10242, 17619), (10007, 17309), (9743, 17022), (9464, 16750), (9174, 16490), (8873, 16243), (8566, 16002), (8257, 15766), (7944, 15534), (7742, 15245), (7750, 14855), (7752, 14466), (7752, 14076), (7752, 13686), (7752, 13297), (7752, 12907), (7749, 12518), (7745, 12129), (8000, 11850)]),
             (name: "Ice Harbour", at: (11400, 15050), domain: Naval, facing: None, kind: Printer, room: 450, path: [(11253, 14614), (11102, 14304), (10877, 14043), (10610, 13823), (10310, 13655), (9982, 13547), (9645, 13472), (9300, 13450)]),
             (name: "Rime Cirque", at: (3900, 19500), domain: Land, facing: Some(294), kind: Auxiliary, room: 350, path: []),
-            (name: "Scarfell", at: (5400, 2900), domain: Land, facing: None, kind: Printer, room: 450, path: [(5750, 3198), (6035, 3444), (6318, 3691), (6600, 3940), (6880, 4191), (7159, 4443), (7439, 4694), (7710, 4954), (7959, 5236), (8180, 5540), (8347, 5875), (8393, 6248), (8467, 6616), (8496, 6990), (8436, 7361), (8369, 7730), (8300, 8100)]),
-            (name: "Blackwater", at: (11300, 2900), domain: Land, facing: None, kind: Printer, room: 450, path: [(10953, 3202), (10659, 3451), (10356, 3690), (10049, 3922), (9747, 4161), (9455, 4413), (9171, 4673), (8901, 4949), (8646, 5238), (8412, 5543), (8276, 5897), (8391, 6263), (8471, 6640), (8489, 7023), (8411, 7400), (8439, 7781), (8550, 8150)]),
+            (name: "Scarfell", at: (5400, 2900), domain: Land, facing: None, kind: Printer, room: 450, path: [(5749, 3200), (6049, 3457), (6350, 3712), (6652, 3966), (6958, 4216), (7266, 4463), (7578, 4704), (7919, 4899), (8305, 4978), (8435, 5315), (8401, 5708), (8400, 6103), (8400, 6498), (8400, 6893), (8400, 7287), (8400, 7682), (8407, 8077), (8300, 8450)]),
+            (name: "Blackwater", at: (11300, 2900), domain: Land, facing: None, kind: Printer, room: 450, path: [(10953, 3202), (10655, 3454), (10350, 3698), (10041, 3936), (9733, 4175), (9430, 4421), (9129, 4670), (8798, 4872), (8436, 5006), (8375, 5376), (8400, 5765), (8400, 6155), (8400, 6545), (8400, 6935), (8400, 7326), (8400, 7716), (8389, 8106), (8550, 8450)]),
             (name: "Floe Harbour", at: (11500, 5500), domain: Naval, facing: None, kind: Printer, room: 450, path: [(11381, 5944), (11238, 6267), (10993, 6522), (10690, 6704), (10353, 6813), (10005, 6882), (9654, 6930), (9300, 6950)]),
             (name: "Frostvault", at: (2900, 1500), domain: Land, facing: Some(60), kind: Auxiliary, room: 350, path: []),
-            (name: "Wester Isle", at: (2300, 10500), domain: Land, facing: None, kind: Printer, room: 450, path: [(2749, 10400), (3119, 10329), (3492, 10274), (3867, 10236), (4244, 10214), (4620, 10192), (4996, 10163), (5373, 10151), (5749, 10184), (6124, 10219), (6500, 10250)]),
+            (name: "Wester Isle", at: (2300, 10500), domain: Land, facing: None, kind: Printer, room: 450, path: [(2745, 10386), (3067, 10187), (3442, 10145), (3825, 10152), (4208, 10152), (4592, 10152), (4975, 10152), (5359, 10152), (5742, 10145), (6124, 10175), (6500, 10250)]),
             (name: "Gull Skerry", at: (1500, 13700), domain: Naval, facing: None, kind: Printer, room: 450, path: [(1959, 13670), (2344, 13647), (2730, 13625), (3115, 13606), (3501, 13598), (3887, 13600), (4273, 13602), (4659, 13591), (5044, 13571), (5430, 13548), (5815, 13525), (6200, 13500)]),
             (name: "Seal Skerry", at: (1500, 6900), domain: Naval, facing: None, kind: Printer, room: 450, path: [(1959, 6930), (2353, 6953), (2748, 6976), (3142, 6995), (3537, 7004), (3932, 7006), (4327, 6999), (4722, 6977), (5116, 6954), (5511, 6955), (5906, 6975), (6300, 7000)]),
             (name: "Far Skerry", at: (1100, 2900), domain: Land, facing: Some(47), kind: Fleet, room: 350, path: []),

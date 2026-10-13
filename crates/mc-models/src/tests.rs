@@ -822,6 +822,8 @@ const OVER_BUDGET: &[Over] = &[
     ("precursor_terrace", Some(112), None, None),
     ("precursor_citadel", Some(356), Some(0.61), None),
     ("precursor_seaway", None, Some(1.0), None),
+    // A bridge 1.6 km long: its far level keeps the span's girders, portals and arches.
+    ("precursor_bridge", Some(420), None, Some(12_000)),
     // The Corona is a small tower; most of its mid detail is its laser heads and radar.
     ("missile_defense", None, Some(0.6), None),
     // The Vigil is small; most of its mid detail is its drive, lift jets, legs and booms.

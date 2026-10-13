@@ -3,23 +3,25 @@
 //! [`Layout::Rimehold`](super::Layout::Rimehold). The defenders hold the
 //! hold: an upland of snowbound tundra in the middle-west of the map, their
 //! four starts close together on it, one toward each corner. Open water runs
-//! all the way round the hold, a kilometre and a half wide, and four necks of
-//! land cross it, one from each side, narrow enough to wall:
+//! all the way round the hold, a kilometre and a half wide, and four ways
+//! cross it, one from each side, each a line to wall across:
 //!
-//! * east, the Causeway, the widest, from the Progenitor's base: the Heart
-//!   stands at grade on a level floor on the mainland, its Gate over the
-//!   road, facing west down it;
-//! * north, a gravel spit from the highlands: ice-capped mountains, the
+//! * east, the Causeway, a neck of land a kilometre wide, from the
+//!   Progenitor's base: the Heart stands at grade on a level floor on the
+//!   mainland, its Gate over the road, facing west down it;
+//! * north, a hard-light bridge from the highlands: ice-capped mountains, the
 //!   printing Shapers' rooms in basins among them;
-//! * south, a rocky neck from the fells: rolling tundra under nunataks;
-//! * west, a long tombolo from Wester Isle out in the ocean.
+//! * south, a bridge from the fells: rolling tundra under nunataks;
+//! * west, a bridge from Wester Isle out in the ocean.
 //!
-//! The mainland wraps the hold's sea round on three sides; the ocean is open
-//! to the west. The necks part the sea ring into three: the west (the ocean,
-//! and the north and south straits as far as their necks), the north lagoon
-//! and the south lagoon either side of the Causeway. Each has its own
-//! Shaper slips, and the base has a sea gate on each lagoon, so ships come at
-//! every start; aircraft come from the base and every site.
+//! The bridges ([`BRIDGES`]) are the Progenitor's: decks of hard light
+//! [`DECK_TOP`] over the water, a level landing raised on each shore with a ramp
+//! down inland. Land units cross on the deck, ships sail under it (the map's
+//! decks, `crate::deck`), so the sea runs all the way round the hold but for
+//! the Causeway. The mainland wraps it round on three sides; the ocean is open
+//! to the west. Shaper slips in the ocean and on both lagoons either side of the
+//! Causeway, and a sea gate of the base's on each lagoon, so ships come at every
+//! start; aircraft come from the base and every site.
 //!
 //! Behind the printing sites, hidden, the auxiliary Shapers: in a cirque in
 //! the highlands, a hollow in the fells, a basin over the base, on an atoll in
@@ -33,8 +35,11 @@ use super::bays::dist;
 use super::facility::{Facility, Facing};
 use super::sites::{Ground, Kind, Site, Way};
 use super::{Pad, Terrain};
+use crate::deck::Deck;
+use crate::landmark::HARDLIGHT_BRIDGE;
 use crate::noise::smoothstep;
 use crate::BUILD_CELL_M;
+use mc_core::{Fx, FxVec2};
 
 mod base;
 mod shape;
@@ -59,25 +64,81 @@ const FACILITY: Facility = Facility {
     sites: SITES,
 };
 
-/// The necks' lines, hold end first: every way over a neck runs along its
-/// line (`shape.rs` raises the neck round it).
-const NORTH_NECK: [(f64, f64); 4] = [
-    (7_850.0, 12_750.0),
-    (7_750.0, 13_300.0),
-    (7_600.0, 13_900.0),
-    (7_650.0, 14_550.0),
+/// The bridges' decks stand this high over the water: the tallest ship (38 m,
+/// the battleship's masts) passes under with room.
+const DECK_TOP: f64 = 52.0;
+
+/// A hard-light bridge over the hold's sea: its landing on the hold and its
+/// landing across the water, each a little inland of its shore on ground the
+/// bake raises to the deck (`shape.rs`). Each runs square to the map, so the
+/// drawn bridge (`PropKind::PrecursorBridge`, at the hold's landing, turned to
+/// the far one) lies exactly on its deck.
+pub(super) struct Bridge {
+    pub(super) hold: (f64, f64),
+    pub(super) far: (f64, f64),
+}
+
+impl Bridge {
+    pub(super) fn length(&self) -> f64 {
+        dist(self.hold, self.far)
+    }
+
+    /// The prop's scale: its drawn span stretched to the bridge's length.
+    pub(super) fn scale(&self) -> f64 {
+        self.length() / HARDLIGHT_BRIDGE.span
+    }
+
+    /// Half the deck's width, as drawn at the prop's scale.
+    pub(super) fn half(&self) -> f64 {
+        HARDLIGHT_BRIDGE.half * self.scale()
+    }
+
+    /// Metres along the bridge from its hold landing toward its far one, and
+    /// metres off its line.
+    pub(super) fn frame(&self, p: (f64, f64)) -> (f64, f64) {
+        let l = self.length();
+        let u = (
+            (self.far.0 - self.hold.0) / l,
+            (self.far.1 - self.hold.1) / l,
+        );
+        let (dx, dy) = (p.0 - self.hold.0, p.1 - self.hold.1);
+        (dx * u.0 + dy * u.1, (dx * u.1 - dy * u.0).abs())
+    }
+
+    /// Whether `p` is on the deck, `margin` metres wider all round.
+    pub(super) fn under(&self, p: (f64, f64), margin: f64) -> bool {
+        let (along, off) = self.frame(p);
+        along >= -margin && along <= self.length() + margin && off <= self.half() + margin
+    }
+
+    fn deck(&self) -> Deck {
+        let fx = |v: f64| Fx((v * 65_536.0).round() as i64);
+        Deck {
+            a: FxVec2::new(fx(self.hold.0), fx(self.hold.1)),
+            b: FxVec2::new(fx(self.far.0), fx(self.far.1)),
+            half: fx(self.half()),
+            top: fx(DECK_TOP),
+        }
+    }
+}
+
+/// The bridges: north to the highlands, south to the fells, west to Wester Isle.
+pub(super) const BRIDGES: [Bridge; 3] = [
+    Bridge {
+        hold: (7_752.0, 12_700.0),
+        far: (7_752.0, 14_650.0),
+    },
+    Bridge {
+        hold: (8_400.0, 7_650.0),
+        far: (8_400.0, 5_750.0),
+    },
+    Bridge {
+        hold: (5_352.0, 10_152.0),
+        far: (3_700.0, 10_152.0),
+    },
 ];
-const SOUTH_NECK: [(f64, f64); 4] = [
-    (8_400.0, 7_550.0),
-    (8_500.0, 6_900.0),
-    (8_400.0, 6_300.0),
-    (8_300.0, 5_750.0),
-];
-const WEST_NECK: [(f64, f64); 3] = [
-    (5_300.0, 10_150.0),
-    (4_500.0, 10_200.0),
-    (3_700.0, 10_250.0),
-];
+
+/// The Causeway, the one neck of land, from the hold to the base's shore.
 const CAUSEWAY: [(f64, f64); 3] = [
     (10_800.0, 10_230.0),
     (11_600.0, 10_180.0),
@@ -152,13 +213,13 @@ const SITES: &[Site] = &[
         level: 150.0,
         way: &[
             (5_500.0, 16_650.0),
-            (6_300.0, 15_950.0),
-            (7_100.0, 15_300.0),
-            (7_650.0, 14_550.0),
-            (7_600.0, 13_900.0),
-            (7_750.0, 13_300.0),
-            (7_850.0, 12_750.0),
-            (7_950.0, 12_200.0),
+            (6_300.0, 16_000.0),
+            (7_100.0, 15_550.0),
+            (7_752.0, 15_350.0),
+            (7_752.0, 14_650.0),
+            (7_752.0, 12_700.0),
+            (7_752.0, 12_100.0),
+            (7_900.0, 11_850.0),
         ],
         cut: 1.2,
     },
@@ -171,13 +232,13 @@ const SITES: &[Site] = &[
         way: &[
             (10_000.0, 17_300.0),
             (9_300.0, 16_600.0),
-            (8_500.0, 15_900.0),
-            (7_900.0, 15_200.0),
-            (7_650.0, 14_550.0),
-            (7_600.0, 13_900.0),
-            (7_750.0, 13_300.0),
-            (7_850.0, 12_750.0),
-            (8_150.0, 12_200.0),
+            (8_500.0, 15_950.0),
+            (7_900.0, 15_500.0),
+            (7_752.0, 15_350.0),
+            (7_752.0, 14_650.0),
+            (7_752.0, 12_700.0),
+            (7_752.0, 12_100.0),
+            (8_000.0, 11_850.0),
         ],
         cut: 1.2,
     },
@@ -219,13 +280,13 @@ const SITES: &[Site] = &[
         level: 100.0,
         way: &[
             (6_100.0, 3_500.0),
-            (7_000.0, 4_300.0),
-            (7_800.0, 5_050.0),
-            (8_300.0, 5_750.0),
-            (8_400.0, 6_300.0),
-            (8_500.0, 6_900.0),
-            (8_400.0, 7_550.0),
-            (8_300.0, 8_100.0),
+            (7_000.0, 4_250.0),
+            (7_800.0, 4_850.0),
+            (8_400.0, 5_050.0),
+            (8_400.0, 5_750.0),
+            (8_400.0, 7_650.0),
+            (8_400.0, 8_200.0),
+            (8_300.0, 8_450.0),
         ],
         cut: 1.0,
     },
@@ -238,12 +299,12 @@ const SITES: &[Site] = &[
         way: &[
             (10_600.0, 3_500.0),
             (9_700.0, 4_200.0),
-            (8_900.0, 4_950.0),
-            (8_300.0, 5_750.0),
-            (8_400.0, 6_300.0),
-            (8_500.0, 6_900.0),
-            (8_400.0, 7_550.0),
-            (8_550.0, 8_150.0),
+            (8_950.0, 4_800.0),
+            (8_400.0, 5_050.0),
+            (8_400.0, 5_750.0),
+            (8_400.0, 7_650.0),
+            (8_400.0, 8_200.0),
+            (8_550.0, 8_450.0),
         ],
         cut: 1.0,
     },
@@ -280,11 +341,11 @@ const SITES: &[Site] = &[
         ground: Ground::Land,
         level: 40.0,
         way: &[
-            (3_000.0, 10_350.0),
-            (3_700.0, 10_250.0),
-            (4_500.0, 10_200.0),
-            (5_300.0, 10_150.0),
-            (5_900.0, 10_200.0),
+            (2_850.0, 10_350.0),
+            (3_150.0, 10_152.0),
+            (3_700.0, 10_152.0),
+            (5_352.0, 10_152.0),
+            (5_950.0, 10_152.0),
             (6_500.0, 10_250.0),
         ],
         cut: 1.2,
@@ -454,6 +515,7 @@ impl Terrain {
             .collect();
         self.precursor = self.facility_pieces(&FACILITY);
         self.precursor.extend(self.rh_sea_gates());
+        self.precursor.extend(self.rh_bridges());
         self.lay_machine();
     }
 
@@ -511,6 +573,11 @@ impl Terrain {
         })
     }
 
+    /// The bridges' decks, for the map file.
+    pub(in crate::bake) fn rimehold_decks(&self) -> Vec<Deck> {
+        BRIDGES.iter().map(Bridge::deck).collect()
+    }
+
     /// Works out every way's floor, once the ground is laid.
     fn rh_profiles(&mut self) {
         let profiles: Vec<Vec<f64>> = self
@@ -522,7 +589,11 @@ impl Terrain {
                 if w.sea {
                     Vec::new()
                 } else {
+                    // (Over a bridge the way runs on its deck.)
                     Self::way_profile(w, SITES, |q| {
+                        if BRIDGES.iter().any(|b| b.under(q, 0.0)) {
+                            return DECK_TOP;
+                        }
                         let r = self.rh_raw(q);
                         r.h + self.erosion.at(q.0, q.1) * r.erodes
                     })

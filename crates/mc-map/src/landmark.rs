@@ -93,6 +93,22 @@ pub struct PowerLine {
     pub pivot: f64,
 }
 
+/// A Progenitor hard-light bridge (`PropKind::PrecursorBridge`) as drawn at scale
+/// 1: its deck runs from the origin along +x for `span` metres, `half` either side,
+/// its walking surface at the origin's height. A map lays the bridge's deck
+/// (`crate::deck::Deck`) to it, scaled as the prop is, so the road units walk on is
+/// the one drawn.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BridgePlan {
+    pub span: f64,
+    pub half: f64,
+}
+
+pub const HARDLIGHT_BRIDGE: BridgePlan = BridgePlan {
+    span: 1_600.0,
+    half: 280.0,
+};
+
 /// The dam's lines.
 pub const GORGE_LINE: PowerLine = PowerLine {
     span: 360.0,

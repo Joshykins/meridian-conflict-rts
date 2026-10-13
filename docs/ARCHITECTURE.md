@@ -29,6 +29,13 @@ Dependencies point downward only: `mc-sim` never sees the renderer or the networ
 - A full-size map is 81 920 m on a side (80 km). Smaller maps are allowed; larger are not.
 - Height/path cell: 8 m. A full map is 10 240 × 10 240 cells.
 - Build cell: 12 m. Structures snap to it. Pathing blocks only the hull (`UnitBlueprint::hull`, half-extents in the structure's own frame, default the radius; `world::hull_cells`): an 8 m cell is blocked when the hull covers more than 3 m of it across. The rest of the lot is walkable apron. Lots still may not overlap: `Nav` keeps a separate lot-occupancy layer (`set_lot`/`lots_free`, rebuilt from the units on restore, never snapshotted) that `can_place` checks. Economy structures stand at least 5 m back from their lot edge, so any two packed lot to lot leave an 8 m lane at either 8 m alignment of the 12 m grid (`tests/place.rs`). That lane is one path cell, too narrow for size class 1 and up, so packed hulls can shut a patch of apron in. An open region of at most 32 cells that structure hulls (not the terrain alone) shut in is a pocket (`nav/pockets.rs`, worked out round each hull as it is taken or given back, snapshotted): `Nav::passable` counts it as ground no hull stands on, so a unit left in one is stranded and walks out through the hulls the short way (`tests/sealed_pocket.rs`).
+- Decks (`mc_map::deck`, the map file's optional decks section): level strips of road standing over the ground, a
+  bridge's. A deck's cells are land and water at once to the pathfinder (`nav::cell_class`), so land units cross on
+  top while ships sail under. A land unit over a deck stands on it; a hover or amphibious one only if it came up onto
+  it from a landing (its height was already near the deck's), so one sailing in under it stays on the water; ships
+  never (`mc-sim/src/decks.rs`). Units on a deck and under it pass each other (`World::apart`); nothing is built on a
+  deck; a shot coming down onto a deck stops on it unless it was fired from on it, and a deck takes a blast between
+  its two sides (`deck_shields`), so plunging fire cannot reach a ship under a bridge (`tests/decks.rs`).
 - Map tile: 256 cells (2 048 m). A full map is 40 × 40 tiles.
 - Nav sector: 32 cells (256 m).
 - Angles are `mc_core::Angle`: `u16`, 65 536 per turn, zero along +X, counter-clockwise.
@@ -446,14 +453,17 @@ invulnerable unit, and the mirror marks it `SHIELD_VEIL` so it is drawn apart fr
   auxiliary ones only by their narrow ways, the ore and the regions.
   `maps/rimehold` ("Rimehold", `mc-bake --layout rimehold --size-km 20 --seed 43`,
   `crates/mc-map/src/bake/rimehold.rs`) is the arctic survival map for four defenders, all of it `Polar`: their starts
-  close together on the hold, an upland of tundra ringed by open water that four necks of land cross (the Causeway
-  east from the base, which stands at grade on the mainland facing west; a spit north from the highlands; a neck
-  south from the fells; a tombolo west from Wester Isle), so walls across the necks hold every land way. The necks
-  part the sea ring into three basins (the west and the north and south lagoons), each with its own Shaper slips,
-  and the base has a sea gate with three slips on each lagoon. The base's installation is the same as The Last
+  close together on the hold, an upland of tundra ringed by open water that four ways cross: the Causeway, a neck of
+  land a kilometre wide, east from the base, which stands at grade on the mainland facing west; and three hard-light
+  bridges (`PropKind::PrecursorBridge`, `mc-models/src/precursor_bridge.rs`, to `landmark::HARDLIGHT_BRIDGE`), north
+  from the highlands, south from the fells and west from Wester Isle, their decks 52 m over the water on landings the
+  bake raises at each end. Walls across the four hold every land way; ships sail under the bridges, so the sea runs
+  round the hold but for the Causeway, with Shaper slips in the ocean and on both lagoons and a sea gate of the base's
+  (three slips) on each lagoon. The base's installation is the same as The Last
   Harvest's (`bake/facility.rs`, laid facing south or west), and both maps cut their Shaper sites' rooms, ways and
   slips the same way (`bake/sites.rs`). `crates/mc-map/tests/rimehold.rs` checks the rooms, bays, slips and guns, the
-  paths, that the hold reaches the rest of the land only over its necks (each opening its own sites), that every
+  paths, that the hold reaches the rest of the land only over its four crossings (each opening its own sites), that
+  the sea is one, that every
   start has ships' water within 2 km, the auxiliary sites' narrow ways and the ore.
   The older survival map is `maps/threshold` ("The Threshold", `mc-bake --layout threshold --size-km 16 --seed 31`,
   `crates/mc-map/src/bake/threshold.rs`): one road along a coast between mountains and the sea, the defenders' lowland

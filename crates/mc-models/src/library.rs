@@ -139,6 +139,7 @@ fn catalogue() -> impl Iterator<Item = &'static ModelDef> {
         .chain(super::precursor_sky::MODELS.iter())
         .chain(super::precursor_gate::MODELS.iter())
         .chain(super::precursor_citadel::MODELS.iter())
+        .chain(super::precursor_bridge::MODELS.iter())
 }
 
 pub(super) fn find(key: &str) -> Option<&'static ModelDef> {
@@ -481,6 +482,7 @@ pub fn prop_model_key(kind_raw: u16) -> &'static str {
         77 => "precursor_rampart",
         78 => "precursor_floor",
         79 => "precursor_citadel",
+        160 => "precursor_bridge",
         80 => "landmark_dam",
         81 => "landmark_switchyard",
         82 => "landmark_pylon",
