@@ -8,6 +8,9 @@
 //! The body is the unit's standing column, from its feet to its full height, as wide as
 //! the unit: a titan's torso stands 300 m and more over its feet, and a disc round its
 //! shins (or the point at its feet, for a drag box) missed everything a player aims at.
+//! A long hull (`UnitBlueprint::body`) is its spine instead, laid along its heading half
+//! way up, as wide as its beam: the Regent's radius is near two kilometres either way of
+//! a hull a few hundred metres across, and a disc that wide picked it from open sky.
 
 use glam::{Vec2, Vec3};
 use mc_data::{BlueprintId, Blueprints, IconKind};
@@ -43,11 +46,25 @@ pub(crate) fn unit_at(
         }
         let pos = Vec3::from(u.pos);
         let height = bp.height.to_f32();
-        // The body: the column from its feet to its top, the unit's size across.
-        let body = column(camera, pos, height).and_then(|(feet, top)| {
-            let (d, along) = to_segment(pixel, feet, top);
-            let at = pos + Vec3::Z * height * along;
-            let reach = (u.radius * scale / (at - eye).length().max(1.0)).max(MIN_REACH);
+        // The body: the column from its feet to its top, the unit's size across; or a long
+        // hull's spine half way up, its beam across.
+        let (ends, width) = match bp.body {
+            Some(b) => {
+                let nose = Vec3::new(u.heading.cos(), u.heading.sin(), 0.0);
+                let mid = pos + Vec3::Z * height * 0.5;
+                let beam = b.beam.to_f32();
+                let ends = (
+                    mid + nose * (b.aft.to_f32() + beam),
+                    mid + nose * (b.fore.to_f32() - beam),
+                );
+                (ends, beam.max(height * 0.5))
+            }
+            None => ((pos, pos + Vec3::Z * height), u.radius),
+        };
+        let body = segment(camera, ends.0, ends.1).and_then(|(a, b)| {
+            let (d, along) = to_segment(pixel, a, b);
+            let at = ends.0.lerp(ends.1, along);
+            let reach = (width * scale / (at - eye).length().max(1.0)).max(MIN_REACH);
             (d <= reach).then_some(d)
         });
         // The icon: where icons.wgsl centres it, half its drawn width round that.
@@ -96,9 +113,12 @@ pub(crate) fn column_in_box(camera: &Camera, pos: Vec3, height: f32, min: Vec2, 
 /// Where a unit's feet (`pos`) and top (`height` over them) are drawn. A top behind the
 /// camera falls back to the feet, and the other way round.
 fn column(camera: &Camera, pos: Vec3, height: f32) -> Option<(Vec2, Vec2)> {
-    let feet = camera.project(pos);
-    let top = camera.project(pos + Vec3::Z * height);
-    match (feet, top) {
+    segment(camera, pos, pos + Vec3::Z * height)
+}
+
+/// Where the segment `a..b` is drawn. An end behind the camera falls back to the other.
+fn segment(camera: &Camera, a: Vec3, b: Vec3) -> Option<(Vec2, Vec2)> {
+    match (camera.project(a), camera.project(b)) {
         (Some(f), Some(t)) => Some((f, t)),
         (Some(p), None) | (None, Some(p)) => Some((p, p)),
         (None, None) => None,
@@ -232,5 +252,35 @@ mod tests {
             aside - half,
             aside + half
         ));
+    }
+
+    /// A long hull is picked along its spine, not from a disc of its radius: a click over
+    /// its nose takes it, one off its beam as far out as its nose is ahead does not.
+    #[test]
+    fn a_click_takes_a_long_hull_along_its_spine_only() {
+        let blueprints = blueprints();
+        let bp = blueprints
+            .unit_by_key("regency_t5_super_destroyer")
+            .expect("regent");
+        let at = Vec3::new(12000.0, 12000.0, 1500.0);
+        let regent = UnitInstance {
+            pos: at.into(),
+            prev_pos: at.into(),
+            blueprint: bp.id.0 as u32,
+            radius: bp.radius.to_f32(),
+            build: 1.0,
+            health: 1.0,
+            ..UnitInstance::zeroed()
+        };
+        let camera = far_camera(at);
+        let mid = Vec3::Z * bp.height.to_f32() * 0.5;
+        let nose = camera
+            .project(at + mid + Vec3::X * 1500.0)
+            .expect("on screen");
+        assert_eq!(unit_at(&[regent], &blueprints, &camera, nose), Some(0));
+        let beam = camera
+            .project(at + mid + Vec3::Y * 1500.0)
+            .expect("on screen");
+        assert_eq!(unit_at(&[regent], &blueprints, &camera, beam), None);
     }
 }

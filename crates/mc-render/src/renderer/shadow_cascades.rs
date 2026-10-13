@@ -19,9 +19,11 @@ const _: () = assert!(
         == crate::gpu_consts::cull_list::SHADOW as usize + CASCADES
 );
 
-/// Metres toward the sun past a cascade's sphere that still cast into it: tall
-/// terrain and aircraft under the cloud layer.
-const CASTER_REACH: f32 = 900.0;
+/// Metres toward the sun past a cascade's sphere that still cast into it: tall terrain,
+/// aircraft under the cloud layer, and a capital ship hanging high over the ground (the
+/// Regent's hull is 2.3 km up: 3.2 km along a sun 45 degrees up). The map is 32-bit
+/// depth, so the longer span costs no acne.
+const CASTER_REACH: f32 = 3200.0;
 
 pub(super) struct Cascade {
     pub view_proj: Mat4,
