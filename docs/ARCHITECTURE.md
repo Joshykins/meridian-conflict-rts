@@ -320,6 +320,29 @@ What a fight looks and sounds like is decided outside the simulation; `docs/STYL
   `world::pitched` carries the muzzle and the emitter round the pivot, so it is state and hashed. The mirror sends last
   tick's and this tick's pitch, and `prev_turret_yaw` beside `turret_yaw`; `entity.wgsl` interpolates both and pitches
   `rig::ARM_GUN` / `ARM_TOOL` vertices about `Model::arm_pivot` (`MeshBuilder::set_arm_pivot`) before the turret yaw.
+- **Weapon groups.** A weapon in a unit file with `mounts: [(pivot, facing, arc?), ...]` is
+  one kind of gun on many houses (the Regent's 72): its `muzzle`/`muzzles` are given about
+  the pivot as the house faces the nose, and loading makes each mount a whole `Weapon` of
+  its own (`Weapon::mount_weapons`, `mc_data::mounts`); what keeps state for a whole unit
+  (cells, orbs, a lens, a split salvo, a fed reload) is refused in a group. Gun slots number
+  every gun of a unit, weapon by weapon and a group's mounts in order
+  (`UnitBlueprint::gun_slot`, at most `MAX_GUNS` 128). The sim keeps each gun's aim, mark,
+  reload, salvo, stream and spin in `Units::mounts` by gun slot (`mc_sim::mounts`: empty for
+  a unit without a group, hashed only where present, `State::validate_mounts` on a
+  restore). Targeting gives each gun its mark from one search round the hull per group,
+  and the weapons phase steps each gun through the one gun step every weapon takes,
+  its state laid into the weapon's slot for the step; both run behind the same hold-fire
+  and stun gate as every other gun, and the weapon's slot is left holding the group's
+  summary (its first gun's mark, the soonest reload). `ShotFired` and `WeaponCharging`
+  carry the gun slot. A model binds each house to its gun slot (`MeshBuilder::with_house`):
+  houses are numbered up to 128 by a limb and a page in spare rig bits (`rig::house_bits`,
+  `gpu_consts::house`), their pivots and guns in a table of their own (`ModelInfo::houses`,
+  scene set 43, `ModelHouse`), and the mirror poses eight gun slots to a `HousePose`, a unit
+  taking as many records in a row as it has guns. A house on a `hull_mounts` hull reaches
+  and leads from its own pivot, and a long hull (`body`) is reached from its capsule
+  (`World::hull_gap`), closed in on at its nearest point and picked along its spine.
+  Cell blocks hold up to 32 cells each, a byte of muzzle order a cell
+  (`ModelInfo::cell_order`), and a launcher's status word counts the cells fired.
 - **Surfaces.** Unit texturing is procedural and per face. When `MeshBuilder` emits a planar face it also works out
   that face's frame and stores it on the vertices (`MeshVertex::face`: position on the face in metres, and the face's
   half size; level on walls, square to the model on decks, along itself for a raked beam; a tube's facets share one
