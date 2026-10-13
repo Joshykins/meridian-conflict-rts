@@ -677,6 +677,9 @@ fn meshes_are_valid() {
                     // Precursor artifacts run deep: half-buried rings and shards, footings
                     // sunk so they stand on a slope without showing their underside.
                     -80.0
+                } else if base_key(&model.key) == "colony_bridge" {
+                    // A road bridge's piers and abutments, footed under the river's bed.
+                    -(mc_map::city::COLONY_BRIDGE_DEPTH_M as f32) - 2.5
                 } else if is_prop {
                     -3.0
                 } else if model.key == "factory_naval" {

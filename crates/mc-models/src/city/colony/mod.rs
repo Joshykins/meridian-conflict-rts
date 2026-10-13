@@ -1,4 +1,4 @@
-//! The colony kit (map prop kinds 131..=134): a frontier colony's prefab town,
+//! The colony kit (map prop kinds 131..=141): a frontier colony's prefab town,
 //! Vela's Port Calder, shipped down as panels and modules and bolted together.
 //! Built on the city kit's tools and drawn by its shader (city.wgsl `PREFAB`,
 //! `HAB`, `HAB_BAND`, `ACCENT`, `TRIM`), so it breaks, burns and comes down as
@@ -13,11 +13,14 @@ use crate::builder::MeshBuilder;
 use crate::gpu_consts::city as pat;
 use crate::library::ModelDef;
 
+mod bridge;
 mod depot;
 mod dig;
+mod fence;
 mod hab;
 mod hangar;
 mod pad;
+mod pit;
 mod port;
 mod stack;
 mod tower;
@@ -35,6 +38,13 @@ pub(crate) const MODELS: &[ModelDef] = &[
     ),
     def("colony_hangar", PropKind::ColonyHangar, hangar::hangar),
     def("colony_dig", PropKind::ColonyDig, dig::dig),
+    def("colony_bridge", PropKind::ColonyBridge, bridge::girder),
+    def("colony_bridge~b", PropKind::ColonyBridge, bridge::haunched),
+    def("colony_bridge~c", PropKind::ColonyBridge, bridge::through),
+    def("colony_fence", PropKind::ColonyFence, fence::fence),
+    def("colony_fence~b", PropKind::ColonyFence, fence::palisade),
+    def("colony_gun_pit", PropKind::ColonyGunPit, pit::sandbags),
+    def("colony_gun_pit~b", PropKind::ColonyGunPit, pit::blocks),
 ];
 
 /// The outline of `r` at height `z` with its upright corners cut back `cut` metres in
