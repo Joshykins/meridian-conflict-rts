@@ -88,16 +88,38 @@ fn slot_angle(k: usize, n: usize) -> f32 {
     PI + halo::GAP * 0.5 + span * (k as f32 + 0.5)
 }
 
+/// The ring's radius, its depth and band, its tilt and its middle.
+fn layout(m: &Mount) -> (f32, f32, f32, f32, glam::Vec3) {
+    let r = m.lens_r * 1.32;
+    (
+        r,
+        r * 0.1,
+        m.lens_half * 0.09 + 0.6,
+        0.14,
+        v3(0.0, 0.0, m.lens_mid + m.lens_half * 0.15),
+    )
+}
+
+/// The middle of the blade hanging in slot `k` (of the halo's own count), in model
+/// space: where an interceptor leaves from (the renderer's hard light, `shaper::halo_slot`).
+pub(super) fn slot_middle(m: &Mount, k: usize) -> glam::Vec3 {
+    let n = m.g.slots.max(1);
+    let (r, depth, band, tilt, centre) = layout(m);
+    let a = slot_angle(k.min(n - 1), n);
+    let local = v3(
+        a.cos() * (r - depth * 0.5),
+        a.sin() * (r - depth * 0.5),
+        -band * 3.0 - m.len * 0.5,
+    );
+    centre + Affine3A::from_rotation_y(tilt).transform_vector3(local)
+}
+
 pub(super) fn draw(b: &mut MeshBuilder, m: &Mount) {
     let n = m.g.slots.max(1);
-    let r = m.lens_r * 1.32;
+    let (r, depth, band, tilt, centre) = layout(m);
     let span = (TAU - halo::GAP) / n as f32;
-    let depth = r * 0.1;
-    let band = m.lens_half * 0.09 + 0.6;
     let len = m.len;
     let w = len * 0.2;
-    let tilt = 0.14f32;
-    let centre = v3(0.0, 0.0, m.lens_mid + m.lens_half * 0.15);
     b.with(
         Affine3A::from_translation(centre) * Affine3A::from_rotation_y(tilt),
         |b| {

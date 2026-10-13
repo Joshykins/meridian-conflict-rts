@@ -12,9 +12,9 @@
 // - **Beam**: a line of light from `a` to `b` turned to the eye, `size_from` wide at
 //   `a` and `size_to` at `b`. It is drawn on from `a` over its `grow` share of its life
 //   and withdraws into `b` at the end. Flat-topped and hard-edged with a line of light
-//   down each edge; a strike's (`PULSES`) has bright chevrons running down it, a braid
-//   (`BRAID`) three strands wound round it, a trail (`TRAIL`) fades from `b` back to `a`
-//   and an unmaking line (`LINE`) is a thin thread.
+//   down each edge; a drive's (`PULSES`) has bright chevrons running down it, a trail
+//   (`TRAIL`) fades from `b` back to `a`, and a Lance's core or an unmaking line (`LINE`)
+//   is a thin thread.
 // - **Ring**: round `a` in the plane facing `b`, or laid on the ground (`DRAPE`). Its
 //   radius runs from `size_from` to `size_to` over its `grow` share, `width` metres
 //   across. In arcs (`ARCS`, more with its tier), a target (`TARGET`: dashes turning, a
@@ -100,13 +100,17 @@ fn alive(p: ProgenitorPiece) -> bool {
     return age >= 0.0 && age <= p.life;
 }
 
-// Drawn on over its `grow` share of its life (at once with none).
+// Drawn on over its `grow` share of its life (at once with none): fast then settling, or
+// slow then fast for a cage closing in (`CLOSE`).
 fn rise_of(p: ProgenitorPiece) -> f32 {
     if p.grow <= 0.0 {
         return 1.0;
     }
-    let t = share_of(p) / p.grow;
-    return 1.0 - pow(1.0 - saturate(t), 3.0);
+    let t = saturate(share_of(p) / p.grow);
+    if has(p, PROGENITOR_FX_CLOSE) {
+        return t * t;
+    }
+    return 1.0 - pow(1.0 - t, 3.0);
 }
 
 // Its light over its life: a flash as it is drawn on, held, then going out over the
@@ -163,9 +167,6 @@ fn vs_beam(@builtin(vertex_index) vid: u32, @builtin(instance_index) inst: u32) 
     let eye = globals.camera.xyz;
     let across = normalize(cross(dir, normalize(eye - at)));
     var width = mix(p.size_from, p.size_to, along);
-    if has(p, PROGENITOR_FX_BRAID) {
-        width *= 2.4;
-    }
     // Never thinner than a pixel and a half; then dimmer by as much.
     let least = pixel_m(at) * 1.5;
     let own = saturate(width / least);
@@ -190,15 +191,6 @@ fn fs_beam(in: PieceOut) -> @location(0) vec4<f32> {
     var edge = 0.0;
     if has(p, PROGENITOR_FX_LINE) {
         core = 1.0 - smoothstep(0.15, 1.0, x);
-    } else if has(p, PROGENITOR_FX_BRAID) {
-        // Three strands wound round a thin core, the near half of each brighter.
-        core = (1.0 - smoothstep(0.08, 0.2, x)) * 0.8;
-        for (var k = 0; k < 3; k++) {
-            let ph = along_m / 26.0 * 6.2831855 - age * 9.0 + f32(k) * 2.0943951;
-            let off = sin(ph) * 0.72;
-            let near = 0.55 + 0.45 * cos(ph);
-            edge = max(edge, exp(-abs(in.uv.y - off) * 16.0) * near);
-        }
     } else {
         // Hard light: flat across, crisp at its sides, a line of light down each edge.
         core = 1.0 - smoothstep(0.32, 0.46, x);

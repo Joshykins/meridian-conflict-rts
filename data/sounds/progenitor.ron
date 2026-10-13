@@ -62,20 +62,20 @@
                 Drive(1.15),
             ],
         ),
-        // A warhead unmade by a shard: the cage closing, air drawn in and swelling; then a
-        // white crack and a deep blow, and the lines of light flung out heard as a fizz
-        // that sinks away under a rolling tail.
+        // A warhead unmade by a shard: the cage closing over a second, air drawn in and
+        // swelling; then a white crack and a deep blow, and the lines of light flung out
+        // heard as a fizz that sinks away under a rolling tail.
         "progenitor_warhead_intercepted": (
-            length: 4.0, peak: 0.75, room: 0.8,
+            length: 4.8, peak: 0.75, room: 0.8,
             layers: [
-                Sweep(from: 1400, to: 400, glide: 0.55, q: 0.8, attack: 0.5, decay: 0.05, gain: 1.0),
-                Fm(from: 130, to: 196, glide: 0.55, ratio: 1.41, index: 1.2, fade: 0.5, attack: 0.5, decay: 0.06, gain: 0.4),
-                Burst(at: 0.55, low: 400, high: 2400, attack: 0.0004, decay: 0.015, gain: 3),
-                Burst(at: 0.55, low: 40, high: 400, attack: 0.002, decay: 0.3, gain: 6),
-                Tone(at: 0.55, from: 90, to: 36, glide: 0.6, attack: 0.003, decay: 0.8, gain: 1.6),
+                Sweep(from: 1400, to: 400, glide: 1.15, q: 0.8, attack: 1.1, decay: 0.05, gain: 1.0),
+                Fm(from: 110, to: 196, glide: 1.15, ratio: 1.41, index: 1.2, fade: 1.0, attack: 1.1, decay: 0.06, gain: 0.4),
+                Burst(at: 1.15, low: 400, high: 2400, attack: 0.0004, decay: 0.015, gain: 3),
+                Burst(at: 1.15, low: 40, high: 400, attack: 0.002, decay: 0.3, gain: 6),
+                Tone(at: 1.15, from: 90, to: 36, glide: 0.6, attack: 0.003, decay: 0.8, gain: 1.6),
                 Drive(1.4),
-                Foam(at: 0.56, from: 1500, to: 450, glide: 1.6, q: 1.0, attack: 0.01, decay: 0.7, gain: 0.5, swell: 30, depth: 0.8),
-                Roll(at: 0.57, from: 700, to: 120, glide: 2.5, attack: 0.03, decay: 0.9, gain: 0.8, swell: 4, depth: 0.6),
+                Foam(at: 1.16, from: 1500, to: 450, glide: 2.0, q: 1.0, attack: 0.01, decay: 0.8, gain: 0.5, swell: 30, depth: 0.8),
+                Roll(at: 1.17, from: 700, to: 120, glide: 2.8, attack: 0.03, decay: 1.0, gain: 0.8, swell: 4, depth: 0.6),
             ],
         ),
         // A Seedcaster's volley leaving, heard by every defender (the toast's sound): a

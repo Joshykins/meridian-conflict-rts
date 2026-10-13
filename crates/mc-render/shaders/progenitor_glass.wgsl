@@ -1,26 +1,24 @@
 // A Progenitor Shaper's dome (`shield_look::PROGENITOR`; shields.wgsl, whose shield
 // helpers this uses). Nothing like ARC's honeycomb, the Regency's prism veil or the
-// Heart's dark veil: clear panes of hard light laid in courses round the dome, each a
-// parallelogram whose upright seams lean (the courses lean the other way each in turn),
-// edged by a seam of cold light, and the courses turning slowly against each other.
-// Its Shaper's tier (the tech byte of its `packed` word) brings more and finer courses,
-// glyph strokes inset in the panes, rings of light running round the seams between
-// courses, and under the glass more domes inside it, each turning its own way.
+// Heart's dark veil: clear facets of hard light, triangles laid in courses round the
+// dome, each edged by a seam of cold blue light, the courses turning slowly against
+// each other. Its Shaper's tier (the tech byte of its `packed` word) brings more and
+// finer courses, glyph strokes inset in the facets, rings of light running round the
+// seams between courses, and under the glass more domes inside it, each turning its own
+// way.
 //
-// A strike flashes the pane it lands on white, breaks it (its fill goes out and cracks
-// run from the strike to its seams) and then the pane knits again: its seam is traced
-// back round it from the corner nearest the strike, a hot point leading, until it is
+// A strike flashes the facet it lands on white, breaks it (its fill goes out and cracks
+// run from the strike to its seams) and then the facet knits again: its seam is traced
+// back round it from the side nearest the strike, a hot point leading, until it is
 // whole and fills again. A ring of light runs out along the seams round it.
 
 const PANE_LIGHT: vec3<f32> = vec3<f32>(PROGENITOR_FX_LIGHT_R, PROGENITOR_FX_LIGHT_G, PROGENITOR_FX_LIGHT_B);
 const PANE_HOT: vec3<f32> = vec3<f32>(PROGENITOR_FX_HOT_R, PROGENITOR_FX_HOT_G, PROGENITOR_FX_HOT_B);
+// The seams' cold blue: deeper than the light, so they read blue, not white.
+const PANE_SEAM: vec3<f32> = vec3<f32>(0.14, 0.38, 1.0);
 // The glass between the seams: a faint cold cast, never dark (the Heart's veil is dark).
-const PANE_FILL: vec3<f32> = vec3<f32>(0.16, 0.26, 0.5);
-// How much wider than a course is tall a pane is, and how far its upright seams lean
-// across a course, in panes.
-const PANE_ASPECT: f32 = 1.8;
-const PANE_LEAN: f32 = 0.34;
-// Seconds a struck pane takes to flash, break and knit whole again.
+const PANE_FILL: vec3<f32> = vec3<f32>(0.14, 0.26, 0.55);
+// Seconds a struck facet takes to flash, break and knit whole again.
 const PANE_KNIT: f32 = 1.5;
 
 fn is_progenitor_field(s: Shield) -> bool {
@@ -32,27 +30,31 @@ fn pane_tier(s: Shield) -> f32 {
     return f32(clamp((s.packed >> 16u) & 255u, 1u, 32u));
 }
 
-// Courses of panes from the rim to the crown at `tier`: sixteen at the first, finer
-// with each tier (a dome grows with its Shaper, so its panes grow with it).
+// Courses of facets from the rim to the crown at `tier`: sixteen at the first, finer
+// with each tier (a dome grows with its Shaper, so its facets grow with it).
 fn pane_courses(tier: f32) -> f32 {
     return clamp(round(16.0 * (1.0 + 0.15 * (tier - 1.0))), 6.0, 40.0);
 }
 
 struct Pane {
-    // Its course (below zero on the wall under the rim), its place round the course,
-    // and a stable hash of it.
+    // Its course (below zero on the wall under the rim), its place round the course
+    // (two facets to a cell), and a stable hash of it.
     id: vec3<f32>,
-    // 0..1 across it and up it.
+    // Its cell's sheared coordinates, 0..1 across and up (the facet is the half below
+    // the diagonal u = v, or above it).
     uv: vec2<f32>,
-    // Metres across and up it.
+    // Metres a cell runs along the course, and a course's height.
     size: vec2<f32>,
     // Metres to its nearest seam.
     seam: f32,
+    // 1 the upper facet of its cell, 0 the lower.
+    upper: f32,
 }
 
-// The pane at `n` on a dome of radius `r` (the round sphere it is stretched from; `n`
+// The facet at `n` on a dome of radius `r` (the round sphere it is stretched from; `n`
 // a unit direction), `drop` metres down the wall under its rim, its courses turned by
-// `turn` turns (each course the other way from the last).
+// `turn` turns (each course the other way from the last). A course is a row of
+// near-equilateral triangles: cells sheared half a cell across a course, cut along u = v.
 fn pane_at(n: vec3<f32>, r: f32, drop: f32, courses: f32, turn: f32) -> Pane {
     let span = 1.5707964 / courses;
     let tall = span * r;
@@ -67,38 +69,44 @@ fn pane_at(n: vec3<f32>, r: f32, drop: f32, courses: f32, turn: f32) -> Pane {
     }
     let mid = (max(course, 0.0) + 0.5) * span;
     let around = 6.2831855 * r * cos(mid);
-    let cells = max(round(around / (tall * PANE_ASPECT)), 3.0);
+    // Cells 1.155 courses long make the triangles all but equilateral.
+    let cells = max(round(around / (tall * 1.155)), 3.0);
     let way = select(-1.0, 1.0, (i32(course + 64.0) & 1) == 0);
     let az = atan2(n.y, n.x) / 6.2831855 + turn * way * (1.0 + 0.15 * abs(course));
-    let x = az * cells + PANE_LEAN * (v - 0.5) * way + course * 0.5;
+    let x = az * cells + 0.5 * v + course * 0.5;
     let idx = floor(x);
     let u = x - idx;
     let slot = idx - floor(idx / cells) * cells;
+    let upper = step(u, v);
+    let cw = around / cells;
+    // Metres across a seam per unit of the sheared coordinates.
+    let g = 1.0 / sqrt(1.0 / (cw * cw) + 0.25 / (tall * tall));
     var p: Pane;
-    p.id = vec3<f32>(course, slot, hash21(vec2<f32>(course * 7.31 + 0.5, slot * 1.93 + 0.25)));
+    p.id = vec3<f32>(
+        course,
+        slot * 2.0 + upper,
+        hash21(vec2<f32>(course * 7.31 + 0.5, (slot * 2.0 + upper) * 1.93 + 0.25)),
+    );
     p.uv = vec2<f32>(u, v);
-    p.size = vec2<f32>(around / cells, tall);
-    p.seam = min(min(u, 1.0 - u) * p.size.x * 0.95, min(v, 1.0 - v) * tall);
+    p.size = vec2<f32>(cw, tall);
+    p.seam = min(min(v, 1.0 - v) * tall, min(min(u, 1.0 - u), abs(u - v)) * g);
+    p.upper = upper;
     return p;
 }
 
-// How far round a pane's seam, 0..1 from its lower left corner, at its nearest seam.
-fn pane_round(uv: vec2<f32>, size: vec2<f32>) -> f32 {
-    let d = vec4<f32>(uv.y * size.y, (1.0 - uv.x) * size.x, (1.0 - uv.y) * size.y, uv.x * size.x);
-    let m = min(min(d.x, d.y), min(d.z, d.w));
-    if m == d.x {
-        return uv.x * 0.25;
-    }
-    if m == d.y {
-        return 0.25 + uv.y * 0.25;
-    }
-    if m == d.z {
-        return 0.5 + (1.0 - uv.x) * 0.25;
-    }
-    return 0.75 + (1.0 - uv.y) * 0.25;
+// A point of a cell in metres, along the course and up it.
+fn pane_metres(uv: vec2<f32>, size: vec2<f32>) -> vec2<f32> {
+    return vec2<f32>((uv.x - 0.5 * uv.y) * size.x, uv.y * size.y);
 }
 
-// A struck pane's seam knitting round it: lit out both ways from `start` (0..1 round
+// How far round its facet's middle `uv` lies, 0..1.
+fn pane_round(p: Pane, uv: vec2<f32>) -> f32 {
+    let mid = select(vec2<f32>(2.0 / 3.0, 1.0 / 3.0), vec2<f32>(1.0 / 3.0, 2.0 / 3.0), p.upper > 0.5);
+    let d = pane_metres(uv, p.size) - pane_metres(mid, p.size);
+    return atan2(d.y, d.x) / 6.2831855 + 0.5;
+}
+
+// A struck facet's seam knitting round it: lit out both ways from `start` (0..1 round
 // it) as far as `k` of the way round (1 whole), and the hot points leading.
 fn pane_knit(at: f32, start: f32, k: f32) -> vec2<f32> {
     let d = abs(fract(at - start + 0.5) - 0.5) * 2.0;
@@ -125,13 +133,14 @@ fn pane_layer(n: vec3<f32>, s: Shield, owner: u32, drop: f32, courses: f32, turn
     fill += held * 0.12;
     var glyph = 0.0;
     if tier >= 2.0 {
-        // A glyph stroke inset along the foot of some panes, and up the side of others.
-        let g = fract(p.id.z * 17.3);
-        let along = select(p.uv.x, p.uv.y, g > 0.5);
-        let across = select(p.uv.y, 1.0 - p.uv.x, g > 0.5) * select(p.size.y, p.size.x, g > 0.5);
-        let reach = 0.15 + 0.55 * fract(p.id.z * 5.7);
-        glyph = (1.0 - smoothstep(w * 0.4, w * 0.8, abs(across - 0.22 * select(p.size.y, p.size.x, g > 0.5))))
-            * step(0.12, along) * step(along, 0.12 + reach) * step(0.35, p.id.z) * see;
+        // A glyph stroke inset along the level side of some facets (the foot of a lower
+        // one, the head of an upper one), a share of its length.
+        let line = select(0.24, 0.76, p.upper > 0.5);
+        let across = abs(p.uv.y - line) * p.size.y;
+        let along = fract(p.uv.x - 0.5 * p.uv.y + 1.0);
+        let reach = 0.15 + 0.4 * fract(p.id.z * 5.7);
+        glyph = (1.0 - smoothstep(w * 0.4, w * 0.8, across))
+            * step(0.3, along) * step(along, 0.3 + reach) * step(0.35, p.id.z) * see;
     }
     var ring = 0.0;
     if tier >= 3.0 && p.id.x >= 0.0 {
@@ -178,7 +187,7 @@ fn pane_layer(n: vec3<f32>, s: Shield, owner: u32, drop: f32, courses: f32, turn
             flash += exp(-age * 9.0) * min(strength, 1.5);
             let broken = smoothstep(0.02, 0.07, age) * (1.0 - smoothstep(PANE_KNIT * 0.75, PANE_KNIT, age));
             // Cracks from the strike to the seams, on a slant: three or four straight runs.
-            let o = (p.uv - p0.uv) * p.size;
+            let o = pane_metres(p.uv, p.size) - pane_metres(p0.uv, p.size);
             var c = 0.0;
             for (var k = 0u; k < 4u; k++) {
                 let a = hash11(h.start * 3.7 + f32(k) * 1.91) * 6.2831855;
@@ -189,7 +198,7 @@ fn pane_layer(n: vec3<f32>, s: Shield, owner: u32, drop: f32, courses: f32, turn
             }
             crack = max(crack, c * broken * (1.0 - smoothstep(0.15, 0.6, age)) * see);
             let k = smoothstep(0.18, PANE_KNIT * 0.8, age);
-            let kn = pane_knit(pane_round(p.uv, p.size), pane_round(p0.uv, p.size), k);
+            let kn = pane_knit(pane_round(p, p.uv), pane_round(p, p0.uv), k);
             knit = min(knit, mix(1.0, kn.x, broken));
             lead = max(lead, kn.y * broken);
             fill *= 1.0 - broken * 0.9;
@@ -201,7 +210,7 @@ fn pane_layer(n: vec3<f32>, s: Shield, owner: u32, drop: f32, courses: f32, turn
     seam *= 1.0 - flick * 0.85;
     let on_seam = seam * knit;
     var rgb = PANE_FILL * fill * (0.6 + fres);
-    rgb += PANE_LIGHT * (on_seam * (0.55 + wave * 2.0) + glyph * 0.6 + ring * 1.4);
+    rgb += PANE_SEAM * on_seam * (0.7 + wave * 1.5) + PANE_LIGHT * (glyph * 0.6 + ring * 1.4);
     flash = min(flash, 1.5);
     rgb += PANE_HOT * (flash * (0.6 + 0.4 * (1.0 - crack)) * 1.4 + crack * 3.0 + lead * seam * 5.0 + ring * 0.4);
     var a = fill * 0.4 + on_seam * 0.4 + glyph * 0.25 + ring * 0.3 + flash * 0.12 + crack * 0.4 + lead * seam * 0.5;
@@ -246,7 +255,7 @@ fn progenitor_glass(p: vec3<f32>, s: Shield, dir: vec3<f32>, owner: u32, time: f
     }
     // The rim: a hard line of light on the silhouette.
     let rim = pow(1.0 - facing, 8.0);
-    var rgb = glass.rgb + PANE_LIGHT * (fres * 0.5 + rim * 2.2);
+    var rgb = glass.rgb + mix(PANE_SEAM, PANE_LIGHT, 0.4) * (fres * 0.5 + rim * 1.8);
     var a = glass.a + fres * 0.12 + rim * 0.3;
     // Opening: the lip of light climbing the dome; collapsing, it runs down hot.
     let open = shield_open(s);

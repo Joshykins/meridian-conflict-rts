@@ -57,6 +57,20 @@ struct Blade {
     sections: usize,
 }
 
+/// Where the Lens and its halo stand on the printing Shaper `g` (also `shaper::lens_height`
+/// and `shaper::halo_slot`, which put the hard light there).
+pub(super) fn mount(g: Growth) -> Mount {
+    let (h, r) = (g.height, g.reach);
+    let lens_h = 0.08 * h + 0.1 * r + 6.0;
+    Mount {
+        g,
+        lens_mid: h * 0.86 - lens_h * 0.2,
+        lens_half: lens_h * 0.5,
+        lens_r: 0.06 * h + 0.22 * r + 3.0,
+        len: 0.12 * h + 6.0,
+    }
+}
+
 pub(super) fn draw(b: &mut MeshBuilder, g: Growth) {
     let (h, r) = (g.height, g.reach);
     let sections = g.tier.min(10);
@@ -72,8 +86,8 @@ pub(super) fn draw(b: &mut MeshBuilder, g: Growth) {
     }
 
     // The core, telescoping: a section a tier, each a little narrower.
-    let lens_h = 0.08 * h + 0.1 * r + 6.0;
-    let lens_mid = h * 0.86 - lens_h * 0.2;
+    let m = mount(g);
+    let (lens_h, lens_mid, lens_r) = (m.lens_half * 2.0, m.lens_mid, m.lens_r);
     let lens_floor = lens_mid - lens_h * 0.5;
     let c0 = r * 0.24;
     let lip = 0.008 * h + 0.8;
@@ -171,17 +185,7 @@ pub(super) fn draw(b: &mut MeshBuilder, g: Growth) {
         },
     );
 
-    let lens_r = 0.06 * h + 0.22 * r + 3.0;
-    halo::draw(
-        b,
-        &Mount {
-            g,
-            lens_mid,
-            lens_half: lens_h * 0.5,
-            lens_r,
-            len: 0.12 * h + 6.0,
-        },
-    );
+    halo::draw(b, &m);
 
     // The Lens on the core's head, the spine standing through a gap in its great ring.
     pale(b);

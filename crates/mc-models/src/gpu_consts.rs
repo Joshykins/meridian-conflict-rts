@@ -1663,12 +1663,12 @@ shared! {
         /// A sphere's bands pole to pole and segments round it.
         pub const SHELL_BANDS: u32 = 14;
         pub const SHELL_SEGMENTS: u32 = 36;
-        /// Flags (`GpuPiece::flags`). A beam: pulses run down it (a strike); it fades from
-        /// `a` back (a trail); it is a thin unmaking line; a braid of light round it.
+        /// Flags (`GpuPiece::flags`). A beam: pulses run down it (a warhead's drive); it
+        /// fades from `a` back (a trail); it is a thin thread (a Lance's core, an unmaking).
         pub const PULSES: u32 = 0x1;
         pub const TRAIL: u32 = 0x2;
         pub const LINE: u32 = 0x4;
-        pub const BRAID: u32 = 0x8;
+        // retired: 0x8 (a braid of light round a Lance)
         /// A ring laid on the ground (`a` the middle, `b` unused): a mark that stays and
         /// cools, a target, broken into arcs.
         pub const DRAPE: u32 = 0x10;
@@ -1681,6 +1681,9 @@ shared! {
         pub const LIGHT: u32 = 0x200;
         /// A sphere's upper half.
         pub const DOME: u32 = 0x400;
+        /// Drawn on slowly at first and faster to the end rather than the other way: a
+        /// cage closing in.
+        pub const CLOSE: u32 = 0x800;
         /// The Progenitor's light: cold blue-white, and white-hot.
         pub const LIGHT_R: f32 = 0.56;
         pub const LIGHT_G: f32 = 0.74;

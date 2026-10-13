@@ -244,7 +244,7 @@ impl Game {
                     continue;
                 };
                 let lens = Vec3::from(u.pos)
-                    + Vec3::Z * mc_render::models::shaper::lens_height(s.kind, s.height);
+                    + Vec3::Z * mc_render::models::shaper::lens_height(s.kind, s.level);
                 let (gain, pan) = self.hear(lens);
                 let gain = gain * (0.35 + 0.65 * s.lance_charge);
                 sum = (sum.0 + gain * gain, sum.1 + gain * gain * pan);

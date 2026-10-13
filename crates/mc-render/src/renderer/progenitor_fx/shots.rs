@@ -10,13 +10,11 @@
 //!   lance-close, antinuke-close, shell-close, warhead-close (the camera close on the
 //!   beam or the body in flight);
 //! - `PROG_TIERS`: the Shaper's tiers, comma-separated (default `1,5`);
-//! - `PROG_LANCE`: the Lance's looks to shoot, `a`, `b`, `c` (default `a`);
 //! - `PROG_TIMES`: seconds into each scene to capture (default per scene);
 //! - `PROG_CAM`: `dx,dy,dz,dist,yaw,pitch` (metres off the Shaper's foot, radians), else
 //!   per scene, looking across from the side;
 //! - `PROG_BIG`: 2560x1440 rather than 1600x900.
 
-use super::LanceLook;
 use crate::camera::Camera;
 use crate::overlay::Overlay;
 use crate::renderer::{FrameInput, Renderer, SceneDesc, Target};
@@ -118,7 +116,8 @@ impl Stage {
 
     fn shard_at(&self, t: f32) -> Vec3 {
         let s = ((t - 0.5) / 2.0).clamp(0.0, 1.0);
-        let lift = self.cell() + Vec3::Z * 600.0 * s.min(0.4) / 0.4;
+        // Slow out of the cell, as the sim's boost is.
+        let lift = self.cell() + Vec3::Z * 600.0 * (s.min(0.4) / 0.4).powi(2);
         lift.lerp(self.meet(), (s - 0.4).max(0.0) / 0.6)
     }
 
@@ -153,8 +152,8 @@ impl Stage {
             "shell" => Vec3::from(self.shell().at(t / 6.0)),
             // Along the Lance's beam, two thirds of the way down.
             "lance" => {
-                let h = shaper_height(self.level()).to_f32();
-                let lens = self.site + Vec3::Z * crate::models::shaper::lens_height(0, h);
+                let lens =
+                    self.site + Vec3::Z * crate::models::shaper::lens_height(0, self.level());
                 lens.lerp(self.target, 0.66)
             }
             _ => self.warhead_at(t),
@@ -171,7 +170,15 @@ impl Stage {
         } else {
             self.shaper_bp
         };
-        f.units.push(unit(bp, 1, self.site, 1));
+        let mut shaper = unit(bp, 1, self.site, 1);
+        // Its halo's launcher word: every interceptor held, but the one the anti-nuke
+        // scene spends at 0.5 s.
+        let capacity = crate::models::shaper::interceptors(level) as u32;
+        let spent = u32::from(self.scene == "antinuke" && k >= 5);
+        shaper.status[2] = mc_sim::nukes::LAUNCHER_MARK
+            | (capacity - spent)
+            | capacity << mc_sim::nukes::LAUNCHER_CAPACITY_SHIFT;
+        f.units.push(shaper);
         for i in 0..4 {
             let off = Vec2::new((i % 2) as f32 * 14.0 - 7.0, (i / 2) as f32 * 14.0 - 7.0);
             let at = self.target.truncate() + off;
@@ -255,13 +262,15 @@ impl Stage {
                     });
                 }
                 if (0.5..2.5).contains(&t) {
-                    f.strategic.push(missile(
+                    let mut shard = missile(
                         STRATEGIC_INTERCEPTOR,
                         8,
                         i_at(t),
                         i_at(t - TICK),
                         StrategicLook::Progenitor,
-                    ));
+                    );
+                    shard.age = t - 0.5;
+                    f.strategic.push(shard);
                 }
                 if k == 25 {
                     f.events.push(SimEvent::WarheadIntercepted {
@@ -396,131 +405,124 @@ fn progenitor_shots() {
     let overlay = Overlay::default();
     let mut base = 100.0f32;
     for scene in list("PROG_SCENES", "lance,shield,antinuke,shell,warhead") {
-        let looks = if scene.starts_with("lance") {
-            list("PROG_LANCE", "a")
-        } else {
-            vec!["a".into()]
-        };
         for tier in list("PROG_TIERS", "1,5") {
-            for look in &looks {
-                let tier: u8 = tier.parse().unwrap();
-                renderer.progenitor_fx.lance = match look.as_str() {
-                    "b" => LanceLook::Braid,
-                    "c" => LanceLook::Gates,
-                    _ => LanceLook::Spear,
-                };
-                let ground = |p: Vec2| renderer.ground_height(p).max(water);
-                let site = at.extend(ground(at));
-                let target_xy = at + Vec2::new(380.0, -220.0);
-                // `-close`: the same staging, the camera close on the body in flight.
-                let (staged, close) = match scene.strip_suffix("-close") {
-                    Some(s) => (s.to_string(), true),
-                    None => (scene.clone(), false),
-                };
-                let stage = Stage {
-                    scene: staged.clone(),
-                    tier,
-                    site,
-                    target: target_xy.extend(ground(target_xy)),
-                    shaper_bp: id("replication_node"),
-                    seed_bp: id("progenitor_seedcaster"),
-                    tank_bp: id("aster_t1_tank"),
-                };
-                let height = shaper_height(stage.level()).to_f32();
-                let lens = crate::models::shaper::lens_height(0, height);
-                let mid = stage.site.lerp(stage.target, 0.5);
-                // Looking across from the side: (focus, distance, yaw, pitch).
-                let (times, focus, dist, pitch): (Vec<f32>, Vec3, f32, f32) = match staged.as_str()
-                {
-                    _ if close => {
-                        let t = match staged.as_str() {
-                            "shell" => 4.0,
-                            "lance" => 3.08,
-                            _ => 2.0,
-                        };
-                        // Drawn a tick behind, eased toward the next.
-                        (vec![t], stage.body_at(t - TICK), 90.0, 0.15)
-                    }
-                    "lance" => (
-                        vec![2.4, 3.08, 3.4],
-                        mid + Vec3::Z * lens * 0.55,
-                        (lens * 2.3).max(700.0),
-                        0.1,
-                    ),
-                    "shield" => {
-                        let r = (180.0 + 22.0 * f32::from(stage.level() - 1)).min(900.0);
-                        (vec![2.0], stage.site + Vec3::Z * r * 0.15, r * 2.8, 0.32)
-                    }
-                    "antinuke" => (
-                        vec![1.6, 2.7, 3.3],
-                        stage.site + Vec3::new(-200.0, 140.0, 1050.0),
-                        2600.0,
-                        0.05,
-                    ),
-                    "shell" => (
-                        vec![4.8, 6.15, 7.5],
-                        stage.target + Vec3::Z * 40.0,
-                        650.0,
-                        0.3,
-                    ),
-                    _ => (
-                        vec![2.6, 3.4, 4.6, 8.0],
-                        stage.target + Vec3::Z * 350.0,
-                        3200.0,
-                        0.18,
-                    ),
-                };
-                let times = std::env::var("PROG_TIMES")
-                    .map(|v| v.split(',').map(|x| x.trim().parse().unwrap()).collect())
-                    .unwrap_or(times);
-                // `PROG_CAM`: dx,dy,dz off the Shaper's foot, distance, yaw, pitch.
-                let cam: Vec<f32> = std::env::var("PROG_CAM")
-                    .map(|v| v.split(',').map(|x| x.trim().parse().unwrap()).collect())
-                    .unwrap_or_else(|_| {
-                        let f = focus - stage.site;
-                        vec![f.x, f.y, f.z, dist, 0.52, pitch]
-                    });
-                let mut camera = Camera::new(size, Vec2::new(w as f32, h as f32));
-                camera.focus = stage.site + Vec3::new(cam[0], cam[1], cam[2]);
-                camera.distance = cam[3];
-                camera.yaw = cam[4];
-                camera.pitch_free = Some(cam[5]);
-                let end = times.iter().copied().fold(0.0, f32::max);
-                let mut next = 0;
-                let mut t = 0.0f32;
-                while next < times.len() && t <= end + 0.06 {
-                    let k = (t / TICK).round() as u32;
-                    let ticked = (t / TICK - k as f32).abs() < 0.01;
-                    let frame = stage.frame(k, &|p| renderer.ground_height(p).max(water));
-                    let frame = RenderFrame {
-                        props_dead: vec![0; map.props().len().div_ceil(32)],
-                        ..frame
+            let tier: u8 = tier.parse().unwrap();
+            let ground = |p: Vec2| renderer.ground_height(p).max(water);
+            let site = at.extend(ground(at));
+            let target_xy = at + Vec2::new(380.0, -220.0);
+            // `-close`: the same staging, the camera close on the body in flight.
+            let (staged, close) = match scene.strip_suffix("-close") {
+                Some(s) => (s.to_string(), true),
+                None => (scene.clone(), false),
+            };
+            let stage = Stage {
+                scene: staged.clone(),
+                tier,
+                site,
+                target: target_xy.extend(ground(target_xy)),
+                shaper_bp: id("replication_node"),
+                seed_bp: id("progenitor_seedcaster"),
+                tank_bp: id("aster_t1_tank"),
+            };
+            let lens = crate::models::shaper::lens_height(0, stage.level());
+            let mid = stage.site.lerp(stage.target, 0.5);
+            // Looking across from the side: (focus, distance, yaw, pitch).
+            let (times, focus, dist, pitch): (Vec<f32>, Vec3, f32, f32) = match staged.as_str() {
+                // The shard leaving its halo slot, from beside the Lens.
+                _ if close && staged == "antinuke" => (
+                    vec![0.75, 1.1],
+                    stage.site + Vec3::Z * lens,
+                    lens * 0.45 + 60.0,
+                    0.05,
+                ),
+                _ if close => {
+                    let t = match staged.as_str() {
+                        "shell" => 4.0,
+                        "lance" => 3.08,
+                        _ => 2.0,
                     };
-                    renderer
-                        .render(&FrameInput {
-                            camera: &camera,
-                            time: base + t,
-                            alpha: (t / TICK - k as f32).max(0.0),
-                            sim: ticked.then_some(&frame),
-                            ghosts: &[],
-                            marks: &[],
-                            ranges: &[],
-                            ranges_drawn: 0,
-                            overlay: &overlay,
-                            build_grid: false,
-                            icons: false,
-                        })
-                        .unwrap();
-                    if t + 0.001 >= times[next] {
-                        let name = format!("{scene}_t{tier}_{look}_{:.2}.ppm", times[next]);
-                        write_ppm(&mut renderer, &out.join(name), w, h);
-                        next += 1;
-                    }
-                    t += 0.05;
+                    // Drawn a tick behind, eased toward the next.
+                    (vec![t], stage.body_at(t - TICK), 90.0, 0.15)
                 }
-                println!("{scene} tier {tier} look {look}: done");
-                base += 200.0;
+                "lance" => (
+                    vec![2.4, 3.08, 3.4],
+                    mid + Vec3::Z * lens * 0.55,
+                    (lens * 2.3).max(700.0),
+                    0.1,
+                ),
+                "shield" => {
+                    let r = (180.0 + 22.0 * f32::from(stage.level() - 1)).min(900.0);
+                    (vec![2.0], stage.site + Vec3::Z * r * 0.15, r * 2.8, 0.32)
+                }
+                "antinuke" => (
+                    vec![1.6, 2.7, 3.3],
+                    stage.site + Vec3::new(-200.0, 140.0, 1050.0),
+                    2600.0,
+                    0.05,
+                ),
+                "shell" => (
+                    vec![4.8, 6.15, 7.5],
+                    stage.target + Vec3::Z * 40.0,
+                    650.0,
+                    0.3,
+                ),
+                _ => (
+                    vec![2.6, 3.4, 4.6, 8.0],
+                    stage.target + Vec3::Z * 350.0,
+                    3200.0,
+                    0.18,
+                ),
+            };
+            let times = std::env::var("PROG_TIMES")
+                .map(|v| v.split(',').map(|x| x.trim().parse().unwrap()).collect())
+                .unwrap_or(times);
+            // `PROG_CAM`: dx,dy,dz off the Shaper's foot, distance, yaw, pitch.
+            let cam: Vec<f32> = std::env::var("PROG_CAM")
+                .map(|v| v.split(',').map(|x| x.trim().parse().unwrap()).collect())
+                .unwrap_or_else(|_| {
+                    let f = focus - stage.site;
+                    vec![f.x, f.y, f.z, dist, 0.52, pitch]
+                });
+            let mut camera = Camera::new(size, Vec2::new(w as f32, h as f32));
+            camera.focus = stage.site + Vec3::new(cam[0], cam[1], cam[2]);
+            camera.distance = cam[3];
+            camera.yaw = cam[4];
+            camera.pitch_free = Some(cam[5]);
+            let end = times.iter().copied().fold(0.0, f32::max);
+            let mut next = 0;
+            let mut t = 0.0f32;
+            while next < times.len() && t <= end + 0.06 {
+                let k = (t / TICK).round() as u32;
+                let ticked = (t / TICK - k as f32).abs() < 0.01;
+                let frame = stage.frame(k, &|p| renderer.ground_height(p).max(water));
+                let frame = RenderFrame {
+                    props_dead: vec![0; map.props().len().div_ceil(32)],
+                    ..frame
+                };
+                renderer
+                    .render(&FrameInput {
+                        camera: &camera,
+                        time: base + t,
+                        alpha: (t / TICK - k as f32).max(0.0),
+                        sim: ticked.then_some(&frame),
+                        ghosts: &[],
+                        marks: &[],
+                        ranges: &[],
+                        ranges_drawn: 0,
+                        overlay: &overlay,
+                        build_grid: false,
+                        icons: false,
+                    })
+                    .unwrap();
+                if t + 0.001 >= times[next] {
+                    let name = format!("{scene}_t{tier}_{:.2}.ppm", times[next]);
+                    write_ppm(&mut renderer, &out.join(name), w, h);
+                    next += 1;
+                }
+                t += 0.05;
             }
+            println!("{scene} tier {tier}: done");
+            base += 200.0;
         }
     }
 }

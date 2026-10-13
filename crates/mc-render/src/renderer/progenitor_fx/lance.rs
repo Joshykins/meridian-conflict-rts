@@ -8,17 +8,16 @@
 //!   close round it (one, then two crossed, then three). From the third tier lines climb
 //!   to it from the collars below. Past half charged a thin line runs from the Lens to
 //!   the mark, and the mark turns on the ground, the size of the last strike's splash.
-//! - **The strike**: the Lance itself, from the Lens to the mark, in the look the user
-//!   chose (`LanceLook`), a ring kicked out round the Lens, and at the mark a flash, a
+//! - **The strike**: the Lance itself, a thin core of hard light from the Lens to the mark
+//!   run through rings that fly down it one after another, a ring kicked out round the
+//!   Lens, and at the mark a flash, a
 //!   ring of arcs out to the sim's splash, lines of light flung up, and a mark burnt into
 //!   the ground that cools from white to blue. From the second tier beams converge on the
 //!   mark from the collars, from the third a lattice dome stands over it, from the fourth
 //!   a pillar of light rises from it, from the fifth a second ring runs far out.
 
-use super::{lens_of, tier_of, LanceLook, Piece, HOT, LIGHT};
-use crate::gpu_consts::progenitor_fx::{
-    ARCS, BRAID, DOME, DRAPE, LIGHT as SHARD, LINE, MARK, PULSES, TARGET,
-};
+use super::{lens_of, tier_of, Piece, HOT, LIGHT};
+use crate::gpu_consts::progenitor_fx::{ARCS, DOME, DRAPE, LIGHT as SHARD, LINE, MARK, TARGET};
 use crate::gpu_consts::puff;
 use crate::renderer::Renderer;
 use glam::Vec3;
@@ -179,60 +178,31 @@ impl Renderer {
             // Not a Shaper: from straight over the mark.
             None => (to + Vec3::Z * 400.0, 1.0, Vec::new()),
         };
-        let look = fx.lance;
         let width = (3.0 + 1.2 * tier).min(12.0);
         let life = 0.55 + 0.08 * tier;
         let seed = self.scatter.unit();
-        match look {
-            LanceLook::Spear => {
-                self.lay_progenitor(
-                    Piece::beam(lens, to)
-                        .size(width * 0.7, width)
-                        .time(time, life, 0.1)
-                        .power(3.0)
-                        .flags(PULSES),
-                );
-                self.lay_progenitor(
-                    Piece::beam(lens, to)
-                        .size(width * 2.2, width * 2.6)
-                        .time(time, life * 0.8, 0.1)
-                        .power(0.45),
-                );
-            }
-            LanceLook::Braid => {
-                self.lay_progenitor(
-                    Piece::beam(lens, to)
-                        .size(width, width * 1.2)
-                        .time(time, life, 0.1)
-                        .power(2.6)
-                        .flags(BRAID),
-                );
-            }
-            LanceLook::Gates => {
-                self.lay_progenitor(
-                    Piece::beam(lens, to)
-                        .size(width * 0.35, width * 0.45)
-                        .time(time, life, 0.08)
-                        .power(3.5)
-                        .flags(LINE),
-                );
-                // Rings flying down the beam to the mark, one after another.
-                let dir = (to - lens).normalize_or(Vec3::NEG_Z);
-                let n = 6 + 2 * tier as usize;
-                for k in 0..n {
-                    let s = k as f32 / n as f32;
-                    self.lay_progenitor(
-                        Piece::ring(lens.lerp(to, s), dir)
-                            .size(width * 1.9, width * 1.3)
-                            .width(width * 0.3)
-                            .time(time + s * 0.16, 0.3, 0.5)
-                            .power(2.2)
-                            .flags(ARCS)
-                            .tier(tier)
-                            .seed(seed + s),
-                    );
-                }
-            }
+        // A thin core of hard light run through rings that fly down it one after another.
+        self.lay_progenitor(
+            Piece::beam(lens, to)
+                .size(width * 0.35, width * 0.45)
+                .time(time, life, 0.08)
+                .power(3.5)
+                .flags(LINE),
+        );
+        let dir = (to - lens).normalize_or(Vec3::NEG_Z);
+        let n = 6 + 2 * tier as usize;
+        for k in 0..n {
+            let s = k as f32 / n as f32;
+            self.lay_progenitor(
+                Piece::ring(lens.lerp(to, s), dir)
+                    .size(width * 1.9, width * 1.3)
+                    .width(width * 0.3)
+                    .time(time + s * 0.16, 0.3, 0.5)
+                    .power(2.2)
+                    .flags(ARCS)
+                    .tier(tier)
+                    .seed(seed + s),
+            );
         }
         // Beams down from the collars, converging on the mark.
         for from in collar {
@@ -241,11 +211,7 @@ impl Renderer {
                     .size(width * 0.25, width * 0.4)
                     .time(time + 0.04, life * 0.8, 0.12)
                     .power(1.8)
-                    .flags(if look == LanceLook::Spear {
-                        PULSES
-                    } else {
-                        LINE
-                    }),
+                    .flags(LINE),
             );
         }
         // The ring kicked out round the Lens.

@@ -7,7 +7,7 @@
 //!
 //! - **The Lance** (`lance.rs`): a crystal of light forming at the Lens as it charges,
 //!   lines drawn in to it, rings closing round it and a thin line to its mark; then the
-//!   strike from the Lens to the mark (its look chosen by `MERIDIAN_PROGENITOR_LANCE`),
+//!   strike from the Lens to the mark (a thin core run through rings flying down it),
 //!   a ring out to the sim's splash and a mark burnt into the ground. Higher tiers add
 //!   beams down from the collars, a lattice over the strike and a pillar rising from it.
 //! - **The anti-nuke and the warheads** (`strategic.rs`): an interceptor is a shard of
@@ -51,29 +51,6 @@ pub(super) const HOT: Vec3 = Vec3::new(HOT_R, HOT_G, HOT_B);
 const MOST_LAID: usize = MAX_PIECES as usize * 3 / 4;
 /// Seconds a piece drawn fresh each frame is given: it never fades in that time.
 const HELD: f32 = 1.0e5;
-
-/// How the Lance strikes (`MERIDIAN_PROGENITOR_LANCE`, docs/SWITCHES.md): three looks
-/// for the user to choose between.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub(crate) enum LanceLook {
-    /// A broad beam of hard light with chevrons running down it to the mark (`a`).
-    Spear,
-    /// Three strands of light wound round a thin core, turning as they run (`b`).
-    Braid,
-    /// A thin core run through rings of light that fly down it one after another (`c`).
-    Gates,
-}
-
-impl LanceLook {
-    /// `MERIDIAN_PROGENITOR_LANCE`: `a`, `b` or `c`; the spear when unset.
-    pub(crate) fn from_env() -> Self {
-        match std::env::var("MERIDIAN_PROGENITOR_LANCE").as_deref() {
-            Ok("b") => Self::Braid,
-            Ok("c") => Self::Gates,
-            _ => Self::Spear,
-        }
-    }
-}
 
 /// One piece of hard light being built (`GpuPiece`; progenitor_fx.wgsl says what each
 /// field is to each kind).
@@ -187,12 +164,15 @@ struct Flash {
 /// standing and flying, and the pass that draws it.
 pub(super) struct ProgenitorFx {
     pass: ProgenitorPass,
-    lance: LanceLook,
     /// Pieces laid by events, until they go out.
     laid: Vec<Piece>,
     flashes: Vec<Flash>,
     /// This tick's Shapers and the ground each stands on.
     shapers: Vec<(ShaperInstance, Vec3)>,
+    /// Each Shaper's heading and launcher word this tick (its halo: `shard_launch`).
+    halos: Vec<(u32, f32, u32)>,
+    /// Shards launched off a halo slot (`shard_launch`).
+    launches: Vec<strategic::Launch>,
     /// The splash each Lance last struck with, by unit (its mark's size while it charges).
     splashes: Vec<(u32, f32)>,
     /// Replication shells in the air, and each one's Seedcaster's level by serial (kept
@@ -212,7 +192,6 @@ impl ProgenitorFx {
     pub(super) fn new(gpu: &Gpu, layouts: &Layouts, passes: &Passes) -> Result<Self, GpuError> {
         Ok(Self {
             pass: ProgenitorPass::new(gpu, layouts, passes)?,
-            lance: LanceLook::from_env(),
             laid: Vec::new(),
             flashes: Vec::new(),
             shapers: Vec::new(),
@@ -222,6 +201,8 @@ impl ProgenitorFx {
             missiles: Vec::new(),
             trails: Vec::new(),
             heard: Vec::new(),
+            halos: Vec::new(),
+            launches: Vec::new(),
             tick_time: 0.0,
         })
     }
@@ -272,7 +253,7 @@ impl ProgenitorFx {
 /// Where a Shaper's Lens is, `foot` the ground it stands on (its model's,
 /// `models::shaper::lens_height`).
 pub(super) fn lens_of(s: &ShaperInstance, foot: Vec3) -> Vec3 {
-    foot + Vec3::Z * crate::models::shaper::lens_height(s.kind, s.height)
+    foot + Vec3::Z * crate::models::shaper::lens_height(s.kind, s.level)
 }
 
 /// Its tier as drawn: past the sixth the pieces stop multiplying and only grow brighter.
@@ -320,10 +301,11 @@ impl Renderer {
             }
             SimEvent::InterceptorLaunch {
                 from,
+                serial,
                 look: Progenitor,
                 ..
             } => {
-                self.shard_launch(Vec3::from(from.to_f32()), time);
+                self.shard_launch(*serial, Vec3::from(from.to_f32()), time);
                 true
             }
             SimEvent::NuclearLaunch {
@@ -369,9 +351,11 @@ impl Renderer {
         let fx = &mut self.progenitor_fx;
         fx.tick_time = time;
         fx.shapers.clear();
+        fx.halos.clear();
         for s in &frame.shapers {
             if let Some(u) = frame.units.iter().find(|u| u.unit_id == s.unit) {
                 fx.shapers.push((s.clone(), Vec3::from(u.pos)));
+                fx.halos.push((s.unit, u.heading, u.status[2]));
             }
         }
         fx.shells.clone_from(&frame.shells);

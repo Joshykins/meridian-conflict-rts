@@ -16,7 +16,7 @@ use super::super::builder::{MeshBuilder, Section};
 use super::super::library::ModelDef;
 use super::super::precursor::{cut_rect, dark, pale, v3};
 use super::halo::{self, Mount};
-use super::kit::{course, joint, lens, ring, shaft, Ring};
+use super::kit::{course, joint, ring, shaft, Ring};
 use super::Growth;
 
 stage_set! {
@@ -95,6 +95,32 @@ pub(super) fn draw_nuke(b: &mut MeshBuilder, g: Growth) {
     spire(b, g, Crown::Silo);
 }
 
+/// Where the Lens and its halo stand on the auxiliary Shaper `g` of `kind` (1 artillery,
+/// else nuke; also `shaper::lens_height` and `shaper::halo_slot`).
+pub(super) fn mount(g: Growth, kind: u8) -> Mount {
+    let crown = if kind == 1 { Crown::Bore } else { Crown::Silo };
+    let h = g.height;
+    let (lens_h, lens_floor) = lens(h, crown);
+    let lens_r = 0.1 * h + 6.0;
+    Mount {
+        g,
+        lens_mid: lens_floor + lens_h * 0.5,
+        lens_half: lens_h * 0.5,
+        lens_r,
+        len: lens_r * 1.15,
+    }
+}
+
+/// The Lens's height and its floor on a spire `h` tall under `crown`.
+fn lens(h: f32, crown: Crown) -> (f32, f32) {
+    let lens_h = 0.1 * h + 8.0;
+    let crown_h = match crown {
+        Crown::Bore => 0.12 * h + 6.0,
+        Crown::Silo => 0.07 * h + 4.0,
+    };
+    (lens_h, h - crown_h - lens_h)
+}
+
 fn spire(b: &mut MeshBuilder, g: Growth, crown: Crown) {
     let (h, t) = (g.height, g.tier.min(10));
     let bh = g.reach * 0.7;
@@ -115,12 +141,7 @@ fn spire(b: &mut MeshBuilder, g: Growth, crown: Crown) {
     }
 
     // The shaft, one stage per tier, shorter as it climbs.
-    let lens_h = 0.1 * h + 8.0;
-    let crown_h = match crown {
-        Crown::Bore => 0.12 * h + 6.0,
-        Crown::Silo => 0.07 * h + 4.0,
-    };
-    let lens_floor = h - crown_h - lens_h;
+    let (lens_h, lens_floor) = lens(h, crown);
     let (w0, w1) = (bh * 0.6, bh * 0.34);
     let width = |z: f32| w0 + (w1 - w0) * (z - foot) / (lens_floor - foot);
     let neck = 0.014 * h + 1.5;
@@ -191,8 +212,9 @@ fn spire(b: &mut MeshBuilder, g: Growth, crown: Crown) {
             b.extrude_y_chamfered(&pillar, top * 0.16, top * 0.04);
         });
     });
-    let lens_r = 0.1 * h + 6.0;
-    lens(
+    let m = mount(g, if crown == Crown::Bore { 1 } else { 2 });
+    let lens_r = m.lens_r;
+    super::kit::lens(
         b,
         v3(0.0, 0.0, lens_mid),
         lens_h * 0.5,
@@ -203,16 +225,7 @@ fn spire(b: &mut MeshBuilder, g: Growth, crown: Crown) {
         0.0,
         0.0,
     );
-    halo::draw(
-        b,
-        &Mount {
-            g,
-            lens_mid,
-            lens_half: lens_h * 0.5,
-            lens_r,
-            len: lens_r * 1.15,
-        },
-    );
+    halo::draw(b, &m);
     let roof = lens_floor + lens_h;
     pale(b);
     let drum = cut_rect(b, top, top, top * 0.28);

@@ -64,21 +64,38 @@ pub const fn reach(kind: u8, level: u16) -> f32 {
     }
 }
 
-/// Metres over a Shaper's foot of the middle of its Lens, where its Lance charges and
-/// strikes from, `height` metres tall as built, by `kind` (`ShaperInstance::kind`): the
-/// printer's on its core's head (printer.rs), a Seedcaster's under its bore and an
-/// Unmaker's under its silo crown (auxiliary.rs). The renderer's hard light and the
-/// game's sounds put the Lens here.
-pub fn lens_height(kind: u8, height: f32) -> f32 {
-    let h = height.max(20.0);
+/// The Lens and halo of the stage a Shaper of `kind` (`ShaperInstance::kind`) and
+/// `level` is drawn with.
+fn mount(kind: u8, level: u16) -> halo::Mount {
+    let g = Growth::at(kind, STAGE_LEVELS[stage(level)]);
     match kind {
-        // h * 0.86 less a fifth of the Lens's height (its reach left out: a few metres).
-        0 => 0.844 * h - 1.2,
-        // Under the bore: h less the crown (0.12 h + 6) and half the Lens (0.05 h + 4).
-        1 => 0.83 * h - 10.0,
-        // Under the silo crown (0.07 h + 4).
-        _ => 0.88 * h - 8.0,
+        0 => printer::mount(g),
+        _ => auxiliary::mount(g, kind),
     }
+}
+
+/// Metres over a Shaper's foot of the middle of its Lens, where its Lance charges and
+/// strikes from, as its stage is drawn: the printer's on its core's head (printer.rs), a
+/// Seedcaster's under its bore and an Unmaker's under its silo crown (auxiliary.rs). The
+/// renderer's hard light and the game's sounds put the Lens here.
+pub fn lens_height(kind: u8, level: u16) -> f32 {
+    mount(kind, level).lens_mid
+}
+
+/// Slots in the halo a Shaper of `kind` and `level` is drawn with.
+pub fn halo_slot_count(kind: u8, level: u16) -> usize {
+    mount(kind, level).g.slots.max(1)
+}
+
+/// Metres long an interceptor blade hangs in the halo of a Shaper of `kind` and `level`.
+pub fn halo_blade(kind: u8, level: u16) -> f32 {
+    mount(kind, level).len
+}
+
+/// The middle of the blade in halo slot `k`, in the Shaper's model space (x forward, y
+/// left, z up from its foot): where the interceptor it stands for leaves from.
+pub fn halo_slot(kind: u8, level: u16, k: usize) -> [f32; 3] {
+    halo::slot_middle(&mount(kind, level), k).to_array()
 }
 
 /// Interceptors a Shaper of `level` may hold: its blueprint's `interceptor_stock`, 1
