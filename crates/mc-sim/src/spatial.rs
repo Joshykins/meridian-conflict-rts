@@ -6,9 +6,12 @@
 //! structures and giants on coarser ones. A query widens its search by each
 //! layer's largest radius, so one titan no longer makes every infantry query
 //! scan a 300 m square; a wide query reads one coarse grid of the kind
-//! instead. Results come out kind by kind, layer by layer (smallest first), and
-//! within a layer in (cell row-major, insertion) order, which depends only on
-//! table contents and the query's size.
+//! instead, and the giants' layer beside it. The kilometres-long hulls (the
+//! Regent) have a layer of their own on 1 km cells and keep out of the coarse
+//! grid and the owner map's reach, so one of them does not widen every query
+//! on the map by its radius. Results come out kind by kind, layer by layer
+//! (smallest first, the giants last), and within a layer in (cell row-major,
+//! insertion) order, which depends only on table contents and the query's size.
 
 use mc_core::{Fx, FxVec2, PlayerMask};
 
@@ -50,8 +53,13 @@ const EMPTY: Entry = Entry {
 
 /// The layers as (cell edge shift, largest radius held): 16 m cells for
 /// anything up to 16 m (units, wrecks, stains), 64 m cells up to 64 m
-/// (structures, big hulls), 256 m cells for the rest (titans, capital ships).
-const LAYERS: [(u32, i32); 3] = [(4, 16), (6, 64), (8, i32::MAX)];
+/// (structures, big hulls), 256 m cells up to 400 m (titans, capital ships),
+/// 1 km cells for the rest (`GIANT`: the Regent, survival's machines).
+const LAYERS: [(u32, i32); 4] = [(4, 16), (6, 64), (8, 400), (10, i32::MAX)];
+/// The giants' layer: not in the coarse grid (`Grids::wide`), which a wide
+/// query reads it beside, nor the owner map's reach (`SpatialIndex::unit_radius`):
+/// each giant marks every owner cell its radius covers instead.
+const GIANT: usize = LAYERS.len() - 1;
 
 /// A query this wide or wider (a fighter's sweep, an artillery reach) reads one
 /// coarse 128 m grid over everything instead: row by row, the fine layers
@@ -261,6 +269,18 @@ impl Grids {
             .chain(std::iter::once(&mut self.wide))
             .chain(self.big.iter_mut().flatten())
     }
+
+    /// The layers a query of `radius` reads, in order: each layer, or for a wide one
+    /// the coarse grid and then the giants'.
+    fn read(&self, radius: Fx) -> impl Iterator<Item = &Layer> {
+        let wide = radius >= WIDE_QUERY;
+        let layers = (!wide).then(|| self.layers.iter()).into_iter().flatten();
+        let coarse = wide
+            .then(|| [&self.wide, &self.layers[GIANT]])
+            .into_iter()
+            .flatten();
+        layers.chain(coarse)
+    }
 }
 
 pub struct SpatialIndex {
@@ -270,7 +290,8 @@ pub struct SpatialIndex {
     owners: Vec<PlayerMask>,
     owners_width: i32,
     owners_height: i32,
-    /// The widest unit, how far a unit centred in one cell reaches out of it.
+    /// The widest unit but the giants, how far a unit centred in one cell reaches
+    /// out of it (a giant marks every cell it reaches, `insert`).
     unit_radius: Fx,
     /// One set of grids per exact entry kind (units, aircraft, wrecks,
     /// stains), in kind order: a search for units never walks past the scorch
@@ -364,17 +385,24 @@ impl SpatialIndex {
             layer.max_radius = layer.max_radius.max(radius);
             layer.staged.push((cx, cy, entry));
         };
+        let giant = at == GIANT;
         if kind & UNIT_KINDS != 0 && owner != NO_OWNER {
-            let (x, y) = self.owner_cell(pos);
-            self.owners[(y * self.owners_width + x) as usize] |= owner_bit(owner);
-            self.unit_radius = self.unit_radius.max(radius);
+            if giant {
+                self.mark_owner(pos, radius, owner);
+            } else {
+                let (x, y) = self.owner_cell(pos);
+                self.owners[(y * self.owners_width + x) as usize] |= owner_bit(owner);
+                self.unit_radius = self.unit_radius.max(radius);
+            }
             let owner = owner as usize % PlayerMask::BITS as usize;
             if self.by_owner.len() <= owner {
                 self.by_owner.resize_with(owner + 1, Vec::new);
             }
             let grids = Self::grids_of(&mut self.by_owner[owner], kind, self.map_size);
             stage(&mut grids.layers[at]);
-            stage(&mut grids.wide);
+            if !giant {
+                stage(&mut grids.wide);
+            }
         }
         let grids = Self::grids_of(&mut self.kinds, kind, self.map_size);
         let wider = BIG_FLOORS
@@ -383,8 +411,21 @@ impl SpatialIndex {
             .count();
         let (layers, wide, big) = (&mut grids.layers, &mut grids.wide, &mut grids.big);
         let bigs = big[..wider].iter_mut().map(|layers| &mut layers[at]);
-        for layer in [&mut layers[at], wide].into_iter().chain(bigs) {
+        let wide = (!giant).then_some(wide);
+        for layer in std::iter::once(&mut layers[at]).chain(wide).chain(bigs) {
             stage(layer);
+        }
+    }
+
+    /// Marks `owner` in every owner cell a giant at `pos` of `radius` reaches.
+    fn mark_owner(&mut self, pos: FxVec2, radius: Fx, owner: u8) {
+        let (x0, y0) = self.owner_cell(FxVec2::new(pos.x - radius, pos.y - radius));
+        let (x1, y1) = self.owner_cell(FxVec2::new(pos.x + radius, pos.y + radius));
+        for y in y0..=y1 {
+            let row = &mut self.owners[(y * self.owners_width) as usize..];
+            for cell in &mut row[x0 as usize..=x1 as usize] {
+                *cell |= owner_bit(owner);
+            }
         }
     }
 
@@ -419,7 +460,10 @@ impl SpatialIndex {
 
     #[inline]
     pub fn len(&self) -> usize {
-        self.kinds.iter().map(|(_, g)| g.wide.sorted.len()).sum()
+        self.kinds
+            .iter()
+            .map(|(_, g)| g.wide.sorted.len() + g.layers[GIANT].sorted.len())
+            .sum()
     }
 
     #[inline]
@@ -462,12 +506,7 @@ impl SpatialIndex {
                     continue;
                 };
                 for (_, grids) in list.iter().filter(|(k, _)| k & kinds != 0) {
-                    let layers = if radius >= WIDE_QUERY {
-                        std::slice::from_ref(&grids.wide)
-                    } else {
-                        &grids.layers[..]
-                    };
-                    for layer in layers {
+                    for layer in grids.read(radius) {
                         if !layer.scan(
                             center,
                             radius,
@@ -488,12 +527,7 @@ impl SpatialIndex {
             return;
         }
         'kinds: for (_, grids) in self.kinds.iter().filter(|(k, _)| k & kinds != 0) {
-            let layers = if radius >= WIDE_QUERY {
-                std::slice::from_ref(&grids.wide)
-            } else {
-                &grids.layers[..]
-            };
-            for layer in layers {
+            for layer in grids.read(radius) {
                 if !layer.scan(
                     center,
                     radius,
@@ -529,12 +563,11 @@ impl SpatialIndex {
         mc_core::perf_count!("spatial.queries");
         let mut keep = |e: &Entry| e.radius <= wider_than || visit(e);
         'kinds: for (_, grids) in self.kinds.iter().filter(|(k, _)| k & kinds != 0) {
-            let layers = match floor {
-                _ if radius >= WIDE_QUERY => std::slice::from_ref(&grids.wide),
-                Some(floor) => &grids.big[floor][..],
-                None => &grids.layers[..],
-            };
-            for layer in layers {
+            // Narrow, the grids of the entries wider than the floor; else what `query` reads.
+            let big = floor.filter(|_| radius < WIDE_QUERY);
+            let narrow = big.map(|f| grids.big[f].iter()).into_iter().flatten();
+            let plain = big.is_none().then(|| grids.read(radius));
+            for layer in narrow.chain(plain.into_iter().flatten()) {
                 if !layer.scan(
                     center,
                     radius,
@@ -557,7 +590,7 @@ impl SpatialIndex {
     pub fn max_radius(&self) -> Fx {
         self.kinds
             .iter()
-            .map(|(_, g)| g.wide.max_radius)
+            .map(|(_, g)| g.wide.max_radius.max(g.layers[GIANT].max_radius))
             .fold(Fx::ZERO, Fx::max)
     }
 
@@ -627,8 +660,10 @@ mod tests {
         let mut all = Vec::new();
         for row in 0..2000 {
             let pos = FxVec2::new(rng.range(Fx::ZERO, size.x), rng.range(Fx::ZERO, size.y));
-            // Mostly small, with a few structures and giants in every layer.
+            // Mostly small, with a few structures and giants in every layer, and a
+            // kilometres-long hull or two in the giants' own.
             let radius = match row % 50 {
+                0 if row % 700 == 0 => rng.range(Fx::from_int(401), Fx::from_int(1900)),
                 0 => rng.range(Fx::from_int(65), Fx::from_int(200)),
                 1..=5 => rng.range(Fx::from_int(17), Fx::from_int(64)),
                 _ => rng.range(Fx::ONE, Fx::from_int(16)),
@@ -637,9 +672,10 @@ mod tests {
             all.push((pos, radius));
         }
         index.build();
-        for _ in 0..200 {
+        for q in 0..200 {
             let c = FxVec2::new(rng.range(Fx::ZERO, size.x), rng.range(Fx::ZERO, size.y));
-            let r = rng.range(Fx::ONE, Fx::from_int(300));
+            // Some wide enough to read the coarse grid and the giants' layer beside it.
+            let r = rng.range(Fx::ONE, Fx::from_int(if q % 8 == 0 { 900 } else { 300 }));
             let mut got = Vec::new();
             index.query(c, r, kind::UNIT, |e| {
                 got.push(e.row);
@@ -756,7 +792,11 @@ mod tests {
                 rng.range(Fx::ZERO, Fx::from_int(300)),
             );
             let pos = clump + jitter;
-            let radius = if row % 97 == 0 {
+            // A few titans, and two kilometres-long hulls reaching far out of their clumps
+            // (they mark the owner map over all they reach).
+            let radius = if row % 1499 == 0 {
+                Fx::from_int(1900)
+            } else if row % 97 == 0 {
                 Fx::from_int(120)
             } else {
                 rng.range(Fx::ONE, Fx::from_int(12))
