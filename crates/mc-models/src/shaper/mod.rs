@@ -7,6 +7,9 @@
 //!   spire (`auxiliary.rs`), stages hovering over each other on necks with collars round
 //!   them, the Lens near the top, under an artillery bore or a silo crown.
 //!
+//! Every one carries its anti-nuke as the halo round its Lens (`halo.rs`), a blade to an
+//! interceptor held.
+//!
 //! Each is drawn by stage: a mesh for each level in [`STAGE_LEVELS`], keyed `<mesh>` at
 //! level 1 (the blueprint's own) and `<mesh>@<level>` past it, authored at its true size
 //! (its `ModelDef` radius is the reach of its foot, [`reach`]). The renderer draws a
@@ -78,6 +81,25 @@ pub fn lens_height(kind: u8, height: f32) -> f32 {
     }
 }
 
+/// Interceptors a Shaper of `level` may hold: its blueprint's `interceptor_stock`, 1
+/// and 0.34 a level, rounded down (mc-sim `growth::grown_launcher`; a test in mc-render
+/// holds the two equal).
+pub const fn interceptors(level: u16) -> usize {
+    let level = if level == 0 { 1 } else { level as usize };
+    (100 + 34 * (level - 1)) / 100
+}
+
+/// Slots in the halo of the stage first drawn at `level`: what the last level drawn with
+/// it may hold, so each interceptor has a blade of its own. Past the last stage the
+/// slots stand for shares of what it holds (entity.wgsl `halo_slot`).
+fn halo_slots(level: u16) -> usize {
+    let last = STAGE_LEVELS
+        .iter()
+        .find(|&&l| l > level)
+        .map_or(level, |&next| next - 1);
+    interceptors(last)
+}
+
 /// Which of [`STAGE_LEVELS`] a Shaper of `level` is drawn with: the last it has reached.
 pub fn stage(level: u16) -> usize {
     STAGE_LEVELS
@@ -110,6 +132,8 @@ struct Growth {
     tier: usize,
     /// The reach of its foot ([`reach`]).
     reach: f32,
+    /// Its halo's slots ([`halo_slots`]).
+    slots: usize,
 }
 
 impl Growth {
@@ -118,6 +142,7 @@ impl Growth {
             height: height(level),
             tier: tier(level),
             reach: reach(kind, level),
+            slots: halo_slots(level),
         }
     }
 }
@@ -136,6 +161,7 @@ macro_rules! stage_set {
 }
 
 mod auxiliary;
+mod halo;
 mod kit;
 mod printer;
 
@@ -145,9 +171,11 @@ mod printer;
 #[cfg(test)]
 pub(super) fn budget(key: &str) -> Option<(usize, f32, usize)> {
     if key.starts_with("replication_node") {
-        Some((1_400, 0.56, 12_000))
+        // Its halo hangs a blade to each interceptor even far off: the stock reads.
+        Some((2_000, 0.56, 12_000))
     } else if key.starts_with("progenitor_seedcaster") || key.starts_with("progenitor_unmaker") {
-        Some((3_000, 0.56, 24_000))
+        // Collars round every neck, and a halo as broad as its Lens.
+        Some((3_000, 0.56, 28_000))
     } else {
         None
     }

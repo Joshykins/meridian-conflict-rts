@@ -229,6 +229,12 @@ MERIDIAN_AIM=MODE with --screenshot: an order being aimed at --cursor, with the 
 (each ship's exit in formation and the energy card), dash a dash by hand (the wave where
 it would come down), fracture a gravitic engine's rift (its path and the well at the point).
 
+MERIDIAN_SURVIVAL=rounds:grace:interval:intensity:fronts:tier:nodes with --scene survival:
+the rules it plays (docs/SWITCHES.md, with MERIDIAN_SURVIVAL_SPAWN and MERIDIAN_SURVIVAL_WHY);
+MERIDIAN_SURVIVAL_PLAY_ON=1: the engine plays on after the defenders fall, its rounds
+coming (printing nothing more) and its Shapers growing, to shoot grown Shapers from a
+headless --observe run.
+
 MERIDIAN_ISSUE_NOTE=TEXT with --screenshot: the F1 report card's note, as if typed.
 
 MERIDIAN_HISTORY_REPORT=N[:PAGE] with --ui history: match N's battle report (1 = the

@@ -198,7 +198,8 @@ pub fn scene_match(
 }
 
 /// The default rules, with `MERIDIAN_SURVIVAL=rounds:grace:interval:intensity:fronts:tier:nodes`
-/// over them (headless scenes and shots of the set-up screen).
+/// over them (headless scenes and shots of the set-up screen), and
+/// `MERIDIAN_SURVIVAL_PLAY_ON=1` (the engine plays on after the defenders fall).
 pub fn env_rules() -> SurvivalRules {
     let mut rules = SurvivalRules::default();
     if let Ok(v) = std::env::var("MERIDIAN_SURVIVAL") {
@@ -212,8 +213,11 @@ pub fn env_rules() -> SurvivalRules {
             fronts: get(4, rules.fronts as u16) as u8,
             tier_cap: get(5, rules.tier_cap as u16) as u8,
             nodes: get(6, rules.nodes as u16) as u8,
+            play_on: false,
         };
     }
+    // A debug run plays on after the defenders fall, to watch the Shapers grow.
+    rules.play_on = std::env::var("MERIDIAN_SURVIVAL_PLAY_ON").is_ok_and(|v| v == "1");
     rules
 }
 

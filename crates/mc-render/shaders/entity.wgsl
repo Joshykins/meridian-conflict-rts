@@ -1324,6 +1324,49 @@ fn riding_frame(src: Entity, model: ModelInfo, t: f32) -> Frame {
     return f;
 }
 
+// A Shaper's halo slot (`gpu_consts::halo`), its clamp or blade, by the launcher's rounds
+// in `status[2]`: x 1 while it is drawn, y how far a spent blade has lifted off (0 at
+// rest), z how much of the blade is there (1 whole; less while it prints in or goes),
+// w 1 while it goes. A model drawn for no launcher (a preview) wears its ring full.
+fn halo_slot(e: Entity, part: u32, t: f32) -> vec4<f32> {
+    let whole = vec4<f32>(1.0, 0.0, 1.0, 0.0);
+    let gone = vec4<f32>(0.0);
+    let pad = e.status[2];
+    if (e.owner_flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) != 0u {
+        return gone;
+    }
+    if (pad & LAUNCHER_MARK) == 0u {
+        return whole;
+    }
+    let k = (part >> HALO_SLOT_SHIFT) & 0xFFu;
+    let n = max((part >> HALO_SLOTS_SHIFT) & 0xFFu, 1u);
+    let stock = pad & LAUNCHER_STOCK_MASK;
+    let capacity = (pad >> LAUNCHER_CAPACITY_SHIFT) & 0xFFu;
+    if (part & HALO_BLADE) == 0u {
+        return select(gone, whole, k < min(capacity, n));
+    }
+    // Slots an interceptor: one each while the ring has a slot for every one it may hold,
+    // past that a share (a slot shows while any of its share is held).
+    let per = f32(n) / f32(max(capacity, n));
+    let held = u32(ceil(f32(stock) * per - 0.001));
+    // A blade spent: those between what it held before the spend and now lift off.
+    let before = floor(e.twin_spin.y);
+    let had = u32(ceil(before * per - 0.001));
+    if before > 0.0 && k >= held && k < had {
+        let lift = clamp(mix(e.twin_spin.x, e.twin_spin.y, t) - before, 0.0, 1.0);
+        return vec4<f32>(1.0, lift, 1.0 - lift, 1.0);
+    }
+    if k < held {
+        return whole;
+    }
+    // The next printing in as it is assembled.
+    let progress = f32((pad >> LAUNCHER_PROGRESS_SHIFT) & 0xFFu) / 255.0;
+    if k == held && stock < capacity && progress > 0.0 {
+        return vec4<f32>(1.0, 0.0, progress, 0.0);
+    }
+    return gone;
+}
+
 @vertex
 fn vs_main(in: VsIn) -> VsOut {
     let entity_index = visible[in.instance];
@@ -2046,6 +2089,20 @@ fn vs_main(in: VsIn) -> VsOut {
             if !(live && held) {
                 p = vec3<f32>(0.0, 0.0, -50.0);
             }
+        } else if (in.part & HALO_PART_MASK) == HALO_PART {
+            // A Shaper's halo slot (`halo_slot`): drawn while it holds its interceptor; one
+            // spent lifts off outward and up along its slot's bearing.
+            let slot = halo_slot(e, in.part, t);
+            if slot.x < 0.5 {
+                p = vec3<f32>(0.0, 0.0, -50.0);
+            } else if slot.y > 0.0 {
+                let k = f32((in.part >> HALO_SLOT_SHIFT) & 0xFFu);
+                let n = f32(max((in.part >> HALO_SLOTS_SHIFT) & 0xFFu, 1u));
+                let a = PI + HALO_GAP * 0.5 + (2.0 * PI - HALO_GAP) / n * (k + 0.5);
+                let reach = model.height * HALO_LIFT_REACH;
+                p += vec3<f32>(cos(a), sin(a), 0.0) * reach * slot.y
+                    + vec3<f32>(0.0, 0.0, reach * 1.5 * slot.y * slot.y);
+            }
         } else if in.part >= REACTOR_PART_COLLAR_FIRST && in.part < REACTOR_PART_COLLAR_FIRST + REACTOR_COLLARS
             && (e.owner_flags & (KIND_WRECK | FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) == 0u {
             // A reactor's collar (`gpu_consts::reactor`): turned about the plant's z axis,
@@ -2552,6 +2609,13 @@ fn vs_main(in: VsIn) -> VsOut {
     if (model.icon & ICON_GROWS) != 0u && e.drive_swing.y > 0.0 {
         out.drive = vec4<f32>(mix(e.drive_swing.x, e.drive_swing.y, t), 0.0, 0.0, 0.0);
         out.drive_at = vec4<f32>(0.0, 0.0, 0.0, GROWTH_DRIVE_TAG);
+    } else if (in.part & (HALO_PART_MASK | HALO_BLADE)) == (HALO_PART | HALO_BLADE) {
+        // A halo blade printing in or going (`halo_keeps`).
+        let slot = halo_slot(e, in.part, t);
+        if slot.x > 0.5 && slot.z < 1.0 {
+            out.drive = vec4<f32>(slot.z, slot.w, 0.0, 0.0);
+            out.drive_at = vec4<f32>(0.0, 0.0, 0.0, HALO_DRIVE_TAG);
+        }
     }
     // A charge coil's light knows its stage and the unit's charge (`coil_state`).
     let coil_pat = in.surface & 0xFFu;
@@ -2731,6 +2795,9 @@ fn growth_over(in: VsOut) -> f32 {
 // Whether a growing Shaper's fragment is there: everything under its line, and over it a
 // lattice of replication light reaching a few bands up, rising, where the print is coming.
 fn growth_keeps(in: VsOut) -> bool {
+    if in.drive_at.w == HALO_DRIVE_TAG {
+        return halo_keeps(in);
+    }
     if in.drive_at.w != GROWTH_DRIVE_TAG {
         return true;
     }
@@ -2745,6 +2812,12 @@ fn growth_keeps(in: VsOut) -> bool {
     let rows = step(0.86, fract(in.local.z / (band * 0.6) - globals.camera.w * 0.6));
     let ribs = step(0.92, fract((in.local.x - in.local.y) / band));
     return rows + ribs > 0.5;
+}
+
+// Whether a halo blade printing in or going is there yet, or still: chunk by chunk
+// in print order, as much of it as `drive.x` says.
+fn halo_keeps(in: VsOut) -> bool {
+    return print_order(in.local, in.state.w) <= in.drive.x;
 }
 
 fn print_order(local: vec3<f32>, seed: f32) -> f32 {
@@ -2992,6 +3065,9 @@ fn fs_shadow(in: VsOut) {
         discard;
     }
     if in.drive_at.w == GROWTH_DRIVE_TAG && growth_over(in) > 0.0 {
+        discard;
+    }
+    if in.drive_at.w == HALO_DRIVE_TAG && !halo_keeps(in) {
         discard;
     }
 }
@@ -4172,6 +4248,12 @@ fn shade_entity(in: VsOut) -> vec4<f32> {
             let base = select(lit_before, vec3<f32>(0.0), order > grow);
             color = base + replication_tint(color - base);
         }
+    }
+    if in.drive_at.w == HALO_DRIVE_TAG {
+        // A halo blade printing in, or spent and going: its edge in print order hot in
+        // the replication blue.
+        let edge = smoothstep(0.14, 0.0, in.drive.x - print_order(in.local, in.state.w));
+        color = mix(color, SHAPER_PRINT * 2.0, edge * 0.8) + SHAPER_PRINT * edge * edge * 2.5;
     }
     if in.drive_at.w == GROWTH_DRIVE_TAG {
         // A Shaper growing: over its line the lattice of what is coming, in the

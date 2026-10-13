@@ -637,7 +637,8 @@ fn meshes_are_valid() {
                             || v.part == part::PILE
                             || v.part == part::FAB_INDEX
                             || v.part == part::FAB_PRESS
-                            || (part::ELEVATOR_ARM..=part::ELEVATOR_ROOF).contains(&v.part)),
+                            || (part::ELEVATOR_ARM..=part::ELEVATOR_ROOF).contains(&v.part)
+                            || v.part & part::HALO_MASK == part::HALO),
                     "{name}: ids"
                 );
                 // Units stand on the ground; props are rooted a little into it for slopes.

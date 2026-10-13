@@ -33,3 +33,42 @@ fn a_level_is_drawn_with_the_last_stage_it_reached() {
     assert_eq!(STAGE_LEVELS[stage(10)], 10);
     assert_eq!(stage(500), STAGES - 1);
 }
+
+#[test]
+fn every_stage_hangs_a_blade_and_clamp_in_each_halo_slot() {
+    use super::super::gpu_consts::halo as h;
+    use super::super::part;
+    for kind in 0..3u8 {
+        for (i, key) in stage_keys(kind).iter().enumerate() {
+            let model = build_model(key).unwrap();
+            let n = halo_slots(STAGE_LEVELS[i]);
+            assert!(n >= interceptors(STAGE_LEVELS[i]), "{key}: {n} slots");
+            for lod in &model.lods {
+                let words: Vec<u32> = lod
+                    .vertices
+                    .iter()
+                    .map(|v| v.part)
+                    .filter(|p| p & part::HALO_MASK == part::HALO)
+                    .collect();
+                for k in 0..n as u32 {
+                    let slot = part::HALO | k << h::SLOT_SHIFT | (n as u32) << h::SLOTS_SHIFT;
+                    // The coarse level hangs its blades without clamps.
+                    assert!(
+                        std::ptr::eq(lod, &model.lods[model.lods.len() - 1])
+                            || words.contains(&slot),
+                        "{key}: slot {k}'s clamp"
+                    );
+                    assert!(
+                        words.contains(&(slot | h::BLADE)),
+                        "{key}: slot {k}'s blade"
+                    );
+                }
+                assert!(
+                    words.iter().all(|w| (w >> h::SLOT_SHIFT & 0xFF) < n as u32
+                        && (w >> h::SLOTS_SHIFT & 0xFF) == n as u32),
+                    "{key}: slot words"
+                );
+            }
+        }
+    }
+}

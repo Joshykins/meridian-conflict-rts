@@ -184,24 +184,6 @@ pub(super) fn shaft(b: &mut MeshBuilder, z0: f32, z1: f32, h0: f32, h1: f32, ban
     });
 }
 
-/// A slab with both ends cut on a slant, `len` tall standing on z, `d` deep in x and
-/// `w` thick in y: a Precursor interceptor in its rack.
-pub(super) fn shard(b: &mut MeshBuilder, at: Vec3, len: f32, d: f32, w: f32) {
-    if b.coarse() {
-        return;
-    }
-    pale(b);
-    let profile = [
-        [at.x - d, at.z],
-        [at.x + d, at.z + d * 1.2],
-        [at.x + d, at.z + len - d * 1.6],
-        [at.x - d, at.z + len],
-    ];
-    b.at(v3(0.0, at.y, 0.0), |b| {
-        b.extrude_y_chamfered(&profile, w, w * 0.2);
-    });
-}
-
 /// The Lens: the Lance's focus. A spindle of live light between a pale floor cap and
 /// roof drum (each `cap` half across), shards standing round it, rings hovering round
 /// it in the shape of a lens, more of them with `tier`. Centred at `c`, `half_h`

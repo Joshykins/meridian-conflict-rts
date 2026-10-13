@@ -157,6 +157,7 @@ pub(crate) fn rules() -> SurvivalRules {
         fronts: Domain::Land.bit() | Domain::Air.bit(),
         tier_cap: 1,
         nodes: 3,
+        play_on: false,
     }
 }
 
@@ -1107,4 +1108,32 @@ fn a_shaper_raises_platforms_in_front_prints_on_them_and_they_unravel_with_it() 
             .starts_with("progenitor_")),
         "the base left no wreck"
     );
+}
+
+#[test]
+fn a_debug_run_plays_on_after_the_defenders_fall() {
+    for play_on in [false, true] {
+        let mut w = world(SurvivalRules {
+            rounds: 0,
+            play_on,
+            ..rules()
+        });
+        let mut events = Vec::new();
+        let acu = w.state.players[0].commander;
+        let kill = PlayerCommand {
+            player: 0,
+            command: Command::DebugDamage {
+                units: vec![acu],
+                permille: 1000,
+            },
+        };
+        run(&mut w, 30, &[kill], &mut events);
+        assert!(w.state.winner.is_some(), "the defender fell");
+        events.clear();
+        run(&mut w, 1200, &[], &mut events);
+        let printed = events
+            .iter()
+            .any(|e| matches!(e, SimEvent::RoundPrinting { .. }));
+        assert_eq!(printed, play_on, "play_on {play_on}");
+    }
 }

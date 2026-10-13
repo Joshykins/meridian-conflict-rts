@@ -1206,6 +1206,7 @@ mod tests {
         use crate::gpu_consts::launcher as l;
         use mc_sim::nukes as n;
         assert_eq!(l::STOCK_MASK, n::LAUNCHER_STOCK_MASK);
+        assert_eq!(l::PROGRESS_SHIFT, n::LAUNCHER_PROGRESS_SHIFT);
         assert_eq!(l::CAPACITY_SHIFT, n::LAUNCHER_CAPACITY_SHIFT);
         assert_eq!(l::MARK, n::LAUNCHER_MARK);
         assert_eq!(l::MANUAL, n::LAUNCHER_MANUAL);

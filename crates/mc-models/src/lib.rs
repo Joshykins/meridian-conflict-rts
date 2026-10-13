@@ -321,6 +321,11 @@ pub mod part {
     pub const ELEVATOR_DOOR: u32 = crate::gpu_consts::elevator::PART_DOOR;
     pub const ELEVATOR_ROOF: u32 = crate::gpu_consts::elevator::PART_ROOF;
     const _: () = assert!(ELEVATOR_ARM > FAB_PRESS && ELEVATOR_ROOF < 256);
+    /// A Shaper's halo slot, its clamp and blade (`gpu_consts::halo`): the slot and the
+    /// slot count in the word's high bits. Compare `word & HALO_MASK`.
+    pub const HALO: u32 = crate::gpu_consts::halo::PART;
+    pub const HALO_MASK: u32 = crate::gpu_consts::halo::PART_MASK;
+    const _: () = assert!(HALO > ELEVATOR_ROOF && HALO < 256);
 
     /// Drawn only where the structure stands in water (`AFLOAT` or `PILE`).
     pub(crate) fn afloat_only(part: u32) -> bool {

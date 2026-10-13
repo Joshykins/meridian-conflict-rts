@@ -559,9 +559,17 @@ impl crate::World {
         let Some(s) = self.state.survival.as_ref() else {
             return Ok(());
         };
-        // Held out, or the defenders are gone: the engine falls quiet.
-        if s.phase == Phase::Won || self.state.winner.is_some() {
+        // Held out, or the defenders are gone: the engine falls quiet (but in a debug run
+        // that plays on, `SurvivalRules::play_on`).
+        if s.phase == Phase::Won || (self.state.winner.is_some() && !s.config.rules.play_on) {
             return Ok(());
+        }
+        // Playing on with the defenders gone, it prints no more rounds: they still come
+        // and its Shapers grow with them, but the field never fills to its cap and stalls.
+        if self.state.winner.is_some() {
+            if let Some(s) = self.state.survival.as_mut() {
+                s.queue.clear();
+            }
         }
         let now = self.state.tick;
         self.survival_nodes_lost()?;

@@ -6,6 +6,10 @@
 //! light over a band hot from the print (entity.wgsl `growth_keeps`). A Shaper reseeded
 //! straight to a high level is seen printing up from the ground.
 //!
+//! Its halo (mc-models `shaper/halo.rs`) shows the interceptors it holds from its unit's
+//! launcher word (`status[2]`); this hands the shader the spent ones as they lift off
+//! (`gpu_consts::halo`).
+//!
 //! Presentation only: it changes the copy of the instances the GPU draws, never the
 //! mirror.
 
@@ -14,8 +18,10 @@ use std::borrow::Cow;
 use bytemuck::Zeroable;
 
 use mc_sim::mirror::{UnitInstance, KIND_GHOST, KIND_WRECK};
+use mc_sim::nukes::{LAUNCHER_MARK, LAUNCHER_STOCK_MASK};
 use mc_sim::survival::ShaperInstance;
 
+use crate::models::gpu_consts::halo::LIFT_TICKS;
 use crate::models::shaper::{self, STAGES, STAGE_LEVELS};
 
 /// The kinds of Shaper (`ShaperInstance::kind`): printer, artillery, nuke.
@@ -30,6 +36,55 @@ pub(super) struct ShaperGrowth {
     /// A stand-in for each stage slot drawn this tick, so the draw lists keep it
     /// (`ActiveDraws::update`).
     drawn: Vec<UnitInstance>,
+    /// Each Shaper's halo last tick.
+    halos: Vec<Halo>,
+}
+
+/// A Shaper's halo: the interceptors it held last tick, and its blades lifting off.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Halo {
+    unit: u32,
+    stock: u32,
+    /// What it held before the spend whose blades are lifting off; 0 none.
+    from: u32,
+    /// Ticks since that spend.
+    lift: u32,
+}
+
+impl Halo {
+    /// Its halo this tick, from last tick's (`was`) and the interceptors it holds now.
+    fn next(was: Option<Halo>, unit: u32, stock: u32) -> Halo {
+        let mut h = Halo {
+            unit,
+            stock,
+            from: 0,
+            lift: 0,
+        };
+        let Some(was) = was else {
+            return h;
+        };
+        if stock < was.stock {
+            // Spent: from what it held (or what it held when the last lift began) the
+            // blades lift off afresh.
+            h.from = was.from.max(was.stock);
+        } else if was.from > stock && was.lift + 1 < LIFT_TICKS {
+            h.from = was.from;
+            h.lift = was.lift + 1;
+        }
+        h
+    }
+
+    /// `UnitInstance::twin_spin`: what it held before the spend plus how far the lift
+    /// has gone, last tick and this (`gpu_consts::halo`); zero with nothing lifting.
+    fn twin_spin(&self) -> [f32; 2] {
+        if self.from == 0 {
+            return [0.0; 2];
+        }
+        // At most 255 rounds: exact in f32.
+        let base = self.from as f32;
+        let step = |t: u32| (t as f32 / LIFT_TICKS as f32).min(0.999);
+        [base + step(self.lift), base + step(self.lift + 1)]
+    }
 }
 
 impl ShaperGrowth {
@@ -38,6 +93,7 @@ impl ShaperGrowth {
             first,
             lines: Vec::new(),
             drawn: Vec::new(),
+            halos: Vec::new(),
         }
     }
 
@@ -51,10 +107,12 @@ impl ShaperGrowth {
         self.drawn.clear();
         if shapers.is_empty() {
             self.lines.clear();
+            self.halos.clear();
             return units;
         }
         let mut units = units;
         let mut lines = Vec::with_capacity(shapers.len());
+        let mut halos = Vec::with_capacity(shapers.len());
         let list = units.to_mut();
         for s in shapers {
             let Some(u) = list
@@ -66,6 +124,12 @@ impl ShaperGrowth {
             let kind = usize::from(s.kind).min(KINDS - 1);
             let stage = shaper::stage(s.level);
             u.blueprint = self.first[kind] + stage as u32;
+            if u.status[2] & LAUNCHER_MARK != 0 {
+                let was = self.halos.iter().find(|h| h.unit == s.unit).copied();
+                let halo = Halo::next(was, s.unit, u.status[2] & LAUNCHER_STOCK_MASK);
+                u.twin_spin = halo.twin_spin();
+                halos.push(halo);
+            }
             let mut stand_in = UnitInstance::zeroed();
             stand_in.blueprint = u.blueprint;
             self.drawn.push(stand_in);
@@ -85,6 +149,7 @@ impl ShaperGrowth {
             lines.push((s.unit, line));
         }
         self.lines = lines;
+        self.halos = halos;
         units
     }
 
@@ -130,6 +195,54 @@ mod tests {
                 "level {level}"
             );
         }
+    }
+
+    #[test]
+    fn the_halos_slots_follow_the_sims_interceptors() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let bps = mc_data::Blueprints::load(&root.join("data")).unwrap();
+        for key in [
+            "replication_node",
+            "progenitor_seedcaster",
+            "progenitor_unmaker",
+        ] {
+            let bp = bps.unit_by_key(key).unwrap();
+            for level in 1..=40u16 {
+                let sim = mc_sim::growth::grown_launcher(bp, level).unwrap().stock;
+                assert_eq!(
+                    shaper::interceptors(level),
+                    usize::from(sim),
+                    "{key} level {level}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_spent_interceptor_lifts_off_and_goes() {
+        let mut halo = Halo::next(None, 7, 3);
+        assert_eq!(halo.twin_spin(), [0.0; 2]);
+        // One spent: from 3 it lifts off, a step a tick.
+        halo = Halo::next(Some(halo), 7, 2);
+        assert_eq!((halo.from, halo.lift), (3, 0));
+        let [a, b] = halo.twin_spin();
+        assert!(a == 3.0 && b > a && b < 4.0);
+        for tick in 1..LIFT_TICKS {
+            halo = Halo::next(Some(halo), 7, 2);
+            assert_eq!((halo.from, halo.lift), (3, tick));
+            let [a, b] = halo.twin_spin();
+            assert!(a.floor() == 3.0 && b.floor() == 3.0 && b > a);
+        }
+        // Gone.
+        halo = Halo::next(Some(halo), 7, 2);
+        assert_eq!(halo.twin_spin(), [0.0; 2]);
+        // Another spent mid-lift starts the lift afresh from what it held before both.
+        halo = Halo::next(Some(halo), 7, 1);
+        halo = Halo::next(Some(halo), 7, 0);
+        assert_eq!((halo.from, halo.lift), (2, 0));
+        // Refilled past it, the lift is over.
+        halo = Halo::next(Some(halo), 7, 2);
+        assert_eq!(halo.from, 0);
     }
 
     #[test]

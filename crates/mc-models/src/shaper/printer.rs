@@ -5,8 +5,8 @@
 //! stands through a gap in the Lens's great ring to the full height; the two flanks
 //! forward stop at about half of it, their tops cut on a slant; from tier 3 two
 //! buttresses stand astern of them. The Lens (the Lance's focus) rides on the core's
-//! head. The anti-nuke is the magazine astern, interceptor keys racked in its dark
-//! channel; the shield's ward is three plates between the blades over the foot.
+//! head, the anti-nuke's halo round it (`halo.rs`); the shield's ward is three plates
+//! between the blades over the foot.
 //!
 //! Everything is laid out from the Shaper's height and the reach of its foot
 //! (`super::reach`), so it grows broader and heavier as it grows taller: the blades'
@@ -14,12 +14,13 @@
 
 use std::f32::consts::PI;
 
-use glam::{Affine3A, Vec3};
+use glam::Affine3A;
 
 use super::super::builder::{MeshBuilder, Section};
 use super::super::library::ModelDef;
-use super::super::precursor::{cut_rect, dark, pale, panel, v3};
-use super::kit::{course, lens, ring, shaft, shard, Ring};
+use super::super::precursor::{cut_rect, pale, v3};
+use super::halo::{self, Mount};
+use super::kit::{course, lens, ring, shaft, Ring};
 use super::Growth;
 
 stage_set! {
@@ -170,7 +171,17 @@ pub(super) fn draw(b: &mut MeshBuilder, g: Growth) {
         },
     );
 
-    magazine(b, g, foot);
+    let lens_r = 0.06 * h + 0.22 * r + 3.0;
+    halo::draw(
+        b,
+        &Mount {
+            g,
+            lens_mid,
+            lens_half: lens_h * 0.5,
+            lens_r,
+            len: 0.12 * h + 6.0,
+        },
+    );
 
     // The Lens on the core's head, the spine standing through a gap in its great ring.
     pale(b);
@@ -186,9 +197,10 @@ pub(super) fn draw(b: &mut MeshBuilder, g: Growth) {
         b,
         v3(0.0, 0.0, lens_mid),
         lens_h * 0.5,
-        0.06 * h + 0.22 * r + 3.0,
+        lens_r,
         0.0,
-        g.tier,
+        // The halo hangs where the Lens's keys would.
+        g.tier.min(3),
         thick * 6.4 + 0.01 * h,
         PI - PI / 12.0,
     );
@@ -232,49 +244,4 @@ fn draw_blade(b: &mut MeshBuilder, blade: &Blade, inner: f32, r: f32, thick: f32
             b.extrude_y_chamfered(&profile, thick, thick * 0.2);
         }
     }
-}
-
-/// The anti-nuke's magazine astern of the spine: a slab racking interceptor keys in its
-/// dark channel, one more a tier.
-fn magazine(b: &mut MeshBuilder, g: Growth, foot: f32) {
-    let (h, r) = (g.height, g.reach);
-    let mag_h = 0.2 * h + 8.0;
-    let (mag_r, half) = (r * 1.08 + 2.0, r * 0.07);
-    b.with(Affine3A::from_rotation_z(PI), |b| {
-        pale(b);
-        let slab = [
-            [mag_r - half, 0.0],
-            [mag_r + half, 0.0],
-            [mag_r + half, mag_h * 0.86],
-            [mag_r - half, mag_h],
-        ];
-        b.extrude_y_chamfered(&slab, r * 0.11, r * 0.014);
-        dark(b);
-        let (y, za, zb) = (r * 0.063, foot * 0.6, mag_h * 0.82);
-        let face = mag_r + half;
-        panel(
-            b,
-            &[
-                v3(face, -y, za),
-                v3(face, y, za),
-                v3(face, y, zb),
-                v3(face, -y, zb),
-            ],
-            Vec3::X,
-            r * 0.003,
-            0.0,
-        );
-        let stock = 3 + g.tier;
-        let pitch = (zb - za) / stock as f32;
-        for k in 0..stock {
-            let zk = za + pitch * (k as f32 + 0.5);
-            shard(
-                b,
-                v3(face + r * 0.02, 0.0, zk - pitch * 0.38),
-                pitch * 0.76,
-                r * 0.02,
-                y * 0.8,
-            );
-        }
-    });
 }

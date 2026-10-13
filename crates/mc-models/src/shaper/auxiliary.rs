@@ -5,17 +5,18 @@
 //! (the Lance's focus) near the top of the stack, and over it the crown that says which
 //! it is: the artillery's bore, two rails leaning forward with a slot between them, or
 //! the nuke's silo, a squat block round a dark well with its hatches thrown open. The
-//! anti-nuke is the quiver, interceptor shards standing in a hovering rack round the
-//! shaft's foot, a pair more a tier; the shield's ward is four plates over the foot.
+//! anti-nuke is the halo round the Lens (`halo.rs`), as on every Shaper; the shield's
+//! ward is four plates over the foot.
 
-use std::f32::consts::{FRAC_PI_4, PI, TAU};
+use std::f32::consts::{FRAC_PI_4, PI};
 
 use glam::Affine3A;
 
 use super::super::builder::{MeshBuilder, Section};
 use super::super::library::ModelDef;
 use super::super::precursor::{cut_rect, dark, pale, v3};
-use super::kit::{course, joint, lens, ring, shaft, shard, Ring};
+use super::halo::{self, Mount};
+use super::kit::{course, joint, lens, ring, shaft, Ring};
 use super::Growth;
 
 stage_set! {
@@ -175,34 +176,6 @@ fn spire(b: &mut MeshBuilder, g: Growth, crown: Crown) {
         },
     );
 
-    // The quiver: interceptor shards in a hovering rack round the shaft's foot.
-    let stock = 4 + 2 * t;
-    let rack = (w0 * 1.9 + top_half * 0.9) * 0.5;
-    ring(
-        b,
-        Ring {
-            r0: rack - bh * 0.06,
-            r1: rack + bh * 0.06,
-            z: foot + 1.0 + bh * 0.02,
-            h: bh * 0.018 + 0.3,
-            pieces: stock,
-            gap: bh * 0.05,
-            turn: 0.0,
-        },
-    );
-    for k in 0..stock {
-        let a = (k as f32 + 0.5) * TAU / stock as f32;
-        b.with(Affine3A::from_rotation_z(a), |b| {
-            shard(
-                b,
-                v3(rack, 0.0, foot + 1.6 + bh * 0.05),
-                0.07 * h + 4.0,
-                bh * 0.045,
-                bh * 0.026,
-            );
-        });
-    }
-
     // The pillars of the Lens, the Lens and its roof drum.
     let lens_mid = lens_floor + lens_h * 0.5;
     let pillar = [
@@ -218,15 +191,27 @@ fn spire(b: &mut MeshBuilder, g: Growth, crown: Crown) {
             b.extrude_y_chamfered(&pillar, top * 0.16, top * 0.04);
         });
     });
+    let lens_r = 0.1 * h + 6.0;
     lens(
         b,
         v3(0.0, 0.0, lens_mid),
         lens_h * 0.5,
-        0.1 * h + 6.0,
+        lens_r,
         top,
-        g.tier,
+        // The halo hangs where the Lens's keys would.
+        g.tier.min(3),
         0.0,
         0.0,
+    );
+    halo::draw(
+        b,
+        &Mount {
+            g,
+            lens_mid,
+            lens_half: lens_h * 0.5,
+            lens_r,
+            len: lens_r * 1.15,
+        },
     );
     let roof = lens_floor + lens_h;
     pale(b);

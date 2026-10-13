@@ -788,7 +788,9 @@ pub struct UnitInstance {
     pub drive_swing: [f32; 2],
     /// The unit's second rotary gun (`Weapon::rotary` 1): its barrels, turned last tick and
     /// this (radians, unwrapped between the two), as `spin_recoil` gives the first's. The
-    /// shader turns them about the mirror of the first gun's bore.
+    /// shader turns them about the mirror of the first gun's bore. The mirror leaves a
+    /// survival Shaper's zero; the renderer hands its halo's spent interceptors in it
+    /// (mc-render `shaper_growth.rs`, `gpu_consts::halo`).
     pub twin_spin: [f32; 2],
 }
 

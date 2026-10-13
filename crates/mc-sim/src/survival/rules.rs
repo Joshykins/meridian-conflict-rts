@@ -34,6 +34,10 @@ pub struct SurvivalRules {
     pub tier_cap: u8,
     /// Replication nodes: 0 none, 1 rare, 2 regular, 3 frequent.
     pub nodes: u8,
+    /// A debug run's, never the set-up screen's: the engine plays on after the defenders
+    /// fall, its rounds coming (printing nothing) and its Shapers growing as before, so a
+    /// headless run can watch them grow (mc-game `MERIDIAN_SURVIVAL_PLAY_ON`).
+    pub play_on: bool,
 }
 
 impl Default for SurvivalRules {
@@ -46,6 +50,7 @@ impl Default for SurvivalRules {
             fronts: 7,
             tier_cap: 3,
             nodes: 2,
+            play_on: false,
         }
     }
 }

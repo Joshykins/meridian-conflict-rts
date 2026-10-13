@@ -1007,6 +1007,8 @@ shared! {
     /// lid shuts.
     pub mod launcher as "LAUNCHER_" {
         pub const STOCK_MASK: u32 = 0xFF;
+        /// How far the next round is assembled, 0..=255.
+        pub const PROGRESS_SHIFT: u32 = 8;
         pub const CAPACITY_SHIFT: u32 = 16;
         pub const MARK: u32 = 0x2000000;
         /// Auto-build off: it assembles only rounds queued by hand.
@@ -1319,6 +1321,33 @@ shared! {
         pub const DRIVE_TAG: f32 = 7.0;
         /// How far over the line the lattice reaches, in bands (`band`).
         pub const LATTICE_BANDS: f32 = 6.0;
+    }
+
+    /// A Shaper's anti-nuke, the halo (mc-models `shaper/halo.rs`, entity.wgsl
+    /// `halo_slot`): an open ring round its Lens, a segment to a slot, the gap astern;
+    /// under each segment a clamp and the interceptor blade hanging from it. The piece's
+    /// part word is `PART | slot << SLOT_SHIFT | slots << SLOTS_SHIFT`, `| BLADE` on the
+    /// blade. The launcher's rounds in `status[2]` (`launcher`) say what is drawn: a
+    /// blade while its slot holds one (by share, when the Shaper holds more than it has
+    /// slots), the next printing in as it is assembled; a clamp while the slot is within
+    /// what the Shaper may hold. A blade spent lifts off and dissolves: the renderer
+    /// (`shaper_growth.rs`) hands it in `UnitInstance::twin_spin`, last tick and this, as
+    /// the stock before the spend plus how far the lift has gone (0 none).
+    pub mod halo as "HALO_" {
+        pub const PART: u32 = 80;
+        pub const PART_MASK: u32 = 0xFF;
+        pub const SLOT_SHIFT: u32 = 8;
+        pub const SLOTS_SHIFT: u32 = 16;
+        pub const BLADE: u32 = 0x100_0000;
+        /// Radians of the ring left open astern; its slots share the rest.
+        pub const GAP: f32 = 0.9;
+        /// Ticks a spent blade takes to lift off and go.
+        pub const LIFT_TICKS: u32 = 12;
+        /// How far it lifts, outward and up, as a share of the model's height.
+        pub const LIFT_REACH: f32 = 0.06;
+        /// `VsOut::drive_at.w` on a blade coming or going: `drive.x` is how much of it is
+        /// there (0..1), `drive.y` 1 while it goes.
+        pub const DRIVE_TAG: f32 = 8.0;
     }
 
     /// How a strategic missile and a nuclear blast are drawn (`mc_data::strategic::StrategicLook`,
