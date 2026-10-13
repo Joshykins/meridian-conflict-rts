@@ -17,6 +17,7 @@ fn the_hulls_fit_their_blueprints_and_keep_their_identity_at_each_lod() {
         "regency_t2_space_frigate",
         "regency_t3_space_cruiser",
         "regency_t4_space_destroyer",
+        "regency_t5_super_destroyer",
     ] {
         let unit = bp.unit(bp.id_of(key).unwrap());
         let mesh = &unit.visual.mesh;

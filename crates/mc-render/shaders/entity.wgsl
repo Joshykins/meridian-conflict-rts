@@ -121,6 +121,13 @@ const LIMB_HOUSE: u32 = 11u;
 // Houses 4..8 reuse the four house limbs with this bit set (`rig::HOUSE_HIGH`).
 const RIG_HOUSE_HIGH: u32 = 0x800000u;
 
+// How big a model's plates are drawn, from its reach: they grow with the model up to
+// 6 m, and past a kilometre of reach (the Regent's three) on again, slowly, so a hull
+// that size is not a grid of small squares.
+fn plate_scale(reach: f32) -> f32 {
+    return clamp(0.55 * pow(reach, 0.6), 0.7, 6.0 + max(reach - 1000.0, 0.0) * 0.006);
+}
+
 // House `slot` (0..8): pivot (xyz) and kick-back travel (w).
 fn house_of(model: ModelInfo, slot: u32) -> vec4<f32> {
     if slot < 4u {
@@ -3329,7 +3336,7 @@ fn shade_entity(in: VsOut) -> vec4<f32> {
         si.unit = in.state.w;
         si.unit_id = in.unit_id;
         // Plates as big as the model and its skin say.
-        si.scale = clamp(0.55 * pow(in.weld.z, 0.6), 0.7, 6.0) * skins[in.skin].plates.x;
+        si.scale = plate_scale(in.weld.z) * skins[in.skin].plates.x;
         si.lights = skins[in.skin].finish.y;
         si.detail = skins[in.skin].plates.z;
         si.seams = skins[in.skin].plates.w;
@@ -3453,7 +3460,7 @@ fn shade_entity(in: VsOut) -> vec4<f32> {
         ri.px = local_px;
         ri.dl1 = dl1;
         ri.dl2 = dl2;
-        ri.scale = clamp(0.55 * pow(in.weld.z, 0.6), 0.7, 6.0) * skins[in.skin].plates.x;
+        ri.scale = plate_scale(in.weld.z) * skins[in.skin].plates.x;
         ri.face = in.face;
         ri.seed = f32((in.model_class >> 24u) & 0xFFu) / 255.0;
         // How each of the face's coordinates grows in model space.
@@ -4107,7 +4114,7 @@ fn shade_entity(in: VsOut) -> vec4<f32> {
         si.wraps = in.face.z < 0.0 && framed;
         si.seed = f32((in.model_class >> 24u) & 0xFFu) / 255.0;
         si.unit = in.state.w;
-        si.scale = clamp(0.55 * pow(in.weld.z, 0.6), 0.7, 6.0);
+        si.scale = plate_scale(in.weld.z);
         // A wreck's buckled plates are cut to the standard depth whatever its skin.
         si.seams = 1.0;
         si.local = in.local;

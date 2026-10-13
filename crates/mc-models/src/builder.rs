@@ -1701,8 +1701,17 @@ impl MeshBuilder {
         let kept: Vec<&[usize; 3]> = triangles
             .iter()
             .filter(|t| {
-                let n = triangle_normal(points[t[0]], points[t[1]], points[t[2]]);
-                n.length() * 0.5 >= MIN_TRIANGLE_AREA && n.dot(normal) > 0.0
+                let [a, b, c] = t.map(|k| points[k]);
+                let n = triangle_normal(a, b, c);
+                // A sliver along a line (a turned piece's collinear corners, bent only
+                // by rounding) has no facing of its own: not drawn, at any size.
+                let longest = a
+                    .distance_squared(b)
+                    .max(b.distance_squared(c))
+                    .max(c.distance_squared(a));
+                n.length() * 0.5 >= MIN_TRIANGLE_AREA
+                    && n.length() > 1e-5 * longest
+                    && n.dot(normal) > 0.0
             })
             .collect();
         if kept.is_empty() {
@@ -2318,7 +2327,10 @@ fn triangulate(points: &[Vec3]) -> Vec<[usize; 3]> {
                 flat[remaining[k]],
                 flat[remaining[(k + 1) % m]],
             );
-            if cross(a, b, c) <= 1e-9 {
+            // Straight, or so nearly that only rounding bends it (a turned piece's
+            // collinear corners): no ear. Measured against the edges, so a sliver is
+            // refused at any size.
+            if cross(a, b, c) <= 1e-9 + 1e-5 * a.distance(b) * b.distance(c) {
                 return false;
             }
             !remaining.iter().any(|&other| {

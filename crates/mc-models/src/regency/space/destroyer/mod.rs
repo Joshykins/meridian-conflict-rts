@@ -14,7 +14,7 @@
 //! batteries' pivots and fork gaps are weapons 1 to 6's, and the cells are weapon 7's
 //! `muzzles`.
 
-mod battery;
+pub(super) mod battery;
 mod cells;
 mod core;
 

@@ -259,4 +259,20 @@
         shield: (kind: Hull, health: 64000, regen: 420), economy: (energy_upkeep: 850),
         sounds: (death: "blast_large", moving: "aster_hover"),
     ),
+    // The Regent: the NR-Class Super Destroyer, the Regency fleet's workhorse, four times the
+    // Scourge's length and more (about 3.5 km). Its guns and the Edict are being built; for now it
+    // carries its hull, its stats and its drives.
+    (
+        key: "regency_t5_super_destroyer", name: "The Regent", role: "Super Destroyer",
+        title: "NR-Class Super Destroyer",
+        tech: 5, categories: ["Air", "Space", "Experimental"], health: 2000000,
+        cost: (materials: 400000, energy: 4000000, time: 1300000),
+        radius: 1900, height: 760, footprint: (250, 75), hull: (1900, 600), vision: 4000, radar: 6000,
+        body: (fore: 1900, aft: -1550, beam: 450),
+        motion: (layer: Air, size: 0, speed: 40, accel: 2, turn: 3, altitude: 1500, hover: true, hangs: true),
+        hull_mounts: true,
+        weapons: [], mesh: "regency_regent", icon: Warship,
+        shield: (kind: Hull, health: 800000, regen: 4000), economy: (energy_upkeep: 4000),
+        sounds: (death: "blast_large", moving: "aster_hover"),
+    ),
 ]

@@ -42,8 +42,9 @@ pub(super) fn battery(b: &mut MeshBuilder, weapon: usize, pivot: Vec3) {
     });
 }
 
-/// The ball, authored about its pivot at the origin, facing +x: all of it pitches.
-fn house(b: &mut MeshBuilder) {
+/// The ball, authored about its pivot at the origin, facing +x: all of it pitches. The
+/// Regent's grand batteries are the same ball, scaled.
+pub(in crate::regency::space) fn house(b: &mut MeshBuilder) {
     b.with_recoil(|b| {
         let sides = b.sides(10);
         let rings = if b.fine() { 6 } else { 4 };

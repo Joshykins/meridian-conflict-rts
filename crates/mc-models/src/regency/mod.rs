@@ -369,6 +369,10 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         // mounts in pockets pressed into the chines (each pocket's stations add a
         // ring to every plate course) and sixteen hatched cells.
         "regency_space_destroyer" => 24000,
+        // The tech 5 super destroyer, three kilometres of it, one or two a match: several
+        // plated sub-hulls, the machinery between them, eighty-two guns (about twenty
+        // thousand triangles of them) and two seeker spines.
+        "regency_regent" => 64000,
         "regency_submarine" => 2800,
         "regency_frigate" => 4500,
         "regency_destroyer" | "regency_cruiser" => 7000,
