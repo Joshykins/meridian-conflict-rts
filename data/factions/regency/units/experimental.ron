@@ -441,7 +441,7 @@
         sounds: (death: "blast_colossal"),
     ),
     (
-        // The yard the Regent is raised from (working name; the user has not settled one).
+        // The Regent Yard: the yard the Regent is raised from.
         // Nothing stands on a lot three and a half kilometres long, so the Regent is built
         // in the sky: its hull condenses at its cruise height over the yard, along its keel
         // from the middle out, on one great beam the yard casts straight up from its
@@ -449,7 +449,7 @@
         // the hull hangs there where it can be seen and shot at, and if the yard falls the
         // half-built hull comes down with it. When it is finished it gets under way.
         key: "regency_t5_sky_yard",
-        name: "Sky Yard",
+        name: "Regent Yard",
         role: "Super Destroyer Yard", title: "Sky Shipyard",
         tech: 5,
         categories: ["Land", "Factory", "Experimental"],

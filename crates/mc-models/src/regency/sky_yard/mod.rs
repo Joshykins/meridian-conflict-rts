@@ -1,23 +1,16 @@
-//! The Regent's yard (`regency_t5_sky_yard`, mesh "regency_sky_yard"; its name is still a
-//! working one): the tech 5 structure the Regent is raised from, authored at its unit
-//! file's size (metres; a 24 x 24 lot of 12 m cells, 288 m square, 300 m high).
+//! The Regent Yard (`regency_t5_sky_yard`, mesh "regency_sky_yard"): the tech 5 structure
+//! the Regent is raised from, authored at its unit file's size (metres; a 24 x 24 lot of
+//! 12 m cells, 288 m square, 300 m high).
 //!
 //! The Regent is built in the sky over the yard, at its cruise height, on one great
 //! nanite beam the yard casts straight up from [`EMITTER`] (the unit file's first
 //! emitter; the renderer draws the beam). Helpers' streams pour into four intakes round
-//! its foot ([`INTAKE_R`], [`INTAKE_Z`]: its other emitters). Every design here puts its
-//! emitter and intakes at those points, so the data fits whichever is picked.
+//! its foot ([`INTAKE_R`], [`INTAKE_Z`]: its other emitters). The yard puts its emitter
+//! and intakes there.
 //!
-//! Three designs while one is picked (CLAUDE.md, "Building and showing models"):
-//!
-//! - [`spire`] (the mesh, A): a plated spire whose courses sweep up its faces into
-//!   spikes, three great rings turning round it, four plated buttresses from the lot's
-//!   corners, the emitter in a crown of plates at its point.
-//! - [`cradle`] (`~b`): four great plated arms rising from the corners and bending in
-//!   over the middle, their claws holding a turning lens ring the beam leaves through;
-//!   rotor drums turn in the bed under it.
-//! - [`bore`] (`~c`): a bore ringed by a low wall, eight blade-shards flaring outward
-//!   round it, and a mast of rotor drums rising out of it to the emitter.
+//! The design (`bore.rs`, the user's pick): a bore ringed by a low wall, eight
+//! blade-shards flaring outward round it, and a mast of rotor drums rising out of it to
+//! the emitter.
 //!
 //! Finish (docs/STYLE.md "The Regency look"): dark plate over dark graphite works, red
 //! optics where it looks out (`pattern::EMBER_SLOT`), violet only on what builds: the
@@ -25,17 +18,13 @@
 //! the plates and never a lit piece of mesh.
 
 mod bore;
-mod cradle;
 mod ground;
-mod spire;
 #[cfg(test)]
 mod tests;
 
 use glam::Vec3;
 
 pub(super) use bore::bore;
-pub(super) use cradle::cradle;
-pub(super) use spire::spire;
 
 /// The unit file's size.
 pub(super) const RADIUS: f32 = 140.0;

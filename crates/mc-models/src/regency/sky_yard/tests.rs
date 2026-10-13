@@ -1,4 +1,4 @@
-//! The yard's designs against the unit file and the library's checks.
+//! The yard against the unit file and the library's checks.
 
 use super::*;
 use crate::build_model_scaled;
@@ -6,13 +6,10 @@ use crate::build_model_scaled;
 const KEY: &str = "regency_sky_yard";
 /// The unit file's lot, in build cells.
 const CELLS: u8 = 24;
-const DESIGNS: [&str; 3] = [KEY, "regency_sky_yard~b", "regency_sky_yard~c"];
 
 #[test]
-fn every_design_fits_the_librarys_checks() {
-    for key in DESIGNS {
-        super::super::check(key, RADIUS, HEIGHT, Some(u32::from(CELLS)), &[]);
-    }
+fn it_fits_the_librarys_checks() {
+    super::super::check(KEY, RADIUS, HEIGHT, Some(u32::from(CELLS)), &[]);
 }
 
 /// The model is authored at the unit file's size, on its lot, and its emitters are the
@@ -49,12 +46,10 @@ fn the_unit_file_is_the_models_size_and_emitters() {
 /// Nothing stands over the emitter: the beam goes straight up from it clear of the model.
 #[test]
 fn the_beam_goes_up_clear() {
-    for key in DESIGNS {
-        let model = build_model_scaled(key, RADIUS, HEIGHT, 5).unwrap();
-        let over = model.lods[0].vertices.iter().find(|v| {
-            let p = Vec3::from(v.pos);
-            p.z > EMITTER.z + 0.5 && p.truncate().length() < 5.0
-        });
-        assert!(over.is_none(), "{key}: {over:?} over the emitter");
-    }
+    let model = build_model_scaled(KEY, RADIUS, HEIGHT, 5).unwrap();
+    let over = model.lods[0].vertices.iter().find(|v| {
+        let p = Vec3::from(v.pos);
+        p.z > EMITTER.z + 0.5 && p.truncate().length() < 5.0
+    });
+    assert!(over.is_none(), "{over:?} over the emitter");
 }

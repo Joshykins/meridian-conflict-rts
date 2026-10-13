@@ -203,22 +203,10 @@ pub(super) const MODELS: &[ModelDef] = &[
         gravitic_engine::HEIGHT,
         gravitic_engine::crown,
     ),
-    // The Regent's yard: its hull is raised in the sky over it on one great beam from its
-    // emitter (`sky_yard`), three designs while one is picked.
+    // The Regent Yard: the Regent is raised in the sky over it on one great beam from its
+    // emitter (`sky_yard`).
     ModelDef::new(
         "regency_sky_yard",
-        sky_yard::RADIUS,
-        sky_yard::HEIGHT,
-        sky_yard::spire,
-    ),
-    ModelDef::new(
-        "regency_sky_yard~b",
-        sky_yard::RADIUS,
-        sky_yard::HEIGHT,
-        sky_yard::cradle,
-    ),
-    ModelDef::new(
-        "regency_sky_yard~c",
         sky_yard::RADIUS,
         sky_yard::HEIGHT,
         sky_yard::bore,
@@ -445,8 +433,8 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         // A 22 x 22 tech 5 site: twelve plated shards, rotor rings, gantries, masts and
         // their stays.
         "regency_gravitic_engine" => 34000,
-        // A 24 x 24 tech 5 yard: the apron, four intakes, and a spire, arms or shards
-        // with their plate courses, turning rings and the emitter's crown.
+        // A 24 x 24 tech 5 yard: the apron, four intakes, the walled bore, eight flaring
+        // shards and the mast of rotor drums to the emitter.
         "regency_sky_yard" => 34000,
         "regency_wake_tank" => 5000,
         // Three armoured belts, layered crown, segmented lance and six rocket cells.
