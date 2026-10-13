@@ -402,6 +402,17 @@ pub enum PropKind {
     /// The way into a dig: a heavy hall over the pit, its lift tower and spoil heap;
     /// 48 by 40 m. The quarry round it is the map's own ground.
     ColonyDig = 138,
+    /// A road bridge over a river: its deck from the origin along +x for
+    /// `city::COLONY_BRIDGE_M` (scaled by the prop's scale), its road at the
+    /// origin's height, which the map raises its landing to; the deck itself is
+    /// a map's deck (`crate::deck`), so it has no solid plan.
+    ColonyBridge = 139,
+    /// A run of security fence along +x from its middle, `city::FENCE_SEGMENT_M`
+    /// long, laid end to end round a yard.
+    ColonyFence = 140,
+    /// A gun pit: a revetted ring open at the back (-y), a gun's room inside;
+    /// 16 m across.
+    ColonyGunPit = 141,
     /// The Progenitor's second range (the first is full).
     /// A hard-light bridge (`crate::landmark::HARDLIGHT_BRIDGE`): its deck from the
     /// origin along +x, its walking surface at the origin's height, which the map
@@ -411,7 +422,7 @@ pub enum PropKind {
 }
 
 impl PropKind {
-    pub const ALL: [PropKind; 97] = [
+    pub const ALL: [PropKind; 100] = [
         PropKind::TreeBroadleaf,
         PropKind::TreeConifer,
         PropKind::TreePine,
@@ -508,6 +519,9 @@ impl PropKind {
         PropKind::ColonyPortControl,
         PropKind::ColonyHangar,
         PropKind::ColonyDig,
+        PropKind::ColonyBridge,
+        PropKind::ColonyFence,
+        PropKind::ColonyGunPit,
         PropKind::PrecursorBridge,
     ];
 

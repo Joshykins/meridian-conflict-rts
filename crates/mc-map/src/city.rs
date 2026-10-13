@@ -65,6 +65,15 @@ pub const TRANSIT_DECK_M: i32 = 14;
 /// stand at `±TRANSIT_STATION_PYLONS_M` along x, in an avenue's median.
 pub const TRANSIT_STATION_M: i32 = 84;
 pub const TRANSIT_STATION_PYLONS_M: i32 = 30;
+/// A [`PropKind::ColonyBridge`]'s deck: its length along its heading at
+/// scale 1, its road's half width, and how far its piers reach down under
+/// the road to a river's bed.
+pub const COLONY_BRIDGE_M: i32 = 120;
+pub const COLONY_BRIDGE_HALF_M: i32 = 8;
+pub const COLONY_BRIDGE_DEPTH_M: i32 = 12;
+/// One [`PropKind::ColonyFence`] run's length along its heading, laid end to
+/// end at scale 1.
+pub const FENCE_SEGMENT_M: i32 = 24;
 
 /// The numbers of a city kind; `None` for every other kind.
 pub const fn structure(kind: PropKind) -> Option<Structure> {
@@ -253,6 +262,16 @@ pub const fn structure(kind: PropKind) -> Option<Structure> {
         ),
         ColonyHangar => s("colony_hangar", &[(0, 0, 32, 24)], &[19], 9_000, 20, true),
         ColonyDig => s("colony_dig", &[(0, 0, 24, 20)], &[22], 10_000, 10, false),
+        ColonyBridge => s("colony_bridge", &[], &[], 0, 0, false),
+        ColonyFence => s("colony_fence", &[(0, 0, 12, 1)], &[3], 300, 0, false),
+        ColonyGunPit => s(
+            "colony_gun_pit",
+            &[(-7, 0, 1, 7), (7, 0, 1, 7), (0, 7, 6, 1)],
+            &[2, 2, 2],
+            1_500,
+            0,
+            false,
+        ),
         _ => return None,
     })
 }
