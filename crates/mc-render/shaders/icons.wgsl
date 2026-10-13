@@ -117,11 +117,11 @@ fn sd_chevron(p: vec2<f32>, up: bool) -> f32 {
 // A loop with its head on the right, turning anticlockwise: the repeat mark, centred on
 // the origin.
 fn sd_repeat(p: vec2<f32>) -> f32 {
-    let r = 0.26;
-    let w = 0.07;
+    let r = 0.29;
+    let w = 0.06;
     // The loop is open between these two angles, at the upper right.
-    let a0 = 0.2;
-    let a1 = 1.3;
+    let a0 = -0.1;
+    let a1 = 1.5;
     let a = atan2(p.y, p.x);
     let e0 = r * vec2<f32>(cos(a0), sin(a0));
     let e1 = r * vec2<f32>(cos(a1), sin(a1));
@@ -132,9 +132,9 @@ fn sd_repeat(p: vec2<f32>) -> f32 {
     // The head, at the loop's end on the right, pointing the way round (up).
     let along = vec2<f32>(-sin(a0), cos(a0));
     let out = vec2<f32>(cos(a0), sin(a0));
-    let tip = e0 + along * 0.13;
+    let tip = e0 + along * 0.17;
     let back = e0 - along * 0.05;
-    let head = min(sd_segment(p, back + out * 0.15, tip), sd_segment(p, back - out * 0.15, tip)) - w;
+    let head = min(sd_segment(p, back + out * 0.19, tip), sd_segment(p, back - out * 0.19, tip)) - w;
     return min(d, head);
 }
 
@@ -626,7 +626,7 @@ fn fs_icon(in: IconOut) -> @location(0) vec4<f32> {
     var loop_fill = 0.0;
     var loop_edge = 0.0;
     if (in.icon & ICON_REPEAT) != 0u {
-        let m = sd_repeat(in.uv - vec2<f32>(2.0 * PAUSE_REACH - 1.0 - 0.52, -0.38));
+        let m = sd_repeat(in.uv - vec2<f32>(2.0 * PAUSE_REACH - 1.0 - 0.52, -0.40));
         let aam = fwidth(m) * 1.2;
         loop_fill = 1.0 - smoothstep(-aam, aam, m);
         loop_edge = 1.0 - smoothstep(-aam, aam, m - 0.16);
