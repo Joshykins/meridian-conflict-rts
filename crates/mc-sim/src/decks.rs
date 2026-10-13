@@ -9,7 +9,10 @@
 //! the bed. Ships never are, nor aircraft, which fly over anyway. Units on a deck
 //! and units under it pass each other; nothing is built on a deck
 //! (`World::lot_fits`); a shot coming down onto a deck stops there unless it was
-//! fired from on it (`impacts.rs`).
+//! fired from on it, and one fired from under it stops on its underside
+//! (`impacts.rs`), so a unit under a deck holds its fire at anything it would have
+//! to shoot up through the deck (`line_of_fire.rs`). A ship beside a bridge still
+//! shoots up over its side at what is on it.
 
 use crate::World;
 use mc_core::{Fx, FxVec2, FxVec3};
@@ -42,6 +45,19 @@ impl World {
     /// Whether `row` is on a deck where it stands now.
     pub(crate) fn on_deck(&self, row: usize) -> bool {
         self.deck_under(row, self.state.units.pos[row]).is_some()
+    }
+
+    /// Whether `row` is under a deck: over the water or the ground a deck spans,
+    /// not on it, and lower than its top.
+    pub(crate) fn under_deck(&self, row: usize) -> bool {
+        let decks = self.terrain.decks();
+        if decks.is_empty() {
+            return false;
+        }
+        let units = &self.state.units;
+        decks
+            .top_at(units.pos[row])
+            .is_some_and(|top| units.z[row] < top && !self.on_deck(row))
     }
 
     /// Whether two ground units pass each other where they stand: a ship and a

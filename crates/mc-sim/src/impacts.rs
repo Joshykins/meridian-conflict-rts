@@ -225,7 +225,8 @@ impl World {
             });
         }
         // A shot coming down onto a bridge's deck stops on it, unless it was fired
-        // from on the deck (`decks.rs`).
+        // from on the deck; one fired from under it stops on its underside
+        // (`decks.rs`).
         if let Some((point, t)) = self
             .terrain
             .decks()

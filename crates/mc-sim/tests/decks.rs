@@ -1,7 +1,8 @@
 //! Decks (`decks.rs`): a bridge's road over a strait. Land units cross on top and
 //! stand at the deck's height; ships sail under it and the two pass each other;
 //! nothing is built on it; shells coming down onto it stop there, so a ship under a
-//! bridge is out of a land battery's reach while one beside it is not.
+//! bridge is out of a land battery's reach while one beside it is not, and a ship
+//! under it cannot shoot up through it while one beside it can.
 
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
@@ -202,5 +203,50 @@ fn shells_stop_on_the_deck_over_a_ship() {
     assert!(
         hurt(ROAD + 200) > Fx::ZERO,
         "the battery never hit the open water"
+    );
+}
+
+/// A frigate left to fire at will on a tank on the deck: from under the deck it
+/// holds its fire (every shot would meet the underside); from the open water
+/// beside the bridge it shoots up over the side.
+#[test]
+fn a_ship_under_the_deck_cannot_shoot_up_through_it() {
+    let hurt = |ship_at: (i32, i32), tank_at: (i32, i32)| {
+        let mut w = strait();
+        spawn(&mut w, "aster_t1_frigate", 0, ship_at.0, ship_at.1, 0);
+        let tank = spawn(
+            &mut w,
+            "aster_t1_tank",
+            1,
+            tank_at.0,
+            tank_at.1,
+            flag::PASSIVE,
+        );
+        let t = row(&w, tank);
+        assert_eq!(
+            w.state.units.z[t],
+            Fx::from_int(BANK as i32),
+            "the tank is not on the deck"
+        );
+        let full = w.state.units.health[t];
+        let mut fired = 0;
+        for _ in 0..300 {
+            w.tick(&[]).unwrap();
+            fired += w.state.projectiles.len();
+        }
+        let left = w
+            .state
+            .units
+            .row(tank)
+            .map_or(Fx::ZERO, |r| w.state.units.health[r]);
+        (full - left, fired)
+    };
+    let (under, shots) = hurt((1_020, ROAD), (1_300, ROAD));
+    assert_eq!(under, Fx::ZERO, "the frigate shot up through the deck");
+    assert_eq!(shots, 0, "the frigate wasted shots on the deck's underside");
+    let (beside, _) = hurt((1_020, ROAD + 300), (1_100, ROAD + 40));
+    assert!(
+        beside > Fx::ZERO,
+        "the frigate beside the bridge never hit the tank on it"
     );
 }

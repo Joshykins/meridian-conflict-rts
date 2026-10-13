@@ -11,6 +11,10 @@
 //!   mound under the water (`World::bed_climb`).
 //! - Every `CHECK_EVERY` ticks for a unit, spread over the rows, and at once when a gun
 //!   takes a new target: one or two raycasts against the heightfield per gun.
+//! - A bridge's deck stands in the way too (`decks.rs`): a gun under it cannot shoot up
+//!   through it, and a unit under a deck holds every shot that would climb (shells that
+//!   lob, missiles) whatever it aims at, since each would meet the deck's underside.
+//!   Only its torpedoes and flat guns with a clear line under the deck fire.
 //! - City blocks stand in the way as the ground does (`city.rs`): the line asks the
 //!   same question a shot's sweep does, so a gun never pours its shells into a wall
 //!   with its target behind it. Attack-ground is not checked: a gun told to fire on a
@@ -32,23 +36,20 @@ pub(crate) const CHECK_EVERY: u32 = 4;
 const MAX_CANDIDATES: usize = 4;
 
 impl World {
-    /// Whether weapon `weapon` of `row` needs to see what it shoots.
+    /// Whether weapon `weapon` of `row` needs to see what it shoots: a flat gun, or
+    /// any shot that climbs from under a deck.
     pub(crate) fn needs_line(&self, row: usize, weapon: &Weapon) -> bool {
         let flat = if weapon.torpedo {
             // Interceptors run at torpedoes, not at anything a unit is laid on.
             !weapon.intercepts
         } else {
-            weapon.trajectory == Trajectory::Direct
-                && !weapon.guided
-                // A fleck homes and climbs over what is in its way (`orbs.rs`).
-                && weapon.orbs == 0
-                && weapon.curve.0 == 0
-                && weapon.cone.is_none()
+            flies_flat(weapon)
         };
-        flat && self
-            .bp(row)
-            .motion
-            .is_none_or(|m| m.layer != mc_data::MoveLayer::Air)
+        (flat || !weapon.torpedo && self.under_deck(row))
+            && self
+                .bp(row)
+                .motion
+                .is_none_or(|m| m.layer != mc_data::MoveLayer::Air)
     }
 
     /// Whether this tick is `row`'s turn to look again.
@@ -68,6 +69,10 @@ impl World {
             let short = self.bp(target).radius;
             return len <= short * 2
                 || self.torpedo_run_clear(from, from + (to - from) * ((len - short) / len));
+        }
+        if !flies_flat(weapon) && self.under_deck(row) {
+            // It would climb into the deck's underside.
+            return false;
         }
         let muzzle_z = units.z[row] + weapon.pivot.unwrap_or(weapon.muzzle).z;
         self.clear_from(units.pos[row].extend(muzzle_z), target)
@@ -101,7 +106,8 @@ impl World {
     }
 
     /// Whether the segment stays above the ground all the way, in pieces the raycast
-    /// takes, and meets no city block standing (the same test a shot's sweep makes).
+    /// takes, and meets no deck and no city block standing (the same tests a shot's
+    /// sweep makes; a gun on a deck fires off it).
     fn line_clear(&self, from: FxVec3, to: FxVec3) -> bool {
         let d = to - from;
         let longest = d.x.abs().max(d.y.abs()).max(d.z.abs());
@@ -121,9 +127,11 @@ impl World {
             }
             a = b;
         }
-        self.city_shapes
-            .first_hit(&self.state.city, from, to)
-            .is_none()
+        self.terrain.decks().crossing(from, to, from).is_none()
+            && self
+                .city_shapes
+                .first_hit(&self.state.city, from, to)
+                .is_none()
     }
 
     /// The nearest target other than `hidden` that `weapon` of `row` may shoot and can
@@ -181,4 +189,15 @@ impl World {
         (0..MAX_WEAPONS)
             .any(|w| units.row(units.weapon_target[row][w]).is_some() && !self.shot_blocked(row, w))
     }
+}
+
+/// Whether `weapon` flies straight at what it shoots: not lobbed, not homing, not
+/// curving.
+fn flies_flat(weapon: &Weapon) -> bool {
+    weapon.trajectory == Trajectory::Direct
+        && !weapon.guided
+        // A fleck homes and climbs over what is in its way (`orbs.rs`).
+        && weapon.orbs == 0
+        && weapon.curve.0 == 0
+        && weapon.cone.is_none()
 }

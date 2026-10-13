@@ -149,25 +149,36 @@ impl Decks {
         near && (min.1..=max.1).any(|y| (min.0..=max.0).any(|x| self.covers_cell(x, y)))
     }
 
-    /// Where the segment from `from` to `to` comes down through a deck's
-    /// surface from above, the first such point along it, and how far along
-    /// the segment that is (0 to 1): a shot meets the deck there. A segment
-    /// climbing, or level, passes; so does a shot fired from on the deck
-    /// (`fired_from` over it, at most `ON_DECK` over its top), which a unit on
-    /// a bridge fires off it.
+    /// Where the segment from `from` to `to` passes through a deck's surface,
+    /// the first such point along it, and how far along the segment that is (0
+    /// to 1): a shot meets the deck there, coming down onto it, or climbing into
+    /// its underside when it was fired from under it (`fired_from` over the
+    /// deck and below its top). A level segment passes; so does a shot coming
+    /// down that was fired from on the deck (at most `ON_DECK` over its top),
+    /// which a unit on a bridge fires off it, and one climbing that was fired
+    /// from beside the deck, which comes up over its side at a unit on it.
     pub fn crossing(&self, from: FxVec3, to: FxVec3, fired_from: FxVec3) -> Option<(FxVec3, Fx)> {
-        if from.z <= to.z {
+        if from.z == to.z {
             return None;
         }
+        let down = from.z > to.z;
         let mut best: Option<(Fx, FxVec3)> = None;
         for d in &self.decks {
-            if from.z < d.top || to.z > d.top {
+            let through = if down {
+                from.z >= d.top && to.z <= d.top
+            } else {
+                from.z < d.top && to.z >= d.top
+            };
+            if !through {
                 continue;
             }
-            let fired_on = d.covers(fired_from.xy())
-                && fired_from.z >= d.top - Fx::ONE
-                && fired_from.z <= d.top + ON_DECK;
-            if fired_on {
+            let over = d.covers(fired_from.xy());
+            let passes = if down {
+                over && fired_from.z >= d.top - Fx::ONE && fired_from.z <= d.top + ON_DECK
+            } else {
+                !over || fired_from.z >= d.top
+            };
+            if passes {
                 continue;
             }
             // How far along the segment it reaches the deck's height.
@@ -222,7 +233,7 @@ mod tests {
     }
 
     #[test]
-    fn decks_answer_for_cells_and_for_shots_coming_down() {
+    fn decks_answer_for_cells_and_for_shots_through_them() {
         let decks = Decks::new(vec![deck()]);
         assert_eq!(
             decks.top_at(FxVec2::from_ints(300, 100)),
@@ -248,13 +259,28 @@ mod tests {
             FxVec3::new(Fx::from_int(290), Fx::from_int(100), Fx::from_int(55)),
         );
         assert_eq!(off, None);
-        // From under the deck, or past its side, a shot goes on.
+        // Fired from under the deck, a shot climbing meets its underside; fired
+        // from beside it, it comes up over the side; past its side it goes on.
+        let under = FxVec3::new(Fx::from_int(300), Fx::from_int(110), Fx::from_int(15));
         let up = decks.crossing(
             FxVec3::new(Fx::from_int(300), Fx::from_int(100), Fx::from_int(20)),
             FxVec3::new(Fx::from_int(300), Fx::from_int(100), Fx::from_int(80)),
-            sky,
+            under,
         );
-        assert_eq!(up, None);
+        assert_eq!(up.map(|p| p.0.z), Some(Fx::from_int(50)));
+        assert_eq!(up.map(|p| p.1), Some(Fx::HALF));
+        let over_the_side = decks.crossing(
+            FxVec3::new(Fx::from_int(300), Fx::from_int(130), Fx::from_int(45)),
+            FxVec3::new(Fx::from_int(300), Fx::from_int(120), Fx::from_int(55)),
+            FxVec3::new(Fx::from_int(300), Fx::from_int(400), Fx::from_int(15)),
+        );
+        assert_eq!(over_the_side, None);
+        let past = decks.crossing(
+            FxVec3::new(Fx::from_int(300), Fx::from_int(300), Fx::from_int(20)),
+            FxVec3::new(Fx::from_int(300), Fx::from_int(300), Fx::from_int(80)),
+            under,
+        );
+        assert_eq!(past, None);
         let beside = decks.crossing(
             FxVec3::new(Fx::from_int(300), Fx::from_int(300), Fx::from_int(80)),
             FxVec3::new(Fx::from_int(300), Fx::from_int(300), Fx::from_int(20)),
