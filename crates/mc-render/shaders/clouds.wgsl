@@ -625,16 +625,18 @@ const MIST_SIGMA: f32 = 0.003;
 const MIST_PERIOD: f32 = 2300.0;
 // How much deeper than `atmos.mist.y` a hollow's mist may pool, metres.
 const MIST_POOL: f32 = 90.0;
+// How much deeper autumn's banks lie than elsewhere, a share.
+const AUTUMN_MIST_DEEPER: f32 = 0.25;
 // Steps along a ray through the mist's slab, at most.
 const MIST_STEPS: i32 = 40;
 
 // The mist's extinction at `p`, per metre.
 fn mist_at(p: vec3<f32>) -> f32 {
-    // Autumn karst keeps its mist in the valleys all day, deeper and wider than
-    // anywhere else: the pillars stand out of it.
+    // Autumn karst keeps a little mist in its valleys all day, wisps lying a
+    // little deeper than elsewhere: the ground still shows through it.
     let fall = autumn_within(p.xy, REGIONS_SKY_BLEND_M);
-    let amount = min(max(atmos.mist.x, 0.5 * fall) + 0.3 * fall, 1.0);
-    let depth = atmos.mist.y * (1.0 + 0.9 * fall);
+    let amount = max(atmos.mist.x, 0.45 * fall);
+    let depth = atmos.mist.y * (1.0 + AUTUMN_MIST_DEEPER * fall);
     let land = cloud_floor(p.xy);
     // Above the highest a bank can stand here: nothing more to look up.
     if p.z >= max(land, globals.map.z) + depth * 1.5 {
@@ -642,7 +644,7 @@ fn mist_at(p: vec3<f32>) -> f32 {
     }
     // A hollow fills to the land round it, but no deeper than this over its floor:
     // a narrow gorge under a high smoothed floor is not hundreds of metres of fog.
-    let floor = min(max(land, globals.map.z), max(terrain_height(p.xy), globals.map.z) + MIST_POOL * (1.0 + fall));
+    let floor = min(max(land, globals.map.z), max(terrain_height(p.xy), globals.map.z) + MIST_POOL * (1.0 + AUTUMN_MIST_DEEPER * fall));
     let q = p.xy - atmos.wind.xy * 0.35;
     let n = textureSampleLevel(cloud_noise, repeat_sampler, vec3<f32>(turn(q, TURN_OCTAVE) / MIST_PERIOD, 0.37 + p.z / 900.0), 0.0);
     let bank = n.x * 0.75 + n.y * 0.25;
@@ -681,7 +683,7 @@ fn mist_march(eye: vec3<f32>, rd: vec3<f32>, t_scene: f32, jitter: f32) -> Mist 
     // The slab the banks can lie in: from the sea or the lowest land to the
     // deepest a bank can stand over the highest of the cloud floor.
     let z0 = min(globals.map.z, atmos.frame.w) - 2.0;
-    let z1 = max(globals.map.z, atmos.shape.w) + atmos.mist.y * (1.0 + 0.9 * fall) * 1.5;
+    let z1 = max(globals.map.z, atmos.shape.w) + atmos.mist.y * (1.0 + AUTUMN_MIST_DEEPER * fall) * 1.5;
     var t0 = 0.0;
     var t1 = t_scene;
     if abs(rd.z) > 1e-5 {

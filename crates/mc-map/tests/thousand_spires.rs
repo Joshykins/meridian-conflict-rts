@@ -1,17 +1,17 @@
-//! Holds "Thousand Spires" (three teams of four, `mc-bake --layout spires`)
-//! to its promise. The three thirds are not the same to look at: the plan's
-//! lines lie their own way in each, and the hills, islands, massif and
-//! pillars are each third's own. They are to play the same. On the baked
-//! terrain, by the simulation's own rules:
+//! Holds "Thousand Spires" (one against one, `mc-bake --layout spires`) to
+//! its promise. The two halves are not the same to look at: the plan's lines
+//! lie their own way in each, and the hills, islands, massif and pillars are
+//! each half's own. They are to play the same. On the baked terrain, by the
+//! simulation's own rules:
 //!
-//! * there are twelve starts, the north team's four and the same turned a
-//!   third of a turn and two thirds, and every start can walk to every other;
-//! * every ore field has its two turned twins, and every start can walk to
+//! * there are two starts, the north one and the same turned a half turn,
+//!   and each can walk to the other;
+//! * every ore field has its turned twin, and every start can walk to
 //!   every field;
-//! * each base's walk to its own team's ore is as long as its twins' in the
-//!   other teams within 8%, to the island in the middle within 12%, to the
-//!   nearest enemy base within 14%;
-//! * the sea is one, round the map and up the three estuaries, and the lake
+//! * each base's walk to its own ore is as long as the other's within 8%,
+//!   to the island in the middle within 10%, to the valleys' middle fords
+//!   within 12%;
+//! * the sea is one, round the map and up the two estuaries, and the lake
 //!   in the middle is too shallow for ships;
 //! * the woods are deciduous: most trees broadleaf.
 //!
@@ -131,12 +131,9 @@ impl Map {
         }
         d
     }
-    /// A point turned `k` thirds of a turn counter-clockwise about the middle.
-    fn turn(&self, p: (f64, f64), k: usize) -> (f64, f64) {
-        let a = k as f64 * std::f64::consts::TAU / 3.0;
-        let (s, c) = a.sin_cos();
-        let (dx, dy) = (p.0 - self.mid.0, p.1 - self.mid.1);
-        (self.mid.0 + dx * c - dy * s, self.mid.1 + dx * s + dy * c)
+    /// A point turned a half turn about the middle.
+    fn turn(&self, p: (f64, f64)) -> (f64, f64) {
+        (2.0 * self.mid.0 - p.0, 2.0 * self.mid.1 - p.1)
     }
 }
 
@@ -144,15 +141,13 @@ fn near(a: (f64, f64), b: (f64, f64)) -> f64 {
     (a.0 - b.0).hypot(a.1 - b.1)
 }
 
-/// The widest spread among three amounts, as a share of the largest.
-fn spread(v: [f64; 3]) -> f64 {
-    let lo = v.iter().copied().fold(f64::INFINITY, f64::min);
-    let hi = v.iter().copied().fold(0.0, f64::max);
-    (hi - lo) / hi.max(1e-9)
+/// How far apart two amounts are, as a share of the larger.
+fn spread(v: [f64; 2]) -> f64 {
+    (v[0] - v[1]).abs() / v[0].max(v[1]).max(1e-9)
 }
 
 #[test]
-fn thousand_spires_plays_the_same_for_every_team() {
+fn thousand_spires_plays_the_same_for_both_players() {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../maps/thousand_spires.mcmap");
     let Ok(file) = MapFile::open(&path) else {
         eprintln!("{} not baked; skipping", path.display());
@@ -174,11 +169,9 @@ fn thousand_spires_plays_the_same_for_every_team() {
         .iter()
         .map(|p| (p.x.to_f64(), p.y.to_f64()))
         .collect();
-    assert_eq!(starts.len(), 12);
-    for (i, &s) in starts.iter().enumerate() {
-        if near(s, map.turn(starts[i % 4], i / 4)) > 1.0 {
-            problems.push(format!("start {i} is not start {} turned", i % 4));
-        }
+    assert_eq!(starts.len(), 2);
+    if near(starts[1], map.turn(starts[0])) > 1.0 {
+        problems.push("start 1 is not start 0 turned".into());
     }
 
     let land: Vec<bool> = (0..w * h).map(|i| map.land_cell(i % w, i / w)).collect();
@@ -202,12 +195,12 @@ fn thousand_spires_plays_the_same_for_every_team() {
             .ok()
             .and_then(|v| v.parse::<usize>().ok())
             .unwrap_or(0)
-            .min(11);
+            .min(1);
         // (`SPIRES_WALK_TO=j` draws the shortest way from there to start j in red.)
         let to = std::env::var("SPIRES_WALK_TO")
             .ok()
             .and_then(|v| v.parse::<usize>().ok())
-            .map(|j| &walks[j.min(11)]);
+            .map(|j| &walks[j.min(1)]);
         write_walk(&map, &walks[from], to, &out);
     }
     for (i, &s) in starts.iter().enumerate() {
@@ -226,68 +219,60 @@ fn thousand_spires_plays_the_same_for_every_team() {
         })
         .collect();
     for &c in &fields {
-        if !(1..3).all(|k| fields.iter().any(|&f| near(f, map.turn(c, k)) < 2.0)) {
-            problems.push(format!("the ore field at {c:?} has no turned twins"));
+        if !fields.iter().any(|&f| near(f, map.turn(c)) < 2.0) {
+            problems.push(format!("the ore field at {c:?} has no turned twin"));
         }
         if at(&walks[0], c) < 0 {
             problems.push(format!("the ore field at {c:?} is out of reach"));
         }
     }
 
-    // Each base against its twins in the other teams.
-    // (Walks are in hundredths of a cell.)
+    // Each base against the other. (Walks are in hundredths of a cell.)
     let metres = |d: i32| d as f64 / 100.0 * cell;
+    let island = [0, 1].map(|i| metres(at(&walks[i], map.mid)));
+    // Its own ore: the fields in its half, by the north player's.
+    let own = [0, 1].map(|i| {
+        fields
+            .iter()
+            .filter(|&&c| c.1 > map.mid.1)
+            .map(|&c| metres(at(&walks[i], if i == 0 { c } else { map.turn(c) })))
+            .sum::<f64>()
+    });
+    // The valleys' middle fords, east and west (the river's ford half way
+    // out from the middle; the south player's east is the north's west).
+    let ford = |east: bool| {
+        let x = map.mid.0 + if east { 2_150.0 } else { -2_150.0 };
+        (x, map.mid.1)
+    };
+    let east = [
+        metres(at(&walks[0], ford(true))),
+        metres(at(&walks[1], ford(false))),
+    ];
+    let west = [
+        metres(at(&walks[0], ford(false))),
+        metres(at(&walks[1], ford(true))),
+    ];
     let mut worst = 0.0f64;
-    for slot in 0..4 {
-        let twins = [slot, 4 + slot, 8 + slot];
-        let island = twins.map(|i| metres(at(&walks[i], map.mid)));
-        let nearest = twins.map(|i| {
-            (0..12)
-                .filter(|&j| j / 4 != i / 4)
-                .map(|j| (at(&walks[i], starts[j]), j))
-                .filter(|&(d, _)| d >= 0)
-                .min()
-                .map_or((f64::INFINITY, 0), |(d, j)| (metres(d), j))
-        });
-        let enemy = nearest.map(|n| n.0);
+    for (what, v, most) in [
+        // (The ground is natural, not turned: a base's way to the middle
+        // or to the valleys wanders more than its way to its ore.)
+        ("to the island", island, 0.10),
+        ("to the east valley's ford", east, 0.12),
+        ("to the west valley's ford", west, 0.12),
+        ("to its own ore", own, 0.08),
+    ] {
         println!(
-            "slot {slot}'s nearest enemies: starts {}, {}, {}",
-            nearest[0].1, nearest[1].1, nearest[2].1
+            "{what}: {:.0} / {:.0} m ({:.1}% apart)",
+            v[0],
+            v[1],
+            100.0 * spread(v)
         );
-        // The team's own ore: the fields in its third, by the north team's.
-        let own = twins.map(|i| {
-            let k = i / 4;
-            fields
-                .iter()
-                .filter(|&&c| {
-                    let (dx, dy) = (c.0 - map.mid.0, c.1 - map.mid.1);
-                    let a = dy.atan2(dx).to_degrees().rem_euclid(360.0);
-                    (30.0..150.0).contains(&a)
-                })
-                .map(|&c| metres(at(&walks[i], map.turn(c, k))))
-                .sum::<f64>()
-        });
-        for (what, v, most) in [
-            // (The ground is natural, not turned: a base's way to the
-            // middle or to an enemy wanders more than its way to its ore.)
-            ("to the island", island, 0.12),
-            ("to the nearest enemy", enemy, 0.14),
-            ("to its team's ore", own, 0.08),
-        ] {
-            println!(
-                "slot {slot} {what}: {:.0} / {:.0} / {:.0} m ({:.1}% apart)",
-                v[0],
-                v[1],
-                v[2],
-                100.0 * spread(v)
-            );
-            worst = worst.max(spread(v));
-            if spread(v) > most {
-                problems.push(format!("slot {slot}'s walks {what} differ: {v:?}"));
-            }
+        worst = worst.max(spread(v));
+        if spread(v) > most {
+            problems.push(format!("the bases' walks {what} differ: {v:?}"));
         }
     }
-    println!("the teams' walks differ by {:.1}% at most", 100.0 * worst);
+    println!("the players' walks differ by {:.1}% at most", 100.0 * worst);
 
     // One sea round the map and up the estuaries; the lake not sailable.
     let corner = (2u32, 2u32);
@@ -301,7 +286,7 @@ fn thousand_spires_plays_the_same_for_every_team() {
         }
     }
     let lake = map.cell_of(map.mid);
-    let (lx, ly) = (lake.0, lake.1 + (1_000.0 / cell) as u32);
+    let (lx, ly) = (lake.0, lake.1 + (550.0 / cell) as u32);
     if map.sea_cell(lx, ly) {
         problems.push("the lake is deep enough for ships".into());
     }
@@ -370,7 +355,7 @@ fn write_walk(map: &Map, walk: &[i32], to: Option<&Vec<i32>>, out: &str) {
                 // Lighter the nearer, banded every kilometre.
                 let km = walk[i] as f64 / 100.0 * CELL_SIZE_M as f64 / 1_000.0;
                 let v =
-                    200.0 - 120.0 * (km / 25.0).min(1.0) - 25.0 * (km.fract() < 0.08) as u8 as f64;
+                    200.0 - 120.0 * (km / 14.0).min(1.0) - 25.0 * (km.fract() < 0.08) as u8 as f64;
                 [v as u8, v as u8, v as u8]
             } else if map.land_cell(cx, cy) {
                 [150, 60, 60]

@@ -14,7 +14,7 @@
 //! mc-bake --layout tripoint --size-km 12 --seed 13 --name "Tripoint" -o maps/tripoint.mcmap
 //! mc-bake --layout siege --size-km 6 --seed 3 --name "Halcyon" -o maps/halcyon.mcmap
 //! mc-bake --layout antarctic --size-km 12 --seed 37 --name "Erebus Strait" -o maps/erebus_strait.mcmap
-//! mc-bake --layout spires --size-km 24 --seed 17 --name "Thousand Spires" -o maps/thousand_spires.mcmap
+//! mc-bake --layout spires --size-km 12 --seed 17 --name "Thousand Spires" -o maps/thousand_spires.mcmap
 //! mc-bake --layout harvest --size-km 24 --seed 41 --name "The Last Harvest" -o maps/last_harvest.mcmap
 //! ```
 //!
@@ -71,10 +71,11 @@ usage: mc-bake -o <file.mcmap> [options]
                    team on a coast under its ice sheet, mountains between
                    its starts, sea ice along it, two caldera islands in the
                    strait; no trees; exactly 12 km
-                   spires: \"Thousand Spires\", 4v4v4 in autumn sandstone
+                   spires: \"Thousand Spires\", 1v1 in autumn sandstone
                    karst: a lake ringed by a massif of pillars in the
-                   middle, a valley with a river and an estuary between
-                   every two teams, terraces down to the sea; exactly 24 km
+                   middle, a valley with a river and an estuary east and
+                   west between the two, terraces down to the sea;
+                   exactly 12 km
                    harvest: \"The Last Harvest\", the survival map for four
                    defenders: an autumn heartland and a valley up to the
                    Progenitor's base, desert, alpine country, isles and
@@ -82,8 +83,8 @@ usage: mc-bake -o <file.mcmap> [options]
                    and the Heart's; exactly 24 km
   --players <n>    start positions, 1-32 (default: 2 up to 8 km, 4 up to 24 km,
                    else 8; islands and alpine: always 2; the 8-player layouts
-                   take exactly 8, crosswater and antarctic 4, tripoint 3, siege 2,
-                   spires 12, harvest 5)
+                   take exactly 8, crosswater and antarctic 4, tripoint 3, siege
+                   and spires 2, harvest 5)
   --threads <n>    worker threads (default: all cores; does not change the result)
   --preview <ppm>  also write a shaded overview image with markers
   --verify         re-read the file and check its content id
@@ -205,8 +206,8 @@ fn parse_args() -> Result<Args, String> {
     if args.layout == Layout::Antarctic && args.players.is_some_and(|n| n != 4) {
         return Err("--layout antarctic is a four-player layout (--players 4)".into());
     }
-    if args.layout == Layout::Spires && args.players.is_some_and(|n| n != 12) {
-        return Err("--layout spires is a twelve-player layout (--players 12)".into());
+    if args.layout == Layout::Spires && args.players.is_some_and(|n| n != 2) {
+        return Err("--layout spires is a two-player layout (--players 2)".into());
     }
     if args.layout == Layout::Harvest && args.players.is_some_and(|n| n != 5) {
         return Err("--layout harvest has exactly 5 starts (--players 5)".into());

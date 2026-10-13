@@ -57,12 +57,14 @@ impl Symmetry {
                 base: if players <= 4 { PI / 4.0 } else { PI / 8.0 },
             }),
             Layout::Alpine | Layout::AlpineTeams => Some(Symmetry::Mirror),
-            Layout::TwinBays | Layout::Archipelago | Layout::Frostline | Layout::Antarctic => {
-                Some(Symmetry::HalfTurn)
-            }
+            Layout::TwinBays
+            | Layout::Archipelago
+            | Layout::Frostline
+            | Layout::Antarctic
+            | Layout::Spires => Some(Symmetry::HalfTurn),
             Layout::Canyon => Some(Symmetry::MirrorSides),
             Layout::Crosswater => Some(Symmetry::QuarterTurn),
-            Layout::Tripoint | Layout::Spires => Some(Symmetry::Thirds),
+            Layout::Tripoint => Some(Symmetry::Thirds),
             // These lay their own wreckage with their plans (`bake.rs`).
             Layout::Threshold | Layout::Siege | Layout::Harvest => None,
         }

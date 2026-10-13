@@ -73,11 +73,11 @@ pub enum Layout {
     /// turn; the west team's starts first, each followed by its image.
     /// Exactly 12 km.
     Antarctic,
-    /// "Thousand Spires": three teams of four in autumn sandstone karst, a
-    /// lake in the middle ringed by a massif of pillars, a valley between
-    /// every two teams from the lake to the sea (see `spires.rs`). One plan
-    /// for every team, each third's ground its own; the north team's four
-    /// starts first, then the others' turned. Exactly 24 km.
+    /// "Thousand Spires": one against one in autumn sandstone karst, a lake
+    /// in the middle ringed by a massif of pillars, a valley east and west
+    /// between the two from the lake to the sea (see `spires.rs`). One plan
+    /// for both, each half's ground its own; the north start first, then the
+    /// south one turned. Exactly 12 km.
     Spires,
     /// "The Last Harvest": the survival map for four defenders (see
     /// `harvest.rs`). An autumn heartland in the middle, the defenders' four
@@ -212,10 +212,10 @@ impl BakeParams {
         }
     }
 
-    /// A square twelve-player [`Layout::Spires`] map.
+    /// A square two-player [`Layout::Spires`] map.
     pub fn spires(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
         BakeParams {
-            players: 12,
+            players: 2,
             layout: Layout::Spires,
             ..BakeParams::square(name, size_tiles, seed)
         }
@@ -313,12 +313,12 @@ impl BakeParams {
             ));
         }
         if self.layout == Layout::Spires
-            && (self.players != 12
+            && (self.players != 2
                 || (self.tiles_w as i32 * TILE_SIZE_M) as f64 != spires::SIZE
                 || self.tiles_h != self.tiles_w)
         {
             return Err(MapError::Invalid(
-                "the Spires layout is for exactly 12 players on a 24 km map".into(),
+                "the Spires layout is for exactly 2 players on a 12 km map".into(),
             ));
         }
         if self.layout == Layout::Siege

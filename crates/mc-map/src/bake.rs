@@ -666,16 +666,21 @@ impl Terrain {
         }
         // Tripoint is fair by a third of a turn: turn every point into the
         // north third.
-        if matches!(self.layout, Layout::Tripoint | Layout::Spires) {
+        if self.layout == Layout::Tripoint {
             let k = tripoint::third((vx, vy));
             let (qx, qy) = tripoint::turn((vx, vy), 3 - k);
             return (qx, qy, r);
         }
-        // Halden's Grip, The Axis, Frostline and Erebus Strait are fair by a
-        // half turn: fold the north-east half onto the south-west.
+        // Halden's Grip, The Axis, Frostline, Erebus Strait and Thousand
+        // Spires are fair by a half turn: fold the north-east half onto the
+        // south-west.
         if matches!(
             self.layout,
-            Layout::TwinBays | Layout::Archipelago | Layout::Frostline | Layout::Antarctic
+            Layout::TwinBays
+                | Layout::Archipelago
+                | Layout::Frostline
+                | Layout::Antarctic
+                | Layout::Spires
         ) {
             return if vx + vy > 0.0 {
                 (-vx, -vy, r)
@@ -1389,7 +1394,7 @@ mod test_maps {
     pub(super) static HALCYON: LazyLock<Terrain> =
         LazyLock::new(|| Terrain::new(&BakeParams::siege("t", 3, 3)));
     pub(super) static SPIRES: LazyLock<Terrain> =
-        LazyLock::new(|| Terrain::new(&BakeParams::spires("t", 12, 17)));
+        LazyLock::new(|| Terrain::new(&BakeParams::spires("t", 6, 17)));
     pub(super) static HARVEST: LazyLock<Terrain> =
         LazyLock::new(|| Terrain::new(&BakeParams::harvest("t", 12, 41)));
 }

@@ -1,15 +1,16 @@
-// Thousand Spires: three teams of four in sandstone karst country in autumn,
+// Thousand Spires: one against one in sandstone karst country in autumn,
 // after Wulingyuan. A lake in the middle, pillars standing out of it, ringed
 // by a massif of sandstone blocks and columns with a gate down to the lake
-// from each team's tableland; a valley with a river and an estuary between
-// every two teams; benches stepping down to the sea. The woods red and gold,
-// mist lying in the valleys. A fair, misty morning; skirmish set-up can
-// override the weather and the time of day.
+// from each player's tableland; a valley with a river and an estuary east
+// and west between the two; benches stepping down to the sea. The woods red
+// and gold, a little mist lying in the valleys. A clear morning, so the
+// ground reads from the strategic view; skirmish set-up can override the
+// weather and the time of day.
 (
     biome: Autumn,
-    style: Teams,
-    weather: Fair,
-    tweaks: (mist: 0.9, rain: 0.3),
+    style: Duel,
+    weather: Clear,
+    tweaks: (mist: 0.3, rain: 0.3),
     time: Morning,
     climate: Autumn,
 )

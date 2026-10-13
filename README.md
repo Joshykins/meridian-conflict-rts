@@ -94,7 +94,7 @@ cargo run --release -p mc-map --bin mc-bake -- --layout frostline --size-km 16 -
 cargo run --release -p mc-map --bin mc-bake -- --layout tripoint --size-km 12 --seed 13 --name "Tripoint" -o maps/tripoint.mcmap
 cargo run --release -p mc-map --bin mc-bake -- --layout siege --size-km 6 --seed 3 --name "Halcyon" -o maps/halcyon.mcmap
 cargo run --release -p mc-map --bin mc-bake -- --layout antarctic --size-km 12 --seed 37 --name "Erebus Strait" -o maps/erebus_strait.mcmap
-cargo run --release -p mc-map --bin mc-bake -- --layout spires --size-km 24 --seed 17 --name "Thousand Spires" -o maps/thousand_spires.mcmap
+cargo run --release -p mc-map --bin mc-bake -- --layout spires --size-km 12 --seed 17 --name "Thousand Spires" -o maps/thousand_spires.mcmap
 cargo run --release -p mc-map --bin mc-bake -- --layout harvest --size-km 24 --seed 41 --name "The Last Harvest" -o maps/last_harvest.mcmap
 ```
 

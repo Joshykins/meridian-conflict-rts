@@ -6,8 +6,8 @@
 //! [`BENCH`] metres: a cliff where the step is sharp, a long slope where the
 //! ground is gentle, so the escarpments wander and break of themselves.
 //!
-//! Every third is laid from the same plan, but nothing here is turned: the
-//! plan's lines are read through a slow warp of their own in each third,
+//! Both halves are laid from the same plan, but nothing here is turned: the
+//! plan's lines are read through a slow warp of their own in each half,
 //! and all the noise is the map's own. Only the bases, their pads and the
 //! ore are held where the plan puts them.
 
@@ -17,17 +17,17 @@ use crate::noise::hash2;
 
 /// How far the warp bends the plan's lines, metres at most, about; and the
 /// lengths it bends them over.
-const WARP: f64 = 1_500.0;
-const WARP_L: (f64, f64) = (5_200.0, 1_700.0);
+const WARP: f64 = 700.0;
+const WARP_L: (f64, f64) = (2_800.0, 900.0);
 /// How far the escarpments' rims and the valleys' walls stand off their
 /// (warped) lines, metres at most, about.
-const FRAY: f64 = 260.0;
+const FRAY: f64 = 170.0;
 /// The benches: the first step's foot over the water, and the rise from
 /// one to the next, metres.
 const BENCH_0: f64 = 10.0;
 const BENCH: f64 = 46.0;
 /// The massif's towers: the cell each may stand in, metres.
-const TOWER_CELL: f64 = 210.0;
+const TOWER_CELL: f64 = 180.0;
 /// The highest a massif top or pillar stands, metres over the water (the
 /// map's heights stop at 768).
 const PEAK: f64 = 740.0;
@@ -133,8 +133,7 @@ impl Pillars {
 impl Terrain {
     /// Metres from a design point to the nearest base.
     fn sp_base_dist(&self, q: (f64, f64)) -> f64 {
-        let p = half(q);
-        dist(p, INNER).min(dist(p, FLANK))
+        dist(half(q), BASE)
     }
 
     /// Metres from a design point to the edge of the nearest ore field the
@@ -147,26 +146,26 @@ impl Terrain {
     }
 
     /// Where the plan is read for a design point: bent by a slow warp of the
-    /// map's own, so no two thirds' escarpments, valleys, coasts or massifs
-    /// lie alike. Held still round the bases, the ore, the island and the
+    /// map's own, so the two halves' escarpments, valleys, coasts and massifs
+    /// do not lie alike. Held still round the bases, the ore, the island and the
     /// fords, and down the gates.
     pub(super) fn sp_warp(&self, q: (f64, f64)) -> (f64, f64) {
         let k = WARP
-            * smoothstep(650.0, 1_900.0, self.sp_base_dist(q))
-            * smoothstep(120.0, 700.0, self.sp_ore_dist(q))
-            * smoothstep(700.0, 1_800.0, q.0.hypot(q.1))
+            * smoothstep(450.0, 1_200.0, self.sp_base_dist(q))
+            * smoothstep(100.0, 450.0, self.sp_ore_dist(q))
+            * smoothstep(450.0, 1_000.0, q.0.hypot(q.1))
             // and at the fords, so every valley is crossed where the plan has it,
-            * smoothstep(300.0, 1_500.0, {
+            * smoothstep(200.0, 900.0, {
                 let (b, t) = edge_frame(half(q));
                 FORDS
                     .iter()
                     .map(|&f| (t - f).hypot(b))
                     .fold(f64::INFINITY, f64::min)
             })
-            // and down each team's gate to the lake, so every gate is as long.
-            * smoothstep(250.0, 1_100.0, half(q).0).max(smoothstep(
-                MASSIF_OUT + 300.0,
-                MASSIF_OUT + 1_200.0,
+            // and down each player's gate to the lake, so both gates are as long.
+            * smoothstep(180.0, 650.0, half(q).0).max(smoothstep(
+                MASSIF_OUT + 200.0,
+                MASSIF_OUT + 700.0,
                 q.0.hypot(q.1),
             ));
         if k <= 0.0 {
@@ -182,35 +181,35 @@ impl Terrain {
     }
 
     /// Metres off the nearest valley's middle line and out along it, of a
-    /// (warped) design point. The line meanders: it is the edge between two
-    /// thirds pushed this way and that, the same push seen from either side.
+    /// (warped) design point. The line meanders: it is the edge between the
+    /// halves pushed this way and that, the same push seen from either side.
     fn sp_valley(&self, w: (f64, f64)) -> (f64, f64) {
         let n = north(w);
         let (b, t) = edge_frame((n.0.abs(), n.1));
-        // Which side of the line: the east half of one third faces the west
-        // half of the next.
+        // Which side of the line: the east side of one half faces the west
+        // side of the other.
         let across = b * n.0.signum();
         let (x, y) = on_map(w);
-        let swing = 650.0
-            * smoothstep(MASSIF_IN, MASSIF_IN + 1_400.0, t)
-            * smoothstep(1_300.0, 2_300.0, self.sp_base_dist(w))
+        let swing = 350.0
+            * smoothstep(MASSIF_IN, MASSIF_IN + 800.0, t)
+            * smoothstep(800.0, 1_400.0, self.sp_base_dist(w))
             * (self
                 .warp_y
-                .fbm(x / 3_400.0 + 21.0, y / 3_400.0 - 4.0, 3, 0.5)
-                + 0.3 * self.warp_x.fbm(x / 1_100.0, y / 1_100.0 + 13.0, 2, 0.5));
+                .fbm(x / 1_900.0 + 21.0, y / 1_900.0 - 4.0, 3, 0.5)
+                + 0.3 * self.warp_x.fbm(x / 700.0, y / 700.0 + 13.0, 2, 0.5));
         ((across - swing).abs(), t)
     }
 
-    /// Metres from a (warped) design point to the middle line of its third's
+    /// Metres from a (warped) design point to the middle line of its half's
     /// ford over the lake: out from the island along the gate's line, swinging
     /// this way and that between its ends (each its own way).
     fn sp_lake_ford(&self, w: (f64, f64)) -> f64 {
         let n = north(w);
         let r = w.0.hypot(w.1);
         let along =
-            smoothstep(250.0, 650.0, r) * (1.0 - smoothstep(LAKE_R - 150.0, LAKE_R + 150.0, r));
-        let k = third(w) as f64;
-        let swing = 130.0 * along * self.lake.fbm(r / 420.0 + 11.0 * k, 3.7 + k, 2, 0.5);
+            smoothstep(150.0, 400.0, r) * (1.0 - smoothstep(LAKE_R - 100.0, LAKE_R + 100.0, r));
+        let k = side(w) as f64;
+        let swing = 80.0 * along * self.lake.fbm(r / 260.0 + 11.0 * k, 3.7 + k, 2, 0.5);
         (n.0 - swing).abs()
     }
 
@@ -218,7 +217,7 @@ impl Terrain {
     /// lake to the island, or across a river.
     pub(super) fn sp_ford(&self, w: (f64, f64)) -> f64 {
         let r = w.0.hypot(w.1);
-        let lake = if (250.0..LAKE_R + 250.0).contains(&r) {
+        let lake = if (150.0..LAKE_R + 150.0).contains(&r) {
             self.sp_lake_ford(w)
         } else {
             f64::INFINITY
@@ -226,7 +225,7 @@ impl Terrain {
         let (b, t) = self.sp_valley(w);
         FORDS
             .iter()
-            .map(|&f| (t - f).abs().max(b - 420.0).max(0.0))
+            .map(|&f| (t - f).abs().max(b - 260.0).max(0.0))
             .fold(lake, f64::min)
     }
 
@@ -234,23 +233,23 @@ impl Terrain {
     /// fords: the small relief and the pillars keep off what must be
     /// built on or walked.
     fn sp_keep(&self, q: (f64, f64), w: (f64, f64)) -> f64 {
-        smoothstep(1_050.0, 1_400.0, self.sp_base_dist(q))
-            * smoothstep(40.0, 260.0, self.sp_ore_dist(q))
-            * smoothstep(60.0, 260.0, self.sp_ford(w))
+        smoothstep(650.0, 900.0, self.sp_base_dist(q))
+            * smoothstep(30.0, 180.0, self.sp_ore_dist(q))
+            * smoothstep(50.0, 200.0, self.sp_ford(w))
     }
 
     /// The river's (and the estuary's) half width and depth below the water,
     /// out along the valley, and how much of a ford's approach the point is
     /// on (0..1: the banks lie back there, so units can walk down to it).
     fn sp_channel(&self, t: f64) -> (f64, f64, f64) {
-        let river = RIVER_HALF.0 + (RIVER_HALF.1 - RIVER_HALF.0) * smoothstep(2_000.0, 7_000.0, t);
-        let open = smoothstep(ESTUARY.0, 10_400.0, t);
+        let river = RIVER_HALF.0 + (RIVER_HALF.1 - RIVER_HALF.0) * smoothstep(1_000.0, 3_600.0, t);
+        let open = smoothstep(ESTUARY.0, 5_300.0, t);
         let ford = FORDS
             .iter()
             .map(|&f| smoothstep(FORD_HALF + 30.0, FORD_HALF, (t - f).abs()))
             .fold(0.0, f64::max);
         let deep =
-            RIVER_BED + (ESTUARY.2 - RIVER_BED) * smoothstep(ESTUARY.0, ESTUARY.0 + 1_400.0, t);
+            RIVER_BED + (ESTUARY.2 - RIVER_BED) * smoothstep(ESTUARY.0, ESTUARY.0 + 800.0, t);
         let approach = FORDS
             .iter()
             .map(|&f| smoothstep(FORD_HALF + 160.0, FORD_HALF + 20.0, (t - f).abs()))
@@ -274,28 +273,25 @@ impl Terrain {
     /// over the kilometres; held at the middle of its bench round each base.
     fn sp_lie(&self, x: f64, y: f64, q: (f64, f64), w: (f64, f64)) -> f64 {
         let r = w.0.hypot(w.1);
-        let coast = self.sp_coast(off_axis(half(w)));
-        let inland = smoothstep(coast - 400.0, coast - 4_000.0, r);
+        // (The coast without its harbour: the bay cuts into the benches, it
+        // does not lower the base's tableland behind it.)
+        let coast = COAST.0 + COAST.1 * off_axis(half(w));
+        let inland = smoothstep(coast - 300.0, coast - 2_200.0, r);
         let mut e = LOWLAND
             + (TABLE + 30.0 - LOWLAND) * inland
-            + 70.0
-                * self.tilt.fbm(x / 4_600.0 + 40.0, y / 4_600.0, 3, 0.5)
+            + 55.0
+                * self.tilt.fbm(x / 2_600.0 + 40.0, y / 2_600.0, 3, 0.5)
                 * smoothstep(0.1, 0.5, inland)
-            + 24.0 * self.tilt.fbm(x / 1_300.0 - 7.0, y / 1_300.0 + 2.0, 2, 0.5);
-        // Each base on the middle of the bench it falls on, the bench's edge
-        // wandering in and out round it. (All four of the third's bases, by
-        // their own distances: no seam down the axis.)
-        let n = north(q);
-        let k = third(q);
-        let wander = 1.0 + 0.4 * self.mtn_gap.fbm(x / 900.0 + 3.0, y / 900.0, 2, 0.5);
-        for b in [INNER, FLANK, (-INNER.0, INNER.1), (-FLANK.0, FLANK.1)] {
-            let d = dist(n, b) * wander;
-            if d < 2_000.0 {
-                let at = on_map(turn(b, k));
-                let (step, _) = bench_of(self.sp_lie_raw(at.0, at.1, half(b)));
-                let middle = BENCH_0 + BENCH * (step + 0.5);
-                e += (middle - e) * smoothstep(2_000.0, 1_100.0, d);
-            }
+            + 18.0 * self.tilt.fbm(x / 800.0 - 7.0, y / 800.0 + 2.0, 2, 0.5);
+        // The base on the middle of the bench it falls on, the bench's edge
+        // wandering in and out round it.
+        let wander = 1.0 + 0.4 * self.mtn_gap.fbm(x / 600.0 + 3.0, y / 600.0, 2, 0.5);
+        let d = dist(north(q), BASE) * wander;
+        if d < 1_200.0 {
+            let at = on_map(turn(BASE, side(q)));
+            let (step, _) = bench_of(self.sp_lie_raw(at.0, at.1, BASE));
+            let middle = BENCH_0 + BENCH * (step + 0.5);
+            e += (middle - e) * smoothstep(1_200.0, 650.0, d);
         }
         e
     }
@@ -303,44 +299,35 @@ impl Terrain {
     /// [`Terrain::sp_lie`] at a base's own point (where nothing holds it).
     fn sp_lie_raw(&self, x: f64, y: f64, b: (f64, f64)) -> f64 {
         let r = b.0.hypot(b.1);
-        let coast = self.sp_coast(off_axis(b));
-        let inland = smoothstep(coast - 400.0, coast - 4_000.0, r);
+        let coast = COAST.0 + COAST.1 * off_axis(b);
+        let inland = smoothstep(coast - 300.0, coast - 2_200.0, r);
         LOWLAND
             + (TABLE + 30.0 - LOWLAND) * inland
-            + 70.0
-                * self.tilt.fbm(x / 4_600.0 + 40.0, y / 4_600.0, 3, 0.5)
+            + 55.0
+                * self.tilt.fbm(x / 2_600.0 + 40.0, y / 2_600.0, 3, 0.5)
                 * smoothstep(0.1, 0.5, inland)
-            + 24.0 * self.tilt.fbm(x / 1_300.0 - 7.0, y / 1_300.0 + 2.0, 2, 0.5)
+            + 18.0 * self.tilt.fbm(x / 800.0 - 7.0, y / 800.0 + 2.0, 2, 0.5)
     }
 
-    /// How much a (warped) design point is on one of a base's ways off its bench,
-    /// 0..1: toward the gate, down into the valley, out to the coast and
-    /// over to its neighbours. Escarpments lie back into slopes along them,
-    /// so no base's bench is ringed by cliffs.
+    /// How much a (warped) design point is on one of the base's ways off its
+    /// bench, 0..1: toward the gate, down into the valleys, out to the
+    /// harbour and down to the terraces. Escarpments lie back into slopes
+    /// along them, so the base's bench is not ringed by cliffs.
     fn sp_way(&self, q: (f64, f64)) -> f64 {
         let p = half(q);
-        let to_valley = |b: (f64, f64)| {
-            let (_, t) = edge_frame(b);
-            let off = valley_half(t) - 250.0;
-            (SIN_EDGE * t - COS_EDGE * off, COS_EDGE * t + SIN_EDGE * off)
-        };
-        let to_coast = |b: (f64, f64)| {
-            let r = b.0.hypot(b.1);
-            let out = (COAST.0 - 500.0) / r;
-            (b.0 * out, b.1 * out)
-        };
+        let gate = (0.0, MASSIF_OUT + 100.0);
+        let valley = (2_600.0, valley_half(2_600.0) - 150.0);
+        let harbour = (0.0, COAST.0 - HARBOUR.0 - 250.0);
         let ways = [
-            (INNER, (0.0, MASSIF_OUT + 150.0)),
-            ((0.0, MASSIF_OUT + 150.0), (0.0, LAKE_R)),
-            (INNER, (-INNER.0, INNER.1)),
-            (INNER, FLANK),
-            (INNER, to_coast(INNER)),
-            (INNER, to_valley(INNER)),
-            (FLANK, to_valley(FLANK)),
-            (FLANK, to_coast(FLANK)),
+            (BASE, gate),
+            (gate, (0.0, LAKE_R)),
+            (BASE, valley),
+            (BASE, harbour),
+            (BASE, (ORE[1].0, ORE[1].1)),
+            ((ORE[1].0, ORE[1].1), (ORE[2].0, ORE[2].1)),
         ];
         ways.iter()
-            .map(|&(a, b)| smoothstep(260.0, 110.0, segment(p, a, b).0))
+            .map(|&(a, b)| smoothstep(220.0, 90.0, segment(p, a, b).0))
             .fold(0.0, f64::max)
     }
 
@@ -356,7 +343,7 @@ impl Terrain {
             -0.2,
             0.2,
             self.ridge
-                .fbm(x / 1_500.0 - 11.0, y / 1_500.0 + 6.0, 3, 0.5),
+                .fbm(x / 1_000.0 - 11.0, y / 1_000.0 + 6.0, 3, 0.5),
         )
         .max(self.sp_way(w));
         // A sharp step, laid back toward the unstepped lie where the ground
@@ -367,17 +354,17 @@ impl Terrain {
         // Inside the massif's outer edge the ground under it falls as the
         // gate's floor does, down to the lake's shore.
         if r < MASSIF_OUT {
-            let gate = SHORE + (land - SHORE) * smoothstep(MASSIF_IN - 150.0, MASSIF_OUT, r);
-            land += (gate - land) * smoothstep(MASSIF_OUT, MASSIF_OUT - 400.0, r);
+            let gate = SHORE + (land - SHORE) * smoothstep(MASSIF_IN - 100.0, MASSIF_OUT, r);
+            land += (gate - land) * smoothstep(MASSIF_OUT, MASSIF_OUT - 300.0, r);
         }
         // The valley, cut down to its floor: a cliff from the benches, or a
         // slope where the ground is gentle and from the low ground by the sea.
         let (b, t) = self.sp_valley(w);
         let drop = land - valley_floor(t);
-        let fray = self.ridge.fbm(x / 700.0 + 3.0, y / 700.0 - 8.0, 3, 0.5) * FRAY;
-        let run = 26.0 + 280.0 * (1.0 - smoothstep(14.0, 34.0, drop)) + 520.0 * gentle * gentle;
+        let fray = self.ridge.fbm(x / 500.0 + 3.0, y / 500.0 - 8.0, 3, 0.5) * FRAY;
+        let run = 26.0 + 200.0 * (1.0 - smoothstep(14.0, 34.0, drop)) + 360.0 * gentle * gentle;
         let wide =
-            valley_half(t) * (1.0 + 0.22 * self.lake.fbm(x / 2_600.0, y / 2_600.0 + 5.0, 2, 0.5));
+            valley_half(t) * (1.0 + 0.22 * self.lake.fbm(x / 1_600.0, y / 1_600.0 + 5.0, 2, 0.5));
         let valley = smoothstep(-0.5 * run, 0.5 * run, wide + fray - b);
         land += (valley_floor(t) - land) * valley;
         (land, valley)
@@ -388,7 +375,7 @@ impl Terrain {
     /// and here and there cone karst, steep round hills in clusters.
     fn sp_relief(&self, x: f64, y: f64, q: (f64, f64), w: (f64, f64), land: f64) -> f64 {
         let keep = self.sp_keep(q, w);
-        let hills = self.tilt.fbm(x / 1_100.0, y / 1_100.0, 4, 0.5);
+        let hills = self.tilt.fbm(x / 800.0, y / 800.0, 4, 0.5);
         let grain = self.detail.fbm(x / 260.0, y / 260.0, 3, 0.5);
         let lowland = 1.0 - smoothstep(BENCH_0 + 6.0, BENCH_0 + BENCH, land);
         let amp = 6.0 + 18.0 * lowland;
@@ -397,13 +384,13 @@ impl Terrain {
         // Cone karst: where its own field rises, away from the ways.
         let field = self
             .mtn_gap
-            .fbm(x / 2_800.0 + 7.0, y / 2_800.0 - 2.0, 3, 0.5);
+            .fbm(x / 1_800.0 + 7.0, y / 1_800.0 - 2.0, 3, 0.5);
         let cones =
             smoothstep(0.18, 0.4, field) * smoothstep(0.6, 1.0, keep) * smoothstep(4.0, 12.0, land);
         if cones > 0.0 {
             let (f1, h1) = worley(self.seed ^ 0x636F_6E65, q, 170.0);
             let d = dist(q, f1);
-            let radius = 95.0 + 45.0 * unit(h1, 0);
+            let radius = 80.0 + 40.0 * unit(h1, 0);
             let tall = (40.0 + 70.0 * unit(h1, 24)) * cones;
             let cone = smoothstep(radius, 0.0, d + 8.0 * grain);
             h += tall * cone.powf(0.8);
@@ -421,34 +408,34 @@ impl Terrain {
         // The sea: headlands and coves, a beach falling to a shelf, then
         // deep; islands where its own field rises out of it. The coast keeps
         // its distance from the ore by it.
-        let hold = smoothstep(150.0, 900.0, self.sp_ore_dist(q))
-            * smoothstep(1_300.0, 2_200.0, self.sp_base_dist(q));
+        let hold = smoothstep(100.0, 500.0, self.sp_ore_dist(q))
+            * smoothstep(800.0, 1_300.0, self.sp_base_dist(q));
         let coast = self.sp_coast(s)
             + hold
-                * (self.coast.fbm(x / 7_000.0, y / 7_000.0, 3, 0.5) * 2_000.0
-                    + self.coast.fbm(x / 2_400.0 - 3.0, y / 2_400.0, 3, 0.5) * 500.0
-                    + self.coast.fbm(x / 1_100.0 + 5.0, y / 1_100.0, 3, 0.55) * 320.0
-                    + self.coast_warp.fbm(x / 340.0, y / 340.0, 3, 0.5) * 110.0);
+                * (self.coast.fbm(x / 3_800.0, y / 3_800.0, 3, 0.5) * 1_000.0
+                    + self.coast.fbm(x / 1_500.0 - 3.0, y / 1_500.0, 3, 0.5) * 300.0
+                    + self.coast.fbm(x / 800.0 + 5.0, y / 800.0, 3, 0.55) * 200.0
+                    + self.coast_warp.fbm(x / 300.0, y / 300.0, 3, 0.5) * 80.0);
         let sea = r - coast;
-        if sea > -400.0 {
-            let floor = -DEEP * smoothstep(0.0, 700.0, sea).powf(0.8)
-                + 4.0 * self.lake.fbm(x / 600.0, y / 600.0, 3, 0.5) * smoothstep(80.0, 500.0, sea);
-            let wet = smoothstep(-220.0, 25.0, sea);
+        if sea > -300.0 {
+            let floor = -DEEP * smoothstep(0.0, 450.0, sea).powf(0.8)
+                + 4.0 * self.lake.fbm(x / 500.0, y / 500.0, 3, 0.5) * smoothstep(80.0, 350.0, sea);
+            let wet = smoothstep(-160.0, 25.0, sea);
             h = h * (1.0 - wet) + floor.min(0.2) * wet;
             // Islands, out past the shallows, clear of the estuaries.
             let isle = self
                 .lake
-                .fbm(x / 1_500.0 + 31.0, y / 1_500.0 - 17.0, 3, 0.5);
+                .fbm(x / 1_000.0 + 31.0, y / 1_000.0 - 17.0, 3, 0.5);
             let rise = smoothstep(0.32, 0.5, isle)
-                * smoothstep(500.0, 900.0, sea)
-                * smoothstep(ESTUARY.1 + 500.0, ESTUARY.1 + 900.0, b);
+                * smoothstep(350.0, 650.0, sea)
+                * smoothstep(ESTUARY.1 + 300.0, ESTUARY.1 + 600.0, b);
             if rise > 0.0 {
                 h = h
                     .max(-DEEP + (DEEP + 6.0 + 30.0 * smoothstep(0.5, 0.7, isle)) * rise.powf(0.5));
             }
         }
         // The river down the valley's line, opening into the estuary.
-        if t > LAKE_R - 300.0 {
+        if t > LAKE_R - 200.0 {
             let (wide, deep, approach) = self.sp_channel(t);
             let wobble = self.lake_shore.fbm(x / 300.0, y / 300.0, 2, 0.5);
             let inside = wide + 0.25 * wide.min(200.0) * wobble - b;
@@ -459,26 +446,26 @@ impl Terrain {
             }
         }
         // The lake: coves and points, round the island.
-        if r < LAKE_R + 900.0 {
+        if r < LAKE_R + 600.0 {
             let shore = LAKE_R
                 + self
                     .lake_shore
-                    .fbm(x / 700.0 + 13.0, y / 700.0 - 7.0, 3, 0.5)
-                    * 320.0;
+                    .fbm(x / 500.0 + 13.0, y / 500.0 - 7.0, 3, 0.5)
+                    * 180.0;
             let lake = shore - r;
-            let floor = (-0.6 - (LAKE_DEEP - 0.6) * smoothstep(0.0, 240.0, lake)).max(-LAKE_DEEP);
-            let beach = 0.4 + (h - 0.4) * smoothstep(0.0, 160.0, -lake);
+            let floor = (-0.6 - (LAKE_DEEP - 0.6) * smoothstep(0.0, 160.0, lake)).max(-LAKE_DEEP);
+            let beach = 0.4 + (h - 0.4) * smoothstep(0.0, 120.0, -lake);
             h = h.min(beach.max(floor));
             h += (floor - h) * smoothstep(-6.0, 6.0, lake);
             // The island: low, level on top for building.
-            let edge = ISLAND.0 + self.coast.fbm(x / 300.0 - 9.0, y / 300.0 + 2.0, 3, 0.5) * 90.0;
-            let island = smoothstep(edge + 40.0, edge - 200.0, q.0.hypot(q.1));
+            let edge = ISLAND.0 + self.coast.fbm(x / 300.0 - 9.0, y / 300.0 + 2.0, 3, 0.5) * 60.0;
+            let island = smoothstep(edge + 40.0, edge - 140.0, q.0.hypot(q.1));
             if island > 0.0 {
                 h = h.max(-LAKE_DEEP + (ISLAND.1 + LAKE_DEEP) * island.powf(0.6));
             }
             // The fords out to the island, one from each gate.
             // A gravel bar, wandering, its sides falling soon into the water.
-            if (200.0..LAKE_R + 500.0).contains(&r) {
+            if (150.0..LAKE_R + 350.0).contains(&r) {
                 let d = self.sp_lake_ford(w) + 10.0 * self.detail.fbm(x / 90.0, y / 90.0, 2, 0.5);
                 if d < LAKE_FORD_HALF + 40.0 {
                     let crest = 1.4
@@ -497,29 +484,29 @@ impl Terrain {
     fn sp_massif_mask(&self, x: f64, y: f64, q: (f64, f64), w: (f64, f64)) -> f64 {
         let p = half(w);
         let r = w.0.hypot(w.1);
-        let fray = self.mtn_mask.fbm(x / 1_500.0, y / 1_500.0, 3, 0.5) * 900.0
-            + self.mtn_mask.fbm(x / 4_000.0 + 9.0, y / 4_000.0, 2, 0.5) * 900.0;
+        let fray = self.mtn_mask.fbm(x / 1_000.0, y / 1_000.0, 3, 0.5) * 480.0
+            + self.mtn_mask.fbm(x / 2_400.0 + 9.0, y / 2_400.0, 2, 0.5) * 480.0;
         let (b, t) = self.sp_valley(w);
         let off_valley = smoothstep(
             valley_half(t) + 30.0,
-            valley_half(t) + 380.0,
+            valley_half(t) + 260.0,
             b + 0.5 * fray,
         );
-        let ring = smoothstep(MASSIF_IN - 100.0, MASSIF_IN + 300.0, r + 0.4 * fray)
-            * smoothstep(MASSIF_OUT + 100.0, MASSIF_OUT - 300.0, r + fray)
+        let ring = smoothstep(MASSIF_IN - 80.0, MASSIF_IN + 200.0, r + 0.4 * fray)
+            * smoothstep(MASSIF_OUT + 80.0, MASSIF_OUT - 220.0, r + fray)
             * smoothstep(
                 GATE_HALF + 20.0,
-                GATE_HALF + 300.0,
-                p.0 + 50.0 * self.crag.fbm(x / 500.0 + 4.0, y / 500.0, 2, 0.5),
+                GATE_HALF + 220.0,
+                p.0 + 40.0 * self.crag.fbm(x / 400.0 + 4.0, y / 400.0, 2, 0.5),
             );
         // Outliers: on the benches, not in the valleys, off the ways.
-        let field = self.mtn.fbm(x / 2_300.0 - 3.0, y / 2_300.0 + 8.0, 3, 0.5);
+        let field = self.mtn.fbm(x / 1_500.0 - 3.0, y / 1_500.0 + 8.0, 3, 0.5);
         let out = smoothstep(0.28, 0.5, field)
             * smoothstep(0.7, 1.0, self.sp_keep(q, w))
-            * smoothstep(MASSIF_OUT + 200.0, MASSIF_OUT + 600.0, r)
+            * smoothstep(MASSIF_OUT + 150.0, MASSIF_OUT + 450.0, r)
             * smoothstep(
-                self.sp_coast(off_axis(p)) - 600.0,
-                self.sp_coast(off_axis(p)) - 1_200.0,
+                self.sp_coast(off_axis(p)) - 400.0,
+                self.sp_coast(off_axis(p)) - 800.0,
                 r,
             );
         (ring.max(0.7 * out)) * off_valley
@@ -536,7 +523,7 @@ impl Terrain {
             return ground;
         }
         let saddle = ground + 110.0 * mask * mask;
-        let peaks = self.mtn_height.fbm(x / 1_300.0, y / 1_300.0, 3, 0.5);
+        let peaks = self.mtn_height.fbm(x / 900.0, y / 900.0, 3, 0.5);
         let (ci, cj) = (
             (q.0 / TOWER_CELL).floor() as i64,
             (q.1 / TOWER_CELL).floor() as i64,
@@ -567,7 +554,7 @@ impl Terrain {
                 // A tower's sides steepen to a wall at its foot; its top is a
                 // dome (a high power) or a cone (a low one).
                 let k = 2.2 + 4.0 * unit(hash2(mix, 1, 2), 0);
-                let tall = (260.0 + 380.0 * mask * (0.6 + 0.4 * peaks))
+                let tall = (240.0 + 340.0 * mask * (0.6 + 0.4 * peaks))
                     * (0.55 + 0.45 * unit(hash2(mix, 3, 4), 0));
                 h = h.max(ground + tall * (1.0 - t.powf(k)));
             }
@@ -613,7 +600,7 @@ impl Terrain {
         if self.sp_keep(at, w) < 0.95 {
             return NONE;
         }
-        if (MASSIF_IN - 200.0..MASSIF_OUT + 150.0).contains(&r) && b > valley_half(t) - 150.0 {
+        if (MASSIF_IN - 150.0..MASSIF_OUT + 120.0).contains(&r) && b > valley_half(t) - 120.0 {
             return NONE;
         }
         // Drifts: pillars crowd in some places and leave others open.
@@ -622,39 +609,39 @@ impl Terrain {
                 * smoothstep(
                     -0.3,
                     0.4,
-                    self.forest_kind.fbm(x / 1_400.0, y / 1_400.0, 2, 0.5),
+                    self.forest_kind.fbm(x / 900.0, y / 900.0, 2, 0.5),
                 );
         let (_, valley) = self.sp_level(x, y, at, w);
         let channel = self.sp_channel(t).0;
         let coast = self.sp_coast(off_axis(p));
-        let (chance, size, tall) = if at.0.hypot(at.1) < LAKE_R - 150.0 {
+        let (chance, size, tall) = if at.0.hypot(at.1) < LAKE_R - 100.0 {
             // Out of the lake, round the island, clear of the fords.
-            if at.0.hypot(at.1) < ISLAND.0 + 220.0 || self.sp_lake_ford(w) < LAKE_FORD_HALF + 130.0
+            if at.0.hypot(at.1) < ISLAND.0 + 150.0 || self.sp_lake_ford(w) < LAKE_FORD_HALF + 100.0
             {
                 NONE
             } else {
-                (0.32, 1.0, (150.0, 320.0))
+                (0.32, 1.0, (130.0, 280.0))
             }
-        } else if r < MASSIF_IN + 100.0 {
+        } else if r < MASSIF_IN + 80.0 {
             // The lake's shore, round the gate's mouth.
             (
-                if p.0 < GATE_HALF + 250.0 { 0.0 } else { 0.3 },
+                if p.0 < GATE_HALF + 200.0 { 0.0 } else { 0.3 },
                 0.9,
-                (120.0, 280.0),
+                (110.0, 250.0),
             )
-        } else if r > coast + 150.0 {
+        } else if r > coast + 100.0 {
             // Stacks in the sea, near the coast, clear of the estuary's way.
-            if r > coast + 1_400.0 || b < channel + 250.0 {
+            if r > coast + 900.0 || b < channel + 200.0 {
                 NONE
             } else {
                 (0.05, 0.7, (40.0, 140.0))
             }
-        } else if r > coast - 250.0 {
+        } else if r > coast - 200.0 {
             NONE
         } else if valley > 0.95 {
             // The valley floor, clear of the river and its banks and of the
             // ways to the fords.
-            if b < channel + 160.0 || FORDS.iter().any(|&f| (t - f).abs() < 480.0) {
+            if b < channel + 130.0 || FORDS.iter().any(|&f| (t - f).abs() < 350.0) {
                 NONE
             } else {
                 (0.11, 0.9, (90.0, 260.0))

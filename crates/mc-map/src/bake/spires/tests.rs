@@ -8,7 +8,7 @@ use crate::bake::test_maps::SPIRES;
 #[test]
 fn the_bases_stand_level() {
     let t = &*SPIRES;
-    assert_eq!(t.starts.len(), 12);
+    assert_eq!(t.starts.len(), 2);
     for (i, &(x, y)) in t.starts.iter().enumerate() {
         let h = t.height(x, y);
         assert!(h > 40.0, "base {i} at {h} m, down by the sea");
@@ -25,7 +25,7 @@ fn the_bases_stand_level() {
 #[test]
 fn the_middle_and_the_sea_are_where_they_should_be() {
     let t = &*SPIRES;
-    for k in 0..3 {
+    for k in 0..2 {
         let at = |p: (f64, f64)| {
             let m = on_map(turn(p, k));
             t.height(m.0, m.1)
@@ -36,24 +36,24 @@ fn the_middle_and_the_sea_are_where_they_should_be() {
         // (Pillars stand in it: most of a ring round the island is water.)
         let wet = (0..24)
             .map(|i| {
-                let a = i as f64 * PI / 36.0 + PI / 3.0;
-                at((950.0 * a.cos(), 950.0 * a.sin()))
+                let a = i as f64 * PI / 30.0 + PI / 10.0;
+                at((560.0 * a.cos(), 560.0 * a.sin()))
             })
             .filter(|h| (-LAKE_DEEP - 0.1..0.0).contains(h))
             .count();
-        assert!(wet >= 16, "only {wet} of 24 in the lake in third {k}");
-        // The sea behind every team.
-        assert!(at((0.0, 12_100.0)) < -20.0, "sea behind team {k}");
+        assert!(wet >= 16, "only {wet} of 24 in the lake in half {k}");
+        // The sea behind each player.
+        assert!(at((0.0, 6_000.0)) < -20.0, "sea behind player {k}");
         // The massif stands tall either side of the gate.
         // (Its towers stand apart: look over a grid either side of the gate.)
         let massif = (0..12)
             .flat_map(|i| {
-                (0..8).map(move |j| (-1_650.0 + 300.0 * i as f64, 2_900.0 + 220.0 * j as f64))
+                (0..8).map(move |j| (-990.0 + 180.0 * i as f64, 1_450.0 + 120.0 * j as f64))
             })
-            .filter(|p| p.0.abs() > 400.0)
+            .filter(|p| p.0.abs() > 250.0)
             .map(at)
             .fold(0.0, f64::max);
-        assert!(massif > 300.0, "massif in third {k}: {massif}");
+        assert!(massif > 300.0, "massif in half {k}: {massif}");
     }
 }
 
@@ -65,7 +65,7 @@ fn the_middle_and_the_sea_are_where_they_should_be() {
 #[ignore]
 fn spires_relief() {
     let spec =
-        std::env::var("SPIRES_RELIEF").unwrap_or_else(|_| "0,0,24576,1024,relief.ppm".into());
+        std::env::var("SPIRES_RELIEF").unwrap_or_else(|_| "0,0,12288,1024,relief.ppm".into());
     let v: Vec<&str> = spec.split(',').collect();
     let (x0, y0, span, px): (f64, f64, f64, usize) = (
         v[0].parse().unwrap(),
