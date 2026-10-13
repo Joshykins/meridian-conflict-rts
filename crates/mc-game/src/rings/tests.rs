@@ -405,14 +405,14 @@ fn placing_a_radar_shows_our_radar_network() {
     ];
     let network = cover_network(&b, id("aster_t2_radar"), None, 0, units.iter());
     let reach: Vec<(f32, f32)> = network.iter().map(|r| (r.center[0], r.outer)).collect();
-    assert_eq!(reach, [(0.0, 3000.0), (100.0, 12000.0)]);
+    assert_eq!(reach, [(0.0, 4500.0), (100.0, 18000.0)]);
     assert!(network.iter().all(|r| r.group == Reach::Radar as u32));
 
     // A headless shot draws no ghost: the site's own ring comes last.
     let with_site = cover_network(&b, id("aster_t2_radar"), Some([9.0, 9.0]), 0, units.iter());
     assert_eq!(
         with_site.last().map(|r| (r.center, r.outer)),
-        Some(([9.0, 9.0], 6000.0))
+        Some(([9.0, 9.0], 9000.0))
     );
 
     assert!(cover_network(&b, id("aster_t1_tank"), None, 0, units.iter()).is_empty());
