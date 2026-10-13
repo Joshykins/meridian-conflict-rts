@@ -10,6 +10,9 @@
 
 use super::*;
 use crate::bake::bays::segment;
+use crate::bake::sites::{
+    off_ways, Way, FILL, FILL_MOST, LANE_DEEP, LOW_CUT, PRINTER_ROOM, SHOULDER,
+};
 use crate::landmark::{harvest_depth, harvest_look, HARVEST_HEARTLAND};
 use crate::noise::{bump, hash2};
 
@@ -52,18 +55,6 @@ const ISLES_NORTH: [(f64, f64); 5] = [
     (7_500.0, 11_450.0),
 ];
 
-/// The base's floor, level at [`BASE_H`].
-const BASE: [(f64, f64); 9] = [
-    (9_200.0, 18_800.0),
-    (10_800.0, 18_450.0),
-    (12_300.0, 18_300.0),
-    (13_900.0, 18_450.0),
-    (15_300.0, 18_850.0),
-    (15_400.0, 21_000.0),
-    (15_500.0, 25_200.0),
-    (9_000.0, 25_200.0),
-    (9_050.0, 21_000.0),
-];
 /// How far round the base's floor the ground takes to come back.
 const BASE_BLEND: f64 = 520.0;
 
@@ -268,130 +259,6 @@ const BASINS: [(&str, f64, bool); 5] = [
     ("Frostvault", 800.0, true),
 ];
 
-/// The most a way's or a room's walls reach out from its floor, metres.
-const SHOULDER: f64 = 900.0;
-/// The most a room's level ground runs out past it in lobes.
-const ROOM_LOBES: f64 = 280.0;
-/// Metres out per metre up an embankment, and up the ground a way climbs
-/// through in the lowland.
-const FILL: f64 = 4.0;
-/// The most an embankment spreads.
-const FILL_MOST: f64 = 260.0;
-const LOW_CUT: f64 = 6.0;
-/// Metres between a way's profile's samples.
-const STEP: f64 = 16.0;
-/// The ways' index: cells this big across the map.
-const CELL: f64 = 512.0;
-const CELLS: usize = 48;
-
-/// One way as cut: its line, its floor along it, its walls.
-pub(super) struct Way {
-    line: Vec<(f64, f64)>,
-    /// Metres along the line at each of its points.
-    run: Vec<f64>,
-    /// The floor's height every [`STEP`] metres along; empty for a sea lane.
-    profile: Vec<f64>,
-    pub(super) half: f64,
-    cut: f64,
-    /// A sea lane, kept deep, not a floor cut level.
-    sea: bool,
-    /// A printing site's way through the mountains: a valley is shaped
-    /// round it before the erosion runs.
-    valley: Option<(f64, f64)>,
-    /// Metres from the line past which the way changes nothing.
-    reach: f64,
-    /// For each index cell, the segments that may lie within `reach` of it.
-    cells: Vec<Vec<u16>>,
-}
-
-impl Way {
-    fn new(site: &Site) -> Way {
-        let (line, half, cut) = (site_line_points(site), site.half(), site.cut);
-        let mut run = vec![0.0];
-        for w in line.windows(2) {
-            run.push(run.last().unwrap() + dist(w[0], w[1]));
-        }
-        let reach = half + SHOULDER + 20.0;
-        let mut cells = vec![Vec::new(); CELLS * CELLS];
-        for (k, w) in line.windows(2).enumerate() {
-            let lo = (w[0].0.min(w[1].0) - reach, w[0].1.min(w[1].1) - reach);
-            let hi = (w[0].0.max(w[1].0) + reach, w[0].1.max(w[1].1) + reach);
-            let span = |a: f64, b: f64| {
-                let i0 = ((a / CELL).floor().max(0.0) as usize).min(CELLS - 1);
-                let i1 = ((b / CELL).floor().max(0.0) as usize).min(CELLS - 1);
-                i0..=i1
-            };
-            for j in span(lo.1, hi.1) {
-                for i in span(lo.0, hi.0) {
-                    cells[j * CELLS + i].push(k as u16);
-                }
-            }
-        }
-        Way {
-            line,
-            run,
-            profile: Vec::new(),
-            half,
-            cut,
-            sea: site.ground == Ground::Naval,
-            valley: (site.kind == Kind::Printer && site.ground == Ground::Land && cut >= 0.8)
-                .then_some((site.level, site.room())),
-            reach,
-            cells,
-        }
-    }
-
-    /// Metres from the way's line and along it, within its reach.
-    pub(super) fn near(&self, p: (f64, f64)) -> Option<(f64, f64)> {
-        let cell = |v: f64| ((v / CELL).floor().max(0.0) as usize).min(CELLS - 1);
-        let mut best = (f64::INFINITY, 0.0);
-        for &k in &self.cells[cell(p.1) * CELLS + cell(p.0)] {
-            let k = k as usize;
-            let (d, t) = segment(p, self.line[k], self.line[k + 1]);
-            if d < best.0 {
-                best = (d, self.run[k] + t * (self.run[k + 1] - self.run[k]));
-            }
-        }
-        (best.0 <= self.reach).then_some(best)
-    }
-
-    /// The floor at `along` metres.
-    fn floor(&self, along: f64) -> f64 {
-        let f = (along / STEP).clamp(0.0, (self.profile.len() - 1) as f64);
-        let i = (f as usize).min(self.profile.len().saturating_sub(2));
-        let t = f - i as f64;
-        self.profile[i] * (1.0 - t) + self.profile[(i + 1).min(self.profile.len() - 1)] * t
-    }
-
-    /// Points every `every` metres along the line, the last one included.
-    #[cfg(test)]
-    pub(super) fn points(&self, every: f64) -> Vec<(f64, f64)> {
-        self.points_from(0.0, every)
-    }
-
-    /// Points from `start` metres along to the end, about `every` metres
-    /// apart, the last one included.
-    #[cfg(test)]
-    pub(super) fn points_from(&self, start: f64, every: f64) -> Vec<(f64, f64)> {
-        let total = *self.run.last().unwrap();
-        let n = ((total - start) / every).ceil().max(1.0) as usize;
-        (0..=n)
-            .map(|i| self.at(start + (total - start) * i as f64 / n as f64))
-            .collect()
-    }
-
-    fn at(&self, along: f64) -> (f64, f64) {
-        let k = self
-            .run
-            .windows(2)
-            .position(|w| along <= w[1])
-            .unwrap_or(self.run.len() - 2);
-        let t = ((along - self.run[k]) / (self.run[k + 1] - self.run[k]).max(1e-9)).clamp(0.0, 1.0);
-        let (a, b) = (self.line[k], self.line[k + 1]);
-        (a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t)
-    }
-}
-
 /// The ground's plan, worked out once.
 #[derive(Default)]
 pub(super) struct Plan {
@@ -432,7 +299,7 @@ fn cells_of(cell: f64) -> usize {
 impl Plan {
     pub(super) fn outlines() -> Plan {
         Plan {
-            base: closed(&BASE),
+            base: closed(&super::base::FACILITY.floor_outline()),
             fjords: FJORDS.iter().map(|f| rounded(f.0)).collect(),
             river: rounded(&RIVER),
             river_run: Vec::new(),
@@ -473,18 +340,8 @@ impl Plan {
 
     /// Metres from the nearest way's line, less its half width.
     fn off_ways(&self, p: (f64, f64)) -> f64 {
-        self.ways
-            .iter()
-            .filter_map(|w| w.near(p).map(|(d, _)| d - w.half))
-            .fold(f64::INFINITY, f64::min)
+        off_ways(&self.ways, p)
     }
-}
-
-/// A site's way's line, the site first, rounded.
-fn site_line_points(s: &Site) -> Vec<(f64, f64)> {
-    let mut pts = vec![s.at];
-    pts.extend_from_slice(s.way);
-    rounded(&pts)
 }
 
 /// A y-at-x (or x-at-y) table, eased between its corners.
@@ -712,7 +569,8 @@ impl Terrain {
             + 260.0 * self.mtn_gap.fbm(p.0 / 1_100.0 + 9.0, p.1 / 1_100.0, 3, 0.5);
         // (Always well round the machine's bastions, whose benches are cut at
         // the floor's level: no notch in the hills behind.)
-        super::base::BASTIONS
+        super::base::FACILITY
+            .bastions()
             .iter()
             .fold(frayed, |b, &(at, _, _)| b.max(700.0 - dist(p, at)))
     }
@@ -831,7 +689,7 @@ impl Terrain {
             + 50.0 * self.mtn_height.get(x / 2_900.0, y / 2_900.0);
         // Foothills rise out of the lowland before the wall.
         let h = low + (peaks - low) * smoothstep(-900.0, 900.0, da);
-        let h = self.hv_valleys(p, h, low);
+        let h = self.site_valleys(&self.hv.plan.ways, p, h, low);
         self.hv_basins(p, h, HARVEST_ALPINE)
     }
 
@@ -860,7 +718,7 @@ impl Terrain {
             + ranges * (160.0 + 560.0 * big.powf(1.5));
         let w = smoothstep(-400.0, 1_600.0, dp) * smoothstep(0.0, 450.0, shore);
         let h = low + (ground - low) * w;
-        let h = self.hv_valleys(p, h, low);
+        let h = self.site_valleys(&self.hv.plan.ways, p, h, low);
         self.hv_basins(p, h, HARVEST_FJORDS)
     }
 
@@ -1000,7 +858,7 @@ impl Terrain {
         // The rooms first: a way leaving or entering one is held at its level
         // through it, and cuts on through the room's walls.
         for s in SITES {
-            h = self.hv_room(s, p, h);
+            h = self.site_room(s, p, h);
         }
         if let Some((d, half, _)) = self.hv_river(p) {
             h += (-2.6 - h) * (1.0 - smoothstep(half - 8.0, half + 28.0, d));
@@ -1061,86 +919,6 @@ impl Terrain {
         h
     }
 
-    /// A site's room cut level; a naval site's pad and, in front of it, its
-    /// slips' water.
-    fn hv_room(&self, s: &Site, p: (f64, f64), h: f64) -> f64 {
-        let d = dist(p, s.at);
-        let reach = s.room() + 40.0;
-        if d > reach + ROOM_LOBES + SHOULDER {
-            return h;
-        }
-        if s.ground == Ground::Naval {
-            return self.hv_slips(s, p, d, h);
-        }
-        // The level ground runs out past the room in lobes, and its shoulders
-        // wander: a floor the ground has, not a disc cut into it. A printer's
-        // room in the hills or the mountains is a valley's floor, the slopes
-        // coming down to it long and concave; the desert's rooms keep the
-        // canyon's sheer walls, and the hidden sites the steep sides of their
-        // rings, which must not open.
-        let lobes = ROOM_LOBES
-            * self
-                .mtn_gap
-                .fbm(p.0 / 380.0 + 1.7, p.1 / 380.0, 3, 0.5)
-                .max(0.0)
-            + 60.0 * self.ridge.fbm(p.0 / 140.0, p.1 / 140.0 - 3.0, 2, 0.5);
-        let core = reach + lobes.max(0.0);
-        let valley = s.kind == Kind::Printer && s.cut >= 0.5;
-        let run = match () {
-            _ if h <= s.level => FILL,
-            _ if valley => s.cut.max(3.4),
-            _ => s.cut.max(1.0),
-        };
-        let edge = core
-            + (run
-                * (h - s.level).abs()
-                * (0.75 + 0.6 * self.detail.get(p.0 / 260.0, p.1 / 260.0))
-                + 30.0)
-                .min(SHOULDER);
-        let t = smoothstep(core, edge, d);
-        // (A valley's foot: the slope eases out onto the floor.)
-        let t = if valley { t.powf(1.5) } else { t };
-        h + (s.level - h) * (1.0 - t)
-    }
-
-    /// A naval site: the Shaper's pad level on an islet or a shore, the land
-    /// rising behind it into a wooded hill, its coast wandering; in front, a
-    /// quay and the slips' water, deep.
-    fn hv_slips(&self, s: &Site, p: (f64, f64), d: f64, mut h: f64) -> f64 {
-        let first = s.way[0];
-        let f = dist(first, s.at);
-        let (fx, fy) = ((first.0 - s.at.0) / f, (first.1 - s.at.1) / f);
-        let u = (p.0 - s.at.0) * fx + (p.1 - s.at.1) * fy;
-        let wander = |k: f64, l: f64| self.coast.fbm(p.0 / l + k, p.1 / l - k, 3, 0.5);
-        let pad = 200.0 + 50.0 * wander(3.0, 240.0);
-        let coast = 400.0 + 170.0 * wander(-5.0, 330.0);
-        // Behind the pad the ground climbs; at its sides it falls to a beach.
-        let behind = smoothstep(40.0, -260.0, u);
-        let hill = 55.0
-            * behind
-            * smoothstep(pad, coast, d)
-            * (0.6 + 0.4 * self.crag.ridged(p.0 / 260.0, p.1 / 260.0, 2, 0.5));
-        let shore = 1.0 - smoothstep(coast - 30.0, coast + 90.0 * (1.0 - behind) + 30.0, d);
-        let ground = s.level + hill - (s.level + 3.0) * smoothstep(coast - 90.0, coast + 30.0, d);
-        let quay = 95.0 + 35.0 * wander(9.0, 180.0);
-        let land = shore * (1.0 - smoothstep(quay, quay + 25.0, u));
-        if land > 0.0 && (h < ground || d < coast) {
-            h += (ground - h) * land;
-        }
-        // The pad itself dead level.
-        h += (s.level - h)
-            * (1.0 - smoothstep(pad, pad + 30.0, d))
-            * (1.0 - smoothstep(quay, quay + 25.0, u));
-        let reach = s.room() + 40.0;
-        let wet = (1.0 - smoothstep(reach + 20.0, reach + 140.0, d))
-            * smoothstep(quay + 15.0, quay + 45.0, u);
-        let deep = -LANE_DEEP - 4.0;
-        if h > deep {
-            h += (deep - h) * wet;
-        }
-        h
-    }
-
     /// Works out every way's floor, once the ground is laid.
     pub(super) fn hv_profiles(&mut self) {
         let profiles: Vec<Vec<f64>> = self
@@ -1152,93 +930,15 @@ impl Terrain {
                 if w.sea {
                     Vec::new()
                 } else {
-                    self.hv_profile(w)
+                    Self::way_profile(w, SITES, |q| {
+                        let r = self.hv_raw(q);
+                        r.h + self.erosion.at(q.0, q.1) * r.erodes
+                    })
                 }
             })
             .collect();
         for (w, p) in self.hv.plan.ways.iter_mut().zip(profiles) {
             w.profile = p;
         }
-    }
-
-    /// A printing site's valley down out of the mountains: the ground round
-    /// its way's line eased down toward a floor falling from the site's level,
-    /// walls wandering in and out, before the erosion furrows them.
-    fn hv_valleys(&self, p: (f64, f64), mut h: f64, low: f64) -> f64 {
-        for way in &self.hv.plan.ways {
-            let Some((level, room)) = way.valley else {
-                continue;
-            };
-            let Some((d, along)) = way.near(p) else {
-                continue;
-            };
-            let floor = (level - 0.085 * (along - room).max(0.0)).max(low.min(level));
-            if h <= floor {
-                continue;
-            }
-            let wide = 520.0 + 380.0 * self.mtn_gap.fbm(along / 1_400.0, 3.7, 2, 0.5);
-            let wander = 160.0 * self.ridge.fbm(p.0 / 700.0 + 1.3, p.1 / 700.0, 3, 0.5);
-            let shape = smoothstep(0.5 * way.half, way.half + wide, d + wander).powf(0.8);
-            h = floor + (h - floor) * shape;
-        }
-        h
-    }
-
-    /// A way's floor: the ground along it, smoothed, held level through the
-    /// rooms it leaves and enters, never under 2.5 m over the water (fords and sandbars), and no
-    /// steeper than [`GRADE`] anywhere.
-    fn hv_profile(&self, way: &Way) -> Vec<f64> {
-        let total = *way.run.last().unwrap();
-        let n = (total / STEP).ceil() as usize + 1;
-        let pts: Vec<(f64, f64)> = (0..n).map(|i| way.at(i as f64 * STEP)).collect();
-        let raw: Vec<f64> = pts
-            .iter()
-            .map(|&q| {
-                let r = self.hv_raw(q);
-                r.h + self.erosion.at(q.0, q.1) * r.erodes
-            })
-            .collect();
-        // The rooms the way runs through hold it at their level.
-        let lock: Vec<Option<f64>> = pts
-            .iter()
-            .map(|&q| {
-                SITES
-                    .iter()
-                    .find(|s| dist(q, s.at) < s.room() + 60.0)
-                    .map(|s| s.level)
-            })
-            .collect();
-        // The lowest floor no steeper than the grade anywhere (cutting through
-        // what stands in the way), then held within the grade's cones from
-        // every room it touches: each room's level exactly, and from there
-        // down (or up) to the ground no steeper than the grade.
-        let rise = GRADE * STEP;
-        let mut low: Vec<f64> = raw.iter().map(|v| v.max(2.5)).collect();
-        for i in 1..n {
-            low[i] = low[i].min(low[i - 1] + rise);
-        }
-        for i in (0..n - 1).rev() {
-            low[i] = low[i].min(low[i + 1] + rise);
-        }
-        let locks: Vec<(usize, f64)> = lock
-            .iter()
-            .enumerate()
-            .filter_map(|(i, l)| l.map(|v| (i, v)))
-            .collect();
-        let z = low
-            .iter()
-            .enumerate()
-            .map(|(i, &v)| {
-                let cone = |sign: f64| {
-                    locks
-                        .iter()
-                        .map(move |&(k, l)| l + sign * rise * (i as f64 - k as f64).abs())
-                };
-                let under = cone(-1.0).fold(f64::NEG_INFINITY, f64::max);
-                let over = cone(1.0).fold(f64::INFINITY, f64::min);
-                v.clamp(under.min(over), over)
-            })
-            .collect();
-        z
     }
 }

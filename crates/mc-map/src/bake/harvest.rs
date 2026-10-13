@@ -37,6 +37,7 @@
 
 use super::bays::{dist, inside};
 use super::canyon::{smooth_closed, smooth_open};
+use super::sites::{Ground, Kind, Site};
 use super::{Pad, Terrain};
 use crate::format::PropKind;
 use crate::landmark::{
@@ -57,74 +58,6 @@ pub(super) const SIZE: f64 = 24_576.0;
 
 /// The base's floor, metres over the water: the valley rises to it.
 const BASE_H: f64 = 62.0;
-
-/// What a site raises.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Kind {
-    /// Prints units onto platforms in front of it.
-    Printer,
-    /// Raises an auxiliary Shaper (whichever kind the sim picks): hidden behind
-    /// the printers.
-    Auxiliary,
-    /// Kept for the Gatewright, whose fleets come by air: always raises one once its
-    /// tier comes.
-    Fleet,
-}
-
-/// Where a site's Shaper stands: on dry ground, or on an islet or shore pad
-/// with its slips in deep water in front of it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Ground {
-    Land,
-    Naval,
-}
-
-/// A Shaper site.
-struct Site {
-    name: &'static str,
-    at: (f64, f64),
-    kind: Kind,
-    ground: Ground,
-    /// The room's level (land), or the Shaper's pad's (naval), metres over the water.
-    level: f64,
-    /// A printer's way toward the defenders, after `at`; an auxiliary site's
-    /// narrow way in, from `at` out to ground the rest of the map reaches.
-    way: &'static [(f64, f64)],
-    /// How the way's walls stand where it cuts into higher ground: metres out
-    /// per metre up (sheer canyon walls in the desert, valley sides in the
-    /// mountains).
-    cut: f64,
-}
-
-/// The room a printing site's base grows into, and an auxiliary one's, metres.
-const PRINTER_ROOM: f64 = 450.0;
-const AUX_ROOM: f64 = 350.0;
-/// Half a printing site's way's width, and an auxiliary site's narrow way's;
-/// half a sea lane's.
-const WAY_HALF: f64 = 130.0;
-const NARROW_HALF: f64 = 36.0;
-const LANE_HALF: f64 = 160.0;
-/// How deep a sea lane and a naval site's slips are kept, metres.
-const LANE_DEEP: f64 = 18.0;
-/// The steepest a way climbs, rise over run.
-const GRADE: f64 = 0.09;
-
-impl Site {
-    fn room(&self) -> f64 {
-        match self.kind {
-            Kind::Printer => PRINTER_ROOM,
-            _ => AUX_ROOM,
-        }
-    }
-
-    fn half(&self) -> f64 {
-        match (self.kind, self.ground) {
-            (Kind::Printer, Ground::Land) => WAY_HALF,
-            (Kind::Printer, Ground::Naval) => LANE_HALF,
-            _ => NARROW_HALF,
-        }
-    }
-}
 
 /// Every site: the base's three, then each region's printers and its
 /// auxiliary Shaper behind them.
@@ -714,45 +647,6 @@ impl Terrain {
                 None => k,
             })
     }
-}
-
-/// A site's sidecar line: its room, its kind and its way, map metres.
-#[cfg(test)]
-fn site_line(s: &Site, way: &[(f64, f64)]) -> String {
-    let kind = match s.kind {
-        Kind::Printer => "Printer",
-        Kind::Auxiliary => "Auxiliary",
-        Kind::Fleet => "Fleet",
-    };
-    let domain = match s.ground {
-        Ground::Land => "Land",
-        Ground::Naval => "Naval",
-    };
-    let path = way
-        .iter()
-        .map(|p| format!("({:.0}, {:.0})", p.0, p.1))
-        .collect::<Vec<_>>()
-        .join(", ");
-    // An auxiliary site faces the defenders.
-    let facing = if s.kind == Kind::Printer {
-        "None".to_string()
-    } else {
-        let (sx, sy) = SPAWNS
-            .iter()
-            .fold((0.0, 0.0), |a, s| (a.0 + s.0 .0 / 4.0, a.1 + s.0 .1 / 4.0));
-        let deg = (sy - s.at.1)
-            .atan2(sx - s.at.0)
-            .to_degrees()
-            .rem_euclid(360.0);
-        format!("Some({deg:.0})")
-    };
-    format!(
-        "    (name: \"{}\", at: ({:.0}, {:.0}), domain: {domain}, facing: {facing}, kind: {kind}, room: {:.0}, path: [{path}]),\n",
-        s.name,
-        s.at.0,
-        s.at.1,
-        s.room()
-    )
 }
 
 /// A design point's distance round a closed outline, for a smooth one.
