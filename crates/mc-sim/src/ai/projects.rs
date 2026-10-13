@@ -54,6 +54,9 @@ pub(super) fn project_kind(bp: &UnitBlueprint) -> Option<Project> {
         // finished freed the slot for the next, and sides had 30 to 60 of them
         // by forty minutes (`spotter_job` builds the one a side wants).
         || (bp.is_mobile() && bp.weapons.is_empty())
+        // A yard that raises a hull aloft (`Builder::aloft`) is a project only for what it
+        // raises, and the AI raises no Regent yet.
+        || bp.builder.as_ref().is_some_and(|b| b.aloft)
     {
         return None;
     }

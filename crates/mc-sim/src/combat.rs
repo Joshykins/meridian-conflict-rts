@@ -1198,13 +1198,18 @@ impl World {
         } else {
             Fx::ZERO
         };
-        let wreck_materials = bp.cost_materials * bp.wreck_fraction + cargo_materials;
+        // A hull raised aloft by its yard (`sky_yard.rs`) falls half built if it dies so,
+        // its wreck worth what was built of it; any other unfinished hull in the air
+        // (a Gatewright's print) is gone, as a site is.
+        let built = self.built_share(row);
+        let falls_unbuilt = !complete && bp.built_aloft;
+        let wreck_materials = (bp.cost_materials * bp.wreck_fraction + cargo_materials) * built;
         // Taken apart to the last plate: nothing is left to blow up or to lie about.
         // A commander's reactor goes up all the same.
         let reclaimed = units.has_flag(row, flag::RECLAIMED) && !bp.has(cat::COMMANDER);
         let surface = self.terrain.height_at(pos).max(self.terrain.water_level());
         let airborne = visible
-            && complete
+            && (complete || falls_unbuilt)
             && leave_wreck
             && !reclaimed
             && bp.motion.map(|m| m.layer) == Some(mc_data::MoveLayer::Air)
@@ -1225,6 +1230,7 @@ impl World {
             prev_pitch: 0,
             roll: units.bank[row],
             prev_roll: units.bank[row],
+            built,
         });
         // A ship goes down slowly and settles on the seabed (`sinking.rs`).
         let sinking = (visible
@@ -1341,13 +1347,15 @@ impl World {
         row: usize,
         keep_blocked: bool,
     ) -> Result<(), SimError> {
-        // Whatever it was assembling dies with it.
+        // Whatever it was assembling dies with it; what a yard was raising in the sky
+        // comes down.
         let units = &self.state.units;
         if let Some(t) = units.row(units.build_target[row]) {
             if units.has_flag(t, flag::IN_FACTORY) {
                 self.remove_unit_row(t, true)?;
             }
         }
+        self.drop_aloft_product(row);
         self.state.orders.clear(&mut self.state.units, row);
         self.stop_moving(row);
         let release = {

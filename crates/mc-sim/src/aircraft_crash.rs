@@ -78,6 +78,9 @@ pub struct AircraftCrash {
     pub prev_pitch: i16,
     pub roll: i16,
     pub prev_roll: i16,
+    /// The share of the hull that was built when it fell: one, but for a hull a yard
+    /// was raising aloft (`sky_yard.rs`), drawn as far as it had condensed.
+    pub built: Fx,
 }
 
 impl AircraftCrash {
@@ -100,6 +103,7 @@ impl AircraftCrash {
                 | (self.roll as u16 as u64) << 32
                 | (self.prev_roll as u16 as u64) << 48,
         );
+        h.write_i64(self.built.0);
     }
 
     /// One tick of the tumble. A light hull goes over and over; a heavy one (`heft`

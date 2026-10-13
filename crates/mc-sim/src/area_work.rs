@@ -164,8 +164,9 @@ impl World {
         let inside = |e: &crate::spatial::Entry| e.pos.distance(centre) <= radius + e.radius;
         let raising = self.index.nearest(pos, span, kind::UNIT, |e| {
             let t = e.row as usize;
-            // A station reaches a factory's product only as far as the product's edge.
-            let product = self.factory_product(t).unwrap_or(t);
+            // A station reaches a factory's product only as far as the product's edge,
+            // and a yard's hull aloft only at the yard.
+            let product = self.work_anchor(self.factory_product(t).unwrap_or(t));
             self.unit_entry_is_current(e)
                 && inside(e)
                 && self.area_raise(owner, t)
@@ -206,8 +207,11 @@ impl World {
         }
         match self.assist_work(t) {
             Some(AssistWork::Raise | AssistWork::Round | AssistWork::Shield) => true,
+            // A bay's product, an upgrade's new body, or a yard's hull aloft.
             Some(AssistWork::Product(p)) => {
-                units.has_flag(p, flag::IN_FACTORY) || units.has_flag(p, flag::UPGRADE)
+                units.has_flag(p, flag::IN_FACTORY)
+                    || units.has_flag(p, flag::UPGRADE)
+                    || self.builds_aloft(t)
             }
             Some(AssistWork::Mend) | None => false,
         }
@@ -221,7 +225,7 @@ impl World {
             return None;
         }
         units.row(units.build_target[t]).filter(|&p| {
-            units.has_flag(p, flag::IN_FACTORY)
+            (units.has_flag(p, flag::IN_FACTORY) || self.builds_aloft(t))
                 && units.has_flag(p, flag::UNDER_CONSTRUCTION)
                 && !units.has_flag(p, flag::UPGRADE)
         })

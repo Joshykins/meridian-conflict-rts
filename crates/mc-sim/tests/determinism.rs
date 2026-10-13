@@ -4,9 +4,11 @@
 //! blasts, two factories' linked batch forming up, a self-destruct counting down across
 //! the snapshot, city blocks shot, set alight and brought down, a space elevator's cable
 //! clamped and its first platform docked, a Fulgur raised on Repeat and its lot laid
-//! again, tanks on a bridge's deck over the sea while the fleets pass under it, the
-//! Regent's weapon groups turning and firing gun by gun) must hash identically at every
-//! worker count and after a snapshot is restored mid-match.
+//! again, tanks on a bridge's deck over the sea while the fleets pass under it, a
+//! Regent's weapon groups turning and firing gun by gun, a second Regent's Edict
+//! gathering across the snapshot on a moving hull and firing, a third raised aloft over
+//! its yard across the snapshot and getting under way after it) must hash identically at
+//! every worker count and after a snapshot is restored mid-match.
 //!
 //! `battle.rs` covers a land-only battle the same way; this is the one to extend
 //! when a new domain or system arrives (CLAUDE.md, section 3).
@@ -276,6 +278,9 @@ fn setup(w: &mut World) {
                 // The Regency surge artillery: it plants and lobs a shell into the south's
                 // army, whose wake rolls out round the crater and burns (`surge.rs`).
                 add("regency_t4_surge_artillery", 1, 300, 600);
+                // The Regent's yard: the hull goes up in the sky over it across the
+                // snapshot, finishes after it and gets under way (`sky_yard.rs`).
+                add(YARD, 1, YARD_AT.0, YARD_AT.1);
             }
         }
     }
@@ -308,6 +313,11 @@ fn setup(w: &mut World) {
     let north = &mut w.state.players[1];
     north.bonus_storage[1] += Fx::from_int(600_000);
     north.energy += Fx::from_int(500_000);
+    // And its yard's Regent.
+    north.bonus_storage[0] += Fx::from_int(60_000);
+    north.materials += Fx::from_int(50_000);
+    north.bonus_storage[1] += Fx::from_int(400_000);
+    north.energy += Fx::from_int(400_000);
     // The north's AA start hurt, for the Exarch's repair field to mend.
     let aa = w.blueprints.id_of("aster_t1_aa").unwrap();
     for row in w.state.units.slots.iter().collect::<Vec<_>>() {
@@ -337,7 +347,7 @@ fn regent_on(w: &World) -> Vec<PlayerCommand> {
     let units: Vec<UnitId> = u
         .slots
         .iter()
-        .filter(|&r| u.blueprint[r] == bp)
+        .filter(|&r| u.blueprint[r] == bp && u.owner[r] == 0)
         .map(|r| u.id(r))
         .collect();
     vec![
@@ -357,6 +367,22 @@ fn regent_on(w: &World) -> Vec<PlayerCommand> {
             },
         },
     ]
+}
+
+/// The north's Regent yard: x, and distance from home.
+const YARD: &str = "regency_t5_sky_yard";
+const YARD_AT: (i32, i32) = (350, 1700);
+/// When the Regent over it is all but finished: it finishes after the snapshot.
+const REGENT_NEARLY: u32 = 150;
+
+/// The Regent of the north's, raised over its yard.
+fn north_regent(w: &World) -> Option<UnitId> {
+    let bp = w.blueprints.id_of(REGENT).unwrap();
+    let u = &w.state.units;
+    u.slots
+        .iter()
+        .find(|&r| u.blueprint[r] == bp && u.owner[r] == 1)
+        .map(|r| u.id(r))
 }
 
 /// Where the warhead lands, and a field of wrecks lies.
@@ -444,6 +470,26 @@ fn elevator_on(w: &World) -> Vec<PlayerCommand> {
     .collect()
 }
 
+/// The north's yard starts a Regent.
+fn yard_on(w: &World) -> Vec<PlayerCommand> {
+    let bp = w.blueprints.id_of(YARD).unwrap();
+    let u = &w.state.units;
+    let factories: Vec<UnitId> = u
+        .slots
+        .iter()
+        .filter(|&r| u.blueprint[r] == bp)
+        .map(|r| u.id(r))
+        .collect();
+    vec![PlayerCommand {
+        player: 1,
+        command: Command::Produce {
+            factories,
+            blueprint: w.blueprints.id_of("regency_t5_super_destroyer").unwrap(),
+            count: 1,
+        },
+    }]
+}
+
 /// The south's two factories.
 fn factories(w: &World) -> Vec<UnitId> {
     let bp = w.blueprints.id_of("aster_t1_land_factory").unwrap();
@@ -525,6 +571,7 @@ fn script(w: &mut World, tick: u32) -> Vec<PlayerCommand> {
             .chain(batch_on(w))
             .chain(elevator_on(w))
             .chain(regent_on(w))
+            .chain(yard_on(w))
             // The economy's focus (`focus.rs`): held in each side's state, and restored.
             .chain([PlayerCommand {
                 player: 1,
@@ -685,6 +732,14 @@ fn script(w: &mut World, tick: u32) -> Vec<PlayerCommand> {
                 },
             }]
         }
+        // The Regent all but finished, with a few hundred ticks of work left on it.
+        REGENT_NEARLY => vec![PlayerCommand {
+            player: 1,
+            command: Command::DebugSetBuild {
+                units: north_regent(w).into_iter().collect(),
+                permille: 975,
+            },
+        }],
         // A timed self-destruct still counting down when the snapshot is taken.
         t if t == SNAPSHOT_AT - 20 => vec![PlayerCommand {
             player: 1,
@@ -737,6 +792,7 @@ fn reference() -> Vec<u64> {
     let mut regent_weapons = std::collections::BTreeSet::new();
     let mut regent_guns_at_snapshot = 0;
     let mut regent_shots_after = 0;
+    let (mut aloft_at_snapshot, mut regent_done) = (false, false);
     let hashes = (1..TICKS)
         .map(|t| {
             let commands = script(&mut w, t);
@@ -767,6 +823,16 @@ fn reference() -> Vec<u64> {
                 .iter()
                 .any(|r| u.hangar[r] != mc_sim::tables::Handle::NONE && u.blueprint[r] != courier);
             wing_out |= w.state.wings.bays.values().any(|b| !b.launching.is_empty());
+            if let Some(r) = north_regent(&w).and_then(|id| w.state.units.row(id)) {
+                let u = &w.state.units;
+                regent_done |= !u.has_flag(r, flag::UNDER_CONSTRUCTION)
+                    && w.state.orders.front(u, r).is_some();
+                if t == SNAPSHOT_AT {
+                    aloft_at_snapshot = u.has_flag(r, flag::UNDER_CONSTRUCTION)
+                        && !u.has_flag(r, flag::IN_FACTORY)
+                        && u.z[r] > Fx::from_int(1000);
+                }
+            }
             if t == SNAPSHOT_AT {
                 held_at_snapshot = held;
                 let u = &w.state.units;
@@ -848,6 +914,12 @@ fn reference() -> Vec<u64> {
         })
         .collect();
     eprintln!("determinism: city {on_blocks} shots on blocks, {alight} alight, {down} down");
+    // The Regent went up aloft over its yard across the snapshot, and got under way.
+    assert!(
+        aloft_at_snapshot,
+        "no Regent was going up aloft at the snapshot"
+    );
+    assert!(regent_done, "the Regent was never finished and sent off");
     // The gravitic engine's well struck before the snapshot and holds across it.
     assert!(well_at_snapshot, "no gravity well held at the snapshot");
     // The storm bomber's clouds struck down.

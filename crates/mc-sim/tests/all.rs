@@ -93,6 +93,7 @@ mod regency_reclaim;
 mod regency_space;
 mod regency_t3_guns;
 mod regent;
+mod regent_yard;
 mod repair;
 mod repair_field;
 mod sarissa;
