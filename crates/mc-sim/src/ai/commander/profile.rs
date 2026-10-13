@@ -227,10 +227,10 @@ fn weapon_reaches(w: &Weapon, t: Target) -> bool {
     }
 }
 
-/// Damage a second of one weapon.
+/// Damage a second of one weapon: every gun of a group (`Weapon::guns`).
 fn weapon_dps(w: &Weapon) -> Fx {
     let shots = w.salvo.max(1) as i32 * w.salvo_batch.max(1) as i32;
-    w.damage * shots * TICKS_PER_SECOND as i32 / w.reload_ticks.max(1) as i32
+    w.damage * shots * TICKS_PER_SECOND as i32 / w.reload_ticks.max(1) as i32 * w.guns() as i32
 }
 
 impl Profile {

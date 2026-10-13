@@ -19,14 +19,16 @@ impl World {
             self.capital_hold(row, self.state.units.pos[target]);
             return Ok(());
         }
+        // In on the nearest of its hull: a long hull's side, not its middle a kilometre
+        // past it (`World::hull_near`).
+        let (at, half) = self.hull_near(self.state.units.pos[row], target);
         let reach = weapons
             .iter()
             .filter(|weapon| self.weapon_reaches(target, weapon))
             .map(|weapon| weapon.range_max)
             .max()
             .unwrap_or(Fx::ZERO)
-            + self.hull_radius(target);
-        let at = self.state.units.pos[target];
+            + half;
         self.capital_close_in(row, at, reach)
     }
 

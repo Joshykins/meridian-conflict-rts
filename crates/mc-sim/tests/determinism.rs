@@ -4,8 +4,9 @@
 //! blasts, two factories' linked batch forming up, a self-destruct counting down across
 //! the snapshot, city blocks shot, set alight and brought down, a space elevator's cable
 //! clamped and its first platform docked, a Fulgur raised on Repeat and its lot laid
-//! again, tanks on a bridge's deck over the sea while the fleets pass under it) must hash identically at every worker count and after a snapshot is
-//! restored mid-match.
+//! again, tanks on a bridge's deck over the sea while the fleets pass under it, the
+//! Regent's weapon groups turning and firing gun by gun) must hash identically at every
+//! worker count and after a snapshot is restored mid-match.
 //!
 //! `battle.rs` covers a land-only battle the same way; this is the one to extend
 //! when a new domain or system arrives (CLAUDE.md, section 3).
@@ -28,7 +29,9 @@ use std::sync::Arc;
 /// (`decks.rs`) runs out from the shore over the sea across the middle, 20 m over the water.
 const CELLS: u32 = 512;
 const SHORE_CELL: usize = 200;
-const TICKS: u32 = 550;
+/// Long enough for the fleets to close and meet torpedoes with interceptors, which they do
+/// late: the Regent overhead draws their guns first.
+const TICKS: u32 = 700;
 const SNAPSHOT_AT: u32 = 250;
 
 fn terrain() -> Heightfield {
@@ -276,6 +279,21 @@ fn setup(w: &mut World) {
             }
         }
     }
+    // The Regent off the south's coast, nose north: two of its weapon groups, its ventral
+    // lances' held beams and its keel guns' salvos, shell a point at sea ahead to starboard
+    // gun by gun (`mounts.rs`), across the snapshot.
+    spawns.push(PlayerCommand {
+        player: 0,
+        command: Command::DebugSpawn {
+            owner: 0,
+            blueprint: w.blueprints.id_of(REGENT).unwrap(),
+            pos: REGENT_AT,
+            heading: Angle::from_degrees(90),
+            count: 1,
+            flags: 0,
+            build: 1000,
+        },
+    });
     // A wreck field where the warhead lands: the blast wears it down (`wreck_damage.rs`).
     spawns.push(PlayerCommand {
         player: 0,
@@ -305,6 +323,41 @@ const GUNNER: (i32, i32) = (300, 1000);
 /// Where the south's engineer raises a Fulgur on Repeat (`site_repeat.rs`).
 const REPEAT_LOT: (i32, i32) = (180, 800);
 const FULGUR: &str = "aster_t4_assault_tank";
+
+/// The Regent, where it hangs, and the point at sea ahead to starboard it shells, holding
+/// its fire for anything else (its groups' guns that take the ground and bear on it).
+const REGENT: &str = "regency_t5_super_destroyer";
+const REGENT_AT: FxVec2 = FxVec2::from_ints(3600, 1700);
+const REGENT_MARK: FxVec2 = FxVec2::from_ints(3950, 2800);
+
+/// The Regent's orders, after the tick-1 attack-move: hold fire, and shell `REGENT_MARK`.
+fn regent_on(w: &World) -> Vec<PlayerCommand> {
+    let bp = w.blueprints.id_of(REGENT).unwrap();
+    let u = &w.state.units;
+    let units: Vec<UnitId> = u
+        .slots
+        .iter()
+        .filter(|&r| u.blueprint[r] == bp)
+        .map(|r| u.id(r))
+        .collect();
+    vec![
+        PlayerCommand {
+            player: 0,
+            command: Command::SetFireState {
+                units: units.clone(),
+                state: mc_sim::FireState::HoldFire,
+            },
+        },
+        PlayerCommand {
+            player: 0,
+            command: Command::AttackGround {
+                units,
+                pos: REGENT_MARK,
+                queue: false,
+            },
+        },
+    ]
+}
 
 /// Where the warhead lands, and a field of wrecks lies.
 const WRECK_FIELD: FxVec2 = FxVec2::from_ints(900, 3300);
@@ -471,6 +524,7 @@ fn script(w: &mut World, tick: u32) -> Vec<PlayerCommand> {
             })
             .chain(batch_on(w))
             .chain(elevator_on(w))
+            .chain(regent_on(w))
             // The economy's focus (`focus.rs`): held in each side's state, and restored.
             .chain([PlayerCommand {
                 player: 1,
@@ -678,6 +732,11 @@ fn reference() -> Vec<u64> {
     let mut lanced = 0;
     let fulgur = w.blueprints.id_of(FULGUR).unwrap();
     let mut relaid = false;
+    let regent = w.blueprints.id_of(REGENT).unwrap();
+    let mut regent_guns = std::collections::BTreeSet::new();
+    let mut regent_weapons = std::collections::BTreeSet::new();
+    let mut regent_guns_at_snapshot = 0;
+    let mut regent_shots_after = 0;
     let hashes = (1..TICKS)
         .map(|t| {
             let commands = script(&mut w, t);
@@ -750,6 +809,24 @@ fn reference() -> Vec<u64> {
                 }
             }
             surging += usize::from(!w.state.surges.is_empty());
+            for e in &w.events {
+                if let mc_sim::SimEvent::ShotFired {
+                    blueprint,
+                    weapon,
+                    gun,
+                    ..
+                } = e
+                {
+                    if *blueprint == regent {
+                        regent_guns.insert(*gun);
+                        regent_weapons.insert(*weapon);
+                        regent_shots_after += usize::from(t > SNAPSHOT_AT);
+                    }
+                }
+            }
+            if t == SNAPSHOT_AT {
+                regent_guns_at_snapshot = regent_guns.len();
+            }
             // A finished Fulgur of the south's, and its lot laid again on Repeat.
             let u = &w.state.units;
             let of_south = |r: usize| u.owner[r] == 0 && u.blueprint[r] == fulgur;
@@ -787,6 +864,15 @@ fn reference() -> Vec<u64> {
     assert!(relaid, "no lot was laid again on Repeat");
     // The Shaper's Lance struck.
     assert!(lanced > 0, "the Lance never struck");
+    // The Regent's groups fired gun by gun on both sides of the snapshot.
+    assert!(
+        regent_weapons.len() >= 2 && regent_guns_at_snapshot >= 8,
+        "the Regent's groups: weapons {regent_weapons:?}, {regent_guns_at_snapshot} guns by the snapshot"
+    );
+    assert!(
+        regent_shots_after > 0,
+        "the Regent's guns never fired after the snapshot: {regent_guns:?}"
+    );
     // A surge shell landed and its wake rolled out.
     assert!(surging > 0, "no surge shell's wake rolled out");
     // The elevator's first platform brought its queue down after the snapshot.

@@ -43,6 +43,21 @@ impl crate::World {
         }
         from.distance(units.pos[row]) - self.hull_radius(row)
     }
+
+    /// The middle of `row`'s hull nearest `from` (on its body's spine, `spine`), and how far
+    /// its side stands out from there: what a gun closing in on it closes on. A disc's
+    /// centre and its `hull_radius`.
+    pub(crate) fn hull_near(&self, from: FxVec2, row: usize) -> (FxVec2, Fx) {
+        let bp = self.bp(row);
+        let units = &self.state.units;
+        if bp.body.is_none() || bp.growth.is_some() {
+            return (units.pos[row], self.hull_radius(row));
+        }
+        let (a, b, half) = spine(bp, units.pos[row], units.heading[row]);
+        let d = b - a;
+        let u = ((from - a).dot(d) / d.length_sq().max(Fx::EPSILON)).clamp(Fx::ZERO, Fx::ONE);
+        (a + d * u, half)
+    }
 }
 
 /// Where along the shot `from + vel * t`, `t` in `enter..=leave`, it passes nearest the

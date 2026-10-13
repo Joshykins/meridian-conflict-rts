@@ -11,6 +11,8 @@
 
 mod guns;
 mod spear;
+#[cfg(test)]
+mod tests;
 
 use glam::{Affine3A, Vec3};
 

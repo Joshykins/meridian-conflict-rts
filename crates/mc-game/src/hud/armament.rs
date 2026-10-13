@@ -77,11 +77,13 @@ pub fn groups(weapons: &[Weapon]) -> Vec<Group<'_>> {
         .into_iter()
         .map(|s| {
             let names: Vec<&str> = s.iter().map(|w| w.name.as_str()).collect();
+            // A weapon group's guns count one each (`Weapon::guns`).
+            let count = s.iter().map(|w| w.guns()).sum::<usize>();
             Group {
                 weapon: s[0],
-                count: s.len(),
+                count,
                 name: shared_name(&names),
-                dps: weapon_dps(s[0]) * s.len() as f32,
+                dps: weapon_dps(s[0]) * count as f32,
             }
         })
         .collect();

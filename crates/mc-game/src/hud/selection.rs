@@ -41,15 +41,18 @@ pub fn orders_width(families: usize) -> f32 {
     families as f32 * (ORDER_W + ORDER_GAP) - ORDER_GAP + 28.0
 }
 
-/// Damage per second of one weapon. `salvo` counts every projectile of a salvo;
-/// `salvo_batch` only groups them.
+/// Damage per second of one gun of a weapon (a group's guns each fire it, `Weapon::guns`).
+/// `salvo` counts every projectile of a salvo; `salvo_batch` only groups them.
 pub fn weapon_dps(w: &Weapon) -> f32 {
     w.damage.to_f32() * w.salvo.max(1) as f32 / (w.reload_ticks.max(1) as f32 * 0.1)
 }
 
-/// Damage per second of everything a unit carries.
+/// Damage per second of everything a unit carries: every gun of every group.
 pub fn dps(bp: &UnitBlueprint) -> f32 {
-    bp.weapons.iter().map(weapon_dps).sum()
+    bp.weapons
+        .iter()
+        .map(|w| weapon_dps(w) * w.guns() as f32)
+        .sum()
 }
 
 /// A weapon's name and its figures, two to a row when drawn.

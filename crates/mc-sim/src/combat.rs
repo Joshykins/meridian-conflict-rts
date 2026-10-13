@@ -165,10 +165,6 @@ pub fn spinal_dead_zone(drop: f32, bore: f32) -> f32 {
 }
 /// Ballistic gravity, metres per tick squared. Stronger than Earth's so shells arc visibly.
 pub(crate) const GRAVITY: Fx = Fx::ratio(40, (DT * DT) as i64);
-/// Hit points an intercept laser burns off a missile each tick.
-const LASER_BITE: Fx = Fx::from_int(10);
-/// Ticks after a kill before the laser acquires another missile.
-const LASER_GAP: u16 = 3;
 
 /// A shot's aim error, angle steps across and along (or up): a point drawn evenly from a
 /// disc of radius `spread`, so the misses scatter in a circle round the aim point rather
@@ -516,8 +512,9 @@ impl World {
         let facing = units.heading[row] + units.weapon_yaw[row][w];
         let mut found = false;
         let friends = self.team_mask(units.owner[row]);
+        let reach = weapon.range_max + self.gun_offset(row, weapon);
         self.index
-            .query_foes(units.pos[row], weapon.range_max, kind::UNIT, friends, |e| {
+            .query_foes(units.pos[row], reach, kind::UNIT, friends, |e| {
                 let t = e.row as usize;
                 found = self.unit_entry_is_current(e)
                     && self.is_valid_target(row, t, weapon)
@@ -981,100 +978,7 @@ impl World {
                 })
                 .collect()
         };
-        let mut gone = vec![false; self.state.projectiles.len()];
-        let defenders: Vec<_> = self
-            .state
-            .units
-            .slots
-            .iter()
-            .filter(|&r| {
-                self.state.units.is_active(r)
-                    && self.state.units.health[r] > Fx::ZERO
-                    && self.bp(r).anti_missile > Fx::ZERO
-                    && !self.powered_down(r)
-                    && !self.state.units.has_flag(r, flag::PASSIVE)
-                    && self.state.units.fire_state[r] != FireState::HoldFire
-            })
-            .collect();
-        for r in defenders {
-            if self.state.units.intercept_cooldown[r] > 0 {
-                self.state.units.intercept_cooldown[r] -= 1;
-                continue;
-            }
-            let center = self.state.units.pos[r].extend(self.state.units.z[r]);
-            let owner = self.state.units.owner[r];
-            let radius = self.bp(r).anti_missile;
-            if self.state.players[owner as usize].efficiency <= Fx::ZERO {
-                continue;
-            }
-            // Each laser (`anti_missile_lasers`) takes a missile of its own from a mount
-            // of its own.
-            let mut lased: Vec<usize> = Vec::new();
-            let mut used: Vec<FxVec3> = Vec::new();
-            for _ in 0..self.bp(r).anti_missile_lasers {
-                // Stay on a casing already burning. Otherwise the nearest full one.
-                let mut best: Option<(usize, bool, Fx, Fx)> = None;
-                for &i in &casings {
-                    if gone[i] || lased.contains(&i) {
-                        continue;
-                    }
-                    let p = &self.state.projectiles;
-                    let w = &self.blueprints.unit(p.blueprint[i]).weapons[p.weapon[i] as usize];
-                    let max = w.casing_hp();
-                    if max <= Fx::ZERO || !self.are_enemies(owner, p.owner[i]) {
-                        continue;
-                    }
-                    let d2 = (p.pos[i] - center).length_sq();
-                    if d2 > radius * radius {
-                        continue;
-                    }
-                    let hp = if p.hp[i] > Fx::ZERO { p.hp[i] } else { max };
-                    let burning = hp < max;
-                    let take = match best {
-                        None => true,
-                        Some((_, was, best_hp, best_d)) => {
-                            (burning && !was)
-                                || (burning == was
-                                    && (hp < best_hp || (hp == best_hp && d2 < best_d)))
-                        }
-                    };
-                    if take {
-                        best = Some((i, burning, hp, d2));
-                    }
-                }
-                let Some((i, _, hp, _)) = best else {
-                    break;
-                };
-                lased.push(i);
-                let left = hp - LASER_BITE;
-                let dead = left <= Fx::ZERO;
-                let to = self.state.projectiles.pos[i];
-                // A hull with emitters of its own fires from the one nearest the missile.
-                let heading = self.state.units.heading[r];
-                let from = self
-                    .bp(r)
-                    .anti_missile_mounts
-                    .iter()
-                    .map(|m| center + m.xy().rotate(heading).extend(m.z))
-                    .filter(|at| !used.contains(at))
-                    .min_by_key(|at| (*at - to).length_sq())
-                    .unwrap_or(center);
-                used.push(from);
-                self.events.push(SimEvent::MissileLased {
-                    from,
-                    to,
-                    killed: dead,
-                    blueprint: self.state.units.blueprint[r],
-                });
-                if dead {
-                    killed.push(i);
-                    gone[i] = true;
-                    self.state.units.intercept_cooldown[r] = LASER_GAP;
-                } else {
-                    self.state.projectiles.hp[i] = left;
-                }
-            }
-        }
+        self.lase_missiles(&casings, &mut killed);
         killed.sort_unstable();
         for i in killed.into_iter().rev() {
             self.state.projectiles.swap_remove(i);

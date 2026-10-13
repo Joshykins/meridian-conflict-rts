@@ -132,11 +132,13 @@ pub(super) fn details_card(
                     mine.iter().map(|&k| rings[k].arc).collect();
                 let names: Vec<&str> = set.iter().map(|&k| bp.weapons[k].name.as_str()).collect();
                 let name = crate::hud::armament::shared_name(&names);
+                // Each gun of a weapon group counts (`Weapon::guns`): "\u{d7}12".
+                let guns = set.iter().map(|&k| bp.weapons[k].guns()).sum();
                 weapon_card(
                     ui,
                     &bp.weapons[set[0]],
                     &name,
-                    set.len(),
+                    guns,
                     r,
                     lit.max(res.glow),
                     back,

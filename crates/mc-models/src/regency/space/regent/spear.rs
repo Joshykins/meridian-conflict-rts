@@ -22,7 +22,8 @@ use super::super::body::{feather, st, Body, Station, CHINE, DECK_EDGE, SPINE};
 use super::super::dress::{drives, lifts, mark};
 use super::super::style::{self, shard, Finish};
 use super::guns::{
-    arm, spine, well, Kind, Mount, Spine, AA, AA_LANCE, LANCE, REPEATER, RONDEL, SUPPRESSION,
+    arm, guns, rondels, spines, well, Kind, Mount, Spine, AA, AA_LANCE, LANCE, REPEATER, RONDEL,
+    SUPPRESSION,
 };
 use super::{
     batteries, deck, horns, keel_guns, plates, pocketed, row, terrace, tier_tops, Block, Courses,
@@ -64,7 +65,7 @@ const BATTERIES: [f32; 6] = [1350.0, 1180.0, 1010.0, 840.0, 700.0, 560.0];
 /// The tail's vertebrae: each a bulge plated in a chevron, a lit notch behind it.
 const VERTEBRAE: [f32; 3] = [-300.0, -500.0, -700.0];
 
-static HULL: LazyLock<Body> = LazyLock::new(|| pocketed(&STATIONS, &BATTERIES));
+pub(super) static HULL: LazyLock<Body> = LazyLock::new(|| pocketed(&STATIONS, &BATTERIES));
 
 /// A keel spike: how it hangs.
 #[derive(Clone, Copy)]
@@ -194,7 +195,7 @@ const POD_DRIVE: (Vec3, f32) = (Vec3::new(-110.0, 0.0, 52.0), 32.0);
 static PODS: LazyLock<Piece> = LazyLock::new(|| Piece::new(&POD, &[], POD_AT, 0.0));
 
 /// Every gun but the seekers: port side (drawn mirrored) and on the centreline.
-fn mounts(body: &Body) -> (Vec<Mount>, Vec<Mount>) {
+pub(super) fn mounts(body: &Body) -> (Vec<Mount>, Vec<Mount>) {
     let mut port = batteries(body, &BATTERIES);
     port.extend(row(
         body,
@@ -257,13 +258,14 @@ fn mounts(body: &Body) -> (Vec<Mount>, Vec<Mount>) {
 }
 
 /// The port arm's seeker spine on the arm's root, four cells along and eight across.
-fn seekers() -> Spine {
+pub(super) fn seekers() -> Spine {
     let at = Vec2::new(180.0, 360.0);
     let rib = rib_at(at.y + 86.0);
     let top = rib.z + rib.t * 0.5;
     Spine {
         at,
-        deck: top + 10.0,
+        // Held to a quarter metre, as a gun's pivot is: the unit file gives the cells exactly.
+        deck: ((top + 10.0) * 4.0).round() / 4.0,
         foot: top - rib.t * 0.7,
         along: 4,
         across: 8,
@@ -277,20 +279,19 @@ fn draw(b: &mut MeshBuilder) {
         return;
     }
     let (port, centre) = mounts(body);
-    let seek = seekers();
     body.hull(b);
     b.mirror_y(|b| {
         carapace(b, body);
         vertebrae(b, body);
         arm_hull(b);
         pod(b);
-        spine(b, seek);
-        arm(b, &port);
+        rondels(b, &port);
     });
+    spines(b, seekers());
     for m in &centre {
         well(b, m.pivot, LANCE * 2.3, LANCE * 0.8, m.kind == Kind::Lance);
     }
-    arm(b, &centre);
+    arm(b, &guns(&port, &centre));
     let crown = terrace(b, body, TOWER, &TOWER_TIERS);
     horns(b, TOWER, crown);
     fins(b, body);

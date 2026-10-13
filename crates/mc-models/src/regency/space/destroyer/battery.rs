@@ -28,8 +28,15 @@ const FORK_X: f32 = 3.0;
 /// Where a battery at `pivot` gathers its plasma: the port fork's gap, then starboard's.
 #[cfg(test)]
 pub(super) fn muzzles(pivot: Vec3) -> [Vec3; 2] {
-    let g = GAP * SIZE;
-    [pivot + g, pivot + v3(g.x, -g.y, g.z)]
+    gaps(SIZE).map(|g| pivot + g)
+}
+
+/// Where the ball (`house`) built at `scale` gathers its plasma off its pivot: the port
+/// fork's gap, then starboard's.
+#[cfg(test)]
+pub(in crate::regency::space) fn gaps(scale: f32) -> [Vec3; 2] {
+    let g = GAP * scale;
+    [g, v3(g.x, -g.y, g.z)]
 }
 
 /// A battery bound to `weapon`, its ball turning and pitching about `pivot`.
