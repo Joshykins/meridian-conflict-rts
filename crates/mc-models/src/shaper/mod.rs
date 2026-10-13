@@ -61,6 +61,23 @@ pub const fn reach(kind: u8, level: u16) -> f32 {
     }
 }
 
+/// Metres over a Shaper's foot of the middle of its Lens, where its Lance charges and
+/// strikes from, `height` metres tall as built, by `kind` (`ShaperInstance::kind`): the
+/// printer's on its core's head (printer.rs), a Seedcaster's under its bore and an
+/// Unmaker's under its silo crown (auxiliary.rs). The renderer's hard light and the
+/// game's sounds put the Lens here.
+pub fn lens_height(kind: u8, height: f32) -> f32 {
+    let h = height.max(20.0);
+    match kind {
+        // h * 0.86 less a fifth of the Lens's height (its reach left out: a few metres).
+        0 => 0.844 * h - 1.2,
+        // Under the bore: h less the crown (0.12 h + 6) and half the Lens (0.05 h + 4).
+        1 => 0.83 * h - 10.0,
+        // Under the silo crown (0.07 h + 4).
+        _ => 0.88 * h - 8.0,
+    }
+}
+
 /// Which of [`STAGE_LEVELS`] a Shaper of `level` is drawn with: the last it has reached.
 pub fn stage(level: u16) -> usize {
     STAGE_LEVELS

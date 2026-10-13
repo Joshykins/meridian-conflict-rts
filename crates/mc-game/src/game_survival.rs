@@ -243,7 +243,8 @@ impl Game {
                 let Some(u) = frame.units.iter().find(|u| u.unit_id == s.unit) else {
                     continue;
                 };
-                let lens = Vec3::from(u.pos) + Vec3::Z * s.lens_height();
+                let lens = Vec3::from(u.pos)
+                    + Vec3::Z * mc_render::models::shaper::lens_height(s.kind, s.height);
                 let (gain, pan) = self.hear(lens);
                 let gain = gain * (0.35 + 0.65 * s.lance_charge);
                 sum = (sum.0 + gain * gain, sum.1 + gain * gain * pan);

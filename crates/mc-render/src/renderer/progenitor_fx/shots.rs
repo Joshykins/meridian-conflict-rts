@@ -153,7 +153,8 @@ impl Stage {
             "shell" => Vec3::from(self.shell().at(t / 6.0)),
             // Along the Lance's beam, two thirds of the way down.
             "lance" => {
-                let lens = self.site + Vec3::Z * shaper_height(self.level()).to_f32() * 0.86;
+                let h = shaper_height(self.level()).to_f32();
+                let lens = self.site + Vec3::Z * crate::models::shaper::lens_height(0, h);
                 lens.lerp(self.target, 0.66)
             }
             _ => self.warhead_at(t),
@@ -426,7 +427,7 @@ fn progenitor_shots() {
                     tank_bp: id("aster_t1_tank"),
                 };
                 let height = shaper_height(stage.level()).to_f32();
-                let lens = height * 0.86;
+                let lens = crate::models::shaper::lens_height(0, height);
                 let mid = stage.site.lerp(stage.target, 0.5);
                 // Looking across from the side: (focus, distance, yaw, pitch).
                 let (times, focus, dist, pitch): (Vec<f32>, Vec3, f32, f32) = match staged.as_str()

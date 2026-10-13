@@ -269,9 +269,10 @@ impl ProgenitorFx {
     }
 }
 
-/// Where a Shaper's Lens is, `foot` the ground it stands on (`ShaperInstance::lens_height`).
+/// Where a Shaper's Lens is, `foot` the ground it stands on (its model's,
+/// `models::shaper::lens_height`).
 pub(super) fn lens_of(s: &ShaperInstance, foot: Vec3) -> Vec3 {
-    foot + Vec3::Z * s.lens_height()
+    foot + Vec3::Z * crate::models::shaper::lens_height(s.kind, s.height)
 }
 
 /// Its tier as drawn: past the sixth the pieces stop multiplying and only grow brighter.

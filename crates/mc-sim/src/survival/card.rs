@@ -48,25 +48,6 @@ pub struct ShaperInstance {
     pub foot: f32,
 }
 
-#[expect(
-    clippy::float_arithmetic,
-    clippy::disallowed_types,
-    reason = "presentation: where the renderer and the sounds put its Lens"
-)]
-impl ShaperInstance {
-    /// Metres over its foot of its Lens, where its Lance charges and strikes from: near
-    /// the top of what is built so far (a printing Shaper's braced blades carry it at
-    /// 0.86 of their height, an auxiliary's spire at 0.92).
-    pub fn lens_height(&self) -> f32 {
-        let share = if self.kind == SiteKind::Printer as u8 {
-            0.86
-        } else {
-            0.92
-        };
-        self.height.max(20.0) * share
-    }
-}
-
 /// A piece of a Shaper's base, for the card and the interface.
 #[derive(Clone, Copy, Debug)]
 pub struct PieceView {
