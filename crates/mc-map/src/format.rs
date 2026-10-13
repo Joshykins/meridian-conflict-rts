@@ -391,6 +391,17 @@ pub enum PropKind {
     /// The colony's operations tower, stepped blocks under a glazed cab, behind its
     /// annex on the street; 44 m.
     ColonyTower = 134,
+    /// A landing pad for shuttles: an octagon half a metre up on sloped edges, its
+    /// markings, rim lights and lamps; 64 by 64 m. Scenery: nothing hits it.
+    ColonyPad = 135,
+    /// A spaceport's terminal with its control cab; 48 by 28 m, the cab 26 m up.
+    ColonyPortControl = 136,
+    /// A hangar for small craft: a heavy box, its doors the width of its front in a
+    /// deep portal; 64 by 48 m.
+    ColonyHangar = 137,
+    /// The way into a dig: a heavy hall over the pit, its lift tower and spoil heap;
+    /// 48 by 40 m. The quarry round it is the map's own ground.
+    ColonyDig = 138,
     /// The Progenitor's second range (the first is full).
     /// A hard-light bridge (`crate::landmark::HARDLIGHT_BRIDGE`): its deck from the
     /// origin along +x, its walking surface at the origin's height, which the map
@@ -400,7 +411,7 @@ pub enum PropKind {
 }
 
 impl PropKind {
-    pub const ALL: [PropKind; 93] = [
+    pub const ALL: [PropKind; 97] = [
         PropKind::TreeBroadleaf,
         PropKind::TreeConifer,
         PropKind::TreePine,
@@ -493,6 +504,10 @@ impl PropKind {
         PropKind::ColonyHabStack,
         PropKind::ColonyDepot,
         PropKind::ColonyTower,
+        PropKind::ColonyPad,
+        PropKind::ColonyPortControl,
+        PropKind::ColonyHangar,
+        PropKind::ColonyDig,
         PropKind::PrecursorBridge,
     ];
 

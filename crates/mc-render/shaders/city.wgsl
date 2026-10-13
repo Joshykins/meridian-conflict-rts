@@ -890,6 +890,31 @@ fn city_plain(i: CityIn) -> CityLook {
         let rgb = select(city_prefab_rgb(city_hash(i.inst, 2.0)), city_accent_rgb(city_hash(i.inst, 15.0)), p == CITY_ACCENT);
         o.albedo = city_wall(CITY_FINISH_PREFAB, rgb, st, i.local, i.px, i.inst);
         o.roughness = 0.7;
+    } else if p == CITY_PAD {
+        // Slabs 4 m square; the ring and the cross by the face's own frame, so the
+        // marks centre on the pad whatever its size.
+        let half = min(abs(i.face.z), abs(i.face.w));
+        let q = i.face.xy;
+        let fw = fwidth(st);
+        var c = vec3<f32>(0.36, 0.355, 0.34) * (1.0 + 0.3 * broad);
+        c *= 1.0 + 0.06 * (hash21(floor(st / 4.0) + vec2<f32>(i.inst * 7.0)) - 0.5);
+        let joint = max(city_lines(st.x, 0.02, 4.0, fw.x), city_lines(st.y, 0.02, 4.0, fw.y));
+        c *= 1.0 - 0.35 * joint;
+        let r = length(q);
+        let ring = city_box(r - half * 0.62, 0.5, i.px);
+        let inner = city_box(r - half * 0.62 + 1.1, 0.12, i.px);
+        let cross = max(city_box(q.x, 0.35, i.px) * step(abs(q.y), half * 0.2),
+            city_box(q.y, 0.35, i.px) * step(abs(q.x), half * 0.2));
+        let edge = max(city_box(abs(i.face.z) - abs(q.x) - 0.9, 0.2, i.px), city_box(abs(i.face.w) - abs(q.y) - 0.9, 0.2, i.px))
+            * step(abs(q.x), abs(i.face.z) - 0.6) * step(abs(q.y), abs(i.face.w) - 0.6);
+        let wear = 0.75 + 0.25 * smoothstep(0.3, 0.7, surf_noise3(i.local * 0.4 + i.inst * 3.0));
+        c = mix(c, vec3<f32>(0.7, 0.5, 0.1), ring * wear);
+        c = mix(c, vec3<f32>(0.72, 0.72, 0.68), max(max(inner, cross), edge) * wear);
+        // Scorch from engines at the middle.
+        let burn = (1.0 - smoothstep(0.0, half * 0.5, r)) * (0.6 + 0.4 * surf_noise3(i.local * 0.3));
+        c = mix(c, vec3<f32>(0.05, 0.045, 0.04), 0.65 * burn);
+        o.albedo = c;
+        o.roughness = 0.9;
     } else if p == CITY_TRIM {
         // Dark moulded composite: a faint grain, a sheen, scuffed pale at its edges.
         var c = vec3<f32>(0.07, 0.075, 0.08) * (1.0 + 0.5 * broad);

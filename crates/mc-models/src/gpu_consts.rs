@@ -436,6 +436,9 @@ shared! {
         pub const ACCENT: u32 = 90;
         /// Dark composite trim: bands, skirts, frames, the recesses between modules.
         pub const TRIM: u32 = 91;
+        /// A landing pad's deck, on a level face: concrete slabs, a painted ring and a
+        /// cross at the face's middle, a line round its edge, engine scorch at the centre.
+        pub const PAD: u32 = 92;
         /// A facade pattern plus this: the same wall in the same finish, no windows (a
         /// gable, the pier beside a door, a stair tower's blind face).
         pub const BLANK: u32 = 100;

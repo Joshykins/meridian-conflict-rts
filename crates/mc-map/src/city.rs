@@ -242,6 +242,17 @@ pub const fn structure(kind: PropKind) -> Option<Structure> {
             60,
             true,
         ),
+        ColonyPad => s("colony_pad", &[], &[], 0, 0, false),
+        ColonyPortControl => s(
+            "colony_port_control",
+            &[(-6, 0, 18, 14), (18, 0, 6, 8)],
+            &[9, 26],
+            6_000,
+            90,
+            true,
+        ),
+        ColonyHangar => s("colony_hangar", &[(0, 0, 32, 24)], &[19], 9_000, 20, true),
+        ColonyDig => s("colony_dig", &[(0, 0, 24, 20)], &[22], 10_000, 10, false),
         _ => return None,
     })
 }

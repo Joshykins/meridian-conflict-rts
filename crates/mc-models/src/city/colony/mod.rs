@@ -14,7 +14,11 @@ use crate::gpu_consts::city as pat;
 use crate::library::ModelDef;
 
 mod depot;
+mod dig;
 mod hab;
+mod hangar;
+mod pad;
+mod port;
 mod stack;
 mod tower;
 
@@ -23,6 +27,14 @@ pub(crate) const MODELS: &[ModelDef] = &[
     def("colony_hab_stack", PropKind::ColonyHabStack, stack::stack),
     def("colony_depot", PropKind::ColonyDepot, depot::depot),
     def("colony_tower", PropKind::ColonyTower, tower::tower),
+    def("colony_pad", PropKind::ColonyPad, pad::pad),
+    def(
+        "colony_port_control",
+        PropKind::ColonyPortControl,
+        port::port,
+    ),
+    def("colony_hangar", PropKind::ColonyHangar, hangar::hangar),
+    def("colony_dig", PropKind::ColonyDig, dig::dig),
 ];
 
 /// The outline of `r` at height `z` with its upright corners cut back `cut` metres in
@@ -152,7 +164,7 @@ fn recess(
     let inner = r.grow(-inset);
     let icut = (cut - inset * 0.4).max(0.0);
     cut_walls(b, inner, icut, steps, z0, z1, all(pattern), pattern);
-    if b.mid() {
+    if b.fine() {
         let o0 = cut_ring(r, cut, steps, z0);
         let i0 = cut_ring(inner, icut, steps, z0);
         ring_ledge(b, &i0, &o0, true, pattern);
@@ -289,4 +301,74 @@ fn hood(
         Side::Front | Side::Back => b.extrude_x(&profile, a0, a1),
         Side::East | Side::West => b.extrude_y(&profile, a0, a1),
     });
+}
+
+/// A glazed cab, its glass canted out from `lo` at `z0` to `hi` at `z1`, under a heavy
+/// brim and a flat roof; the roof's height.
+fn canted_cab(b: &mut MeshBuilder, lo: Rect, z0: f32, hi: Rect, z1: f32, cut: f32) -> f32 {
+    ring_walls(
+        b,
+        &cut_ring(lo, cut, 1, z0),
+        &cut_ring(hi, cut + 0.6, 1, z1),
+        1,
+        all(pat::HAB_BAND),
+        pat::TRIM,
+    );
+    let brim = hi.grow(0.4);
+    let lid = hi.grow(-2.0);
+    let roof = z1 + 1.8;
+    paint(b, pat::PREFAB);
+    b.loft(
+        &[
+            cut_ring(hi, cut + 0.6, 1, z1),
+            cut_ring(brim, cut + 0.8, 1, z1 + 0.2),
+            cut_ring(brim, cut + 0.8, 1, z1 + 0.9),
+            cut_ring(lid, cut, 1, roof),
+        ],
+        false,
+        false,
+    );
+    deck(b, lid, roof, pat::ROOF_FLAT);
+    roof
+}
+
+/// A lamp mast from `at` up `h`: a pole and a lamp head lit by the surface. Full
+/// detail.
+fn lamp_mast(b: &mut MeshBuilder, at: Vec3, h: f32) {
+    if !b.fine() {
+        return;
+    }
+    paint(b, pat::STEEL);
+    b.beam(at, at + Vec3::Z * h, Vec2::splat(0.3), Vec2::splat(0.18));
+    boxed(
+        b,
+        at + v3(-0.6, -0.35, h - 0.5),
+        at + v3(0.6, 0.35, h),
+        pat::LED,
+    );
+}
+
+/// A heap of spoil round `at`, `r` across and `h` high, its outline rough.
+fn spoil(b: &mut MeshBuilder, at: Vec3, r: Vec2, h: f32, seed: u32) {
+    let n = if b.fine() { 14 } else { 7 };
+    let ring = |k: f32, z: f32| -> Vec<Vec3> {
+        (0..n)
+            .map(|i| {
+                let a = i as f32 / n as f32 * std::f32::consts::TAU;
+                let wob = 0.85 + 0.3 * crate::builder::hash_unit(seed, i as u32);
+                at + v3(a.cos() * r.x * k * wob, a.sin() * r.y * k * wob, z)
+            })
+            .collect()
+    };
+    paint(b, pat::RUBBLE);
+    b.loft(
+        &[
+            ring(1.0, -1.0),
+            ring(0.75, h * 0.45),
+            ring(0.35, h * 0.85),
+            ring(0.08, h),
+        ],
+        false,
+        true,
+    );
 }

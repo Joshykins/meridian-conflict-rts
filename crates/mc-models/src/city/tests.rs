@@ -11,8 +11,10 @@ fn city_kinds() -> impl Iterator<Item = PropKind> {
 
 /// The kind a catalogue key is the model of.
 fn kind_of(key: &str) -> PropKind {
+    // A design variant (`mesh~name`) is built to its mesh's numbers.
+    let base = key.split('~').next().unwrap_or(key);
     city_kinds()
-        .find(|k| structure(*k).is_some_and(|s| s.model == key))
+        .find(|k| structure(*k).is_some_and(|s| s.model == base))
         .unwrap_or_else(|| panic!("{key} is no city kind's model"))
 }
 

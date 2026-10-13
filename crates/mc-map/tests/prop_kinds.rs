@@ -103,6 +103,10 @@ fn every_kind() -> Vec<PropKind> {
         ColonyHabStack,
         ColonyDepot,
         ColonyTower,
+        ColonyPad,
+        ColonyPortControl,
+        ColonyHangar,
+        ColonyDig,
     ];
     for kind in &all {
         match kind {
@@ -124,7 +128,8 @@ fn every_kind() -> Vec<PropKind> {
             | CityWallTower | CityGate | CityRubble | CityStreetLight | CityTransit
             | CityTransitStation | CityBillboard | CityCar | CityBarricade | CityWindTurbine
             | CitySolarArray | CityMast | CityMonument | ColonyHab | ColonyHabStack
-            | ColonyDepot | ColonyTower => {}
+            | ColonyDepot | ColonyTower | ColonyPad | ColonyPortControl | ColonyHangar
+            | ColonyDig => {}
         }
     }
     all
