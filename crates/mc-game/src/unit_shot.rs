@@ -395,9 +395,15 @@ fn hide_staged(map: &MapFile, frame: &mut RenderFrame, keep: Option<usize>) {
     frame
         .props_dead
         .resize((first + PropKind::ALL.len()).div_ceil(32), 0);
-    for i in (0..PropKind::ALL.len()).filter(|&i| Some(i) != keep) {
+    // Each bit set or cleared outright: a prop shot calls this twice, every prop
+    // hidden and then its own shown.
+    for i in 0..PropKind::ALL.len() {
         let bit = first + i;
-        frame.props_dead[bit / 32] |= 1 << (bit % 32);
+        if Some(i) == keep {
+            frame.props_dead[bit / 32] &= !(1 << (bit % 32));
+        } else {
+            frame.props_dead[bit / 32] |= 1 << (bit % 32);
+        }
     }
 }
 
