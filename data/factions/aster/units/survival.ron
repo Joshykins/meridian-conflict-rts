@@ -250,7 +250,7 @@
     ),
     // A Shaper's base (mc-sim survival/base.rs): raised round it as it grows, unravelled
     // when it dies. Units print on a platform's deck: only a pier at its middle blocks.
-    // The meshes are placeholders until the base has its own models.
+    // Their meshes: mc-models shaper/base.rs.
     (
         key: "progenitor_platform",
         name: "Print Platform",
@@ -262,7 +262,7 @@
         radius: 48, height: 3, footprint: (8, 8),
         hull: (4, 4),
         vision: 200,
-        mesh: "precursor_floor", icon: Factory,
+        mesh: "progenitor_platform", icon: Factory,
         lights: [],
         sounds: (death: "blast_large"),
     ),
@@ -277,7 +277,7 @@
         radius: 96, height: 4, footprint: (16, 16),
         hull: (6, 6),
         vision: 200,
-        mesh: "precursor_floor", icon: Factory,
+        mesh: "progenitor_platform_great", icon: Factory,
         lights: [],
         sounds: (death: "blast_large"),
     ),
@@ -293,7 +293,7 @@
         hull: (4, 4),
         water_build: true,
         vision: 200,
-        mesh: "precursor_floor", icon: Factory,
+        mesh: "progenitor_slip", icon: Factory,
         lights: [],
         sounds: (death: "blast_large"),
     ),
@@ -309,7 +309,7 @@
         hull: (6, 6),
         water_build: true,
         vision: 200,
-        mesh: "precursor_floor", icon: Factory,
+        mesh: "progenitor_slip_great", icon: Factory,
         lights: [],
         sounds: (death: "blast_large"),
     ),
@@ -325,7 +325,7 @@
         radius: 14, height: 40, footprint: (3, 3),
         water_build: true,
         vision: 200,
-        mesh: "precursor_pylon", icon: Shield,
+        mesh: "progenitor_pylon", icon: Shield,
         lights: [],
         sounds: (death: "blast_large"),
     ),

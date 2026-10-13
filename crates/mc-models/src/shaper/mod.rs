@@ -9,6 +9,9 @@
 //!   Gatewright (`progenitor_gatewright`, fleets) wears the Seedcaster's spire until its
 //!   own crown is chosen (`stage_set`).
 //!
+//! Round them stand the pieces of their bases (`base.rs`): print platforms and slips,
+//! shield pylons.
+//!
 //! Every one carries its anti-nuke as the halo round its Lens (`halo.rs`), a blade to an
 //! interceptor held.
 //!
@@ -147,11 +150,12 @@ pub fn stage_keys(kind: u8) -> &'static [&'static str; STAGES] {
     }
 }
 
-pub(super) const MODELS: [&[ModelDef]; 4] = [
+pub(super) const MODELS: [&[ModelDef]; 5] = [
     &[auxiliary::SILO],
     &printer::MODELS,
     &auxiliary::ARTILLERY_MODELS,
     &auxiliary::NUKE_MODELS,
+    &base::MODELS,
 ];
 
 /// How far a Shaper has grown, as its meshes are drawn.
@@ -190,6 +194,7 @@ macro_rules! stage_set {
 }
 
 mod auxiliary;
+mod base;
 mod halo;
 mod kit;
 mod printer;
@@ -199,7 +204,10 @@ mod printer;
 /// across the map, so its reduced level keeps its rings.
 #[cfg(test)]
 pub(super) fn budget(key: &str) -> Option<(usize, f32, usize)> {
-    if key.starts_with("replication_node") {
+    if base::MODELS.iter().any(|m| m.key == key) {
+        // A base piece (`base.rs`): a great platform is 190 m across.
+        Some((700, 0.8, 9_000))
+    } else if key.starts_with("replication_node") {
         // Its halo hangs a blade to each interceptor even far off: the stock reads.
         Some((2_000, 0.56, 12_000))
     } else if key.starts_with("progenitor_seedcaster") || key.starts_with("progenitor_unmaker") {
