@@ -649,6 +649,7 @@ fn meshes_are_valid() {
                     "precursor_",
                     "landmark_",
                     "city_",
+                    "colony_",
                 ]
                 .iter()
                 .any(|family| model.key.starts_with(family));

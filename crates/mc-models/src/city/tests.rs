@@ -2,7 +2,6 @@ use glam::Vec3;
 use mc_map::city::structure;
 use mc_map::PropKind;
 
-use super::MODELS;
 use crate::gpu_consts::city as pat;
 use crate::{build_model, material, prop_model_key, Model};
 
@@ -24,6 +23,8 @@ fn pattern(v: &crate::MeshVertex) -> u32 {
 /// Glass the shader can break: windows, shopfronts, curtain walls, glass roofs.
 fn glazed(p: u32) -> bool {
     (pat::HOUSE..=pat::ARCHED).contains(&p)
+        || p == pat::HAB
+        || p == pat::HAB_BAND
         || p == pat::ROOF_GLASS
         || p == pat::SHOP
         || p == pat::LOBBY
@@ -34,7 +35,7 @@ fn every_city_kind_has_its_model() {
     for kind in city_kinds() {
         let key = prop_model_key(kind.raw());
         assert_eq!(key, structure(kind).unwrap().model);
-        assert!(MODELS.iter().any(|d| d.key == key), "{key} is in the kit");
+        assert!(super::models().any(|d| d.key == key), "{key} is in the kit");
         assert!(build_model(key).is_some(), "{key} builds");
     }
 }
@@ -44,7 +45,7 @@ fn every_city_kind_has_its_model() {
 /// wall rises past the highest top (only spires, masts and crowns may).
 #[test]
 fn city_models_keep_to_their_plans() {
-    for def in MODELS {
+    for def in super::models() {
         let kind = kind_of(def.key);
         let s = structure(kind).unwrap();
         let model = build_model(def.key).unwrap();
@@ -145,7 +146,7 @@ fn overhang(kind: PropKind) -> f32 {
 /// Glass where the city's numbers say there is glazing, none where they say none.
 #[test]
 fn glazing_follows_the_numbers() {
-    for def in MODELS {
+    for def in super::models() {
         let s = structure(kind_of(def.key)).unwrap();
         let model: Model = build_model(def.key).unwrap();
         let glass = model
@@ -164,7 +165,7 @@ fn glazing_follows_the_numbers() {
 /// Every city face is the shader's: city concrete with a city pattern (lamps aside).
 #[test]
 fn city_faces_carry_city_patterns() {
-    for def in MODELS {
+    for def in super::models() {
         let model = build_model(def.key).unwrap();
         for lod in model.lods.iter().chain(&model.far) {
             for v in &lod.vertices {
@@ -192,7 +193,7 @@ fn city_faces_carry_city_patterns() {
 /// The far level, for a structure a few pixels across, is cheaper than the coarse one.
 #[test]
 fn city_far_levels_are_cheaper() {
-    for def in MODELS {
+    for def in super::models() {
         let model = build_model(def.key).unwrap();
         let far = model.far.as_ref().expect("a far level");
         let coarse = model.lods[2].indices.len() / 3;

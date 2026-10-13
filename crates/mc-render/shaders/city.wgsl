@@ -63,6 +63,7 @@ const CITY_FINISH_BRICK: u32 = 1u;
 const CITY_FINISH_STONE: u32 = 2u;
 const CITY_FINISH_CONCRETE: u32 = 3u;
 const CITY_FINISH_SHEET: u32 = 4u;
+const CITY_FINISH_PREFAB: u32 = 5u;
 
 fn city_hash(inst: f32, salt: f32) -> f32 {
     return hash11(inst * 913.7 + salt * 17.31);
@@ -121,9 +122,37 @@ fn city_sheet_rgb(pick: f32) -> vec3<f32> {
     return c;
 }
 
+// A colony's prefab cladding, as shipped: off-white, pale grey, buff, a pale
+// blue-grey, sand, a mid grey.
+fn city_prefab_rgb(pick: f32) -> vec3<f32> {
+    let i = u32(pick * 7.0);
+    var c = vec3<f32>(0.7, 0.69, 0.66);
+    if i == 1u { c = vec3<f32>(0.58, 0.59, 0.58); }
+    if i == 2u { c = vec3<f32>(0.64, 0.6, 0.52); }
+    if i == 3u { c = vec3<f32>(0.52, 0.57, 0.6); }
+    if i == 4u { c = vec3<f32>(0.62, 0.57, 0.47); }
+    if i == 5u { c = vec3<f32>(0.44, 0.45, 0.45); }
+    if i >= 6u { c = vec3<f32>(0.74, 0.73, 0.7); }
+    return c;
+}
+
+// A colony's accent paint, faded by sun and salt: orange, teal, ochre, colony
+// blue, oxide red, olive.
+fn city_accent_rgb(pick: f32) -> vec3<f32> {
+    let i = u32(pick * 6.0);
+    var c = vec3<f32>(0.6, 0.27, 0.09);
+    if i == 1u { c = vec3<f32>(0.1, 0.33, 0.35); }
+    if i == 2u { c = vec3<f32>(0.62, 0.46, 0.13); }
+    if i == 3u { c = vec3<f32>(0.13, 0.22, 0.38); }
+    if i == 4u { c = vec3<f32>(0.42, 0.13, 0.09); }
+    if i >= 5u { c = vec3<f32>(0.28, 0.32, 0.19); }
+    return c;
+}
+
 // Which finish a facade of `pattern` is on this instance.
 fn city_finish_of(pattern: u32, inst: f32) -> u32 {
     let h = city_hash(inst, 1.0);
+    if pattern == CITY_PREFAB || pattern == CITY_HAB || pattern == CITY_HAB_BAND { return CITY_FINISH_PREFAB; }
     if pattern == CITY_RENDER { return CITY_FINISH_RENDER; }
     if pattern == CITY_BRICK { return CITY_FINISH_BRICK; }
     if pattern == CITY_STONE || pattern == CITY_ARCHED || pattern == CITY_LOBBY { return CITY_FINISH_STONE; }
@@ -157,6 +186,7 @@ fn city_finish_rgb(finish: u32, inst: f32) -> vec3<f32> {
     if finish == CITY_FINISH_STONE { return city_stone_rgb(pick); }
     if finish == CITY_FINISH_CONCRETE { return city_concrete_rgb(pick); }
     if finish == CITY_FINISH_SHEET { return city_sheet_rgb(pick); }
+    if finish == CITY_FINISH_PREFAB { return city_prefab_rgb(pick); }
     return city_render_rgb(pick);
 }
 
@@ -184,6 +214,25 @@ fn city_lines_integral(x: f32, w: f32, period: f32) -> f32 {
 fn city_lines(x: f32, w: f32, period: f32, fw: f32) -> f32 {
     let h = max(fw, 1e-4) * 0.6;
     return clamp((city_lines_integral(x + h, w, period) - city_lines_integral(x - h, w, period)) / (2.0 * h), 0.0, 1.0);
+}
+
+// Prefab cladding on `rgb` at `st` (metres on the wall): factory panels 1.2 m wide and
+// 1.5 m tall, each its own shade of the batch, a dark seam round each and a fixing
+// near each corner.
+fn city_prefab_panels(rgb: vec3<f32>, st: vec2<f32>, px: f32, inst: f32) -> vec3<f32> {
+    var c = rgb;
+    let size = vec2<f32>(1.2, 1.5);
+    let fw = fwidth(st);
+    let vis = surf_resolved(0.2, px);
+    let id = floor(st / size);
+    c *= 1.0 + 0.09 * (hash21(id + vec2<f32>(inst * 41.0)) - 0.5) * vis;
+    let seam = max(city_lines(st.x, 0.025, size.x, fw.x), city_lines(st.y, 0.025, size.y, fw.y));
+    c *= 1.0 - 0.45 * seam;
+    let inp = fract(st / size) * size;
+    let corner = min(inp, size - inp);
+    let fixing = length(corner - vec2<f32>(0.09));
+    c *= 1.0 - 0.3 * clamp((0.025 - fixing) / max(px, 1e-5) + 0.5, 0.0, 1.0) * surf_resolved(0.05, px);
+    return c;
 }
 
 // A wall's own texture at `st` (metres on the wall: x along, y up), on `rgb`.
@@ -223,6 +272,8 @@ fn city_wall(finish: u32, rgb: vec3<f32>, st: vec2<f32>, local: vec3<f32>, px: f
         let rib = fract(st.x / 0.25);
         let vis = surf_resolved(0.25, px);
         c *= 1.0 - 0.22 * vis * smoothstep(0.35, 0.5, abs(rib - 0.5));
+    } else if finish == CITY_FINISH_PREFAB {
+        c = city_prefab_panels(c, st, px, inst);
     } else {
         // Render: smooth, a little blotchy where it was patched.
         let patched = smoothstep(0.55, 0.75, surf_noise3(local * 0.35 + vec3<f32>(inst * 50.0)));
@@ -380,6 +431,10 @@ fn city_grid(p: u32) -> CityGrid {
         g = CityGrid(1000.0, CITY_SHED_BAY, 0.92, CITY_SHED_SILL, CITY_SHED_HEAD, f32(CITY_SHED_PANES), 14.0);
     } else if p == CITY_GUTTED {
         g = CityGrid(CITY_GUTTED_STOREY, CITY_GUTTED_BAY, 0.46, 0.28, 0.84, 1.0, 5.0);
+    } else if p == CITY_HAB {
+        g = CityGrid(CITY_HAB_STOREY, CITY_HAB_BAY, CITY_HAB_WIDE, CITY_HAB_SILL, CITY_HAB_HEAD, f32(CITY_HAB_PANES), 3.6);
+    } else if p == CITY_HAB_BAND {
+        g = CityGrid(CITY_HAB_BAND_STOREY, CITY_HAB_BAND_BAY, CITY_HAB_BAND_WIDE, CITY_HAB_BAND_SILL, CITY_HAB_BAND_HEAD, f32(CITY_HAB_BAND_PANES), 6.0);
     }
     return g;
 }
@@ -409,6 +464,7 @@ fn city_facade(i_in: CityIn) -> CityLook {
     let shed = i.pattern == CITY_SHED;
     let curtain = i.pattern == CITY_CURTAIN;
     let ribbon = i.pattern == CITY_RIBBON;
+    let prefab = i.pattern == CITY_HAB || i.pattern == CITY_HAB_BAND;
     let gutted = i.pattern == CITY_GUTTED || i.gutted > 0.5;
     let n = city_n_of(w, g.bay);
     let m = select(city_n_of(h, g.storey), 1.0, shed);
@@ -451,7 +507,7 @@ fn city_facade(i_in: CityIn) -> CityLook {
     let pq = q.x + win_half.x - (column + 0.5) * pane_w;
     var bars = city_line(abs(pq) - 0.5 * pane_w, frame_w, pane_w, i.px);
     bars = max(bars, city_line(abs(q.y) - win_half.y, frame_w * 1.4, win_half.y * 2.0, i.px));
-    if !curtain && !shed && i.pattern != CITY_ARCHED {
+    if !curtain && !shed && !prefab && i.pattern != CITY_ARCHED {
         bars = max(bars, city_line(q.y - win_half.y * 0.55, frame_w, win_half.y * 2.0, i.px) * step(2.4, 2.0 * win_half.y));
     }
     if shed {
@@ -490,9 +546,14 @@ fn city_facade(i_in: CityIn) -> CityLook {
     inner = mix(vec3<f32>(0.08, 0.075, 0.07), inner, resolve);
     // Sills under the windows, rain run down from them, soot over the broken ones.
     var wall_here = wall;
+    if prefab {
+        // A prefab window sits in a deep dark frame moulded into its panel.
+        let rim = city_box(q.x, win_half.x + 0.14, i.px) * city_box(q.y, win_half.y + 0.14, i.px);
+        wall_here = mix(wall_here, vec3<f32>(0.075, 0.08, 0.085), rim * resolve);
+    }
     if !curtain && !shed {
         let sill = city_box(cu, win_half.x + 0.08, i.px) * city_box(q.y + win_half.y + 0.06, 0.06, i.px);
-        wall_here = mix(wall_here, base * 1.25 + vec3<f32>(0.04), sill * detail);
+        wall_here = mix(wall_here, base * 1.25 + vec3<f32>(0.04), sill * detail * select(1.0, 0.0, prefab));
         let below = clamp(-(q.y + win_half.y + 0.12) / 0.9, 0.0, 1.0);
         let run = city_box(cu, win_half.x * 0.8, i.px) * step(0.001, below) * (1.0 - below);
         wall_here *= 1.0 - 0.07 * run * detail;
@@ -505,7 +566,7 @@ fn city_facade(i_in: CityIn) -> CityLook {
         let strength = max(smoothstep(0.25, 0.9, i.damage), max(flames, gutted_f(gutted)));
         wall_here = mix(wall_here, vec3<f32>(0.025, 0.022, 0.02), clamp(burnt * plume * strength, 0.0, 0.92));
     }
-    let frame_rgb = select(vec3<f32>(0.62, 0.61, 0.58), vec3<f32>(0.12, 0.12, 0.13), curtain || ribbon || i.pattern == CITY_OFFICE || shed || hash11(i.inst * 5.0) < 0.35);
+    let frame_rgb = select(vec3<f32>(0.62, 0.61, 0.58), vec3<f32>(0.12, 0.12, 0.13), curtain || ribbon || prefab || i.pattern == CITY_OFFICE || shed || hash11(i.inst * 5.0) < 0.35);
     let frame = max(bars, shard * 0.7) * opening;
     o.albedo = mix(wall_here, frame_rgb, frame);
     o.glass = opening * (1.0 - frame);
@@ -825,6 +886,17 @@ fn city_plain(i: CityIn) -> CityLook {
         o.tint = vec3<f32>(0.85, 0.95, 0.95);
         o.f0 = 0.04;
         o.tilt = vec2<f32>(sin(i.time * 1.3 + i.local.x * 2.0), cos(i.time * 1.1 + i.local.y * 2.3)) * 0.02;
+    } else if p == CITY_PREFAB || p == CITY_ACCENT {
+        let rgb = select(city_prefab_rgb(city_hash(i.inst, 2.0)), city_accent_rgb(city_hash(i.inst, 15.0)), p == CITY_ACCENT);
+        o.albedo = city_wall(CITY_FINISH_PREFAB, rgb, st, i.local, i.px, i.inst);
+        o.roughness = 0.7;
+    } else if p == CITY_TRIM {
+        // Dark moulded composite: a faint grain, a sheen, scuffed pale at its edges.
+        var c = vec3<f32>(0.07, 0.075, 0.08) * (1.0 + 0.5 * broad);
+        c = mix(c, vec3<f32>(0.2, 0.2, 0.19), 0.25 * smoothstep(0.65, 0.9, surf_noise3(i.local * 1.5 + i.inst * 5.0)));
+        o.albedo = c;
+        o.roughness = 0.55;
+        o.metallic = 0.2;
     } else if p == CITY_WHITE_STEEL {
         o.albedo = vec3<f32>(0.72, 0.73, 0.72) * (1.0 + 0.15 * broad);
         o.roughness = 0.45;
@@ -932,7 +1004,8 @@ fn city_surface(i: CityIn) -> CityLook {
         return city_decks(i);
     }
     if p == CITY_HOUSE || p == CITY_TERRACE || p == CITY_FLATS || p == CITY_OFFICE || p == CITY_RIBBON
-        || p == CITY_CURTAIN || p == CITY_SHED || p == CITY_ARCHED || p == CITY_GUTTED {
+        || p == CITY_CURTAIN || p == CITY_SHED || p == CITY_ARCHED || p == CITY_GUTTED
+        || p == CITY_HAB || p == CITY_HAB_BAND {
         return city_facade(i);
     }
     return city_plain(i);

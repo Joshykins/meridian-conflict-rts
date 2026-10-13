@@ -423,6 +423,19 @@ shared! {
         pub const WATER: u32 = 85;
         /// Steel painted white: wind turbines, dishes.
         pub const WHITE_STEEL: u32 = 86;
+        /// The colony kit (`city/colony`): prefab cladding, large factory-made panels
+        /// with their seams and fixings, in the instance's colony colour (whites, pale
+        /// greys, buffs). No windows: the blank wall of a hab.
+        pub const PREFAB: u32 = 87;
+        /// A hab's facade: prefab cladding with wide windows in deep dark frames.
+        pub const HAB: u32 = 88;
+        /// A band of glazing on prefab cladding: an ops deck, a hab's strip windows.
+        pub const HAB_BAND: u32 = 89;
+        /// Prefab panels in the instance's accent colour: faded orange, teal, ochre,
+        /// colony blue, oxide red.
+        pub const ACCENT: u32 = 90;
+        /// Dark composite trim: bands, skirts, frames, the recesses between modules.
+        pub const TRIM: u32 = 91;
         /// A facade pattern plus this: the same wall in the same finish, no windows (a
         /// gable, the pier beside a door, a stair tower's blind face).
         pub const BLANK: u32 = 100;
@@ -486,6 +499,18 @@ shared! {
         pub const ARCHED_SILL: f32 = 0.22;
         pub const ARCHED_HEAD: f32 = 0.86;
         pub const ARCHED_PANES: u32 = 2;
+        pub const HAB_STOREY: f32 = 3.0;
+        pub const HAB_BAY: f32 = 2.4;
+        pub const HAB_WIDE: f32 = 0.64;
+        pub const HAB_SILL: f32 = 0.34;
+        pub const HAB_HEAD: f32 = 0.76;
+        pub const HAB_PANES: u32 = 2;
+        pub const HAB_BAND_STOREY: f32 = 3.2;
+        pub const HAB_BAND_BAY: f32 = 1.6;
+        pub const HAB_BAND_WIDE: f32 = 0.94;
+        pub const HAB_BAND_SILL: f32 = 0.34;
+        pub const HAB_BAND_HEAD: f32 = 0.84;
+        pub const HAB_BAND_PANES: u32 = 1;
         pub const DECKS_STOREY: f32 = 3.0;
         pub const GUTTED_STOREY: f32 = 3.2;
         pub const GUTTED_BAY: f32 = 3.2;

@@ -15,6 +15,7 @@ use crate::library::ModelDef;
 
 mod blocks;
 mod civic;
+pub(super) mod colony;
 mod kit;
 mod outskirts;
 mod street;
@@ -128,6 +129,12 @@ pub(super) const MODELS: &[ModelDef] = &[
     def("city_mast", PropKind::CityMast, street::mast_tower),
     def("city_monument", PropKind::CityMonument, street::monument),
 ];
+
+/// The city kit's models and the colony kit's.
+#[cfg(test)]
+fn models() -> impl Iterator<Item = &'static ModelDef> {
+    MODELS.iter().chain(colony::MODELS)
+}
 
 /// Full-detail triangle budgets above the default: the towers, a few dozen on the
 /// map and seen from everywhere, and the big public buildings, one or two each.

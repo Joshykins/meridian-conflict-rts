@@ -230,6 +230,18 @@ pub const fn structure(kind: PropKind) -> Option<Structure> {
         CitySolarArray => s("city_solar_array", &[], &[], 0, 0, false),
         CityMast => s("city_mast", &[(0, 0, 4, 4)], &[110], 3_000, 0, false),
         CityMonument => s("city_monument", &[(0, 0, 7, 7)], &[9], 2_500, 0, false),
+        // The colony kit.
+        ColonyHab => s("colony_hab", &[(0, 0, 10, 7)], &[7], 1_600, 50, true),
+        ColonyHabStack => s("colony_hab_stack", &[(0, 0, 22, 9)], &[14], 4_500, 70, true),
+        ColonyDepot => s("colony_depot", &[(0, 0, 28, 17)], &[12], 5_500, 20, true),
+        ColonyTower => s(
+            "colony_tower",
+            &[(0, -4, 8, 8), (0, 12, 14, 6)],
+            &[44, 7],
+            8_000,
+            60,
+            true,
+        ),
         _ => return None,
     })
 }

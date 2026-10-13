@@ -379,6 +379,18 @@ pub enum PropKind {
     CityMast = 129,
     /// A square's monument over a fountain basin.
     CityMonument = 130,
+    /// The colony kit: a frontier colony's prefab town (Vela's Port Calder),
+    /// shipped as panels and modules. A family hab: a heavy two-storey block; 20 by
+    /// 14 m.
+    ColonyHab = 131,
+    /// Flats: four storeys of hab modules terraced back from the street, a round
+    /// stair core; 44 by 18 m.
+    ColonyHabStack = 132,
+    /// A depot: a heavy hall with two great doors to the street; 56 by 34 m.
+    ColonyDepot = 133,
+    /// The colony's operations tower, stepped blocks under a glazed cab, behind its
+    /// annex on the street; 44 m.
+    ColonyTower = 134,
     /// The Progenitor's second range (the first is full).
     /// A hard-light bridge (`crate::landmark::HARDLIGHT_BRIDGE`): its deck from the
     /// origin along +x, its walking surface at the origin's height, which the map
@@ -388,7 +400,7 @@ pub enum PropKind {
 }
 
 impl PropKind {
-    pub const ALL: [PropKind; 89] = [
+    pub const ALL: [PropKind; 93] = [
         PropKind::TreeBroadleaf,
         PropKind::TreeConifer,
         PropKind::TreePine,
@@ -477,6 +489,10 @@ impl PropKind {
         PropKind::CitySolarArray,
         PropKind::CityMast,
         PropKind::CityMonument,
+        PropKind::ColonyHab,
+        PropKind::ColonyHabStack,
+        PropKind::ColonyDepot,
+        PropKind::ColonyTower,
         PropKind::PrecursorBridge,
     ];
 
