@@ -174,6 +174,7 @@ fn main() {
                     owner: 0,
                     blueprint: id,
                     weapon: 0,
+                    gun: 0,
                 });
             }
             if i == 8 {

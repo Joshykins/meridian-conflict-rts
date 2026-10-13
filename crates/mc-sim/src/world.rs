@@ -620,6 +620,7 @@ impl World {
                 self.state.units.prev_weapon_yaw[row][w] = weapon.facing;
             }
         }
+        self.fit_mounts(row);
         if let Some(arm) = bp.builder.as_ref().and_then(|b| b.arm) {
             if arm.shoulder.is_some() {
                 self.state.units.arm_pitch[row][0] = arm.rest;
@@ -718,6 +719,7 @@ impl World {
         units.prev_bank.clone_from(&units.bank);
         units.prev_weapon_yaw.clone_from(&units.weapon_yaw);
         units.prev_arm_pitch.clone_from(&units.arm_pitch);
+        units.begin_mounts_tick();
         units.prev_shield_open.clone_from(&units.shield_open);
         units.prev_deploy.clone_from(&units.deploy);
         for f in &mut units.flags {
@@ -1151,6 +1153,9 @@ impl World {
         state.validate().map_err(SimError::Snapshot)?;
         state
             .validate_ids(self.blueprints.units.len())
+            .map_err(SimError::Snapshot)?;
+        state
+            .validate_mounts(&self.blueprints)
             .map_err(SimError::Snapshot)?;
         if state.players.len() != self.state.players.len()
             || state.props_dead.len() != self.state.props_dead.len()

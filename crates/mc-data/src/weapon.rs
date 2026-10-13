@@ -272,6 +272,11 @@ pub struct Weapon {
     /// Background text for the interface, from the faction's `lore.ron`. Empty when it has none.
     /// Cosmetic: not in the content hash.
     pub lore: String,
+    /// A weapon group's guns (`RawWeapon::mounts`, `crate::mounts`): empty for one gun.
+    pub mounts: Vec<crate::mounts::Mount>,
+    /// Each of `mounts` as a weapon of its own, at its pivot, resting and covering its arc
+    /// (`Weapon::gun`). Empty for one gun.
+    pub mount_weapons: Vec<Weapon>,
 }
 
 impl Weapon {

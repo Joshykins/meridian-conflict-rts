@@ -81,24 +81,22 @@ impl World {
         };
     }
 
-    /// `UnitInstance::status[2]` for a cell launcher: a bit per cell still holding a
-    /// missile, bit `k` for the cell under muzzle `k`. Mid-salvo the cells fired so far are
-    /// empty; after it they stay empty until the hatches start to open for the next.
-    /// `None` for a unit without hatches.
-    pub(crate) fn loaded_cells(&self, row: usize) -> Option<u32> {
+    /// `UnitInstance::status[2]` for a cell launcher: how many of its cells, in firing
+    /// order, are empty, so the cell under muzzle `k` holds a missile while `k` is at least
+    /// that. Mid-salvo the cells fired so far are empty; after it they all stay empty until
+    /// the hatches start to open for the next. `None` for a unit without hatches.
+    pub(crate) fn fired_cells(&self, row: usize) -> Option<u32> {
         let bp = self.bp(row);
         let w = bp.weapons.iter().position(|w| w.hatch_ticks > 0)?;
         let weapon = &bp.weapons[w];
-        let cells = weapon.muzzles.len().clamp(1, 16) as u32;
-        let all = (1u32 << cells) - 1;
+        let cells = weapon.muzzles.len().max(1) as u32;
         let left = self.state.units.weapon_salvo_left[row][w];
         Some(if left > 0 {
-            let fired = (weapon.salvo - left).min(cells as u8) as u32;
-            all & !((1u32 << fired) - 1)
+            (weapon.salvo - left).min(cells as u8) as u32
         } else if self.state.units.weapon_cooldown[row][w] > weapon.hatch_ticks {
-            0
+            cells
         } else {
-            all
+            0
         })
     }
 

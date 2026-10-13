@@ -1862,7 +1862,7 @@ mod tests {
             assert_eq!(house.pivot, pivot);
         }
         for (i, house) in model.houses.iter().enumerate() {
-            assert_eq!(house.weapon as usize, i + 1);
+            assert_eq!(house.gun as usize, i + 1);
         }
         // The charge crawls on the bare rails: out of the mantlet, short of the muzzle, on
         // the rails as `rail_gun` lays them (it never narrows the slot it is given).

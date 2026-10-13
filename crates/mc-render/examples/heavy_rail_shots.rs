@@ -686,6 +686,7 @@ fn main() {
                         owner: 0,
                         blueprint: stage.blueprint,
                         weapon: stage.weapon,
+                        gun: u16::from(stage.weapon),
                     });
                 }
                 if k == charge {
@@ -697,6 +698,7 @@ fn main() {
                         owner: 0,
                         blueprint: stage.blueprint,
                         weapon: stage.weapon,
+                        gun: u16::from(stage.weapon),
                     });
                 }
                 if k < charge {

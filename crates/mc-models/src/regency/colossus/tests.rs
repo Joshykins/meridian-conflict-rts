@@ -79,10 +79,10 @@ fn the_rig_is_the_unit_files() {
     assert_eq!(Vec3::from(model.turret_pivot), v3(0.0, 0.0, RACE));
     assert_eq!(Vec3::from(model.arm_pivot.unwrap()), LANCE_PIVOT);
     assert_eq!(Vec3::from(model.shield_emitter.unwrap()), body::EMITTER);
-    let houses: Vec<(u8, Vec3)> = model
+    let houses: Vec<(u16, Vec3)> = model
         .houses
         .iter()
-        .map(|h| (h.weapon, Vec3::from(h.pivot)))
+        .map(|h| (h.gun, Vec3::from(h.pivot)))
         .collect();
     assert_eq!(
         houses,
@@ -301,9 +301,7 @@ fn the_cells_are_clear() {
         rake.to_degrees()
     );
     let model = model();
-    let own = |v: &crate::MeshVertex| {
-        v.rig & rig::LIMB_MASK == rig::HOUSE_FIRST + 2 && v.rig & rig::HOUSE_HIGH == 0
-    };
+    let own = |v: &crate::MeshVertex| rig::house_slot(v.rig) == Some(2);
     let others: Vec<Vec3> = model.lods[0]
         .vertices
         .iter()

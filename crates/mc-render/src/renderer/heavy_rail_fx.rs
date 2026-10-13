@@ -44,7 +44,6 @@ use mc_data::BlueprintId;
 use mc_sim::mirror::{
     HousePose, ProjectileInstance, SimEvent, UnitInstance, KIND_GHOST, KIND_WRECK, PROJECTILE_BEAM,
     PROJECTILE_ENDS_SHIFT, PROJECTILE_FADE_BEAM, PROJECTILE_RAIL, PROJECTILE_STARTS_SHIFT,
-    UNIT_HOUSE_SHIFT,
 };
 use std::mem::size_of;
 
@@ -571,11 +570,9 @@ impl Renderer {
         // otherwise only the first weapon's turn and elevation are in the instance, which a
         // gun on the same elbow shares (the commander's arm guns). A gun fixed in the hull
         // (`turret_turn` 0, the spinal cannon) lies along the keel.
-        let house = (u.status[1] >> UNIT_HOUSE_SHIFT)
-            .checked_sub(1)
-            .and_then(|i| self.heavy_rail.houses.get(i as usize))
-            .filter(|_| w.mount)
-            .and_then(|h| h.pose.get(weapon as usize));
+        let house =
+            super::hull_frame::gun_pose(u, &self.heavy_rail.houses, bp.gun_slot(weapon as usize))
+                .filter(|_| w.mount);
         let on_torso = !w.mount && w.pivot.is_some() && w.pivot == bp.weapons[0].pivot;
         let fixed = w.turret_turn == 0 || (weapon != 0 && house.is_none() && !on_torso);
         let (yaw, pitch) = match house {

@@ -78,7 +78,7 @@ fn nimbus_mounts_lasers_and_dispenser() {
         let slot = model
             .houses
             .iter()
-            .position(|h| h.weapon as usize == k + 1 && Vec3::from(h.pivot).distance(*pivot) < 1e-3)
+            .position(|h| h.gun as usize == k + 1 && Vec3::from(h.pivot).distance(*pivot) < 1e-3)
             .unwrap_or_else(|| panic!("a mount for weapon {} at {pivot}", k + 1));
         let gun = move |v: &MeshVertex| {
             (v.rig & rig::LIMB_MASK) == rig::HOUSE_FIRST + (slot as u32 & 3)

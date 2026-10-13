@@ -720,18 +720,12 @@ impl MeshBuilder {
     /// inside `with_recoil` pitches about the pivot by the weapon's pitch and kicks `travel`
     /// metres back along x when it fires. Authored level and facing forward (+x), even a
     /// house astern: a `rear` weapon rests turned round. Up to `rig::HOUSE_COUNT` houses.
-    pub fn with_house(
-        &mut self,
-        weapon: usize,
-        pivot: Vec3,
-        travel: f32,
-        f: impl FnOnce(&mut Self),
-    ) {
+    pub fn with_house(&mut self, gun: usize, pivot: Vec3, travel: f32, f: impl FnOnce(&mut Self)) {
         let slot = self
             .houses
             .iter()
             .position(|h| {
-                h.weapon as usize == weapon
+                h.gun as usize == gun
                     && h.pivot == self.transform.transform_point3(pivot).to_array()
             })
             .unwrap_or_else(|| {
@@ -744,20 +738,25 @@ impl MeshBuilder {
                 self.houses.push(super::House {
                     pivot: at.to_array(),
                     travel: travel * side,
-                    weapon: weapon as u8,
+                    gun: gun as u16,
                 });
                 self.houses.len() - 1
             });
         let previous = self.rig;
         if slot >= 4 {
             assert!(
-                previous & (rig::UPGRADE | rig::MODULE_MASK | rig::UNTIL_MASK) == 0,
-                "a fifth or later gun house cannot be a refit piece"
+                previous
+                    & (rig::UPGRADE
+                        | rig::MODULE_MASK
+                        | rig::UNTIL_MASK
+                        | rig::DEPLOY
+                        | rig::HOUSE_PAGE_MASK)
+                    == 0,
+                "a fifth or later gun house cannot be a refit piece or siege gear"
             );
         }
-        self.rig = (previous & !(rig::LIMB_MASK | rig::HOUSE_HIGH))
-            | (rig::HOUSE_FIRST + (slot as u32 & 3))
-            | if slot >= 4 { rig::HOUSE_HIGH } else { 0 };
+        self.rig =
+            (previous & !(rig::LIMB_MASK | rig::HOUSE_PAGE_MASK)) | rig::house_bits(slot as u32);
         f(self);
         self.rig = previous;
     }
@@ -782,14 +781,15 @@ impl MeshBuilder {
             self.cells.len() < super::CellBlock::MAX_BLOCKS
                 && cells <= super::CellBlock::MAX_CELLS
                 && fire.len() == cells,
-            "a cell block has 1 to 8 cells, each fired once, and a model at most two blocks"
+            "a cell block has 1 to {} cells, each fired once, and a model at most {} blocks",
+            super::CellBlock::MAX_CELLS,
+            super::CellBlock::MAX_BLOCKS,
         );
         let first: usize = self
             .cells
             .iter()
             .map(|b| b.nx as usize * b.ny as usize)
             .sum();
-        assert!(first + cells <= 16, "at most 16 cells on a model");
         let mut order = [u8::MAX; super::CellBlock::MAX_CELLS];
         for (k, &(i, j)) in fire.iter().enumerate() {
             order[i as usize * ny as usize + j as usize] = k as u8;

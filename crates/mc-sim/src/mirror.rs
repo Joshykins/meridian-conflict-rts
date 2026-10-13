@@ -205,6 +205,8 @@ pub enum SimEvent {
         owner: u8,
         blueprint: BlueprintId,
         weapon: u8,
+        /// The gun charging (`UnitBlueprint::gun_slot`): a group's gun, else the weapon's one.
+        gun: u16,
     },
     /// `vel` is metres per tick. `blueprint` and `weapon` name the weapon that fired.
     ShotFired {
@@ -218,6 +220,8 @@ pub enum SimEvent {
         owner: u8,
         blueprint: BlueprintId,
         weapon: u8,
+        /// The gun that fired (`UnitBlueprint::gun_slot`): a group's gun, else the weapon's one.
+        gun: u16,
     },
     /// A cold-launched missile has pitched onto its target and its motor starts here.
     MissileIgnited {
@@ -778,8 +782,8 @@ pub struct UnitInstance {
     pub refit_modules: u32,
     /// Three more state words, their bits named by the `UNIT_*` constants: 0 dive and
     /// deck state and the pause mark, 1 gun-house index, nanite and replicating marks,
-    /// 2 a launcher's rounds (`nukes::LAUNCHER_*`), a cell launcher's loaded cells
-    /// (`launch_cells::loaded_cells`), a mounted gun's aim or a wall
+    /// 2 a launcher's rounds (`nukes::LAUNCHER_*`), how many of a cell launcher's cells are fired
+    /// (`launch_cells::fired_cells`), a mounted gun's aim or a wall
     /// section's neighbours ([`WALL_JOINS`]), a stored unit's carrier; on a spent
     /// casing in the air, one more than the index of the walker that threw it in
     /// `RenderFrame::units` (zero when it is not drawn).

@@ -74,6 +74,7 @@ mod tests {
             owner: 0,
             blueprint: b,
             weapon,
+            gun: u16::from(weapon),
         }
     }
 
@@ -84,6 +85,7 @@ mod tests {
             owner: 0,
             blueprint: b,
             weapon,
+            gun: u16::from(weapon),
         }
     }
 

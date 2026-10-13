@@ -1128,6 +1128,9 @@ struct RiftList {
 // What each skin's surface slots look like (renderer/skins.rs), by `ModelInfo::skin`.
 @group(0) @binding(34) var<storage, read> skins: array<Skin>;
 
+// Every model's gun houses (renderer/model_houses.rs), by `ModelInfo::houses`.
+@group(0) @binding(43) var<storage, read> model_houses: array<ModelHouse>;
+
 // Every model's surface marks (renderer/surface_marks.rs), by `ModelInfo::marks`.
 @group(0) @binding(35) var<storage, read> surface_marks: array<SurfaceMark>;
 

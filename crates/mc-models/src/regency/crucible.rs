@@ -458,7 +458,7 @@ mod tests {
                 let house = model
                     .houses
                     .iter()
-                    .position(|h| h.weapon as usize == i)
+                    .position(|h| h.gun as usize == i)
                     .unwrap_or_else(|| panic!("{key}: no house for head {i}"));
                 let pivot = v(head.pivot.expect("a head turns about its pivot"));
                 assert!(Vec3::from(model.houses[house].pivot).distance(pivot) < 1e-3);

@@ -87,6 +87,7 @@ pub(crate) mod lens_fx;
 mod lift_fx;
 mod map_look;
 mod mine_fx;
+pub(crate) mod model_houses;
 mod nanite_repair_fx;
 mod nanite_site_fx;
 mod nuke_fx;
@@ -159,8 +160,12 @@ pub const MAX_DYNAMIC: usize = MAX_SIM_ENTITIES
     + wreck_finish::MOST_SHOWN
     + city_fx::MOST_FALLING
     + gravitic_engine_fx::MOST_SLABS;
-/// Gun-house poses (`mirror::HousePose`): at most one per unit, so every unit can have one.
-pub const MAX_HOUSES: usize = mc_sim::tables::MAX_UNITS;
+/// Gun-house poses (`mirror::HousePose`): one per unit with houses, so every unit can have
+/// one, and room for `EXTRA_HOUSES` more: a unit with more than eight guns takes one more
+/// record for each eight more (`UnitBlueprint::gun_count`; a Regent takes ten).
+pub const MAX_HOUSES: usize = mc_sim::tables::MAX_UNITS + EXTRA_HOUSES;
+/// Records past one a unit (`MAX_HOUSES`): four hundred Regents' worth.
+const EXTRA_HOUSES: usize = 4096;
 /// Selection rings and status bars: at most one per unit or wreck drawn.
 pub const MAX_MARKS: usize = mc_sim::tables::MAX_UNITS + mc_sim::tables::MAX_WRECKS;
 pub const MAX_EFFECTS: usize = 2048;
@@ -427,16 +432,15 @@ pub(crate) struct ModelInfo {
     /// its field dust reaches (`Model::dust_line`), how far a walker's hips sink in
     /// stride (`Legs::crouch`) and its neck's height (`Model::neck`, zero for none).
     pub(crate) surface: [f32; 4],
-    /// Gun houses of their own (`rig::HOUSE_FIRST + i`): pivot and kick-back travel.
-    pub(crate) houses: [[f32; 4]; 4],
-    /// Which weapon each house is bound to, plus one; zero for no house in that slot.
-    pub(crate) house_weapon: [f32; 4],
+    /// Hatched missile cells' muzzles (`models::CellBlock::gpu`): a byte a grid cell.
+    pub(crate) cell_order: [[u32; 4]; 4],
+    /// Its gun houses in scene set 43 (renderer/model_houses.rs): first | count <<
+    /// `gpu_consts::house::COUNT_SHIFT`.
+    pub(crate) houses: u32,
+    pub(crate) _house_pad: [u32; 3],
     /// A spacecraft's rig for `entity.wgsl` (`models::capital_rig`): gear legs, bay doors,
     /// drives, lift jets, ramp. All zero for any other model.
     pub(crate) capital: [[f32; 4]; 7],
-    /// Houses 4..8 (`rig::HOUSE_HIGH`), as `houses` and `house_weapon`.
-    pub(crate) houses_high: [[f32; 4]; 4],
-    pub(crate) house_weapon_high: [f32; 4],
     /// Where a personal (hull) shield is thrown from (`Model::shield_emitter`), w 1 when
     /// the model says; zero for the default, the top of the hull over the middle.
     pub(crate) shield_emitter: [f32; 4],
@@ -457,7 +461,7 @@ pub(crate) struct ModelInfo {
     /// Hatched missile cells (`models::CellBlock::gpu`): per block its centre, deck, pitch
     /// and hatch half width. All zero for none.
     pub(crate) cells: [[f32; 4]; 4],
-    /// Per block its grid word, then per block its missile order word.
+    /// Per block its grid word (`gpu_consts::cells`); z and w zero.
     pub(crate) cell_grid: [u32; 4],
     /// A charge gun's working gear (`Model::charge_gear`): hub and travel scale. Zero for none.
     pub(crate) charge_gear: [f32; 4],
@@ -478,7 +482,7 @@ pub(crate) struct ModelInfo {
     pub(crate) _skin_pad2: u32,
 }
 
-const _: () = assert!(std::mem::size_of::<ModelInfo>() == 1216);
+const _: () = assert!(std::mem::size_of::<ModelInfo>() == 1136);
 
 // A prop's far level is the draw slot after its own levels.
 const _: () = assert!(models::LOD_COUNT as u32 == lod::FAR);
@@ -1017,6 +1021,8 @@ pub struct Renderer {
     /// What each skin's slots look like (renderer/skins.rs, scene set 34), and what
     /// each model's surface carries where (scene set 35).
     skins: skins::Skins,
+    /// Every model's gun houses (renderer/model_houses.rs, scene set 43).
+    model_houses: model_houses::ModelHouses,
     team_colors: [[f32; 4]; crate::gpu_consts::owner::COLORS as usize],
     slot_count: u32,
     static_count: u32,
@@ -1454,6 +1460,8 @@ impl Renderer {
         let mut model_draws: Vec<[u32; 2]> = Vec::new();
         // What each model's surface carries where.
         let mut surface_marks = surface_marks::MarkList::default();
+        // Every model's gun houses.
+        let mut house_list = model_houses::HouseList::default();
         let mut first_slot: Vec<u32> = Vec::new();
         for (at, (model, _)) in model_list.iter().enumerate() {
             first_slot.push(slots.len() as u32);
@@ -1566,27 +1574,8 @@ impl Renderer {
                 fold: model.fold.unwrap_or([0.0; 4]),
                 fold_wrist: model.fold_wrist.unwrap_or([0.0; 4]),
                 mount: model.mount.unwrap_or([0.0; 4]),
-                houses: std::array::from_fn(|i| {
-                    model
-                        .houses
-                        .get(i)
-                        .map_or([0.0; 4], |h| [h.pivot[0], h.pivot[1], h.pivot[2], h.travel])
-                }),
-                house_weapon: std::array::from_fn(|i| {
-                    model.houses.get(i).map_or(0.0, |h| h.weapon as f32 + 1.0)
-                }),
-                houses_high: std::array::from_fn(|i| {
-                    model
-                        .houses
-                        .get(4 + i)
-                        .map_or([0.0; 4], |h| [h.pivot[0], h.pivot[1], h.pivot[2], h.travel])
-                }),
-                house_weapon_high: std::array::from_fn(|i| {
-                    model
-                        .houses
-                        .get(4 + i)
-                        .map_or(0.0, |h| h.weapon as f32 + 1.0)
-                }),
+                houses: house_list.add(&model.houses),
+                _house_pad: [0; 3],
                 // The rig, and in [3].w the ship's cruise in metres a tick: its drives open
                 // out as it nears that (`entity.wgsl`, the nozzle's flare).
                 capital: models::capital_rig(&model.key).map_or([[0.0; 4]; 7], |mut rig| {
@@ -1620,8 +1609,9 @@ impl Renderer {
                     rig
                 }),
                 siege: model.siege.map_or([[0.0; 4]; 4], |s| s.gpu()),
-                cells: models::CellBlock::gpu(&model.cells).0,
-                cell_grid: models::CellBlock::gpu(&model.cells).1,
+                cells: models::CellBlock::gpu(&model.cells).cells,
+                cell_grid: models::CellBlock::gpu(&model.cells).grid,
+                cell_order: models::CellBlock::gpu(&model.cells).order,
                 spin: model
                     .spins
                     .iter()
@@ -2365,6 +2355,13 @@ impl Renderer {
             &[craters.buffer()],
         );
         let skins = skins::Skins::new(&gpu, bps, &surface_marks)?;
+        let model_houses = model_houses::ModelHouses::new(&gpu, &house_list)?;
+        write_buffers(
+            scene_set,
+            43,
+            vk::DescriptorType::STORAGE_BUFFER,
+            &[model_houses.buffer()],
+        );
         write_buffers(
             scene_set,
             35,
@@ -2669,6 +2666,7 @@ impl Renderer {
             map_info: info,
             shield_color: rgba(faction.shield_color),
             skins,
+            model_houses,
             team_colors,
             slot_count,
             static_count,
@@ -3361,10 +3359,14 @@ impl Renderer {
         );
         self.dynamic.write(0, bytemuck::cast_slice(&patched));
         self.sim_units = units.len() as u32;
-        // One per unit at most (`MAX_HOUSES`): never cut.
+        // A deliberate cap (`MAX_HOUSES`, cosmetic): past it the last units' houses are
+        // posed from the end of the list (entity.wgsl `gun_record` holds the index inside the
+        // buffer), never read past it.
         let houses = &frame.houses[..frame.houses.len().min(MAX_HOUSES)];
         if !houses.is_empty() {
-            let charged = self.titan_charge.patch_houses(units, houses);
+            let charged = self
+                .titan_charge
+                .patch_houses(units, houses, &self.blueprints);
             self.houses.write(0, bytemuck::cast_slice(&charged));
         }
         drop(part);
@@ -4744,11 +4746,8 @@ impl Renderer {
             });
         let heading = hull.map_or(0.0, |g| g.heading);
         let base = hull.map_or(at - Vec3::Z * w.muzzle.z.to_f32(), |g| g.pos);
-        // Only the first `MAX_HOUSES` weapons turn on houses of their own.
-        let pose = hull
-            .and_then(|g| g.house)
-            .filter(|_| (weapon as usize) < mc_data::MAX_HOUSES)
-            .map(|h| h.pose[weapon as usize]);
+        let gun = self.blueprints.unit(blueprint).gun_slot(weapon as usize);
+        let pose = hull.and_then(|g| g.gun_pose(gun)).filter(|_| w.mount);
         // A turret gun's aim is the unit's own: its turret's yaw, and the first gun's
         // pitch about its trunnion (a mortar laid up at a steep lob).
         let turret = hull
@@ -4930,6 +4929,7 @@ impl Renderer {
                 owner,
                 blueprint,
                 weapon,
+                gun,
             } => {
                 // A squeezed plasma gun gathers its charge in front of the bore
                 // (`regency_guns_fx`), not as an ordinary gun's glow nor as a thrown
@@ -4937,8 +4937,7 @@ impl Renderer {
                 // charge rides its barrel).
                 if !self.regency_charging(
                     unit.0,
-                    *blueprint,
-                    *weapon,
+                    (*blueprint, *weapon, *gun),
                     Vec3::from(pos.to_f32()),
                     time,
                 ) {
@@ -5037,6 +5036,7 @@ impl Renderer {
                 owner,
                 blueprint,
                 weapon,
+                gun: _,
             } => {
                 if self.blueprints.unit(*blueprint).weapons[*weapon as usize].beam {
                     // A held beam: one steady stream, not a shot a tick (`plasma_fx`); a
@@ -5781,6 +5781,7 @@ impl Drop for Renderer {
         self.gravitic_engine_fx.destroy(&self.gpu);
         self.ground_melt.destroy(&self.gpu);
         self.skins.destroy(&self.gpu);
+        self.model_houses.destroy(&self.gpu);
         self.city_fx.destroy(&self.gpu);
         self.heat_haze.destroy(&self.gpu);
         self.lens_flares.destroy(&self.gpu);

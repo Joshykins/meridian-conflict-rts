@@ -1391,8 +1391,7 @@ fn weapons_are_turrets_ending_at_the_muzzle() {
                 .all(|m| m.vertices.iter().all(|v| v.part != part::TURRET
                     // A reclaim head's house (`reclaimers::cradle_turret`) is tagged as
                     // one: it is a tool on a house of its own, not a gun turret.
-                    || (rig::HOUSE_FIRST..rig::HOUSE_FIRST + rig::HOUSE_COUNT)
-                        .contains(&(v.rig & rig::LIMB_MASK)))),
+                    || rig::house_slot(v.rig).is_some())),
             "{}: unarmed but has a turret",
             bp.mesh
         );
@@ -2584,7 +2583,7 @@ fn battleship_houses_and_muzzles() {
         let house = model
             .houses
             .iter()
-            .find(|h| h.weapon == weapon)
+            .find(|h| h.gun == u16::from(weapon))
             .expect("house per weapon");
         assert!(
             Vec3::from(house.pivot).distance(Vec3::from(pivot)) < 1e-3,
@@ -2839,7 +2838,7 @@ fn moray_and_kraken_hulls() {
         let houses = model.houses.clone();
         if key == "submarine_hunter" {
             assert_eq!(houses.len(), 1, "moray: one gun house");
-            assert_eq!(houses[0].weapon, 1, "moray: the deck gun is weapon 1");
+            assert_eq!(houses[0].gun, 1, "moray: the deck gun is weapon 1");
             assert!(
                 Vec3::from(houses[0].pivot).distance(Vec3::new(5.5, 0.0, 2.2)) < 1e-3,
                 "moray: house pivot {:?}",
@@ -3018,7 +3017,7 @@ fn marlin_and_manta_hulls() {
             let house = model
                 .houses
                 .iter()
-                .find(|h| h.weapon == *weapon)
+                .find(|h| h.gun == u16::from(*weapon))
                 .expect("house per weapon");
             assert!(
                 Vec3::from(house.pivot).distance(Vec3::from(*pivot) * scale) < 1e-3,
@@ -3188,7 +3187,7 @@ fn fulgur_houses_and_muzzles() {
             .houses
             .iter()
             .enumerate()
-            .find(|(_, h)| h.weapon == weapon)
+            .find(|(_, h)| h.gun == u16::from(weapon))
             .expect("a house per weapon");
         assert!(
             Vec3::from(house.pivot).distance(Vec3::from(pivot)) < 1e-3,
@@ -3228,7 +3227,7 @@ fn fulgur_houses_and_muzzles() {
     }
     let mesh = &model.lods[0];
     // The AA gun rests raised to the sky; the house under it must clear the main barrel.
-    let aa_slot = model.houses.iter().position(|h| h.weapon == 3).unwrap() as u32;
+    let aa_slot = model.houses.iter().position(|h| h.gun == 3).unwrap() as u32;
     let aa_top = mesh
         .vertices
         .iter()
@@ -3332,15 +3331,12 @@ fn titan_houses_muzzles_and_rig() {
         model
             .houses
             .iter()
-            .position(|h| h.weapon == weapon && Vec3::from(h.pivot).distance(pivot) < 0.003)
+            .position(|h| h.gun == u16::from(weapon) && Vec3::from(h.pivot).distance(pivot) < 0.003)
             .unwrap_or_else(|| panic!("titan: a house for weapon {weapon} at {pivot}"))
     };
-    let limb = |slot: usize| rig::HOUSE_FIRST + (slot as u32 & 3);
     let in_house = |slot: usize| {
         move |v: &super::MeshVertex| {
-            (v.rig & rig::LIMB_MASK) == limb(slot)
-                && ((v.rig & rig::HOUSE_HIGH) != 0) == (slot >= 4)
-                && v.part != part::TURRET
+            rig::house_slot(v.rig) == Some(slot as u32) && v.part != part::TURRET
         }
     };
     assert!(model.houses.len() <= rig::HOUSE_COUNT as usize);

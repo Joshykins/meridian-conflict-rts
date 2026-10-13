@@ -170,12 +170,23 @@ pub(super) struct GunHull {
     pub(super) blueprint: u32,
     pub(super) pos: Vec3,
     pub(super) heading: f32,
-    /// How its gun houses are turned, when its guns turn on houses of their own.
-    pub(super) house: Option<HousePose>,
+    /// How its gun houses are turned, when its guns turn on houses of their own: its
+    /// records of `RenderFrame::houses`, eight guns to a record (`hull_frame::gun_pose`).
+    pub(super) houses: Vec<HousePose>,
     /// Its turret's yaw off the hull and its first gun's pitch off the rest pose.
     pub(super) turret: [f32; 2],
     /// A capital ship's hull pitch (its spinal gun's lay), which carries everything on it.
     pub(super) pitch: f32,
+}
+
+impl GunHull {
+    /// Gun `gun`'s pose (`UnitBlueprint::gun_slot`): its yaw off the hull last tick and this,
+    /// then its pitch. None for a hull whose guns turn on no houses of their own.
+    pub(super) fn gun_pose(&self, gun: usize) -> Option<[f32; 4]> {
+        self.houses
+            .get(gun / mc_data::MAX_HOUSES)
+            .map(|h| h.pose[gun % mc_data::MAX_HOUSES])
+    }
 }
 
 /// Metres a torpedo runs between the points of its path that are kept.
@@ -888,14 +899,16 @@ impl Renderer {
             if !bp.weapons.iter().any(|w| w.charge_ticks > 0) {
                 continue;
             }
-            let house = (u.status[1] >> UNIT_HOUSE_SHIFT)
+            let records = bp.gun_count().div_ceil(mc_data::MAX_HOUSES).max(1);
+            let houses = (u.status[1] >> UNIT_HOUSE_SHIFT)
                 .checked_sub(1)
-                .and_then(|i| houses.get(i as usize).copied());
+                .and_then(|i| houses.get(i as usize..(i as usize + records).min(houses.len())))
+                .map_or(Vec::new(), <[HousePose]>::to_vec);
             guns.push(GunHull {
                 blueprint: u.blueprint,
                 pos: Vec3::from(u.pos),
                 heading: u.heading,
-                house,
+                houses,
                 turret: [u.turret_yaw, u.arm_pitch[1]],
                 pitch: super::hull_frame::hull_pitch(u, &bp.visual.mesh),
             });
@@ -2239,6 +2252,7 @@ mod sea_shots {
                                 owner: 0,
                                 blueprint: sub,
                                 weapon: 0,
+                                gun: 0,
                             });
                         }
                         if k >= 2 && k <= 2 + torpedo_ticks {
@@ -2397,6 +2411,7 @@ mod sea_shots {
                                         owner: 0,
                                         blueprint: leviathan,
                                         weapon,
+                                        gun: u16::from(weapon),
                                     });
                                 }
                             }

@@ -18,14 +18,9 @@ fn of_house(model: &Model, weapon: u8) -> impl Fn(&MeshVertex) -> bool {
     let slot = model
         .houses
         .iter()
-        .position(|h| h.weapon == weapon)
+        .position(|h| h.gun == u16::from(weapon))
         .expect("a house for the weapon") as u32;
-    move |v: &MeshVertex| {
-        let high = v.rig & rig::HOUSE_HIGH != 0;
-        let low = v.rig & rig::LIMB_MASK;
-        (rig::HOUSE_FIRST..rig::HOUSE_FIRST + 4).contains(&low)
-            && (low - rig::HOUSE_FIRST) + if high { 4 } else { 0 } == slot
-    }
+    move |v: &MeshVertex| rig::house_slot(v.rig) == Some(slot)
 }
 
 /// The ship floats, fits its blueprint and budget, wears dark plate and the owner's
@@ -34,13 +29,18 @@ fn of_house(model: &Model, weapon: u8) -> impl Fn(&MeshVertex) -> bool {
 fn it_fits() {
     let key = KEY;
     let model = build_model(key).unwrap();
-    let houses: Vec<(u8, Vec3)> = model
+    let houses: Vec<(u16, Vec3)> = model
         .houses
         .iter()
-        .map(|h| (h.weapon, Vec3::from(h.pivot)))
+        .map(|h| (h.gun, Vec3::from(h.pivot)))
         .collect();
     let mut want = vec![(0, MAIN[0]), (1, MAIN[1]), (2, MAIN[2]), (3, AA)];
-    want.extend(SECONDARY.iter().enumerate().map(|(k, &p)| (4 + k as u8, p)));
+    want.extend(
+        SECONDARY
+            .iter()
+            .enumerate()
+            .map(|(k, &p)| (4 + k as u16, p)),
+    );
     assert_eq!(houses, want, "{key}: houses");
     let tris = |lod: usize| model.lods[lod].indices.len() / 3;
     let (full, mid, coarse) = (tris(0), tris(1), tris(2));

@@ -544,6 +544,8 @@ pub(crate) const SCENE_SET: &[Binding] = &[
     (40, vk::DescriptorType::STORAGE_BUFFER),
     (41, vk::DescriptorType::STORAGE_BUFFER),
     (42, vk::DescriptorType::STORAGE_BUFFER),
+    // Every model's gun houses (renderer/model_houses.rs).
+    (43, vk::DescriptorType::STORAGE_BUFFER),
 ];
 
 /// The pass set (group 1 of the scene layout): a pass's own two storage buffers.

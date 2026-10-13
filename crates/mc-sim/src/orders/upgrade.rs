@@ -114,6 +114,7 @@ impl World {
                 self.state.units.deploy[row] = 0;
                 self.state.units.prev_deploy[row] = 0;
             }
+            self.fit_mounts(row);
             self.remove_unit_row(t, true)?;
             if self.bp(row).is_structure() {
                 self.reshape_lot(row, old_id, new.id);

@@ -1093,12 +1093,48 @@ shared! {
         pub const RATE_STEP: f32 = 0.03125;
     }
 
+    /// Gun houses turning on the hull by themselves (`Model::houses`, `rig::house_bits`,
+    /// entity.wgsl `house_slot`): a house's vertices ride one of `LIMBS` limbs from `LIMB`,
+    /// and its page (its slot over `LIMBS`) in two runs of rig bits nothing else on a house
+    /// uses (they mean something only on a refit piece, a leg, an arm or siege gear):
+    /// `PAGE_LOW_BITS` bits at `PAGE_LOW_SHIFT`, then two at `PAGE_HIGH_SHIFT`. Slot =
+    /// limb - `LIMB` + `LIMBS` * page, below `MAX` (`mc_data::MAX_GUNS`). The houses' pivots
+    /// and gun slots are a table of their own (`ModelInfo::houses`, `ModelHouse`); the
+    /// mirror poses `GUNS_PER_RECORD` gun slots to a `HousePose`.
+    pub mod house as "HOUSE_" {
+        pub const LIMB: u32 = 11;
+        pub const LIMBS: u32 = 4;
+        pub const LIMB_MASK: u32 = 0xF;
+        pub const PAGE_LOW_SHIFT: u32 = 16;
+        pub const PAGE_LOW_BITS: u32 = 3;
+        pub const PAGE_LOW_MASK: u32 = 0x7;
+        pub const PAGE_HIGH_SHIFT: u32 = 22;
+        pub const PAGE_HIGH_MASK: u32 = 0x3;
+        pub const MAX: u32 = 128;
+        pub const GUNS_PER_RECORD: u32 = 8;
+        /// `ModelInfo::houses`: the first record in the table, then the count from `COUNT_SHIFT`.
+        pub const FIRST_MASK: u32 = 0xFF_FFFF;
+        pub const COUNT_SHIFT: u32 = 24;
+        /// Not a house's vertex.
+        pub const NONE: u32 = 0xFFFF_FFFF;
+    }
+
     /// Hatched missile cells (`models::CellBlock`, entity.wgsl): each hatch swings up and
     /// out about its outer edge by how far the hatches are open (`UnitInstance::deploy`,
-    /// `mc_sim::launch_cells`); the missile standing in a cell is drawn while its bit is
-    /// set in `status[2]` (`launch_cells::loaded_cells`). The layout is the model's own
-    /// (`ModelInfo::cells`).
+    /// `mc_sim::launch_cells`); the missile standing in a cell is drawn while it is not yet
+    /// fired: its missile's place in the salvo (`ModelInfo::cell_order`, a byte a cell) is
+    /// at least the missiles fired so far (`status[2]`, `launch_cells::fired_cells`). The
+    /// layout is the model's own (`ModelInfo::cells`): up to `MAX_BLOCKS` blocks of up to
+    /// `MAX_CELLS`, each grid at most `MAX_SIDE` cells on a side.
     pub mod cells as "CELLS_" {
+        pub const MAX_CELLS: u32 = 32;
+        pub const MAX_BLOCKS: u32 = 2;
+        pub const MAX_SIDE: u32 = 32;
+        /// A block's grid word (`ModelInfo::cell_grid`): cells along x, then along y from
+        /// `NY_SHIFT`, and `HINGE_Y` when the hatches hinge along y.
+        pub const NX_MASK: u32 = 0xFF;
+        pub const NY_SHIFT: u32 = 8;
+        pub const HINGE_Y: u32 = 0x10000;
         /// A hatch, and its hinge knuckles.
         pub const PART_HATCH: u32 = 47;
         /// The missile standing in a cell.

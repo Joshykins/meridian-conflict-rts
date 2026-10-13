@@ -14,9 +14,27 @@ impl World {
             .max_by_key(|&i| (weapons[i].damage, std::cmp::Reverse(i)))
     }
 
+    /// One tick of weapon `w` of `row`: each gun of a group in turn (`mounts.rs`), else
+    /// the weapon itself.
     pub(super) fn step_weapon(&mut self, row: usize, w: usize) -> Result<(), SimError> {
+        if self.bp(row).weapons[w].is_group() {
+            return self.step_group(row, w);
+        }
+        self.step_gun(row, w, None)
+    }
+
+    /// One gun's tick: weapon `w` of `row`, or gun `m` of its group, whose state
+    /// `step_group` has laid into the weapon's slot.
+    pub(crate) fn step_gun(
+        &mut self,
+        row: usize,
+        w: usize,
+        m: Option<usize>,
+    ) -> Result<(), SimError> {
         let bp = self.blueprints.clone();
-        let weapon = &bp.unit(self.state.units.blueprint[row]).weapons[w];
+        let group = &bp.unit(self.state.units.blueprint[row]).weapons[w];
+        let weapon = m.map_or(group, |m| group.gun(m));
+        let gun = (bp.unit(self.state.units.blueprint[row]).gun_slot(w) + m.unwrap_or(0)) as u16;
         // Interceptor tubes are fired and reloaded by `run_torpedo_defence`, and a
         // `dash_only` weapon goes off only as its unit lands from a dash (`dash.rs`).
         if weapon.intercepts || weapon.dash_only {
@@ -244,13 +262,14 @@ impl World {
             && units.weapon_cooldown[row][w] == weapon.charge_ticks
             && units.weapon_salvo_left[row][w] == 0
         {
-            let at = units.pos[row].extend(units.z[row] + weapon.muzzle.z);
+            let at = charging_point(units, row, weapon, m.is_some());
             self.events.push(SimEvent::WeaponCharging {
                 unit: units.id(row),
                 pos: at,
                 owner: units.owner[row],
                 blueprint: units.blueprint[row],
                 weapon: w as u8,
+                gun,
             });
             if let (Some(storm), Some(m)) = (weapon.bore.and_then(|b| b.storm), mark.as_ref()) {
                 self.events.push(SimEvent::StormCharging {
@@ -349,9 +368,12 @@ impl World {
         let direct_air =
             weapon.trajectory == Trajectory::Direct && !weapon.missile && !weapon.guided && t.air;
         let target_velocity = t.moved;
+        // A ship's house leads its mark from its own pivot, which on a giant hull stands a
+        // kilometre off the middle and as much nearer or further from the mark.
+        let lead_from = if naval { yaw_origin } else { pos };
         let air_aim = direct_air.then(|| {
             direct_air_aim(
-                pos.extend(units.z[row] + weapon.pivot.unwrap_or(weapon.muzzle).z),
+                lead_from.extend(units.z[row] + weapon.pivot.unwrap_or(weapon.muzzle).z),
                 target_center,
                 target_velocity,
                 t.turn,
@@ -376,8 +398,10 @@ impl World {
             t.pos
         } else {
             let flight_ticks = match weapon.trajectory {
-                Trajectory::Direct => pos.distance(t.pos) / step,
-                Trajectory::Ballistic => Fx::from_int(ballistic_ticks(pos.distance(t.pos), weapon)),
+                Trajectory::Direct => lead_from.distance(t.pos) / step,
+                Trajectory::Ballistic => {
+                    Fx::from_int(ballistic_ticks(lead_from.distance(t.pos), weapon))
+                }
             };
             t.pos + t.lead * flight_ticks
         };
@@ -788,10 +812,13 @@ impl World {
         let hidden = t.unit.is_some() && self.shot_blocked(row, w);
         // A lift ship's gun reaches the ground only along the line of sight (`Weapon::slant`).
         let origin = self.gun_origin(row, weapon);
-        let slant_out = t.unit.is_some_and(|u| {
-            !self.slant_reaches(row, u, weapon, origin.distance(t.pos) - t.radius)
-        });
-        let gap = origin.distance(t.pos) - t.radius;
+        let gap = match t.unit {
+            Some(u) => self.hull_gap(origin, u),
+            None => origin.distance(t.pos) - t.radius,
+        };
+        let slant_out = t
+            .unit
+            .is_some_and(|u| !self.slant_reaches(row, u, weapon, gap));
         let in_reach = gap
             <= self.reach_onto(row, weapon, t.z + t.height / 2, t.moved.xy().length())
             && gap >= weapon.range_min - t.radius * 2;
@@ -848,13 +875,14 @@ impl World {
             if countdown > charge_at {
                 return Ok(());
             }
-            let at = units.pos[row].extend(units.z[row] + weapon.muzzle.z);
+            let at = charging_point(units, row, weapon, m.is_some());
             self.events.push(SimEvent::WeaponCharging {
                 unit: units.id(row),
                 pos: at,
                 owner: units.owner[row],
                 blueprint: units.blueprint[row],
                 weapon: w as u8,
+                gun,
             });
             if let (Some(storm), Some(m)) = (weapon.bore.and_then(|b| b.storm), mark.as_ref()) {
                 self.events.push(SimEvent::StormCharging {
@@ -1336,6 +1364,7 @@ impl World {
                 owner,
                 blueprint,
                 weapon: w as u8,
+                gun,
             });
             if let Some(sabot) = weapon.sabot {
                 // The spent casing leaves by the gun's port (`titan.rs`): the port and the

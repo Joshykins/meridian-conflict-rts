@@ -114,6 +114,7 @@ impl World {
                     owner: units.owner[row],
                     blueprint: units.blueprint[row],
                     weapon: w as u8,
+                    gun: bp.gun_slot(w) as u16,
                 });
             }
             self.state.units.weapon_cooldown[row][w] = next;

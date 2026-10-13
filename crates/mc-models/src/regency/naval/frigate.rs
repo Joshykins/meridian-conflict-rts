@@ -651,7 +651,7 @@ mod tests {
             "{key}: {full}/{mid}/{coarse}"
         );
         assert_eq!(model.houses.len(), 1, "{key}: one gun house");
-        assert_eq!(model.houses[0].weapon, 1, "{key}: the AA repeater's house");
+        assert_eq!(model.houses[0].gun, 1, "{key}: the AA repeater's house");
         assert!(Vec3::from(model.houses[0].pivot).distance(AA) < 1e-3);
         for (lod, mesh) in model.lods.iter().enumerate() {
             let name = format!("{key} lod{lod}");

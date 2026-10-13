@@ -13,6 +13,7 @@ pub mod gravitic;
 pub mod growth;
 pub mod lance;
 mod lot;
+pub mod mounts;
 mod raw;
 pub mod refit;
 pub mod regions;
@@ -29,6 +30,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
+pub use mounts::{Mount, MAX_GUNS};
 pub use raw::{
     AntiMissileLook, BuildSounds, Construction, FactionSounds, IconKind, LineLook, LinePath,
     MoveLayer, PlasmaGrade, PowerLine, ShieldKind, ShieldLook, StructureLamps, TorpedoLook,
@@ -1162,8 +1164,8 @@ pub const MAX_WEAPONS: usize = 10;
 pub const ROTARY_SLOTS: usize = 2;
 /// Most drones one unit keeps (`drone_sockets`).
 pub const MAX_DRONES: usize = 6;
-/// Weapons that may turn on gun houses of their own (`mount`) and be drawn turning: the
-/// renderer's rig has this many house limbs (`mirror::HousePose`).
+/// Gun slots one `mirror::HousePose` record poses: a unit with more guns (`MAX_GUNS`,
+/// `UnitBlueprint::gun_slot`) takes as many records in a row as it needs.
 pub const MAX_HOUSES: usize = 8;
 
 /// Highest tech tier. A unit's `tech` is `1..=MAX_TECH`.
@@ -2027,6 +2029,13 @@ impl Blueprints {
                 }
                 for v in w.pivot.map_or([Fx::MAX; 3], |p| [p.x, p.y, p.z]) {
                     h.write_i64(v.0);
+                }
+                h.write_u64(w.mounts.len() as u64);
+                for m in &w.mounts {
+                    for v in [m.pivot.x, m.pivot.y, m.pivot.z] {
+                        h.write_i64(v.0);
+                    }
+                    h.write_u64(m.facing.0 as u64 | (m.half_arc as u64) << 16);
                 }
             }
         }

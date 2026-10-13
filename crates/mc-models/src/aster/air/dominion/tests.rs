@@ -5,8 +5,7 @@ const DESIGNS: [&str; 1] = ["space_dreadnought"];
 
 /// A vertex on a gun house (it turns with its weapon, not with the hull).
 fn on_house(v: &crate::MeshVertex) -> bool {
-    let limb = v.rig & rig::LIMB_MASK;
-    (rig::HOUSE_FIRST..rig::HOUSE_FIRST + 4).contains(&limb) || v.rig & rig::HOUSE_HIGH != 0
+    rig::house_slot(v.rig).is_some()
 }
 
 #[test]
@@ -24,7 +23,7 @@ fn every_design_keeps_its_budgets_rig_and_guns() {
         assert_eq!(model.houses.len(), want.len(), "{key}");
         for (i, (house, pivot)) in model.houses.iter().zip(want).enumerate() {
             assert_eq!(house.pivot, pivot, "{key}");
-            assert_eq!(house.weapon as usize, i, "{key}");
+            assert_eq!(house.gun as usize, i, "{key}");
         }
         assert_eq!(model.cells.len(), 2, "{key}");
         let mesh = &model.lods[0];

@@ -377,7 +377,7 @@ impl World {
                     s.units.hangar[row].0
                 } else {
                     deck_up(row)
-                        .or_else(|| self.loaded_cells(row))
+                        .or_else(|| self.fired_cells(row))
                         .or_else(|| self.held_orbs(row))
                         .unwrap_or_else(|| self.launcher_pad(row))
                 },
@@ -415,30 +415,26 @@ impl World {
         let bp = self.bp(row);
         let pitch = signed_pitch;
         // Guns on houses of their own (`rig::HOUSE`), or a twin on the arm that kicks on
-        // its own shots: every weapon's pose, in a side list.
+        // its own shots: every gun's pose, by gun slot (`UnitBlueprint::gun_slot`), eight
+        // to a record, in as many records in a row as the unit has guns for.
         let house = gunned.map(|_| {
-            let mut hp = HousePose::default();
-            for (w, weapon) in bp.weapons.iter().enumerate().take(mc_data::MAX_HOUSES) {
-                let slot = crate::combat::pitch_slot(weapon, w);
-                hp.pose[w] = [
-                    s.units.prev_weapon_yaw[row][w].to_radians_f32(),
-                    s.units.weapon_yaw[row][w].to_radians_f32(),
-                    pitch(s.units.prev_arm_pitch[row][slot]),
-                    pitch(s.units.arm_pitch[row][slot]),
-                ];
-                // Mid-salvo, each shot kicks on its own: the countdown is the gap to the
-                // next shot, not the reload.
-                let run = if s.units.weapon_salvo_left[row][w] > 0 {
-                    weapon.salvo_delay_ticks.max(1) as u16
-                } else {
-                    weapon.reload_ticks
-                };
-                let (now, prev) = barrel_recoil_pair(s.units.weapon_cooldown[row][w], run);
-                hp.kick[2 * w] = prev;
-                hp.kick[2 * w + 1] = now;
+            let first = houses.len();
+            let records = bp.gun_count().div_ceil(mc_data::MAX_HOUSES).max(1);
+            houses.resize(first + records, HousePose::default());
+            for (w, weapon) in bp.weapons.iter().enumerate() {
+                let slot = bp.gun_slot(w);
+                for m in 0..weapon.guns() {
+                    let (g, (pose, kick)) = (slot + m, self.gun_pose(row, w, m));
+                    let (hp, k) = (
+                        &mut houses[first + g / mc_data::MAX_HOUSES],
+                        g % mc_data::MAX_HOUSES,
+                    );
+                    hp.pose[k] = pose;
+                    hp.kick[2 * k] = kick.1;
+                    hp.kick[2 * k + 1] = kick.0;
+                }
             }
-            houses.push(hp);
-            houses.len() - 1
+            first
         });
         // Reclaim heads on pivots are houses too: head `i` in slot `i`, and they never kick.
         let house = house.or_else(|| {
@@ -458,6 +454,56 @@ impl World {
             })
         });
         house
+    }
+}
+
+impl World {
+    /// Gun `m` of weapon `w` of `row` (a group's gun, else the weapon's one): its yaw off
+    /// the hull last tick and this, then its pitch last tick and this (radians); and its
+    /// kick this tick and last. Mid-salvo each shot kicks on its own: the countdown is the
+    /// gap to the next shot, not the reload. A held beam fires every tick, and never kicks.
+    fn gun_pose(&self, row: usize, w: usize, m: usize) -> ([f32; 4], (f32, f32)) {
+        let s = &self.state;
+        let weapon = self.bp(row).weapons[w].gun(m);
+        let (yaw, prev_yaw, pitch, prev_pitch, cooldown, salvo_left) =
+            match s.units.mounts[row].get(self.bp(row).gun_slot(w) + m) {
+                Some(g) if self.bp(row).weapons[w].is_group() => (
+                    g.yaw,
+                    g.prev_yaw,
+                    g.pitch,
+                    g.prev_pitch,
+                    g.cooldown,
+                    g.salvo_left,
+                ),
+                _ => {
+                    let slot = crate::combat::pitch_slot(weapon, w);
+                    (
+                        s.units.weapon_yaw[row][w],
+                        s.units.prev_weapon_yaw[row][w],
+                        s.units.arm_pitch[row][slot],
+                        s.units.prev_arm_pitch[row][slot],
+                        s.units.weapon_cooldown[row][w],
+                        s.units.weapon_salvo_left[row][w],
+                    )
+                }
+            };
+        let pose = [
+            prev_yaw.to_radians_f32(),
+            yaw.to_radians_f32(),
+            signed_pitch(prev_pitch),
+            signed_pitch(pitch),
+        ];
+        let run = if salvo_left > 0 {
+            weapon.salvo_delay_ticks.max(1) as u16
+        } else {
+            weapon.reload_ticks
+        };
+        let kick = if weapon.beam {
+            (0.0, 0.0)
+        } else {
+            barrel_recoil_pair(cooldown, run)
+        };
+        (pose, kick)
     }
 }
 

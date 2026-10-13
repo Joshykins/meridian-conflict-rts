@@ -21,6 +21,30 @@ pub(crate) fn spine(bp: &UnitBlueprint, pos: FxVec2, heading: Angle) -> (FxVec2,
     }
 }
 
+/// How far `from` is from the hull of `bp` at `pos`, facing `heading`: from its spine's
+/// capsule (`spine`), so a long hull is reached along its sides from where they are, not
+/// from a disc of its radius out past them; a disc's from its rim.
+pub(crate) fn gap(bp: &UnitBlueprint, pos: FxVec2, heading: Angle, from: FxVec2) -> Fx {
+    let (a, b, half) = spine(bp, pos, heading);
+    if a == b {
+        return from.distance(a) - half;
+    }
+    to_segment_sq(from, a, b).sqrt() - half
+}
+
+impl crate::World {
+    /// How far `from` is from `row`'s hull, as its enemies' guns reach for it: from its
+    /// body's capsule (`gap`), or from the rim of its `hull_radius` (a grown Shaper's foot).
+    pub(crate) fn hull_gap(&self, from: FxVec2, row: usize) -> Fx {
+        let bp = self.bp(row);
+        let units = &self.state.units;
+        if bp.body.is_some() && bp.growth.is_none() {
+            return gap(bp, units.pos[row], units.heading[row], from);
+        }
+        from.distance(units.pos[row]) - self.hull_radius(row)
+    }
+}
+
 /// Where along the shot `from + vel * t`, `t` in `enter..=leave`, it passes nearest the
 /// spine `a..b`, and the square of how far off it is there. A disc's spine (`a == b`)
 /// takes the shot's closest pass to its centre.

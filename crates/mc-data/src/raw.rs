@@ -1083,6 +1083,12 @@ pub struct RawWeapon {
     /// Extra tube mouths a volley walks. Empty: every shot uses `muzzle`.
     #[serde(default)]
     pub muzzles: Vec<(f64, f64, f64)>,
+    /// A weapon group: this one weapon is a gun on each of these houses, each with its own
+    /// pivot, rest and arc and its own aim, mark and reload (`crate::mounts`). Its `muzzle`
+    /// and `muzzles` are then given about the pivot, the house facing the nose. Empty (the
+    /// default): one gun.
+    #[serde(default)]
+    pub mounts: Vec<crate::mounts::RawMount>,
     /// The elbow the weapon pitches about to point up or down at its target.
     #[serde(default)]
     pub pivot: Option<(f64, f64, f64)>,
@@ -1571,12 +1577,12 @@ fn full_arc() -> f64 {
     360.0
 }
 
-fn fx(v: f64) -> Fx {
+pub(crate) fn fx(v: f64) -> Fx {
     Fx((v * Fx::ONE.0 as f64).round() as i64)
 }
 
 /// Degrees to angle steps.
-fn steps(deg: f64) -> f64 {
+pub(crate) fn steps(deg: f64) -> f64 {
     deg * 65536.0 / 360.0
 }
 
@@ -1706,15 +1712,11 @@ impl Unit {
         {
             return Err(DataError::Invalid(format!("{key}: effects require dust_opacity/dust_visibility and dust_brightness 0..4, dust_lifetime 0..10, and dust_color/shockwave_color RGB 0..1")));
         }
-        if let Some(i) = self
-            .weapons
-            .iter()
-            .enumerate()
-            .position(|(i, w)| i >= crate::MAX_HOUSES && w.mount)
-        {
+        let guns: usize = self.weapons.iter().map(|w| w.mounts.len().max(1)).sum();
+        if guns > crate::MAX_GUNS {
             return Err(DataError::Invalid(format!(
-                "{key}: weapon {i} is on a gun house, but only the first {} weapons can be",
-                crate::MAX_HOUSES
+                "{key}: {guns} guns, but a unit carries at most {}",
+                crate::MAX_GUNS
             )));
         }
         if self.weapons.len() > MAX_WEAPONS {
@@ -2106,6 +2108,7 @@ impl Unit {
                     "{ctx}: an electric bore fires a direct shot"
                 )));
             }
+            crate::mounts::check(&ctx, w)?;
             weapons.push(Weapon {
                 name: w.name.clone(),
                 damage: fx(w.damage),
@@ -2134,11 +2137,7 @@ impl Unit {
                 turret_turn: (steps(w.turret_turn) / TICKS_PER_SECOND as f64)
                     .round()
                     .clamp(0.0, 32767.0) as u16,
-                half_arc: if w.arc >= 360.0 {
-                    0x8000
-                } else {
-                    (steps(w.arc) / 2.0).round() as u16
-                },
+                half_arc: crate::mounts::half_arc(w.arc),
                 muzzle: FxVec3::new(fx(w.muzzle.0), fx(w.muzzle.1), fx(w.muzzle.2)),
                 muzzles: w
                     .muzzles
@@ -2313,7 +2312,12 @@ impl Unit {
                     0
                 },
                 lore: String::new(),
+                mounts: Vec::new(),
+                mount_weapons: Vec::new(),
             });
+            if let Some(group) = weapons.last_mut() {
+                crate::mounts::assemble(group, crate::mounts::compile(w));
+            }
         }
 
         let e = &self.economy;

@@ -208,6 +208,7 @@ impl World {
             owner,
             blueprint,
             weapon: w as u8,
+            gun: self.blueprints.unit(blueprint).gun_slot(w) as u16,
         });
         Ok(())
     }

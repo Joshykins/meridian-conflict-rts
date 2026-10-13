@@ -101,7 +101,7 @@ fn it_carries_its_weapons() {
     assert_eq!(model.houses.len(), 2, "{key}: two gun houses");
     for (slot, (pivot, muzzle)) in l.aa.into_iter().enumerate() {
         let house = model.houses[slot];
-        assert_eq!(house.weapon as usize, 1 + slot, "{key}");
+        assert_eq!(house.gun as usize, 1 + slot, "{key}");
         assert!(Vec3::from(house.pivot).distance(pivot) < 1e-3, "{key}");
         let of_house = |v: &MeshVertex| v.rig & rig::LIMB_MASK == rig::HOUSE_FIRST + slot as u32;
         for lod in 0..2 {

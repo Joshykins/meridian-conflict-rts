@@ -153,12 +153,13 @@ impl World {
     }
 
     /// Where the reach of `weapon` on `shooter` is measured from across the map: a lift
-    /// ship is so long that each of its gun houses reaches from its own pivot; anything
-    /// else from its middle.
+    /// ship, or a hull with gun houses (`hull_mounts`: a capital ship, whose houses stand
+    /// up to a kilometre and more off its middle), reaches from each house's own pivot;
+    /// anything else from its middle.
     pub(crate) fn gun_origin(&self, shooter: usize, weapon: &Weapon) -> FxVec2 {
         let units = &self.state.units;
         match weapon.pivot {
-            Some(p) if weapon.mount && self.bp(shooter).transport.is_some() => {
+            Some(p) if self.reaches_from_pivot(shooter, weapon) => {
                 units.pos[shooter] + p.xy().rotate(units.heading[shooter])
             }
             _ => units.pos[shooter],
@@ -168,9 +169,15 @@ impl World {
     /// How far `gun_origin` lies from the middle of `shooter`, metres.
     pub(crate) fn gun_offset(&self, shooter: usize, weapon: &Weapon) -> Fx {
         match weapon.pivot {
-            Some(p) if weapon.mount && self.bp(shooter).transport.is_some() => p.xy().length(),
+            Some(p) if self.reaches_from_pivot(shooter, weapon) => p.xy().length(),
             _ => Fx::ZERO,
         }
+    }
+
+    /// Whether `weapon` of `shooter` is a house whose reach is its own (`gun_origin`).
+    fn reaches_from_pivot(&self, shooter: usize, weapon: &Weapon) -> bool {
+        let bp = self.bp(shooter);
+        weapon.mount && (bp.transport.is_some() || bp.hull_mounts)
     }
 
     /// Room taken in the hold of the ship `ship`.

@@ -225,10 +225,12 @@ struct ModelInfo {
     // z: how far a walker's hips sink in full stride (`Legs::crouch`);
     // w: height of a walker's neck (`rig::HEAD`), zero for none; its x is turret_pivot.w.
     surface: vec4<f32>,
-    // Gun houses of their own (limbs 11..15): pivot (xyz) and kick-back travel (w).
-    houses: array<vec4<f32>, 4>,
-    // Which weapon each house is bound to, plus one; zero for no house in that slot.
-    house_weapon: vec4<f32>,
+    // Hatched missile cells' muzzles (`models::CellBlock::gpu`): block b's grid cell c
+    // (i * ny + j) is the weapon's muzzle in byte b * CELLS_MAX_CELLS + c.
+    cell_order: array<vec4<u32>, 4>,
+    // Its gun houses in `model_houses` (bindings.wgsl): first | count << HOUSE_COUNT_SHIFT.
+    houses: u32,
+    _house_pad: array<u32, 3>,
     // A spacecraft's rig (`models::capital::CapitalRig::gpu`), zero for any other model:
     // [0] fore legs hinge x, |y|, z, stow way (+1 foot swings aft, -1 forward; 0: no gear);
     // [1] aft legs the same; [2] bay door hinges |y|: fore inner, outer, aft inner, outer;
@@ -238,9 +240,6 @@ struct ModelInfo {
     // [5] lift jets: fore x, |y|, aft x, |y| (0: none); [6] lift jet mouth z, drive size
     // (1: a 17 m deep bell), belly ramp hinge x, z (z 0: no ramp).
     capital: array<vec4<f32>, 7>,
-    // Houses 4..8 (`rig::HOUSE_HIGH`), as `houses` and `house_weapon`.
-    houses_high: array<vec4<f32>, 4>,
-    house_weapon_high: vec4<f32>,
     // Where a personal (hull) shield is thrown from, bind pose (`Model::shield_emitter`);
     // w 1 when the model says, zero for the default (the top of the hull over the middle).
     shield_emitter: vec4<f32>,
@@ -267,8 +266,8 @@ struct ModelInfo {
     // its centre (xy), the deck its hatches shut on (z) and the cells' pitch (w); [2b + 1].x
     // a hatch's half width.
     cells: array<vec4<f32>, 4>,
-    // Per block its grid in x, y (nx | ny << 4 | 1 << 8 when the hatches hinge along y);
-    // then in z, w per block the missile bit of each grid cell c (i * ny + j) in nibble c.
+    // Per block its grid in x, y (nx, ny << CELLS_NY_SHIFT, CELLS_HINGE_Y when the hatches
+    // hinge along y); z and w zero.
     cell_grid: vec4<u32>,
     // A charge gun's working gear (`Model::charge_gear`, `CHARGE_GEAR_*`): the hub its SPIN
     // gear turns about (xyz) and the scale of its travels (w). Zero for none.
@@ -294,6 +293,16 @@ struct ModelInfo {
     // gravitic_engine_fx), not the clock: a gravitic engine's machinery (`Model::gravity_core`).
     orbit_driven: u32,
     _skin_pad2: u32,
+}
+
+// A gun house of a model's (`mc_models::House`): where it turns, how far its recoiling
+// pieces kick back, and the gun slot it is bound to.
+//!rust crate::renderer::model_houses::GpuHouse
+struct ModelHouse {
+    pivot: vec3<f32>,
+    travel: f32,
+    gun: u32,
+    _pad: array<u32, 3>,
 }
 
 // A box on a model's surface saying what is drawn there (`mc_models::Mark`,

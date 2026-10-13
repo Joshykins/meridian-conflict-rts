@@ -778,7 +778,7 @@ mod tests {
         }
         assert_eq!(model.houses.len(), 1, "{key}: one gun house");
         let house = model.houses[0];
-        assert_eq!(house.weapon, 2);
+        assert_eq!(house.gun, 2);
         assert!(Vec3::from(house.pivot).distance(GUN) < 1e-3);
         let of_house = |v: &MeshVertex| v.rig & rig::LIMB_MASK == rig::HOUSE_FIRST;
         for lod in 0..2 {

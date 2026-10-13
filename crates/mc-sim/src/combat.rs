@@ -24,6 +24,16 @@ fn assault_gun_pivot_x(radius: Fx) -> Fx {
 }
 const DT: i32 = TICKS_PER_SECOND as i32;
 pub(crate) const CHUNK: usize = 256;
+/// Where `weapon` of `row` is heard and seen charging: over the middle of the hull, or a
+/// group's gun (`house`) over its own house's pivot, which may stand a kilometre off it.
+fn charging_point(units: &Units, row: usize, weapon: &Weapon, house: bool) -> FxVec3 {
+    let at = match weapon.pivot.filter(|_| house) {
+        Some(p) => units.pos[row] + p.xy().rotate(units.heading[row]),
+        None => units.pos[row],
+    };
+    at.extend(units.z[row] + weapon.muzzle.z)
+}
+
 /// Turret must be within this of the firing solution to shoot (~2 degrees).
 const AIM_TOLERANCE: u16 = 364;
 /// Where an idle land AA gun rests: raised toward the sky it guards.
@@ -566,8 +576,7 @@ impl World {
         if !self.are_enemies(owner, units.owner[target]) || !self.weapon_reaches(target, weapon) {
             return false;
         }
-        let gap =
-            self.gun_origin(shooter, weapon).distance(units.pos[target]) - self.hull_radius(target);
+        let gap = self.hull_gap(self.gun_origin(shooter, weapon), target);
         let bp = self.bp(shooter);
         if weapon.depression.0 > 0 {
             let to = units.pos[target].extend(units.z[target] + self.bp(target).height / 2);

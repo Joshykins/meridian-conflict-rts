@@ -479,7 +479,7 @@ mod tests {
             "{key}: {full}/{mid}/{coarse}"
         );
         assert_eq!(model.houses.len(), 1, "{key}: one gun house");
-        assert_eq!(model.houses[0].weapon, 0);
+        assert_eq!(model.houses[0].gun, 0);
         assert_eq!(Vec3::from(model.houses[0].pivot), PIVOT);
         for (lod, mesh) in model.lods.iter().enumerate() {
             let name = format!("{key} lod{lod}");

@@ -58,14 +58,15 @@ fn cell_muzzles_stand_in_the_cells_their_model_declares() {
             "{key}: a salvo empties every cell"
         );
         assert!(weapon.split, "{key}");
-        let bits = CellBlock::gpu(blocks).1;
+        let order = CellBlock::gpu(blocks).order;
         for (k, m) in weapon.muzzles.iter().enumerate() {
             let [x, y, z] = [m.x.to_f32(), m.y.to_f32(), m.z.to_f32()];
             let (b, i, j) = cell_of(blocks, x, y);
             let block = &blocks[b];
             let c = i * block.ny as usize + j;
+            let byte = b * CellBlock::MAX_CELLS + c;
             assert_eq!(
-                (bits[2 + b] >> (4 * c)) & 0xF,
+                (order[byte / 16][byte / 4 % 4] >> (8 * (byte % 4))) & 0xFF,
                 k as u32,
                 "{key}: muzzle {k} is in another cell"
             );

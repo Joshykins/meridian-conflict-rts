@@ -114,7 +114,7 @@ fn plasma_gun_houses_are_bound_to_their_weapons_and_end_at_their_muzzles() {
             let p = weapon.pivot.unwrap();
             let pivot = Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
             assert_eq!(Vec3::from(model.houses[slot].pivot), pivot);
-            assert_eq!(model.houses[slot].weapon as usize, slot);
+            assert_eq!(model.houses[slot].gun as usize, slot);
             let p = weapon.muzzle;
             let muzzle = Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
             let near = model.lods[0]
@@ -241,7 +241,7 @@ fn the_destroyers_lance_leaves_its_core_and_its_batteries_and_seekers_their_moun
         let house = model
             .houses
             .iter()
-            .find(|h| h.weapon as usize == 1 + k)
+            .find(|h| h.gun as usize == 1 + k)
             .expect("a house for each battery");
         assert!(Vec3::from(house.pivot).distance(*pivot) < 0.01);
         let have: Vec<Vec3> = weapon.muzzles.iter().map(|&p| at(p)).collect();

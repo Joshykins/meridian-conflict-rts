@@ -971,10 +971,12 @@ impl Renderer {
             .weapons
             .get(weapon as usize)?;
         // A gun fixed along the keel (a warship's spinal bore) turns on no house.
-        let pose = hull
-            .house
-            .filter(|_| (weapon as usize) < mc_data::MAX_HOUSES && w.turret_turn != 0)
-            .map(|h| h.pose[weapon as usize]);
+        let gun = self
+            .blueprints
+            .units
+            .get(hull.blueprint as usize)?
+            .gun_slot(weapon as usize);
+        let pose = hull.gun_pose(gun).filter(|_| w.turret_turn != 0);
         let (yaw, pitch) = pose.map_or((0.0, 0.0), |p| (p[1], p[3]));
         let pivot = w.pivot.map_or(Vec3::ZERO, |p| Vec3::from(p.to_f32()));
         let rot_z = |v: Vec3, a: f32| {
@@ -1018,14 +1020,7 @@ impl Renderer {
                         .distance_squared(beam.near)
                         .total_cmp(&b.pos.distance_squared(beam.near))
                 })
-                .map(|g| super::water_fx::GunHull {
-                    blueprint: g.blueprint,
-                    pos: g.pos,
-                    heading: g.heading,
-                    house: g.house,
-                    turret: g.turret,
-                    pitch: g.pitch,
-                });
+                .cloned();
             // Not in the list this tick (it is filled after the events): try again next tick.
             let Some(hull) = hull else {
                 kept.push(beam);

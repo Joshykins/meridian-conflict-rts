@@ -257,7 +257,7 @@ impl Renderer {
         let gun = GunFrame::of(
             u,
             w,
-            weapon,
+            bp.gun_slot(weapon as usize),
             &self.bore_fx.howitzers.houses,
             &bp.visual.mesh,
             weapon == 0 && w.turret_turn > 0,

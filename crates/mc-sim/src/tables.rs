@@ -182,9 +182,12 @@ pub struct Units {
     pub weapon_target: Vec<[UnitId; MAX_WEAPONS]>,
     /// Bit `w` set: the ground stands between weapon `w` and its target, so it holds its
     /// fire (`line_of_fire.rs`). Always clear for a gun that lobs, homes or has no target.
-    pub shot_blocked: Vec<u8>,
+    pub shot_blocked: Vec<u16>,
     /// `weapon_yaw` at the end of the previous tick, for render interpolation.
     pub prev_weapon_yaw: Vec<[Angle; MAX_WEAPONS]>,
+    /// A unit with a weapon group: each gun's own state, by gun slot (`mounts.rs`).
+    /// Empty for every other unit.
+    pub mounts: Vec<Vec<crate::mounts::MountState>>,
     /// How far the gun arm (first weapon) and the build arm are pitched up (down: negative)
     /// at what they point at. A build arm's rest pitch folds it away when idle.
     /// It moves the muzzle and the emitter, so it is state. Slot `2 + w` is the pitch of
@@ -324,6 +327,7 @@ impl Units {
             weapon_target: Vec::new(),
             shot_blocked: Vec::new(),
             prev_weapon_yaw: Vec::new(),
+            mounts: Vec::new(),
             arm_pitch: Vec::new(),
             prev_arm_pitch: Vec::new(),
             spin: Vec::new(),
@@ -408,6 +412,7 @@ impl Units {
         put(&mut self.weapon_target, row, [Handle::NONE; MAX_WEAPONS]);
         put(&mut self.shot_blocked, row, 0);
         put(&mut self.prev_weapon_yaw, row, [Angle::ZERO; MAX_WEAPONS]);
+        put(&mut self.mounts, row, Vec::new());
         put(&mut self.arm_pitch, row, [Angle::ZERO; ARM_SLOTS]);
         put(&mut self.prev_arm_pitch, row, [Angle::ZERO; ARM_SLOTS]);
         put(&mut self.spin, row, [[0; 4]; ROTARY_SLOTS]);
@@ -583,6 +588,7 @@ impl Units {
                     | (self.stun[row][1] as u64) << 48,
             );
             self.dash[row].hash(h);
+            self.hash_mounts(row, h);
             for w in 0..MAX_WEAPONS {
                 h.write_u64(
                     self.weapon_cooldown[row][w] as u64

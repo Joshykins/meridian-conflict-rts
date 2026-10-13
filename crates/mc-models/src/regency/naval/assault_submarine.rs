@@ -778,7 +778,7 @@ mod tests {
         let slot = model
             .houses
             .iter()
-            .position(|h| h.weapon == weapon)
+            .position(|h| h.gun == u16::from(weapon))
             .expect("a house for the weapon") as u32;
         model.lods[lod]
             .vertices
@@ -806,10 +806,10 @@ mod tests {
     fn it_fits_and_holds_its_weapons() {
         let key = KEY;
         let model = build_model(key).expect(key);
-        let houses: Vec<(u8, Vec3)> = model
+        let houses: Vec<(u16, Vec3)> = model
             .houses
             .iter()
-            .map(|h| (h.weapon, Vec3::from(h.pivot)))
+            .map(|h| (h.gun, Vec3::from(h.pivot)))
             .collect();
         assert_eq!(houses, vec![(4, AA), (2, FORE), (3, AFT)], "{key}: houses");
         let tris = |lod: usize| model.lods[lod].indices.len() / 3;

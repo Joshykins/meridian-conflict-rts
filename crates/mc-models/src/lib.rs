@@ -417,15 +417,41 @@ pub mod rig {
     /// in the `UPGRADE_AT` bits: those only mean anything on refit pieces, never on legs.
     pub const PAIR_SHIFT: u32 = 16;
     pub const PAIR_MASK: u32 = 0x7 << PAIR_SHIFT;
-    /// A gun house of its own on the hull (`Model::houses`): limbs `HOUSE_FIRST..HOUSE_FIRST + HOUSE_COUNT`,
-    /// one per house, each bound to a weapon whose yaw and pitch the mirror publishes
-    /// (`mirror::HousePose`). The house turns about its pivot; its `RECOIL` verts pitch and kick too.
-    pub const HOUSE_FIRST: u32 = 11;
-    /// Houses 4..8 reuse limbs `HOUSE_FIRST..HOUSE_FIRST + 4` with `HOUSE_HIGH` set.
-    pub const HOUSE_COUNT: u32 = 8;
-    /// Marks a house limb as houses 4..8. It borrows the top bit of `UPGRADE_AT`, which only
-    /// means anything on refit pieces, so a house past the fourth cannot be one.
-    pub const HOUSE_HIGH: u32 = 1 << 23;
+    /// A gun house of its own on the hull (`Model::houses`): limbs `HOUSE_FIRST..HOUSE_FIRST + 4`
+    /// and the house's page in bits of their own (`house_bits`, `gpu_consts::house`), each
+    /// house bound to a gun whose yaw and pitch the mirror publishes (`mirror::HousePose`).
+    /// The house turns about its pivot; its `RECOIL` verts pitch and kick too.
+    pub const HOUSE_FIRST: u32 = crate::gpu_consts::house::LIMB;
+    /// The most houses a model has.
+    pub const HOUSE_COUNT: u32 = crate::gpu_consts::house::MAX;
+    /// The rig bits a house past the fourth borrows for its page (`UPGRADE_AT` bits, which
+    /// only mean anything on refit pieces, so such a house cannot be one).
+    pub const HOUSE_PAGE_MASK: u32 = {
+        use crate::gpu_consts::house as h;
+        h::PAGE_LOW_MASK << h::PAGE_LOW_SHIFT | h::PAGE_HIGH_MASK << h::PAGE_HIGH_SHIFT
+    };
+
+    /// The limb and page bits of house `slot`.
+    pub const fn house_bits(slot: u32) -> u32 {
+        use crate::gpu_consts::house as h;
+        let page = slot / h::LIMBS;
+        h::LIMB
+            + slot % h::LIMBS
+            + ((page & h::PAGE_LOW_MASK) << h::PAGE_LOW_SHIFT)
+            + ((page >> h::PAGE_LOW_BITS & h::PAGE_HIGH_MASK) << h::PAGE_HIGH_SHIFT)
+    }
+
+    /// The house a vertex of rig `bits` rides, if any.
+    pub const fn house_slot(bits: u32) -> Option<u32> {
+        use crate::gpu_consts::house as h;
+        let limb = bits & LIMB_MASK;
+        if limb < h::LIMB || limb >= h::LIMB + h::LIMBS {
+            return None;
+        }
+        let page = (bits >> h::PAGE_LOW_SHIFT & h::PAGE_LOW_MASK)
+            | (bits >> h::PAGE_HIGH_SHIFT & h::PAGE_HIGH_MASK) << h::PAGE_LOW_BITS;
+        Some(limb - h::LIMB + h::LIMBS * page)
+    }
     /// Rotary barrels: turn about the axis `Model::spins` gives for the loadout.
     pub const SPIN: u32 = 1 << 30;
     /// Build-arm gear that works while the unit builds, eased in and out with the builder's
@@ -901,12 +927,14 @@ pub struct Excavation {
 }
 
 /// A gun house turning on the hull by itself: where it turns (its pivot, model space), how
-/// far its `rig::RECOIL` verts kick back when it fires, and which weapon of the unit it is.
+/// far its `rig::RECOIL` verts kick back when it fires, and which gun of the unit it is: its
+/// gun slot (`mc_data::UnitBlueprint::gun_slot`), its weapon's index on a unit without
+/// weapon groups.
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct House {
     pub pivot: [f32; 3],
     pub travel: f32,
-    pub weapon: u8,
+    pub gun: u16,
 }
 
 /// A block of hatched missile cells (`part::CELL_HATCH`, `part::CELL_ROUND`): `nx` cells
@@ -914,8 +942,9 @@ pub struct House {
 /// `deck`. Each hatch is hinged on its outer edge (away from the block's middle) along x,
 /// or along y when `hinge_y`, `half` out from its cell's centre, and swings up and out as
 /// the hatches open (`UnitInstance::deploy`). The missile standing in grid cell `i * ny + j`
-/// is shown while bit `first + order[i * ny + j]` of `status[2]` is set: the cells' missiles
-/// in firing order are the weapon's muzzles `first..` (`mc_sim::launch_cells`).
+/// is the weapon's muzzle `first + order[i * ny + j]`, shown while the salvo has not yet
+/// fired it (`status[2]`, `mc_sim::launch_cells::fired_cells`): the cells' missiles in firing
+/// order are the weapon's muzzles `first..`.
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CellBlock {
     pub centre: [f32; 2],
@@ -930,10 +959,10 @@ pub struct CellBlock {
 }
 
 impl CellBlock {
-    /// Cells in one block (a nibble each in the shader's order word).
-    pub const MAX_CELLS: usize = 8;
+    /// Cells in one block (a byte each in `ModelInfo::cell_order`).
+    pub const MAX_CELLS: usize = crate::gpu_consts::cells::MAX_CELLS as usize;
     /// Blocks on one model.
-    pub const MAX_BLOCKS: usize = 2;
+    pub const MAX_BLOCKS: usize = crate::gpu_consts::cells::MAX_BLOCKS as usize;
 
     /// Centre of grid cell (`i`, `j`).
     pub fn grid_centre(&self, i: usize, j: usize) -> [f32; 2] {
@@ -951,22 +980,37 @@ impl CellBlock {
         Some(self.grid_centre(c / self.ny as usize, c % self.ny as usize))
     }
 
-    /// `ModelInfo::cells` and `cell_grid` for up to two blocks: per block its centre,
-    /// deck and pitch, then its hatch half-width; its grid word (`nx | ny << 4 | hinge_y
-    /// << 8`) and its order word (the missile bit of grid cell c in nibble c).
-    pub fn gpu(blocks: &[CellBlock]) -> ([[f32; 4]; 4], [u32; 4]) {
-        let mut cells = [[0.0; 4]; 4];
-        let mut grid = [0; 4];
+    /// `ModelInfo::cells`, `cell_grid` and `cell_order` for up to `MAX_BLOCKS` blocks: per
+    /// block its centre, deck and pitch, then its hatch half-width; its grid word (`nx`,
+    /// `ny` from `cells::NY_SHIFT`, `cells::HINGE_Y`); and the muzzle of each of its grid
+    /// cells, a byte each, block `b`'s cell `c` at byte `b * MAX_CELLS + c`.
+    pub fn gpu(blocks: &[CellBlock]) -> CellsGpu {
+        use crate::gpu_consts::cells as g;
+        let mut out = CellsGpu {
+            cells: [[0.0; 4]; 4],
+            grid: [0; 4],
+            order: [[0; 4]; 4],
+        };
         for (k, b) in blocks.iter().take(Self::MAX_BLOCKS).enumerate() {
-            cells[2 * k] = [b.centre[0], b.centre[1], b.deck, b.pitch];
-            cells[2 * k + 1] = [b.half, 0.0, 0.0, 0.0];
-            grid[k] = b.nx as u32 | (b.ny as u32) << 4 | (b.hinge_y as u32) << 8;
-            grid[2 + k] = (0..b.nx as usize * b.ny as usize)
-                .map(|c| ((b.first + b.order[c]) as u32 & 0xF) << (4 * c))
-                .fold(0, |w, n| w | n);
+            out.cells[2 * k] = [b.centre[0], b.centre[1], b.deck, b.pitch];
+            out.cells[2 * k + 1] = [b.half, 0.0, 0.0, 0.0];
+            out.grid[k] =
+                b.nx as u32 | (b.ny as u32) << g::NY_SHIFT | (b.hinge_y as u32 * g::HINGE_Y);
+            for c in 0..b.nx as usize * b.ny as usize {
+                let byte = k * Self::MAX_CELLS + c;
+                let muzzle = (b.first as u32 + b.order[c] as u32) & 0xFF;
+                out.order[byte / 16][byte / 4 % 4] |= muzzle << (8 * (byte % 4));
+            }
         }
-        (cells, grid)
+        out
     }
+}
+
+/// A model's cell blocks as `ModelInfo` holds them (`CellBlock::gpu`).
+pub struct CellsGpu {
+    pub cells: [[f32; 4]; 4],
+    pub grid: [u32; 4],
+    pub order: [[u32; 4]; 4],
 }
 
 /// A hole a model digs into the ground (a core mine's). The vertex shader pulls what is

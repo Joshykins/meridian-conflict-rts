@@ -479,6 +479,7 @@ impl World {
                     owner,
                     blueprint,
                     weapon: w as u8,
+                    gun: blueprints.unit(blueprint).gun_slot(w) as u16,
                 });
             }
             if weapon.on_dash {

@@ -227,6 +227,8 @@ struct Charge {
     unit: u32,
     blueprint: BlueprintId,
     weapon: u8,
+    /// Which of the unit's guns (`UnitBlueprint::gun_slot`): one of a group's, or the weapon's.
+    gun: u16,
     grade: Grade,
     start: f32,
     due: f32,
@@ -346,6 +348,14 @@ fn trail_kind(t: &Trail) -> f32 {
 }
 
 impl Renderer {
+    /// Gun `gun` (`UnitBlueprint::gun_slot`) of weapon `weapon` of `blueprint`: a group's gun
+    /// (`Weapon::gun`), at its own pivot, or the weapon itself.
+    pub(super) fn gun_weapon(&self, blueprint: BlueprintId, weapon: u8, gun: u16) -> &Weapon {
+        let bp = self.blueprints.unit(blueprint);
+        let m = (gun as usize).saturating_sub(bp.gun_slot(weapon as usize));
+        bp.weapons[weapon as usize].gun(m)
+    }
+
     /// Where `w`'s charges (`weapon` of `u`) are drawn `f` of the way through the tick, one
     /// per star (`stars`), and the way the bore points at each: on its house, or turned
     /// with the turret and pitched about its trunnion, on the hull as it is drawn.
@@ -353,7 +363,7 @@ impl Renderer {
         &self,
         u: &UnitInstance,
         w: &Weapon,
-        weapon: u8,
+        gun: u16,
         houses: &[HousePose],
         f: f32,
     ) -> Vec<(Vec3, Vec3)> {
@@ -362,7 +372,7 @@ impl Renderer {
             .unit(BlueprintId(u.blueprint as u16))
             .visual
             .mesh;
-        let gun = GunFrame::of(u, w, weapon, houses, mesh, w.turret_turn > 0, f);
+        let gun = GunFrame::of(u, w, gun as usize, houses, mesh, w.turret_turn > 0, f);
         if stars(w) > 1 {
             return gun.mouths(w);
         }
@@ -375,8 +385,7 @@ impl Renderer {
     pub(super) fn regency_charging(
         &mut self,
         unit: u32,
-        blueprint: BlueprintId,
-        weapon: u8,
+        (blueprint, weapon, gun): (BlueprintId, u8, u16),
         at: Vec3,
         time: f32,
     ) -> bool {
@@ -396,12 +405,13 @@ impl Renderer {
         let left = w.salvo.max(1);
         let fx = &mut self.plasma_fx.guns;
         fx.charges
-            .retain(|c| !(c.unit == unit && c.blueprint == blueprint && c.weapon == weapon));
+            .retain(|c| !(c.unit == unit && c.blueprint == blueprint && c.gun == gun));
         if fx.charges.len() < MAX_CHARGES {
             fx.charges.push(Charge {
                 unit,
                 blueprint,
                 weapon,
+                gun,
                 grade,
                 start: time,
                 due,
@@ -450,8 +460,8 @@ impl Renderer {
         }
         for i in 0..self.plasma_fx.guns.charges.len() {
             let c = &self.plasma_fx.guns.charges[i];
-            let (unit, blueprint, weapon, laid, due) =
-                (c.unit, c.blueprint, c.weapon, c.laid, c.due);
+            let (unit, blueprint, weapon, gun, laid, due) =
+                (c.unit, c.blueprint, c.weapon, c.gun, c.laid, c.due);
             // Held until the salvo is spent, past the charge's own end.
             let until = time + tick;
             if laid >= until {
@@ -463,7 +473,7 @@ impl Renderer {
             let Some(u) = units.iter().find(live).copied() else {
                 continue;
             };
-            let w = self.blueprints.unit(blueprint).weapons[weapon as usize].clone();
+            let w = self.gun_weapon(blueprint, weapon, gun).clone();
             let from = laid.max(time);
             let steps = ((until - from) / STEP).ceil().max(1.0) as usize;
             for k in 0..steps {
@@ -471,7 +481,7 @@ impl Renderer {
                 let mouths = self.regency_mouths(
                     &u,
                     &w,
-                    weapon,
+                    gun,
                     houses,
                     ((when - time) / tick).clamp(0.0, 1.0),
                 );
@@ -507,8 +517,8 @@ impl Renderer {
             // The surge gun's last tick before its shot: the shell slides out along the rails.
             let grade = self.plasma_fx.guns.charges[i].grade;
             if grade == Grade::Surge && (due - until).abs() < tick * 0.5 {
-                let (from, _) = self.regency_mouths(&u, &w, weapon, houses, 0.0)[0];
-                let (to, dir) = self.regency_mouths(&u, &w, weapon, houses, 1.0)[0];
+                let (from, _) = self.regency_mouths(&u, &w, gun, houses, 0.0)[0];
+                let (to, dir) = self.regency_mouths(&u, &w, gun, houses, 1.0)[0];
                 self.surge_shunt(&w, from, to, dir);
             }
         }

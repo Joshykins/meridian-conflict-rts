@@ -21,7 +21,7 @@ use super::water_fx::PUFF_STEAM;
 use super::{Renderer, PUFF_BOLT, PUFF_SPARK};
 use glam::Vec3;
 use mc_data::{BlueprintId, Weapon};
-use mc_sim::mirror::{HousePose, SimEvent, UnitInstance, KIND_GHOST, KIND_WRECK, UNIT_HOUSE_SHIFT};
+use mc_sim::mirror::{HousePose, SimEvent, UnitInstance, KIND_GHOST, KIND_WRECK};
 use std::f32::consts::{PI, TAU};
 
 /// Guns charging or cooling at once that get the sequence. A deliberate cosmetic cap: a
@@ -208,11 +208,12 @@ impl Renderer {
             .mesh;
         let hull = DrawnHull::of(u, mesh, f);
         // A gun on a house of its own (a warship's) has its pose in the houses list.
-        let house = (u.status[1] >> UNIT_HOUSE_SHIFT)
-            .checked_sub(1)
-            .and_then(|i| self.bore_fx.rifles.houses.get(i as usize))
-            .filter(|_| w.mount)
-            .and_then(|h| h.pose.get(weapon as usize));
+        let gun = self
+            .blueprints
+            .unit(BlueprintId(u.blueprint as u16))
+            .gun_slot(weapon as usize);
+        let house =
+            super::hull_frame::gun_pose(u, &self.bore_fx.rifles.houses, gun).filter(|_| w.mount);
         let yaw = match house {
             Some(p) => lerp_angle(p[0], p[1], f),
             None if w.turret_turn > 0 => lerp_angle(u.prev_turret_yaw, u.turret_yaw, f),

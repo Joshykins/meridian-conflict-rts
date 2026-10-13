@@ -72,15 +72,11 @@ fn breacher_arms_reach_their_muzzles() {
         model
             .houses
             .iter()
-            .position(|h| h.weapon == weapon && Vec3::from(h.pivot).distance(PIVOT) < 0.003)
+            .position(|h| h.gun == u16::from(weapon) && Vec3::from(h.pivot).distance(PIVOT) < 0.003)
             .unwrap_or_else(|| panic!("breacher: a house for weapon {weapon}"))
     };
     let in_house = |slot: usize| {
-        move |v: &MeshVertex| {
-            (v.rig & rig::LIMB_MASK) == rig::HOUSE_FIRST + (slot as u32 & 3)
-                && ((v.rig & rig::HOUSE_HIGH) != 0) == (slot >= 4)
-                && v.part != part::TURRET
-        }
+        move |v: &MeshVertex| rig::house_slot(v.rig) == Some(slot as u32) && v.part != part::TURRET
     };
     let spin = model.spins.first().expect("breacher: the clusters spin").2;
     assert!(

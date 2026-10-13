@@ -32,9 +32,10 @@ struct Charge {
     start: f32,
     due: f32,
     shot: f32,
-    /// The weapon that charges: its blueprint and index, to match its `ShotFired`.
+    /// The gun that charges: its blueprint and gun slot (`UnitBlueprint::gun_slot`), to
+    /// match its `ShotFired`.
     blueprint: u32,
-    weapon: u8,
+    gun: u16,
 }
 
 pub(super) struct TitanCharge {
@@ -42,12 +43,12 @@ pub(super) struct TitanCharge {
     coils: Vec<bool>,
     /// Each unit's last charge begun, whichever gun.
     units: HashMap<u32, Charge>,
-    /// Each gun's own (unit, weapon), for guns on houses of their own.
-    guns: HashMap<(u32, u8), Charge>,
-    /// Seen since the last upload: charges begun (unit, seconds, blueprint, weapon), and
-    /// shots fired by a weapon that charges (blueprint, weapon, where).
-    charges: Vec<(u32, f32, u32, u8)>,
-    shots: Vec<(u32, u8, [f32; 2])>,
+    /// Each gun's own (unit, gun slot), for guns on houses of their own.
+    guns: HashMap<(u32, u16), Charge>,
+    /// Seen since the last upload: charges begun (unit, seconds, blueprint, gun), and
+    /// shots fired by a gun that charges (blueprint, gun, where).
+    charges: Vec<(u32, f32, u32, u16)>,
+    shots: Vec<(u32, u16, [f32; 2])>,
 }
 
 impl TitanCharge {
@@ -75,6 +76,7 @@ impl TitanCharge {
                 unit,
                 blueprint,
                 weapon,
+                gun,
                 ..
             } if self
                 .coils
@@ -87,7 +89,7 @@ impl TitanCharge {
                     unit.0,
                     w.charge_ticks as f32 * tick_seconds,
                     blueprint.0 as u32,
-                    *weapon,
+                    *gun,
                 ));
             }
             SimEvent::StormCharging {
@@ -97,28 +99,26 @@ impl TitanCharge {
                 weapon,
                 ..
             } => {
+                // A storm's bore is an ordinary weapon: its gun is the weapon's one.
                 self.charges.push((
                     unit.0,
                     *ticks as f32 * tick_seconds,
                     blueprint.0 as u32,
-                    *weapon,
+                    blueprints.unit(*blueprint).gun_slot(*weapon as usize) as u16,
                 ));
             }
             SimEvent::ShotFired {
                 pos,
                 blueprint,
-                weapon,
+                gun,
                 ..
             } => {
-                let (bp, w) = (blueprint.0 as u32, *weapon);
-                if self
-                    .guns
-                    .values()
-                    .any(|c| c.blueprint == bp && c.weapon == w)
-                    || self.charges.iter().any(|c| c.2 == bp && c.3 == w)
+                let (bp, g) = (blueprint.0 as u32, *gun);
+                if self.guns.values().any(|c| c.blueprint == bp && c.gun == g)
+                    || self.charges.iter().any(|c| c.2 == bp && c.3 == g)
                 {
                     let p = pos.to_f32();
-                    self.shots.push((bp, w, [p[0], p[1]]));
+                    self.shots.push((bp, g, [p[0], p[1]]));
                 }
             }
             _ => {}
@@ -145,30 +145,30 @@ impl TitanCharge {
             self.shots.clear();
             return Cow::Borrowed(units);
         }
-        for (id, seconds, blueprint, weapon) in self.charges.drain(..) {
-            let gun = self.guns.entry((id, weapon)).or_insert(Charge {
+        for (id, seconds, blueprint, slot) in self.charges.drain(..) {
+            let gun = self.guns.entry((id, slot)).or_insert(Charge {
                 start: NEVER,
                 due: NEVER,
                 shot: NEVER,
                 blueprint,
-                weapon,
+                gun: slot,
             });
             *gun = Charge {
                 start: time,
                 due: time + seconds.max(0.1),
                 blueprint,
-                weapon,
+                gun: slot,
                 ..*gun
             };
             // The unit's own record follows the last charge begun, keeping its last shot.
             let shot = self.units.get(&id).map_or(NEVER, |c| c.shot);
             self.units.insert(id, Charge { shot, ..*gun });
         }
-        for (blueprint, weapon, at) in self.shots.drain(..) {
-            // The nearest unit charging that weapon, or still burning it, fired it.
+        for (blueprint, gun, at) in self.shots.drain(..) {
+            // The nearest unit charging that gun, or still burning it, fired it.
             let mut best: Option<(u32, f32)> = None;
             for u in units.iter().filter(|u| coil(u)) {
-                let Some(c) = self.guns.get(&(u.unit_id, weapon)) else {
+                let Some(c) = self.guns.get(&(u.unit_id, gun)) else {
                     continue;
                 };
                 let burning = c.start <= c.shot && time - c.shot < HOLD_GAP;
@@ -183,10 +183,10 @@ impl TitanCharge {
             let Some((id, _)) = best else {
                 continue;
             };
-            if let Some(c) = self.guns.get_mut(&(id, weapon)) {
+            if let Some(c) = self.guns.get_mut(&(id, gun)) {
                 c.shot = time;
             }
-            if let Some(c) = self.units.get_mut(&id).filter(|c| c.weapon == weapon) {
+            if let Some(c) = self.units.get_mut(&id).filter(|c| c.gun == gun) {
                 c.shot = time;
             }
         }
@@ -219,22 +219,31 @@ impl TitanCharge {
         &self,
         units: &[UnitInstance],
         houses: &'a [HousePose],
+        blueprints: &Blueprints,
     ) -> Cow<'a, [HousePose]> {
         if self.guns.is_empty() {
             return Cow::Borrowed(houses);
         }
         let mut out = houses.to_vec();
         for u in units {
-            let Some(pose) = (u.status[1] >> UNIT_HOUSE_SHIFT)
-                .checked_sub(1)
-                .and_then(|i| out.get_mut(i as usize))
-            else {
+            let Some(first) = (u.status[1] >> UNIT_HOUSE_SHIFT).checked_sub(1) else {
                 continue;
             };
-            for w in 0..MAX_HOUSES {
+            // Its guns' records, eight guns to a record, in a row from its first.
+            let guns = blueprints
+                .units
+                .get(u.blueprint as usize)
+                .map_or(MAX_HOUSES, |bp| bp.gun_count())
+                .div_ceil(MAX_HOUSES)
+                .max(1)
+                * MAX_HOUSES;
+            for g in 0..guns {
+                let Some(pose) = out.get_mut(first as usize + g / MAX_HOUSES) else {
+                    break;
+                };
                 let record = self
                     .guns
-                    .get(&(u.unit_id, w as u8))
+                    .get(&(u.unit_id, g as u16))
                     .map_or([NEVER, 0.0], |c| {
                         if c.shot >= c.start {
                             [c.start, c.shot]
@@ -242,7 +251,8 @@ impl TitanCharge {
                             [c.start, -c.due]
                         }
                     });
-                pose.charge[2 * w..2 * w + 2].copy_from_slice(&record);
+                let k = g % MAX_HOUSES;
+                pose.charge[2 * k..2 * k + 2].copy_from_slice(&record);
             }
         }
         Cow::Owned(out)
@@ -294,7 +304,7 @@ mod tests {
         tc.patch(&[u], 2.0);
         tc.shots.push((1, 0, [0.0, 0.0]));
         tc.patch(&[u], 3.0);
-        let c = tc.patch_houses(&[u], &houses)[0].charge;
+        let c = tc.patch_houses(&[u], &houses, &Blueprints::default())[0].charge;
         assert_eq!((c[0], c[1]), (1.0, 3.0), "house 0 fired at 3");
         assert_eq!(
             (c[4], c[5]),

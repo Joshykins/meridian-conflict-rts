@@ -431,7 +431,7 @@ mod tests {
                 model
                     .houses
                     .iter()
-                    .position(|h| h.weapon as usize == w)
+                    .position(|h| h.gun as usize == w)
                     .map(|s| s as u32)
             };
             for (w, weapon) in unit.weapons.iter().enumerate() {

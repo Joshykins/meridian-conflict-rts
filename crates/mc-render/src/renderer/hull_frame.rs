@@ -59,6 +59,18 @@ impl DrawnHull {
     }
 }
 
+/// Gun `gun`'s pose (its gun slot, `UnitBlueprint::gun_slot`) among `u`'s gun-house
+/// records in `houses` (`RenderFrame::houses`, eight guns a record): its yaw off the hull
+/// last tick and this, then its pitch last tick and this. None for a unit whose guns turn
+/// on no houses of their own.
+pub(super) fn gun_pose(u: &UnitInstance, houses: &[HousePose], gun: usize) -> Option<[f32; 4]> {
+    let per = mc_data::MAX_HOUSES;
+    (u.status[1] >> UNIT_HOUSE_SHIFT)
+        .checked_sub(1)
+        .and_then(|i| houses.get(i as usize + gun / per))
+        .map(|h| h.pose[gun % per])
+}
+
 /// A gun as entity.wgsl draws it `f` of the way through the tick: on a house of its own
 /// (a warship's turret, posed by its weapon's `HousePose`), on the unit's turret (turned
 /// with it, pitched about its trunnion by the arm), or fixed in the hull; and the hull
@@ -74,23 +86,20 @@ pub(super) struct GunFrame {
 }
 
 impl GunFrame {
-    /// Gun `weapon` (`w`) of `u`, whose mesh is `mesh`; `houses` is this tick's
-    /// `RenderFrame::houses`. `turret` says a gun without a house of its own turns with
-    /// the unit's turret and pitches with its arm (else it lies fixed in the hull).
+    /// Gun `gun` (its gun slot) of `u`, `w` its weapon (a group's gun's own), whose mesh is
+    /// `mesh`; `houses` is this tick's `RenderFrame::houses`. `turret` says a gun without a
+    /// house of its own turns with the unit's turret and pitches with its arm (else it lies
+    /// fixed in the hull).
     pub(super) fn of(
         u: &UnitInstance,
         w: &Weapon,
-        weapon: u8,
+        gun: usize,
         houses: &[HousePose],
         mesh: &str,
         turret: bool,
         f: f32,
     ) -> Self {
-        let pose = (u.status[1] >> UNIT_HOUSE_SHIFT)
-            .checked_sub(1)
-            .and_then(|i| houses.get(i as usize))
-            .filter(|_| w.mount)
-            .and_then(|h| h.pose.get(weapon as usize));
+        let pose = gun_pose(u, houses, gun).filter(|_| w.mount);
         let pivot = w.pivot.map(|p| Vec3::from(p.to_f32()));
         let turret = pose.is_none() && turret && pivot.is_some();
         let (yaw, pitch) = match pose {
@@ -191,7 +200,7 @@ mod tests {
             GunFrame::of(
                 &u,
                 w,
-                weapon,
+                weapon as usize,
                 std::slice::from_ref(pose),
                 &bp.visual.mesh,
                 true,
