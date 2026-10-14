@@ -129,7 +129,7 @@ fn fuel(
 ) -> f32 {
     let (Some(tank), Some(view)) = (
         bp.fuel,
-        s.view.frame.fuel.iter().find(|f| f.unit_id == u.unit_id),
+        mc_sim::mirror::FuelView::of(&s.view.frame.fuel, u.unit_id),
     ) else {
         return y;
     };

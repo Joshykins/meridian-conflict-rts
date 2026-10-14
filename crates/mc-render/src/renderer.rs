@@ -109,6 +109,7 @@ mod sea_launch;
 mod shafts;
 mod shield_upload;
 pub(crate) mod skins;
+mod staged_buffer;
 mod stake_fx;
 mod star_core_fx;
 mod storm_cloud_fx;
@@ -789,7 +790,7 @@ pub struct Renderer {
     effect_barriers: Buffer,
     live_effect_barriers: Vec<EffectBarrier>,
     /// Every weapon's pose for units with gun houses of their own (scene set 28, `mirror::HousePose`).
-    houses: Buffer,
+    houses: staged_buffer::StagedBuffer,
     /// Local lights (lights.rs) and their GPU list and cluster grid (scene set 25, 26).
     lights: crate::lights::Lights,
     /// Device-local: every lit pixel reads them. Filled from `light_stage`.
@@ -882,7 +883,7 @@ pub struct Renderer {
     samplers: [vk::Sampler; 3],
 
     globals: Buffer,
-    dynamic: Buffer,
+    dynamic: staged_buffer::StagedBuffer,
     statics: Buffer,
     model_table: Buffer,
     slot_table: Buffer,
@@ -1774,7 +1775,11 @@ impl Renderer {
         let storage = U::STORAGE_BUFFER;
         let total_entities = static_count as u64 + MAX_DYNAMIC as u64;
         let globals = gpu.host_buffer(size_of::<Globals>() as u64, U::UNIFORM_BUFFER)?;
-        let dynamic = gpu.host_buffer((MAX_DYNAMIC * size_of::<UnitInstance>()) as u64, storage)?;
+        let dynamic = staged_buffer::StagedBuffer::new(
+            &gpu,
+            (MAX_DYNAMIC * size_of::<UnitInstance>()) as u64,
+            storage,
+        )?;
         let statics = gpu.buffer_with_data(bytemuck::cast_slice(&statics_data), storage)?;
         let model_table = gpu.buffer_with_data(bytemuck::cast_slice(&infos), storage)?;
         let slot_table = gpu.buffer_with_data(bytemuck::cast_slice(&slots), storage)?;
@@ -1815,11 +1820,12 @@ impl Renderer {
             storage,
         )?;
         effect_barriers.write(0, &vec![0u8; effect_barriers.size as usize]);
-        let houses = gpu.host_buffer(
+        let mut houses = staged_buffer::StagedBuffer::new(
+            &gpu,
             (MAX_HOUSES * size_of::<mc_sim::mirror::HousePose>()) as u64,
             storage,
         )?;
-        houses.write(0, &vec![0u8; houses.size as usize]);
+        houses.write(0, &vec![0u8; houses.device.size as usize]);
         let light_list_bytes =
             (crate::lights::MAX_LIGHTS * size_of::<crate::lights::GpuLight>()) as u64;
         let light_grid_bytes = ((crate::lights::CLUSTERS + crate::lights::MAX_INDICES) * 4) as u64;
@@ -2226,7 +2232,7 @@ impl Renderer {
             scene_set,
             1,
             vk::DescriptorType::STORAGE_BUFFER,
-            &[&dynamic, &statics, &model_table, &cull.visible],
+            &[&dynamic.device, &statics, &model_table, &cull.visible],
         );
         write_buffers(
             scene_set,
@@ -2291,7 +2297,7 @@ impl Renderer {
             cull_set,
             1,
             vk::DescriptorType::STORAGE_BUFFER,
-            &[&dynamic, &statics, &model_table, &slot_table]
+            &[&dynamic.device, &statics, &model_table, &slot_table]
                 .into_iter()
                 .chain(cull.bindings())
                 .chain([&props_dead, &effect_barriers, &cull.sway, &cull.pulled])
@@ -2356,7 +2362,7 @@ impl Renderer {
             scene_set,
             28,
             vk::DescriptorType::STORAGE_BUFFER,
-            &[&houses],
+            &[&houses.device],
         );
         let craters = craters::Craters::new(&gpu)?;
         // A plant's heat sinks vent steam as well as shimmering (`reactor_fx`).
@@ -3471,18 +3477,42 @@ impl Renderer {
 
         drop(part);
         let part = mc_core::perf_span!("cpu.upload.unit_fx");
-        self.ground_contact(units, time, camera);
-        self.storm_beams(time);
-        self.storms_tick(time);
-        self.storm_clouds_tick(&frame.clouds, frame.tick, time);
-        self.mine_blows(units, time, camera);
-        self.aircraft_trails(units, time, camera);
-        self.heat_haze.note(units, self.tick_seconds);
-        self.aircraft_crash_trails(units, time, camera);
-        self.damage_smoke(units, time, camera);
-        self.wreck_smoke(units, time, camera);
-        self.turret_landings(units, time, camera);
-        self.wreck_finish(units, &frame.events, time, camera);
+        {
+            let _t = mc_core::perf_span!("fx.ground_contact");
+            self.ground_contact(units, time, camera);
+        }
+        {
+            let _t = mc_core::perf_span!("fx.storms");
+            self.storm_beams(time);
+            self.storms_tick(time);
+            self.storm_clouds_tick(&frame.clouds, frame.tick, time);
+        }
+        {
+            let _t = mc_core::perf_span!("fx.mine_blows");
+            self.mine_blows(units, time, camera);
+        }
+        {
+            let _t = mc_core::perf_span!("fx.aircraft_trails");
+            self.aircraft_trails(units, time, camera);
+        }
+        {
+            let _t = mc_core::perf_span!("fx.heat_haze");
+            self.heat_haze.note(units, self.tick_seconds);
+        }
+        {
+            let _t = mc_core::perf_span!("fx.crash_trails");
+            self.aircraft_crash_trails(units, time, camera);
+        }
+        {
+            let _t = mc_core::perf_span!("fx.smoke");
+            self.damage_smoke(units, time, camera);
+            self.wreck_smoke(units, time, camera);
+        }
+        {
+            let _t = mc_core::perf_span!("fx.wrecks");
+            self.turret_landings(units, time, camera);
+            self.wreck_finish(units, &frame.events, time, camera);
+        }
         drop(part);
         let part = mc_core::perf_span!("cpu.upload.events");
         self.construction(frame, time, camera);
@@ -5813,6 +5843,8 @@ impl Drop for Renderer {
         self.heat_haze.destroy(&self.gpu);
         self.lens_flares.destroy(&self.gpu);
         self.cull.destroy(&self.gpu);
+        self.dynamic.destroy(&self.gpu);
+        self.houses.destroy(&self.gpu);
         self.pipelines.destroy(&self.gpu);
         self.layouts.destroy(&self.gpu);
         self.passes.destroy(&self.gpu);
@@ -5821,7 +5853,6 @@ impl Drop for Renderer {
         let placeholder = || Buffer::null();
         for b in [
             &mut self.globals,
-            &mut self.dynamic,
             &mut self.statics,
             &mut self.model_table,
             &mut self.slot_table,
@@ -5845,7 +5876,6 @@ impl Drop for Renderer {
             &mut self.shields,
             &mut self.shield_hits,
             &mut self.track_marks,
-            &mut self.houses,
             &mut self.overlay_vb,
             &mut self.mesh_vb,
             &mut self.mesh_ib,

@@ -772,9 +772,10 @@ pub fn opening_commands(
             // 800 m apart across the centre, facing each other.
             let gap = FxVec2::from_ints(400, 0);
             // A spawn puts down one square block of at most `MAX_DEBUG_SPAWN`: a bigger
-            // army (a stress test of thousands) is several blocks, one behind another.
+            // army (a stress test of thousands) is several blocks, in ranks of blocks
+            // across the front, the ranks one behind another, as near square as they go.
             let block = mc_sim::command::MAX_DEBUG_SPAWN;
-            // How far back each side's last block reaches (the first is centred on its spot).
+            // How far back each side's last rank reaches (the first is centred on its spot).
             let mut depth: [Option<i32>; 2] = [None; 2];
             for (side, key, count) in &opts.matchup {
                 let (pos, facing, back) = match side {
@@ -782,14 +783,23 @@ pub fn opening_commands(
                     _ => (centre + gap, Angle::HALF_TURN, 1),
                 };
                 let spacing = blueprints.unit(id(key)).radius.ceil_int() * 2 + 3;
-                let mut left = (*count).max(1);
-                while left > 0 {
+                let count = (*count).max(1);
+                let blocks = count.div_ceil(block) as i32;
+                let across = (blocks as f32).sqrt().ceil() as i32;
+                let side_len = (count.min(block) as f32).sqrt().ceil() as i32 * spacing;
+                let pitch = side_len + 20;
+                let mut left = count;
+                for b in 0..blocks {
                     let n = left.min(block);
-                    let side_len = (n as f32).sqrt().ceil() as i32 * spacing;
-                    let reach = &mut depth[(*side).min(1) as usize];
-                    let middle = reach.map_or(0, |r| r + 20 + side_len / 2);
-                    *reach = Some(middle + side_len / 2);
-                    let at = pos + FxVec2::from_ints(back * middle, 0);
+                    let file = b % across;
+                    if file == 0 {
+                        let reach = &mut depth[(*side).min(1) as usize];
+                        let middle = reach.map_or(0, |r| r + 20 + side_len / 2);
+                        *reach = Some(middle + side_len / 2);
+                    }
+                    let middle = depth[(*side).min(1) as usize].unwrap_or(0) - side_len / 2;
+                    let sideways = (file - (across.min(blocks) - 1) / 2) * pitch;
+                    let at = pos + FxVec2::from_ints(back * middle, sideways);
                     out.push(spawn(*side, key, at, facing, n));
                     left -= n;
                 }

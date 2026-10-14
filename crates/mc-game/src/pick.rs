@@ -15,7 +15,7 @@
 use glam::{Vec2, Vec3};
 use mc_data::{BlueprintId, Blueprints, IconKind};
 use mc_render::gpu_consts::icon;
-use mc_render::Camera;
+use mc_render::{Camera, Projector};
 use mc_sim::mirror::{self, UnitInstance, KIND_WRECK};
 use mc_sim::tables::flag;
 
@@ -31,9 +31,26 @@ pub(crate) fn unit_at(
 ) -> Option<usize> {
     let eye = camera.eye();
     let scale = camera.projection_scale();
+    let projector = camera.projector();
+    let (_, ray) = camera.ray(pixel);
     let mut best: Option<(f32, usize)> = None;
     for (i, u) in units.iter().enumerate() {
         let bp = blueprints.unit(BlueprintId(u.blueprint as u16));
+        // Most of an army is nowhere near the pointer: one far off its ray (further
+        // from it than the unit's whole size and every reach a click has, at its
+        // distance) is passed over before anything is drawn out. A long hull is
+        // measured along its spine below.
+        if bp.body.is_none() {
+            let size = bp.height.to_f32() + u.radius;
+            let to = Vec3::from(u.pos) + Vec3::Z * bp.height.to_f32() * 0.5 - eye;
+            let along = to.dot(ray);
+            let reach = MIN_REACH.max(icon_px(bp.visual.icon) * 0.5) * 2.0;
+            let off = (to.length_squared() - along * along).max(0.0);
+            let room = along.max(0.0) * reach / scale + size;
+            if along > 0.0 && off > room * room {
+                continue;
+            }
+        }
         if bp.carried_drone && u.owner_flags & KIND_WRECK == 0 {
             continue;
         }
@@ -61,14 +78,14 @@ pub(crate) fn unit_at(
             }
             None => ((pos, pos + Vec3::Z * height), u.radius),
         };
-        let body = segment(camera, ends.0, ends.1).and_then(|(a, b)| {
+        let body = segment(&projector, ends.0, ends.1).and_then(|(a, b)| {
             let (d, along) = to_segment(pixel, a, b);
             let at = ends.0.lerp(ends.1, along);
             let reach = (width * scale / (at - eye).length().max(1.0)).max(MIN_REACH);
             (d <= reach).then_some(d)
         });
         // The icon: where icons.wgsl centres it, half its drawn width round that.
-        let icon = camera
+        let icon = projector
             .project(pos + Vec3::Z * height * 0.5)
             .map(|at| at.distance(pixel))
             .filter(|&d| d <= (icon_px(bp.visual.icon) * 0.5).max(MIN_REACH));
@@ -84,8 +101,14 @@ pub(crate) fn unit_at(
 
 /// Whether any of a unit's standing column (`pos` up `height`) is drawn inside the
 /// screen rectangle `min..max`: a drag box over a titan's torso takes it.
-pub(crate) fn column_in_box(camera: &Camera, pos: Vec3, height: f32, min: Vec2, max: Vec2) -> bool {
-    let Some((feet, top)) = column(camera, pos, height) else {
+pub(crate) fn column_in_box(
+    projector: &Projector,
+    pos: Vec3,
+    height: f32,
+    min: Vec2,
+    max: Vec2,
+) -> bool {
+    let Some((feet, top)) = column(projector, pos, height) else {
         return false;
     };
     // Clip the drawn column to the box, one side at a time (Liang-Barsky).
@@ -112,13 +135,13 @@ pub(crate) fn column_in_box(camera: &Camera, pos: Vec3, height: f32, min: Vec2, 
 
 /// Where a unit's feet (`pos`) and top (`height` over them) are drawn. A top behind the
 /// camera falls back to the feet, and the other way round.
-fn column(camera: &Camera, pos: Vec3, height: f32) -> Option<(Vec2, Vec2)> {
-    segment(camera, pos, pos + Vec3::Z * height)
+fn column(projector: &Projector, pos: Vec3, height: f32) -> Option<(Vec2, Vec2)> {
+    segment(projector, pos, pos + Vec3::Z * height)
 }
 
 /// Where the segment `a..b` is drawn. An end behind the camera falls back to the other.
-fn segment(camera: &Camera, a: Vec3, b: Vec3) -> Option<(Vec2, Vec2)> {
-    match (camera.project(a), camera.project(b)) {
+fn segment(projector: &Projector, a: Vec3, b: Vec3) -> Option<(Vec2, Vec2)> {
+    match (projector.project(a), projector.project(b)) {
         (Some(f), Some(t)) => Some((f, t)),
         (Some(p), None) | (None, Some(p)) => Some((p, p)),
         (None, None) => None,
@@ -238,7 +261,7 @@ mod tests {
             "the box leaves its feet out"
         );
         assert!(column_in_box(
-            &camera,
+            &camera.projector(),
             at,
             height,
             torso - half,
@@ -246,7 +269,7 @@ mod tests {
         ));
         let aside = torso + Vec2::X * 400.0;
         assert!(!column_in_box(
-            &camera,
+            &camera.projector(),
             at,
             height,
             aside - half,

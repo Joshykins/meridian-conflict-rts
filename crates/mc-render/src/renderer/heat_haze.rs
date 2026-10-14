@@ -112,6 +112,8 @@ impl HeatHaze {
             | ((mc_sim::tables::flag::IN_FACTORY | mc_sim::tables::flag::UNDER_CONSTRUCTION)
                 as u32)
                 << 8;
+        // The engines whose load is kept (the few in reach of the eye) that still run.
+        let mut live = std::collections::HashSet::with_capacity(self.load.len());
         for u in units {
             let has_ports = self
                 .ports
@@ -119,6 +121,9 @@ impl HeatHaze {
                 .is_some_and(|p| !p.is_empty());
             if !has_ports || u.owner_flags & off != 0 || u.build < 1.0 {
                 continue;
+            }
+            if self.load.contains_key(&u.unit_id) {
+                live.insert(u.unit_id);
             }
             self.units.push(Running {
                 id: u.unit_id,
@@ -129,7 +134,6 @@ impl HeatHaze {
                 heading: u.heading,
             });
         }
-        let live: std::collections::HashSet<u32> = self.units.iter().map(|u| u.id).collect();
         self.load.retain(|id, _| live.contains(id));
     }
 
@@ -147,6 +151,16 @@ impl HeatHaze {
         let eye = camera.eye();
         self.scratch.clear();
         for u in &self.units {
+            // A unit whose ports are all out of reach is passed over before anything is
+            // worked out for it: a sky of fighters is mostly far from the eye.
+            let ports = &self.ports[u.model as usize];
+            let spread = ports
+                .iter()
+                .map(|p| Vec3::from(p.at).length())
+                .fold(0.0, f32::max);
+            if u.prev_pos.lerp(u.pos, alpha).distance(eye) > REACH_M + spread {
+                continue;
+            }
             let travel = u.pos - u.prev_pos;
             let speed = travel.truncate().length() / self.tick_seconds;
             let goal = IDLE + (1.0 - IDLE) * (speed / FULL_SPEED).min(1.0);

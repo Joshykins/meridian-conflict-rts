@@ -1529,11 +1529,7 @@ impl Game {
                 if inspecting {
                     self.view.selection = picked.into();
                 } else if self.shift {
-                    for id in picked {
-                        if !self.view.selection.contains(&id) {
-                            self.view.selection.push(id);
-                        }
-                    }
+                    self.view.selection.extend(picked);
                 } else {
                     self.view.selection = picked.into();
                 }
@@ -1546,6 +1542,7 @@ impl Game {
     /// pulls them into the fight; builders win over structures.
     fn box_pick(&self, min: Vec2, max: Vec2, owner: u8) -> Vec<u32> {
         let (mut army, mut builders, mut structures) = (Vec::new(), Vec::new(), Vec::new());
+        let projector = self.camera.projector();
         for u in &self.view.frame.units {
             if !self.can_inspect(u)
                 || (u.owner_flags & 0xFF) as u8 != owner
@@ -1555,7 +1552,7 @@ impl Game {
             }
             let bp = self.blueprints.unit(BlueprintId(u.blueprint as u16));
             let pos = Vec3::from(u.pos);
-            if crate::pick::column_in_box(&self.camera, pos, bp.height.to_f32(), min, max) {
+            if crate::pick::column_in_box(&projector, pos, bp.height.to_f32(), min, max) {
                 if !bp.is_mobile() {
                     structures.push(u.unit_id);
                 } else if bp.builder.is_some() {
@@ -3766,6 +3763,10 @@ impl Game {
                 .max(1.0);
             let pace = (now.max(before) * mc_core::TICKS_PER_SECOND as f32 / top).min(1.0);
             let (gain, pan) = self.hear(Vec3::from(u.pos));
+            // Out of earshot: not worth a place in the mix.
+            if gain <= 1e-4 {
+                continue;
+            }
             movers.push((sound, gain * (0.5 + 0.5 * pace), pan));
         }
         let mut loops = crate::audio::mix_moving(&movers);
@@ -4795,9 +4796,7 @@ pub(crate) fn unit_bar_shield(unit_id: u32, shields: &[ShieldInstance]) -> f32 {
 /// The fuel line under a unit's health bar: its tank's fill, or -1 for none (an enemy's
 /// tank is not in the frame).
 pub(crate) fn unit_bar_fuel(unit_id: u32, fuel: &[mc_sim::mirror::FuelView]) -> f32 {
-    fuel.iter()
-        .find(|f| f.unit_id == unit_id)
-        .map_or(-1.0, |f| f.fill.clamp(0.0, 1.0))
+    mc_sim::mirror::FuelView::of(fuel, unit_id).map_or(-1.0, |f| f.fill.clamp(0.0, 1.0))
 }
 
 /// Unit under the cursor, else the first of the selection.

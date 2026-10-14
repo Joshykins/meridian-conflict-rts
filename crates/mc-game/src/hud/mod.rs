@@ -351,6 +351,8 @@ pub struct Hud {
     /// `Rings::focus`, so they go out when the card is not drawn.
     pub reach_focus: Option<(u32, u64)>,
     pub minimap_hidden: bool,
+    /// The minimap's unit marks, binned once a tick.
+    chart_marks: minimap::ChartMarks,
     /// The commander's card and the idle engineer and factory cards under it.
     builders: builders::Builders,
     /// The list of every game speed is open under the speed control.

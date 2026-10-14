@@ -26,6 +26,23 @@ impl Selection {
         }
     }
 
+    /// Adds each of `more` not yet selected at the end, in order, with one sort for the
+    /// lot. Returns whether any was added.
+    pub fn extend(&mut self, more: impl IntoIterator<Item = u32>) -> bool {
+        let before = self.ids.len();
+        for id in more {
+            if self.sorted.binary_search(&id).is_err() {
+                self.ids.push(id);
+            }
+        }
+        if self.ids.len() == before {
+            return false;
+        }
+        // An id that came twice in `more` is kept where it first came.
+        *self = std::mem::take(&mut self.ids).into_iter().collect();
+        true
+    }
+
     pub fn clear(&mut self) {
         self.ids.clear();
         self.sorted.clear();
@@ -70,12 +87,24 @@ impl From<Vec<u32>> for Selection {
 }
 
 impl FromIterator<u32> for Selection {
+    /// One sort, not an insert per id: a box round an army of 64 000 would otherwise
+    /// move gigabytes inserting each into the sorted list.
     fn from_iter<I: IntoIterator<Item = u32>>(ids: I) -> Selection {
-        let mut out = Selection::default();
-        for id in ids {
-            out.push(id);
+        let mut ids: Vec<u32> = ids.into_iter().collect();
+        let mut sorted = ids.clone();
+        sorted.sort_unstable();
+        sorted.dedup();
+        if sorted.len() < ids.len() {
+            // Keep each id where it first came.
+            let mut seen = vec![false; sorted.len()];
+            ids.retain(|id| {
+                let i = sorted
+                    .binary_search(id)
+                    .expect("every id is in the sorted list");
+                !std::mem::replace(&mut seen[i], true)
+            });
         }
-        out
+        Selection { ids, sorted }
     }
 }
 
@@ -97,6 +126,11 @@ mod tests {
         s.push(4);
         s.push(9);
         assert_eq!(s, vec![9, 3, 7, 4]);
+        assert!(s.extend([5, 9, 5, 2]));
+        assert!(!s.extend([2, 7]));
+        assert_eq!(s, vec![9, 3, 7, 4, 5, 2]);
+        assert!(s.contains(&2) && s.contains(&5));
+        s.truncate(4);
         s.retain(|&id| id != 3);
         assert_eq!(s, vec![9, 7, 4]);
         assert!(!s.contains(&3) && s.contains(&4));

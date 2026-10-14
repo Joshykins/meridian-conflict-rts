@@ -308,7 +308,7 @@ pub fn info(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
     // sets how far the group can go.
     let low = units
         .iter()
-        .filter_map(|u| s.view.frame.fuel.iter().find(|f| f.unit_id == u.unit_id))
+        .filter_map(|u| mc_sim::mirror::FuelView::of(&s.view.frame.fuel, u.unit_id))
         .map(|f| f.fill.clamp(0.0, 1.0))
         .reduce(f32::min);
     if let Some(low) = low {

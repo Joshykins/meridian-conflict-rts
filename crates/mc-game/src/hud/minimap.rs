@@ -236,24 +236,39 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
 
     // Units. Structures are squares a touch larger; the selection is white. Every unit
     // is marked, through bins a mark wide, so tens of thousands cost what the chart's
-    // few thousand bins do.
-    let mut marks = Marks::new(chart);
-    for (i, u) in view.frame.units.iter().enumerate() {
-        if u.owner_flags & KIND_WRECK != 0 || has_flag(u, flag::IN_FACTORY) {
-            continue;
+    // few thousand bins do; and binned once a tick, since they only move with the tick.
+    let key = (
+        view.frame.tick,
+        view.frame.units.len(),
+        view.selection
+            .iter()
+            .fold(view.selection.len() as u64, |h, &id| {
+                h.rotate_left(5) ^ id as u64
+            }),
+        [chart.x, chart.y, chart.w, chart.h].map(f32::to_bits),
+    );
+    if hud.chart_marks.key != Some(key) {
+        let mut marks = Marks::new(chart);
+        for (i, u) in view.frame.units.iter().enumerate() {
+            if u.owner_flags & KIND_WRECK != 0 || has_flag(u, flag::IN_FACTORY) {
+                continue;
+            }
+            let p = chart_pos(s, chart, Vec2::new(u.pos[0], u.pos[1]));
+            let unknown = u.owner_flags & STATE_UNIDENTIFIED != 0;
+            let layer = if view.selection.contains(&u.unit_id) {
+                Layer::Selected
+            } else if !unknown && s.bp(u).is_structure() {
+                Layer::Structure
+            } else {
+                Layer::Mobile
+            };
+            marks.put(layer, p, i as u32);
         }
-        let p = chart_pos(s, chart, Vec2::new(u.pos[0], u.pos[1]));
-        let unknown = u.owner_flags & STATE_UNIDENTIFIED != 0;
-        let layer = if view.selection.contains(&u.unit_id) {
-            Layer::Selected
-        } else if !unknown && s.bp(u).is_structure() {
-            Layer::Structure
-        } else {
-            Layer::Mobile
-        };
-        marks.put(layer, p, i as u32);
+        hud.chart_marks.key = Some(key);
+        hud.chart_marks.drawn.clear();
+        hud.chart_marks.drawn.extend(marks.drawn());
     }
-    for (layer, p, i) in marks.drawn() {
+    for &(layer, p, i) in &hud.chart_marks.drawn {
         let u = &view.frame.units[i as usize];
         let (half, tone) = match layer {
             Layer::Selected => (1.4, rgb(0xFFFFFF, 1.0)),
@@ -433,6 +448,14 @@ fn ring(ui: &mut Ui, chart: Rect, c: Vec2, radius: f32, color: crate::ui::Color)
             ui.stroke(a, b, 1.0, color);
         }
     }
+}
+
+/// The chart's unit marks as last binned, and what they were binned for (the tick, the
+/// frame's units, the selection and where the chart is).
+#[derive(Default)]
+pub(super) struct ChartMarks {
+    key: Option<(u32, usize, u64, [u32; 4])>,
+    drawn: Vec<(Layer, Vec2, u32)>,
 }
 
 /// What a unit mark on the chart is, in the order they are drawn.

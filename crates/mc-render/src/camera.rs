@@ -170,13 +170,15 @@ impl Camera {
 
     /// Pixel position of a world point, or `None` behind the camera.
     pub fn project(&self, world: Vec3) -> Option<Vec2> {
-        let clip = self.view_proj() * world.extend(1.0);
-        (clip.w > 0.0).then(|| {
-            Vec2::new(
-                (clip.x / clip.w * 0.5 + 0.5) * self.viewport.x,
-                (0.5 - clip.y / clip.w * 0.5) * self.viewport.y,
-            )
-        })
+        self.projector().project(world)
+    }
+
+    /// `project` with the view worked out once: for a pass over thousands of points.
+    pub fn projector(&self) -> Projector {
+        Projector {
+            view_proj: self.view_proj(),
+            viewport: self.viewport,
+        }
     }
 
     /// Zooms by `factor`, keeping the ground point `anchor` under `pixel`,
@@ -362,5 +364,25 @@ mod tests {
                 );
             }
         }
+    }
+}
+
+/// A camera's projection, made once (`Camera::projector`).
+#[derive(Clone, Copy, Debug)]
+pub struct Projector {
+    view_proj: Mat4,
+    viewport: Vec2,
+}
+
+impl Projector {
+    /// Where `world` is drawn, in pixels; `None` behind the camera.
+    pub fn project(&self, world: Vec3) -> Option<Vec2> {
+        let clip = self.view_proj * world.extend(1.0);
+        (clip.w > 0.0).then(|| {
+            Vec2::new(
+                (clip.x / clip.w * 0.5 + 0.5) * self.viewport.x,
+                (0.5 - clip.y / clip.w * 0.5) * self.viewport.y,
+            )
+        })
     }
 }

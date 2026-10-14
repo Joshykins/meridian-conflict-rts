@@ -421,6 +421,8 @@ impl Renderer {
         self.timers.scope(&device, cmd, "uploads");
         self.record_uploads(cmd, input.sim)?;
         self.record_light_copy(cmd);
+        self.dynamic.record(&device, cmd);
+        self.houses.record(&device, cmd);
         self.timers.end(&device, cmd);
         self.timers.scope(&device, cmd, "fog");
         self.fog

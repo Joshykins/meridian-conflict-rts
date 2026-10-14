@@ -7,11 +7,17 @@
 //! aircraft.
 
 use super::capital_fx::{PUFF_THRUST, PUFF_THRUST_GLOW};
-use super::{Renderer, KIND_WRECK, PUFF_CONTRAIL, PUFF_PLASMA, STATE_RADAR};
+use super::{Renderer, KIND_WRECK, PUFF_CONTRAIL, PUFF_PLASMA, PUFF_RING, STATE_RADAR};
 use crate::camera::Camera;
 use crate::models::{self, Vtol};
 use glam::Vec3;
 use mc_sim::mirror::UnitInstance;
+
+/// Most trail puffs one tick's jets lay between them: half the puff ring, so a sky of
+/// tens of thousands of fighters thins each one's trail (down to a puff a port a tick)
+/// rather than writing millions of puffs that overwrite each other before they are
+/// drawn. A deliberate cap: the trails are cosmetic.
+const TRAIL_PUFFS: usize = PUFF_RING / 2;
 
 /// Per blueprint: its VTOL pods, if it has any (`Model::vtol`).
 #[derive(Default)]
@@ -36,6 +42,22 @@ impl Renderer {
             | ((mc_sim::tables::flag::IN_FACTORY | mc_sim::tables::flag::UNDER_CONSTRUCTION)
                 as u32)
                 << 8;
+        // Trails further out than this are specks; the same reach `damage_smoke` keeps.
+        let reach = camera.distance * 2.5 + 600.0;
+        let in_reach = |u: &UnitInstance| Vec3::from(u.pos).distance(camera.focus) <= reach;
+        let flying = units
+            .iter()
+            .filter(|u| {
+                let d = Vec3::from(u.prev_pos).distance(Vec3::from(u.pos));
+                u.owner_flags & hidden == 0 && u.build >= 1.0 && (0.08..=40.0).contains(&d)
+            })
+            .filter(|u| in_reach(u))
+            .count();
+        // Two ports a jet is the common case. Past a puff a port for each, only every
+        // `stride`th jet trails, the same ones tick after tick (by id), so the trails
+        // that are drawn run unbroken.
+        let most_samples = (TRAIL_PUFFS / (flying.max(1) * 2)).clamp(1, 16) as f32;
+        let stride = (flying * 2).div_ceil(TRAIL_PUFFS).max(1) as u32;
         for u in units {
             if u.owner_flags & hidden != 0 || u.build < 1.0 {
                 continue;
@@ -48,6 +70,11 @@ impl Renderer {
             let hover_flight = bp.motion.is_some_and(|m| m.hover);
             let assault = bp.visual.mesh == "assault_air";
             let capital = bp.is_capital_ship();
+            if !capital
+                && (!in_reach(u) || (u.unit_id.wrapping_mul(0x9E37_79B9) >> 16) % stride != 0)
+            {
+                continue;
+            }
             // The ports are placed on the model as authored; a blueprint drawn bigger or
             // smaller moves them with the hull.
             let (authored_radius, authored_height) =
@@ -104,7 +131,7 @@ impl Renderer {
             let samples = if still {
                 1
             } else {
-                (distance / 1.6).ceil().clamp(1.0, 16.0) as usize
+                (distance / 1.6).ceil().clamp(1.0, most_samples) as usize
             };
             let delta = (u.heading - u.prev_heading + std::f32::consts::PI)
                 .rem_euclid(std::f32::consts::TAU)

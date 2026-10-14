@@ -15,8 +15,18 @@ pub struct FuelView {
     pub dry_in: Option<f32>,
 }
 
+impl FuelView {
+    /// The tank of `unit_id` in a frame's list (`RenderFrame::fuel`, in unit id order).
+    pub fn of(fuel: &[FuelView], unit_id: u32) -> Option<&FuelView> {
+        fuel.binary_search_by_key(&unit_id, |f| f.unit_id)
+            .ok()
+            .map(|i| &fuel[i])
+    }
+}
+
 impl World {
-    /// Every tank on `viewer`'s side and its allies' (everyone's with no viewer): an enemy
+    /// Every tank on `viewer`'s side and its allies' (everyone's with no viewer), in unit
+    /// id order so the selection's bars find theirs by search (`FuelView::of`): an enemy
     /// is not told how far its aircraft can still go.
     pub(super) fn write_fuel(&self, viewer: Option<u8>, out: &mut Vec<FuelView>) {
         out.clear();
@@ -37,6 +47,7 @@ impl World {
                     .map(|pace| (units.fuel[row] / pace).to_f32()),
             });
         }
+        out.sort_by_key(|f| f.unit_id);
     }
 }
 

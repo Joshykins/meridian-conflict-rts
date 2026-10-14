@@ -32,7 +32,7 @@ pub mod terrain;
 pub mod textures;
 mod warm;
 
-pub use camera::Camera;
+pub use camera::{Camera, Projector};
 pub use gpu::GpuError;
 pub use overlay::{Face, Overlay, Type};
 pub use renderer::{

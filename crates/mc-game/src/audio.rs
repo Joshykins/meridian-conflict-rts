@@ -818,8 +818,13 @@ pub fn mix_moving(movers: &[(SoundId, f32, f32)]) -> Vec<(SoundId, f32, f32, f32
             if bin.is_empty() {
                 continue;
             }
-            bin.sort_by(|a, c| c.0.total_cmp(&a.0));
+            // Only the loudest few are voiced: a sky of fighters is a bin of tens of
+            // thousands, picked from, not sorted.
+            if bin.len() > VOICES_PER_BIN {
+                bin.select_nth_unstable_by(VOICES_PER_BIN, |a, c| c.0.total_cmp(&a.0));
+            }
             let near = bin.len().min(VOICES_PER_BIN);
+            bin[..near].sort_by(|a, c| c.0.total_cmp(&a.0));
             let extra = bin.len().saturating_sub(near);
             for (v, &(gain, pan)) in bin.iter().take(near).enumerate() {
                 let crowd = if v == 0 {

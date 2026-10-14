@@ -76,14 +76,7 @@ impl Game {
                 }
             }
             (false, true) => {
-                let mut added = false;
-                for &id in groups.get(n) {
-                    if !self.view.selection.contains(&id) {
-                        self.view.selection.push(id);
-                        added = true;
-                    }
-                }
-                if added {
+                if self.view.selection.extend(groups.get(n).iter().copied()) {
                     audio.play(Sfx::Select);
                 }
             }
