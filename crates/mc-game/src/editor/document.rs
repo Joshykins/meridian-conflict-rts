@@ -30,6 +30,12 @@ pub(super) enum Brush {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 pub(super) enum Command {
+    Players {
+        slots: Vec<mc_data::map_settings::MapPlayer>,
+    },
+    Mission {
+        key: Option<String>,
+    },
     Doodad {
         name: String,
         kind: String,
@@ -243,6 +249,22 @@ impl Document {
                 _ => objects::apply(command, &mut placed, blueprints)?,
             }
         }
+        for slot in &environment.config.players {
+            if blueprints.faction_by_key(&slot.faction).is_none() {
+                return Err(format!("Unknown faction: {}", slot.faction));
+            }
+            if usize::from(slot.start) >= self.map.starts.len().max(1) {
+                return Err("Player start is outside the map's start positions".into());
+            }
+        }
+        if !environment.config.players.is_empty()
+            && placed
+                .units
+                .iter()
+                .any(|u| usize::from(u.owner) >= environment.config.players.len())
+        {
+            return Err("A placed unit belongs to a removed player slot".into());
+        }
         self.commit(placed, patches, layers, environment, props)
     }
 
@@ -339,7 +361,11 @@ impl Document {
                 .as_ref()
                 .is_some_and(|(a, b)| a.water != b.water),
             terrain: rect,
-            objects: change.placed.is_some(),
+            objects: change.placed.is_some()
+                || change
+                    .environment
+                    .as_ref()
+                    .is_some_and(|(a, b)| a.config.players != b.config.players),
             cover: change
                 .layers
                 .iter()
@@ -401,3 +427,6 @@ mod environment_tests;
 
 #[cfg(test)]
 mod doodad_tests;
+
+#[cfg(test)]
+mod player_tests;

@@ -72,6 +72,10 @@ pub(crate) struct Recorder {
 }
 impl Recorder {
     pub(crate) fn record(&mut self, world: &mut mc_sim::World) -> Result<(), String> {
+        // Editor/range tests never replace the player's campaign checkpoints.
+        if world.state.cheats {
+            return Ok(());
+        }
         let Some(status) = world.mission_status() else {
             return Ok(());
         };

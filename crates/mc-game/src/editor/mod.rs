@@ -9,6 +9,7 @@ mod environment;
 mod frame;
 mod gestures;
 mod interaction;
+mod map_controls;
 mod navigation;
 mod overlays;
 mod panels;
@@ -60,6 +61,7 @@ pub(crate) struct Editor {
     paint: tools::PaintSettings,
     environment: environment::Controls,
     doodad: doodads::Controls,
+    map_controls: map_controls::Controls,
     radius: f32,
     strength: f32,
     stamp_asset: String,
@@ -82,31 +84,35 @@ pub(crate) struct Editor {
     catalogue: Option<catalogue::Catalogue>,
 }
 
-fn config(placed: &mc_map::placed::Placed) -> MatchConfig {
+fn config(placed: &mc_map::placed::Placed, map: &mc_data::weather::MapConfig) -> MatchConfig {
     MatchConfig {
         seed: 7,
         cheats: true,
         fog: false,
         spawn_commanders: false,
-        players: (0..placed
-            .units
-            .iter()
-            .map(|u| usize::from(u.owner) + 1)
-            .max()
-            .unwrap_or(6)
-            .max(6))
-            .map(|i| PlayerSetup {
-                name: ["Company", "Rebels", "PDF", "ARC", "Holdouts", "Miners"]
-                    .get(i)
-                    .map(|s| (*s).to_owned())
-                    .unwrap_or_else(|| format!("Player {}", i + 1)),
-                faction: "Aster".into(),
-                ai: Default::default(),
-                team: if i == 1 { 1 } else { 0 },
-                controller: mc_sim::tables::Controller::Human,
-                start: 0,
-            })
-            .collect(),
+        players: if !map.players.is_empty() {
+            crate::map_players::roster(&map.players)
+        } else {
+            (0..placed
+                .units
+                .iter()
+                .map(|u| usize::from(u.owner) + 1)
+                .max()
+                .unwrap_or(6)
+                .max(6))
+                .map(|i| PlayerSetup {
+                    name: ["Company", "Rebels", "PDF", "ARC", "Holdouts", "Miners"]
+                        .get(i)
+                        .map(|s| (*s).to_owned())
+                        .unwrap_or_else(|| format!("Player {}", i + 1)),
+                    faction: "Aster".into(),
+                    ai: Default::default(),
+                    team: if i == 1 { 1 } else { 0 },
+                    controller: mc_sim::tables::Controller::Human,
+                    start: 0,
+                })
+                .collect()
+        },
     }
 }
 
@@ -140,6 +146,7 @@ impl Editor {
             paint: Default::default(),
             environment: Default::default(),
             doodad: Default::default(),
+            map_controls: Default::default(),
             radius: 96.0,
             strength: 8.0,
             stamp_asset: "crater.json".into(),
@@ -312,13 +319,18 @@ impl Editor {
         let map = snapshot::map(&self.doc, "test")?;
         let request = crate::ui::setup::MatchRequest {
             map: map.clone(),
-            config: config(&self.doc.placed),
+            config: config(&self.doc.placed, &self.doc.config),
             colors: crate::setup::TEAM_COLORS,
             survival: None,
             sky: Default::default(),
         };
         let mission = crate::campaign::definition(&map)?;
-        crate::app::local_mission_start(request, &self.blueprints, false, mission)
+        crate::app::local_editor_start(
+            request,
+            &self.blueprints,
+            mission,
+            self.map_controls.test_slot,
+        )
     }
 }
 

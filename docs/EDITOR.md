@@ -7,8 +7,8 @@ user's meridian-conflict/maps directory. Open lists both shipped and user maps.
 WASD pans, Q/E orbits, Page Up/Down tilts, and the wheel zooms. Free camera
 keeps the current eye position: WASD flies, Q/E changes height, arrows look,
 Shift boosts movement and the wheel changes speed. Toggle it off to restore
-the previous orbit view. The bottom panel groups Terrain, Paint, Objects, Environment and
-Camera / Reload tools.
+the previous orbit view. The bottom panel groups Terrain, Paint, Objects, Environment,
+Map and Camera / Reload tools.
 Raise, Lower, Flatten, Smooth, Cliff and Noise edit terrain at the cursor.
 Drag to paint a continuous stroke; releasing commits one undo step.
 Ramp connects the existing heights at two clicked endpoints, with the brush
@@ -41,14 +41,14 @@ at match start; missions stage their named groups through the mission program.
 ## File layout
 
 A map folder contains terrain.mcmap, map.ron, placed.ron, and optional
-mission.ron and strings.en.ron. Terrain remains the existing lossless baked
+strings.en.ron. The map configuration stores its mission key and player slots. Terrain remains the existing lossless baked
 format. Placement metadata is versioned, validated and captured when a map opens.
 Loaded maps retain those placements even if the source sidecar is edited later.
 Map identity includes canonical placement values; empty authoring keeps legacy
 terrain identities unchanged.
 
 To bake the checked-in Vela mission terrain, run scripts/vela.sh. The generated
-terrain is ignored by Git; the authored placement, mission manifest and dialogue
+terrain is ignored by Git; the authored placement, map configuration and dialogue
 are tracked. The Contract and Continue Campaign appear in the main menu.
 
 ## Editor API
@@ -70,7 +70,7 @@ Examples:
 
 An edit request has 1–512 actions and is one atomic undo step. Invalid actions
 leave the entire request unapplied. Requests are limited to 256 KiB. Supported
-actions are water, time, climate, weather, climate_regions, terrain, ramp, stamp, paint, road, unit, doodad, region, point, camera, transform, properties and delete; the
+actions are players, mission, water, time, climate, weather, climate_regions, terrain, ramp, stamp, paint, road, unit, doodad, region, point, camera, transform, properties and delete; the
 authoritative schema is editor/document.rs. Coordinates are world metres,
 headings/yaw are degrees, and owner is the zero-based player slot.
 
@@ -88,8 +88,9 @@ For a native editor without opening a window, use:
     meridian --editor vela_m1 --editor-headless --size 1280x720
 
 It serves the same mailbox and renders at ten frames per second. State, edit,
-undo, save, camera, screenshot and reload work normally. Playtest requires the
-windowed editor. Close with {"op":"close"}; unsaved work refuses to close unless
+undo, save, camera, screenshot, reload, test and stop work normally. A headless
+playtest runs the real simulation and HUD; inspect its tick, player resources,
+reclaim beams and prop counts through state. Close with {"op":"close"}; unsaved work refuses to close unless
 {"op":"close","discard":true} is explicitly requested.
 
 A heightmap asset contains width, height and a row-major values array. Each side
@@ -270,3 +271,21 @@ EDITOR-IMPLEMENTATION.md and are not yet available in this slice.
 Offscreen editors also support {"op":"test"} and {"op":"stop"}. While
 testing, state.playtest reports tick, units, beams, dead/reclaimed props and player
 materials; shot captures the game HUD. Stop before editing or saving the document.
+
+
+## Player slots and mission
+
+Map > Players edits the selected slot's name, faction, team, start position and
+human/script or computer controller. Save roster publishes the current slots;
+each change participates in Undo/Redo. Removing a slot used by a placed unit is
+rejected. Test as chooses the local player without changing the saved roster.
+A computer slot selected for testing is controlled by you during that test.
+
+    {"op":"edit","actions":[{"action":"players","slots":[{"name":"Company","faction":"Aster","team":0,"start":0,"computer":false},{"name":"Opposition","faction":"Regency","team":1,"start":0,"computer":true}]}]}
+    {"op":"edit","actions":[{"action":"mission","key":"vela_m1"}]}
+    {"op":"test","slot":1}
+    {"op":"stop"}
+
+Slot, team and start indices are zero-based. Names are limited to 64 bytes.
+A null mission key disables the mission; an empty players array uses the
+match setup roster. Playtests never write normal campaign progress.

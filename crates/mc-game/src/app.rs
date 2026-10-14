@@ -7,7 +7,7 @@
 //! edits, fog) can leak into the next.
 #[path = "app_local.rs"]
 mod local;
-pub(crate) use local::{local_checkpoint_start, local_mission_start, local_start, record_in_sim};
+pub(crate) use local::{local_checkpoint_start, local_editor_start, local_start, record_in_sim};
 #[path = "app_frame.rs"]
 mod frame_view;
 

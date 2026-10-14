@@ -9,32 +9,13 @@ use mc_sim::{
 use serde::Deserialize;
 use std::collections::BTreeMap;
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct Manifest {
-    version: u32,
-    script: String,
-}
-
 pub(crate) fn definition(map: &mc_map::MapFile) -> Result<Option<Definition>, String> {
-    let path = map.path().with_file_name("mission.ron");
-    if map.path().file_name().is_none_or(|p| p != "terrain.mcmap") || !path.exists() {
-        return Ok(None);
+    let config = mc_data::weather::MapConfig::for_map(map.path())?;
+    match config.mission.as_deref() {
+        None => Ok(None),
+        Some("vela_m1") => Ok(Some(mc_missions::definition(map.placed().clone()))),
+        Some(key) => Err(format!("Unsupported mission script: {key}")),
     }
-    use std::io::Read;
-    let file = std::fs::File::open(&path).map_err(|e| e.to_string())?;
-    let mut bytes = Vec::new();
-    file.take(4097)
-        .read_to_end(&mut bytes)
-        .map_err(|e| e.to_string())?;
-    if bytes.len() > 4096 {
-        return Err("Mission manifest exceeds 4 KiB".into());
-    }
-    let manifest: Manifest = ron::de::from_bytes(&bytes).map_err(|e| e.to_string())?;
-    if manifest.version != 1 || manifest.script != "vela_m1" {
-        return Err("Unsupported mission script or version".into());
-    }
-    Ok(Some(mc_missions::definition(map.placed().clone())))
 }
 
 pub(crate) fn config() -> MatchConfig {

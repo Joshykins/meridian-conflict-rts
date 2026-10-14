@@ -21,6 +21,7 @@ const GROUPS: &[(&str, &[usize])] = &[
     ("Paint", &[17, 18, 19, 20, 21]),
     ("Objects", &[0, 5, 27, 6, 7, 8, 9]),
     ("Environment", &[22, 23, 24, 25, 26]),
+    ("Map", &[28]),
     ("Camera / Reload", &[12, 10, 11]),
 ];
 const LABELS: &[&str] = &[
@@ -52,6 +53,7 @@ const LABELS: &[&str] = &[
     "Time",
     "Climate wall",
     "Doodad",
+    "Players",
 ];
 impl Editor {
     pub(super) fn choose_tool(&mut self, name: &str) -> Result<(), String> {
@@ -126,7 +128,15 @@ impl Editor {
         let y = bottom + 54.0 + rows as f32 * 44.0;
         let width = (w - 102.0) * 0.5;
         let mut radius = (self.radius - 8.0) / 504.0;
-        if (22..=26).contains(&self.tool) {
+        if self.tool == 28 {
+            ui.text(
+                34.0,
+                y + 20.0,
+                type_scale::BODY,
+                rgb(palette::TEXT, 1.0),
+                "Configure the roster and choose the slot used by Test.",
+            );
+        } else if (22..=26).contains(&self.tool) {
             ui.text(
                 34.0,
                 y + 20.0,

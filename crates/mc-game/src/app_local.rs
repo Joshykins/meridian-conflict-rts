@@ -24,6 +24,26 @@ pub(crate) fn local_checkpoint_start(
     mission: Option<mc_sim::mission::Definition>,
     checkpoint: Option<crate::campaign_checkpoints::Checkpoint>,
 ) -> Result<GameStart, String> {
+    start_local(request, blueprints, record, mission, checkpoint, None)
+}
+
+pub(crate) fn local_editor_start(
+    request: MatchRequest,
+    blueprints: &Blueprints,
+    mission: Option<mc_sim::mission::Definition>,
+    slot: u8,
+) -> Result<GameStart, String> {
+    start_local(request, blueprints, false, mission, None, Some(slot))
+}
+
+fn start_local(
+    request: MatchRequest,
+    blueprints: &Blueprints,
+    record: bool,
+    mission: Option<mc_sim::mission::Definition>,
+    checkpoint: Option<crate::campaign_checkpoints::Checkpoint>,
+    editor_slot: Option<u8>,
+) -> Result<GameStart, String> {
     let MatchRequest {
         map,
         mut config,
@@ -31,17 +51,30 @@ pub(crate) fn local_checkpoint_start(
         survival,
         sky,
     } = request;
-    if mission.is_some() {
+    if mission.is_some() && editor_slot.is_none() {
         config = crate::campaign::config();
+    }
+    let authored = mc_data::weather::MapConfig::for_map(map.path())?;
+    if !authored.players.is_empty() {
+        config.players = crate::map_players::roster(&authored.players);
+    }
+    if let Some(slot) = editor_slot {
+        let selected = config
+            .players
+            .get_mut(usize::from(slot))
+            .ok_or("Unknown test player slot")?;
+        selected.controller = mc_sim::tables::Controller::Human;
     }
     let content = mc_net::ContentId {
         map_id: map.content_id(),
         blueprint_hash: blueprints.content_hash(),
     };
-    let human = config
-        .players
-        .iter()
-        .position(|p| p.controller == mc_sim::tables::Controller::Human);
+    let human = editor_slot.map(usize::from).or_else(|| {
+        config
+            .players
+            .iter()
+            .position(|p| p.controller == mc_sim::tables::Controller::Human)
+    });
     let observing = human.is_none();
     let local = human.unwrap_or(0);
     let humans = if observing {

@@ -349,6 +349,10 @@ pub struct MapConfig {
     /// (`regions::wander`), the walls unlit; 0, the default, for the crisp lit
     /// line of the Precursors' walls.
     pub blend: f32,
+    /// Optional compiled mission key.
+    pub mission: Option<String>,
+    /// Authored roster; empty retains the match setup roster.
+    pub players: Vec<crate::map_settings::MapPlayer>,
 }
 
 impl Default for MapConfig {
@@ -363,6 +367,8 @@ impl Default for MapConfig {
             style: None,
             strata_lift: 0.0,
             blend: 0.0,
+            mission: None,
+            players: Vec::new(),
         }
     }
 }
@@ -385,6 +391,8 @@ struct MapConfigFile {
     style: Option<MapStyle>,
     strata_lift: f32,
     blend: f32,
+    mission: Option<String>,
+    players: Vec<crate::map_settings::MapPlayer>,
 }
 
 impl From<MapConfig> for MapConfigFile {
@@ -403,18 +411,21 @@ impl From<MapConfig> for MapConfigFile {
             style: config.style,
             strata_lift: config.strata_lift,
             blend: config.blend,
+            mission: config.mission,
+            players: config.players,
         }
     }
 }
 
 impl TryFrom<MapConfigFile> for MapConfig {
-    type Error = RegionError;
+    type Error = crate::map_settings::SettingsError;
 
-    fn try_from(file: MapConfigFile) -> Result<MapConfig, RegionError> {
+    fn try_from(file: MapConfigFile) -> Result<MapConfig, Self::Error> {
+        crate::map_settings::validate(&file.players, file.mission.as_deref())?;
         let regions = match file.regions {
             Some(regions) => {
                 if !(2..=MAX_REGIONS).contains(&regions.len()) {
-                    return Err(RegionError::Regions(regions.len()));
+                    return Err(RegionError::Regions(regions.len()).into());
                 }
                 let own = [
                     ("climate", file.climate.is_some()),
@@ -422,13 +433,13 @@ impl TryFrom<MapConfigFile> for MapConfig {
                     ("tweaks", file.tweaks.is_some()),
                 ];
                 if let Some((field, _)) = own.into_iter().find(|(_, given)| *given) {
-                    return Err(RegionError::OwnAndRegions(field));
+                    return Err(RegionError::OwnAndRegions(field).into());
                 }
                 regions
             }
             None => {
                 if !file.walls.is_empty() {
-                    return Err(RegionError::WallsWithoutRegions);
+                    return Err(RegionError::WallsWithoutRegions.into());
                 }
                 vec![Region {
                     name: String::new(),
@@ -448,6 +459,8 @@ impl TryFrom<MapConfigFile> for MapConfig {
             style: file.style,
             strata_lift: file.strata_lift,
             blend: file.blend.max(0.0),
+            mission: file.mission,
+            players: file.players,
         })
     }
 }

@@ -14,6 +14,7 @@ pub mod gravitic;
 pub mod growth;
 pub mod lance;
 mod lot;
+pub mod map_settings;
 pub mod mounts;
 mod raw;
 pub mod refit;

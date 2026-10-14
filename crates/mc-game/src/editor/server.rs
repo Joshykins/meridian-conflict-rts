@@ -49,6 +49,7 @@ pub(crate) fn serve(
     let mut game: Option<crate::game::Game> = None;
     loop {
         let now = std::time::Instant::now();
+        memory.begin_frame();
         let ctx = FrameCtx {
             renderer: &mut renderer,
             overlay: &mut overlay,
@@ -90,6 +91,7 @@ pub(crate) fn serve(
                 _ => {}
             }
         }
+        memory.end_frame(&input);
         if editor.reload_requested() {
             editor.begin_reload(target());
         }

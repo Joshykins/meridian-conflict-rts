@@ -5,6 +5,15 @@
 // Palms on the strand, jungle on the hills, an atoll out to the north. A
 // bright, breezy morning: white sand, turquoise shallows, deep blue beyond.
 (
+    mission: Some("vela_m1"),
+    players: [
+        (name: "Company", faction: "Aster", team: 0, start: 0, computer: false),
+        (name: "Rebels", faction: "Aster", team: 1, start: 0, computer: false),
+        (name: "PDF", faction: "Aster", team: 0, start: 0, computer: false),
+        (name: "ARC", faction: "Aster", team: 0, start: 0, computer: false),
+        (name: "Holdouts", faction: "Aster", team: 0, start: 0, computer: false),
+        (name: "Miners", faction: "Aster", team: 0, start: 0, computer: false)
+    ],
     biome: Tropical,
     style: Duel,
     weather: Fair,

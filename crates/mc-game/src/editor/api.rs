@@ -49,7 +49,9 @@ enum Request {
         pitch: Option<f32>,
     },
     Shot,
-    Test,
+    Test {
+        slot: Option<u8>,
+    },
     Stop,
     Close {
         #[serde(default)]
@@ -221,7 +223,7 @@ impl Editor {
                     return Ok(json!({"ok":true,"calls":path,"count":calls.len()}));
                 }
                 Request::State => return Ok(json!({"ok":true,"map":self.doc.map.info.name,"source":self.doc.source,
-                    "playtest":self.api.test_state,"dirty":self.doc.dirty,"reloading":self.reloading(),"message":self.message,"destination":self.doc.destination,"placed":self.doc.placed,"environment":self.doc.config,"water_level":self.doc.map.info.water_level.to_f32(),"camera":{"at":self.camera.focus.to_array(),"zoom":self.camera.distance,"yaw":self.camera.yaw.to_degrees(),"pitch":self.camera.pitch_free.map(f32::to_degrees)}})),
+                    "playtest":self.api.test_state,"test_slot":self.map_controls.test_slot,"dirty":self.doc.dirty,"reloading":self.reloading(),"message":self.message,"destination":self.doc.destination,"placed":self.doc.placed,"environment":self.doc.config,"water_level":self.doc.map.info.water_level.to_f32(),"camera":{"at":self.camera.focus.to_array(),"zoom":self.camera.distance,"yaw":self.camera.yaw.to_degrees(),"pitch":self.camera.pitch_free.map(f32::to_degrees)}})),
                 Request::Edit {actions} => self.apply_batch(&actions,renderer)?,
                 Request::Undo|Request::Redo => self.history(matches!(request,Request::Redo),renderer)?,
                 Request::Save {name}=> {if let Some(name)=name {self.save_as(name)?;}else{self.save()?;}}
@@ -241,7 +243,8 @@ impl Editor {
                     self.camera.distance=zoom;self.camera.yaw=yaw.to_radians();self.camera.clamp_focus();
                 }
                 Request::Shot=>{if !self.api.headless {renderer.capture_next_frame();} self.api.shot=Some(id.clone());}
-                Request::Test=>{
+                Request::Test{slot}=>{
+                    if let Some(slot) = slot { self.map_controls.test_slot = slot; }
                     event=Some(Event::Test(Box::new(self.test()?)));
                     self.api.test_state=Some(json!({"tick":0,"starting":true}));
                 }

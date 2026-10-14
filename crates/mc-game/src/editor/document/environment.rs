@@ -17,6 +17,16 @@ impl State {
     }
     pub fn apply(&mut self, command: &Command) -> Result<bool, String> {
         match command {
+            Command::Players { slots } => {
+                mc_data::map_settings::validate(slots, self.config.mission.as_deref())
+                    .map_err(|e| e.to_string())?;
+                self.config.players = slots.clone();
+            }
+            Command::Mission { key } => {
+                mc_data::map_settings::validate(&self.config.players, key.as_deref())
+                    .map_err(|e| e.to_string())?;
+                self.config.mission = key.clone();
+            }
             Command::Water { level } => {
                 if !level.is_finite() || !(-2000.0..=4000.0).contains(level) {
                     return Err("Water level must be between -2000 and 4000 metres".into());

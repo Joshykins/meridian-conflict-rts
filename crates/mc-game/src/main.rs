@@ -33,6 +33,7 @@ mod issues;
 mod line_of_fire;
 mod live;
 mod loading;
+mod map_players;
 mod match_options;
 mod mind_map;
 mod net_bot;

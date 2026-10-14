@@ -35,7 +35,7 @@ pub(super) fn build(
         data,
         blueprints.clone(),
         pool,
-        &config(&doc.placed),
+        &config(&doc.placed, &doc.config),
     )
     .map_err(|e| e.to_string())?;
     world

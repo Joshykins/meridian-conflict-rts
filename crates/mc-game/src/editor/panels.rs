@@ -70,6 +70,9 @@ impl Editor {
         }
     }
     pub(super) fn properties(&mut self, ui: &mut Ui, renderer: &mut mc_render::Renderer) -> Rect {
+        if self.tool == 28 {
+            return self.map_properties(ui, renderer);
+        }
         if self.tool == 27
             || (matches!(self.tool, 0 | 9)
                 && self

@@ -1,10 +1,17 @@
 # Mission authoring
 
 Missions live in mc-missions and compile into the game. A map folder contains
-terrain.mcmap, placed.ron, map.ron, mission.ron and strings.en.ron. The manifest
-selects a registered Rust mission:
+terrain.mcmap, placed.ron, map.ron and strings.en.ron. The map configuration
+selects a registered Rust mission and can supply its player slots:
 
-    (version: 1, script: "vela_m1")
+    (mission: Some("vela_m1"), players: [
+        (name: "Company", faction: "Aster", team: 0, start: 0, computer: false),
+        (name: "Rebels", faction: "Aster", team: 1, start: 0, computer: false),
+    ])
+
+The checked-in Vela roster has six slots. A human/script slot stays idle until
+the player or mission issues orders; a computer slot runs the standard AI.
+Editor playtests enable debugging and never write campaign checkpoints or progress.
 
 Named objects are authored through the editor or its shared command API. Unit,
 region, point and camera names have separate namespaces. Persistent numeric IDs
