@@ -1,0 +1,11 @@
+# What the site's build leaves out (deploy/site.Dockerfile). Unlike the server's
+# (.dockerignore), it keeps data/ and the images: the site is made from them.
+target
+.git
+maps
+artifacts
+site/node_modules
+site/.next
+site/public/generated
+site/content/units
+*.mcreplay

@@ -75,15 +75,17 @@ generates again when either changes; reload the page to see it.
 
 ## Hosting
 
-Any host that builds from the repository works (Vercel or the like): set the
-project's root to `site/`, leave "include files outside the root directory" on
-(the build reads `../data` and `../crates`), and use `pnpm build`. A push that
-changes a unit file or a model then rebuilds the pages with it.
+The site runs on Railway as a service of its own, built with
+`deploy/site.Dockerfile` (Node and the pinned Rust toolchain, then `pnpm build`,
+then Next's standalone server) from the `release` branch. Only
+`scripts/channel.sh promote release` (or a release hotfix) moves that branch, after
+the build is published, so the site always shows the game players have
+(docs/RELEASES.md). The service's settings: source this repository, branch
+`release`, variable `RAILWAY_DOCKERFILE_PATH=deploy/site.Dockerfile`, and the custom
+domains `meridianconflict.com` and `www.meridianconflict.com`.
 
-A build host without Rust gets rustup installed by `scripts/models.mjs` (when
-`CI` is set), which then fetches the toolchain pinned in `rust-toolchain.toml`;
-the build goes into `.next/cache/meridian/target`. This path has not yet run on
-a real host: it needs `curl`, a C linker and a few minutes on the first build.
+To try the image here: `docker build -f deploy/site.Dockerfile -t meridian-site .`
+from the repository root, then `docker run -p 3000:3000 meridian-site`.
 
 ## Speed
 

@@ -243,6 +243,13 @@ the hotfix worktree. A playtest hotfix is the same with `playtest`.
 
 `scripts/channel.sh status` shows where the three stand, here and on origin.
 
+**Railway deploys from `release`.** Two Railway services watch the `release` branch:
+the multiplayer relay (`deploy/Dockerfile`, docs/SERVER.md) and the website
+(`deploy/site.Dockerfile`, `site/README.md`, at `meridianconflict.com`). Since only a
+completed promotion or release hotfix pushes `release`, after its build is
+published, they redeploy exactly when players get a new build, from the same commit.
+A playtest relay, if there is one, watches `playtest` the same way.
+
 There is no CI: every landing on `dev` already passes the gate, and every promotion
 and hotfix runs it again on exactly the commit it publishes.
 

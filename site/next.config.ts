@@ -3,6 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
+  // A server with only what it needs (deploy/site.Dockerfile runs it on Railway).
+  output: "standalone",
   // Every page is static: built once from content/*.json and served from the edge cache.
   async headers() {
     return [

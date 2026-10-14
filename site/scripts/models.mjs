@@ -94,26 +94,17 @@ function requestOf({ factions, units }) {
 }
 
 /**
- * The environment `cargo` runs in, with the toolchain the repository pins. A build host
- * that has no Rust gets rustup installed (it then fetches the pinned toolchain by itself)
- * and builds into the cache the host keeps; anywhere else its absence is an error, since
- * whoever works on the game has it.
+ * The environment `cargo` runs in: with `~/.cargo/bin` on the path, where rustup puts it.
+ * Whoever builds the site has the game's toolchain (`deploy/site.Dockerfile` installs it
+ * for Railway), so its absence is an error.
  */
 function cargoEnv() {
   const bin = join(homedir(), ".cargo", "bin");
   const env = { ...process.env, PATH: `${process.env.PATH}${delimiter}${bin}` };
-  if (spawnSync("cargo", ["--version"], { env }).status === 0) return env;
-  if (!process.env.CI) {
+  if (spawnSync("cargo", ["--version"], { env }).status !== 0) {
     throw new Error("cargo was not found: the site builds its unit models with the game's Rust toolchain (https://rustup.rs)");
   }
-  console.log("models: no Rust on this build host; installing rustup");
-  const install = spawnSync(
-    "sh",
-    ["-c", "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain none"],
-    { env, stdio: "inherit" },
-  );
-  if (install.status !== 0) throw new Error("rustup did not install");
-  return { ...env, CARGO_TARGET_DIR: join(cache, "target") };
+  return env;
 }
 
 /** Runs the exporter over `rawDir` and gives each unit's triangle count. */

@@ -506,12 +506,37 @@ function teamColors() {
 // The owner's colour a faction's units wear on the site: the first two player colours.
 const TEAM_SLOT = { aster: 0, regency: 1 };
 
-/** A faction's paint, for the model exporter and the page's viewer (`mc_models::site::Paint`). */
+/**
+ * A skin slot's colour (`mc_data::skins::Paint`): given outright, or the plate's tinted,
+ * or the skin's light at some strength.
+ */
+function slotColor(skin, slot) {
+  const paint = skin.slots[slot].color;
+  const plate = () => slotColor(skin, "plate");
+  switch (paint.$) {
+    case "Rgb":
+      return paint.value;
+    case "Plate":
+      return plate().map((c, k) => c * paint.value[k]);
+    case "Highlight":
+      return skin.highlight.map((c) => Math.min(1, c * paint.value));
+    case "Light":
+      return paint.args[0];
+    default:
+      throw new Error(`skin slot ${slot}: unknown paint ${JSON.stringify(paint)}`);
+  }
+}
+
+/**
+ * A faction's paint, for the model exporter and the page's viewer (`mc_models::site::Paint`),
+ * from its skin (`data/skins/<skin>.ron`): the plate, the trim and the skin's light.
+ */
 function paintOf(faction, factionKey, teams) {
+  const skin = readRon(join(repo, "data", "skins", `${faction.skin}.ron`));
   return {
-    plating: faction.plating_color,
-    accent: faction.accent_color,
-    glow: faction.highlight_color,
+    plating: slotColor(skin, "plate"),
+    accent: slotColor(skin, "trim"),
+    glow: skin.highlight,
     // `raw.rs` `default_shield_color`.
     shield: faction.shield_color ?? [0.35, 0.75, 1.0],
     team: teams[TEAM_SLOT[factionKey]],
