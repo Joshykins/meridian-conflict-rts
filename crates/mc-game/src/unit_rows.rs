@@ -1,13 +1,21 @@
 //! Quick ways from a unit id to its instance in the frame and to its orders in the
-//! status, and the selection resolved against the frame once per pull.
+//! status, the few units and queues each kind of mark looks for, and the selection
+//! resolved against the frame once per pull.
 //!
 //! The interface asks "where is unit N?" of every selected unit, often several times a
 //! frame (the deck, the order lines, the marks on the ground). With tens of thousands
 //! selected, a hash map lookup or a binary search each was tens of milliseconds a frame.
 //! A unit id is a sim handle, whose low bits are its table row (`Handle::index`), so a
-//! plain array by row, filled once per pull, finds it in one step; each hit is checked
-//! against the id, and a miss falls back to `View::index_of` (or the binary search of the
-//! queues, or of the fuel list), so the answers are always those the slower ways give.
+//! table by row, holding each row's id and filled once per pull, answers in one step
+//! without reading the frame. A row two ids share is asked of `View::index_of` (or the
+//! binary search of the queues, or of the fuel list), and so is everything while the
+//! frame is not the one the tables were filled from (a view filled by hand, before any
+//! pull), where a row's answer is believed only once the list confirms it: the answers
+//! are always those the slower ways give.
+//!
+//! The same pass lists each blueprint's units, and the units and queues the interface
+//! otherwise looked through every frame for the few that matter (`UnitList`,
+//! `QueueList`).
 
 use crate::game::View;
 use mc_sim::mirror::{FuelView, UnitInstance, UnitOrders, KIND_GHOST, KIND_PROP, KIND_WRECK};
