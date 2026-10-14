@@ -138,7 +138,11 @@ impl Structures {
         let mut s = Structures::default();
         for (i, p) in props.iter().enumerate() {
             let max = if let Some(d) = components.get(&(i as u32)) {
-                i64::from(d.health)
+                if d.health == 0 && d.blocking {
+                    i64::from(i32::MAX)
+                } else {
+                    i64::from(d.health)
+                }
             } else {
                 let scale = i64::from(p.scale_milli);
                 mc_map::city::structure(p.kind).map_or(0, |kind| {
@@ -359,7 +363,7 @@ impl CityShapes {
             c.first.push(c.parts.len() as u32);
             let (mut lo, mut hi) = (p.pos, p.pos);
             let mut tallest = Fx::ZERO;
-            for part in crate::doodads::parts(p, components.get(&prop)) {
+            for part in mc_map::placed::prop_parts(p, components.get(&prop)) {
                 let (cx, cy) = (part.centre.x * scale, part.centre.y * scale);
                 let half = part.half * scale;
                 let mid = FxVec2::new(p.pos.x + cx * cos - cy * sin, p.pos.y + cx * sin + cy * cos);
@@ -603,6 +607,10 @@ impl World {
     /// sets it alight at once if it burns. A standing structure only.
     pub(crate) fn damage_structure(&mut self, row: usize, damage: Fx, ignite: bool) {
         let tick = self.state.tick;
+        let prop = self.state.city.prop[row];
+        if self.map.doodads.get(&prop).is_some_and(|d| d.health == 0) {
+            return;
+        }
         let s = &mut self.state.city;
         if s.is_down(row) || damage <= Fx::ZERO {
             return;

@@ -70,7 +70,15 @@ impl Editor {
         }
     }
     pub(super) fn properties(&mut self, ui: &mut Ui, renderer: &mut mc_render::Renderer) -> Rect {
-        if self.tool >= 22 {
+        if self.tool == 27
+            || (matches!(self.tool, 0 | 9)
+                && self
+                    .selected
+                    .is_some_and(|id| self.doc.placed.doodads.iter().any(|d| d.id == id)))
+        {
+            return self.doodad_properties(ui, renderer);
+        }
+        if (22..=26).contains(&self.tool) {
             return self.environment_properties(ui, renderer);
         }
         if (17..=21).contains(&self.tool) {
@@ -275,6 +283,13 @@ impl Editor {
                     .iter()
                     .map(|c| (c.id, c.name.clone(), c.at)),
             )
+            .chain(self.doc.placed.doodads.iter().map(|d| {
+                (
+                    d.id,
+                    d.name.clone(),
+                    self.doc.map.props[d.prop_index as usize].pos,
+                )
+            }))
             .collect();
         let rows = ((outliner.h - 48.0) / 34.0).max(0.0) as usize;
         if outliner.contains(ui.cursor) && input.scroll != 0.0 {
@@ -297,6 +312,7 @@ impl Editor {
                 true,
             ) {
                 self.selected = Some(*object);
+                self.load_doodad(*object);
                 self.name = name.clone();
                 self.camera.focus = Vec2::from(at.to_f32()).extend(0.0);
                 if let Some(u) = self.doc.placed.units.iter().find(|u| u.id == *object) {
@@ -309,42 +325,5 @@ impl Editor {
         }
 
         outliner
-    }
-    pub(super) fn world_input(
-        &mut self,
-        ui: &mut Ui,
-        renderer: &mut mc_render::Renderer,
-        bottom: f32,
-        card: Rect,
-        outliner: Rect,
-    ) {
-        let input = ui.input;
-        let viewport = ui.cursor.y > 90.0
-            && ui.cursor.y < bottom
-            && !card.contains(ui.cursor)
-            && !outliner.contains(ui.cursor);
-        if viewport && !self.confirm_exit {
-            if input.scroll != 0.0 {
-                self.navigation.wheel(&mut self.camera, input.scroll);
-            }
-            let (origin, dir) = self.camera.ray(input.cursor);
-            if let Some(hit) = renderer.pick_ground(origin, dir) {
-                if input.pressed {
-                    let at = [hit.x, hit.y];
-                    let command = self.world_command(at, input.cursor, renderer);
-                    if let Some(command) = command {
-                        let placing = matches!(command, Command::Unit { .. });
-                        match self.apply(command, renderer) {
-                            Err(e) => self.message = e,
-                            Ok(()) if placing => {
-                                self.name =
-                                    format!("{}_{}", self.blueprint, self.doc.placed.next_id)
-                            }
-                            Ok(()) => {}
-                        }
-                    }
-                }
-            }
-        }
     }
 }

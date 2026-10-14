@@ -7,6 +7,13 @@ impl Editor {
         renderer: &mc_render::Renderer,
     ) -> Option<Command> {
         match self.tool {
+            27 => match self.doodad_command(at) {
+                Ok(c) => Some(c),
+                Err(e) => {
+                    self.message = e;
+                    None
+                }
+            },
             22..=25 => None,
             26 => self.climate_wall(at),
             1..=4 => Some(Command::Terrain {

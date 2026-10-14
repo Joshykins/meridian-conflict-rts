@@ -31,16 +31,45 @@ const PROJECTOR_CLEAR: f32 = 60.0;
 /// ground in each texel, softened. Read tile by tile, so no more than one tile's
 /// samples are held at once.
 pub(crate) fn crag_field(map: &MapFile, cell: f32, (w, h): (usize, usize)) -> Vec<f32> {
-    let info = map.info();
+    crag_from(map.info(), map.decks(), cell, (w, h), |tx, ty, samples| {
+        map.read_tile_into(tx, ty, samples).is_ok()
+    })
+}
+pub(crate) fn crag_edited(
+    map: &mc_map::edit::EditMap,
+    cell: f32,
+    dims: (usize, usize),
+) -> Vec<f32> {
+    crag_from(
+        &map.info,
+        &map.decks,
+        cell,
+        dims,
+        |tx, ty, samples| match map.tile(tx, ty) {
+            Ok(tile) => {
+                samples.copy_from_slice(&tile);
+                true
+            }
+            Err(_) => false,
+        },
+    )
+}
+fn crag_from(
+    info: &mc_map::MapInfo,
+    decks: &[mc_map::Deck],
+    cell: f32,
+    (w, h): (usize, usize),
+    mut tile: impl FnMut(u32, u32, &mut [u16]) -> bool,
+) -> Vec<f32> {
     let (min_z, step) = (info.min_z.to_f32(), info.z_step.to_f32());
-    let (tiles_w, tiles_h) = map.size_tiles();
+    let (tiles_w, tiles_h) = (info.tiles_w, info.tiles_h);
     let metres = CELL_SIZE_M as f32;
     let mut field = vec![0f32; w * h];
     let n = TILE_SAMPLES as usize;
     let mut samples = vec![0u16; n * n];
     for ty in 0..tiles_h {
         for tx in 0..tiles_w {
-            if map.read_tile_into(tx, ty, &mut samples).is_err() {
+            if !tile(tx, ty, &mut samples) {
                 continue;
             }
             let at =
@@ -73,16 +102,16 @@ pub(crate) fn crag_field(map: &MapFile, cell: f32, (w, h): (usize, usize)) -> Ve
         h,
         ((SOFTEN_M / cell).round() as usize).max(1),
     );
-    clear_projectors(map, &mut field, cell, (w, h));
+    clear_projectors(decks, &mut field, cell, (w, h));
     field
 }
 
 /// Clears the crag field over each bridge's projectors (`HARDLIGHT_BRIDGE`'s head
 /// and ramp at both ends of every deck, scaled as the deck is), the deck's ends
 /// and [`PROJECTOR_CLEAR`] round them.
-fn clear_projectors(map: &MapFile, field: &mut [f32], cell: f32, (w, h): (usize, usize)) {
+fn clear_projectors(decks: &[mc_map::Deck], field: &mut [f32], cell: f32, (w, h): (usize, usize)) {
     let plan = mc_map::landmark::HARDLIGHT_BRIDGE;
-    for deck in map.decks() {
+    for deck in decks {
         let (a, b) = (Vec2::from(deck.a.to_f32()), Vec2::from(deck.b.to_f32()));
         let len = a.distance(b).max(1.0);
         let dir = (b - a) / len;

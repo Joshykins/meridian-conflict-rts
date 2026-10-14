@@ -2484,7 +2484,9 @@ fn vs_main(in: VsIn) -> VsOut {
     let warp_damped = (e.status[0] & WARP_STATUS_DAMPED) != 0u;
     let warp_seed = hash11(f32(e.unit_id & 0xFFFFu));
     let warp_reach = max(model.bounds_radius * scale, 1.0);
-    let warp = warp_state(e.fx, t, warp_damped, warp_seed, time);
+    // Static props reserve fx for RGB tint, never a unit warp phase.
+    let warp_fx = select(e.fx, vec4<f32>(0.0), (e.owner_flags & KIND_PROP) != 0u);
+    let warp = warp_state(warp_fx, t, warp_damped, warp_seed, time);
     let warp_nanite = (e.status[0] & WARP_STATUS_NANITE) != 0u;
     world = warp_stretch(world, origin, fwd, left, up, local, warp_reach, warp, warp_damped, warp_nanite, warp_seed, time);
     // A standing tree bends over its foot with the wind and away from blasts

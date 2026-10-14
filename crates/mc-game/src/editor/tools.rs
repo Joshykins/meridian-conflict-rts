@@ -19,7 +19,7 @@ impl Default for PaintSettings {
 const GROUPS: &[(&str, &[usize])] = &[
     ("Terrain", &[1, 2, 3, 4, 13, 14, 15, 16]),
     ("Paint", &[17, 18, 19, 20, 21]),
-    ("Objects", &[0, 5, 6, 7, 8, 9]),
+    ("Objects", &[0, 5, 27, 6, 7, 8, 9]),
     ("Environment", &[22, 23, 24, 25, 26]),
     ("Camera / Reload", &[12, 10, 11]),
 ];
@@ -51,6 +51,7 @@ const LABELS: &[&str] = &[
     "Weather",
     "Time",
     "Climate wall",
+    "Doodad",
 ];
 impl Editor {
     pub(super) fn choose_tool(&mut self, name: &str) -> Result<(), String> {
@@ -125,7 +126,7 @@ impl Editor {
         let y = bottom + 54.0 + rows as f32 * 44.0;
         let width = (w - 102.0) * 0.5;
         let mut radius = (self.radius - 8.0) / 504.0;
-        if self.tool >= 22 {
+        if (22..=26).contains(&self.tool) {
             ui.text(
                 34.0,
                 y + 20.0,

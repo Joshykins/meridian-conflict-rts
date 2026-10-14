@@ -1,4 +1,5 @@
 //! Authoring updates use the regular terrain upload queue and GPU fence.
+mod props;
 use super::Renderer;
 impl Renderer {
     pub fn edit_terrain(
@@ -13,6 +14,7 @@ impl Renderer {
 
 #[derive(Default)]
 pub(super) struct EditorState {
+    cliff_base: u32,
     cover: Option<crate::ground_cover::GroundCover>,
     environment: Option<(
         mc_data::weather::MapLook,
@@ -149,5 +151,60 @@ impl Renderer {
             self.set_hour(hour);
         }
         self.editor.environment = Some((look, weather, hour));
+    }
+}
+
+impl EditorState {
+    pub(super) fn new(cliff_base: u32) -> Self {
+        Self {
+            cliff_base,
+            ..Default::default()
+        }
+    }
+}
+
+impl Renderer {
+    #[track_caller]
+    fn edit_scenery_cover(
+        &mut self,
+        map: &mc_map::edit::EditMap,
+    ) -> Result<(), crate::gpu::GpuError> {
+        let cover = crate::ground_cover::edited(map);
+        let bounds = [0, 0, cover.width - 1, cover.height - 1];
+        for (layer, data) in [&cover.texels, &cover.ways, &cover.streets]
+            .iter()
+            .enumerate()
+        {
+            upload(
+                &self.gpu,
+                &self.ground_cover,
+                layer as u32,
+                0,
+                cover.width,
+                bounds,
+                data,
+            )?;
+        }
+        for (mip, (w, h, data)) in cover.mips.iter().enumerate() {
+            upload(
+                &self.gpu,
+                &self.ground_cover,
+                0,
+                mip as u32 + 1,
+                *w,
+                [0, 0, w - 1, h - 1],
+                data,
+            )?;
+        }
+        let mut cliffs = crate::cliff_blocks::CliffBlocks::new(
+            &cover,
+            glam::Vec2::from(map.info.size_metres().to_f32()),
+        );
+        if let Some((look, _, _)) = &self.editor.environment {
+            cliffs.set_look(look);
+        }
+        self.tile_cache.cliffs = cliffs;
+        self.editor.cover = Some(cover);
+        Ok(())
     }
 }

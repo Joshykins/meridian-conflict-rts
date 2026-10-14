@@ -6,10 +6,29 @@ pub(super) fn instances(
     staged: &[Prop],
     prop_base: u32,
 ) -> Vec<UnitInstance> {
+    build(
+        scene.map.props(),
+        |i| {
+            scene
+                .map
+                .doodad(i)
+                .map(|d| d.tint)
+                .or_else(|| scene.map.prop_tints().get(i).copied())
+        },
+        tile_cache,
+        staged,
+        prop_base,
+    )
+}
+pub(super) fn build(
+    props: &[Prop],
+    tint: impl Fn(usize) -> Option<[u8; 3]>,
+    tile_cache: &TileCache,
+    staged: &[Prop],
+    prop_base: u32,
+) -> Vec<UnitInstance> {
     let kinds: Vec<u16> = PropKind::ALL.iter().map(|k| k.raw()).collect();
-    scene
-        .map
-        .props()
+    props
         .iter()
         .chain(staged)
         .enumerate()
@@ -79,7 +98,7 @@ pub(super) fn instances(
                 mount: [0.0; 4],
                 spin_recoil: [0.0; 4],
                 // Static props reserve fx for RGB tint and presence; sim units use it for their effects.
-                fx: scene.map.prop_tints().get(i).map_or([0.0; 4], |t| {
+                fx: tint(i).map_or([0.0; 4], |t| {
                     [
                         t[0] as f32 / 255.0,
                         t[1] as f32 / 255.0,

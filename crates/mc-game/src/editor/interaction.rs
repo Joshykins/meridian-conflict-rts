@@ -1,5 +1,29 @@
 use super::*;
 impl Editor {
+    pub(super) fn select_object(&mut self, id: u64) -> Result<(), String> {
+        let named = self
+            .doc
+            .placed
+            .units
+            .iter()
+            .map(|u| (u.id, &u.name))
+            .chain(self.doc.placed.doodads.iter().map(|d| (d.id, &d.name)))
+            .chain(self.doc.placed.points.iter().map(|p| (p.id, &p.name)))
+            .chain(self.doc.placed.regions.iter().map(|p| (p.id, &p.name)))
+            .chain(self.doc.placed.cameras.iter().map(|p| (p.id, &p.name)))
+            .find(|(key, _)| *key == id)
+            .ok_or("Object no longer exists")?;
+        self.name = named.1.clone();
+        self.selected = Some(id);
+        self.load_doodad(id);
+        if let Some(u) = self.doc.placed.units.iter().find(|u| u.id == id) {
+            self.blueprint = u.blueprint.clone();
+            self.group = u.group.clone();
+            self.owner = u.owner;
+            self.heading = u.heading.to_radians_f32().to_degrees();
+        }
+        Ok(())
+    }
     pub(super) fn save_as(&mut self, name: String) -> Result<(), String> {
         let previous = self.doc.destination.take();
         let previous_name = std::mem::replace(&mut self.save_name, name);
@@ -34,6 +58,13 @@ impl Editor {
                     .iter()
                     .map(|r| (r.id, &r.name, (r.min + r.max) * mc_core::Fx::HALF)),
             );
+        let objects = objects.chain(
+            self.doc
+                .placed
+                .doodads
+                .iter()
+                .map(|d| (d.id, &d.name, self.doc.map.props[d.prop_index as usize].pos)),
+        );
         for (id, name, at) in objects {
             let at = Vec2::from(at.to_f32());
             if let Some(screen) = self.camera.project(at.extend(renderer.ground_height(at))) {
@@ -46,6 +77,7 @@ impl Editor {
         self.selected = nearest.as_ref().map(|(_, id, _)| *id);
         if let Some((_, id, name)) = nearest {
             self.name = name;
+            self.load_doodad(id);
             if let Some(u) = self.doc.placed.units.iter().find(|u| u.id == id) {
                 self.blueprint = u.blueprint.clone();
                 self.group = u.group.clone();

@@ -10,6 +10,7 @@ Shift boosts movement and the wheel changes speed. Toggle it off to restore
 the previous orbit view. The bottom panel groups Terrain, Paint, Objects, Environment and
 Camera / Reload tools.
 Raise, Lower, Flatten, Smooth, Cliff and Noise edit terrain at the cursor.
+Drag to paint a continuous stroke; releasing commits one undo step.
 Ramp connects the existing heights at two clicked endpoints, with the brush
 radius as its half-width. Stamp reads a named JSON heightmap from the map's
 stamps folder (Vela includes crater.json); strength is its height in metres. Unit, Region,
@@ -67,7 +68,7 @@ Examples:
 
 An edit request has 1–512 actions and is one atomic undo step. Invalid actions
 leave the entire request unapplied. Requests are limited to 256 KiB. Supported
-actions are water, time, climate, weather, climate_regions, terrain, ramp, stamp, paint, road, unit, region, point, camera, transform, properties and delete; the
+actions are water, time, climate, weather, climate_regions, terrain, ramp, stamp, paint, road, unit, doodad, region, point, camera, transform, properties and delete; the
 authoritative schema is editor/document.rs. Coordinates are world metres,
 headings/yaw are degrees, and owner is the zero-based player slot.
 
@@ -98,8 +99,9 @@ horizontal half-width and its original aspect ratio is retained.
     {"op":"edit","actions":[{"action":"stamp","at":[600,600],"radius":128,"strength":24,"asset":"crater.json"}]}
 
 All terrain tools share sample-level undo and the live tile/overview upload path.
-Cliff edits make a steep plateau in the heightfield; regeneration of decorative
-cliff block props remains a separate pending task.
+Cliff edits make a steep plateau in the heightfield. Decorative cliff rocks,
+terrain refinement and relief rebuild when a stroke ends, using the edited heights.
+Tree placement also refreshes forest canopy and ground cover.
 
 ## Paint
 
@@ -122,6 +124,30 @@ sentinel across the map, so that first edit uploads the entire snow layer.
 
 Ground values are 0–8 in the order above; road kinds are 0–5. Tool names use
 lowercase labels with underscores, such as free_camera and reload_data.
+
+## Doodads
+
+Objects > Doodad opens an authoring tool for every built-in prop kind. Browse the
+searchable catalogue, then click the terrain to place separate named objects.
+Pick a prop or use the outliner to edit it. Appearance controls rotation, uniform
+scale and RGB tint. Components controls blocking, health, reclaim value and an
+optional local box (half width, half depth, height in metres at scale one).
+Apply to selection preserves its ID, including when renaming it. Move and Delete
+use the same selection; undo restores the original components and prop table.
+
+Health zero means indestructible. A blocking indestructible object stops shots
+as well as movement. A prop without native collision geometry needs a custom
+footprint before health, blocking or reclaim can be enabled. Destruction releases
+blocked cells and uses the same footprint for impact and collapse presentation.
+Reclaim values are authored and preserved; collection is still being implemented.
+
+    {"op":"choose_doodad","kind":"CityBillboard"}
+    {"op":"edit","actions":[{"action":"doodad","name":"district_sign","kind":"CityBillboard","at":[4000,8500],"heading":90,"scale":1.5,"tint":[255,120,60],"blocking":true,"health":400,"reclaim":20,"footprint":[8,2,15]}]}
+    {"op":"select","id":1}
+
+The component side table remains keyed to baked prop indices; saves and deletions
+remap those indices while named identities stay fixed. Props, tint, destruction
+geometry and cliff scenery update live without rebuilding models or pipelines.
 
 ## Environment
 
@@ -232,6 +258,6 @@ at tick 5347 before the next choreography pass. The expanded route includes
 civilian evacuation cars, physical ARC cargo drops, queued comms and checkpoint
 recovery. Add --resume to restore every checkpoint into a fresh world during the
 route. Use --mission-pilot with a headless screenshot to inspect later beats.
-Full encounter balance and visual review remain in progress. Component prop editing, decorative cliff regeneration,
+Full encounter balance and visual review remain in progress. Reclaim collection,
 resizing and remaining gizmos are tracked in
 EDITOR-IMPLEMENTATION.md and are not yet available in this slice.

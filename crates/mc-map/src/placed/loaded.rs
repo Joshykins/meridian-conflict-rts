@@ -3,6 +3,7 @@ use super::*;
 pub(crate) struct Loaded {
     pub placed: Placed,
     pub content_id: u64,
+    pub by_prop: std::collections::BTreeMap<u32, usize>,
 }
 impl Loaded {
     pub(crate) fn read(
@@ -34,6 +35,16 @@ impl Loaded {
             hash.write_u8s(text.as_bytes());
             hash.finish()
         };
-        Ok(Self { placed, content_id })
+        let by_prop = placed
+            .doodads
+            .iter()
+            .enumerate()
+            .map(|(i, d)| (d.prop_index, i))
+            .collect();
+        Ok(Self {
+            placed,
+            content_id,
+            by_prop,
+        })
     }
 }

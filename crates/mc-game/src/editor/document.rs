@@ -1,8 +1,10 @@
 //! The authoring document and undoable commands shared by the UI and mailbox.
+mod doodads;
 mod environment;
 mod objects;
 mod paint;
 pub(super) use paint::Paint;
+mod history;
 mod properties;
 mod stamp;
 mod terrain;
@@ -28,6 +30,18 @@ pub(super) enum Brush {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 pub(super) enum Command {
+    Doodad {
+        name: String,
+        kind: String,
+        at: [f32; 2],
+        heading: f32,
+        scale: f32,
+        tint: [u8; 3],
+        blocking: bool,
+        health: u32,
+        reclaim: u32,
+        footprint: Option<[f32; 3]>,
+    },
     Water {
         level: f32,
     },
@@ -126,12 +140,15 @@ pub(super) enum Command {
 pub(super) struct Update {
     pub terrain: Option<[u32; 4]>,
     pub objects: bool,
+    pub props: bool,
     pub environment: bool,
     pub water: bool,
     pub cover: Vec<(mc_map::edit::Layer, [u32; 4])>,
 }
 
 struct Change {
+    props: Option<(doodads::State, doodads::State)>,
+    children: Vec<Change>,
     heights: Vec<(u32, u32, u16, u16)>,
     placed: Option<(Placed, Placed)>,
     layers: Vec<paint::Change>,
@@ -147,6 +164,7 @@ pub(super) struct Document {
     pub dirty: bool,
     undo: Vec<Change>,
     redo: Vec<Change>,
+    stroke: Option<Vec<Change>>,
 }
 
 fn point(p: [f32; 2]) -> Result<FxVec2, String> {
@@ -171,6 +189,7 @@ impl Document {
             dirty: false,
             undo: vec![],
             redo: vec![],
+            stroke: None,
         })
     }
 
@@ -186,6 +205,7 @@ impl Document {
         }
         let mut environment = environment::State::from_doc(self);
         let mut placed = self.placed.clone();
+        let mut props = None;
         let mut patches = BTreeMap::new();
         let mut layers = paint::Patches::default();
         for command in commands {
@@ -219,10 +239,11 @@ impl Document {
                     kind,
                 } => layers.road(&self.map, *from, *to, *width, *kind)?,
                 command if environment.apply(command)? => {}
+                command if doodads::apply(command, &self.map, &mut props, &mut placed)? => {}
                 _ => objects::apply(command, &mut placed, blueprints)?,
             }
         }
-        self.commit(placed, patches, layers, environment)
+        self.commit(placed, patches, layers, environment, props)
     }
 
     fn commit(
@@ -231,11 +252,21 @@ impl Document {
         patches: BTreeMap<(u32, u32), u16>,
         layers: paint::Patches,
         environment: environment::State,
+        props: Option<doodads::State>,
     ) -> Result<Update, String> {
         placed
-            .validate(&self.map.info, self.map.props.len())
+            .validate(
+                &self.map.info,
+                props
+                    .as_ref()
+                    .map_or(self.map.props.len(), |p| p.props.len()),
+            )
             .map_err(|e| e.to_string())?;
         let mut change = Change {
+            children: vec![],
+            props: props
+                .filter(|p| !p.matches(&self.map))
+                .map(|p| (doodads::State::from_map(&self.map), p)),
             environment: (environment != environment::State::from_doc(self))
                 .then(|| (environment::State::from_doc(self), environment)),
             heights: vec![],
@@ -251,12 +282,17 @@ impl Document {
         }
         let rect = self.restore(&change, true)?;
         self.placed = placed;
-        if change.environment.is_some()
+        if change.props.is_some()
+            || change.environment.is_some()
             || change.placed.is_some()
             || !change.heights.is_empty()
             || !change.layers.is_empty()
         {
-            self.undo.push(change);
+            if let Some(stroke) = &mut self.stroke {
+                stroke.push(change);
+            } else {
+                self.undo.push(change);
+            }
             self.redo.clear();
             self.dirty = true;
         }
@@ -264,6 +300,9 @@ impl Document {
     }
 
     fn restore(&mut self, change: &Change, forward: bool) -> Result<Update, String> {
+        if !change.children.is_empty() {
+            return self.restore_children(&change.children, forward);
+        }
         let mut rect: Option<[u32; 4]> = None;
         for &(x, y, old, new) in &change.heights {
             self.map
@@ -274,6 +313,9 @@ impl Document {
                 Some([a, b, c, d]) => [a.min(x), b.min(y), c.max(x), d.max(y)],
             });
         }
+        if let Some((old, new)) = &change.props {
+            (if forward { new } else { old }).restore(&mut self.map);
+        }
         if let Some((old, new)) = &change.placed {
             self.placed = if forward { new.clone() } else { old.clone() };
         }
@@ -283,6 +325,11 @@ impl Document {
             self.map.info.water_level = state.water;
         }
         Ok(Update {
+            props: change.props.is_some()
+                || change
+                    .placed
+                    .as_ref()
+                    .is_some_and(|(a, b)| a.doodads != b.doodads),
             environment: change
                 .environment
                 .as_ref()
@@ -302,6 +349,7 @@ impl Document {
     }
 
     pub fn undo(&mut self) -> Result<Update, String> {
+        self.end_stroke();
         let Some(change) = self.undo.pop() else {
             return Ok(Update::default());
         };
@@ -311,6 +359,7 @@ impl Document {
         Ok(rect)
     }
     pub fn redo(&mut self) -> Result<Update, String> {
+        self.end_stroke();
         let Some(change) = self.redo.pop() else {
             return Ok(Update::default());
         };
@@ -320,7 +369,7 @@ impl Document {
         Ok(rect)
     }
     pub fn can_undo(&self) -> bool {
-        !self.undo.is_empty()
+        !self.undo.is_empty() || self.stroke.as_ref().is_some_and(|s| !s.is_empty())
     }
     pub fn can_redo(&self) -> bool {
         !self.redo.is_empty()
@@ -349,3 +398,6 @@ mod paint_tests;
 
 #[cfg(test)]
 mod environment_tests;
+
+#[cfg(test)]
+mod doodad_tests;

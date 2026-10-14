@@ -4,6 +4,7 @@ mod browser;
 mod cameras;
 mod catalogue;
 mod document;
+mod doodads;
 mod environment;
 mod frame;
 mod gestures;
@@ -18,6 +19,7 @@ pub(crate) use reload::ReloadRequest;
 mod screenshot;
 mod server;
 mod snapshot;
+mod strokes;
 mod tools;
 pub(crate) use screenshot::screenshot;
 pub(crate) use server::serve;
@@ -52,8 +54,10 @@ pub(crate) struct Editor {
     fresh: bool,
     tool: usize,
     tool_group: usize,
+    stroke: strokes::Stroke,
     paint: tools::PaintSettings,
     environment: environment::Controls,
+    doodad: doodads::Controls,
     radius: f32,
     strength: f32,
     stamp_asset: String,
@@ -130,8 +134,10 @@ impl Editor {
             fresh: true,
             tool: 0,
             tool_group: 0,
+            stroke: Default::default(),
             paint: Default::default(),
             environment: Default::default(),
+            doodad: Default::default(),
             radius: 96.0,
             strength: 8.0,
             stamp_asset: "crater.json".into(),
@@ -234,6 +240,13 @@ impl Editor {
                 .edit_terrain(&self.doc.map, rect)
                 .map_err(|e| e.to_string())?;
         }
+        let scenery = update.props
+            || update.terrain.is_some()
+            || update.water
+            || update
+                .cover
+                .iter()
+                .any(|(layer, _)| *layer == mc_map::edit::Layer::Snow);
         for (layer, rect) in update.cover {
             renderer
                 .edit_cover(&self.doc.map, layer, rect)
@@ -242,15 +255,28 @@ impl Editor {
         if update.environment {
             self.apply_environment(renderer);
         }
-        if update.water || update.terrain.is_some() {
+        if update.water || (update.terrain.is_some() && !self.doc.stroking()) {
             renderer
                 .edit_water(self.doc.map.info.water_level)
+                .map_err(|e| e.to_string())?;
+        }
+        if scenery && !self.doc.stroking() {
+            self.fresh = true;
+            renderer
+                .edit_props(&self.doc.map, &self.doc.placed)
                 .map_err(|e| e.to_string())?;
         }
         // Unit origins come from the simulation mirror; rebuild them when the
         // ground changes too. Props sample the live height tiles in the shader.
         if update.objects || update.water || update.terrain.is_some() {
             self.refresh_units()?;
+        }
+        if update.objects || update.props {
+            if let Some(id) = self.selected {
+                if self.select_object(id).is_err() {
+                    self.selected = None;
+                }
+            }
         }
         Ok(())
     }

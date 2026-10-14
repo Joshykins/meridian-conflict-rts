@@ -13,6 +13,9 @@ impl Catalogue {
 impl Editor {
     pub(super) fn catalogue_entries(&self, query: &str) -> Vec<(String, String)> {
         let query = query.to_lowercase();
+        if self.tool == 27 {
+            return doodads::catalogue(&query);
+        }
         self.blueprints
             .units
             .iter()
@@ -59,7 +62,11 @@ impl Editor {
             card.y + 35.0,
             type_scale::TITLE,
             rgb(palette::TEXT, 1.0),
-            "UNIT CATALOGUE",
+            if self.tool == 27 {
+                "DOODAD CATALOGUE"
+            } else {
+                "UNIT CATALOGUE"
+            },
         );
         if ui.button(
             id("editor_catalogue_close", 0),
@@ -95,7 +102,7 @@ impl Editor {
             type_scale::CAPTION,
             rgb(palette::DIM, 1.0),
             &format!(
-                "{} units · search names, roles or keys · scroll for more",
+                "{} entries · search names, roles or keys · scroll for more",
                 entries.len()
             ),
         );
@@ -113,7 +120,11 @@ impl Editor {
                 true,
             ) {
                 ui.mem.editing = None;
-                if let Err(e) = self.choose_unit(key) {
+                if let Err(e) = if self.tool == 27 {
+                    self.choose_doodad(key)
+                } else {
+                    self.choose_unit(key)
+                } {
                     self.message = e;
                 }
                 return;

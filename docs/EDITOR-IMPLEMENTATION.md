@@ -107,9 +107,23 @@ playable mission, authored and revised through the editor and its API.
   destroyed in the matrix: commander AI b914c756d95136a4, every-domain
   b9e9c78fcc8683a3. Live prop authoring and reclaim are still pending.
 
+- Added live doodad placement and components, shared simulation/render geometry,
+  dynamic prop buffers, RGB/scale/rotation controls, catalogue, selection and
+  deletion. Stable identity survives deletion remapping and sorted saves.
+- Terrain edits now regenerate cliff rocks, cliff relief/refinement and canopy
+  from the document. Continuous terrain/paint drags publish one undo entry and
+  defer scenery regeneration until release. Focused transaction, footprint and
+  stroke regressions pass. Native add/move/delete, tint, unit visibility after
+  scenery refresh, catalogue and generated cliff rocks are verified. Undo/Save
+  restores the original terrain hash and environment exactly.
+- Native review caught prop tint entering the unit warp animation and stale
+  visibility masks after scenery replacement; both are fixed and rechecked.
+  The full gate passed all editor/render/simulation tests; an existing network
+  clock timing test failed under concurrent load, then passed alone.
+
 ## Still required before final delivery
-- Component doodads, general destructible/reclaimable props.
-- Decorative cliff regeneration and resize.
+- Doodad reclaim collection.
+- Map resize/crop/extend and player configuration.
 - Remaining gizmo/snapping improvements.
 - Propaganda components and encounter balance; human playtest and cinematic review.
 - Full checks, determinism matrix/cross-platform verification, final native

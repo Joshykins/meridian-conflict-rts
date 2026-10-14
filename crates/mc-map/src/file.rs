@@ -233,6 +233,13 @@ impl MapFile {
     pub fn placed(&self) -> &crate::placed::Placed {
         &self.authoring.placed
     }
+    /// Captured authored components for one baked prop.
+    pub fn doodad(&self, index: usize) -> Option<&crate::placed::Doodad> {
+        self.authoring
+            .by_prop
+            .get(&(index as u32))
+            .map(|&i| &self.authoring.placed.doodads[i])
+    }
 
     #[inline]
     pub fn size_tiles(&self) -> (u32, u32) {

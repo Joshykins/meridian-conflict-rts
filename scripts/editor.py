@@ -58,7 +58,7 @@ def mcp(box):
             if method == "initialize":
                 result = {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}}, "serverInfo": {"name": "meridian-editor", "version": "1"}}
             elif method == "tools/list":
-                result = {"tools": [{"name": "editor", "description": "Edit and inspect the open Meridian map editor. Operations: state, tool, capture_camera, recall_camera, edit, undo, redo, save, camera, shot, test, reload, model_calls, catalogue, choose_unit, close.",
+                result = {"tools": [{"name": "editor", "description": "Edit and inspect the open Meridian map editor. Operations: state, tool, capture_camera, recall_camera, edit, undo, redo, save, camera, shot, test, reload, model_calls, catalogue, choose_unit, choose_doodad, select, close.",
                     "inputSchema": {"type": "object", "properties": {"request": {"type": "object"}}, "required": ["request"]}}]}
             elif method == "tools/call":
                 reply = send(box, message["params"]["arguments"]["request"])

@@ -2581,7 +2581,7 @@ impl Renderer {
             noise,
             terrain_materials,
             ground_cover,
-            editor: Default::default(),
+            editor: editor::EditorState::new(cliff_base),
             sky,
             nuke_volume,
             wake_shells,

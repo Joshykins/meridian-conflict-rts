@@ -24,6 +24,12 @@ enum Request {
     Catalogue {
         query: String,
     },
+    Select {
+        id: u64,
+    },
+    ChooseDoodad {
+        kind: String,
+    },
     ChooseUnit {
         blueprint: String,
     },
@@ -185,6 +191,7 @@ impl Editor {
         let mut event = None;
         let result=request.and_then(|request| {
             if self.reloading() && !matches!(request,Request::State|Request::Shot|Request::Camera{..}) {return Err("Reload is running; wait for state to report completion".into());}
+            if self.doc.stroking() && !matches!(request,Request::State|Request::Shot|Request::Camera{..}){self.finish_stroke(renderer)?;}
             match request {
                 Request::Catalogue{query}=>{
                     if query.len()>128 {return Err("Search is limited to 128 bytes".into());}
@@ -195,6 +202,8 @@ impl Editor {
                 Request::CaptureCamera{name}=>self.apply(self.capture_view(name),renderer)?,
                 Request::RecallCamera{name}=>self.recall_view(&name,renderer)?,
                 Request::Tool{name}=>self.choose_tool(&name)?,
+                Request::Select{id}=>self.select_object(id)?,
+                Request::ChooseDoodad{kind}=>self.choose_doodad(&kind)?,
                 Request::ChooseUnit{blueprint}=>self.choose_unit(&blueprint)?,
                 Request::Reload{resources}=>self.request_reload(resources)?,
                 Request::ModelCalls{key}=>{

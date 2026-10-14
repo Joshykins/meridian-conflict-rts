@@ -1,6 +1,9 @@
 //! Authored prop components: deterministic collision and durability overrides.
 use mc_core::{Fx, FxVec2};
-use mc_map::{placed::Doodad, Prop};
+use mc_map::{
+    placed::{prop_parts as parts, Doodad},
+    Prop,
+};
 use std::collections::BTreeMap;
 pub(crate) type Components = BTreeMap<u32, Doodad>;
 
@@ -23,9 +26,7 @@ pub(crate) fn validate(props: &[Prop], components: &Components) -> Result<(), cr
                 return Err(crate::SimError::Setup("invalid doodad footprint".into()));
             }
         }
-        let needs_shape = d.health > 0
-            || d.reclaim > 0
-            || (d.blocking && p.kind.solid_plan().is_empty() && !p.kind.is_building());
+        let needs_shape = d.health > 0 || d.reclaim > 0 || d.blocking;
         if needs_shape && parts(p, Some(d)).is_empty() {
             return Err(crate::SimError::Setup(format!(
                 "doodad {} needs a footprint for its components",
@@ -34,31 +35,6 @@ pub(crate) fn validate(props: &[Prop], components: &Components) -> Result<(), cr
         }
     }
     Ok(())
-}
-pub(crate) struct Part {
-    pub centre: FxVec2,
-    pub half: FxVec2,
-    pub top: Fx,
-}
-pub(crate) fn parts(prop: &Prop, component: Option<&Doodad>) -> Vec<Part> {
-    if let Some(f) = component.and_then(|d| d.footprint.as_ref()) {
-        return vec![Part {
-            centre: FxVec2::ZERO,
-            half: f.half,
-            top: f.height,
-        }];
-    }
-    mc_map::city::structure(prop.kind).map_or_else(Vec::new, |kind| {
-        kind.plan
-            .iter()
-            .zip(kind.tops)
-            .map(|(&(x, y, hx, hy), &top)| Part {
-                centre: FxVec2::from_ints(x, y),
-                half: FxVec2::from_ints(hx, hy),
-                top: Fx::from_int(top),
-            })
-            .collect()
-    })
 }
 /// Explicit footprints block cells touched by their rotated box. The map bounds
 /// cap work even for a component whose prop is outside the playable edge.

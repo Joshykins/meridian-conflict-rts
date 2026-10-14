@@ -13,6 +13,11 @@ impl Editor {
             cover,
             ..
         } = ctx;
+        if !input.down && self.doc.stroking() {
+            if let Err(error) = self.finish_stroke(renderer) {
+                self.message = error;
+            }
+        }
         let mut event = self.api_frame(renderer);
         if self.catalogue.is_none() && memory.editing == Some(id("editor_catalogue_search", 0)) {
             memory.editing = None;

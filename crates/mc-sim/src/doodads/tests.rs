@@ -7,6 +7,9 @@ fn terrain() -> Heightfield {
     Heightfield::from_samples(128, 128, vec![20; 129 * 129], Fx::ZERO, Fx::ONE, Fx::ZERO)
 }
 fn world(blocking: bool) -> World {
+    world_health(blocking, 120)
+}
+fn world_health(blocking: bool, health: u32) -> World {
     let props = vec![Prop {
         kind: PropKind::CityBillboard,
         pos: FxVec2::from_ints(512, 512),
@@ -20,7 +23,7 @@ fn world(blocking: bool) -> World {
         prop_index: 0,
         tint: [255; 3],
         blocking,
-        health: 120,
+        health,
         reclaim: 0,
         footprint: Some(Footprint {
             half: FxVec2::from_ints(20, 4),
@@ -124,4 +127,18 @@ fn authored_tree_is_not_removed_by_decorative_tree_clearing() {
     assert!(!w.is_scenery_tree(0));
     w.map.doodads.clear();
     assert!(w.is_scenery_tree(0));
+}
+
+#[test]
+fn an_indestructible_blocker_stops_shells_without_taking_damage() {
+    let mut w = world_health(true, 0);
+    let from = FxVec2::from_ints(512, 400).extend(Fx::from_int(25));
+    let to = FxVec2::from_ints(512, 600).extend(Fx::from_int(25));
+    assert!(w.city_shapes.first_hit(&w.state.city, from, to).is_some());
+    w.damage_structure(0, Fx::from_int(1_000_000), true);
+    assert_eq!(w.state.city.health, vec![i32::MAX]);
+    assert!(w.is_prop_alive(0));
+    assert!(!w
+        .nav
+        .passable(mc_data::MoveLayer::Land, 0, FxVec2::from_ints(512, 512)));
 }
