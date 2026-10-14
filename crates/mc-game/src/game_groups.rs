@@ -35,8 +35,12 @@ impl ControlGroups {
     }
 
     fn take_out(&mut self, units: &[u32]) {
+        // Looked up in order: a group of 64 000 made from a selection of as many is not a
+        // search of the one for each of the other.
+        let mut sorted = units.to_vec();
+        sorted.sort_unstable();
         for group in &mut self.members {
-            group.retain(|id| !units.contains(id));
+            group.retain(|id| sorted.binary_search(id).is_err());
         }
     }
 

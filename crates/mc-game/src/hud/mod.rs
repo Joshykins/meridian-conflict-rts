@@ -290,6 +290,16 @@ pub fn has_flag(u: &UnitInstance, f: u16) -> bool {
     u.owner_flags & (f as u32) << 8 != 0
 }
 
+/// What the HUD works out from big sets of units and keeps between frames: a selection or
+/// a control group of tens of thousands is looked through once per pull, not every frame.
+#[derive(Default)]
+struct Kept {
+    /// The deck's figures, order card and panels (`selection/kept.rs`).
+    deck: selection::Kept,
+    /// The control groups' members as found, for their badges and card (`groups.rs`).
+    groups: groups::GroupsKept,
+}
+
 #[derive(Default)]
 pub struct Hud {
     /// Survival's card, banner and what they read from the map.
@@ -365,9 +375,9 @@ pub struct Hud {
     /// What the deck showed when the details card was last looked at: another
     /// selection (or coming back to the same one) closes the card.
     details_for: Option<Vec<u32>>,
-    /// What the deck works out from many units, kept for as long as they and the frame
-    /// stay the same (`selection/kept.rs`).
-    kept: selection::Kept,
+    /// What is worked out from many units, kept for as long as they and the frame stay
+    /// the same.
+    kept: Kept,
     /// The construction keys are live (B): digits pick a tier, Q..Y a shelf, A..L an item on it.
     pub build_keys: bool,
     /// A construction key pressed since the last frame, for the panel to act on.
@@ -607,7 +617,7 @@ impl Hud {
         mine_marks(ui, s, &mut self.survey);
         self.pause_frame(ui, view.paused && !view.menu_open);
         if !view.observing && !self.free.on {
-            groups::badges(ui, s);
+            groups::badges(&mut self.kept.groups, ui, s);
         }
         let fold = self.fold_begin(ui, free_camera::Part::Top);
         let speed_hits = self.speed_hits(ui);
@@ -771,8 +781,8 @@ impl Hud {
         // The units shown are looked at again only when they may have changed: the same
         // stamp is the same selection found in the same frame.
         let shown_now = (!selected.is_empty()).then_some(stamp);
-        if shown_now.is_none() || self.kept.compared != shown_now {
-            self.kept.compared = shown_now;
+        if shown_now.is_none() || self.kept.deck.compared != shown_now {
+            self.kept.deck.compared = shown_now;
             let showing = units.iter().map(|u| u.unit_id);
             let same =
                 (self.details_for.as_ref()).map(|was| was.iter().copied().eq(showing.clone()));
@@ -785,7 +795,7 @@ impl Hud {
             }
             if !units.is_empty() && !self.deck_units.iter().copied().eq(showing.clone()) {
                 self.deck_units = showing.collect();
-                self.kept.closing += 1;
+                self.kept.deck.closing += 1;
             }
         }
         if !units.is_empty() {
@@ -811,7 +821,7 @@ impl Hud {
             inspect_only = self.deck_inspect;
             shown = Some(selection::Shown::Closing {
                 pulls: view.pulls(),
-                units: self.kept.closing,
+                units: self.kept.deck.closing,
             });
             self.deck_units
                 .iter()
@@ -820,11 +830,11 @@ impl Hud {
         } else {
             if closing && !self.deck_units.is_empty() {
                 self.deck_units.clear();
-                self.kept.closing += 1;
+                self.kept.deck.closing += 1;
             }
             units
         };
-        self.kept.show(shown.filter(|_| view.pulls() > 0));
+        self.kept.deck.show(shown.filter(|_| view.pulls() > 0));
         let (fade, shift, live) = (ui.fade, ui.shift, ui.interactive);
         ui.fade *= deck_k;
         ui.shift.y += (1.0 - deck_k) * 36.0;
@@ -856,7 +866,7 @@ impl Hud {
                 x = orders.right() + GAP;
                 // Which of the panels below are for this selection, and the units they are
                 // for: kept like the order card.
-                let panels = self.kept.panels(s, &units);
+                let panels = self.kept.deck.panels(s, &units);
                 let unit = |id: u32| units.iter().copied().find(|u| u.unit_id == id);
                 // A nuclear silo's or an interceptor array's rounds and launch (`silo.rs`).
                 if let Some((launcher, l)) =

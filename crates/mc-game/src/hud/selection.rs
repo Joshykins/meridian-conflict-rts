@@ -233,7 +233,7 @@ pub fn info(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
         return;
     }
     // Worked out once per tick and selection (`kept.rs`).
-    let sum = hud.kept.summary(s, units);
+    let sum = hud.kept.deck.summary(s, units);
     // A lift ship with units picked out of its hold: the ship's panel stays up,
     // its hold showing which are picked.
     if let Some(base) = sum
@@ -1248,22 +1248,22 @@ pub fn order_families(s: &Scene, units: &[&UnitInstance]) -> usize {
 /// How many families the deck's order card shows, for laying out the deck.
 pub fn card_families(hud: &mut Hud, s: &Scene, units: &[&UnitInstance]) -> usize {
     let _t = mc_core::perf_span!("ui.order_families");
-    hud.kept.card(s, units).len()
+    hud.kept.deck.card(s, units).len()
 }
 
 pub fn orders(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: Rect) {
     let _t = mc_core::perf_span!("ui.selection_orders");
     hud.glass(ui, r);
     let x = r.x + 14.0;
-    let card = hud.kept.card(s, units);
-    let mobile = hud.kept.any_kind(s, units, |b| b.is_mobile());
+    let card = hud.kept.deck.card(s, units);
+    let mobile = hud.kept.deck.any_kind(s, units, |b| b.is_mobile());
 
     if mobile && units.len() > 1 && s.view.formation_panel {
         formation_panel(hud, ui, s, r);
     }
 
     let mut hint = None;
-    let priority = hud.kept.mix(s, units);
+    let priority = hud.kept.deck.mix(s, units);
     for (col, (family, orders)) in card.iter().enumerate() {
         let tone = family.tone();
         let cx = x + col as f32 * (ORDER_W + ORDER_GAP);

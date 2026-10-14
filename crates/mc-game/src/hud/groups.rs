@@ -12,40 +12,105 @@ use super::{build, flag, has_flag, icons, Hud, HudAction, Scene};
 use crate::audio::Sfx;
 use crate::ui::{id, ink, palette, rgb, style, type_scale, Rect, Style, Ui};
 use glam::{Vec2, Vec3};
-use mc_data::{BlueprintId, UnitBlueprint};
+use mc_data::BlueprintId;
 use mc_render::Face;
-use mc_sim::mirror::KIND_WRECK;
+use mc_sim::mirror::{UnitInstance, KIND_WRECK};
 
 /// The digit on a unit's badge.
 const BADGE_DIGIT: Style = style(Face::Bold, 10.5, 0.0);
 const BADGE: f32 = 13.0;
 
-/// The type a group has most of (the lower blueprint id on a tie).
-fn main_type<'a>(s: &'a Scene, members: &[u32]) -> Option<&'a UnitBlueprint> {
+/// Each control group's members as found in the frame: worked out once per pull and
+/// whenever the groups or the selection change, not every frame, for groups of tens of
+/// thousands.
+#[derive(Default)]
+pub(super) struct GroupsKept {
+    /// The pull and the selection (`Picked::stamp`) they were found for.
+    key: Option<(u64, u64)>,
+    groups: Vec<Found>,
+}
+
+struct Found {
+    /// Its key.
+    n: usize,
+    /// The group as it was when found, to tell when it changes.
+    ids: Vec<u32>,
+    /// Its members' indices in `frame.units`.
+    rows: Vec<u32>,
+    /// The box round where those of them that wear the number stand (`badges`).
+    reach: Option<(Vec3, Vec3)>,
+    /// The type it has most of (the lower blueprint id on a tie).
+    main: Option<BlueprintId>,
+    /// It is the selection.
+    lit: bool,
+}
+
+impl GroupsKept {
+    fn found(&mut self, s: &Scene) -> &[Found] {
+        let view = s.view;
+        let key = (view.pulls(), view.picked().stamp());
+        let mut groups = view.groups.filled();
+        // Never pulled (a view filled by hand): every time, as it may have changed.
+        let same = view.pulls() > 0
+            && self.key == Some(key)
+            && self.groups.iter().all(|f| {
+                groups
+                    .next()
+                    .is_some_and(|(n, ids)| n == f.n && ids == f.ids)
+            })
+            && groups.next().is_none();
+        if !same {
+            self.key = Some(key);
+            self.groups = view
+                .groups
+                .filled()
+                .map(|(n, ids)| find(s, n, ids))
+                .collect();
+        }
+        &self.groups
+    }
+}
+
+fn find(s: &Scene, n: usize, ids: &[u32]) -> Found {
+    let view = s.view;
+    let rows: Vec<u32> = (ids.iter())
+        .filter_map(|&id| view.unit_index(id))
+        .map(|i| i as u32)
+        .collect();
     let mut counts: Vec<(u16, usize)> = Vec::new();
-    for id in members {
-        let Some(&i) = s.view.index_of.get(id) else {
-            continue;
-        };
-        let bp = s.view.frame.units[i].blueprint as u16;
+    let mut reach: Option<(Vec3, Vec3)> = None;
+    for &i in &rows {
+        let u = &view.frame.units[i as usize];
+        let bp = u.blueprint as u16;
         match counts.iter_mut().find(|(b, _)| *b == bp) {
             Some((_, n)) => *n += 1,
             None => counts.push((bp, 1)),
         }
+        if u.owner_flags & KIND_WRECK == 0 && !has_flag(u, flag::IN_FACTORY) {
+            let at = Vec3::from(u.pos);
+            let (lo, hi) = reach.unwrap_or((at, at));
+            reach = Some((lo.min(at), hi.max(at)));
+        }
     }
-    counts
-        .iter()
+    let main = (counts.iter())
         .max_by_key(|&&(bp, n)| (n, std::cmp::Reverse(bp)))
-        .map(|&(bp, _)| s.blueprints.unit(BlueprintId(bp)))
+        .map(|&(bp, _)| BlueprintId(bp));
+    Found {
+        n,
+        ids: ids.to_vec(),
+        rows,
+        reach,
+        main,
+        lit: same_units(&view.selection, ids),
+    }
 }
 
 /// The groups card, from `top` and kept above `bottom`. Returns the y under it.
 pub(super) fn card(hud: &mut Hud, ui: &mut Ui, s: &Scene, top: f32, bottom: f32) -> f32 {
-    let groups: Vec<(usize, Vec<u32>)> = s
-        .view
-        .groups
-        .filled()
-        .map(|(n, m)| (n, m.to_vec()))
+    let groups: Vec<(usize, &[u32])> = s.view.groups.filled().collect();
+    // What each looks like, kept from when its members were last found.
+    let looks: Vec<(Option<BlueprintId>, bool)> = (hud.kept.groups.found(s).iter())
+        .map(|f| (f.main, f.lit))
         .collect();
     let r = Rect::new(
         super::EDGE,
@@ -94,17 +159,16 @@ pub(super) fn card(hud: &mut Hud, ui: &mut Ui, s: &Scene, top: f32, bottom: f32)
 
     let per_row = per_row();
     let left = label.right() + PAD;
-    for (i, (n, members)) in groups.iter().enumerate() {
+    for (i, (&(n, members), &(main, lit))) in groups.iter().zip(&looks).enumerate() {
         let tr = Rect::new(
             left + (i % per_row) as f32 * (TILE + TILE_GAP),
             r.y + PAD + (i / per_row) as f32 * (TILE + TILE_GAP),
             TILE,
             TILE,
         );
-        let lit = same_units(&s.view.selection, members);
-        let t = hud.tile(ui, id("group-tile", *n), tr, lit, true);
+        let t = hud.tile(ui, id("group-tile", n), tr, lit, true);
         let art = Rect::new(tr.x + 1.0, tr.y + 1.0, tr.w - 2.0, tr.h - 2.0);
-        if let Some(bp) = main_type(s, members) {
+        if let Some(bp) = main.map(|bp| s.blueprints.unit(bp)) {
             domain_wash(ui, art, Domain::of(bp), t.glow);
             if !hud.thumbs.draw(ui, bp.id, art, 1.0) {
                 icons::strategic(
@@ -135,18 +199,14 @@ pub(super) fn card(hud: &mut Hud, ui: &mut Ui, s: &Scene, top: f32, bottom: f32)
             ui.audio.play(Sfx::Select);
             let action = if s.view.shift {
                 let mut units = s.view.selection.clone();
-                for id in members {
-                    if !units.contains(id) {
-                        units.push(*id);
-                    }
-                }
+                units.extend(members.iter().copied());
                 HudAction::Select {
                     units: units.to_vec(),
                     focus: false,
                 }
             } else {
                 HudAction::Select {
-                    units: members.clone(),
+                    units: members.to_vec(),
                     focus: lit,
                 }
             };
@@ -176,12 +236,19 @@ fn tip(ui: &mut Ui, card: Rect, y: f32, text: &str) {
 /// hull, as wide as it). A group with more than `EACH_MOST` members on screen
 /// wears one cap in the middle of them instead: a cap on each of thousands is a
 /// carpet of digits, and costs more than the rest of the interface together.
-pub(super) fn badges(ui: &mut Ui, s: &Scene) {
+pub(super) fn badges(kept: &mut GroupsKept, ui: &mut Ui, s: &Scene) {
     let _t = mc_core::perf_span!("ui.group_badges");
     const EACH_MOST: usize = 64;
+    // A group of more members than this finds out first from a share of them whether
+    // more than `EACH_MOST` are on screen; when they are, its one cap goes in the middle
+    // of that share's. A deliberate cosmetic cap: the middle of thousands moves by less
+    // than a pixel, and looking at each of them every frame cost more than the rest of
+    // the interface.
+    const SHARE: usize = 4096;
     let viewport = s.camera.viewport;
     let eye = s.camera.eye();
     let scale = s.camera.projection_scale();
+    let projector = s.camera.projector();
     let cap = |ui: &mut Ui, at: Vec2, digit: &str| {
         let r = Rect::new(at.x - BADGE, at.y - BADGE * 0.5, BADGE, BADGE);
         ui.fill(r, ink(0.8));
@@ -194,34 +261,72 @@ pub(super) fn badges(ui: &mut Ui, s: &Scene) {
             digit,
         );
     };
-    let mut shown: Vec<Vec2> = Vec::new();
-    for (n, members) in s.view.groups.filled() {
-        let digit = n.to_string();
-        shown.clear();
-        for id in members {
-            let Some(&i) = s.view.index_of.get(id) else {
-                continue;
-            };
-            let u = &s.view.frame.units[i];
-            if u.owner_flags & KIND_WRECK != 0 || has_flag(u, flag::IN_FACTORY) {
-                continue;
-            }
-            let at = Vec3::from(u.pos);
-            let Some(p) = s.camera.project(at) else {
-                continue;
-            };
-            if p.x < -40.0 || p.y < -40.0 || p.x > viewport.x + 40.0 || p.y > viewport.y + 40.0 {
-                continue;
-            }
-            // The bars' size, in window pixels, as the shader works it out.
-            let px = scale / eye.distance(at).max(1.0);
-            let half_w = (u.radius * 0.8 * px).max(16.0);
-            let below = (u.radius * 0.6 * px).max(6.0) + 2.0;
-            shown.push(Vec2::new(
-                (p.x - half_w - 3.0) / ui.s,
-                (p.y + below + 3.0) / ui.s,
-            ));
+    let away = |p: Vec2| {
+        [
+            p.x < -40.0,
+            p.y < -40.0,
+            p.x > viewport.x + 40.0,
+            p.y > viewport.y + 40.0,
+        ]
+    };
+    // Where a member's number goes, if it is on screen: left of where its bars sit.
+    let points = ui.s;
+    let badge_at = |u: &UnitInstance| {
+        if u.owner_flags & KIND_WRECK != 0 || has_flag(u, flag::IN_FACTORY) {
+            return None;
         }
+        let at = Vec3::from(u.pos);
+        let p = projector.project(at)?;
+        if away(p).into_iter().any(|a| a) {
+            return None;
+        }
+        // The bars' size, in window pixels, as the shader works it out.
+        let px = scale / eye.distance(at).max(1.0);
+        let half_w = (u.radius * 0.8 * px).max(16.0);
+        let below = (u.radius * 0.6 * px).max(6.0) + 2.0;
+        Some(Vec2::new(
+            (p.x - half_w - 3.0) / points,
+            (p.y + below + 3.0) / points,
+        ))
+    };
+    let units = &s.view.frame.units;
+    let mut shown: Vec<Vec2> = Vec::new();
+    for g in kept.found(s) {
+        let Some((lo, hi)) = g.reach else {
+            continue;
+        };
+        // Its box all past one edge of the screen: so is every member.
+        let corners: Option<Vec<[bool; 4]>> = (0..8)
+            .map(|k| {
+                let pick = |bit: usize, a: f32, b: f32| if k & bit == 0 { a } else { b };
+                let c = Vec3::new(
+                    pick(1, lo.x, hi.x),
+                    pick(2, lo.y, hi.y),
+                    pick(4, lo.z, hi.z),
+                );
+                projector.project(c).map(away)
+            })
+            .collect();
+        if corners.is_some_and(|c| (0..4).any(|side| c.iter().all(|a| a[side]))) {
+            continue;
+        }
+        let digit = g.n.to_string();
+        if g.rows.len() > SHARE {
+            let step = g.rows.len().div_ceil(SHARE);
+            let (mut n, mut sum) = (0usize, Vec2::ZERO);
+            for &i in g.rows.iter().step_by(step) {
+                if let Some(at) = badge_at(&units[i as usize]) {
+                    n += 1;
+                    sum += at;
+                }
+            }
+            if n > EACH_MOST {
+                cap(ui, sum / n as f32, &digit);
+                continue;
+            }
+        }
+        shown.clear();
+        shown.extend(g.rows.iter().filter_map(|&i| badge_at(&units[i as usize])));
         if shown.len() > EACH_MOST {
             let middle = shown.iter().copied().sum::<Vec2>() / shown.len() as f32;
             cap(ui, middle, &digit);

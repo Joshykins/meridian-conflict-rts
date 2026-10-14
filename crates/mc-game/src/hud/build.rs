@@ -22,6 +22,7 @@ pub(super) mod batch;
 mod data_card;
 mod line;
 pub(super) mod queue;
+mod speaker;
 mod strip;
 pub(super) mod tray;
 mod wings;
@@ -68,36 +69,11 @@ struct Stack {
 
 pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: Rect) {
     let _t = mc_core::perf_span!("ui.build");
-    // The highest tier of builder in the selection speaks for it, among builders of the
-    // first one's kind (engineers, or factories): what it can start, the others help
-    // raise. A factory still going up takes its queue already: it starts on it once it
-    // stands. Each pass over the units below is made only when one of their blueprints
-    // could answer it: thousands of fighters have none of these.
-    let builds = (hud.kept).any_kind(s, units, |bp| {
-        bp.builder.as_ref().is_some_and(|b| !b.builds.is_empty())
-    });
-    let upgrades = (hud.kept).any_kind(s, units, |bp| {
-        bp.upgrades_to.is_some() || s.blueprints.refit_set(bp.id).is_some()
-    });
-    let carriers = (hud.kept).any_kind(s, units, |bp| bp.air_wings.is_some());
-    let builders: &[&UnitInstance] = if builds { units } else { &[] };
-    let mut builder_units = builders.iter().map(|u| (*u, s.bp(u))).filter(|(u, bp)| {
-        bp.builder.as_ref().is_some_and(|b| !b.builds.is_empty())
-            && (!has_flag(u, flag::UNDER_CONSTRUCTION) || bp.has(cat::FACTORY))
-    });
-    let builder_unit = builder_units.next().map(|first| {
-        let kind = first.1.has(cat::FACTORY);
-        let tier = |(u, bp): (&UnitInstance, &UnitBlueprint)| planned(s, u, bp).tech;
-        builder_units
-            .filter(|(_, bp)| bp.has(cat::FACTORY) == kind)
-            .fold(first, |best, b| if tier(b) > tier(best) { b } else { best })
-    });
-    // A structure still going up queues its tiers already, to start once it stands.
-    let upgraders: &[&UnitInstance] = if upgrades { units } else { &[] };
-    let upgrader = upgraders.iter().map(|u| (*u, s.bp(u))).find(|(u, bp)| {
-        (bp.upgrades_to.is_some() || s.blueprints.refit_set(bp.id).is_some())
-            && (!has_flag(u, flag::UNDER_CONSTRUCTION) || !bp.is_mobile())
-    });
+    let speaker::Speakers {
+        builder: builder_unit,
+        upgrader,
+        carriers,
+    } = speaker::speakers(hud, s, units);
     let refits = upgrader.is_some_and(|(_, bp)| s.blueprints.refit_set(bp.id).is_some());
     if builder_unit.is_none() && upgrader.is_none() && r.w >= TILE_W + 28.0 && carriers {
         if let Some((carrier, air_wings)) = wings::carrier_of(s, units) {
