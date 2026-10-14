@@ -48,6 +48,7 @@ fn flak_bursts_render() {
                 time,
                 alpha: 1.0,
                 sim: Some(&frame),
+                latest: None,
                 ghosts: &[],
                 marks: &[],
                 ranges: &[],

@@ -97,6 +97,7 @@ fn main() {
                     time: 10.0,
                     alpha: 1.0,
                     sim: (i == 0).then_some(&frame),
+                    latest: None,
                     ghosts: &[],
                     marks: &[],
                     ranges: &[],

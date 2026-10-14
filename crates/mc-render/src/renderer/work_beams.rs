@@ -90,10 +90,17 @@ impl WorkBeams {
         // Each source unit's pose this tick and last, to move its emitters back a tick.
         // Only live units: wrecks, props and ghosts share their ids' numbers with them.
         let not_units = KIND_WRECK | KIND_PROP | KIND_GHOST;
+        // Only the units that cast a beam, or did last tick: of an army of a hundred
+        // thousand, the few at work.
+        let sources: std::collections::HashSet<u32> = (frame.beam_sources.iter())
+            .chain(was.keys().map(|(source, _)| source))
+            .copied()
+            .collect();
         let poses: HashMap<u32, Pose> = frame
             .units
             .iter()
-            .filter(|u| u.owner_flags & not_units == 0)
+            .filter(|u| !sources.is_empty() && u.owner_flags & not_units == 0)
+            .filter(|u| sources.contains(&u.unit_id))
             .map(|u| {
                 (
                     u.unit_id,

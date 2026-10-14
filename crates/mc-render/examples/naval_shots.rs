@@ -166,6 +166,7 @@ fn main() {
                     time: time + i as f32 * 0.1,
                     alpha: 1.0,
                     sim: (i == 0).then_some(&frame),
+                    latest: None,
                     ghosts: &[],
                     marks: &[],
                     ranges: &[],

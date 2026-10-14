@@ -14,7 +14,6 @@
 //! whose difference is the surge.
 
 use std::borrow::Cow;
-use std::collections::HashMap;
 
 use mc_sim::mirror::{UnitInstance, KIND_GHOST, KIND_PROP, KIND_WRECK};
 
@@ -63,6 +62,8 @@ impl Spring {
 
 #[derive(Clone, Copy)]
 struct Eased {
+    /// Whose it is: the row is shared by every unit that ever stood in it.
+    unit: u32,
     turn: Spring,
     speed: Spring,
     /// The upload this flier was last seen in.
@@ -71,7 +72,9 @@ struct Eased {
 
 #[derive(Default)]
 pub(super) struct FlightEase {
-    fliers: HashMap<u32, Eased>,
+    /// By the unit's row (`Handle::index`): a sky of a hundred thousand fliers is a
+    /// lookup each, not a hash; a slot not seen in the last upload is a new flier's.
+    fliers: Vec<Option<Eased>>,
     upload: u32,
 }
 
@@ -104,24 +107,32 @@ impl FlightEase {
             let turn = turn_share(u.heading - u.prev_heading);
             let speed = u.gait[1];
             let travel = glam::Vec3::from(u.pos).distance(glam::Vec3::from(u.prev_pos));
-            let eased = match self.fliers.get(&u.unit_id).filter(|_| travel <= JUMP) {
+            let row = mc_sim::Handle(u.unit_id).index();
+            if row >= self.fliers.len() {
+                self.fliers.resize(row + 1, None);
+            }
+            let last = self.fliers[row].filter(|e| {
+                e.unit == u.unit_id && e.seen == upload.wrapping_sub(1) && travel <= JUMP
+            });
+            let eased = match last {
                 Some(e) => Eased {
+                    unit: u.unit_id,
                     turn: e.turn.step(turn, TURN_SETTLE),
                     speed: e.speed.step(speed, SPEED_SETTLE),
                     seen: upload,
                 },
                 None => Eased {
+                    unit: u.unit_id,
                     turn: Spring::rest(turn),
                     speed: Spring::rest(speed),
                     seen: upload,
                 },
             };
-            self.fliers.insert(u.unit_id, eased);
+            self.fliers[row] = Some(eased);
             u.drive_swing = eased.turn.at;
             u.gait[1] = eased.speed.at[1].max(0.0);
             u.gait[2] = eased.speed.at[0].max(0.0);
         }
-        self.fliers.retain(|_, e| e.seen == upload);
         Cow::Owned(units)
     }
 }

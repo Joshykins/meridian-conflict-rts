@@ -205,6 +205,7 @@ fn main() {
                     time: 10.0 + i as f32 * 0.1,
                     alpha: if speed == 0.0 { 1.0 } else { 0.0 },
                     sim: Some(&frame),
+                    latest: None,
                     ghosts: &[],
                     marks: &[],
                     ranges: &[],

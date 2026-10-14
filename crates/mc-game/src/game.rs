@@ -4744,6 +4744,7 @@ impl Game {
             time: world_time,
             alpha,
             sim: fresh.then_some(&self.view.frame),
+            latest: Some(&self.view.frame),
             ghosts: if clean { &[] } else { &ghosts },
             marks: if clean { &[] } else { &marks },
             ranges: if clean { &[] } else { &ranges },

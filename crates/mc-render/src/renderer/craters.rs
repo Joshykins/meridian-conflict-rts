@@ -393,6 +393,7 @@ mod shots {
                     time: t,
                     alpha: 1.0,
                     sim: (*first).then_some(&frame),
+                    latest: None,
                     ghosts: &[],
                     marks: &[],
                     ranges: &[],

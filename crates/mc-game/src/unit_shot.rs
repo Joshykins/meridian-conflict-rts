@@ -333,6 +333,7 @@ impl Studio {
                 time: self.time,
                 alpha,
                 sim: if i == 0 { sim } else { None },
+                latest: None,
                 ghosts: &[],
                 marks: &[],
                 ranges: &[],

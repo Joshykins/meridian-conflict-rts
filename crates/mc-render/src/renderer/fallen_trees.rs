@@ -329,6 +329,7 @@ mod tests {
                             time,
                             alpha: 1.0,
                             sim: Some(frame),
+                            latest: None,
                             ghosts: &[],
                             marks: &[],
                             ranges: &[],

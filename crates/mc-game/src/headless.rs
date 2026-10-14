@@ -1157,6 +1157,7 @@ pub fn screenshot(
             time: 10.0 + i as f32 * 0.016,
             alpha: 1.0,
             sim: (i == 0).then_some(&frame),
+            latest: Some(&frame),
             ghosts: &ghosts,
             marks: &marks,
             ranges: &ranges,
@@ -1187,12 +1188,16 @@ pub fn screenshot(
         world.write_render_frame(shot_eyes(opts), &mut frame);
         let mirror_ns = mirror.elapsed().as_nanos() as u64;
         let last = k + 1 == shot.follow;
-        for (i, alpha) in [
-            if last { shot.alpha * 0.5 } else { 0.5 },
-            if last { shot.alpha } else { 1.0 },
-        ]
-        .into_iter()
-        .enumerate()
+        // Frames a followed tick is drawn in (`MERIDIAN_FOLLOW_FRAMES`, two unless set):
+        // the frames after a tick's own lay the effects it starts (`tick_stages.rs`).
+        let per: usize = std::env::var("MERIDIAN_FOLLOW_FRAMES")
+            .ok()
+            .and_then(|n| n.parse().ok())
+            .unwrap_or(2)
+            .clamp(2, 16);
+        for (i, alpha) in (1..=per)
+            .map(|j| j as f32 / per as f32 * if last { shot.alpha } else { 1.0 })
+            .enumerate()
         {
             let at = time + alpha / mc_core::TICKS_PER_SECOND as f32;
             let input = FrameInput {
@@ -1200,6 +1205,7 @@ pub fn screenshot(
                 time: at,
                 alpha,
                 sim: (i == 0).then_some(&frame),
+                latest: Some(&frame),
                 ghosts: &ghosts,
                 marks: &marks,
                 ranges: &ranges,
@@ -1485,6 +1491,7 @@ pub fn ui_screenshot(
             time,
             alpha: 1.0,
             sim: (i == 0).then_some(&frame),
+            latest: Some(&frame),
             ghosts: &[],
             marks: &[],
             ranges: &[],

@@ -101,11 +101,11 @@ impl Renderer {
 
         // ---- CPU-side updates -------------------------------------------------
         let camera = input.camera;
+        // A tick's effects are timed from its start, where its units are drawn at
+        // alpha 0; the frame that brings it may already be part way through it.
+        let tick_start = input.time - input.alpha.clamp(0.0, 1.0) * self.tick_seconds;
         if let Some(frame) = input.sim {
             let _t = mc_core::perf_span!("cpu.upload_sim");
-            // A tick's effects are timed from its start, where its units are drawn at
-            // alpha 0; the frame that brings it may already be part way through it.
-            let tick_start = input.time - input.alpha.clamp(0.0, 1.0) * self.tick_seconds;
             self.upload_sim(frame, tick_start, camera);
             let _t = mc_core::perf_span!("cpu.upload.draws_terrain");
             self.cull
@@ -124,6 +124,7 @@ impl Renderer {
             );
             self.adjacency_links.set_sim(&frame.links, input.time);
         }
+        self.tick_stages(input.sim, input.latest, tick_start, camera);
         self.adjacency_links.upload(&self.blueprints);
         let extras = mc_core::perf_span!("cpu.extras");
         let ghosts = &input.ghosts[..input.ghosts.len().min(MAX_GHOSTS)];

@@ -20,6 +20,7 @@ headless captures.
 | `MERIDIAN_GRASS_DENSITY` | `0`–`1` | Fraction of the grass field grown; Low 0, Medium 0.5, High/Ultra 1. |
 | `MERIDIAN_WATER_REFLECTIONS` | `0` off, `1` on | Screen-space reflections on water; off on Low. |
 | `MERIDIAN_GPU_TIMERS` | `0` to disable | A/B profiling overhead. GPU timing values are unavailable when off; compare `cpu.render` instead. |
+| `MERIDIAN_FOLLOW_FRAMES` | `2`–`16` | Headless: frames each followed tick is drawn in (default 2), so a `--perf` capture shows a tick's work spread over the frames after it as play does. |
 | `MERIDIAN_GPU_CRUMBS` | `0` to disable, `1` to enable | Finding a lost device (`VK_AMD_buffer_marker`), on by default on AMD GPUs: a breadcrumb before every scope, ground decal, grass band, missile and model draw (models drawn one draw slot at a time), so the error log lists which draws the GPU reached and finished. Costs frame time (2 ms GPU and 4 ms CPU a frame on a large map); `0` keeps only the scope edges. Other GPUs whose driver has the extension (NVIDIA) mark only the scope edges unless `1`; GPUs without it have no breadcrumbs. |
 
 `scripts/perf-suite.sh OUT_DIR [CASE...]` runs native macOS/Linux or Windows via WSL.

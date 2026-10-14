@@ -121,6 +121,7 @@ pub(crate) mod surface_marks;
 pub(crate) mod surge_fx;
 mod survival_fx;
 mod terrain_lit;
+mod tick_stages;
 mod trail_fx;
 mod tree_wind;
 mod unit_kinds;
@@ -311,6 +312,9 @@ pub struct FrameInput<'a> {
     pub alpha: f32,
     /// A new tick's mirror, when one arrived since the last frame.
     pub sim: Option<&'a RenderFrame>,
+    /// The newest tick's mirror, every frame (the one `sim` brought, held until the
+    /// next): the frames after a tick lay the effects it starts (`tick_stages.rs`).
+    pub latest: Option<&'a RenderFrame>,
     /// Placement previews, appended after the sim's units.
     pub ghosts: &'a [UnitInstance],
     pub marks: &'a [Mark],
@@ -895,6 +899,8 @@ pub struct Renderer {
     dynamic: staged_buffer::StagedBuffer,
     /// The frame's units by blueprint, for the effects of a few kinds (`unit_kinds.rs`).
     unit_kinds: unit_kinds::UnitKinds,
+    /// The newest tick's work spread over the frames after it (`tick_stages.rs`).
+    tick_stages: tick_stages::TickStages,
     statics: Buffer,
     model_table: Buffer,
     slot_table: Buffer,
@@ -2587,6 +2593,7 @@ impl Renderer {
             globals,
             dynamic,
             unit_kinds: Default::default(),
+            tick_stages: Default::default(),
             statics,
             model_table,
             slot_table,
@@ -3437,11 +3444,16 @@ impl Renderer {
             self.lights.tick(frame, &self.blueprints);
         }
 
+        let shots = mc_core::perf_span!("lists.projectiles");
         let projectiles = &frame.projectiles[..frame.projectiles.len().min(MAX_PROJECTILES)];
         self.projectiles.write(0, bytemuck::cast_slice(projectiles));
         self.projectile_count = projectiles.len() as u32;
 
+        drop(shots);
+        let beams = mc_core::perf_span!("lists.beams");
         self.upload_beams(frame, time);
+        drop(beams);
+        let stains_span = mc_core::perf_span!("lists.stains");
 
         let stains = &frame.stains[..frame.stains.len().min(MAX_STAINS)];
         self.stains.write(0, bytemuck::cast_slice(stains));
@@ -3483,6 +3495,8 @@ impl Renderer {
         let crater_count = craters.len() + spills.len();
         let stained = stains.len() + crater_count;
         self.stain_runs = [stains.len() as u32, crater_count as u32];
+        drop(stains_span);
+        let pads_span = mc_core::perf_span!("lists.pads");
         let pads = self.structure_pads(units, &frame.pads, MAX_STAINS.saturating_sub(stained));
         if !pads.is_empty() {
             self.stains.write(
@@ -3493,12 +3507,15 @@ impl Renderer {
         self.pad_count = pads.len() as u32;
         let used = stained + pads.len();
         self.ore.upload(&self.stains, used, MAX_STAINS, time);
+        drop(pads_span);
+        let props_span = mc_core::perf_span!("lists.props");
 
         let mut dead = self.cliff_rocks.dead_props(&frame.props_dead).to_vec();
         dead.resize(self.props_dead.size as usize / 4, 0);
         self.city_fx.hide_heaps(&frame.props_dead, &mut dead);
         self.props_dead.write(0, bytemuck::cast_slice(&dead));
         self.city_fx.set_looks(&frame.city, frame.tick);
+        drop(props_span);
 
         // Units glide from the last tick's place to this one's over the coming
         // tick, so what a tick reports is timed against that stretch.
@@ -3509,263 +3526,6 @@ impl Renderer {
         self.last_tick_time = time;
 
         drop(part);
-        let part = mc_core::perf_span!("cpu.upload.unit_fx");
-        {
-            let _t = mc_core::perf_span!("fx.ground_contact");
-            self.ground_contact(units, time, camera);
-        }
-        {
-            let _t = mc_core::perf_span!("fx.storms");
-            self.storm_beams(time);
-            self.storms_tick(time);
-            self.storm_clouds_tick(&frame.clouds, frame.tick, time);
-        }
-        {
-            let _t = mc_core::perf_span!("fx.mine_blows");
-            self.mine_blows(units, time, camera);
-        }
-        {
-            let _t = mc_core::perf_span!("fx.aircraft_trails");
-            self.aircraft_trails(units, time, camera);
-        }
-        {
-            let _t = mc_core::perf_span!("fx.heat_haze");
-            self.heat_haze.note(units, self.tick_seconds);
-        }
-        {
-            let _t = mc_core::perf_span!("fx.crash_trails");
-            self.aircraft_crash_trails(units, time, camera);
-        }
-        {
-            let _t = mc_core::perf_span!("fx.smoke");
-            self.damage_smoke(units, time, camera);
-            self.wreck_smoke(units, time, camera);
-        }
-        {
-            let _t = mc_core::perf_span!("fx.wrecks");
-            self.turret_landings(units, time, camera);
-            self.wreck_finish(units, &frame.events, time, camera);
-        }
-        drop(part);
-        let part = mc_core::perf_span!("cpu.upload.events");
-        let pre = mc_core::perf_span!("ev.pre");
-        self.construction(frame, time, camera);
-        self.nanite_site_glints(frame, time, camera.eye());
-        // A blast (or an Edict's strike) is known before the trees it kills are looked at
-        // (`nuke_fx::tree_fate`).
-        // (The Progenitor's unmaking is not a blast of fire: `progenitor_event` draws it.)
-        for event in &frame.events {
-            if matches!(event, SimEvent::NuclearDetonation { look, .. }
-                if *look != mc_data::strategic::StrategicLook::Progenitor)
-                || matches!(event, SimEvent::EdictFired { .. })
-            {
-                self.nuke_event(event, time);
-            }
-        }
-        self.tree_fires(frame, time, camera);
-        self.city_events(frame, time, camera);
-        self.trample_trees(frame, time);
-        self.clear_lots(frame, time);
-        // Before the events: a Lance's strike and a shell's landing read this tick's Shapers.
-        self.progenitor_tick(frame, time);
-        drop(pre);
-        // A shot, a hit or a charged shell's discharge makes a flash and sparks gone in
-        // under a second. Far past what the camera shows they are out of sight, and of a
-        // sky-wide air war's tens of thousands a tick only the nearest `SMALL_EVENTS`
-        // are drawn (a deliberate cap: they are cosmetic, and the shots themselves are
-        // drawn whatever). Their craters and the clouds they stir are still made.
-        let reach = camera.distance * 3.0 + 1500.0;
-        let small: Vec<(f32, usize)> = frame
-            .events
-            .iter()
-            .enumerate()
-            .filter_map(|(i, event)| match event {
-                SimEvent::ShotFired { pos, .. }
-                | SimEvent::Impact { pos, .. }
-                | SimEvent::ShellDischarge { to: pos, .. } => {
-                    Some((Vec3::from(pos.to_f32()).distance(camera.focus), i))
-                }
-                _ => None,
-            })
-            .collect();
-        let mut drawn = vec![true; frame.events.len()];
-        for &(d, i) in &small {
-            drawn[i] = d <= reach;
-        }
-        let mut near: Vec<(f32, usize)> = small.into_iter().filter(|&(d, _)| d <= reach).collect();
-        if near.len() > SMALL_EVENTS {
-            near.select_nth_unstable_by(SMALL_EVENTS, |a, b| a.0.total_cmp(&b.0));
-            for &(_, i) in &near[SMALL_EVENTS..] {
-                drawn[i] = false;
-            }
-        }
-        {
-            let _t = mc_core::perf_span!("ev.effects");
-            for (event, drawn) in frame.events.iter().zip(drawn) {
-                if drawn {
-                    self.effects_of(event, time);
-                }
-            }
-        }
-        {
-            let _t = mc_core::perf_span!("ev.clouds_craters");
-            for event in &frame.events {
-                self.stir_clouds(event, time);
-                self.impact_crater(event, time);
-            }
-        }
-        drop(part);
-        let part = mc_core::perf_span!("cpu.upload.sky");
-        self.sky.set_units(units.iter().map(|u| {
-            let bp = self
-                .blueprints
-                .unit(mc_data::BlueprintId(u.blueprint as u16));
-            bp.transport
-                .is_none()
-                .then_some(glam::Vec2::new(u.pos[0], u.pos[1]))
-        }));
-        let flyers: Vec<_> = units
-            .iter()
-            .filter(|u| {
-                stirs_clouds(
-                    u,
-                    self.blueprints
-                        .unit(mc_data::BlueprintId(u.blueprint as u16)),
-                )
-            })
-            .map(|u| {
-                let r = self
-                    .blueprints
-                    .unit(mc_data::BlueprintId(u.blueprint as u16))
-                    .radius
-                    .to_f32();
-                (Vec3::from(u.prev_pos), Vec3::from(u.pos), r)
-            })
-            .collect();
-        self.sky.set_flyers(flyers.into_iter());
-        drop(part);
-        let _part = mc_core::perf_span!("cpu.upload.weapon_fx");
-        {
-            let _t = mc_core::perf_span!("wfx.ground_fires");
-            self.ground_fires(&frame.fires, time);
-        }
-        {
-            let _t = mc_core::perf_span!("wfx.flush_rail_misses");
-            self.flush_rail_misses(time);
-        }
-        {
-            let _t = mc_core::perf_span!("wfx.rail_wakes");
-            self.rail_wakes(projectiles, time, camera);
-        }
-        {
-            let _t = mc_core::perf_span!("wfx.write_fade_beams");
-            self.write_fade_beams(time);
-        }
-        {
-            let _t = mc_core::perf_span!("wfx.write_plasma_fx");
-            self.write_plasma_fx(units, time);
-        }
-        {
-            let _t = mc_core::perf_span!("wfx.regency_guns_tick");
-            self.regency_guns_tick(units, &frame.houses, time);
-        }
-        {
-            let _t = mc_core::perf_span!("wfx.regency_trails");
-            self.regency_trails(projectiles, time);
-        }
-        {
-            let _t = mc_core::perf_span!("wfx.gravitic_tick");
-            self.gravitic_tick(projectiles, time);
-        }
-        {
-            let _t = mc_core::perf_span!("wfx.excavation_tick");
-            self.excavation_tick(units, time, camera);
-        }
-        {
-            let _t = mc_core::perf_span!("wfx.star_core_tick");
-            self.star_core_tick(units, time, camera);
-        }
-        {
-            let _t = mc_core::perf_span!("wfx.orb_tick");
-            self.orb_tick(units, frame.tick, time, camera);
-        }
-        {
-            let _t = mc_core::perf_span!("wfx.nanite_repair_tick");
-            self.nanite_repair_tick(frame, time, camera);
-        }
-        {
-            let _t = mc_core::perf_span!("wfx.elevator_tick");
-            self.elevator_tick(units, &frame.events, time, camera);
-        }
-        {
-            let _t = mc_core::perf_span!("wfx.lance_core_tick");
-            self.lance_core_tick(units, time, camera);
-        }
-        {
-            let _t = mc_core::perf_span!("wfx.bolt_rifle_tick");
-            self.bolt_rifle_tick(units, &frame.houses, time);
-        }
-        {
-            let _t = mc_core::perf_span!("wfx.arc_howitzer_tick");
-            self.arc_howitzer_tick(units, &frame.houses, time);
-        }
-        {
-            let _t = mc_core::perf_span!("wfx.write_bore_strokes");
-            self.write_bore_strokes(time);
-        }
-        {
-            let _t = mc_core::perf_span!("wfx.heavy_rail_tick");
-            self.heavy_rail_tick(units, &frame.houses, projectiles, time);
-        }
-        // Before the strokes are written (`emp_tick`): its lightning is among them.
-        {
-            let _t = mc_core::perf_span!("wfx.gravitic_engine_tick");
-            self.gravitic_engine_tick(frame, time, camera);
-        }
-        {
-            let _t = mc_core::perf_span!("wfx.emp_tick");
-            self.emp_tick(frame, units, time, camera);
-        }
-        {
-            let _t = mc_core::perf_span!("wfx.great_gun_tick");
-            self.great_gun_tick(projectiles, time);
-        }
-        {
-            let _t = mc_core::perf_span!("wfx.missile_trails");
-            self.missile_trails(projectiles, time, camera);
-        }
-        {
-            let _t = mc_core::perf_span!("wfx.nuke_tick");
-            self.nuke_tick(frame, time, camera);
-        }
-        {
-            let _t = mc_core::perf_span!("wfx.write_regency_trails");
-            self.write_regency_trails(time);
-        }
-        {
-            let _t = mc_core::perf_span!("wfx.edict_tick");
-            self.edict_tick(frame, time, camera);
-        }
-        {
-            let _t = mc_core::perf_span!("wfx.lens_tick");
-            self.lens_tick(frame, time);
-        }
-        {
-            let _t = mc_core::perf_span!("wfx.surge_tick");
-            self.surge_tick(time);
-        }
-        {
-            let _t = mc_core::perf_span!("wfx.stream_bursts");
-            self.stream_bursts(projectiles, time, camera);
-        }
-        {
-            let _t = mc_core::perf_span!("wfx.sea_tick");
-            self.sea_tick(units, projectiles, time, camera);
-        }
-        {
-            let _t = mc_core::perf_span!("wfx.warp_tick");
-            self.warp_tick(frame, time, camera);
-        }
     }
 
     /// The rounds of a stream gun's shot (`Weapon::rounds`) have no sim impact of their
@@ -6179,6 +5939,7 @@ mod environment_tests {
                     time: 0.0,
                     alpha: 1.0,
                     sim: Some(&frame),
+                    latest: None,
                     ghosts: &[],
                     marks: &[],
                     ranges: &[],
@@ -6233,6 +5994,7 @@ mod environment_tests {
                     time,
                     alpha: 1.0,
                     sim: Some(&frame),
+                    latest: None,
                     ghosts: &[],
                     marks: &[],
                     ranges: &[],
@@ -6307,6 +6069,7 @@ mod environment_tests {
                         time: 50.0 + step as f32 * 0.1,
                         alpha: 1.0,
                         sim: Some(&frame),
+                        latest: None,
                         ghosts: &[],
                         marks: &[],
                         ranges: &[],
@@ -6374,6 +6137,7 @@ mod shockwave_tests {
                     time,
                     alpha: 1.0,
                     sim: Some(frame),
+                    latest: None,
                     ghosts: &[],
                     marks: &[],
                     ranges: &[],
@@ -6589,6 +6353,7 @@ mod glass_tests {
                     time: 1.0,
                     alpha: 1.0,
                     sim: Some(&frame),
+                    latest: None,
                     ghosts: &[],
                     marks: &[],
                     ranges: &[],

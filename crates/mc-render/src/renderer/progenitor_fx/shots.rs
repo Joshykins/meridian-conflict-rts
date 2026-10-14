@@ -653,6 +653,7 @@ fn progenitor_shots() {
                         time: base + t,
                         alpha: (t / TICK - k as f32).max(0.0),
                         sim: ticked.then_some(&frame),
+                        latest: None,
                         ghosts: &[],
                         marks: &[],
                         ranges: &[],

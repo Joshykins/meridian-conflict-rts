@@ -1313,6 +1313,7 @@ pub(crate) fn shoot(
             time,
             alpha: 1.0,
             sim: None,
+            latest: None,
             ghosts: &[],
             marks: &[],
             ranges: &[],
