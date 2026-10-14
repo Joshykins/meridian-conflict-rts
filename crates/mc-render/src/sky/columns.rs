@@ -6,14 +6,52 @@
 use super::*;
 use crate::gpu_consts::cloud_columns::LAYERS;
 
-/// Texels a side of each half of the map: the map with a margin round it, and the
-/// air far out round that (cloud_shape.wgsl `columns_rect`).
-const RES: u32 = 1024;
+/// Texels a side of the map over the map and a margin round it, and of the one over
+/// the air far out round that, which only the horizon sees (cloud_shape.wgsl
+/// `columns_rect`).
+const NEAR_RES: u32 = 1024;
+const FAR_RES: u32 = 512;
+/// A frame bakes one row in this many: the air drifts a metre or so in a few frames.
+const STAGGER: u32 = 4;
 
 pub(super) struct Columns {
-    /// `LAYERS` near, then `LAYERS` far; written by `cs_columns`, read in GENERAL.
-    image: Image,
+    /// `LAYERS` each; written by `cs_columns`, read in GENERAL.
+    near: Image,
+    far: Image,
     pipeline: vk::Pipeline,
+    /// The whole map wants baking on the next frame (made, or the sky started over).
+    stale: std::cell::Cell<bool>,
+}
+
+/// A `res`-square map of `LAYERS` layers, in GENERAL.
+fn map_image(gpu: &Gpu, res: u32) -> Result<Image, GpuError> {
+    let image = gpu.image(&ImageDesc {
+        width: res,
+        height: res,
+        format: vk::Format::R16G16B16A16_SFLOAT,
+        usage: vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::SAMPLED,
+        layers: LAYERS,
+        mips: 1,
+        array: true,
+    })?;
+    // SAFETY: `submit_once` hands a recording command buffer of this device; the image
+    // was just made, one mip, every layer still in UNDEFINED.
+    gpu.submit_once(|cmd| unsafe {
+        gpu.transition(
+            cmd,
+            image.image,
+            vk::ImageSubresourceRange {
+                aspect_mask: vk::ImageAspectFlags::COLOR,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: LAYERS,
+            },
+            vk::ImageLayout::UNDEFINED,
+            vk::ImageLayout::GENERAL,
+        );
+    })?;
+    Ok(image)
 }
 
 impl Columns {
@@ -24,42 +62,30 @@ impl Columns {
         module: vk::ShaderModule,
         layout: vk::PipelineLayout,
     ) -> Result<Columns, GpuError> {
-        let image = gpu.image(&ImageDesc {
-            width: RES,
-            height: RES,
-            format: vk::Format::R16G16B16A16_SFLOAT,
-            usage: vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::SAMPLED,
-            layers: LAYERS * 2,
-            mips: 1,
-            array: true,
-        })?;
-        // SAFETY: `submit_once` hands a recording command buffer of this device; the image
-        // was just made, one mip, every layer still in UNDEFINED.
-        gpu.submit_once(|cmd| unsafe {
-            gpu.transition(
-                cmd,
-                image.image,
-                vk::ImageSubresourceRange {
-                    aspect_mask: vk::ImageAspectFlags::COLOR,
-                    base_mip_level: 0,
-                    level_count: 1,
-                    base_array_layer: 0,
-                    layer_count: LAYERS * 2,
-                },
-                vk::ImageLayout::UNDEFINED,
-                vk::ImageLayout::GENERAL,
-            );
-        })?;
+        let near = map_image(gpu, NEAR_RES)?;
+        let far = map_image(gpu, FAR_RES)?;
         let pipeline = pipelines::compute_pipeline(gpu, module, c"cs_columns", layout)?;
-        Ok(Columns { image, pipeline })
+        Ok(Columns {
+            near,
+            far,
+            pipeline,
+            stale: std::cell::Cell::new(true),
+        })
     }
 
-    /// For the drawing set's bindings 7 (written) and 8 (read), both in GENERAL.
-    pub(super) fn view(&self) -> vk::ImageView {
-        self.image.view
+    /// The near map and the far one, for the drawing set's bindings 7 and 8 (written
+    /// and read) and 11 and 12, all in GENERAL.
+    pub(super) fn views(&self) -> [vk::ImageView; 2] {
+        [self.near.view, self.far.view]
     }
 
-    /// Bakes the map: after the weather step, before anything draws a cloud.
+    /// Bake the whole map on the next frame.
+    pub(super) fn invalidate(&self) {
+        self.stale.set(true);
+    }
+
+    /// Bakes the map, or a share of its rows: after the weather step, before anything
+    /// draws a cloud.
     pub(super) fn record(
         &self,
         gpu: &Gpu,
@@ -96,8 +122,13 @@ impl Columns {
                 &sets,
                 &[],
             );
-            let groups = RES.div_ceil(8);
-            dev.cmd_dispatch(cmd, groups, groups, 2);
+            // `cs_columns` takes its stride from the dispatch's height.
+            let rows = if self.stale.replace(false) {
+                NEAR_RES
+            } else {
+                NEAR_RES / STAGGER
+            };
+            dev.cmd_dispatch(cmd, NEAR_RES.div_ceil(8), rows.div_ceil(8), 2);
             let after = [vk::MemoryBarrier::default()
                 .src_access_mask(vk::AccessFlags::SHADER_WRITE)
                 .dst_access_mask(vk::AccessFlags::SHADER_READ)];
@@ -117,6 +148,7 @@ impl Columns {
         // SAFETY: made by `new` on this device; called once, from `Sky::destroy` after the
         // device has gone idle.
         unsafe { gpu.device.destroy_pipeline(self.pipeline, None) };
-        gpu.destroy_image_ref(&self.image);
+        gpu.destroy_image_ref(&self.near);
+        gpu.destroy_image_ref(&self.far);
     }
 }

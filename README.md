@@ -47,9 +47,8 @@ step. Ultra is only chosen by hand. Picking a preset, render scale or AA by hand
 turns Auto off. Settings saved before Auto existed keep their preset.
 
 Simple shading keeps material colours, normal maps, weather and shadows, but uses
-one terrain texture patch instead of three anti-tiling patches, hardware shadow
-filtering instead of nine taps, and refreshes one quarter of the cloud-shadow
-field per frame. Full shading retains the original detail. These paths work on
+one terrain texture patch instead of three anti-tiling patches and hardware shadow
+filtering instead of nine taps. Full shading retains the original detail. These paths work on
 all supported GPUs.
 
 The performance suite also runs natively on macOS and Linux:

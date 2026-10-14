@@ -432,9 +432,11 @@ impl Renderer {
         self.timers.draws(&device, cmd, "clouds.columns");
         self.sky.record_columns(&self.gpu, cmd, self.scene_set);
         self.timers.end(&device, cmd);
+        self.timers.draws(&device, cmd, "clouds.light");
+        self.sky.record_light(&self.gpu, cmd, self.scene_set);
+        self.timers.end(&device, cmd);
         self.timers.draws(&device, cmd, "clouds.shade");
-        self.sky
-            .record_shade(&self.gpu, cmd, self.scene_set, self.quality.simple_shading);
+        self.sky.record_shade(&self.gpu, cmd, self.scene_set);
         self.timers.end(&device, cmd);
         // GPU culling and draw generation.
         self.timers.draws(&device, cmd, "cull");

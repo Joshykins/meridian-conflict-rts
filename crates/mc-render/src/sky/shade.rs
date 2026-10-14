@@ -1,5 +1,5 @@
-//! The column map's bake and the cloud shadows (a compact interleaved dispatch on lower
-//! quality presets).
+//! The column map's bake, the light volume and the cloud shadows (a quarter of the
+//! texels a frame, in a compact interleaved dispatch).
 use super::*;
 
 impl Sky {
@@ -16,32 +16,35 @@ impl Sky {
         );
     }
 
+    /// The light volume (`light.rs`): after the column map, before the shade and the march.
+    pub fn record_light(&self, gpu: &Gpu, cmd: vk::CommandBuffer, scene_set: vk::DescriptorSet) {
+        if !self.clouds {
+            return;
+        }
+        self.light.record(
+            gpu,
+            cmd,
+            self.draw_pipeline_layout,
+            [scene_set, self.draw_sets[0]],
+        );
+    }
+
     /// The clouds' shade on the land: after `record_sim`, before anything is lit.
-    pub fn record_shade(
-        &self,
-        gpu: &Gpu,
-        cmd: vk::CommandBuffer,
-        scene_set: vk::DescriptorSet,
-        simple: bool,
-    ) {
+    pub fn record_shade(&self, gpu: &Gpu, cmd: vk::CommandBuffer, scene_set: vk::DescriptorSet) {
         if !self.clouds {
             return;
         }
         let dev = &gpu.device;
-        // Match atmos.frame.x in cs_shade: the first frame and wrap refresh the
-        // whole field. Reuse the existing uniforms to keep draw layouts compatible.
-        let stride = if simple && self.frame_index % 1024 > 1 {
-            2
-        } else {
-            1
-        };
+        // A quarter of the texels a frame (cs_shade), but the whole field on the first
+        // frames and at each wrap of atmos.frame.x.
+        let stride = if self.frame_index % 1024 > 1 { 2 } else { 1 };
         let groups = SHADE_RES.div_ceil(stride * 8);
         let shaders = vk::PipelineStageFlags::VERTEX_SHADER
             | vk::PipelineStageFlags::FRAGMENT_SHADER
             | vk::PipelineStageFlags::COMPUTE_SHADER;
         // SAFETY: the renderer calls `record_shade` with its recording `cmd`, outside any
         // render pass; `shade_pipeline` was made with `draw_pipeline_layout`, whose set 0 is
-        // `scene_set`'s layout. Dispatch stride matches cs_shade's existing uniforms.
+        // `scene_set`'s layout; cs_shade takes its stride from the dispatch's size.
         unsafe {
             // Last frame's lighting read it; this dispatch reads and rewrites it.
             let before = [vk::MemoryBarrier::default()

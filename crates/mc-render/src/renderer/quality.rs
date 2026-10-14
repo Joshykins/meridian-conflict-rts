@@ -10,7 +10,7 @@ pub struct SceneQuality {
     pub prop_detail: [f32; 3],
     /// Cloud march resolution is window resolution divided by this, in each axis.
     pub cloud_divisor: u32,
-    /// Single-patch terrain textures, cheaper shadow filtering and staggered cloud shade.
+    /// Single-patch terrain textures and cheaper shadow filtering.
     pub simple_shading: bool,
     /// Texels along each side of every sun shadow cascade.
     pub shadow_size: u32,

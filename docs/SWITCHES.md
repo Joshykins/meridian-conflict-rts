@@ -8,7 +8,7 @@ headless captures.
 
 | Variable | Values | Purpose |
 |---|---|---|
-| `MERIDIAN_SIMPLE_SHADING` | `1` on, `0` off | Single-patch terrain textures, hardware shadow filtering and staggered cloud-shadow updates. Low and Medium use it. |
+| `MERIDIAN_SIMPLE_SHADING` | `1` on, `0` off | Single-patch terrain textures and hardware shadow filtering. Low and Medium use it. |
 | `MERIDIAN_RENDER_SCALE` | `0.5`–`2.0` | Scene resolution relative to output; UI stays at output resolution. |
 | `MERIDIAN_AA` | `off`, `smaa` | Edge smoothing. |
 | `MERIDIAN_PROP_DETAIL` | `minimum radius,LOD bias,shadow radius` | Scenery detail; Low is `6,4,8`, Medium `3,3,5`, High `1.2,2,0`, Ultra `1.2,1,0`. |

@@ -33,17 +33,51 @@ fn turn(p: vec2<f32>, r: vec2<f32>) -> vec2<f32> {
 // Extinction of the thickest cloud, per metre.
 const CLOUD_SIGMA: f32 = 0.045;
 
+// ---- How cloud droplets scatter light -------------------------------------------
+
+// The droplets' mean diameter, micrometres (fair-weather cumulus, 10-20).
+const CLOUD_DROPLET_UM: f32 = 16.0;
+
+// Draine's phase function (Draine 2003): Henyey-Greenstein with a cos² term
+// `alpha` that lifts the light thrown back and to the sides.
+fn phase_draine(mu: f32, g: f32, alpha: f32) -> f32 {
+    return phase_hg(mu, g) * (1.0 + alpha * mu * mu) / (1.0 + alpha * (1.0 + 2.0 * g * g) / 3.0);
+}
+
+// Light scattered by water droplets `d` micrometres across through cosine `mu`
+// from straight on (Jendersie and d'Eon 2023): a Henyey-Greenstein lobe for the
+// narrow bright peak round the sun, blended with Draine's for the rest, fitted to
+// Mie scattering. `soften` scales both lobes' anisotropy, 1 as fitted: the light
+// scattered more than once has forgotten more of the way it came.
+// The share of the light `phase_mie` throws into its narrow forward peak: carried
+// on almost straight, it lights the cloud deeper in, as light scattered again.
+fn mie_peak(d: f32) -> f32 {
+    return 1.0 - exp(-0.599085 / (d - 0.641583) - 0.665888);
+}
+
+fn phase_mie(mu: f32, d: f32, soften: f32) -> f32 {
+    let g_hg = exp(-0.0990567 / (d - 1.67154)) * soften;
+    let g_d = exp(-2.20679 / (d + 3.91029) - 0.428934) * soften;
+    let alpha = exp(3.62489 - 8.29288 / (d + 5.52825));
+    let w_d = exp(-0.599085 / (d - 0.641583) - 0.665888);
+    return mix(phase_hg(mu, g_hg), phase_draine(mu, g_d, alpha), w_d);
+}
+
 // ---- The column map ------------------------------------------------------------
 // `cloud_columns` (sky/columns.rs): `CLOUD_COLUMNS_LAYERS` layers over the map and a
-// margin round it, then as many again over the air far out round the map (the
-// horizon a low eye looks at, tens of kilometres off), coarser. Per texel:
+// margin round it, and `cloud_columns_far` as many over the air far out round the map
+// (the horizon a low eye looks at, tens of kilometres off), coarser. Per texel:
 //   0  base (m), reach (how tall the column grows, m; 0 no cloud), how much of the
 //      billows the cover fills, storm
 //   1  sheet, seeded, firm, flat (1 a closed deck or a sheet)
 //   2  erosion, grey, extinction scale (per metre), billow period (m)
 //   3  where the billows are looked up, off the point (xy), and the erosion (zw):
 //      a wheeling storm's turn, the wakes' bend, churned air's swirl
-//   4  the last aircraft wake through here: its height and how much it thins the cloud
+//   4  the last aircraft wake through here: its height and how much it thins the
+//      cloud; how hard it rains; how far into polar country (snow, not rain)
+//   5  the cloud floor (the smoothed land, m), the floor the mist lies on (m), how
+//      far into autumn country (deeper mist, all day), how much mist the ground
+//      holds (thinner over open sea, none in desert air)
 
 const COLUMN_LAYERS: i32 = i32(CLOUD_COLUMNS_LAYERS);
 // The near map's margin past each edge of the map, as a share of its size.
@@ -51,7 +85,7 @@ const COLUMNS_MARGIN: f32 = 0.125;
 // How far past the map's edges the far map reaches, metres. Past it there is no cloud.
 const COLUMNS_FAR: f32 = 40000.0;
 
-// Where `cloud_columns` covers: x0, y0, width, height (far: the outer layers).
+// Where `cloud_columns` covers: x0, y0, width, height (far: `cloud_columns_far`).
 fn columns_rect(far: bool) -> vec4<f32> {
     let size = atmos.weather.yz;
     var edge = size * COLUMNS_MARGIN;
@@ -61,11 +95,11 @@ fn columns_rect(far: bool) -> vec4<f32> {
     return vec4<f32>(-edge, size + edge * 2.0);
 }
 
-// A spot in the column map: its uv and the first of its layers; layer < 0
-// past the far map's edge.
+// A spot in the column map: its uv, and which map (0 near, 1 far, -1 past the
+// far map's edge).
 struct ColumnAt {
     uv: vec2<f32>,
-    layer: i32,
+    map: i32,
 }
 
 fn column_at(xy: vec2<f32>) -> ColumnAt {
@@ -77,23 +111,26 @@ fn column_at(xy: vec2<f32>) -> ColumnAt {
     let far = columns_rect(true);
     let fuv = (xy - far.xy) / far.zw;
     if all(fuv >= vec2<f32>(0.0)) && all(fuv <= vec2<f32>(1.0)) {
-        return ColumnAt(fuv, COLUMN_LAYERS);
+        return ColumnAt(fuv, 1);
     }
     return ColumnAt(fuv, -1);
 }
 
 fn column_layer(at: ColumnAt, k: i32) -> vec4<f32> {
-    return textureSampleLevel(cloud_columns, clamp_sampler, at.uv, at.layer + k, 0.0);
+    if at.map == 0 {
+        return textureSampleLevel(cloud_columns, clamp_sampler, at.uv, k, 0.0);
+    }
+    return textureSampleLevel(cloud_columns_far, clamp_sampler, at.uv, k, 0.0);
 }
 
 // Layer 0 at `at`: the base and reach that say whether a point can be in cloud at all.
 fn column_base(at: ColumnAt) -> vec4<f32> {
-    if at.layer < 0 {
+    if at.map < 0 {
         return vec4<f32>(0.0);
     }
     var c = column_layer(at, 0);
     // The far map fades out toward its edge: no wall of cloud standing at the end.
-    if at.layer > 0 {
+    if at.map > 0 {
         let edge = min(min(at.uv.x, 1.0 - at.uv.x), min(at.uv.y, 1.0 - at.uv.y));
         c.y *= smoothstep(0.0, 0.08, edge);
     }
@@ -101,7 +138,7 @@ fn column_base(at: ColumnAt) -> vec4<f32> {
 }
 
 // The column over map point `xy`, every layer, for `cs_columns`.
-fn bake_column(xy: vec2<f32>) -> array<vec4<f32>, 5> {
+fn bake_column(xy: vec2<f32>) -> array<vec4<f32>, 6> {
     // Round a wheeling storm the billows turn with the weather (`weather_at`).
     let p = vortex_warp_in(atmos.vortex, xy);
     let w = weather_at(xy);
@@ -190,12 +227,23 @@ fn bake_column(xy: vec2<f32>) -> array<vec4<f32>, 5> {
     // Bigger weather, bigger billows.
     let period = SHAPE_PERIOD * mix(1.0, max(sky.scale, 0.5), 0.6);
     let turned = p - xy - bent;
-    return array<vec4<f32>, 5>(
+    // The mist (clouds.wgsl `mist_at`). Autumn karst keeps a little mist in its
+    // valleys all day, wisps lying a little deeper than elsewhere.
+    let fall = autumn_within(xy, REGIONS_SKY_BLEND_M);
+    let land = cloud_floor(xy);
+    // A hollow fills to the land round it, but no deeper than this over its floor:
+    // a narrow gorge under a high smoothed floor is not hundreds of metres of fog.
+    let mist_floor = min(max(land, globals.map.z), max(terrain_height(xy), globals.map.z) + MIST_POOL * (1.0 + AUTUMN_MIST_DEEPER * fall));
+    // Over open sea, away from the land, it lies thinner, or the sea reads as fog;
+    // desert air is too dry for it.
+    let held = (1.0 - 0.6 * smoothstep(0.0, 20.0, globals.map.z - land)) * (1.0 - climate_within(xy, REGIONS_SKY_BLEND_M).y);
+    return array<vec4<f32>, 6>(
         vec4<f32>(base, reach, filled, storm),
         vec4<f32>(sheet, seeded, firm, max(deck_closed, sheet)),
         vec4<f32>(erode, grey, CLOUD_SIGMA * (0.65 + 0.8 * storm) * mix(0.12, 1.0, firm), period),
         vec4<f32>(turned + swirl, turned - swirl * 2.0),
-        vec4<f32>(stir.z, streak, 0.0, 0.0),
+        vec4<f32>(stir.z, streak, w.w, polar_within(xy, REGIONS_SKY_BLEND_M)),
+        vec4<f32>(land, mist_floor, fall, held),
     );
 }
 
@@ -345,4 +393,75 @@ fn cloud_shape(p: vec3<f32>, at: ColumnAt, c0: vec4<f32>, detail: f32, grey: boo
         out.grey = c2.y;
     }
     return out;
+}
+
+// ---- The light volume ------------------------------------------------------------
+// `cloud_light` (sky/light.rs, baked by clouds.wgsl `cs_light`): over the near column
+// map's ground, slices up the layer from under the lowest base to over the highest
+// storm top, closer together low down where fair-weather cloud is (a slice's height
+// goes as the square of its number); rgb how much sunlight gets through from there
+// (`sun_taps`), at each of the march's three octaves of scattered light
+// (`LIGHT_OCTAVES`), past the first `SUN_NEAR` metres, which `sun_through` taps
+// itself. Looked up again for every lit sample of every ray, the taps were three
+// quarters of the march.
+//
+// The light got through, not the cloud in the way, is what is kept: blended between
+// texels, the cloud in the way from a sunlit face (none) and from inside (much)
+// averaged to half, which let no light through, and every top went grey.
+
+// How far under the cloud base the volume starts, metres.
+const LIGHT_BELOW: f32 = 300.0;
+// How far toward the sun the light is tapped at the sample itself, metres (two
+// taps, the second twice the first): the light changes fastest across a cloud's
+// sunlit face and the gaps beside it, and read from the volume alone it was blurred
+// over a texel or two, the lumps and the shreds lit flat.
+const SUN_NEAR: f32 = 210.0;
+// The light scattered once, then many times, approximated by ever-softer octaves
+// (Hillaire 2016): each sees this share of the cloud in the way.
+const LIGHT_OCTAVES: vec3<f32> = vec3<f32>(1.0, 0.3, 0.06);
+
+// The volume's heights over the cloud floor: its bottom, and how far it reaches up.
+fn light_span() -> vec2<f32> {
+    let bottom = atmos.layer.x - LIGHT_BELOW;
+    let top = atmos.layer.z + (atmos.layer.z - atmos.layer.x) * TOP_LUMP * 0.5;
+    return vec2<f32>(bottom, top - bottom);
+}
+
+// The optical depth toward the sun from `p` through the coarse cloud, over the
+// kilometre past `SUN_NEAR`: two taps, the second twice the first, so a cloud's
+// far side sits in its own shade.
+fn sun_taps(p: vec3<f32>) -> f32 {
+    let sun = globals.sun.xyz;
+    var tau = 0.0;
+    var reach = 0.0;
+    for (var k = 0; k < 2; k++) {
+        let seg = SUN_NEAR * 4.0 / 3.0 * exp2(f32(k));
+        tau += cloud_at(p + sun * (reach + seg * 0.5), 0.0).sigma * seg;
+        reach += seg;
+    }
+    return tau;
+}
+
+// How much sunlight reaches `p` through the coarse cloud, at each octave
+// (`LIGHT_OCTAVES`), past `tau` more of the cloud's own in the way: a tap over the
+// first `SUN_NEAR` metres, then the light volume from there. Off its ground (cloud
+// far out over the horizon, a few texels on screen) the volume's taps themselves.
+fn sun_through(p: vec3<f32>, tau: f32) -> vec3<f32> {
+    let sun = globals.sun.xyz;
+    let near = tau + (cloud_at(p + sun * (SUN_NEAR / 6.0), 0.0).sigma
+        + cloud_at(p + sun * (SUN_NEAR * 2.0 / 3.0), 0.0).sigma * 2.0) * SUN_NEAR / 3.0;
+    let q = p + sun * SUN_NEAR;
+    let rect = columns_rect(false);
+    let uv = (q.xy - rect.xy) / rect.zw;
+    var through: vec3<f32>;
+    if any(uv < vec2<f32>(0.0)) || any(uv > vec2<f32>(1.0)) {
+        through = exp(-sun_taps(q) * LIGHT_OCTAVES);
+    } else {
+        let span = light_span();
+        let up = clamp((q.z - cloud_floor(q.xy) - span.x) / span.y, 0.0, 1.0);
+        let slices = f32(textureDimensions(cloud_light).z);
+        let w = (sqrt(up) * (slices - 1.0) + 0.5) / slices;
+        through = textureSampleLevel(cloud_light, clamp_sampler, vec3<f32>(uv, w), 0.0).rgb;
+    }
+    return through * exp(-near * LIGHT_OCTAVES);
 }

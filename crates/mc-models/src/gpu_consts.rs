@@ -780,8 +780,8 @@ shared! {
     /// The clouds' column map (mc-render sky/columns.rs, cloud_shape.wgsl): what the air
     /// holds over each spot, baked once a frame.
     pub mod cloud_columns as "CLOUD_COLUMNS_" {
-        /// Layers of the map over the map and round it; as many again for the air far out.
-        pub const LAYERS: u32 = 5;
+        /// Layers of each of its maps: over the map and round it, and the air far out.
+        pub const LAYERS: u32 = 6;
     }
 
     /// What stirs the weather (sky.rs `Disturber`, clouds_sim.wgsl `cs_force`). The wake

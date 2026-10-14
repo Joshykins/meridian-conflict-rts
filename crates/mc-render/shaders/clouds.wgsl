@@ -30,9 +30,15 @@
 @group(1) @binding(4) var cloud_now: texture_2d<f32>;
 // This frame's half of the march (`fs_march`), half as wide as `cloud_march`.
 @group(1) @binding(6) var cloud_march_half: texture_2d<u32>;
-// The column map (cloud_shape.wgsl): written by `cs_columns`, read by everything after.
+// The column map (cloud_shape.wgsl), near and far: written by `cs_columns`, read by
+// everything after.
 @group(1) @binding(7) var cloud_columns_out: texture_storage_2d_array<rgba16float, write>;
 @group(1) @binding(8) var cloud_columns: texture_2d_array<f32>;
+@group(1) @binding(11) var cloud_columns_far_out: texture_storage_2d_array<rgba16float, write>;
+@group(1) @binding(12) var cloud_columns_far: texture_2d_array<f32>;
+// The light volume (cloud_shape.wgsl `sun_through`): written by `cs_light`.
+@group(1) @binding(9) var cloud_light_out: texture_storage_3d<rgba16float, write>;
+@group(1) @binding(10) var cloud_light: texture_3d<f32>;
 
 struct FullOut {
     @builtin(position) clip: vec4<f32>,
@@ -197,26 +203,60 @@ fn clearing(p: vec3<f32>) -> f32 {
     // 1200 m across sliced every tall cloud near the camera into a smooth wall
     // with a hard rim, which showed as bands and streaks as the view moved.
     let bubble = mix(clamp(atmos.view.z * 0.12, 250.0, 600.0), max(atmos.view.z * 0.45, 120.0), among);
+    let far = distance(p, eye);
+    // Past the most its ragged edge reaches: no noise to look up.
+    if far >= bubble * 1.35 {
+        return keep;
+    }
     let rag = grad_noise2(p.xy + vec2<f32>(p.z * 0.7, -p.z * 0.4) - atmos.wind.xy, bubble * 0.6) - 0.5;
-    keep *= smoothstep(bubble * 0.4, bubble, distance(p, eye) + rag * bubble * 0.7);
+    keep *= smoothstep(bubble * 0.4, bubble, far + rag * bubble * 0.7);
     return keep;
 }
 
-// The column map (cloud_shape.wgsl `bake_column`): the near layers over the map and
-// its margin (z 0), the far ones round it (z 1).
+// The column map (cloud_shape.wgsl `bake_column`): the near map over the map and its
+// margin (z 0), the far one round it (z 1). Every row, or every so manyth from the
+// frame number's (sky/columns.rs `STAGGER`), as the dispatch's height says.
 @compute @workgroup_size(8, 8)
-fn cs_columns(@builtin(global_invocation_id) id: vec3<u32>) {
-    let size = textureDimensions(cloud_columns_out).xy;
-    if any(id.xy >= size) {
+fn cs_columns(@builtin(global_invocation_id) id: vec3<u32>, @builtin(num_workgroups) groups: vec3<u32>) {
+    let far = id.z == 1u;
+    let near_size = textureDimensions(cloud_columns_out).xy;
+    var size = near_size;
+    if far {
+        size = textureDimensions(cloud_columns_far_out).xy;
+    }
+    let stride = max(near_size.y / (groups.y * 8u), 1u);
+    let texel = vec2<u32>(id.x, id.y * stride + u32(atmos.frame.x) % stride);
+    if any(texel >= size) {
         return;
     }
-    let rect = columns_rect(id.z == 1u);
-    let xy = rect.xy + (vec2<f32>(id.xy) + 0.5) / vec2<f32>(size) * rect.zw;
+    let rect = columns_rect(far);
+    let xy = rect.xy + (vec2<f32>(texel) + 0.5) / vec2<f32>(size) * rect.zw;
     let column = bake_column(xy);
-    let first = i32(id.z) * COLUMN_LAYERS;
     for (var k = 0; k < COLUMN_LAYERS; k++) {
-        textureStore(cloud_columns_out, vec2<i32>(id.xy), first + k, column[k]);
+        if far {
+            textureStore(cloud_columns_far_out, vec2<i32>(texel), k, column[k]);
+        } else {
+            textureStore(cloud_columns_out, vec2<i32>(texel), k, column[k]);
+        }
     }
+}
+
+// The light volume (cloud_shape.wgsl `sun_through`): every slice, or every so manyth
+// (sky/light.rs `STAGGER`) from the frame number's, as the dispatch's depth says.
+@compute @workgroup_size(8, 8)
+fn cs_light(@builtin(global_invocation_id) id: vec3<u32>, @builtin(num_workgroups) groups: vec3<u32>) {
+    let size = textureDimensions(cloud_light_out);
+    let stride = max(size.z / groups.z, 1u);
+    let slice = id.z * stride + u32(atmos.frame.x) % stride;
+    if any(id.xy >= size.xy) || slice >= size.z {
+        return;
+    }
+    let rect = columns_rect(false);
+    let xy = rect.xy + (vec2<f32>(id.xy) + 0.5) / vec2<f32>(size.xy) * rect.zw;
+    let span = light_span();
+    let up = f32(slice) / f32(size.z - 1u);
+    let p = vec3<f32>(xy, cloud_floor(xy) + span.x + up * up * span.y);
+    textureStore(cloud_light_out, vec3<i32>(vec2<i32>(id.xy), i32(slice)), vec4<f32>(exp(-sun_taps(p) * LIGHT_OCTAVES), 1.0));
 }
 
 // The clouds' shade on everything under them (sky.rs `shade`, read by
@@ -240,13 +280,14 @@ const SHADE_BLEND: f32 = 0.25;
 const SHADE_DETAIL: f32 = 2.0;
 
 @compute @workgroup_size(8, 8)
-fn cs_shade(@builtin(global_invocation_id) invocation: vec3<u32>) {
+fn cs_shade(@builtin(global_invocation_id) invocation: vec3<u32>, @builtin(num_workgroups) groups: vec3<u32>) {
     let size = textureDimensions(cloud_shade_out);
-    // Dispatch only the live texels: skipping lanes in a full-size dispatch
-    // still pays for inactive lanes on SIMD GPUs. The first frame fills all.
-    // Match the CPU dispatch and periodically refresh the entire field at wrap.
+    // A quarter of the texels a frame, each of a 2x2 block in turn (the clouds move
+    // little in four frames), dispatching only those: skipping lanes in a full-size
+    // dispatch still pays for inactive lanes on SIMD GPUs. The first frames fill
+    // all (sky/shade.rs `record_shade`), as the dispatch's size says.
     let frame = u32(atmos.frame.x);
-    let stagger = quality(QUALITY_SIMPLE_SHADING) && frame > 1u;
+    let stagger = groups.x * 8u < size.x;
     let stride = select(1u, 2u, stagger);
     let phase = frame % 4u;
     let offset = select(vec2<u32>(0u), vec2<u32>(phase & 1u, phase >> 1u), stagger);
@@ -360,38 +401,37 @@ const AUTUMN_MIST_DEEPER: f32 = 0.25;
 // Steps along a ray through the mist's slab, at most.
 const MIST_STEPS: i32 = 40;
 
-// The mist's extinction at `p`, per metre.
+// The mist's extinction at `p`, per metre. Where it may lie and how much the
+// ground holds come from the column map (cloud_shape.wgsl `bake_column`).
 fn mist_at(p: vec3<f32>) -> f32 {
-    // Autumn karst keeps a little mist in its valleys all day, wisps lying a
-    // little deeper than elsewhere: the ground still shows through it.
-    let fall = autumn_within(p.xy, REGIONS_SKY_BLEND_M);
-    let amount = max(atmos.mist.x, 0.45 * fall);
-    let depth = atmos.mist.y * (1.0 + AUTUMN_MIST_DEEPER * fall);
-    let land = cloud_floor(p.xy);
-    // Above the highest a bank can stand here: nothing more to look up.
-    if p.z >= max(land, globals.map.z) + depth * 1.5 {
+    let at = column_at(p.xy);
+    if at.map < 0 {
         return 0.0;
     }
-    // A hollow fills to the land round it, but no deeper than this over its floor:
-    // a narrow gorge under a high smoothed floor is not hundreds of metres of fog.
-    let floor = min(max(land, globals.map.z), max(terrain_height(p.xy), globals.map.z) + MIST_POOL * (1.0 + AUTUMN_MIST_DEEPER * fall));
+    let c5 = column_layer(at, 5);
+    let land = c5.x;
+    let fall = c5.z;
+    // Autumn karst keeps a little mist in its valleys all day, wisps lying a
+    // little deeper than elsewhere: the ground still shows through it.
+    let amount = max(atmos.mist.x, 0.45 * fall);
+    let depth = atmos.mist.y * (1.0 + AUTUMN_MIST_DEEPER * fall);
+    // Above the highest a bank can stand here: nothing more to look up.
+    if p.z >= max(land, globals.map.z) + depth * 1.5 || c5.w <= 0.0 {
+        return 0.0;
+    }
     let q = p.xy - atmos.wind.xy * 0.35;
     let n = textureSampleLevel(cloud_noise, repeat_sampler, vec3<f32>(turn(q, TURN_OCTAVE) / MIST_PERIOD, 0.37 + p.z / 900.0), 0.0);
     let bank = n.x * 0.75 + n.y * 0.25;
     // The bank's top rides up and down with it, so the banks are lumpy on top.
-    let inside = floor + depth * (0.5 + bank) - p.z;
+    let inside = c5.y + depth * (0.5 + bank) - p.z;
     if inside <= 0.0 {
         return 0.0;
     }
     // Banks with clear air between them: at the thickest a bank covers a third or
     // so of the low ground, not all of it.
     let dens = clamp((bank - (1.0 - 0.6 * amount)) / 0.25, 0.0, 1.0);
-    // Over open sea, away from the land, it lies thinner, or the sea reads as fog.
-    let sea = 1.0 - 0.6 * smoothstep(0.0, 20.0, globals.map.z - land);
-    // Desert air is too dry for it.
-    let dry = climate_within(p.xy, REGIONS_SKY_BLEND_M).y;
     // Soft on top, thickest low down.
-    return dens * sea * smoothstep(0.0, 30.0, inside) * (1.0 - dry) * MIST_SIGMA;
+    return dens * c5.w * smoothstep(0.0, 30.0, inside) * MIST_SIGMA;
 }
 
 struct Mist {
@@ -448,9 +488,10 @@ fn mist_march(eye: vec3<f32>, rd: vec3<f32>, t_scene: f32, jitter: f32) -> Mist 
             break;
         }
         let p = eye + rd * t;
-        // Where the player looks through, thinned like the clouds.
-        let sigma = mist_at(p) * mix(0.15, 1.0, clearing(p));
+        var sigma = mist_at(p);
         if sigma > 0.0 {
+            // Where the player looks through, thinned like the clouds.
+            sigma *= mix(0.15, 1.0, clearing(p));
             // The sun's share is shaded by the clouds above.
             let shade = cloud_shadow(p);
             let lit = diffuse * mix(0.6, 1.0, shade) + glow * shade;
@@ -615,9 +656,11 @@ fn march(in: FullOut) -> vec4<f32> {
 
     let sun = globals.sun.xyz;
     let mu = dot(rd, sun);
-    // Two lobes: the bright silver lining toward the sun, a little back-glow.
-    let phase = mix(phase_hg(mu, 0.75), phase_hg(mu, -0.2), 0.3);
-    let phase_soft = mix(phase_hg(mu, 0.35), phase_hg(mu, -0.1), 0.3);
+    // Water droplets' scattering (`phase_mie`): the narrow bright peak round the
+    // sun, the silver lining, and Draine's broad bulk with a little back-glow; the
+    // light scattered again, softer.
+    let phase = phase_mie(mu, CLOUD_DROPLET_UM, 1.0);
+    let phase_soft = phase_mie(mu, CLOUD_DROPLET_UM, 0.5);
     let span = t1 - t0;
     // Steps grow with distance: fine where clouds are near and large on screen.
     // Not rounded: a whole number of steps would jump as the camera moves.
@@ -683,48 +726,31 @@ fn march(in: FullOut) -> vec4<f32> {
             let keep = clearing(p);
             let sigma_full = c.sigma;
             c.sigma = sigma_full * mix(0.025, 1.0, keep * keep);
-            // Light from the sun: four taps toward it through the coarse cloud,
-            // reaching a kilometre, so a cloud's far side sits in its own shade.
-            // Zoomed out, where a march texel is tens of metres wide, two taps
-            // over the same kilometre (a quarter of the march's cost saved),
-            // blended in over a band so no line shows where they change.
-            var tau = 0.0;
+            // Light from the sun: through the coarse cloud toward it (`sun_through`,
+            // mostly from the light volume), past a short tap with the fine erosion,
+            // about one of its lumps toward the sun, so each lump shades the crease
+            // behind it. Lit from the coarse cloud alone the cauliflower changed the
+            // outline but never its own light: smooth cotton gradients. Not on a
+            // deck's or a sheet's flat top, which it turned into one even fleece
+            // from edge to edge; and faded out zoomed out, where a march texel is
+            // tens of metres wide and the lumps are smaller than it.
+            var crease = 0.0;
+            var past = 0.0;
             if light_lod < 1.0 {
-                // First a short tap with the fine erosion, about one of its
-                // lumps toward the sun, so each lump shades the crease behind
-                // it. Lit from the coarse taps alone the cauliflower changed
-                // the outline but never its own light: smooth cotton gradients.
-                // Not on a deck's or a sheet's flat top, which it turned into
-                // one even fleece from edge to edge.
                 let short = DETAIL_PERIOD * detail * 0.06;
-                tau = cloud_shape(p + sun * short, at, c0, detail, false).sigma * short * 2.0 * (1.0 - 0.8 * c.flat);
-                var reach = short * 2.0;
-                for (var k = 0; k < 4; k++) {
-                    let seg = 70.0 * exp2(f32(k));
-                    let q = p + sun * (reach + seg * 0.5);
-                    tau += cloud_at(q, 0.0).sigma * seg;
-                    reach += seg;
-                }
-            }
-            if light_lod > 0.0 {
-                var coarse = 0.0;
-                var reach = 0.0;
-                for (var k = 0; k < 2; k++) {
-                    let seg = 210.0 * exp2(f32(k) * 2.0);
-                    let q = p + sun * (reach + seg * 0.5);
-                    coarse += cloud_at(q, 0.0).sigma * seg;
-                    reach += seg;
-                }
-                tau = mix(tau, coarse, light_lod);
+                let fade = (1.0 - light_lod) * (1.0 - 0.8 * c.flat);
+                crease = cloud_shape(p + sun * short, at, c0, detail, false).sigma * short * 2.0 * fade;
+                past = short * 2.0 * (1.0 - light_lod);
             }
             // Beer's law with the light scattered many times approximated by
             // ever-softer octaves (Hillaire 2016), and the dark "powder" rims.
-            let sun_through = exp(-tau) * phase + exp(-tau * 0.3) * 0.3 * phase_soft + exp(-tau * 0.06) * 0.25 * 0.0796;
+            let sunward = sun_through(p + sun * past, crease);
+            let sunlit = sunward.x * (phase + mie_peak(CLOUD_DROPLET_UM) * phase_soft) + sunward.y * 0.3 * phase_soft + sunward.z * 0.25 * 0.0796;
             // Powder darkens thin cloud only looking toward the sun (its
             // in-scatter has not built up yet there). From above, with the sun
             // behind the eye, it greyed every rim and softened the outline.
             let powder = mix(1.0, 1.0 - exp(-c.sigma * 90.0), smoothstep(-0.2, 0.5, mu));
-            let direct = atmos.sun_color.rgb * sun_through * mix(0.55, 1.0, powder) * 2.6 * mix(1.0, atmos.sun_color.w, 0.8);
+            let direct = atmos.sun_color.rgb * sunlit * mix(0.55, 1.0, powder) * 2.6 * mix(1.0, atmos.sun_color.w, 0.8);
             // Sky light from above, dimmer low in the cloud and inside storms;
             // the land's light from below on the base.
             // The column above hides the sky from a point low in the cloud: a
@@ -805,9 +831,9 @@ fn with_rain(cloud: vec4<f32>, eye: vec3<f32>, rd: vec3<f32>, t_scene: f32, pixe
         return cloud;
     }
     // Nothing falling anywhere along it: done.
-    let r0 = weather_at((eye + rd * ta).xy).w;
-    let r1 = weather_at((eye + rd * tb).xy).w;
-    let rm = weather_at((eye + rd * (ta + tb) * 0.5).xy).w;
+    let r0 = column_layer(column_at((eye + rd * ta).xy), 4).z;
+    let r1 = column_layer(column_at((eye + rd * tb).xy), 4).z;
+    let rm = column_layer(column_at((eye + rd * (ta + tb) * 0.5).xy), 4).z;
     if max(r0, max(r1, rm)) < 0.01 {
         return cloud;
     }
@@ -819,18 +845,20 @@ fn with_rain(cloud: vec4<f32>, eye: vec3<f32>, rd: vec3<f32>, t_scene: f32, pixe
     let time = atmos.weather.w;
     for (var i = 0; i < 8; i++) {
         let p = eye + rd * t;
-        let r = weather_at(p.xy).w;
+        let at = column_at(p.xy);
+        let c4 = column_layer(at, 4);
+        let r = select(0.0, c4.z, at.map >= 0);
         if r > 0.005 {
             // Shafts: coarse noise in plan, stretched tall, drifting down.
             let q = p.xy - atmos.wind.xy * 1.1;
             let streak = textureSampleLevel(cloud_noise, repeat_sampler,
                 vec3<f32>(q / 260.0, (p.z + time * 55.0) / 1800.0), 0.0).z;
-            let under = cloud_floor(p.xy) + atmos.layer.x - 60.0;
+            let under = column_layer(at, 5).x + atmos.layer.x - 60.0;
             let hang = smoothstep(under, under - 250.0, p.z);
             var sigma = r * 0.00055 * (0.35 + 1.3 * streak) * hang;
             // Lit grey by the sky, a little by the sun through the cloud above.
             var source = atmos.sky_color.rgb * 1.1 + atmos.sun_color.rgb * 0.035;
-            let cold = polar_within(p.xy, REGIONS_SKY_BLEND_M);
+            let cold = c4.w;
             if cold > 0.0 {
                 // Polar snow comes down in thicker, whiter veils than rain.
                 sigma *= 1.0 + 0.6 * cold;

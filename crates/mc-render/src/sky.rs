@@ -19,11 +19,13 @@
 mod blast;
 mod columns;
 mod cut;
+mod light;
 mod regions;
 mod seed;
 pub(crate) use seed::SeedCell;
 mod shade;
 mod targets;
+mod volume;
 
 use crate::camera::Camera;
 use crate::descriptors::{Binding, SetPool};
@@ -65,6 +67,10 @@ const DRAW_SET: &[Binding] = &[
     (6, vk::DescriptorType::SAMPLED_IMAGE),
     (7, vk::DescriptorType::STORAGE_IMAGE),
     (8, vk::DescriptorType::SAMPLED_IMAGE),
+    (9, vk::DescriptorType::STORAGE_IMAGE),
+    (10, vk::DescriptorType::SAMPLED_IMAGE),
+    (11, vk::DescriptorType::STORAGE_IMAGE),
+    (12, vk::DescriptorType::SAMPLED_IMAGE),
 ];
 
 /// The target the march draws this frame's half of its texels into (`Sky::resize`);
@@ -493,6 +499,8 @@ pub struct Sky {
     shade: Image,
     /// What the air holds over each spot, baked each frame (`columns.rs`).
     columns: columns::Columns,
+    /// How much cloud lies toward the sun from each point of the layer (`light.rs`).
+    light: light::LightVolume,
     /// The march this frame, then two histories it is folded into in turn.
     targets: Vec<Image>,
     target_fbs: Vec<vk::Framebuffer>,
@@ -669,7 +677,7 @@ impl Sky {
         };
         let state = [weather_image()?, weather_image()?];
         let flow = [weather_image()?, weather_image()?];
-        let noise = noise_image(gpu)?;
+        let noise = volume::volume_image(gpu, [NOISE_RES; 3], vk::Format::R8G8B8A8_UNORM)?;
         let shade = gpu.image(&ImageDesc {
             width: SHADE_RES,
             height: SHADE_RES,
@@ -922,9 +930,15 @@ impl Sky {
             )?;
 
         let columns = columns::Columns::new(gpu, draw_module, draw_pipeline_layout)?;
+        let light = light::LightVolume::new(gpu, draw_module, draw_pipeline_layout)?;
         for set in draw_sets {
-            write_image(gpu, set, 7, T::STORAGE_IMAGE, columns.view(), general);
-            write_image(gpu, set, 8, T::SAMPLED_IMAGE, columns.view(), general);
+            let [near, far] = columns.views();
+            write_image(gpu, set, 7, T::STORAGE_IMAGE, near, general);
+            write_image(gpu, set, 8, T::SAMPLED_IMAGE, near, general);
+            write_image(gpu, set, 11, T::STORAGE_IMAGE, far, general);
+            write_image(gpu, set, 12, T::SAMPLED_IMAGE, far, general);
+            write_image(gpu, set, 9, T::STORAGE_IMAGE, light.view(), general);
+            write_image(gpu, set, 10, T::SAMPLED_IMAGE, light.view(), general);
         }
 
         // Bake the cloud noise once.
@@ -961,6 +975,7 @@ impl Sky {
             noise,
             shade,
             columns,
+            light,
             targets: Vec::new(),
             target_fbs: Vec::new(),
             march_size: (0, 0),
@@ -1115,6 +1130,8 @@ impl Sky {
     /// Plays the match at `hour` (24-hour clock).
     pub fn set_hour(&mut self, hour: f32) {
         self.hour = hour.rem_euclid(24.0);
+        // The sun has jumped: light the clouds afresh at once.
+        self.light.invalidate();
     }
 
     /// How far the day has gone for lamps: 0 in daylight, 1 once the sun is
@@ -1790,6 +1807,10 @@ impl Sky {
             );
         }
         self.readback_pending = true;
+        if self.reset {
+            self.columns.invalidate();
+            self.light.invalidate();
+        }
         self.reset = false;
     }
 
@@ -1995,6 +2016,7 @@ impl Sky {
                 dev.destroy_pipeline(p, None);
             }
             self.columns.destroy(gpu);
+            self.light.destroy(gpu);
             for m in self.modules {
                 dev.destroy_shader_module(m, None);
             }
@@ -2071,62 +2093,6 @@ fn write_buffer(
 }
 
 /// The 3D cloud noise, 128 texels a side, RGBA8.
-fn noise_image(gpu: &Gpu) -> Result<Image, GpuError> {
-    let dev = &gpu.device;
-    let format = vk::Format::R8G8B8A8_UNORM;
-    let info = vk::ImageCreateInfo::default()
-        .image_type(vk::ImageType::TYPE_3D)
-        .format(format)
-        .extent(vk::Extent3D {
-            width: NOISE_RES,
-            height: NOISE_RES,
-            depth: NOISE_RES,
-        })
-        .mip_levels(1)
-        .array_layers(1)
-        .samples(vk::SampleCountFlags::TYPE_1)
-        .tiling(vk::ImageTiling::OPTIMAL)
-        .usage(vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::SAMPLED)
-        .initial_layout(vk::ImageLayout::UNDEFINED);
-    // SAFETY: the device is alive and `info` lives to the end of the call; the image is bound
-    // once, at offset 0, to fresh device-local memory its requirements allow; the 3D view
-    // covers its one mip and layer in its own format.
-    unsafe {
-        let image = dev.create_image(&info, None)?;
-        let memory = gpu.allocate(
-            dev.get_image_memory_requirements(image),
-            vk::MemoryPropertyFlags::DEVICE_LOCAL,
-        )?;
-        dev.bind_image_memory(image, memory, 0)?;
-        let aspect = vk::ImageAspectFlags::COLOR;
-        let view = dev.create_image_view(
-            &vk::ImageViewCreateInfo::default()
-                .image(image)
-                .view_type(vk::ImageViewType::TYPE_3D)
-                .format(format)
-                .subresource_range(vk::ImageSubresourceRange {
-                    aspect_mask: aspect,
-                    base_mip_level: 0,
-                    level_count: 1,
-                    base_array_layer: 0,
-                    layer_count: 1,
-                }),
-            None,
-        )?;
-        Ok(Image {
-            image,
-            view,
-            memory,
-            format,
-            width: NOISE_RES,
-            height: NOISE_RES,
-            layers: 1,
-            mips: 1,
-            aspect,
-        })
-    }
-}
-
 #[cfg(test)]
 mod shots {
     use crate::camera::Camera;
