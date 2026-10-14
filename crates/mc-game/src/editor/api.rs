@@ -15,6 +15,12 @@ enum Request {
     Tool {
         name: String,
     },
+    CaptureCamera {
+        name: String,
+    },
+    RecallCamera {
+        name: String,
+    },
     Catalogue {
         query: String,
     },
@@ -186,6 +192,8 @@ impl Editor {
                     self.catalogue=Some(super::catalogue::Catalogue::with_query(query));
                     return Ok(json!({"ok":true,"units":units}));
                 }
+                Request::CaptureCamera{name}=>self.apply(self.capture_view(name),renderer)?,
+                Request::RecallCamera{name}=>self.recall_view(&name,renderer)?,
                 Request::Tool{name}=>self.choose_tool(&name)?,
                 Request::ChooseUnit{blueprint}=>self.choose_unit(&blueprint)?,
                 Request::Reload{resources}=>self.request_reload(resources)?,

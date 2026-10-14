@@ -80,6 +80,18 @@ pub struct Camera {
     pub at: FxVec2,
     pub distance: u32,
     pub yaw: Angle,
+    #[serde(default)]
+    pub pose: Option<CameraPose>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CameraPose {
+    pub height: Fx,
+    /// Degrees below the horizon, in hundredths. Integer authoring metadata
+    /// remains safe to carry through mission snapshots.
+    pub pitch_centideg: i16,
+    pub free: bool,
 }
 
 /// Additional properties for a baked prop. The editor remaps prop_index when
@@ -172,7 +184,14 @@ impl Placed {
         }
         for c in &self.cameras {
             identity(3, c.id, &c.name)?;
-            if !inside(c.at) || !(25..=300_000).contains(&c.distance) {
+            if !inside(c.at)
+                || !(25..=300_000).contains(&c.distance)
+                || c.pose.as_ref().is_some_and(|p| {
+                    p.height < Fx::from_int(-10_000)
+                        || p.height > Fx::from_int(300_000)
+                        || !(-8950..=8950).contains(&p.pitch_centideg)
+                })
+            {
                 return Err(bad("invalid camera"));
             }
         }

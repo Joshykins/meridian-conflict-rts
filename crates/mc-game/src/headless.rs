@@ -327,7 +327,7 @@ pub fn screenshot(
         true,
         shot.report.is_some().then_some(&mut chronicle),
     )?;
-    let mission_presentation = crate::campaign::Presentation::load(&map);
+    let mut mission_presentation = crate::campaign::Presentation::load(&map);
     // A selected factory gets a queue to show: a few of its first two products.
     if let Some(key) = &shot.select {
         let u = &world.state.units;
@@ -927,6 +927,18 @@ pub fn screenshot(
         })
         .transpose()?;
     let audio = crate::audio::Audio::silent();
+    if shot.camera.is_none() {
+        // A still captures the authored cue after its presentation pan settles.
+        // Explicit --camera remains available for inspecting other action.
+        mission_presentation.update(
+            view.status.mission.as_ref(),
+            &mut camera,
+            &renderer,
+            &audio,
+            1.4,
+        );
+    }
+
     let input = crate::ui::Input {
         cursor: shot
             .cursor

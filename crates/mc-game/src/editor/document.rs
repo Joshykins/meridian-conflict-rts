@@ -80,6 +80,10 @@ pub(super) enum Command {
         at: [f32; 2],
         distance: u32,
         yaw: f32,
+        height: Option<f32>,
+        pitch: Option<f32>,
+        #[serde(default)]
+        free: bool,
     },
     Transform {
         id: u64,
@@ -296,7 +300,7 @@ impl Document {
 }
 
 #[cfg(test)]
-mod tests;
+pub(super) mod tests;
 
 #[cfg(test)]
 mod paint_tests;

@@ -1,5 +1,7 @@
 //! Mission assets, startup and presentation. Simulation only sees stable text IDs.
+mod camera;
 use crate::ui::{palette, rgb, type_scale, Rect, Ui};
+use camera::Pan;
 use mc_sim::{
     mission::{Definition, Objective, Status},
     MatchConfig, PlayerSetup,
@@ -78,13 +80,6 @@ pub(crate) struct Presentation {
     error: Option<String>,
 }
 
-struct Pan {
-    focus: glam::Vec3,
-    distance: f32,
-    yaw: f32,
-    elapsed: f32,
-}
-
 impl Presentation {
     pub(crate) fn load(map: &mc_map::MapFile) -> Self {
         let mut result = Self::default();
@@ -130,26 +125,11 @@ impl Presentation {
         if let Some((target, start, _)) = &status.camera {
             if self.camera != Some(*start) {
                 self.camera = Some(*start);
-                self.pan = Some(Pan {
-                    focus: camera.focus,
-                    distance: camera.distance,
-                    yaw: camera.yaw,
-                    elapsed: 0.0,
-                });
+                self.pan = Some(Pan::new(camera));
             }
             if let Some(pan) = &mut self.pan {
-                pan.elapsed += dt;
-                let t = (pan.elapsed / 1.4).clamp(0.0, 1.0);
-                let ease = t * t * (3.0 - 2.0 * t);
                 let at = glam::Vec2::from(target.at.to_f32());
-                camera.focus = pan.focus.lerp(at.extend(renderer.ground_height(at)), ease);
-                camera.distance = pan.distance + (target.distance as f32 - pan.distance) * ease;
-                let yaw = target.yaw.to_radians_f32();
-                let delta = (yaw - pan.yaw + std::f32::consts::PI)
-                    .rem_euclid(std::f32::consts::TAU)
-                    - std::f32::consts::PI;
-                camera.yaw = pan.yaw + delta * ease;
-                if t >= 1.0 {
+                if pan.advance(camera, target, renderer.ground_height(at), dt) {
                     self.pan = None;
                 }
             }

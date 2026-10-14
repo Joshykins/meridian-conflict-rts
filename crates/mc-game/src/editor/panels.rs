@@ -132,11 +132,21 @@ impl Editor {
         if ui.button(
             id("editor_owner", 0),
             Rect::new(card.x + 16.0, card.y + 280.0, 190.0, 34.0),
-            &format!("Player slot: {}", self.owner + 1),
+            &if self.tool == 8 {
+                "Capture current view".into()
+            } else {
+                format!("Player slot: {}", self.owner + 1)
+            },
             ButtonKind::Secondary,
             true,
         ) {
-            self.owner = (self.owner + 1) % 6;
+            if self.tool == 8 {
+                if let Err(error) = self.apply(self.capture_view(self.name.clone()), renderer) {
+                    self.message = error;
+                }
+            } else {
+                self.owner = (self.owner + 1) % mc_core::MAX_PLAYERS as u8;
+            }
         }
         if ui.button(
             id("editor_delete", 0),
@@ -154,25 +164,48 @@ impl Editor {
         if ui.button(
             id("editor_rotate", 0),
             Rect::new(card.x + 16.0, card.y + 318.0, 298.0, 27.0),
-            &format!("Heading: {:.0}°  (+15°)", self.heading),
+            &if self
+                .doc
+                .placed
+                .cameras
+                .iter()
+                .any(|c| Some(c.id) == self.selected)
+            {
+                "View saved camera".into()
+            } else {
+                format!("Heading: {:.0}°  (+15°)", self.heading)
+            },
             ButtonKind::Secondary,
             true,
         ) {
-            self.heading = (self.heading + 15.0) % 360.0;
-            if let Some(unit) = self
-                .selected
-                .and_then(|id| self.doc.placed.units.iter().find(|u| u.id == id))
-                .cloned()
+            if let Some(name) = self
+                .doc
+                .placed
+                .cameras
+                .iter()
+                .find(|c| Some(c.id) == self.selected)
+                .map(|c| c.name.clone())
             {
-                if let Err(e) = self.apply(
-                    Command::Transform {
-                        id: unit.id,
-                        at: unit.at.to_f32(),
-                        heading: self.heading,
-                    },
-                    renderer,
-                ) {
-                    self.message = e;
+                if let Err(error) = self.recall_view(&name, renderer) {
+                    self.message = error;
+                }
+            } else {
+                self.heading = (self.heading + 15.0) % 360.0;
+                if let Some(unit) = self
+                    .selected
+                    .and_then(|id| self.doc.placed.units.iter().find(|u| u.id == id))
+                    .cloned()
+                {
+                    if let Err(e) = self.apply(
+                        Command::Transform {
+                            id: unit.id,
+                            at: unit.at.to_f32(),
+                            heading: self.heading,
+                        },
+                        renderer,
+                    ) {
+                        self.message = e;
+                    }
                 }
             }
         }

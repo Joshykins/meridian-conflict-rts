@@ -78,10 +78,15 @@ playable mission, authored and revised through the editor and its API.
 - Native evacuation, ARC carrier arrival and ending dialogue screenshots are
   captured. Full human encounter and cinematic composition review remain.
 
+- Saved cameras now preserve altitude, pitch and orbit/free mode. Native capture,
+  move, exact recall, Save and Undo pass. Cinematic pans interpolate complete
+  poses, and default mission stills use the authored cue. Full gate passes in
+  257 s, including 867 simulation integration tests and 348 game tests.
+
 ## Still required before final delivery
 - Component doodads, general destructible/reclaimable props.
 - Water/climate controls, decorative cliff regeneration and resize.
-- Remaining gizmo/snapping improvements and persistent full camera poses.
+- Remaining gizmo/snapping improvements.
 - Propaganda components and encounter balance; human playtest and cinematic review.
 - Full checks, determinism matrix/cross-platform verification, final native
   screenshots, docs reconciliation, and the pull request to dev.

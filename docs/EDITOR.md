@@ -13,7 +13,9 @@ Raise, Lower, Flatten, Smooth, Cliff and Noise edit terrain at the cursor.
 Ramp connects the existing heights at two clicked endpoints, with the brush
 radius as its half-width. Stamp reads a named JSON heightmap from the map's
 stamps folder (Vela includes crater.json); strength is its height in metres. Unit, Region,
-Point and Camera create named placements. A region uses two opposite corners.
+Point creates a named placement. Camera captures the current composed view;
+its Capture current view button also works without clicking the terrain. A
+region uses two opposite corners.
 Select picks an object in the viewport or outliner; Move places that selection
 at the cursor, and the heading button rotates a selected unit. Browse opens a
 searchable unit catalogue including mission-only variants. Apply to selection
@@ -155,6 +157,18 @@ height is the focus altitude in metres and pitch is degrees below the horizon.
 Properties uses {"action":"properties","id":1,"name":"lead","group":"company",
 "owner":0,"blueprint":"company_merrick"}. Omit unit-only fields when renaming a
 point, region or camera. Invalid or duplicate names leave the batch unchanged.
+
+Saved cameras preserve focus altitude, distance, yaw, pitch and orbit/free mode.
+Select a camera and press View saved camera to restore its view. Legacy cameras
+without a pose continue to use ground-level orbit views.
+
+    {"op":"capture_camera","name":"street_closeup"}
+    {"op":"recall_camera","name":"street_closeup"}
+    {"op":"edit","actions":[{"action":"camera","name":"street_closeup","at":[7738,8008],"distance":25,"yaw":0,"height":120,"pitch":15,"free":true}]}
+
+Cinematic pans interpolate authored height and pitch as well as position and
+zoom. Mission screenshots without an explicit --camera use the active authored
+cue after its pan settles.
 
 ## Mission checkpoints
 

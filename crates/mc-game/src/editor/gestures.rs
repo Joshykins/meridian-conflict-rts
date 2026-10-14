@@ -95,12 +95,7 @@ impl Editor {
                 name: self.name.clone(),
                 at,
             }),
-            8 => Some(Command::Camera {
-                name: self.name.clone(),
-                at,
-                distance: self.camera.distance.round().clamp(25.0, 300_000.0) as u32,
-                yaw: self.camera.yaw.to_degrees(),
-            }),
+            8 => Some(self.capture_view(self.name.clone())),
             9 => self.selected.map(|id| Command::Transform {
                 id,
                 at,

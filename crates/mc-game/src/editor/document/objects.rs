@@ -68,32 +68,7 @@ pub(super) fn apply(
                 placed.next_id += 1;
             }
         }
-        Command::Camera {
-            name,
-            at,
-            distance,
-            yaw,
-        } => {
-            if !yaw.is_finite() {
-                return Err("Camera yaw must be finite".into());
-            }
-            let at = point(*at)?;
-            let yaw = Angle::from_radians_f32(yaw.to_radians());
-            if let Some(c) = placed.cameras.iter_mut().find(|c| c.name == *name) {
-                c.at = at;
-                c.distance = *distance;
-                c.yaw = yaw;
-            } else {
-                placed.cameras.push(mc_map::placed::Camera {
-                    id: placed.next_id,
-                    name: name.clone(),
-                    at,
-                    distance: *distance,
-                    yaw,
-                });
-                placed.next_id += 1;
-            }
-        }
+        Command::Camera { .. } => camera(placed, command)?,
         Command::Transform { id, at, heading } => {
             let at = point(*at)?;
             if !heading.is_finite() {
@@ -139,5 +114,64 @@ pub(super) fn apply(
         }
         _ => return Err("Expected an object command".into()),
     }
+    Ok(())
+}
+
+fn camera(placed: &mut Placed, command: &Command) -> Result<(), String> {
+    let Command::Camera {
+        name,
+        at,
+        distance,
+        yaw,
+        height,
+        pitch,
+        free,
+    } = command
+    else {
+        return Err("Expected camera".into());
+    };
+
+    if !yaw.is_finite() {
+        return Err("Camera yaw must be finite".into());
+    }
+    let pose = match (height, pitch) {
+        (Some(height), Some(pitch))
+            if height.is_finite()
+                && (-10_000.0..=300_000.0).contains(height)
+                && pitch.is_finite()
+                && (-89.5..=89.5).contains(pitch) =>
+        {
+            Some(mc_map::placed::CameraPose {
+                height: Fx::from_f32(*height),
+                pitch_centideg: (*pitch * 100.0).round() as i16,
+                free: *free,
+            })
+        }
+        (None, None) if !free => None,
+        _ => {
+            return Err(
+                "Saved camera requires finite height and pitch (-89.5 to 89.5 degrees)".into(),
+            )
+        }
+    };
+    let at = point(*at)?;
+    let yaw = Angle::from_radians_f32(yaw.to_radians());
+    if let Some(c) = placed.cameras.iter_mut().find(|c| c.name == *name) {
+        c.at = at;
+        c.distance = *distance;
+        c.yaw = yaw;
+        c.pose = pose;
+    } else {
+        placed.cameras.push(mc_map::placed::Camera {
+            id: placed.next_id,
+            name: name.clone(),
+            at,
+            distance: *distance,
+            yaw,
+            pose,
+        });
+        placed.next_id += 1;
+    }
+
     Ok(())
 }

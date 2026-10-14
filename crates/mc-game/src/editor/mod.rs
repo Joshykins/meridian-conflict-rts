@@ -1,6 +1,7 @@
 //! In-game map authoring. The document outlives playtests and owns all edits.
 mod api;
 mod browser;
+mod cameras;
 mod catalogue;
 mod document;
 mod frame;
