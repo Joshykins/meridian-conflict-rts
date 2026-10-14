@@ -279,11 +279,13 @@ fn oversized_frames_are_rejected_both_ways() {
     ));
 
     // A full-budget bundle from every player a match can have does fit.
-    let mut pending = vec![vec![0u8; 1020]; 200];
+    // More queued than the budget takes, a kilobyte each with its cost.
+    let queued = MAX_COMMANDS_BYTES / 1024 + 40;
+    let mut pending = vec![vec![0u8; 1020]; queued];
     let mut budget = MAX_COMMANDS_BYTES;
     let per_player = take_commands(&mut pending, &mut budget);
     assert_eq!(per_player.len(), MAX_COMMANDS_BYTES / 1024);
-    assert_eq!(pending.len(), 200 - per_player.len());
+    assert_eq!(pending.len(), queued - per_player.len());
     let full = Message::Bundle(TickBundle {
         tick: 0,
         players: (0..MAX_PLAYERS as u8)

@@ -125,6 +125,7 @@ impl Renderer {
             self.adjacency_links.set_sim(&frame.links, input.time);
         }
         self.adjacency_links.upload(&self.blueprints);
+        let extras = mc_core::perf_span!("cpu.extras");
         let ghosts = &input.ghosts[..input.ghosts.len().min(MAX_GHOSTS)];
         self.dynamic.write(
             (self.sim_units as usize * size_of::<UnitInstance>()) as u64,
@@ -202,6 +203,8 @@ impl Renderer {
                 .chain(torn)
                 .chain(self.shaper_growth.drawn()),
         );
+        drop(extras);
+        let terrain_nodes = mc_core::perf_span!("cpu.terrain_nodes");
 
         let z_range = (
             self.map_info.min_z.to_f32(),
@@ -222,6 +225,8 @@ impl Renderer {
         self.tile_cache
             .update(camera, &self.pool, &mut self.upload_scratch);
 
+        drop(terrain_nodes);
+        let marks_span = mc_core::perf_span!("cpu.marks");
         // Ringed marks first, those laid over the ground then the flat ones, then those
         // that only show bars: the ring draws take the front runs.
         let (ringed, bare): (Vec<&Mark>, Vec<&Mark>) = input
@@ -273,6 +278,8 @@ impl Renderer {
             .filter(|m| m.kind & (crate::gpu_consts::mark::HOVER | Mark::BARS_ONLY) == 0)
             .map(|m| m.unit_index)
             .collect();
+        drop(marks_span);
+        let sky_span = mc_core::perf_span!("cpu.sky");
         // Explosions and weapon flashes light the clouds over them.
         let glows =
             self.lights
@@ -285,6 +292,7 @@ impl Renderer {
             tick_seconds: self.tick_seconds,
             selected: &selected,
         });
+        drop(sky_span);
         let shadow_strength = self.quality.shadow_strength(camera.distance);
         let cascades = shadow_cascades::fit(camera, sun, z_range, self.shadow.size());
         let shadow_view_proj: Mat4 = cascades[0].view_proj;
