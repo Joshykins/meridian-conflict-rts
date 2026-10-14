@@ -20,9 +20,10 @@
 #   scripts/channel.sh finish                  from inside a landed hotfix worktree:
 #                                              removes it and its branch
 #
-# A promotion or a hotfix is one pass: the branch moves, scripts/release.sh
-# builds its tip and publishes it to the build store, and only then are the
-# branch and a tag (builds/CHANNEL-N) pushed to origin. If the build or the
+# A promotion or a hotfix is one pass: the commit is checked (scripts/check.sh,
+# in a worktree of its own), the branch moves, scripts/release.sh builds its tip
+# and publishes it to the build store, and only then are the branch and a tag
+# (builds/CHANNEL-N) pushed to origin. A commit that fails the check moves nothing. If the build or the
 # upload fails, the branch goes back to where it was and nothing is pushed.
 # OPTS go to release.sh: --notes FILE (the patch notes; else drafted from the
 # commits), --no-upload (a trial: build the zip, publish and push nothing, and
@@ -197,8 +198,11 @@ case $cmd in
         b=$(branch_of "$channel")
         in_step_with_origin "$from" "$b"
         [[ $(git rev-parse "$b") != "$(git rev-parse "$from")" ]] || { echo "channel.sh: $b is already at $from" >&2; exit 1; }
+        target=$(git rev-parse "$from")
+        "$here/scripts/check.sh" --head "$target" || { echo "channel.sh: $from fails the check; nothing promoted" >&2; exit 1; }
+        [[ $(git rev-parse "$from") == "$target" ]] || { echo "channel.sh: $from moved during the check; run promote again" >&2; exit 1; }
         old=$(git rev-parse "$b")
-        fast_forward "$b" "$from"
+        fast_forward "$b" "$target"
         echo "promoted $b to $from ($(git rev-list --count "$old..$b") commits); publishing"
         publish "$channel" "$b=$old" -- "$@"
         push_published "$channel" "$from" "$b"

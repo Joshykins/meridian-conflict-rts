@@ -3,10 +3,11 @@
 #
 #   scripts/check.sh            fmt, clippy (warnings are errors), every test
 #   scripts/check.sh --quick    fmt and clippy only
-#   scripts/check.sh --head     the full check on the last commit, in a worktree
-#                               of its own: what is committed, without the
-#                               uncommitted edits other sessions have in the
-#                               shared tree
+#   scripts/check.sh --head [REF]  the full check on the last commit (or REF), in a
+#                               worktree of its own: what is committed, without
+#                               the uncommitted edits other sessions have in the
+#                               shared tree. scripts/channel.sh checks what it
+#                               promotes this way.
 #
 # The toolchain comes from rust-toolchain.toml. Tests build in the `gate`
 # profile (Cargo.toml): optimised like release, but incremental and without
@@ -22,11 +23,12 @@ set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
 
 mode=full
+ref=HEAD
 case "${1:-}" in
     --quick) mode=quick ;;
-    --head) mode=head ;;
+    --head) mode=head; ref=${2:-HEAD} ;;
     "") ;;
-    *) echo "usage: scripts/check.sh [--quick|--head]" >&2; exit 2 ;;
+    *) echo "usage: scripts/check.sh [--quick|--head [REF]]" >&2; exit 2 ;;
 esac
 
 if [ "$mode" = head ]; then
@@ -35,12 +37,13 @@ if [ "$mode" = head ]; then
     if [ ! -d "$verify" ]; then
         git -C "$root" worktree add --detach "$verify" HEAD >/dev/null
     fi
-    git -C "$verify" checkout --quiet --detach "$(git -C "$root" rev-parse HEAD)"
+    commit=$(git -C "$root" rev-parse --verify "$ref^{commit}")
+    git -C "$verify" checkout --quiet --detach "$commit"
     # Baked maps are not checked in; the tests that need them read the shared ones.
     for m in "$root"/maps/*.mcmap; do
         [ -e "$m" ] && ln -sf "$m" "$verify/maps/"
     done
-    echo "== checking $(git -C "$root" log -1 --format='%h %s') in $verify"
+    echo "== checking $(git -C "$root" log -1 --format='%h %s' "$commit") in $verify"
     exec "$verify/scripts/check.sh"
 fi
 

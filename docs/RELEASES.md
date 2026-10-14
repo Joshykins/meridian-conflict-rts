@@ -217,7 +217,8 @@ scripts/channel.sh promote playtest --notes notes.md
 ```
 
 fetches origin (and stops if `playtest` or `dev` moved there from another machine),
-fast-forwards `playtest` to `dev`, runs `scripts/release.sh playtest` (build, pack,
+runs the full gate on `dev`'s tip in a worktree of its own (`scripts/check.sh --head`;
+a failure promotes nothing), fast-forwards `playtest` to that commit, runs `scripts/release.sh playtest` (build, pack,
 sign, upload: *Publishing* below), and only then pushes `dev`, `playtest` and a tag
 `builds/playtest-<N>` to GitHub. If the build or the upload fails, `playtest` goes
 back where it was and nothing is pushed. `--notes FILE` is the patch notes (without
@@ -242,10 +243,8 @@ the hotfix worktree. A playtest hotfix is the same with `playtest`.
 
 `scripts/channel.sh status` shows where the three stand, here and on origin.
 
-**CI** (`.github/workflows/check.yml`) runs `scripts/check.sh` on GitHub's Linux
-runners for every push to the three branches and every pull request into them. It
-checks; it never builds for players or publishes. Publishing stays on the machine
-above, so the release key never leaves it.
+There is no CI: every landing on `dev` already passes the gate, and every promotion
+and hotfix runs it again on exactly the commit it publishes.
 
 ## Publishing
 
