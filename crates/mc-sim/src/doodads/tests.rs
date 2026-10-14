@@ -3,13 +3,16 @@ use crate::{tables::Controller, world::MapData, MatchConfig, PlayerSetup, World}
 use mc_core::Angle;
 use mc_map::{placed::Footprint, Heightfield, PropKind};
 use std::{path::Path, sync::Arc};
-fn terrain() -> Heightfield {
+pub(super) fn terrain() -> Heightfield {
     Heightfield::from_samples(128, 128, vec![20; 129 * 129], Fx::ZERO, Fx::ONE, Fx::ZERO)
 }
 fn world(blocking: bool) -> World {
     world_health(blocking, 120)
 }
 fn world_health(blocking: bool, health: u32) -> World {
+    world_salvage(blocking, health, 0)
+}
+pub(super) fn world_salvage(blocking: bool, health: u32, reclaim: u32) -> World {
     let props = vec![Prop {
         kind: PropKind::CityBillboard,
         pos: FxVec2::from_ints(512, 512),
@@ -24,7 +27,7 @@ fn world_health(blocking: bool, health: u32) -> World {
         tint: [255; 3],
         blocking,
         health,
-        reclaim: 0,
+        reclaim,
         footprint: Some(Footprint {
             half: FxVec2::from_ints(20, 4),
             height: Fx::from_int(18),
@@ -141,4 +144,39 @@ fn an_indestructible_blocker_stops_shells_without_taking_damage() {
     assert!(!w
         .nav
         .passable(mc_data::MoveLayer::Land, 0, FxVec2::from_ints(512, 512)));
+}
+
+#[test]
+fn ordinary_authored_units_validate_the_whole_roster_before_spawning() {
+    let mut w = world(false);
+    let unit = mc_map::placed::PlacedUnit {
+        id: 2,
+        name: "engineer".into(),
+        group: "crew".into(),
+        blueprint: "aster_t1_engineer".into(),
+        owner: 0,
+        at: FxVec2::from_ints(400, 400),
+        heading: Angle::QUARTER_TURN,
+    };
+    let mut placed = mc_map::placed::Placed {
+        next_id: 4,
+        units: vec![
+            unit.clone(),
+            mc_map::placed::PlacedUnit {
+                id: 3,
+                name: "bad_slot".into(),
+                owner: 7,
+                ..unit
+            },
+        ],
+        ..Default::default()
+    };
+    assert!(w.spawn_placed_units(&placed).is_err());
+    assert_eq!(w.state.units.slots.live(), 0);
+    placed.units.pop();
+    w.spawn_placed_units(&placed).unwrap();
+    let row = w.state.units.slots.iter().next().unwrap();
+    assert_eq!(w.state.units.pos[row], placed.units[0].at);
+    assert_eq!(w.state.units.heading[row], placed.units[0].heading);
+    assert_eq!(w.state.units.owner[row], 0);
 }

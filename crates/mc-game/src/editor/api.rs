@@ -50,6 +50,7 @@ enum Request {
     },
     Shot,
     Test,
+    Stop,
     Close {
         #[serde(default)]
         discard: bool,
@@ -66,6 +67,7 @@ pub(super) struct Api {
     dir: PathBuf,
     pub(super) enabled: bool,
     pub(super) headless: bool,
+    pub(super) test_state: Option<Value>,
     polled: Instant,
     shot: Option<String>,
 }
@@ -78,6 +80,7 @@ impl Api {
             .join(std::process::id().to_string());
         Self {
             dir,
+            test_state: None,
             enabled: true,
             headless: false,
             polled: Instant::now() - Duration::from_secs(1),
@@ -190,6 +193,9 @@ impl Editor {
         let (id, request) = self.api.poll()?;
         let mut event = None;
         let result=request.and_then(|request| {
+            if self.api.test_state.is_some() && !matches!(request, Request::State | Request::Shot | Request::Stop) {
+                return Err("Stop the playtest before editing the document".into());
+            }
             if self.reloading() && !matches!(request,Request::State|Request::Shot|Request::Camera{..}) {return Err("Reload is running; wait for state to report completion".into());}
             if self.doc.stroking() && !matches!(request,Request::State|Request::Shot|Request::Camera{..}){self.finish_stroke(renderer)?;}
             match request {
@@ -215,7 +221,7 @@ impl Editor {
                     return Ok(json!({"ok":true,"calls":path,"count":calls.len()}));
                 }
                 Request::State => return Ok(json!({"ok":true,"map":self.doc.map.info.name,"source":self.doc.source,
-                    "dirty":self.doc.dirty,"reloading":self.reloading(),"message":self.message,"destination":self.doc.destination,"placed":self.doc.placed,"environment":self.doc.config,"water_level":self.doc.map.info.water_level.to_f32(),"camera":{"at":self.camera.focus.to_array(),"zoom":self.camera.distance,"yaw":self.camera.yaw.to_degrees(),"pitch":self.camera.pitch_free.map(f32::to_degrees)}})),
+                    "playtest":self.api.test_state,"dirty":self.doc.dirty,"reloading":self.reloading(),"message":self.message,"destination":self.doc.destination,"placed":self.doc.placed,"environment":self.doc.config,"water_level":self.doc.map.info.water_level.to_f32(),"camera":{"at":self.camera.focus.to_array(),"zoom":self.camera.distance,"yaw":self.camera.yaw.to_degrees(),"pitch":self.camera.pitch_free.map(f32::to_degrees)}})),
                 Request::Edit {actions} => self.apply_batch(&actions,renderer)?,
                 Request::Undo|Request::Redo => self.history(matches!(request,Request::Redo),renderer)?,
                 Request::Save {name}=> {if let Some(name)=name {self.save_as(name)?;}else{self.save()?;}}
@@ -236,8 +242,12 @@ impl Editor {
                 }
                 Request::Shot=>{if !self.api.headless {renderer.capture_next_frame();} self.api.shot=Some(id.clone());}
                 Request::Test=>{
-                    if self.api.headless{return Err("Playtests require a windowed editor; --mission-pilot checks the route offscreen".into());}
                     event=Some(Event::Test(Box::new(self.test()?)));
+                    self.api.test_state=Some(json!({"tick":0,"starting":true}));
+                }
+                Request::Stop=>{
+                    if self.api.test_state.is_none(){return Err("No playtest is running".into());}
+                    event=Some(Event::StopTest);
                 }
                 Request::Close{discard}=>{
                     if self.doc.dirty && !discard {return Err("Save edits before closing, or explicitly set discard to true".into());}

@@ -306,6 +306,18 @@ impl TileCache {
         Ok(())
     }
 
+    /// Drop simulation flattening before reapplying the authored samples.
+    /// Doing it in the opposite order rewinds the overview to the original file.
+    pub(crate) fn restore_editor(
+        &mut self,
+        doc: &mc_map::edit::EditMap,
+        uploads: &mut Vec<TerrainUpload>,
+    ) -> Result<(), mc_map::MapError> {
+        self.apply_edits(&[], 0.0, uploads);
+        let (w, h) = doc.info.size_cells();
+        self.edit_terrain(doc, [0, 0, w, h], uploads)
+    }
+
     pub fn tiles(&self) -> (u32, u32) {
         (self.tiles_w, self.tiles_h)
     }
@@ -603,6 +615,40 @@ fn patch_tile(samples: &mut [u16], tile: (u32, u32), e: &FlattenRecord) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn stopping_a_playtest_restores_authored_tiles_and_overview_after_flattening() {
+        let path =
+            std::env::temp_dir().join(format!("mc-editor-rewind-{}.mcmap", std::process::id()));
+        mc_map::bake::bake(&mc_map::bake::BakeParams::square("rewind", 2, 17), &path).unwrap();
+        let map = Arc::new(MapFile::open(&path).unwrap());
+        let mut doc = mc_map::edit::EditMap::load(&map).unwrap();
+        let authored = doc.samples()[0].saturating_add(100);
+        doc.set_sample(0, 0, authored).unwrap();
+        let mut cache = TileCache::new(map, CliffBlocks::none());
+        let mut uploads = Vec::new();
+        cache
+            .edit_terrain(&doc, [0, 0, 0, 0], &mut uploads)
+            .unwrap();
+        cache.apply_edits(
+            &[FlattenRecord {
+                min_x: 0,
+                min_y: 0,
+                max_x: 8,
+                max_y: 8,
+                sample: authored.saturating_sub(50),
+            }],
+            0.0,
+            &mut uploads,
+        );
+        assert_ne!(cache.overview[0], authored);
+        cache.restore_editor(&doc, &mut uploads).unwrap();
+        cache.apply_edits(&[], 1.0, &mut uploads);
+        assert!(cache.edits.is_empty());
+        assert_eq!(cache.overview[0], authored);
+        assert_eq!(cache.editor_tiles[&(0, 0)][0], authored);
+        drop(cache);
+        std::fs::remove_file(path).unwrap();
+    }
 
     #[test]
     fn selection_is_bounded_and_covers_the_view() {

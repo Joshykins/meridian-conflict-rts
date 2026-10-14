@@ -38,14 +38,9 @@ pub(super) fn build(
         &config(&doc.placed),
     )
     .map_err(|e| e.to_string())?;
-    for unit in &doc.placed.units {
-        let bp = blueprints
-            .id_of(&unit.blueprint)
-            .ok_or_else(|| format!("Unknown unit {}", unit.blueprint))?;
-        world
-            .spawn_unit(bp, unit.owner, unit.at, unit.heading, true)
-            .map_err(|e| e.to_string())?;
-    }
+    world
+        .spawn_placed_units(&doc.placed)
+        .map_err(|e| e.to_string())?;
     let mut frame = RenderFrame::default();
     world.write_render_frame(None, &mut frame);
     frame.terrain_edits.clear();

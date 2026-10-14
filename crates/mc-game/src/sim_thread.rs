@@ -631,6 +631,8 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                             }
                             if let Some(mission) = options.mission {
                                 if let Err(e) = world.as_mut().unwrap().begin_mission(mission) { return fail(e.to_string()); }
+                            } else if let Err(e) = world.as_mut().unwrap().spawn_placed_units(setup.map.placed()) {
+                                return fail(e.to_string());
                             }
                             if let Some(survival) = options.survival {
                                 if let Err(e) = world.as_mut().unwrap().begin_survival(survival) {

@@ -12,6 +12,7 @@ mod interaction;
 mod navigation;
 mod overlays;
 mod panels;
+mod playtest;
 mod preview;
 mod reload;
 mod save;
@@ -42,6 +43,7 @@ pub(crate) enum Event {
     Leave,
     Open(Box<Editor>),
     Test(Box<GameStart>),
+    StopTest,
 }
 
 pub(crate) struct Editor {
@@ -190,9 +192,13 @@ impl Editor {
     }
 
     pub fn restore(&mut self, renderer: &mut mc_render::Renderer) -> Result<(), String> {
-        let (w, h) = self.doc.map.info.size_cells();
+        self.held.clear();
+        self.api.test_state = None;
         renderer
-            .edit_terrain(&self.doc.map, [0, 0, w, h])
+            .edit_props(&self.doc.map, &self.doc.placed)
+            .map_err(|e| e.to_string())?;
+        renderer
+            .restore_editor_terrain(&self.doc.map)
             .map_err(|e| e.to_string())?;
         self.apply_environment(renderer);
         renderer
@@ -312,36 +318,7 @@ impl Editor {
             sky: Default::default(),
         };
         let mission = crate::campaign::definition(&map)?;
-        let has_mission = mission.is_some();
-        let mut start = crate::app::local_mission_start(request, &self.blueprints, false, mission)?;
-        if has_mission {
-            return Ok(start);
-        }
-        let units = self.doc.placed.units.clone();
-        start.scene = Some((
-            Box::new(move |world| {
-                units
-                    .iter()
-                    .filter_map(|u| {
-                        let bp = world.blueprints.id_of(&u.blueprint)?;
-                        Some(mc_sim::PlayerCommand {
-                            player: u.owner,
-                            command: mc_sim::Command::DebugSpawn {
-                                blueprint: bp,
-                                pos: u.at,
-                                heading: u.heading,
-                                owner: u.owner,
-                                count: 1,
-                                flags: 0,
-                                build: 1000,
-                            },
-                        })
-                    })
-                    .collect()
-            }),
-            Box::new(|_| vec![]),
-        ));
-        Ok(start)
+        crate::app::local_mission_start(request, &self.blueprints, false, mission)
     }
 }
 

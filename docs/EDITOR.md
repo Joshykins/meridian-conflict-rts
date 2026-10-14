@@ -33,8 +33,10 @@ Save and Save As publish the terrain and placement files together, preserving
 other assets in the folder. Save As refuses an existing unrelated destination.
 Undo and Redo operate on command batches. Test exports a private copy; leaving
 the match restores the retained authoring document, including unsaved changes
-and undo history. This first implementation rebuilds the renderer at that
-transition, so a loading curtain is currently visible.
+and undo history. Test and Stop borrow the existing renderer without a loading
+curtain. The terrain and prop buffers are restored on Stop, including structures
+flattened or destroyed during the test. Ordinary maps spawn their authored units
+at match start; missions stage their named groups through the mission program.
 
 ## File layout
 
@@ -139,7 +141,10 @@ Health zero means indestructible. A blocking indestructible object stops shots
 as well as movement. A prop without native collision geometry needs a custom
 footprint before health, blocking or reclaim can be enabled. Destruction releases
 blocked cells and uses the same footprint for impact and collapse presentation.
-Reclaim values are authored and preserved; collection is still being implemented.
+Builders and reclaimers collect authored salvage with their normal tools, including
+area reclaim and idle work within reach. Full stores leave the remaining material
+in the prop. Destruction preserves its salvage; finishing collection removes both
+the prop and its rubble, opens its cells, and survives checkpoint restoration.
 
     {"op":"choose_doodad","kind":"CityBillboard"}
     {"op":"edit","actions":[{"action":"doodad","name":"district_sign","kind":"CityBillboard","at":[4000,8500],"heading":90,"scale":1.5,"tint":[255,120,60],"blocking":true,"health":400,"reclaim":20,"footprint":[8,2,15]}]}
@@ -261,3 +266,7 @@ route. Use --mission-pilot with a headless screenshot to inspect later beats.
 Full encounter balance and visual review remain in progress. Reclaim collection,
 resizing and remaining gizmos are tracked in
 EDITOR-IMPLEMENTATION.md and are not yet available in this slice.
+
+Offscreen editors also support {"op":"test"} and {"op":"stop"}. While
+testing, state.playtest reports tick, units, beams, dead/reclaimed props and player
+materials; shot captures the game HUD. Stop before editing or saving the document.

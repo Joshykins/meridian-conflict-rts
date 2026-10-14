@@ -46,9 +46,10 @@ pub(crate) fn serve(
         "Offscreen editor {} ready; use scripts/editor.sh. Close with op=close.",
         std::process::id()
     );
+    let mut game: Option<crate::game::Game> = None;
     loop {
         let now = std::time::Instant::now();
-        let event = editor.frame(FrameCtx {
+        let ctx = FrameCtx {
             renderer: &mut renderer,
             overlay: &mut overlay,
             input: &input,
@@ -61,9 +62,33 @@ pub(crate) fn serve(
             dt: 0.1,
             time: started.elapsed().as_secs_f32(),
             cover: None,
-        })?;
-        if matches!(event, Some(Event::Leave)) {
-            return Ok(());
+        };
+        if let Some(current) = &mut game {
+            let leaving = matches!(current.frame(ctx)?, Some(crate::game::GameEvent::Leave));
+            if editor.poll_test(current, &mut renderer) || leaving {
+                game = None;
+                audio.release_world();
+                editor.restore(&mut renderer)?;
+                memory = Default::default();
+            }
+        } else {
+            match editor.frame(ctx)? {
+                Some(Event::Leave) => return Ok(()),
+                Some(Event::Test(start)) => {
+                    editor.prepare_test_renderer(&start.map, &mut renderer)?;
+                    let mut current = crate::game::Game::new(
+                        *start,
+                        editor.blueprints.clone(),
+                        editor.pool.clone(),
+                        editor.camera.viewport,
+                        false,
+                    );
+                    current.editor_camera(editor.camera.clone());
+                    game = Some(current);
+                    memory = Default::default();
+                }
+                _ => {}
+            }
         }
         if editor.reload_requested() {
             editor.begin_reload(target());

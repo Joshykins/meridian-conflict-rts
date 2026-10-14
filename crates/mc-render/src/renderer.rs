@@ -3377,7 +3377,8 @@ impl Renderer {
 
         let mut dead = self.cliff_rocks.dead_props(&frame.props_dead).to_vec();
         dead.resize(self.props_dead.size as usize / 4, 0);
-        self.city_fx.hide_heaps(&frame.props_dead, &mut dead);
+        self.city_fx
+            .hide_heaps(&frame.props_dead, &frame.city, &mut dead);
         self.props_dead.write(0, bytemuck::cast_slice(&dead));
         self.city_fx.set_looks(&frame.city, frame.tick);
 

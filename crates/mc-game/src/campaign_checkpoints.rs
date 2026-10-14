@@ -50,7 +50,7 @@ impl Checkpoint {
             return Err("Checkpoint is too large".into());
         }
         let saved: Self = mc_sim::decode_untrusted(&bytes, limit)?;
-        if saved.version != 2
+        if saved.version != 3
             || saved.map != map.content_id()
             || saved.blueprints != blueprints.content_hash()
             || saved.program != program_hash(&definition)?
@@ -77,7 +77,7 @@ impl Recorder {
         };
         if status.beat > 0 && self.boundary != Some((status.beat, status.checkpoint)) {
             let saved = Checkpoint {
-                version: 2,
+                version: 3,
                 map: world.map.content_id,
                 blueprints: world.blueprints.content_hash(),
                 program: program_hash(

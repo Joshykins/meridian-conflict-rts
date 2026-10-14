@@ -81,6 +81,8 @@ pub(crate) fn cells(prop: &Prop, d: &Doodad, size: FxVec2) -> Option<Vec<crate::
 }
 
 #[cfg(test)]
+mod reclaim_tests;
+#[cfg(test)]
 mod tests;
 
 impl crate::World {

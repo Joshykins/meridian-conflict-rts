@@ -33,7 +33,9 @@ pub const GUTTED: u8 = 2;
 pub const DOWN: u8 = 4;
 /// Flag: listed in [`Structures::touched`].
 const LISTED: u8 = 8;
-const KNOWN_FLAGS: u8 = BURNING | GUTTED | DOWN | LISTED;
+/// Flag: all authored salvage was collected; hide the rubble as well.
+pub const RECLAIMED: u8 = 16;
+const KNOWN_FLAGS: u8 = BURNING | GUTTED | DOWN | LISTED | RECLAIMED;
 
 /// Below this share of its health (thousandths) a structure that burns catches fire.
 pub const BURN_AT_PERMILLE: i64 = 550;
@@ -97,6 +99,8 @@ pub struct Structures {
     pub health: Vec<i32>,
     /// Health whole: the kind's times the square of the prop's scale.
     pub max: Vec<i32>,
+    /// Authored materials still available, including after destruction.
+    pub salvage: Vec<Fx>,
     /// `BURNING`, `GUTTED`, `DOWN`.
     pub flags: Vec<u8>,
     /// The tick its flags last changed: it caught fire, went out or came down.
@@ -126,7 +130,11 @@ impl Structures {
         (self.health[row].max(0) as i64 * 255 / max) as u8
     }
 
-    fn touch(&mut self, row: usize) {
+    pub(crate) fn is_touched(&self, row: usize) -> bool {
+        self.flags[row] & LISTED != 0
+    }
+
+    pub(crate) fn touch(&mut self, row: usize) {
         if self.flags[row] & LISTED == 0 {
             self.flags[row] |= LISTED;
             self.touched.push(row as u32);
@@ -138,7 +146,7 @@ impl Structures {
         let mut s = Structures::default();
         for (i, p) in props.iter().enumerate() {
             let max = if let Some(d) = components.get(&(i as u32)) {
-                if d.health == 0 && d.blocking {
+                if d.health == 0 && (d.blocking || d.reclaim > 0) {
                     i64::from(i32::MAX)
                 } else {
                     i64::from(d.health)
@@ -163,6 +171,9 @@ impl Structures {
             let row = s.prop.len();
             s.prop.push(i as u32);
             s.max.push(max as i32);
+            s.salvage.push(Fx::from_int(
+                components.get(&(i as u32)).map_or(0, |d| d.reclaim as i32),
+            ));
             s.health.push((max - worn) as i32);
             s.flags.push(0);
             s.since.push(0);
@@ -179,6 +190,7 @@ impl Structures {
             let r = row as usize;
             h.write_u64(row as u64 | (self.flags[r] as u64) << 32);
             h.write_u64(self.health[r] as u32 as u64 | (self.since[r] as u64) << 32);
+            h.write_u64(self.salvage[r].0 as u64);
         }
     }
 
@@ -191,6 +203,7 @@ impl Structures {
         if [
             self.health.len(),
             self.max.len(),
+            self.salvage.len(),
             self.flags.len(),
             self.since.len(),
         ]
@@ -212,6 +225,9 @@ impl Structures {
             let (health, max, flags) = (self.health[r], self.max[r], self.flags[r]);
             let down = flags & DOWN != 0;
             if max <= 0
+                || self.salvage[r] < Fx::ZERO
+                || self.salvage[r] > Fx::from_int(1_000_000)
+                || (flags & RECLAIMED != 0 && (!down || self.salvage[r] != Fx::ZERO))
                 || health > max
                 || health < 0
                 || flags & !KNOWN_FLAGS != 0

@@ -330,14 +330,19 @@ impl CityFx {
 
     /// Hides, in `bits` (one per static entity), every rubble heap whose
     /// building still stands (`dead`: the sim's dead props).
-    pub(super) fn hide_heaps(&mut self, dead: &[u32], bits: &mut [u32]) {
+    pub(super) fn hide_heaps(&mut self, dead: &[u32], city: &[StructureView], bits: &mut [u32]) {
         self.dead.clear();
         self.dead.extend_from_slice(dead);
+        let reclaimed: std::collections::BTreeSet<_> = city
+            .iter()
+            .filter(|s| s.flags & mc_sim::city::RECLAIMED != 0)
+            .map(|s| s.prop)
+            .collect();
         for &(entity, prop) in &self.heaps {
             let down = dead
                 .get(prop as usize / 32)
                 .is_some_and(|w| w & (1 << (prop % 32)) != 0);
-            if !down {
+            if !down || reclaimed.contains(&prop) {
                 if let Some(w) = bits.get_mut(entity as usize / 32) {
                     *w |= 1 << (entity % 32);
                 }

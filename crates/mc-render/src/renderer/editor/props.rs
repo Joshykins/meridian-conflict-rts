@@ -106,7 +106,7 @@ impl Renderer {
         let mut hidden = cliffs.dead_props(&[]).to_vec();
         hidden.resize(pending.dead.size as usize / 4, 0);
         if let Some(city) = &mut pending.city {
-            city.hide_heaps(&[], &mut hidden);
+            city.hide_heaps(&[], &[], &mut hidden);
         }
         pending.dead.write(0, bytemuck::cast_slice(&hidden));
         self.gpu.wait_idle();

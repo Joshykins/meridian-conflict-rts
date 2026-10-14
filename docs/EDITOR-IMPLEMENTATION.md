@@ -121,8 +121,23 @@ playable mission, authored and revised through the editor and its API.
   The full gate passed all editor/render/simulation tests; an existing network
   clock timing test failed under concurrent load, then passed alone.
 
+- Authored salvage now uses builder/reclaimer tools, storage limits, beams and
+  area orders. Remaining materials are hashed and restored; collection removes
+  props, rubble and collision. Nine focused regressions pass. Windows/Linux
+  match with salvage in the matrix (every-domain 3c1cff9125b9e53e).
+- Ordinary matches now spawn authored units before the first tick; missions
+  retain staged group spawning. Test/Stop reuses the editor renderer, camera and
+  history, and is available in the offscreen service through the same Game loop.
+- Full gate passes in 230 s. Native salvage beams, the exact 80-material credit,
+  prop/rubble removal, two Test/Stop cycles and exact terrain hash restoration
+  after Undo/Save are verified. Native review caught a missing reclaimed flag
+  in the render mirror; it is fixed and covered by a mirror regression.
+- A terrain-cache regression now covers discarding simulation flattening before
+  reapplying authored overview heights. This final ordering fix awaits the next
+  native build. An intermittent blank minimap occurred in offscreen game
+  captures (one of six probe frames); investigate before final delivery.
+
 ## Still required before final delivery
-- Doodad reclaim collection.
 - Map resize/crop/extend and player configuration.
 - Remaining gizmo/snapping improvements.
 - Propaganda components and encounter balance; human playtest and cinematic review.

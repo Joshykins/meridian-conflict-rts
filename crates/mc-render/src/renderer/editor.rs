@@ -2,6 +2,13 @@
 mod props;
 use super::Renderer;
 impl Renderer {
+    pub fn restore_editor_terrain(
+        &mut self,
+        doc: &mc_map::edit::EditMap,
+    ) -> Result<(), mc_map::MapError> {
+        self.tile_cache
+            .restore_editor(doc, &mut self.upload_scratch)
+    }
     pub fn edit_terrain(
         &mut self,
         document: &mc_map::edit::EditMap,

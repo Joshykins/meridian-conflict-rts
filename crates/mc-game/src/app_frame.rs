@@ -361,7 +361,7 @@ impl App {
                             "Escape: leave match to return to the editor".into(),
                         ))
                     }
-                    None => {}
+                    None | Some(crate::editor::Event::StopTest) => {}
                 }
             }
             Stage::Match(game) => {
@@ -380,7 +380,16 @@ impl App {
                     time,
                     cover: self.curtain.as_mut(),
                 };
-                match game.frame(ctx)? {
+                let game_event = game.frame(ctx)?;
+                let stop_test = self
+                    .editor_return
+                    .as_mut()
+                    .is_some_and(|editor| editor.poll_test(game, renderer));
+                match if stop_test {
+                    Some(GameEvent::Leave)
+                } else {
+                    game_event
+                } {
                     Some(GameEvent::Leave) => {
                         // What was left, and how long it was played.
                         let detail = format!(
@@ -555,7 +564,9 @@ impl App {
             self.apply_settings(settings_changed.1)?;
         }
         if let Some((pending, title, detail)) = next {
-            self.load(pending, title, &detail);
+            if let Some(pending) = self.editor_transition(pending)? {
+                self.load(pending, title, &detail);
+            }
         }
         if quit {
             event_loop.exit();

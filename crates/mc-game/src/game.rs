@@ -2,6 +2,8 @@
 //!
 //! Everything here reads the published render mirror and status; it never
 //! touches the simulation directly. Player intent leaves as `Command`s.
+#[path = "game_editor.rs"]
+mod editor_test;
 #[path = "game_frame.rs"]
 mod frame_view;
 

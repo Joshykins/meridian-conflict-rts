@@ -60,30 +60,57 @@ fn terrain() -> Heightfield {
 fn world(threads: usize) -> World {
     let blueprints =
         Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+    let mut props = city();
+    let salvage_prop = props.len() as u32;
+    props.push(mc_map::Prop {
+        kind: mc_map::PropKind::CityBillboard,
+        pos: FxVec2::from_ints(100, 3650),
+        heading: Angle::ZERO,
+        scale_milli: 1000,
+        wear_milli: 0,
+    });
     let map = MapData {
-        doodads: [(
-            0,
-            mc_map::placed::Doodad {
-                id: 1,
-                name: "matrix_billboard".into(),
-                prop_index: 0,
-                tint: [255; 3],
-                blocking: true,
-                health: 1400,
-                reclaim: 0,
-                footprint: Some(mc_map::placed::Footprint {
-                    half: FxVec2::from_ints(12, 3),
-                    height: Fx::from_int(15),
-                }),
-            },
-        )]
+        doodads: [
+            (
+                0,
+                mc_map::placed::Doodad {
+                    id: 1,
+                    name: "matrix_billboard".into(),
+                    prop_index: 0,
+                    tint: [255; 3],
+                    blocking: true,
+                    health: 1400,
+                    reclaim: 0,
+                    footprint: Some(mc_map::placed::Footprint {
+                        half: FxVec2::from_ints(12, 3),
+                        height: Fx::from_int(15),
+                    }),
+                },
+            ),
+            (
+                salvage_prop,
+                mc_map::placed::Doodad {
+                    id: 2,
+                    name: "matrix_salvage".into(),
+                    prop_index: salvage_prop,
+                    tint: [255; 3],
+                    blocking: true,
+                    health: 0,
+                    reclaim: 10_000,
+                    footprint: Some(mc_map::placed::Footprint {
+                        half: FxVec2::from_ints(8, 3),
+                        height: Fx::from_int(10),
+                    }),
+                },
+            ),
+        ]
         .into_iter()
         .collect(),
         name: "determinism".into(),
         content_id: 1,
         ore: Vec::new(),
         starts: vec![FxVec2::from_ints(800, 500), FxVec2::from_ints(800, 3600)],
-        props: city(),
+        props,
     };
     let player = |name: &str, team| PlayerSetup {
         name: name.into(),
@@ -375,6 +402,18 @@ fn setup(w: &mut World) {
             blueprint: w.blueprints.id_of("aster_t2_tank").unwrap(),
             pos: WRECK_FIELD,
             count: 9,
+        },
+    });
+    spawns.push(PlayerCommand {
+        player: 1,
+        command: Command::DebugSpawn {
+            owner: 1,
+            blueprint: w.blueprints.id_of("aster_t2_reclaimer").unwrap(),
+            pos: FxVec2::from_ints(100, 3600),
+            heading: Angle::ZERO,
+            count: 1,
+            flags: 0,
+            build: 1000,
         },
     });
     w.tick(&spawns).unwrap();
@@ -1129,6 +1168,11 @@ fn reference() -> Vec<u64> {
     assert!(
         !w.is_prop_alive(0),
         "the authored billboard survived the warhead"
+    );
+    let salvage = w.state.city.salvage.last().unwrap();
+    assert!(
+        *salvage < Fx::from_int(10_000),
+        "authored salvage was never collected"
     );
     // The factory's scouts formed up, waited across the snapshot and left together.
     assert!(held_at_snapshot > 0, "no batch was waiting at the snapshot");

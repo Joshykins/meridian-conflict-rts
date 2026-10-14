@@ -1191,6 +1191,14 @@ impl World {
                 "snapshot is from a different match".into(),
             ));
         }
+        for (row, &prop) in state.city.prop.iter().enumerate() {
+            let total = Fx::from_int(self.map.doodads.get(&prop).map_or(0, |d| d.reclaim as i32));
+            if state.city.salvage[row] > total
+                || (state.city.salvage[row] != total && !state.city.is_touched(row))
+            {
+                return Err(SimError::Snapshot("invalid doodad salvage".into()));
+            }
+        }
         if let Some(mission) = &state.mission {
             mission
                 .definition
