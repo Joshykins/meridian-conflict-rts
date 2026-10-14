@@ -346,20 +346,21 @@ pub(super) fn draw(ui: &mut Ui, field: &Field, placing: Option<(BlueprintId, Vec
     let team = if site.is_some() {
         team_of(view.local)
     } else {
+        // The blueprint first: few units are arrays, and the selection is looked up
+        // only for those.
         view.frame
             .units
             .iter()
             .filter(|u| {
-                view.selection.contains(&u.unit_id) && u.owner_flags & STATE_UNIDENTIFIED == 0
+                u.owner_flags & STATE_UNIDENTIFIED == 0
+                    && field
+                        .blueprints
+                        .unit(BlueprintId(u.blueprint as u16))
+                        .strategic
+                        .as_ref()
+                        .is_some_and(|s| s.kind == StrategicKind::Interceptor)
             })
-            .find(|u| {
-                field
-                    .blueprints
-                    .unit(BlueprintId(u.blueprint as u16))
-                    .strategic
-                    .as_ref()
-                    .is_some_and(|s| s.kind == StrategicKind::Interceptor)
-            })
+            .find(|u| view.selection.contains(&u.unit_id))
             .and_then(|u| team_of(owner_of(u)))
     };
     let Some(team) = team else { return };

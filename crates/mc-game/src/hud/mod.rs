@@ -258,7 +258,7 @@ impl Scene<'_> {
         if u.owner_flags & (KIND_WRECK | KIND_GHOST | KIND_PROP) != 0 {
             return None;
         }
-        crate::sim_thread::queue_of(&self.view.status.queues, u.unit_id)
+        self.view.queue(u.unit_id)
     }
 
     /// What `owner` is paid of its income, `[materials, energy]` as factors
@@ -365,6 +365,9 @@ pub struct Hud {
     /// What the deck showed when the details card was last looked at: another
     /// selection (or coming back to the same one) closes the card.
     details_for: Option<Vec<u32>>,
+    /// What the deck works out from many units, kept for as long as they and the frame
+    /// stay the same (`selection/kept.rs`).
+    kept: selection::Kept,
     /// The construction keys are live (B): digits pick a tier, Q..Y a shelf, A..L an item on it.
     pub build_keys: bool,
     /// A construction key pressed since the last frame, for the panel to act on.
@@ -732,16 +735,11 @@ impl Hud {
         drop(part);
         let part = mc_core::perf_span!("ui.hud.deck");
         let deck_prep = mc_core::perf_span!("ui.deck_prep");
-        let selected: Vec<&UnitInstance> = view
-            .selection
-            .iter()
-            .filter_map(|id| view.index_of.get(id))
-            .map(|&i| &view.frame.units[i])
-            .collect();
+        // Found in the frame once per tick and selection (`unit_rows.rs`).
+        let selected: Vec<&UnitInstance> = view.picked_units();
+        let stamp = view.picked().stamp();
         let hovered = s.hover.and_then(|id| {
-            view.index_of
-                .get(&id)
-                .map(|&i| &view.frame.units[i])
+            view.unit(id)
                 .filter(|u| u.owner_flags & (KIND_WRECK | STATE_UNIDENTIFIED) == 0)
         });
         let ours = selected
@@ -759,25 +757,42 @@ impl Hud {
         // The deck slides up and fades in when something is picked, back down when
         // nothing is, and dips briefly when the selection becomes something else.
         // By unit, not loadout: a finished refit is still the same selection.
-        let mut kinds: Vec<u32> = units
-            .iter()
-            .map(|u| s.blueprints.base_of(BlueprintId(u.blueprint as u16)).0 as u32)
+        let blueprints = if selected.is_empty() {
+            units.iter().map(|u| u.blueprint).collect()
+        } else {
+            view.picked().kinds().to_vec()
+        };
+        let mut kinds: Vec<u32> = (blueprints.into_iter())
+            .map(|bp| s.blueprints.base_of(BlueprintId(bp as u16)).0 as u32)
             .collect();
         kinds.sort_unstable();
         kinds.dedup();
         let deck_id = id("hud-deck", 0);
-        let showing: Vec<u32> = units.iter().map(|u| u.unit_id).collect();
-        if self.details_for.as_ref().is_some_and(|was| *was != showing) {
-            self.details_open = false;
-            ui.snap(id("unit-details-card", 0), 0.0);
+        // The units shown are looked at again only when they may have changed: the same
+        // stamp is the same selection found in the same frame.
+        let shown_now = (!selected.is_empty()).then_some(stamp);
+        if shown_now.is_none() || self.kept.compared != shown_now {
+            self.kept.compared = shown_now;
+            let showing = units.iter().map(|u| u.unit_id);
+            let same =
+                (self.details_for.as_ref()).map(|was| was.iter().copied().eq(showing.clone()));
+            if same == Some(false) {
+                self.details_open = false;
+                ui.snap(id("unit-details-card", 0), 0.0);
+            }
+            if same != Some(true) {
+                self.details_for = Some(showing.clone().collect());
+            }
+            if !units.is_empty() && !self.deck_units.iter().copied().eq(showing.clone()) {
+                self.deck_units = showing.collect();
+                self.kept.closing += 1;
+            }
         }
-        self.details_for = Some(showing);
         if !units.is_empty() {
             if !self.deck_units.is_empty() && kinds != self.deck_kinds {
                 let now = ui.ease(deck_id, 1.0, 0.0);
                 ui.snap(deck_id, now.min(0.85));
             }
-            self.deck_units = units.iter().map(|u| u.unit_id).collect();
             self.deck_kinds = kinds;
             self.deck_inspect = inspect_only;
         }
@@ -788,19 +803,28 @@ impl Hud {
             ui.ease(deck_id, 1.0, 36.0)
         };
         let closing = units.is_empty();
+        // What is worked out from the units is kept while they and the frame stay the
+        // same (`selection/kept.rs`); for the unit under the pointer it is not. Never
+        // before the first pull: a deck drawn by hand (tests) changes its frame in place.
+        let mut shown = (!selected.is_empty()).then_some(selection::Shown::Selection(stamp));
         let units: Vec<&UnitInstance> = if closing && deck_k > 0.01 {
             inspect_only = self.deck_inspect;
+            shown = Some(selection::Shown::Closing {
+                pulls: view.pulls(),
+                units: self.kept.closing,
+            });
             self.deck_units
                 .iter()
-                .filter_map(|id| view.index_of.get(id))
-                .map(|&i| &view.frame.units[i])
+                .filter_map(|&id| view.unit(id))
                 .collect()
         } else {
-            if closing {
+            if closing && !self.deck_units.is_empty() {
                 self.deck_units.clear();
+                self.kept.closing += 1;
             }
             units
         };
+        self.kept.show(shown.filter(|_| view.pulls() > 0));
         let (fade, shift, live) = (ui.fade, ui.shift, ui.interactive);
         ui.fade *= deck_k;
         ui.shift.y += (1.0 - deck_k) * 36.0;
@@ -825,13 +849,19 @@ impl Hud {
                 let orders = Rect::new(
                     x,
                     deck_y,
-                    selection::orders_width(selection::order_families(s, &units)),
+                    selection::orders_width(selection::card_families(self, s, &units)),
                     DECK_H,
                 );
                 selection::orders(self, ui, s, &units, orders);
                 x = orders.right() + GAP;
+                // Which of the panels below are for this selection, and the units they are
+                // for: kept like the order card.
+                let panels = self.kept.panels(s, &units);
+                let unit = |id: u32| units.iter().copied().find(|u| u.unit_id == id);
                 // A nuclear silo's or an interceptor array's rounds and launch (`silo.rs`).
-                if let Some((launcher, l)) = silo::launcher_of(s, &units) {
+                if let Some((launcher, l)) =
+                    (panels.launcher).and_then(|(id, l)| Some((unit(id)?, l)))
+                {
                     let pw = silo::WIDTH.min(w - EDGE - x);
                     if pw > 200.0 {
                         silo::panel(self, ui, s, launcher, &l, Rect::new(x, deck_y, pw, DECK_H));
@@ -841,7 +871,9 @@ impl Hud {
                 // A tier-5 titan's great bore and its strike (`titan.rs`).
                 // A dasher's dash and its button in the same place (`dash.rs`), and a
                 // ship's Edict (`edict.rs`).
-                if let Some((titan, count)) = titan::titan_of(s, &units) {
+                if let Some((titan, count)) =
+                    (panels.titan).and_then(|(id, n)| Some((unit(id)?, n)))
+                {
                     let pw = titan::WIDTH.min(w - EDGE - x);
                     if pw > 220.0 {
                         let r = Rect::new(x, deck_y, pw, DECK_H);
@@ -856,7 +888,9 @@ impl Hud {
                     }
                 }
                 // A gravitic engine's well and its fracture button there too (`gravitic.rs`).
-                if let Some((engine, count)) = gravitic::engine_of(s, &units) {
+                if let Some((engine, count)) =
+                    (panels.engine).and_then(|(id, n)| Some((unit(id)?, n)))
+                {
                     let pw = titan::WIDTH.min(w - EDGE - x);
                     if pw > 220.0 {
                         let r = Rect::new(x, deck_y, pw, DECK_H);
@@ -867,7 +901,9 @@ impl Hud {
                 // A space elevator's crates and next payload, beside its build menu
                 // (`elevator.rs`): the menu keeps its room first, so on a narrow screen the
                 // panel shrinks, and then goes.
-                if let Some((lift, v, count)) = elevator::elevator_of(s, &units) {
+                if let Some((lift, v, count)) =
+                    (panels.elevator).and_then(|(id, v, n)| Some((unit(id)?, v, n)))
+                {
                     let pw = elevator::width_for(w - EDGE - x);
                     if pw > 0.0 {
                         let r = Rect::new(x, deck_y, pw, DECK_H);
@@ -876,7 +912,9 @@ impl Hud {
                     }
                 }
                 // A lift ship's hold, where a builder's construction panel goes.
-                if let Some((ship, view)) = cargo::ship_of(s, &units) {
+                if let Some((ship, view)) =
+                    (panels.ship.as_ref()).and_then(|(id, v)| Some((unit(*id)?, v)))
+                {
                     let hold_w = cargo::width(w - EDGE - x);
                     if hold_w > 0.0 {
                         cargo::panel(
@@ -884,7 +922,7 @@ impl Hud {
                             ui,
                             s,
                             ship.unit_id,
-                            &view,
+                            view,
                             Rect::new(x, deck_y, hold_w, DECK_H),
                         );
                         x += hold_w + GAP;
@@ -904,7 +942,7 @@ impl Hud {
         drop(part);
         let _part = mc_core::perf_span!("ui.hud.after");
         if let Some(u) = hovered {
-            if !selected.iter().any(|s| s.unit_id == u.unit_id) && !selected.is_empty() {
+            if !view.selection.contains(&u.unit_id) && !selected.is_empty() {
                 // Not claimed, like the deck shown for a hover (above).
                 let top = deck_y - 40.0 - DECK_H;
                 selection::hover_card(self, ui, s, u, Rect::new(EDGE, top, 336.0, DECK_H));

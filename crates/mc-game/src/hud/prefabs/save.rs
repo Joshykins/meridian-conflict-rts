@@ -20,12 +20,15 @@ pub(in crate::hud) fn can_save(s: &Scene, units: &[&UnitInstance]) -> bool {
             && s.bp(u).built_on_site()
             && !s.bp(u).is_mobile()
     });
-    structures
-        || s.view
-            .status
-            .plans
-            .iter()
-            .any(|p| units.iter().any(|u| u.unit_id == p.unit_id))
+    if structures || s.view.status.plans.is_empty() {
+        return structures;
+    }
+    // Who holds a plan, looked up by each unit: not every unit for each plan.
+    let mut planners: Vec<u32> = s.view.status.plans.iter().map(|p| p.unit_id).collect();
+    planners.sort_unstable();
+    units
+        .iter()
+        .any(|u| planners.binary_search(&u.unit_id).is_ok())
 }
 
 /// The button in `r`, filled with the accent so it stands out from the card.

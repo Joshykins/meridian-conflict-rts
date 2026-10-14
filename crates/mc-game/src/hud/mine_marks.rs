@@ -453,7 +453,7 @@ pub(super) fn mine_marks(ui: &mut Ui, s: &Scene, survey: &mut Survey) {
         .frame
         .units
         .iter()
-        .filter(|u| s.view.selection.contains(&u.unit_id) && s.bp(u).mine.is_some())
+        .filter(|u| s.bp(u).mine.is_some() && s.view.selection.contains(&u.unit_id))
         .map(|u| u.unit_id)
         .collect();
     // A builder with a mine still to start in its queue brings the survey up
@@ -463,9 +463,12 @@ pub(super) fn mine_marks(ui: &mut Ui, s: &Scene, survey: &mut Survey) {
         .status
         .queues
         .iter()
-        .filter(|q| s.view.selection.contains(&q.unit_id))
-        .flat_map(|q| &q.orders)
-        .any(|o| o.kind == OrderKind::Build && s.blueprints.unit(o.blueprint).mine.is_some());
+        .filter(|q| {
+            q.orders.iter().any(|o| {
+                o.kind == OrderKind::Build && s.blueprints.unit(o.blueprint).mine.is_some()
+            })
+        })
+        .any(|q| s.view.selection.contains(&q.unit_id));
     if placing.is_none() && selected.is_empty() && !ordering && !s.show_reclaim {
         return;
     }

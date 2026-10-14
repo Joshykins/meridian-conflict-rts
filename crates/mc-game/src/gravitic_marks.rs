@@ -46,11 +46,7 @@ pub fn draw(ui: &mut Ui, field: &Field, cursor: Option<Vec3>) {
     let Some(at) = cursor.map(|c| c.truncate()) else {
         return;
     };
-    let engines: Vec<(Vec2, &Gravitic)> = view
-        .selection
-        .iter()
-        .filter_map(|id| view.index_of.get(id))
-        .map(|&i| &view.frame.units[i])
+    let engines: Vec<(Vec2, &Gravitic)> = (view.picked_units().into_iter())
         .filter(|u| (u.owner_flags & 0xFF) as u8 == view.local)
         .filter_map(|u| {
             let g = gravitic_of(field, BlueprintId(u.blueprint as u16))?;

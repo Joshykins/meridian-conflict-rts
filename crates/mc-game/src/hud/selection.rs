@@ -19,6 +19,7 @@ use mc_sim::{veterancy_health, FireState, VETERANCY_MAX};
 
 mod details;
 mod formation;
+mod kept;
 mod pause_order;
 mod repeat_order;
 mod shaper;
@@ -26,6 +27,7 @@ mod status;
 
 use details::details_card;
 use formation::formation_panel;
+pub(super) use kept::{Kept, Shown};
 pub use repeat_order::repeat_site;
 use status::status_page;
 
@@ -230,35 +232,24 @@ pub fn info(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
         single(hud, ui, s, u, r, strip);
         return;
     }
+    // Worked out once per tick and selection (`kept.rs`).
+    let sum = hud.kept.summary(s, units);
     // A lift ship with units picked out of its hold: the ship's panel stays up,
     // its hold showing which are picked.
-    let bases: Vec<&&UnitInstance> = units
-        .iter()
-        .filter(|u| s.bp(u).transport.is_some())
-        .collect();
-    if let [base] = bases[..] {
-        if units
-            .iter()
-            .all(|u| u.unit_id == base.unit_id || u.stored())
-        {
-            single(hud, ui, s, base, r, strip);
-            return;
-        }
+    if let Some(base) = sum
+        .base
+        .and_then(|id| units.iter().find(|u| u.unit_id == id))
+    {
+        single(hud, ui, s, base, r, strip);
+        return;
     }
 
     // Many units: a tile per type, most numerous first.
-    let mut types: Vec<(u32, Vec<u32>)> = Vec::new();
-    for u in units {
-        match types.iter_mut().find(|(bp, _)| *bp == u.blueprint) {
-            Some((_, ids)) => ids.push(u.unit_id),
-            None => types.push((u.blueprint, vec![u.unit_id])),
-        }
-    }
-    types.sort_by_key(|(bp, ids)| (std::cmp::Reverse(ids.len()), *bp));
+    let types = &sum.types;
     // Structures of the player's own (or builders' plans) can be kept as a prefab: the
     // button closes the heading.
     let mut right = x + cw;
-    if super::prefabs::can_save(s, units) {
+    if sum.can_save {
         let w = super::prefabs::SAVE_W;
         super::prefabs::save_button(hud, ui, Rect::new(right - w, r.y + 9.0, w, 22.0));
         right -= w + 12.0;
@@ -271,12 +262,7 @@ pub fn info(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
     );
     // Its record, right of the heading, only once there is one: kills, then what its
     // reclaimers have brought in between them.
-    let kills: u32 = units.iter().map(|u| u.kill_count()).sum();
-    let reclaimed: f32 = units
-        .iter()
-        .filter(|u| s.bp(u).sends_reclaimers())
-        .filter_map(|u| s.queue_of(u).map(|q| q.reclaimed))
-        .sum();
+    let (kills, reclaimed) = (sum.kills, sum.reclaimed);
     if kills > 0 {
         let kills = format!("{kills} kill{}", if kills == 1 { "" } else { "s" });
         ui.text_right(
@@ -297,7 +283,7 @@ pub fn info(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
             &format!("{} materials reclaimed", whole(reclaimed)),
         );
     }
-    let health: f32 = units.iter().map(|u| u.health).sum::<f32>() / units.len() as f32;
+    let health = sum.health;
     bar(
         ui,
         Rect::new(x, r.y + 32.0, cw, 4.0),
@@ -306,16 +292,11 @@ pub fn info(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
     );
     // The aircraft among them: the emptiest tank, under the health bar, since that one
     // sets how far the group can go.
-    let low = units
-        .iter()
-        .filter_map(|u| mc_sim::mirror::FuelView::of(&s.view.frame.fuel, u.unit_id))
-        .map(|f| f.fill.clamp(0.0, 1.0))
-        .reduce(f32::min);
-    if let Some(low) = low {
+    if let Some(low) = sum.low_fuel {
         bar(ui, Rect::new(x, r.y + 38.0, cw, 3.0), low, fuel_tone(low));
     }
     // What the whole selection makes and spends, in the same strip as for one unit.
-    let (materials, energy) = super::economy::total(s, units);
+    let (materials, energy) = sum.economy;
     let economy = super::economy::strip(
         ui,
         materials,
@@ -325,8 +306,8 @@ pub fn info(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
     let top = if economy { r.y + 76.0 } else { r.y + 48.0 };
 
     // A selection of core mines only: their investment and one feed for all of them.
-    let mines = super::mine::views(s, units);
-    if !mines.is_empty() && mines.len() == units.len() {
+    if sum.all_mines {
+        let mines = super::mine::views(s, units);
         super::mine::panel(ui, s, &mines, Rect::new(x, top, cw, super::mine::HEIGHT));
         return;
     }
@@ -334,15 +315,15 @@ pub fn info(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
     let (tw, th, gap, per_row) = (56.0, 64.0, 6.0, 5);
     let rows = if economy { 1 } else { 2 };
     let shown = types.len().min(per_row * rows);
-    for (i, (bp_id, ids)) in types.iter().take(shown).enumerate() {
-        let bp = s.blueprints.unit(mc_data::BlueprintId(*bp_id as u16));
+    for (i, &(bp_id, count, paused)) in types.iter().take(shown).enumerate() {
+        let bp = s.blueprints.unit(mc_data::BlueprintId(bp_id as u16));
         let tr = Rect::new(
             x + (i % per_row) as f32 * (tw + gap),
             top + (i / per_row) as f32 * (th + gap),
             tw,
             th,
         );
-        let t = hud.tile(ui, id("sel-type", *bp_id as usize), tr, false, true);
+        let t = hud.tile(ui, id("sel-type", bp_id as usize), tr, false, true);
         let art = Rect::new(tr.x + 1.0, tr.y + 1.0, tr.w - 2.0, 48.0);
         domain_wash(ui, art, Domain::of(bp), t.glow);
         if !hud.thumbs.draw(
@@ -366,24 +347,20 @@ pub fn info(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
             tr.bottom() - 11.0,
             type_scale::VALUE,
             rgb(0xFFFFFF, 1.0),
-            &ids.len().to_string(),
+            &count.to_string(),
         );
         // Some of this type paused: the pause mark in the corner.
-        if units.iter().any(|u| u.blueprint == *bp_id && u.paused()) {
+        if paused {
             super::build::pause_mark(ui, Vec2::new(tr.right() - 10.0, tr.y + 10.0), 14.0);
         }
         if t.clicked {
             ui.audio.play(Sfx::Select);
             // Click keeps only this type; shift-click drops it.
-            let keep: Vec<u32> = if s.view.shift {
-                units
-                    .iter()
-                    .filter(|u| u.blueprint != *bp_id)
-                    .map(|u| u.unit_id)
-                    .collect()
-            } else {
-                ids.clone()
-            };
+            let keep: Vec<u32> = units
+                .iter()
+                .filter(|u| (u.blueprint == bp_id) != s.view.shift)
+                .map(|u| u.unit_id)
+                .collect();
             hud.actions.push(HudAction::Select {
                 units: keep,
                 focus: false,
@@ -985,6 +962,7 @@ pub fn hover_card(hud: &Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect) 
     ui.interactive = live;
 }
 
+#[derive(Clone)]
 struct Order {
     glyph: Glyph,
     label: &'static str,
@@ -1010,10 +988,17 @@ pub fn ordered_as<'a>(
 /// What the selection can do, family by family. A family nobody selected can
 /// use is left off the card; so is any order in it that nobody can carry out.
 /// A factory offers what its products can do: they are the ones who will do it.
-fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
-    let bps: Vec<&UnitBlueprint> = units
+/// `kinds` are the units' blueprints, each once (`kept::kinds_of`): what only a blueprint
+/// decides is asked of those, not of every unit.
+fn families(s: &Scene, units: &[&UnitInstance], kinds: &[u32]) -> Vec<(Family, Vec<Order>)> {
+    let kinds: Vec<&UnitBlueprint> = kinds
         .iter()
-        .flat_map(|u| ordered_as(s.blueprints, s.bp(u)))
+        .map(|&k| s.blueprints.unit(mc_data::BlueprintId(k as u16)))
+        .collect();
+    let has = |test: &dyn Fn(&UnitBlueprint) -> bool| kinds.iter().any(|bp| test(bp));
+    let bps: Vec<&UnitBlueprint> = kinds
+        .iter()
+        .flat_map(|bp| ordered_as(s.blueprints, bp))
         .collect();
     let mobile = bps.iter().any(|b| b.is_mobile());
     let air = bps
@@ -1026,7 +1011,7 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
             .any(|w| w.target_mask & (cat::LAND | cat::NAVAL | cat::STRUCTURE) != 0)
     });
     let builders = bps.iter().any(|b| b.works_in_field());
-    let reclaimers = units.iter().any(|u| s.bp(u).sends_reclaimers());
+    let reclaimers = has(&|b| b.sends_reclaimers());
     let targeting = |t: Targeting| s.view.mode == Mode::Target(t);
     // A selection of only aircraft that orbit (the Argus) calls its guard an Orbit.
     let orbiters = mobile
@@ -1041,10 +1026,20 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
         Order { glyph: Glyph::Guard, label: "Guard", key: "", hint: "Guard (Ctrl+G): press on a spot, or on a friendly unit to go with it, and drag out the ring. These units are stationed there: they hold it and go after enemies that come in. Aircraft circle it halfway out, a group in formation. Shift queues; shift-drag the centre to move it. Any other order takes a unit off.", action: HudAction::Target(Targeting::Guard), lit: targeting(Targeting::Guard) }
     };
     // Whether most of the armed selection holds its fire.
-    let holding_fire = {
+    let holding_fire = armed && {
         let (mut held, mut n) = (0usize, 0usize);
+        // Units come in runs of one blueprint: each run's is looked at once.
+        let mut run: Option<(u32, bool)> = None;
         for u in units {
-            if ordered_as(s.blueprints, s.bp(u)).any(|b| !b.weapons.is_empty()) {
+            let shoots = match run {
+                Some((bp, shoots)) if bp == u.blueprint => shoots,
+                _ => {
+                    let shoots = ordered_as(s.blueprints, s.bp(u)).any(|b| !b.weapons.is_empty());
+                    run = Some((u.blueprint, shoots));
+                    shoots
+                }
+            };
+            if shoots {
                 n += 1;
                 held += usize::from(u.fire_state() == FireState::HoldFire);
             }
@@ -1066,14 +1061,14 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
         movement.push(Order { glyph: Glyph::Patrol, label: "Patrol", key: "P", hint: "Click a point: the group patrols out to it and back, in formation. Hold shift to add more posts: over a patrol already flown, each goes into the leg nearest the pointer. Shift-drag a post to move it, right-click one to drop it.", action: HudAction::Target(Targeting::Patrol), lit: targeting(Targeting::Patrol) });
     }
     // Capital ships with a warp drive jump: charge off the grid, then out and back in.
-    if units.iter().any(|u| s.bp(u).warp.is_some()) {
+    if has(&|b| b.warp.is_some()) {
         movement.push(Order { glyph: Glyph::Warp, label: "Warp", key: "O", hint: "Warp (O): click a point. Each ship stops, charges its drive off the grid (a big draw for a few seconds; slower while energy runs short) and jumps, as far as its drive reaches toward the point. The pointer shows the energy the jump takes. An enemy dampener's field drags a jump into it and throws the ship out hurt and stunned. The drive then recharges.", action: HudAction::Target(Targeting::Warp), lit: targeting(Targeting::Warp) });
     }
     // Unarmed aircraft have no stances; they still circle on guard, as scouts and pickets.
     if air && !armed {
         movement.push(guard());
     }
-    if units.iter().any(|u| s.bp(u).is_mobile()) && units.len() > 1 {
+    if has(&|b| b.is_mobile()) && units.len() > 1 {
         movement.push(Order {
             glyph: Glyph::Formation,
             label: "Formation",
@@ -1135,12 +1130,20 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
     }
     // A lift ship loads (sets down, ramp lowered), unloads, or once down lifts off:
     // a column of its own, keys shown (a leading shift mark is Shift+key).
-    let lifts: Vec<_> = units
-        .iter()
-        .filter(|u| s.bp(u).transport.is_some())
-        .collect();
+    let lifts: Vec<_> = if has(&|b| b.transport.is_some()) {
+        units
+            .iter()
+            .filter(|u| s.bp(u).transport.is_some())
+            .collect()
+    } else {
+        Vec::new()
+    };
     // Any other capital ship only sets down or lifts off, and only when told to.
-    let landers: Vec<_> = units.iter().filter(|u| s.bp(u).is_capital_ship()).collect();
+    let landers: Vec<_> = if has(&|b| b.is_capital_ship()) {
+        units.iter().filter(|u| s.bp(u).is_capital_ship()).collect()
+    } else {
+        Vec::new()
+    };
     if lifts.is_empty() && !landers.is_empty() {
         let down = landers.iter().any(|u| u.set_down());
         let mut land = vec![
@@ -1199,7 +1202,11 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
         });
     }
     // Submarines dive and surface: the button says which way the selection will go.
-    let subs = units.iter().filter(|u| s.bp(u).dive.is_some()).count();
+    let subs = if has(&|b| b.dive.is_some()) {
+        units.iter().filter(|u| s.bp(u).dive.is_some()).count()
+    } else {
+        0
+    };
     if subs > 0 {
         let down = units
             .iter()
@@ -1212,9 +1219,13 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
         });
     }
     // Builders, factories and anything that upgrades can pause their work.
-    work.extend(pause_order::pause_order(s, units));
+    if has(&|b| mc_sim::pause::pausable(s.blueprints, b)) {
+        work.extend(pause_order::pause_order(s, units));
+    }
     // A unit raised on its own lot can be raised there again and again.
-    work.extend(repeat_order::repeat_order(s, units));
+    if has(&|b| b.is_site_built_unit()) {
+        work.extend(repeat_order::repeat_order(s, units));
+    }
     work.push(Order { glyph: Glyph::Stop, label: "Stop", key: "X",
  hint: "Drop every order. A factory clears its queue and forgets the orders it hands its units.", action: HudAction::Stop, lit: false });
     out.push((
@@ -1228,25 +1239,31 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
     out
 }
 
-/// How many families the order card will show, for laying out the deck.
+/// How many families the order card will show.
+#[cfg(test)]
 pub fn order_families(s: &Scene, units: &[&UnitInstance]) -> usize {
+    families(s, units, &kept::kinds_of(units)).len()
+}
+
+/// How many families the deck's order card shows, for laying out the deck.
+pub fn card_families(hud: &mut Hud, s: &Scene, units: &[&UnitInstance]) -> usize {
     let _t = mc_core::perf_span!("ui.order_families");
-    families(s, units).len()
+    hud.kept.card(s, units).len()
 }
 
 pub fn orders(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: Rect) {
     let _t = mc_core::perf_span!("ui.selection_orders");
     hud.glass(ui, r);
     let x = r.x + 14.0;
-    let card = families(s, units);
-    let mobile = units.iter().any(|u| s.bp(u).is_mobile());
+    let card = hud.kept.card(s, units);
+    let mobile = hud.kept.any_kind(s, units, |b| b.is_mobile());
 
     if mobile && units.len() > 1 && s.view.formation_panel {
         formation_panel(hud, ui, s, r);
     }
 
     let mut hint = None;
-    let priority = super::priority::Mix::of(s, units);
+    let priority = hud.kept.mix(s, units);
     for (col, (family, orders)) in card.iter().enumerate() {
         let tone = family.tone();
         let cx = x + col as f32 * (ORDER_W + ORDER_GAP);

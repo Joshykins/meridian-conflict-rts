@@ -204,6 +204,9 @@ pub struct View {
     pub status: SimStatus,
     /// Unit id -> index in `frame.units`.
     pub index_of: HashMap<u32, usize>,
+    /// `index_of` and the queues by handle row, and the selection found in the frame
+    /// once per pull (`unit_rows.rs`).
+    pub rows: crate::unit_rows::Rows,
     pub selection: crate::selected::Selection,
     pub mode: Mode,
     pub formation_panel: bool,
@@ -261,6 +264,7 @@ impl View {
             frame: RenderFrame::default(),
             status: SimStatus::default(),
             index_of: HashMap::new(),
+            rows: Default::default(),
             selection: Default::default(),
             mode: Mode::Normal,
             formation_panel: false,
@@ -3130,6 +3134,13 @@ impl Game {
                 self.view.index_of.insert(u.unit_id, i);
             }
         }
+        let View {
+            rows,
+            frame,
+            status,
+            ..
+        } = &mut self.view;
+        rows.rebuild(&frame.units, &status.queues, &frame.fuel);
         let index_of = &self.view.index_of;
         let (units, blueprints) = (&self.view.frame.units, &self.blueprints);
         let selectable = |id: &u32| {

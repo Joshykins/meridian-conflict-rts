@@ -995,13 +995,14 @@ pub fn draw(ui: &mut Ui, field: &Field, alpha: f32, cursor: Option<Vec3>) {
     }
 
     // ---- titans selected ----------------------------------------------------------------
-    let picked: Vec<&UnitInstance> = view
-        .selection
-        .iter()
-        .filter_map(|id| view.index_of.get(id))
-        .map(|&i| &view.frame.units[i])
-        .filter(|u| is_titan(bp_of(field.blueprints, u)))
-        .collect();
+    // Asked of the selection's blueprints first: a sky of fighters has no titan.
+    let picked: Vec<&UnitInstance> = if view.picks_any(|bp| is_titan(field.blueprints.unit(bp))) {
+        (view.picked_units().into_iter())
+            .filter(|u| is_titan(bp_of(field.blueprints, u)))
+            .collect()
+    } else {
+        Vec::new()
+    };
     for u in &picked {
         frame(ui, field, u, alpha, true);
         reach_labels(ui, field, u, alpha);

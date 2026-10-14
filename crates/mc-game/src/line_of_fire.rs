@@ -80,10 +80,15 @@ pub fn draw_hover(ui: &mut Ui, field: &Field, target: usize) {
     let tb = blueprints.unit(BlueprintId(t.blueprint as u16));
     let aim = Vec3::from(t.pos);
     let (mut in_range, mut hidden) = (0, 0);
-    for id in &view.selection {
-        let Some(u) = view.index_of.get(id).map(|&i| &view.frame.units[i]) else {
-            continue;
-        };
+    // Only units with a flat gun can be hidden: a sky of fighters has none.
+    let flat = |bp: BlueprintId| {
+        let ub = blueprints.unit(bp);
+        ub.weapons.iter().any(|w| needs_line(ub, w))
+    };
+    if !view.picks_any(flat) {
+        return;
+    }
+    for u in view.picked_units() {
         let ub = blueprints.unit(BlueprintId(u.blueprint as u16));
         let gap = Vec2::from([u.pos[0], u.pos[1]]).distance(aim.truncate()) - t.radius;
         let guns: Vec<&Weapon> = ub

@@ -64,11 +64,7 @@ pub fn draw(ui: &mut Ui, field: &Field, cursor: Option<Vec3>) {
     let Some(at) = cursor.map(|c| c.truncate()) else {
         return;
     };
-    let ships: Vec<(Vec2, Vec2, f32, &Edict)> = view
-        .selection
-        .iter()
-        .filter_map(|id| view.index_of.get(id))
-        .map(|&i| &view.frame.units[i])
+    let ships: Vec<(Vec2, Vec2, f32, &Edict)> = (view.picked_units().into_iter())
         .filter(|u| (u.owner_flags & 0xFF) as u8 == view.local)
         .filter_map(|u| {
             let bp = field.blueprints.unit(BlueprintId(u.blueprint as u16));

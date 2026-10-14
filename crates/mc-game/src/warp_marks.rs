@@ -72,11 +72,14 @@ pub fn jumps(field: &Field, mark: Vec2, alpha: f32) -> Vec<Jump> {
     let view = field.view;
     let size = field.map.info().size_metres();
     let size = Vec2::new(size.x.to_f32(), size.y.to_f32());
-    let ships: Vec<(&UnitInstance, mc_data::Warp, f32)> = view
-        .selection
-        .iter()
-        .filter_map(|id| view.index_of.get(id))
-        .map(|&i| &view.frame.units[i])
+    // Asked of the selection's blueprints first: a sky of fighters has no drive.
+    let drives = view.picks_any(|bp| field.blueprints.unit(bp).warp.is_some());
+    let picked = if drives {
+        view.picked_units()
+    } else {
+        Vec::new()
+    };
+    let ships: Vec<(&UnitInstance, mc_data::Warp, f32)> = (picked.into_iter())
         .filter(|u| owner_of(u) == view.local && u.owner_flags & KIND_WRECK == 0)
         .filter_map(|u| {
             let bp = field.blueprints.unit(BlueprintId(u.blueprint as u16));

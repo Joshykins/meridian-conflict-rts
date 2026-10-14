@@ -62,17 +62,18 @@ pub fn draw(ui: &mut Ui, field: &Field, alpha: f32, cursor: Option<Vec3>) {
         under_way(ui, field, d, hostile(d.owner), alpha);
     }
 
-    let picked: Vec<&UnitInstance> = view
-        .selection
-        .iter()
-        .filter_map(|id| view.index_of.get(id))
-        .map(|&i| &view.frame.units[i])
-        .filter(|u| {
-            bp_of(field, BlueprintId(u.blueprint as u16)).dash.is_some()
-                && (u.owner_flags & 0xFF) as u8 == view.local
-                && !view.observing
-        })
-        .collect();
+    // Asked of the selection's blueprints first: a sky of fighters has no dasher.
+    let dashers = !view.observing && view.picks_any(|bp| bp_of(field, bp).dash.is_some());
+    let picked: Vec<&UnitInstance> = if dashers {
+        (view.picked_units().into_iter())
+            .filter(|u| {
+                bp_of(field, BlueprintId(u.blueprint as u16)).dash.is_some()
+                    && (u.owner_flags & 0xFF) as u8 == view.local
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
     let aiming = matches!(
         view.mode,
         Mode::Target(Targeting::Attack | Targeting::Bombard | Targeting::Strike | Targeting::Dash)

@@ -52,6 +52,7 @@ mod sim_thread;
 mod survival;
 mod titan_marks;
 mod ui;
+mod unit_rows;
 mod unit_shot;
 mod warp_in_marks;
 mod warp_marks;
