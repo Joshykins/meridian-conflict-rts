@@ -104,20 +104,17 @@ pub struct Front {
     /// `None` inside is the test range: there is nothing to set up first.
     launching: Option<(Launching, f32)>,
     quitting: Option<f32>,
-    /// This install's update and old builds (`ui/updates.rs`).
-    builds: super::updates::Builds,
+    /// The install the launcher started this game in, if it did.
+    install: Option<Arc<crate::builds::Install>>,
 }
 
-/// Has the launcher take over (an update, an old build); true when it did,
+/// Has the launcher play an old replay in its own build; true when it did,
 /// and the game quits.
-fn hand_over(
-    builds: &super::updates::Builds,
-    start: impl FnOnce(&crate::builds::Install) -> std::io::Result<()>,
-) -> bool {
-    let Some(install) = &builds.install else {
+fn hand_over(install: Option<&crate::builds::Install>, replay: &std::path::Path) -> bool {
+    let Some(install) = install else {
         return false;
     };
-    match start(install) {
+    match install.watch_in_its_build(replay) {
         Ok(()) => true,
         Err(e) => {
             log::error!("the launcher did not start: {e}");
@@ -157,7 +154,7 @@ impl Front {
             director,
             launching: None,
             quitting: None,
-            builds: super::updates::Builds::new(),
+            install: crate::builds::Install::find().map(Arc::new),
         }
     }
 
@@ -217,7 +214,7 @@ impl Front {
             self.history = Some(HistoryState::new(
                 self.blueprints.clone(),
                 self.pool.clone(),
-                self.builds.install.clone(),
+                self.install.clone(),
             ));
         }
         // Set-up and multiplayer share an image slot for their charts.
@@ -350,11 +347,6 @@ impl Front {
                     Some(MenuAction::Quit) => self.quitting = Some(0.0),
                     None => {}
                 }
-                if super::updates::card(ui, &self.builds, enter)
-                    && hand_over(&self.builds, |install| install.restart())
-                {
-                    self.quitting = Some(0.0);
-                }
             }
             Screen::Setup(_) => {
                 let Some(state) = self.setup.as_mut() else {
@@ -396,7 +388,7 @@ impl Front {
                             Some((Launching::Event(FrontEvent::Replay(path, at)), 0.0));
                     }
                     Some(HistoryAction::WatchInItsBuild(path))
-                        if hand_over(&self.builds, |install| install.watch_in_its_build(&path)) =>
+                        if hand_over(self.install.as_deref(), &path) =>
                     {
                         self.quitting = Some(0.0);
                     }

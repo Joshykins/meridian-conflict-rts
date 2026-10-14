@@ -43,7 +43,6 @@ pub struct HistoryState {
     slots_taken: bool,
     /// The install old builds come into, when the launcher started the game.
     install: Option<Arc<crate::builds::Install>>,
-    fetching: old_build::Fetching,
 }
 
 impl HistoryState {
@@ -68,7 +67,6 @@ impl HistoryState {
             summary: None,
             slots_taken: false,
             install,
-            fetching: old_build::Fetching::default(),
         }
     }
 
@@ -256,11 +254,7 @@ fn list(ui: &mut Ui, state: &mut HistoryState, enter: f32) -> Option<HistoryActi
                 );
             }
             if let Some(s) = found.get(state.selected) {
-                let old = OldBuild {
-                    install: state.install.as_deref(),
-                    fetching: &mut state.fetching,
-                };
-                match details(ui, detail, s, old) {
+                match details(ui, detail, s, state.install.as_deref()) {
                     Some(Pick::Report) => report = Some(state.selected),
                     Some(Pick::Watch(at)) => {
                         action = Some(HistoryAction::Watch(s.path.clone(), at))
@@ -374,14 +368,14 @@ enum Pick {
     WatchInItsBuild,
 }
 
-/// What the selected match's card needs to offer the build that recorded it.
-struct OldBuild<'a> {
-    install: Option<&'a crate::builds::Install>,
-    fetching: &'a mut old_build::Fetching,
-}
-
 /// The selected match: who played, its marks, and the report and watch buttons.
-fn details(ui: &mut Ui, r: Rect, s: &Summary, old: OldBuild) -> Option<Pick> {
+/// `install` is where the build that recorded it would run from.
+fn details(
+    ui: &mut Ui,
+    r: Rect,
+    s: &Summary,
+    install: Option<&crate::builds::Install>,
+) -> Option<Pick> {
     let mut action = None;
     ui.panel(r);
     let (x, cw) = (r.x + 28.0, r.w - 56.0);
@@ -441,7 +435,7 @@ fn details(ui: &mut Ui, r: Rect, s: &Summary, old: OldBuild) -> Option<Pick> {
         ui.text_fit_left(x, y, cw, type_scale::CAPTION, rgb(palette::WARN, 1.0), p);
         y += 24.0;
     }
-    let (taken, watch_old) = old_build::draw(ui, x, y, cw, s, old.install, old.fetching);
+    let (taken, watch_old) = old_build::draw(ui, x, y, cw, s, install);
     y += taken;
     if watch_old {
         action = Some(Pick::WatchInItsBuild);
