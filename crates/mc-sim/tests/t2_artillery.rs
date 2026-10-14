@@ -42,6 +42,7 @@ fn world(sea: bool) -> World {
         Fx::from_int(WATER),
     );
     let map = MapData {
+        doodads: Default::default(),
         name: "artillery".into(),
         content_id: 1,
         ore: Vec::new(),

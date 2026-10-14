@@ -16,6 +16,7 @@ fn world(workers: usize) -> World {
     World::with_terrain(
         terrain(),
         MapData {
+            doodads: Default::default(),
             name: "mission test".into(),
             content_id: 1,
             ore: vec![],

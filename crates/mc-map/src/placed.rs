@@ -108,6 +108,16 @@ pub struct Doodad {
     pub blocking: bool,
     pub health: u32,
     pub reclaim: u32,
+    #[serde(default)]
+    pub footprint: Option<Footprint>,
+}
+
+/// A prop-local box in metres at scale one. Heading and scale follow its prop.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Footprint {
+    pub half: FxVec2,
+    pub height: Fx,
 }
 
 impl Placed {
@@ -200,6 +210,21 @@ impl Placed {
         let mut props = BTreeSet::new();
         for d in &self.doodads {
             identity(4, d.id, &d.name)?;
+            if d.health > 1_000_000
+                || d.reclaim > 1_000_000
+                || d.footprint.as_ref().is_some_and(|f| {
+                    f.half.x <= Fx::ZERO
+                        || f.half.y <= Fx::ZERO
+                        || f.height <= Fx::ZERO
+                        || f.half.x > Fx::from_int(256)
+                        || f.half.y > Fx::from_int(256)
+                        || f.height > Fx::from_int(1024)
+                })
+            {
+                return Err(bad(
+                    "doodad health, reclaim or footprint exceeds its limits",
+                ));
+            }
             if d.prop_index as usize >= prop_count || !props.insert(d.prop_index) {
                 return Err(bad("invalid or repeated doodad reference"));
             }

@@ -16,6 +16,7 @@ fn world() -> World {
     );
     let terrain = Heightfield::flat(1280, 1280, Fx::from_int(20));
     let map = MapData {
+        doodads: Default::default(),
         name: "engineer upgrade".into(),
         content_id: 1,
         ore: Vec::new(),

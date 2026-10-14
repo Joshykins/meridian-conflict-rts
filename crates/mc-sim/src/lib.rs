@@ -45,6 +45,7 @@ mod debug;
 mod decks;
 mod destruct;
 mod dogfight;
+mod doodads;
 pub mod economy;
 pub mod edict;
 pub mod elevator;

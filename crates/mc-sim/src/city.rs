@@ -134,14 +134,25 @@ impl Structures {
     }
 
     /// The table for `props`: one row per structure that can be hit, worn as the map says.
-    fn new(props: &[Prop]) -> Structures {
+    fn new(props: &[Prop], components: &crate::doodads::Components) -> Structures {
         let mut s = Structures::default();
         for (i, p) in props.iter().enumerate() {
-            let Some(kind) = mc_map::city::structure(p.kind).filter(|k| k.health > 0) else {
-                continue;
+            let max = if let Some(d) = components.get(&(i as u32)) {
+                i64::from(d.health)
+            } else {
+                let scale = i64::from(p.scale_milli);
+                mc_map::city::structure(p.kind).map_or(0, |kind| {
+                    if kind.health == 0 {
+                        0
+                    } else {
+                        (i64::from(kind.health) * scale * scale / 1_000_000)
+                            .clamp(1, i64::from(i32::MAX))
+                    }
+                })
             };
-            let scale = p.scale_milli as i64;
-            let max = (kind.health as i64 * scale * scale / 1_000_000).clamp(1, i32::MAX as i64);
+            if max == 0 {
+                continue;
+            }
             // A map's worst wear leaves it standing on its last point: what it
             // wants knocked down it lays as rubble.
             let worn = (max * p.wear_milli.min(1000) as i64 / 1000).min(max - 1);
@@ -322,7 +333,12 @@ pub struct CityShapes {
 }
 
 impl CityShapes {
-    pub(crate) fn new(table: &Structures, props: &[Prop], terrain: &Heightfield) -> CityShapes {
+    pub(crate) fn new(
+        table: &Structures,
+        props: &[Prop],
+        terrain: &Heightfield,
+        components: &crate::doodads::Components,
+    ) -> CityShapes {
         let size = terrain.size_metres();
         let dims = (
             (size.x.ceil_int() / BUCKET_M).max(1),
@@ -337,18 +353,17 @@ impl CityShapes {
         c.bucket_top = vec![Fx::MIN; cover.len()];
         for (row, &prop) in table.prop.iter().enumerate() {
             let p = &props[prop as usize];
-            let kind = mc_map::city::structure(p.kind).expect("a structure row is a city kind");
             let scale = Fx::from_int(p.scale_milli as i32) / 1000;
             let ground = terrain.height_at(p.pos);
             let (sin, cos) = (p.heading.sin(), p.heading.cos());
             c.first.push(c.parts.len() as u32);
             let (mut lo, mut hi) = (p.pos, p.pos);
             let mut tallest = Fx::ZERO;
-            for (&(cx, cy, hx, hy), &top) in kind.plan.iter().zip(kind.tops) {
-                let (cx, cy) = (Fx::from_int(cx) * scale, Fx::from_int(cy) * scale);
-                let half = FxVec2::new(Fx::from_int(hx) * scale, Fx::from_int(hy) * scale);
+            for part in crate::doodads::parts(p, components.get(&prop)) {
+                let (cx, cy) = (part.centre.x * scale, part.centre.y * scale);
+                let half = part.half * scale;
                 let mid = FxVec2::new(p.pos.x + cx * cos - cy * sin, p.pos.y + cx * sin + cy * cos);
-                let top = Fx::from_int(top) * scale;
+                let top = part.top * scale;
                 tallest = tallest.max(top);
                 let part = Part {
                     mid,
@@ -392,8 +407,9 @@ impl CityShapes {
         c.other_solids = props
             .iter()
             .enumerate()
-            .filter(|(_, p)| {
-                !p.kind.is_city() && (p.kind.is_building() || !p.kind.solid_plan().is_empty())
+            .filter(|(i, p)| {
+                table.prop.binary_search(&(*i as u32)).is_err()
+                    && !crate::lots::prop_cells(p, size, components.get(&(*i as u32))).is_empty()
             })
             .map(|(i, _)| i as u32)
             .collect();
@@ -572,9 +588,13 @@ impl CityShapes {
 }
 
 /// What a city row is built from: the state table and the map's shapes.
-pub(crate) fn build(props: &[Prop], terrain: &Heightfield) -> (Structures, CityShapes) {
-    let table = Structures::new(props);
-    let shapes = CityShapes::new(&table, props, terrain);
+pub(crate) fn build(
+    props: &[Prop],
+    terrain: &Heightfield,
+    components: &crate::doodads::Components,
+) -> (Structures, CityShapes) {
+    let table = Structures::new(props, components);
+    let shapes = CityShapes::new(&table, props, terrain, components);
     (table, shapes)
 }
 

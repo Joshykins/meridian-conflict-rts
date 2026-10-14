@@ -21,6 +21,7 @@ pub(crate) fn world() -> World {
         Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
     );
     let map = MapData {
+        doodads: Default::default(),
         name: "adjacency".into(),
         content_id: 1,
         ore: Vec::new(),

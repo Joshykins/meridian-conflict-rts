@@ -506,7 +506,7 @@ impl World {
                 self.prop_index.query(storm.pos, reach, kind::PROP, |e| {
                     let prop = e.row as usize;
                     if e.pos.distance(storm.pos) <= reach
-                        && self.map.props[prop].kind.is_tree()
+                        && self.is_scenery_tree(prop)
                         && self.is_prop_alive(prop)
                     {
                         trees.push(prop);

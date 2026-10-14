@@ -38,6 +38,7 @@ fn world_seated(cells: u32, seats: [(Controller, AiConfig); 2]) -> World {
     World::with_terrain(
         Heightfield::flat(cells, cells, Fx::from_int(20)),
         MapData {
+            doodads: Default::default(),
             name: "AI test".into(),
             content_id: 47,
             ore: Vec::new(),

@@ -174,6 +174,7 @@ pub struct MapData {
     pub ore: Vec<mc_map::OreRegion>,
     pub starts: Vec<FxVec2>,
     pub props: Vec<Prop>,
+    pub doodads: std::collections::BTreeMap<u32, mc_map::placed::Doodad>,
 }
 
 pub struct World {
@@ -309,6 +310,13 @@ impl World {
     ) -> Result<World, SimError> {
         let terrain = Heightfield::load(map_file).map_err(|e| SimError::Setup(e.to_string()))?;
         let map = MapData {
+            doodads: map_file
+                .placed()
+                .doodads
+                .iter()
+                .cloned()
+                .map(|d| (d.prop_index, d))
+                .collect(),
             name: map_file.info().name.clone(),
             content_id: map_file.content_id(),
             ore: map_file.ore_regions().to_vec(),
@@ -435,8 +443,9 @@ impl World {
         prop_index.build();
 
         let mut nav = Nav::new(&terrain, pool.clone())?;
-        crate::lots::block_buildings(&mut nav, &map.props, size);
-        let (city, city_shapes) = crate::city::build(&map.props, &terrain);
+        crate::doodads::validate(&map.props, &map.doodads)?;
+        crate::lots::block_buildings(&mut nav, &map.props, size, &map.doodads);
+        let (city, city_shapes) = crate::city::build(&map.props, &terrain, &map.doodads);
         let state = State {
             tick: 0,
             rng: Rng::new(config.seed),

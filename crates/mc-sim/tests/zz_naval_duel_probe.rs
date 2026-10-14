@@ -15,6 +15,7 @@ fn sea(seed: u64) -> World {
     let samples = vec![0u16; 257 * 257];
     let terrain = Heightfield::from_samples(256, 256, samples, Fx::ZERO, Fx::ONE, Fx::from_int(20));
     let map = MapData {
+        doodads: Default::default(),
         name: "sea".into(),
         content_id: 1,
         ore: Vec::new(),

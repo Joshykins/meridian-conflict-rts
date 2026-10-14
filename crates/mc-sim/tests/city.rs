@@ -46,6 +46,7 @@ fn terrain() -> Heightfield {
 
 fn map(props: Vec<Prop>) -> MapData {
     MapData {
+        doodads: Default::default(),
         name: "city".into(),
         content_id: 1,
         ore: Vec::new(),

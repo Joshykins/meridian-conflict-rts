@@ -99,6 +99,14 @@ playable mission, authored and revised through the editor and its API.
   Missions and the editor share that immutable snapshot; legacy empty authoring
   retains its original identity. Placement changes invalidate incompatible saves.
 
+- Added simulation use of authored doodad health, blocking and rotated custom
+  footprints. Weapon traces and destruction use the same geometry; collapse opens
+  cells and snapshots restore health/collision. Authored trees bypass decorative
+  clearing. Four focused regressions and existing city/tree tests pass.
+- The full gate passes in 185 s. Windows/Linux match with an authored billboard
+  destroyed in the matrix: commander AI b914c756d95136a4, every-domain
+  b9e9c78fcc8683a3. Live prop authoring and reclaim are still pending.
+
 ## Still required before final delivery
 - Component doodads, general destructible/reclaimable props.
 - Decorative cliff regeneration and resize.

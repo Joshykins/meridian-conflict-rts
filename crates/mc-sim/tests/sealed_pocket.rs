@@ -39,6 +39,7 @@ fn flat() -> World {
         Fx::from_int(20),
     );
     let map = MapData {
+        doodads: Default::default(),
         name: "flat".into(),
         content_id: 1,
         ore: Vec::new(),

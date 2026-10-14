@@ -61,6 +61,24 @@ fn world(threads: usize) -> World {
     let blueprints =
         Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
     let map = MapData {
+        doodads: [(
+            0,
+            mc_map::placed::Doodad {
+                id: 1,
+                name: "matrix_billboard".into(),
+                prop_index: 0,
+                tint: [255; 3],
+                blocking: true,
+                health: 1400,
+                reclaim: 0,
+                footprint: Some(mc_map::placed::Footprint {
+                    half: FxVec2::from_ints(12, 3),
+                    height: Fx::from_int(15),
+                }),
+            },
+        )]
+        .into_iter()
+        .collect(),
         name: "determinism".into(),
         content_id: 1,
         ore: Vec::new(),
@@ -147,7 +165,7 @@ fn city() -> Vec<mc_map::Prop> {
         wear_milli,
     };
     let mut props = vec![
-        at(PropKind::CityHouse, 840, 3300, 0, 0),
+        at(PropKind::CityBillboard, 840, 3300, 0, 0),
         at(PropKind::CityHouse, 960, 3300, 0, 300),
         at(PropKind::CityTenement, 900, 3390, 0x4000, 0),
         at(PropKind::CityOffice, 900, 3200, 0x2000, 0),
@@ -1108,6 +1126,10 @@ fn reference() -> Vec<u64> {
     assert!(on_blocks > 0, "no shot met a city block");
     assert!(alight > 0, "no city block caught fire");
     assert!(down > 0, "no city block came down");
+    assert!(
+        !w.is_prop_alive(0),
+        "the authored billboard survived the warhead"
+    );
     // The factory's scouts formed up, waited across the snapshot and left together.
     assert!(held_at_snapshot > 0, "no batch was waiting at the snapshot");
     assert!(batches_sent > 0, "no batch filled and left");

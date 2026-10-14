@@ -17,6 +17,13 @@ pub(super) fn build(
     );
     terrain = terrain.with_decks(doc.map.decks.clone());
     let data = mc_sim::world::MapData {
+        doodads: doc
+            .placed
+            .doodads
+            .iter()
+            .cloned()
+            .map(|d| (d.prop_index, d))
+            .collect(),
         name: info.name.clone(),
         content_id,
         ore: doc.map.ore.clone(),

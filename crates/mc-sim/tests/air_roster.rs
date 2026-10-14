@@ -31,6 +31,7 @@ fn world_on(terrain: Heightfield) -> World {
         Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
     );
     let map = MapData {
+        doodads: Default::default(),
         name: "range".into(),
         content_id: 1,
         ore: Vec::new(),
@@ -581,6 +582,7 @@ fn all_aa_structures_can_be_placed_on_water_and_stand_at_its_surface() {
         spawn_commanders: false,
     };
     let map = MapData {
+        doodads: Default::default(),
         name: "water".into(),
         content_id: 2,
         ore: Vec::new(),

@@ -52,7 +52,7 @@ impl World {
             let d = e.pos - pos;
             if d.x.abs() <= half
                 && d.y.abs() <= half
-                && self.map.props[prop].kind.is_tree()
+                && self.is_scenery_tree(prop)
                 && self.is_prop_alive(prop)
             {
                 found.push(prop);
@@ -136,7 +136,7 @@ impl World {
                 let d = e.pos - pos;
                 if d.dot(nose).abs() <= half_x
                     && d.dot(side).abs() <= half_y
-                    && self.map.props[prop].kind.is_tree()
+                    && self.is_scenery_tree(prop)
                     && self.is_prop_alive(prop)
                 {
                     felled.push((prop, pos, motion));
@@ -171,7 +171,7 @@ impl World {
             self.prop_index.query(pos, reach, kind::PROP, |e| {
                 let prop = e.row as usize;
                 if e.pos.distance_sq(pos) <= reach * reach
-                    && self.map.props[prop].kind.is_tree()
+                    && self.is_scenery_tree(prop)
                     && self.is_prop_alive(prop)
                 {
                     felled.push((prop, pos, pos - prev));

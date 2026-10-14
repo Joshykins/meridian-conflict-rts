@@ -24,6 +24,7 @@ fn world() -> World {
     );
     let terrain = Heightfield::flat(512, 512, Fx::from_int(20));
     let map = MapData {
+        doodads: Default::default(),
         name: "orbs".into(),
         content_id: 1,
         ore: Vec::new(),
