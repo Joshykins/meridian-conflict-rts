@@ -110,7 +110,7 @@ impl World {
         match o.kind {
             OrderKind::Move | OrderKind::AttackMove => {
                 let _span = mc_core::perf_span!("orders.move");
-                self.run_move(row, &o, &fights)?
+                self.run_move(row, &o, fights)?
             }
             OrderKind::Attack => {
                 let _span = mc_core::perf_span!("orders.attack");

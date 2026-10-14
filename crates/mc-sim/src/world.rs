@@ -1072,34 +1072,49 @@ impl World {
         self.fog.begin();
         let rows: Vec<usize> = self.state.units.slots.iter().collect();
         // Every unit's discs, once per fog cell: the hundred tanks of a cell
-        // with one sight and one team stamp the same discs, and a stamp is an OR.
-        let mut stamps: Vec<_> = rows
-            .iter()
-            .filter(|&&row| !self.state.units.has_flag(row, flag::IN_FACTORY))
-            .map(|&row| {
-                let bp = self.blueprints.unit(self.state.units.blueprint[row]);
-                // Construction sites see a little so their owner can watch them.
-                // An intel tower that draws energy is dark while the grid cannot pay.
-                let (vision, radar) = if self.state.units.is_active(row) {
-                    (bp.vision, self.live_radar(row))
-                } else {
-                    (bp.radius * 2, Fx::ZERO)
-                };
-                let sight = (vision, radar, self.live_sonar(row));
-                let mask = self.team_mask(self.state.units.owner[row]);
-                (Fog::cell_of(self.state.units.pos[row]), sight, mask, row)
-            })
-            .collect();
-        // The renderer draws every unit's own disc, round and following it.
-        for &(_, (vision, _, _), mask, row) in &stamps {
-            self.fog
-                .note_sight(Some(row), self.state.units.pos[row], vision, mask);
-        }
-        // The whole tuple orders them, so the sort is total; one of each.
-        stamps.sort_unstable();
-        stamps.dedup_by_key(|&mut (cell, sight, mask, _)| (cell, sight, mask));
-        for (_, (vision, radar, sonar), mask, row) in stamps {
+        // with one sight and one team stamp the same discs, and a stamp is an OR
+        // that reads only the cell. Each (sight, team) pair gets a number, and a
+        // unit is one key, (cell, pair, row), so a hundred thousand sort as integers.
+        let mut pairs: Vec<((Fx, Fx, Fx), PlayerMask)> = Vec::new();
+        let mut numbered: std::collections::BTreeMap<((Fx, Fx, Fx), PlayerMask), u32> =
+            Default::default();
+        let mut keys: Vec<u128> = Vec::with_capacity(rows.len());
+        for &row in &rows {
+            if self.state.units.has_flag(row, flag::IN_FACTORY) {
+                continue;
+            }
+            let bp = self.blueprints.unit(self.state.units.blueprint[row]);
+            // Construction sites see a little so their owner can watch them.
+            // An intel tower that draws energy is dark while the grid cannot pay.
+            let (vision, radar) = if self.state.units.is_active(row) {
+                (bp.vision, self.live_radar(row))
+            } else {
+                (bp.radius * 2, Fx::ZERO)
+            };
+            let sight = (vision, radar, self.live_sonar(row));
+            let mask = self.team_mask(self.state.units.owner[row]);
             let pos = self.state.units.pos[row];
+            // The renderer draws every unit's own disc, round and following it.
+            self.fog.note_sight(Some(row), pos, vision, mask);
+            let pair = match pairs.last() {
+                Some(&last) if last == (sight, mask) => pairs.len() as u32 - 1,
+                _ => *numbered.entry((sight, mask)).or_insert_with(|| {
+                    pairs.push((sight, mask));
+                    pairs.len() as u32 - 1
+                }),
+            };
+            let (cx, cy) = Fog::cell_of(pos);
+            let cell =
+                ((cy as u32 ^ 0x8000_0000) as u128) << 32 | (cx as u32 ^ 0x8000_0000) as u128;
+            keys.push(cell << 64 | (pair as u128) << 32 | row as u128);
+        }
+        // Keys are unique (the row), so the order is total; one of each cell and pair,
+        // the lowest row's.
+        keys.sort_unstable();
+        keys.dedup_by_key(|k| *k >> 32);
+        for key in keys {
+            let ((vision, radar, sonar), mask) = pairs[(key >> 32) as u32 as usize];
+            let pos = self.state.units.pos[key as u32 as usize];
             self.fog.stamp_discs(pos, vision, radar, mask);
             self.fog.reveal_sonar(pos, sonar, mask);
         }
