@@ -161,12 +161,7 @@ impl Document {
         let file = MapFile::open(path).map_err(|e| e.to_string())?;
         let map = EditMap::load(&file).map_err(|e| e.to_string())?;
         let folder = path.file_name().is_some_and(|p| p == "terrain.mcmap");
-        let sidecar = path.with_file_name("placed.ron");
-        let placed = if folder && sidecar.exists() {
-            Placed::read(&sidecar, &map.info, map.props.len()).map_err(|e| e.to_string())?
-        } else {
-            Placed::default()
-        };
+        let placed = file.placed().clone();
         Ok(Self {
             map,
             placed,

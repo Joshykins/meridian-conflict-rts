@@ -34,13 +34,7 @@ pub(crate) fn definition(map: &mc_map::MapFile) -> Result<Option<Definition>, St
     if manifest.version != 1 || manifest.script != "vela_m1" {
         return Err("Unsupported mission script or version".into());
     }
-    let placed = mc_map::placed::Placed::read(
-        &map.path().with_file_name("placed.ron"),
-        map.info(),
-        map.props().len(),
-    )
-    .map_err(|e| e.to_string())?;
-    Ok(Some(mc_missions::definition(placed)))
+    Ok(Some(mc_missions::definition(map.placed().clone())))
 }
 
 pub(crate) fn config() -> MatchConfig {

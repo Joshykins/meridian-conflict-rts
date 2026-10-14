@@ -95,6 +95,10 @@ playable mission, authored and revised through the editor and its API.
   Native water/climate-wall/dusk screenshots, repeated saves and Undo pass; the
   restored document environment and terrain hash match the original exactly.
 
+- Map loading now captures validated placements and binds them into map identity.
+  Missions and the editor share that immutable snapshot; legacy empty authoring
+  retains its original identity. Placement changes invalidate incompatible saves.
+
 ## Still required before final delivery
 - Component doodads, general destructible/reclaimable props.
 - Decorative cliff regeneration and resize.

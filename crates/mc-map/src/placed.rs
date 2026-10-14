@@ -1,6 +1,8 @@
 //! Stable authoring identities. Array positions and runtime unit handles are
 //! deliberately absent from mission references; scripts address names.
+mod loaded;
 use crate::{MapError, MapInfo};
+pub(crate) use loaded::Loaded;
 use mc_core::{Angle, Fx, FxVec2};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;

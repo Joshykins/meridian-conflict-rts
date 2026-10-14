@@ -22,6 +22,7 @@ pub struct MapFile {
     path: std::path::PathBuf,
     info: MapInfo,
     content_id: u64,
+    authoring: crate::placed::Loaded,
     dir: Vec<DirEntry>,
     overview: Vec<u16>,
     props: Vec<Prop>,
@@ -187,7 +188,9 @@ impl MapFile {
                 .to_vec(),
         };
 
+        let authoring = crate::placed::Loaded::read(&path, &info, props.len(), content_id)?;
         Ok(MapFile {
+            authoring,
             _lifetimes: Vec::new(),
             file,
             path,
@@ -217,11 +220,18 @@ impl MapFile {
         &self.info.name
     }
 
-    /// Identifies the map content. Replays and netplay compare it so everyone
-    /// simulates on the same terrain.
+    /// Identifies terrain and the captured authoring document. Replays and
+    /// netplay compare it so different placed objects cannot share a match.
+    /// Legacy maps without authoring retain their original terrain identity.
     #[inline]
     pub fn content_id(&self) -> u64 {
-        self.content_id
+        self.authoring.content_id
+    }
+
+    /// Validated placements captured when the map opens. Never reread a mutable
+    /// sidecar after the map has been selected or its identity exchanged.
+    pub fn placed(&self) -> &crate::placed::Placed {
+        &self.authoring.placed
     }
 
     #[inline]

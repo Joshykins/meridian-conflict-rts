@@ -39,7 +39,10 @@ transition, so a loading curtain is currently visible.
 
 A map folder contains terrain.mcmap, map.ron, placed.ron, and optional
 mission.ron and strings.en.ron. Terrain remains the existing lossless baked
-format. Placement metadata is versioned and validated before use.
+format. Placement metadata is versioned, validated and captured when a map opens.
+Loaded maps retain those placements even if the source sidecar is edited later.
+Map identity includes canonical placement values; empty authoring keeps legacy
+terrain identities unchanged.
 
 To bake the checked-in Vela mission terrain, run scripts/vela.sh. The generated
 terrain is ignored by Git; the authored placement, mission manifest and dialogue
@@ -202,7 +205,7 @@ queues, control state and camera cues are in the simulation snapshot and hash.
 
 Each checkpoint stores the entire world at its tick boundary. A local session
 restores that snapshot before releasing its next tick. Saves bind to the terrain
-content ID, blueprint hash and authored mission program hash. Separate mission
+and captured placement content ID, blueprint hash and authored mission program hash. Separate mission
 keys have separate save folders even when their terrain is identical. Incompatible saves produce a menu notice.
 Completed progress is stored separately from checkpoint snapshots.
 

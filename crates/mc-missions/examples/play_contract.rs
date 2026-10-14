@@ -5,12 +5,7 @@ fn main() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let map = mc_map::MapFile::open(root.join("maps/vela_m1/terrain.mcmap")).unwrap();
     let bp = Arc::new(mc_data::Blueprints::load(&root.join("data")).unwrap());
-    let placed = mc_map::placed::Placed::read(
-        &map.path().with_file_name("placed.ron"),
-        map.info(),
-        map.props().len(),
-    )
-    .unwrap();
+    let placed = map.placed().clone();
     let cfg = MatchConfig {
         seed: 7,
         cheats: false,
