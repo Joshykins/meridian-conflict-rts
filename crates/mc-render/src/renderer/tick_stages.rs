@@ -5,28 +5,38 @@
 //! later, timed from the tick's start all the same. With a hundred thousand units that
 //! work was tens of milliseconds, all on the frame the tick arrived in, a hitch on
 //! every tick; spread a stage a frame over the frames after it, it is a fraction of each.
+//!
+//! The weapons' effects are not spread: what they draw (beams, strokes, trails) is
+//! appended to the projectile list after the tick's shots, which the tick's own frame
+//! writes afresh. Written a frame later, they were drawn only from that frame to the
+//! next tick (beams flickered); written with the shots, they are drawn all tick long.
 
 use super::*;
 
-/// The stages, in the order they run, one a frame from the tick's own frame on.
+/// The stages, in the order they run: the first `ON_TICK` on the tick's own frame, then
+/// one a frame.
 #[derive(Clone, Copy)]
 enum Stage {
     Events,
+    WeaponFx,
     Trails,
     UnitFx,
     Smoke,
-    WeaponFx,
     Sky,
 }
 
 const STAGES: [Stage; 6] = [
     Stage::Events,
+    Stage::WeaponFx,
     Stage::Trails,
     Stage::UnitFx,
     Stage::Smoke,
-    Stage::WeaponFx,
     Stage::Sky,
 ];
+
+/// The stages the tick's own frame runs: its hits, and the weapons' effects, which go
+/// in the projectile list after its shots (module comment).
+const ON_TICK: usize = 2;
 
 /// Where the newest tick's stages have got to, and when it began.
 pub(super) struct TickStages {
@@ -68,9 +78,12 @@ impl Renderer {
                     self.tick_stage(frame, camera);
                 }
             } else {
-                // The first (the tick's hits and deaths) goes with the tick itself; at 60
-                // frames a second and 10 ticks, the rest have the five frames after it.
-                self.tick_stage(frame, camera);
+                // The tick's hits and deaths and its weapons' effects go with the tick
+                // itself; at 60 frames a second and 10 ticks, the rest have the five
+                // frames after it.
+                while self.tick_stages.next < ON_TICK {
+                    self.tick_stage(frame, camera);
+                }
             }
         } else if let Some(frame) = latest {
             if self.tick_stages.next < STAGES.len() {
@@ -165,12 +178,6 @@ impl Renderer {
                     self.ground_contact(units, time, camera);
                 }
                 {
-                    let _t = mc_core::perf_span!("fx.storms");
-                    self.storm_beams(time);
-                    self.storms_tick(time);
-                    self.storm_clouds_tick(&frame.clouds, frame.tick, time);
-                }
-                {
                     let _t = mc_core::perf_span!("fx.mine_blows");
                     self.mine_blows(units, time, camera);
                 }
@@ -200,6 +207,13 @@ impl Renderer {
             }
             Stage::WeaponFx => {
                 let _part = mc_core::perf_span!("cpu.upload.weapon_fx");
+                // Their strokes are bore strokes (`write_bore_strokes`, below).
+                {
+                    let _t = mc_core::perf_span!("fx.storms");
+                    self.storm_beams(time);
+                    self.storms_tick(time);
+                    self.storm_clouds_tick(&frame.clouds, frame.tick, time);
+                }
                 {
                     let _t = mc_core::perf_span!("wfx.ground_fires");
                     self.ground_fires(&frame.fires, time);
@@ -354,5 +368,19 @@ impl Renderer {
                 drop(part);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The weapons' beams and strokes go in the projectile list the tick's own frame
+    /// writes; run on a later frame, they were drawn only from then to the next tick.
+    #[test]
+    fn weapon_effects_run_on_the_ticks_own_frame() {
+        assert!(STAGES[..ON_TICK]
+            .iter()
+            .any(|s| matches!(s, Stage::WeaponFx)));
     }
 }
