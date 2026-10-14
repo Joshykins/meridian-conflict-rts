@@ -15,6 +15,8 @@ def build(destination):
     destination = destination.resolve()
     if destination == ROOT or destination in ROOT.parents or destination == SOURCE.parent:
         raise ValueError("Choose a map folder, not the repository or maps directory")
+    if destination != SOURCE and SOURCE in destination.parents:
+        raise ValueError("The bake destination must be outside the source asset folder")
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary = Path(tempfile.mkdtemp(prefix=".vela-build-", dir=destination.parent))
     staged = temporary / "map"
