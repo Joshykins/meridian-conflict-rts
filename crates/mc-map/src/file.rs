@@ -32,9 +32,14 @@ pub struct MapFile {
     streets: Vec<u8>,
     wrecks: Vec<MapWreck>,
     decks: Vec<Deck>,
+    tints: Vec<[u8; 3]>,
 }
 
 impl MapFile {
+    pub fn prop_tints(&self) -> &[[u8; 3]] {
+        &self.tints
+    }
+
     pub fn path(&self) -> &Path {
         &self.path
     }
@@ -165,6 +170,14 @@ impl MapFile {
             }
         };
 
+        let tints = match layout.tints_offset {
+            0 => Vec::new(),
+            at => section(at, layout.prop_count as usize * 3)?
+                .as_chunks::<3>()
+                .0
+                .to_vec(),
+        };
+
         Ok(MapFile {
             file,
             path,
@@ -180,6 +193,7 @@ impl MapFile {
             streets,
             wrecks,
             decks,
+            tints,
         })
     }
 
@@ -317,6 +331,7 @@ impl MapFile {
             &self.ways,
             &self.streets,
             &self.decks,
+            &self.tints,
         );
         if computed == self.content_id {
             Ok(())

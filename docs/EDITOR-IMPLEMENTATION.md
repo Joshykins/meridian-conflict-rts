@@ -35,11 +35,16 @@ playable mission, authored and revised through the editor and its API.
 - Native Windows landing inspection exposed cinematic HUD clipping; shared HUD
   correction is implemented and awaits the next screenshot pass.
 
+- Added optional backward-compatible prop tints and Company skin variants.
+- Fixed campaign units appearing in the skirmish production inventory.
+- Real-order route smoke check reaches victory at tick 5347, without teleports
+  or forced triggers; encounter pacing and remaining choreography need work.
+
 ## Still required before final delivery
-- Prop tint layer, component doodads, general destructible/reclaimable props.
+- Component doodads, general destructible/reclaimable props.
 - Ground cover painting, water/climate controls, remaining brushes and resize.
 - Free camera, catalogue/gizmo improvements and reload UI/API.
-- Company appearance, miners leaving, propaganda, allied transport arrivals,
+- Native review of Company appearance; miners leaving, propaganda, allied transport arrivals,
   battle balance, complete real-order playthrough and checkpoint recovery.
 - Full checks, determinism matrix/cross-platform verification, final native
   screenshots, docs reconciliation, and the pull request to dev.

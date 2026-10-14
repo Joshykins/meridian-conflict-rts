@@ -4109,6 +4109,15 @@ fn shade_entity(in: VsOut) -> vec4<f32> {
         }
     }
 
+    // Optional map tint. Untinted legacy props have fx.w=0; dynamic unit FX are unrelated.
+    if (flags & KIND_PROP) != 0u && in.unit_id < arrayLength(&static_entities) {
+        let tint = static_entities[in.unit_id].fx;
+        if tint.w > 0.5 {
+            m.albedo *= tint.xyz;
+            m.emissive *= tint.xyz;
+        }
+    }
+
     let shadow = sun_shadow(in.world, n);
     // Hull plating and frames are grey metal: the sky's blue is half taken out of
     // their fill light, or the shaded side of every hull reads as blue paint.

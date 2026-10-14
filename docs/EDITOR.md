@@ -84,7 +84,17 @@ authored content.
 
 The editor shell, height editing, named placement, undo, atomic save/export,
 playtest return, API/MCP, mission runtime, checkpoint storage and Vela route
-definition are implemented. Full Vela combat balance and end-to-end playthrough
-verification remain in progress. Component prop editing, the remaining terrain
+definition are implemented. Optional RGB prop tints survive save/reopen and render
+without changing legacy map hashes. Mission-only Company variants have a separate
+skin and remain outside skirmish production lists.
+
+Run the real-order route check with:
+
+    cargo run --profile gate -p mc-missions --example play_contract
+
+It requires the baked Vela terrain and issues ordinary player movement/attack
+orders, without forcing triggers or changing unit state. The first route completed
+at tick 5347. This is a smoke check; full encounter balance, miners and allied
+transport choreography are still being developed. Component prop editing, the remaining terrain
 and paint tools, resizing, free camera and reload controls are tracked in
 EDITOR-IMPLEMENTATION.md and are not yet available in this slice.

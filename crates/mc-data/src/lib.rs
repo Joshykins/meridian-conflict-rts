@@ -827,6 +827,8 @@ impl Default for EffectSettings {
 
 #[derive(Clone, Debug)]
 pub struct Visual {
+    /// Optional authored skin for mission/custom units; presentation only.
+    pub skin: Option<String>,
     pub effects: EffectSettings,
     pub mesh: String,
     pub icon: IconKind,
@@ -1013,6 +1015,8 @@ pub struct UnitBlueprint {
     /// Scrap a giant gun throws out (`Weapon::sabot`): it only ever lies about as a wreck,
     /// so it is in no list or menu.
     pub scrap: bool,
+    /// Authored scenario variant, excluded from ordinary production lists.
+    pub mission_only: bool,
     /// Some unit's salvage drone (`drone`): it flies for its carrier, is neither picked
     /// nor selected on its own, and is never ordered.
     pub carried_drone: bool,
@@ -1616,6 +1620,13 @@ impl Blueprints {
                     "{}: only a shield, radar, sonar, warp dampener, mine or fabricator draws energy upkeep",
                     u.key
                 )));
+            }
+        }
+        for u in &units {
+            if let Some(key) = &u.visual.skin {
+                if !skins.iter().any(|s| s.key == *key) {
+                    return Err(DataError::Invalid(format!("{}: unknown skin {key}", u.key)));
+                }
             }
         }
         Ok(Blueprints {

@@ -13,6 +13,7 @@ pub struct EditMap {
     pub info: MapInfo,
     samples: Vec<u16>,
     pub props: Vec<Prop>,
+    pub tints: Vec<[u8; 3]>,
     pub starts: Vec<FxVec2>,
     pub ore: Vec<OreRegion>,
     pub snow: Vec<u8>,
@@ -48,6 +49,7 @@ impl EditMap {
             info,
             samples,
             props: file.props().to_vec(),
+            tints: file.prop_tints().to_vec(),
             starts: file.start_positions().to_vec(),
             ore: file.ore_regions().to_vec(),
             snow: file.snow().unwrap_or_default().to_vec(),
@@ -136,6 +138,7 @@ impl EditMap {
         }
         writer.set_wrecks(self.wrecks.clone())?;
         writer.set_decks(self.decks.clone())?;
+        writer.set_prop_tints(self.tints.clone())?;
         for ty in 0..self.info.tiles_h {
             for tx in 0..self.info.tiles_w {
                 writer.push_tile(&encode_tile(&self.tile(tx, ty)?))?;

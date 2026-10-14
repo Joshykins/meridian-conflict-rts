@@ -29,6 +29,9 @@ fn the_contract_has_resolved_references_and_all_dialogue() {
     }
     assert_eq!(checkpoints, vec![1, 2, 3, 4, 5, 6]);
     let merrick = bp.unit_by_key("company_merrick").unwrap();
+    assert!(merrick.mission_only);
+    assert!(!bp.is_listed(merrick.id));
+    assert_eq!(merrick.visual.skin.as_deref(), Some("company"));
     assert!(merrick.builder.is_none());
     assert_eq!(merrick.economy.materials_income, Fx::ZERO);
     assert_eq!(merrick.economy.energy_income, Fx::ZERO);

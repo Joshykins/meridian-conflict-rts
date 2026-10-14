@@ -53,3 +53,43 @@ fn failed_save_leaves_previous_file_readable() {
     );
     std::fs::remove_file(path).unwrap();
 }
+
+#[test]
+fn prop_tints_follow_stable_tile_sort_and_survive_edit_roundtrip() {
+    use crate::{Prop, PropKind};
+    use mc_core::Angle;
+    let source = MapFile::open(test_util::baked_4km()).unwrap();
+    let mut edit = EditMap::load(&source).unwrap();
+    edit.props = vec![
+        Prop {
+            kind: PropKind::RockSmall,
+            pos: FxVec2::from_ints(3000, 3000),
+            heading: Angle::ZERO,
+            scale_milli: 1000,
+            wear_milli: 0,
+        },
+        Prop {
+            kind: PropKind::RockLarge,
+            pos: FxVec2::from_ints(500, 500),
+            heading: Angle::ZERO,
+            scale_milli: 1000,
+            wear_milli: 0,
+        },
+    ];
+    edit.tints = vec![[255, 0, 0], [0, 128, 255]];
+    let path = test_util::temp_path("editor-tints");
+    edit.save(&path).unwrap();
+    let saved = MapFile::open(&path).unwrap();
+    saved.verify().unwrap();
+    assert_eq!(saved.props()[0].kind, PropKind::RockLarge);
+    assert_eq!(saved.prop_tints(), &[[0, 128, 255], [255, 0, 0]]);
+    let again = EditMap::load(&saved).unwrap();
+    assert_eq!(again.save(&path).unwrap(), saved.content_id());
+    edit.tints.pop();
+    assert!(edit.save(&path).is_err());
+    assert_eq!(
+        MapFile::open(&path).unwrap().content_id(),
+        saved.content_id()
+    );
+    std::fs::remove_file(path).unwrap();
+}

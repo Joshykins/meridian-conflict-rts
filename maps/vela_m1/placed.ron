@@ -18,7 +18,7 @@
             id: 2,
             name: "company_tank_1",
             group: "company",
-            blueprint: "aster_t1_tank",
+            blueprint: "company_t1_tank",
             owner: 0,
             at: (
                 x: (216137728),
@@ -30,7 +30,7 @@
             id: 3,
             name: "company_tank_2",
             group: "company",
-            blueprint: "aster_t1_tank",
+            blueprint: "company_t1_tank",
             owner: 0,
             at: (
                 x: (217972736),
@@ -42,7 +42,7 @@
             id: 4,
             name: "company_tank_3",
             group: "company",
-            blueprint: "aster_t1_tank",
+            blueprint: "company_t1_tank",
             owner: 0,
             at: (
                 x: (219807744),
@@ -54,7 +54,7 @@
             id: 5,
             name: "company_tank_4",
             group: "company",
-            blueprint: "aster_t1_tank",
+            blueprint: "company_t1_tank",
             owner: 0,
             at: (
                 x: (221642752),
@@ -66,7 +66,7 @@
             id: 6,
             name: "company_tank_5",
             group: "company",
-            blueprint: "aster_t1_tank",
+            blueprint: "company_t1_tank",
             owner: 0,
             at: (
                 x: (216137728),
@@ -78,7 +78,7 @@
             id: 7,
             name: "company_tank_6",
             group: "company",
-            blueprint: "aster_t1_tank",
+            blueprint: "company_t1_tank",
             owner: 0,
             at: (
                 x: (217972736),
@@ -90,7 +90,7 @@
             id: 8,
             name: "company_tank_7",
             group: "company",
-            blueprint: "aster_t1_tank",
+            blueprint: "company_t1_tank",
             owner: 0,
             at: (
                 x: (219807744),
@@ -102,7 +102,7 @@
             id: 9,
             name: "company_tank_8",
             group: "company",
-            blueprint: "aster_t1_tank",
+            blueprint: "company_t1_tank",
             owner: 0,
             at: (
                 x: (221642752),
@@ -114,7 +114,7 @@
             id: 10,
             name: "company_scout_1",
             group: "company",
-            blueprint: "aster_t1_scout",
+            blueprint: "company_t1_scout",
             owner: 0,
             at: (
                 x: (219414528),
@@ -126,7 +126,7 @@
             id: 11,
             name: "company_artillery_1",
             group: "company",
-            blueprint: "aster_t1_artillery",
+            blueprint: "company_t1_artillery",
             owner: 0,
             at: (
                 x: (212860928),
@@ -138,7 +138,7 @@
             id: 12,
             name: "company_scout_2",
             group: "company",
-            blueprint: "aster_t1_scout",
+            blueprint: "company_t1_scout",
             owner: 0,
             at: (
                 x: (221708288),
@@ -150,7 +150,7 @@
             id: 13,
             name: "company_artillery_2",
             group: "company",
-            blueprint: "aster_t1_artillery",
+            blueprint: "company_t1_artillery",
             owner: 0,
             at: (
                 x: (215154688),
@@ -846,7 +846,7 @@
             id: 71,
             name: "company_bombers_1",
             group: "company_bombers",
-            blueprint: "aster_t1_bomber",
+            blueprint: "company_t1_bomber",
             owner: 0,
             at: (
                 x: (206307328),
@@ -858,7 +858,7 @@
             id: 72,
             name: "company_bombers_2",
             group: "company_bombers",
-            blueprint: "aster_t1_bomber",
+            blueprint: "company_t1_bomber",
             owner: 0,
             at: (
                 x: (212205568),
@@ -870,7 +870,7 @@
             id: 73,
             name: "company_bombers_3",
             group: "company_bombers",
-            blueprint: "aster_t1_bomber",
+            blueprint: "company_t1_bomber",
             owner: 0,
             at: (
                 x: (218103808),
@@ -882,7 +882,7 @@
             id: 74,
             name: "bastion_landing",
             group: "landing_ship",
-            blueprint: "aster_t3_lift_ship",
+            blueprint: "company_t3_lift_ship",
             owner: 0,
             at: (
                 x: (209584128),

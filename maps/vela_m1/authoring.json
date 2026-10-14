@@ -138,5 +138,209 @@
       9128,
       6608
     ]
+  },
+  {
+    "action": "unit",
+    "name": "merrick",
+    "group": "company",
+    "blueprint": "company_merrick",
+    "owner": 0,
+    "at": [
+      3368,
+      7988
+    ],
+    "heading": 0
+  },
+  {
+    "action": "unit",
+    "name": "company_tank_1",
+    "group": "company",
+    "blueprint": "company_t1_tank",
+    "owner": 0,
+    "at": [
+      3298,
+      7948
+    ],
+    "heading": 0
+  },
+  {
+    "action": "unit",
+    "name": "company_tank_2",
+    "group": "company",
+    "blueprint": "company_t1_tank",
+    "owner": 0,
+    "at": [
+      3326,
+      7948
+    ],
+    "heading": 0
+  },
+  {
+    "action": "unit",
+    "name": "company_tank_3",
+    "group": "company",
+    "blueprint": "company_t1_tank",
+    "owner": 0,
+    "at": [
+      3354,
+      7948
+    ],
+    "heading": 0
+  },
+  {
+    "action": "unit",
+    "name": "company_tank_4",
+    "group": "company",
+    "blueprint": "company_t1_tank",
+    "owner": 0,
+    "at": [
+      3382,
+      7948
+    ],
+    "heading": 0
+  },
+  {
+    "action": "unit",
+    "name": "company_tank_5",
+    "group": "company",
+    "blueprint": "company_t1_tank",
+    "owner": 0,
+    "at": [
+      3298,
+      7918
+    ],
+    "heading": 0
+  },
+  {
+    "action": "unit",
+    "name": "company_tank_6",
+    "group": "company",
+    "blueprint": "company_t1_tank",
+    "owner": 0,
+    "at": [
+      3326,
+      7918
+    ],
+    "heading": 0
+  },
+  {
+    "action": "unit",
+    "name": "company_tank_7",
+    "group": "company",
+    "blueprint": "company_t1_tank",
+    "owner": 0,
+    "at": [
+      3354,
+      7918
+    ],
+    "heading": 0
+  },
+  {
+    "action": "unit",
+    "name": "company_tank_8",
+    "group": "company",
+    "blueprint": "company_t1_tank",
+    "owner": 0,
+    "at": [
+      3382,
+      7918
+    ],
+    "heading": 0
+  },
+  {
+    "action": "unit",
+    "name": "company_scout_1",
+    "group": "company",
+    "blueprint": "company_t1_scout",
+    "owner": 0,
+    "at": [
+      3348,
+      8028
+    ],
+    "heading": 0
+  },
+  {
+    "action": "unit",
+    "name": "company_artillery_1",
+    "group": "company",
+    "blueprint": "company_t1_artillery",
+    "owner": 0,
+    "at": [
+      3248,
+      7998
+    ],
+    "heading": 0
+  },
+  {
+    "action": "unit",
+    "name": "company_scout_2",
+    "group": "company",
+    "blueprint": "company_t1_scout",
+    "owner": 0,
+    "at": [
+      3383,
+      8028
+    ],
+    "heading": 0
+  },
+  {
+    "action": "unit",
+    "name": "company_artillery_2",
+    "group": "company",
+    "blueprint": "company_t1_artillery",
+    "owner": 0,
+    "at": [
+      3283,
+      7998
+    ],
+    "heading": 0
+  },
+  {
+    "action": "unit",
+    "name": "company_bombers_1",
+    "group": "company_bombers",
+    "blueprint": "company_t1_bomber",
+    "owner": 0,
+    "at": [
+      3148,
+      8748
+    ],
+    "heading": 180
+  },
+  {
+    "action": "unit",
+    "name": "company_bombers_2",
+    "group": "company_bombers",
+    "blueprint": "company_t1_bomber",
+    "owner": 0,
+    "at": [
+      3238,
+      8748
+    ],
+    "heading": 180
+  },
+  {
+    "action": "unit",
+    "name": "company_bombers_3",
+    "group": "company_bombers",
+    "blueprint": "company_t1_bomber",
+    "owner": 0,
+    "at": [
+      3328,
+      8748
+    ],
+    "heading": 180
+  },
+  {
+    "action": "unit",
+    "name": "bastion_landing",
+    "group": "landing_ship",
+    "blueprint": "company_t3_lift_ship",
+    "owner": 0,
+    "at": [
+      3198,
+      8328
+    ],
+    "heading": 270
   }
 ]

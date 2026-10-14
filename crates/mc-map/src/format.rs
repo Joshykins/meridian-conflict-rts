@@ -1033,6 +1033,8 @@ pub(crate) struct Layout {
     /// 0: no decks.
     pub decks_offset: u64,
     pub deck_count: u32,
+    /// Optional RGB byte triplets, one per sorted prop.
+    pub tints_offset: u64,
 }
 
 // ---------------------------------------------------------------------------
