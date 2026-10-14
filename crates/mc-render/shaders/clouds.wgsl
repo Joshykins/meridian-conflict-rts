@@ -1268,9 +1268,10 @@ fn upsample_whole(uv: vec2<f32>, centre: vec2<f32>, last: vec2<i32>) -> vec4<f32
 // march texels are several pixels wide, and one straddling a treetop and the
 // sky marched to the sky (the farthest of its corners): its cloud and rain,
 // spread by the cubic filter, greyed the leaves beside it and blurred every
-// crown against the sky. Each texel of a cubic B-spline counts only as far
-// as it marched to this pixel's own depth; where none did, the nearest wins
-// (none at all for a pixel nearer than all of them).
+// crown against the sky. Where the texels round it went as far as the pixel,
+// a cubic (`upsample_whole`); across a jump, each of the four nearest counts only
+// as far as it marched to this pixel's own depth, and where none did, the nearest
+// wins (none at all for a pixel nearer than all of them).
 fn upsample(uv: vec2<f32>, depth: f32) -> vec4<f32> {
     let size = vec2<f32>(textureDimensions(cloud_now));
     let at = uv * size - 0.5;
@@ -1287,47 +1288,27 @@ fn upsample(uv: vec2<f32>, depth: f32) -> vec4<f32> {
     if max(spread.x, spread.y) < 0.11 {
         return upsample_whole(uv, centre, last);
     }
+    // Across a jump in depth: the four texels round the pixel, blended by how near
+    // each is, each counting only as far as it marched to this pixel's own depth.
+    // (A cubic over sixteen here cost a third of the whole composite: every pixel
+    // in a block of them along the horizon waited on it.)
     let f = at - centre;
-    let f2 = f * f;
-    let f3 = f2 * f;
-    var wx = array<f32, 4>(
-        (1.0 - 3.0 * f.x + 3.0 * f2.x - f3.x) / 6.0,
-        (4.0 - 6.0 * f2.x + 3.0 * f3.x) / 6.0,
-        (1.0 + 3.0 * f.x + 3.0 * f2.x - 3.0 * f3.x) / 6.0,
-        f3.x / 6.0,
-    );
-    var wy = array<f32, 4>(
-        (1.0 - 3.0 * f.y + 3.0 * f2.y - f3.y) / 6.0,
-        (4.0 - 6.0 * f2.y + 3.0 * f3.y) / 6.0,
-        (1.0 + 3.0 * f.y + 3.0 * f2.y - 3.0 * f3.y) / 6.0,
-        f3.y / 6.0,
-    );
-    let base = vec2<i32>(centre) - vec2<i32>(1);
-    var ok = array<f32, 16>();
-    var worst = 1.0;
+    var sum = vec4<f32>(0.0);
+    var weight = 0.0;
     var nearest = 1.0e30;
     var nearest_at = vec2<i32>(0);
-    for (var i = 0; i < 16; i++) {
-        let px = clamp(base + vec2<i32>(i & 3, i >> 2u), vec2<i32>(0), last);
+    for (var i = 0; i < 4; i++) {
+        let k = vec2<i32>(i & 1, i >> 1u);
+        let px = clamp(vec2<i32>(centre) + k, vec2<i32>(0), last);
         let there = bitcast<f32>(textureLoad(cloud_march, px, 0).w);
         // Log distance apart: a quarter of the way nearer or farther halves it.
         let apart = abs(log2(max(there, 0.1) / max(reach, 0.1)));
-        ok[i] = exp2(-apart * apart * 12.0);
-        worst = min(worst, ok[i]);
         if apart < nearest {
             nearest = apart;
             nearest_at = px;
         }
-    }
-    // All of a piece after all.
-    if worst > 0.9 {
-        return upsample_whole(uv, centre, last);
-    }
-    var sum = vec4<f32>(0.0);
-    var weight = 0.0;
-    for (var i = 0; i < 16; i++) {
-        let w = wx[i & 3] * wy[i >> 2u] * ok[i];
-        let px = clamp(base + vec2<i32>(i & 3, i >> 2u), vec2<i32>(0), last);
+        let side = mix(1.0 - f, f, vec2<f32>(k));
+        let w = side.x * side.y * exp2(-apart * apart * 12.0);
         sum += textureLoad(cloud_now, px, 0) * w;
         weight += w;
     }
