@@ -492,21 +492,34 @@ impl World {
             self.damage_structure(row, weapon.damage * KINETIC_SHARE, ignite);
         }
         if weapon.splash > Fx::ZERO {
-            let victims: Vec<_> = self
-                .state
-                .units
-                .slots
-                .iter()
-                .filter(|&r| {
-                    // A half-built site stands in the open and takes the blast too;
-                    // only what is still inside a factory is out of reach.
-                    !self.state.units.has_flag(r, flag::IN_FACTORY)
+            // A half-built site stands in the open and takes the blast too; only what
+            // is still inside a factory is out of reach, and the index leaves that out.
+            let mut victims = Vec::new();
+            let friends = self.team_mask(owner);
+            self.index
+                .query_foes(hit.point.xy(), weapon.splash, kind::UNIT, friends, |e| {
+                    let r = e.row as usize;
+                    if self.state.units.slots.is_alive(r)
                         && self.are_enemies(owner, self.state.units.owner[r])
                         && (self.bp(r).target_categories() & weapon.target_mask != 0
                             || (weapon.torpedo && self.on_seabed(r)))
-                        && (hit.unit == Some(r) || self.blast_reaches(hit.point, r, weapon))
-                })
-                .collect();
+                        && self.blast_reaches(hit.point, r, weapon)
+                    {
+                        victims.push(r);
+                    }
+                    true
+                });
+            // The unit struck is in the blast however the index last saw it.
+            if let Some(r) = hit.unit.filter(|r| !victims.contains(r)) {
+                if !self.state.units.has_flag(r, flag::IN_FACTORY)
+                    && self.are_enemies(owner, self.state.units.owner[r])
+                    && (self.bp(r).target_categories() & weapon.target_mask != 0
+                        || (weapon.torpedo && self.on_seabed(r)))
+                {
+                    victims.push(r);
+                }
+            }
+            victims.sort_unstable();
             // Snapshot all protection before charging any field. A blast that
             // exhausts a shield is still absorbed for every victim of that blast.
             let victims: Vec<_> = victims
