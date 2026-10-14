@@ -198,7 +198,7 @@ const CRASH_TRAILS: usize = 1500;
 const SMOKERS: usize = 2000;
 /// Most shots, hits and discharges a tick whose flash and sparks are drawn, the nearest
 /// the camera's focus (`upload_sim`).
-const SMALL_EVENTS: usize = 3000;
+const SMALL_EVENTS: usize = 1200;
 pub const MAX_PUFFS: usize = 24576 + nuke_fx::NUKE_PUFF_SLOTS;
 /// Tail of the puff buffer. Smoke over a fire is rewritten here every frame,
 /// so a carpet cannot wrap the ring and erase a column halfway through.
@@ -3378,6 +3378,7 @@ impl Renderer {
             );
         }
         self.unit_kinds.rebuild(units, self.blueprints.units.len());
+        let patch = mc_core::perf_span!("inst.patch");
         let patched = self.titan_charge.patch(units, time);
         let patched = self.capital_fx.swing.patch(&self.blueprints, patched);
         let patched = self.wing_fx.ease(patched);
@@ -3397,13 +3398,17 @@ impl Renderer {
             self.tick_seconds,
         );
         let patched = self.edict_fx.patch(patched, &frame.edicts, time);
+        drop(patch);
+        let write = mc_core::perf_span!("inst.write");
         self.dynamic.write(0, bytemuck::cast_slice(&patched));
+        drop(write);
         self.sim_units = units.len() as u32;
         // A deliberate cap (`MAX_HOUSES`, cosmetic): past it the last units' houses are
         // posed from the end of the list (entity.wgsl `gun_record` holds the index inside the
         // buffer), never read past it.
         let houses = &frame.houses[..frame.houses.len().min(MAX_HOUSES)];
         if !houses.is_empty() {
+            let _t = mc_core::perf_span!("inst.houses");
             let charged = self
                 .titan_charge
                 .patch_houses(units, houses, &self.blueprints);
@@ -3427,7 +3432,10 @@ impl Renderer {
             let _t = mc_core::perf_span!("lists.upload_shields");
             self.upload_shields(frame, camera.eye());
         }
-        self.lights.tick(frame, &self.blueprints);
+        {
+            let _t = mc_core::perf_span!("lists.lights");
+            self.lights.tick(frame, &self.blueprints);
+        }
 
         let projectiles = &frame.projectiles[..frame.projectiles.len().min(MAX_PROJECTILES)];
         self.projectiles.write(0, bytemuck::cast_slice(projectiles));
@@ -3540,6 +3548,7 @@ impl Renderer {
         }
         drop(part);
         let part = mc_core::perf_span!("cpu.upload.events");
+        let pre = mc_core::perf_span!("ev.pre");
         self.construction(frame, time, camera);
         self.nanite_site_glints(frame, time, camera.eye());
         // A blast (or an Edict's strike) is known before the trees it kills are looked at
@@ -3559,6 +3568,7 @@ impl Renderer {
         self.clear_lots(frame, time);
         // Before the events: a Lance's strike and a shell's landing read this tick's Shapers.
         self.progenitor_tick(frame, time);
+        drop(pre);
         // A shot, a hit or a charged shell's discharge makes a flash and sparks gone in
         // under a second. Far past what the camera shows they are out of sight, and of a
         // sky-wide air war's tens of thousands a tick only the nearest `SMALL_EVENTS`
@@ -3589,12 +3599,20 @@ impl Renderer {
                 drawn[i] = false;
             }
         }
-        for (event, drawn) in frame.events.iter().zip(drawn) {
-            if drawn {
-                self.effects_of(event, time);
+        {
+            let _t = mc_core::perf_span!("ev.effects");
+            for (event, drawn) in frame.events.iter().zip(drawn) {
+                if drawn {
+                    self.effects_of(event, time);
+                }
             }
-            self.stir_clouds(event, time);
-            self.impact_crater(event, time);
+        }
+        {
+            let _t = mc_core::perf_span!("ev.clouds_craters");
+            for event in &frame.events {
+                self.stir_clouds(event, time);
+                self.impact_crater(event, time);
+            }
         }
         drop(part);
         let part = mc_core::perf_span!("cpu.upload.sky");

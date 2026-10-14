@@ -64,14 +64,14 @@ impl Renderer {
             let bp = self
                 .blueprints
                 .unit(mc_data::BlueprintId(u.blueprint as u16));
-            let vtol = self.vtol.0.get(u.blueprint as usize).copied().flatten();
-            let fans = vtol.map_or(bp.visual.mesh == "reclaim_drone", |v| v.fans);
-            let hover_flight = bp.motion.is_some_and(|m| m.hover);
-            let assault = bp.visual.mesh == "assault_air";
             let capital = bp.is_capital_ship();
             if !capital && (!in_reach(u) || !share.takes(u.unit_id)) {
                 continue;
             }
+            let vtol = self.vtol.0.get(u.blueprint as usize).copied().flatten();
+            let fans = vtol.map_or(bp.visual.mesh == "reclaim_drone", |v| v.fans);
+            let hover_flight = bp.motion.is_some_and(|m| m.hover);
+            let assault = bp.visual.mesh == "assault_air";
             // The ports are placed on the model as authored; a blueprint drawn bigger or
             // smaller moves them with the hull.
             let (authored_radius, authored_height) =
