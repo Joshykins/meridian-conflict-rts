@@ -13,13 +13,15 @@ pub(in crate::hud) const WIDE: f32 = 122.0;
 const TIP: &str = "Save Prefab  \u{b7}  keep this layout, to lay it again with B, then P";
 
 /// Whether the selection has anything to save: a structure of the player's own,
-/// or a builder with structures planned.
-pub(in crate::hud) fn can_save(s: &Scene, units: &[&UnitInstance]) -> bool {
-    let structures = units.iter().any(|u| {
-        (u.owner_flags & 0xFF) as u8 == s.view.local
-            && s.bp(u).built_on_site()
-            && !s.bp(u).is_mobile()
-    });
+/// or a builder with structures planned. `structures`: any of their blueprints is one;
+/// when none is, the units are not looked through for one.
+pub(in crate::hud) fn can_save(s: &Scene, units: &[&UnitInstance], structures: bool) -> bool {
+    let structures = structures
+        && units.iter().any(|u| {
+            (u.owner_flags & 0xFF) as u8 == s.view.local
+                && s.bp(u).built_on_site()
+                && !s.bp(u).is_mobile()
+        });
     if structures || s.view.status.plans.is_empty() {
         return structures;
     }

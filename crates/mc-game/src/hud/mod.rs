@@ -783,18 +783,24 @@ impl Hud {
         let shown_now = (!selected.is_empty()).then_some(stamp);
         if shown_now.is_none() || self.kept.deck.compared != shown_now {
             self.kept.deck.compared = shown_now;
-            let showing = units.iter().map(|u| u.unit_id);
-            let same =
-                (self.details_for.as_ref()).map(|was| was.iter().copied().eq(showing.clone()));
+            // With every selected unit found, those shown are the selection, which is
+            // compared without looking at the units.
+            let showing: std::borrow::Cow<[u32]> =
+                if units.len() == view.selection.len() && !selected.is_empty() {
+                    std::borrow::Cow::Borrowed(&view.selection[..])
+                } else {
+                    std::borrow::Cow::Owned(units.iter().map(|u| u.unit_id).collect())
+                };
+            let same = (self.details_for.as_deref()).map(|was| was == &showing[..]);
             if same == Some(false) {
                 self.details_open = false;
                 ui.snap(id("unit-details-card", 0), 0.0);
             }
             if same != Some(true) {
-                self.details_for = Some(showing.clone().collect());
+                self.details_for = Some(showing.to_vec());
             }
-            if !units.is_empty() && !self.deck_units.iter().copied().eq(showing.clone()) {
-                self.deck_units = showing.collect();
+            if !units.is_empty() && self.deck_units[..] != showing[..] {
+                self.deck_units = showing.into_owned();
                 self.kept.deck.closing += 1;
             }
         }

@@ -133,7 +133,10 @@ pub fn alerts(hud: &mut Hud, ui: &mut Ui, s: &Scene, dt: f32) {
         // Enemy elevators in sight: the first look at one is called, and its standing up
         // once it was seen going up.
         let team = |p: u8| view.status.players.get(p as usize).map(|pl| pl.team);
-        for u in &view.frame.units {
+        // Looked for only when the frame holds an elevator: most never do.
+        let elevators = view.in_frame(|bp| s.blueprints.unit(bp).elevator.is_some());
+        let units: &[UnitInstance] = if elevators { &view.frame.units } else { &[] };
+        for u in units {
             if u.owner_flags & (KIND_WRECK | STATE_UNIDENTIFIED) != 0
                 || s.bp(u).elevator.is_none()
                 || view.observing

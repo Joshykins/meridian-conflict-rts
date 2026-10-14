@@ -51,6 +51,13 @@ fn same_order(a: &QueuedOrder, b: &QueuedOrder) -> bool {
 
 /// Two queues whose lines run the same way (`same_order`), from the same group.
 fn same_route(a: &UnitOrders, b: &UnitOrders) -> bool {
+    // A group's members, most often: every order alike, found in one pass over both.
+    let alike = |x: &[QueuedOrder], y: &[QueuedOrder]| {
+        x.len() == y.len() && x.iter().zip(y).all(|(p, q)| same_order(p, q))
+    };
+    if alike(&a.orders, &b.orders) && alike(&a.standing, &b.standing) {
+        return true;
+    }
     a.orders.first().map(|o| o.formation) == b.orders.first().map(|o| o.formation)
         && drawn_route(a).count() == drawn_route(b).count()
         && drawn_route(a)
@@ -135,15 +142,12 @@ impl Routes {
         self.lone.clear();
         let queues = &view.status.queues;
         // Routes met so far, by hash, and the queue first met on each; and the last one met,
-        // which the next queue (the next member of the same group, most often) is likely on.
+        // which the next queue (the next member of the same group, most often) is on.
         let mut groups: IdMap<u64, Vec<u32>> = IdMap::default();
         let mut lone: IdMap<u64, Vec<u32>> = IdMap::default();
         let (mut last_group, mut last_lone) = (None::<u32>, None::<u32>);
         let met = |seen: &mut IdMap<u64, Vec<u32>>, last: &mut Option<u32>, i: u32| {
             let queue = &queues[i as usize];
-            if let Some(first) = last.filter(|&f| same_route(&queues[f as usize], queue)) {
-                return Some(first);
-            }
             let firsts = seen.entry(route_hash(queue)).or_default();
             let first = (firsts.iter().copied()).find(|&f| same_route(&queues[f as usize], queue));
             if first.is_none() {
@@ -164,6 +168,20 @@ impl Routes {
                 continue;
             }
             let i = i as u32;
+            // The next member of the last group or lone route met, most often (a batch's
+            // queue is drawn whatever its route).
+            let on = |last: Option<u32>| {
+                queue.batch.is_none()
+                    && last.is_some_and(|f| same_route(&queues[f as usize], queue))
+            };
+            if on(last_group) {
+                continue;
+            }
+            if on(last_lone) {
+                let u = &view.frame.units[row];
+                self.lone.push((i, Vec2::new(u.pos[0], u.pos[1])));
+                continue;
+            }
             match kind_of(queue) {
                 Kind::Other => self.always.push(i),
                 Kind::Group => {
@@ -236,6 +254,49 @@ mod tests {
         let mut routes = Routes::default();
         // 0 and 1 stand for their groups; 2 and 5 walk alone.
         assert_eq!(routes.drawn(&view, Vec2::ZERO), [0, 1, 2, 5]);
+    }
+
+    /// Probe: what the order lines' bookkeeping costs the CPU with 64 000 selected in one
+    /// command group: bringing the kept groups up to date and sorting out the queues to
+    /// draw, after a pull and between pulls. Run:
+    ///
+    ///     cargo test --profile gate -p mc-game zz_orders_64k -- --ignored --nocapture
+    #[test]
+    #[ignore = "probe: prints timings, asserts nothing"]
+    fn zz_orders_64k_selected() {
+        let mut view = side(64_000, |_| Some(77));
+        let mut map = super::super::OrderMap::default();
+        let pull = |view: &mut View| {
+            view.frame.tick += 1;
+            let v = view;
+            v.rows.rebuild(
+                v.frame.tick,
+                &v.frame.units,
+                &v.status.queues,
+                &v.frame.fuel,
+            );
+        };
+        pull(&mut view);
+        map.keep_groups_now(&view);
+        let ms = |t: std::time::Instant| t.elapsed().as_secs_f64() * 1000.0;
+        for pulled in [true, false, true, false] {
+            if pulled {
+                pull(&mut view);
+            }
+            let t = std::time::Instant::now();
+            view.picked();
+            let picked = ms(t);
+            let t = std::time::Instant::now();
+            map.keep_groups_now(&view);
+            let groups = ms(t);
+            let t = std::time::Instant::now();
+            let drawn = map.routes.drawn(&view, Vec2::ZERO).len();
+            let routes = ms(t);
+            println!(
+                "{}: picked {picked:.2} ms, groups {groups:.2} ms, routes {routes:.2} ms ({drawn} drawn)",
+                if pulled { "after a pull" } else { "between pulls" }
+            );
+        }
     }
 
     #[test]

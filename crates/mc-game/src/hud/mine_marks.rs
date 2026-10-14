@@ -448,27 +448,29 @@ pub(super) fn mine_marks(ui: &mut Ui, s: &Scene, survey: &mut Survey) {
         Mode::Place(bp) => s.blueprints.unit(bp).mine.map(|m| (bp, m)),
         _ => None,
     };
-    let selected: Vec<u32> = s
-        .view
-        .frame
-        .units
-        .iter()
-        .filter(|u| s.bp(u).mine.is_some() && s.view.selection.contains(&u.unit_id))
-        .map(|u| u.unit_id)
-        .collect();
+    // The selection's blueprints are asked first, each once: a sky of fighters holds
+    // no mine and no builder, and its units need not be looked through.
+    let picks = |test: &dyn Fn(&mc_data::UnitBlueprint) -> bool| {
+        s.view.picks_any(|bp| test(s.blueprints.unit(bp)))
+    };
+    let selected: Vec<u32> = if picks(&|bp| bp.mine.is_some()) {
+        (s.view.frame.units.iter())
+            .filter(|u| s.bp(u).mine.is_some() && s.view.selection.contains(&u.unit_id))
+            .map(|u| u.unit_id)
+            .collect()
+    } else {
+        Vec::new()
+    };
     // A builder with a mine still to start in its queue brings the survey up
     // too: the grid it is laying out reads only against the others' reach.
-    let ordering = s
-        .view
-        .status
-        .queues
-        .iter()
-        .filter(|q| {
-            q.orders.iter().any(|o| {
-                o.kind == OrderKind::Build && s.blueprints.unit(o.blueprint).mine.is_some()
+    let ordering = picks(&|bp| bp.builder.is_some())
+        && (s.view.status.queues.iter())
+            .filter(|q| {
+                q.orders.iter().any(|o| {
+                    o.kind == OrderKind::Build && s.blueprints.unit(o.blueprint).mine.is_some()
+                })
             })
-        })
-        .any(|q| s.view.selection.contains(&q.unit_id));
+            .any(|q| s.view.selection.contains(&q.unit_id));
     if placing.is_none() && selected.is_empty() && !ordering && !s.show_reclaim {
         return;
     }

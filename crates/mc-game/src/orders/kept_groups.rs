@@ -4,7 +4,7 @@
 //! now once per pull, with the frames between drawing it from the sums kept.
 
 use super::{badge_radius, muster, Field, Group, OrderMap};
-use crate::fast_hash::{IdMap, IdSet};
+use crate::fast_hash::{IdSet, RowMap};
 use crate::game::View;
 use glam::{Vec2, Vec3};
 use mc_sim::tables::OrderKind;
@@ -17,6 +17,8 @@ pub(super) struct GroupsKept {
     at: Option<u64>,
     /// Counts the times they were: what `found` was found for.
     runs: u64,
+    /// The group each unit is in, while they are brought up to date.
+    group_of: RowMap<u64>,
     found: RefCell<Found>,
 }
 
@@ -57,13 +59,15 @@ impl OrderMap {
         // The group each unit is in (one at most), looked up by unit: a side of thousands
         // in a few big groups costs a pass over its queues, not a search of every group's
         // members for every unit.
-        let mut group_of: IdMap<u32, u64> = IdMap::default();
-        group_of.reserve(self.kept.values().map(Vec::len).sum());
+        let mut group_of = std::mem::take(&mut self.groups_kept.group_of);
+        group_of.clear();
         for (&formation, members) in &self.kept {
-            group_of.extend(members.iter().map(|&id| (id, formation)));
+            for &id in members {
+                group_of.insert(id, formation);
+            }
         }
         for id in self.ordered.take() {
-            if let Some(formation) = group_of.remove(&id) {
+            if let Some(formation) = group_of.remove(id) {
                 self.left.insert((id, formation));
             }
         }
@@ -83,18 +87,19 @@ impl OrderMap {
                 }
             } else if front.formation == 0 {
                 // Walking on its own now: out of every group.
-                group_of.remove(&id);
+                group_of.remove(id);
             }
         }
-        group_of.retain(|&id, _| view.unit_index(id).is_some());
-        for (formation, members) in self.kept.iter_mut() {
-            members.retain(|id| group_of.get(id) == Some(formation));
+        group_of.retain(|id, _| view.unit_index(id).is_some());
+        for (&formation, members) in self.kept.iter_mut() {
+            members.retain(|&id| group_of.get(id) == Some(formation));
         }
         for (formation, id) in joining {
-            if group_of.get(&id) == Some(&formation) {
+            if group_of.get(id) == Some(formation) {
                 self.kept.entry(formation).or_default().push(id);
             }
         }
+        self.groups_kept.group_of = group_of;
         self.kept.retain(|_, members| members.len() > 1);
         let live: IdSet<u64> = self.kept.keys().copied().collect();
         self.left

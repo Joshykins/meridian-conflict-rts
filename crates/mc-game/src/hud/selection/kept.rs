@@ -7,13 +7,14 @@
 //! (`Shown`), and asked of the blueprints once each where the blueprint alone decides
 //! (`kinds`). Nothing shown changes: the same functions give the same answers, less often.
 
-use super::{families, Family, Order};
+use super::{families, ordered_as, Family, Order};
 use crate::game::Mode;
 use crate::hud::economy::{self, Flow};
 use crate::hud::priority::Mix;
 use crate::hud::{cargo, elevator, gravitic, silo, titan, Scene};
 use mc_data::{BlueprintId, UnitBlueprint};
 use mc_sim::mirror::{CargoView, ElevatorView, UnitInstance};
+use mc_sim::FireState;
 
 /// What the deck shows, as far as what is kept for it goes.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -70,6 +71,11 @@ pub(super) struct Summary {
     pub(super) economy: (Flow, Flow),
     /// Every one of them is a core mine with its view: the mine panel instead of tiles.
     pub(super) all_mines: bool,
+    /// Of those that shoot (they or what they make, `ordered_as`), how many hold their
+    /// fire, and how many there are: the order card's Hold Fire.
+    held: (usize, usize),
+    /// Their priorities, for the order card's Priority.
+    mix: Mix,
 }
 
 /// The panels beside the order card, and the first unit each is for (by id) and how many.
@@ -94,7 +100,6 @@ pub(in crate::hud) struct Kept {
     kinds: Memo<Shown, Vec<u32>>,
     summary: Memo<Shown, Summary>,
     card: Memo<(Shown, Mode, bool), Card>,
-    mix: Memo<Shown, Mix>,
     panels: Memo<Shown, Panels>,
 }
 
@@ -148,14 +153,19 @@ impl Kept {
     /// The order card's families (`families`); the lit orders follow the mode.
     pub(super) fn card(&mut self, s: &Scene, units: &[&UnitInstance]) -> Card {
         let kinds = self.kinds(s, units).to_vec();
+        let (held, of) = self.summary(s, units).held;
         let key = self
             .shown
             .map(|shown| (shown, s.view.mode, s.view.formation_panel));
-        (self.card.get(key, || families(s, units, &kinds))).clone()
+        let holding = held * 2 > of;
+        (self
+            .card
+            .get(key, || families(s, units, &kinds, Some(holding))))
+        .clone()
     }
 
     pub(in crate::hud) fn mix(&mut self, s: &Scene, units: &[&UnitInstance]) -> Mix {
-        *self.mix.get(self.shown, || Mix::of(s, units))
+        self.summary(s, units).mix
     }
 
     pub(in crate::hud) fn panels(&mut self, s: &Scene, units: &[&UnitInstance]) -> Panels {
@@ -188,10 +198,60 @@ impl Kept {
     }
 }
 
-/// `Summary`, in a pass or two over `units`.
+/// `Summary`, in one pass over `units` (two for a lift ship's hold).
 fn summary(s: &Scene, units: &[&UnitInstance], kinds: &[u32]) -> Summary {
     let any = |test: &dyn Fn(&UnitBlueprint) -> bool| kinds.iter().any(|&k| test(bp_of(s, k)));
     let mut out = Summary::default();
+    let mut health = 0.0;
+    // What they make and spend together.
+    let (mut materials, mut energy) = (Flow::default(), Flow::default());
+    // For each blueprint met, as `out.types`: whether it shoots (it or what it makes),
+    // takes a priority, and sends reclaimers, asked once.
+    let mut traits: Vec<(bool, bool, bool)> = Vec::new();
+    // Units come in runs of one blueprint: the tile is looked for only when the run ends.
+    let mut at = usize::MAX;
+    for u in units {
+        if out.types.get(at).is_none_or(|t| t.0 != u.blueprint) {
+            at = match out.types.iter().position(|t| t.0 == u.blueprint) {
+                Some(i) => i,
+                None => {
+                    let bp = s.bp(u);
+                    out.types.push((u.blueprint, 0, false));
+                    traits.push((
+                        ordered_as(s.blueprints, bp).any(|b| !b.weapons.is_empty()),
+                        mc_sim::focus::prioritizable(s.blueprints, bp),
+                        bp.sends_reclaimers(),
+                    ));
+                    out.types.len() - 1
+                }
+            };
+        }
+        let tile = &mut out.types[at];
+        tile.1 += 1;
+        tile.2 |= u.paused();
+        let (shoots, prioritizable, reclaims) = traits[at];
+        out.kills += u.kill_count();
+        health += u.health;
+        if let Some(f) = s.view.fuel(u.unit_id) {
+            let fill = f.fill.clamp(0.0, 1.0);
+            out.low_fuel = Some(out.low_fuel.map_or(fill, |low: f32| low.min(fill)));
+        }
+        if reclaims {
+            out.reclaimed += s.queue_of(u).map_or(0.0, |q| q.reclaimed);
+        }
+        let (m, e) = economy::flows(s, u, s.bp(u));
+        materials.add(m);
+        energy.add(e);
+        if shoots {
+            out.held.0 += usize::from(u.fire_state() == FireState::HoldFire);
+            out.held.1 += 1;
+        }
+        out.mix.add(s, u, prioritizable);
+    }
+    out.types
+        .sort_by_key(|&(bp, n, _)| (std::cmp::Reverse(n), bp));
+    out.health = health / units.len().max(1) as f32;
+    out.economy = (materials, energy);
     // A lift ship with units picked out of its hold: the ship's panel stays up.
     if any(&|bp| bp.transport.is_some()) {
         let mut bases = units.iter().filter(|u| s.bp(u).transport.is_some());
@@ -201,42 +261,11 @@ fn summary(s: &Scene, units: &[&UnitInstance], kinds: &[u32]) -> Summary {
                 .all(|u| u.unit_id == base.unit_id || u.stored())
             {
                 out.base = Some(base.unit_id);
-                return out;
             }
         }
     }
-    let reclaimers = any(&|bp| bp.sends_reclaimers());
-    let mut health = 0.0;
-    // Units come in runs of one blueprint: the tile is looked for only when the run ends.
-    let mut at = usize::MAX;
-    for u in units {
-        if out.types.get(at).is_none_or(|t| t.0 != u.blueprint) {
-            at = match out.types.iter().position(|t| t.0 == u.blueprint) {
-                Some(i) => i,
-                None => {
-                    out.types.push((u.blueprint, 0, false));
-                    out.types.len() - 1
-                }
-            };
-        }
-        let tile = &mut out.types[at];
-        tile.1 += 1;
-        tile.2 |= u.paused();
-        out.kills += u.kill_count();
-        health += u.health;
-        if let Some(f) = s.view.fuel(u.unit_id) {
-            let fill = f.fill.clamp(0.0, 1.0);
-            out.low_fuel = Some(out.low_fuel.map_or(fill, |low: f32| low.min(fill)));
-        }
-        if reclaimers && s.bp(u).sends_reclaimers() {
-            out.reclaimed += s.queue_of(u).map_or(0.0, |q| q.reclaimed);
-        }
-    }
-    out.types
-        .sort_by_key(|&(bp, n, _)| (std::cmp::Reverse(n), bp));
-    out.health = health / units.len().max(1) as f32;
-    out.can_save = crate::hud::prefabs::can_save(s, units);
-    out.economy = economy::total(s, units);
+    let structures = any(&|bp| bp.built_on_site() && !bp.is_mobile());
+    out.can_save = crate::hud::prefabs::can_save(s, units, structures);
     // A mine's view comes only with a mine's blueprint (`World::mine_view`).
     out.all_mines = !units.is_empty()
         && kinds.iter().all(|&k| bp_of(s, k).mine.is_some())

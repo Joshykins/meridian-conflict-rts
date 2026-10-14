@@ -1836,6 +1836,7 @@ mod idle;
 mod prefabs;
 mod priority;
 mod queue_tray;
+mod scale;
 mod top_bar;
 mod warp;
 mod wings;

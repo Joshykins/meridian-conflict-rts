@@ -19,7 +19,7 @@ impl Flow {
         self.made < 0.005 && self.wanted < 0.005 && self.used < 0.005
     }
 
-    fn add(&mut self, o: Flow) {
+    pub(in crate::hud) fn add(&mut self, o: Flow) {
         self.made += o.made;
         self.wanted += o.wanted;
         self.used += o.used;
@@ -74,17 +74,6 @@ fn rated(bp: &UnitBlueprint, dial: [f32; 2]) -> (Flow, Flow) {
             used: upkeep,
         },
     )
-}
-
-/// The flows of several units together.
-pub fn total(s: &Scene, units: &[&UnitInstance]) -> (Flow, Flow) {
-    let (mut m, mut e) = (Flow::default(), Flow::default());
-    for u in units {
-        let (a, b) = flows(s, u, s.bp(u));
-        m.add(a);
-        e.add(b);
-    }
-    (m, e)
 }
 
 fn rate(v: f32) -> String {

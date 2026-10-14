@@ -990,7 +990,13 @@ pub fn ordered_as<'a>(
 /// A factory offers what its products can do: they are the ones who will do it.
 /// `kinds` are the units' blueprints, each once (`kept::kinds_of`): what only a blueprint
 /// decides is asked of those, not of every unit.
-fn families(s: &Scene, units: &[&UnitInstance], kinds: &[u32]) -> Vec<(Family, Vec<Order>)> {
+/// `holding`: whether most of those that shoot hold their fire, when already counted.
+fn families(
+    s: &Scene,
+    units: &[&UnitInstance],
+    kinds: &[u32],
+    holding: Option<bool>,
+) -> Vec<(Family, Vec<Order>)> {
     let kinds: Vec<&UnitBlueprint> = kinds
         .iter()
         .map(|&k| s.blueprints.unit(mc_data::BlueprintId(k as u16)))
@@ -1026,26 +1032,28 @@ fn families(s: &Scene, units: &[&UnitInstance], kinds: &[u32]) -> Vec<(Family, V
         Order { glyph: Glyph::Guard, label: "Guard", key: "", hint: "Guard (Ctrl+G): press on a spot, or on a friendly unit to go with it, and drag out the ring. These units are stationed there: they hold it and go after enemies that come in. Aircraft circle it halfway out, a group in formation. Shift queues; shift-drag the centre to move it. Any other order takes a unit off.", action: HudAction::Target(Targeting::Guard), lit: targeting(Targeting::Guard) }
     };
     // Whether most of the armed selection holds its fire.
-    let holding_fire = armed && {
-        let (mut held, mut n) = (0usize, 0usize);
-        // Units come in runs of one blueprint: each run's is looked at once.
-        let mut run: Option<(u32, bool)> = None;
-        for u in units {
-            let shoots = match run {
-                Some((bp, shoots)) if bp == u.blueprint => shoots,
-                _ => {
-                    let shoots = ordered_as(s.blueprints, s.bp(u)).any(|b| !b.weapons.is_empty());
-                    run = Some((u.blueprint, shoots));
-                    shoots
+    let holding_fire = armed
+        && holding.unwrap_or_else(|| {
+            let (mut held, mut n) = (0usize, 0usize);
+            // Units come in runs of one blueprint: each run's is looked at once.
+            let mut run: Option<(u32, bool)> = None;
+            for u in units {
+                let shoots = match run {
+                    Some((bp, shoots)) if bp == u.blueprint => shoots,
+                    _ => {
+                        let shoots =
+                            ordered_as(s.blueprints, s.bp(u)).any(|b| !b.weapons.is_empty());
+                        run = Some((u.blueprint, shoots));
+                        shoots
+                    }
+                };
+                if shoots {
+                    n += 1;
+                    held += usize::from(u.fire_state() == FireState::HoldFire);
                 }
-            };
-            if shoots {
-                n += 1;
-                held += usize::from(u.fire_state() == FireState::HoldFire);
             }
-        }
-        held * 2 > n
-    };
+            held * 2 > n
+        });
 
     let mut out = Vec::new();
     let mut movement = Vec::new();
@@ -1242,7 +1250,7 @@ fn families(s: &Scene, units: &[&UnitInstance], kinds: &[u32]) -> Vec<(Family, V
 /// How many families the order card will show.
 #[cfg(test)]
 pub fn order_families(s: &Scene, units: &[&UnitInstance]) -> usize {
-    families(s, units, &kept::kinds_of(units)).len()
+    families(s, units, &kept::kinds_of(units), None).len()
 }
 
 /// How many families the deck's order card shows, for laying out the deck.

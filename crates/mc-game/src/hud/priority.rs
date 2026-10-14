@@ -80,21 +80,25 @@ impl Mix {
     pub(in crate::hud) fn of(s: &Scene, units: &[&UnitInstance]) -> Mix {
         let mut mix = Mix::default();
         for u in units {
-            if super::has_flag(u, mc_sim::tables::flag::UNDER_CONSTRUCTION)
-                || mc_sim::focus::prioritizable(s.blueprints, s.bp(u))
-            {
-                mix.counts[slot(u.priority())] += 1;
-                if u.priority() == Priority::Even {
-                    if let Some(i) = inherited(s, u) {
-                        mix.inherited[slot(i.p)] += 1;
-                        if i.p != Priority::Even {
-                            mix.from.get_or_insert(i.from);
-                        }
+            mix.add(s, u, mc_sim::focus::prioritizable(s.blueprints, s.bp(u)));
+        }
+        mix
+    }
+
+    /// Counts `u` in, when it takes a priority: `prioritizable` is its blueprint's
+    /// (`mc_sim::focus::prioritizable`), so a pass over many asks it once a blueprint.
+    pub(in crate::hud) fn add(&mut self, s: &Scene, u: &UnitInstance, prioritizable: bool) {
+        if super::has_flag(u, mc_sim::tables::flag::UNDER_CONSTRUCTION) || prioritizable {
+            self.counts[slot(u.priority())] += 1;
+            if u.priority() == Priority::Even {
+                if let Some(i) = inherited(s, u) {
+                    self.inherited[slot(i.p)] += 1;
+                    if i.p != Priority::Even {
+                        self.from.get_or_insert(i.from);
                     }
                 }
             }
         }
-        mix
     }
 
     pub(in crate::hud) fn any(self) -> bool {

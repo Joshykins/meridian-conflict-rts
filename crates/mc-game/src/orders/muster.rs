@@ -28,9 +28,7 @@ type Seen = (Vec3, Vec<u32>);
 /// factory is selected. `middle_of` finds a set of units' middle and those of them seen.
 pub(super) fn batch_groups(field: &Field, middle_of: &dyn Fn(&[u32]) -> Seen) -> Vec<Group> {
     let view = field.view;
-    view.status
-        .queues
-        .iter()
+    view.batch_queues()
         .filter_map(|q| {
             let b = q.batch.as_ref()?;
             let (middle, members) = middle_of(&b.units);
@@ -134,7 +132,7 @@ pub(super) fn filling_ring(
 pub(super) fn links(ui: &mut Ui, field: &Field) {
     let view = field.view;
     let mut drawn: Vec<u32> = Vec::new();
-    for q in &view.status.queues {
+    for q in view.batch_queues() {
         let Some(b) = q.batch.as_ref() else {
             continue;
         };
@@ -160,9 +158,7 @@ pub(super) fn links(ui: &mut Ui, field: &Field) {
         let lit = view.shift
             || b.linked.iter().any(|id| view.selection.contains(id))
             || view
-                .status
-                .queues
-                .iter()
+                .batch_queues()
                 .filter_map(|o| o.batch.as_ref().filter(|o| o.group == b.group))
                 .any(|o| o.units.iter().any(|u| view.selection.contains(u)));
         let strength = if lit { 1.0 } else { 0.35 };

@@ -3140,7 +3140,7 @@ impl Game {
             status,
             ..
         } = &mut self.view;
-        rows.rebuild(&frame.units, &status.queues, &frame.fuel);
+        rows.rebuild(frame.tick, &frame.units, &status.queues, &frame.fuel);
         let index_of = &self.view.index_of;
         let (units, blueprints) = (&self.view.frame.units, &self.blueprints);
         let selectable = |id: &u32| {

@@ -343,8 +343,15 @@ pub(super) fn draw(ui: &mut Ui, field: &Field, placing: Option<(BlueprintId, Vec
     });
     let team_of = |p: u8| view.status.players.get(p as usize).map(|pl| pl.team);
     // Whose network: ours while placing; the selected array's side otherwise.
+    let interceptor = |bp: BlueprintId| {
+        (field.blueprints.unit(bp).strategic.as_ref())
+            .is_some_and(|s| s.kind == StrategicKind::Interceptor)
+    };
     let team = if site.is_some() {
         team_of(view.local)
+    } else if !view.picks_any(interceptor) {
+        // Asked of the selection's blueprints first: most selections hold no array.
+        None
     } else {
         // The blueprint first: few units are arrays, and the selection is looked up
         // only for those.

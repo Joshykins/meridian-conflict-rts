@@ -38,6 +38,37 @@ pub(super) struct Builders {
     next: HashMap<(u8, u32), usize>,
     /// 1 when the commander was hit, fading.
     commander_hit: f32,
+    /// What the cards show, as last found in the frame (`Found`).
+    found: Option<Found>,
+}
+
+/// The commander and the idle units by card, found once per pull: the frame only changes
+/// with one, and looking through every unit of an army of 100 000 each frame cost
+/// milliseconds.
+struct Found {
+    /// The pull and the side they were found for.
+    key: (u64, u8),
+    /// The commander's index in `frame.units`.
+    commander: Option<usize>,
+    idle: [Vec<(mc_data::BlueprintId, Vec<u32>)>; CARDS.len()],
+}
+
+impl Builders {
+    fn found(&mut self, s: &Scene) -> &Found {
+        let key = (s.view.pulls(), s.view.local);
+        // Never pulled (a view filled by hand): every time, as it may have changed.
+        if s.view.pulls() == 0 || self.found.as_ref().is_some_and(|f| f.key != key) {
+            self.found = None;
+        }
+        self.found.get_or_insert_with(|| {
+            let (commander, idle) = idle_kinds(s);
+            Found {
+                key,
+                commander,
+                idle: idle.map(|card| (card.into_iter()).map(|(bp, ids)| (bp.id, ids)).collect()),
+            }
+        })
+    }
 }
 
 /// The idle pulse, shared so every card's bar and dot beat together.
@@ -69,11 +100,7 @@ fn status_line(ui: &mut Ui, x: f32, y: f32, w: f32, text: &str, tone: u32, k: f3
 /// and a click takes the ship instead.
 pub(super) fn commander_card(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, dt: f32) -> bool {
     let _t = mc_core::perf_span!("ui.commander_card");
-    let Some(u) = s.view.frame.units.iter().find(|u| {
-        (u.owner_flags & 0xFF) as u8 == s.view.local
-            && u.owner_flags & KIND_WRECK == 0
-            && s.bp(u).has(cat::COMMANDER)
-    }) else {
+    let Some(u) = (hud.builders.found(s).commander).map(|i| &s.view.frame.units[i]) else {
         return false;
     };
     let bp = s.bp(u);
@@ -238,19 +265,24 @@ const CARDS: [(&str, &str, u32); 3] = [
 /// a salvage unit (`UnitBlueprint::is_salvager`), never a reclaim tower, and it is
 /// idle only with no orders and no wreck in reach: one with wreckage round it will
 /// clear it by itself, or is waiting for room to store it.
-fn idle_kinds<'a>(s: &'a Scene) -> [Vec<Kind<'a>>; CARDS.len()] {
+/// The commander's index in `frame.units`, and the idle units by card: one pass over
+/// the frame.
+fn idle_kinds<'a>(s: &'a Scene) -> (Option<usize>, [Vec<Kind<'a>>; CARDS.len()]) {
     let mut kinds: [Vec<Kind<'a>>; CARDS.len()] = Default::default();
-    // Settled wrecks (not hulls still falling or sinking): where they lie and how big.
-    let wrecks: Vec<(Vec2, f32)> = s
-        .view
-        .frame
-        .units
-        .iter()
-        .filter(|w| w.owner_flags & KIND_WRECK != 0 && w.packed == 0)
-        .map(|w| (Vec2::new(w.pos[0], w.pos[1]), w.radius))
-        .collect();
-    for u in &s.view.frame.units {
+    // Settled wrecks: found only once an idle salvager needs them.
+    let mut wrecks: Option<Vec<(Vec2, f32)>> = None;
+    let mut commander = None;
+    // Only units that could be on a card are looked at: an army of fighters is passed by.
+    let cards = |bp: mc_data::BlueprintId| {
+        let bp = s.blueprints.unit(bp);
+        bp.has(cat::COMMANDER) || bp.has(cat::ENGINEER) || bp.has(cat::FACTORY) || bp.is_salvager()
+    };
+    for i in s.view.units_of(cards) {
+        let u = &s.view.frame.units[i];
         let mine = (u.owner_flags & 0xFF) as u8 == s.view.local && u.owner_flags & KIND_WRECK == 0;
+        if mine && commander.is_none() && s.bp(u).has(cat::COMMANDER) {
+            commander = Some(i);
+        }
         // One in a lift ship's hold is `IN_FACTORY` too: it rides, it is not idle.
         if !mine
             || u.stored()
@@ -266,7 +298,7 @@ fn idle_kinds<'a>(s: &'a Scene) -> [Vec<Kind<'a>>; CARDS.len()] {
             1
         } else if bp.is_salvager()
             && !has_flag(u, flag::RECLAIMING | flag::WORKING)
-            && !wreck_in_reach(bp, u.pos, &wrecks)
+            && !wreck_in_reach(bp, u.pos, wrecks.get_or_insert_with(|| settled_wrecks(s)))
         {
             2
         } else {
@@ -291,7 +323,15 @@ fn idle_kinds<'a>(s: &'a Scene) -> [Vec<Kind<'a>>; CARDS.len()] {
     for card in &mut kinds {
         card.sort_unstable_by_key(|(bp, _)| rank(bp));
     }
-    kinds
+    (commander, kinds)
+}
+
+/// Settled wrecks (not hulls still falling or sinking): where they lie and how big.
+fn settled_wrecks(s: &Scene) -> Vec<(Vec2, f32)> {
+    (s.view.frame.units.iter())
+        .filter(|w| w.owner_flags & KIND_WRECK != 0 && w.packed == 0)
+        .map(|w| (Vec2::new(w.pos[0], w.pos[1]), w.radius))
+        .collect()
 }
 
 /// Whether a wreck lies within a salvage unit's reach of `pos`: its reclaim range, or
@@ -320,7 +360,12 @@ pub(super) fn per_row() -> usize {
 pub(super) fn idle_cards(hud: &mut Hud, ui: &mut Ui, s: &Scene, top: f32, bottom: f32) -> f32 {
     let _t = mc_core::perf_span!("ui.idle_cards");
     let mut y = top;
-    for (card, kinds) in idle_kinds(s).into_iter().enumerate() {
+    let idle = hud.builders.found(s).idle.clone().map(|card| {
+        (card.into_iter())
+            .map(|(bp, ids)| (s.blueprints.unit(bp), ids))
+            .collect::<Vec<Kind>>()
+    });
+    for (card, kinds) in idle.into_iter().enumerate() {
         if kinds.is_empty() {
             continue;
         }
@@ -483,5 +528,8 @@ fn tip(ui: &mut Ui, card: Rect, y: f32, all: &str) {
 
 /// Whether the selection is exactly these units, in any order.
 pub(super) fn same_units(selection: &Selection, ids: &[u32]) -> bool {
-    selection.len() == ids.len() && ids.iter().all(|id| selection.contains(id))
+    // The same ids in the same order most often (a group made from the selection): one
+    // comparison of the two lists, before a search for each id.
+    selection.len() == ids.len()
+        && (ids == &selection[..] || ids.iter().all(|id| selection.contains(id)))
 }
