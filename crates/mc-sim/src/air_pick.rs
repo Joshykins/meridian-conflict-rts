@@ -5,6 +5,14 @@
 //! of fighters in one sky, finding them by searching round the fighter read every
 //! friend within a kilometre for every pick; `Chasers` lists them by mark instead,
 //! once a tick, so a pick reads only the few on its candidates.
+//!
+//! Orders run one row after another, and a fighter's pick sees the picks made before
+//! it this tick. With a hundred thousand fighters that one thread was most of the tick.
+//! So the picks are first worked out on the pool from the tick's starting state
+//! (`speculate_air_picks`), each noting the marks whose chasers it counted. As the
+//! orders then run, every mark whose chasers change is noted (`note_chase_change`), and
+//! a fighter takes its worked-out pick only when none of the marks it counted changed;
+//! otherwise it picks again there and then. The picks come out as if made in turn.
 
 use crate::spatial::kind;
 use crate::tables::*;
@@ -25,6 +33,35 @@ const SCRAMBLE_PROBE: Fx = Fx::from_int(128);
 const PICK_BUDGET: usize = 48;
 
 const END: u32 = u32::MAX;
+
+/// Fighters' picks worked out ahead of the orders (`World::speculate_air_picks`).
+#[derive(Default)]
+pub(crate) struct AirSpecs {
+    /// Per row: its pick's index in `picks`, or `END`.
+    by_row: Vec<u32>,
+    picks: Vec<Spec>,
+    /// The marks each pick counted the chasers of (`Spec::seen` ranges over it).
+    seen: Vec<u32>,
+    /// Per row: its chasers have changed since the picks were made.
+    changed: Vec<bool>,
+}
+
+/// One fighter's pick, and what it rested on.
+struct Spec {
+    /// Its front order then (node), and what that named.
+    order: u32,
+    named: UnitId,
+    pick: Option<u32>,
+    seen: (u32, u32),
+}
+
+/// What of a unit its chasers' counts read: the mark its front order names, and
+/// whether it is on a run.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ChaseState {
+    target: Option<usize>,
+    run: bool,
+}
 
 /// The aircraft whose front order names each unit, by the unit's row: listed at the
 /// start of `run_orders` and added to as fighters take new marks (`World::air_fight`).
@@ -84,6 +121,16 @@ impl World {
     /// What the aircraft flies at: the target its order names, else a detected enemy
     /// within `reach`.
     pub(crate) fn air_engage_target_within(&self, row: usize, reach: Fx) -> Option<usize> {
+        self.engage_within(row, reach, &mut None)
+    }
+
+    /// `air_engage_target_within`, noting in `seen` the marks whose chasers it counted.
+    fn engage_within(
+        &self,
+        row: usize,
+        reach: Fx,
+        seen: &mut Option<&mut Vec<u32>>,
+    ) -> Option<usize> {
         let bp = self.bp(row);
         // A lift ship never flies at anything: its guns shoot what comes in reach.
         if bp.weapons.is_empty() || bp.transport.is_some() {
@@ -122,7 +169,7 @@ impl World {
             return None;
         }
         if fighter {
-            return self.air_spread_pick(row, mask, reach);
+            return self.air_spread_pick(row, mask, reach, seen);
         }
         let friends = self.team_mask(units.owner[row]);
         self.index
@@ -141,7 +188,13 @@ impl World {
     /// its own opponent, rather than piling onto the first few it sees while the
     /// rest of the enemy flies free. Orders run in row order, so a fighter sees the
     /// picks the fighters before it made this tick.
-    fn air_spread_pick(&self, row: usize, mask: u32, reach: Fx) -> Option<usize> {
+    fn air_spread_pick(
+        &self,
+        row: usize,
+        mask: u32,
+        reach: Fx,
+        seen: &mut Option<&mut Vec<u32>>,
+    ) -> Option<usize> {
         if !self.fires_at_will(row) {
             return None;
         }
@@ -193,6 +246,9 @@ impl World {
                     return best.map(|(_, t)| t);
                 }
                 weighed += 1;
+                if let Some(seen) = seen {
+                    seen.push(t as u32);
+                }
                 let score = distance + crowd * self.air_pursuers(row, t);
                 if best.is_none_or(|(s, b)| score < s || (score == s && t < b)) {
                     best = Some((score, t));
@@ -236,5 +292,132 @@ impl World {
             }
         }
         seen
+    }
+
+    /// Works out on the pool the pick of every aircraft whose front order flies it at
+    /// what it finds (attack-move, patrol), from the state the orders start from.
+    pub(crate) fn speculate_air_picks(&mut self) {
+        let mut specs = std::mem::take(&mut self.scratch.air_specs);
+        let units = &self.state.units;
+        let rows = units.slots.rows();
+        let this = &*self;
+        let made: Vec<(Vec<(u32, u32, UnitId, Option<u32>, u32)>, Vec<u32>)> =
+            self.pool.parallel_map_chunks(rows, 256, |_, range| {
+                let mut picks = Vec::new();
+                let mut seen = Vec::new();
+                for row in range {
+                    if !units.slots.is_alive(row)
+                        || !units.is_active(row)
+                        || units.drone_parent[row] != Handle::NONE
+                        || !this.is_air(row)
+                        || this.stunned(row)
+                    {
+                        continue;
+                    }
+                    let Some(o) = this.state.orders.front(units, row) else {
+                        continue;
+                    };
+                    if !matches!(o.kind, OrderKind::AttackMove | OrderKind::Patrol) {
+                        continue;
+                    }
+                    let first = seen.len() as u32;
+                    let pick = this
+                        .engage_within(row, this.bp(row).vision, &mut Some(&mut seen))
+                        .map(|t| t as u32);
+                    picks.push((row as u32, units.order_head[row], o.target, pick, first));
+                }
+                (picks, seen)
+            });
+        specs.by_row.clear();
+        specs.by_row.resize(rows, END);
+        specs.picks.clear();
+        specs.seen.clear();
+        specs.changed.clear();
+        specs.changed.resize(rows, false);
+        for (picks, seen) in made {
+            let base = specs.seen.len() as u32;
+            let ends: Vec<u32> = picks
+                .iter()
+                .skip(1)
+                .map(|p| p.4)
+                .chain(std::iter::once(seen.len() as u32))
+                .collect();
+            for ((row, order, named, pick, first), end) in picks.into_iter().zip(ends) {
+                specs.by_row[row as usize] = specs.picks.len() as u32;
+                specs.picks.push(Spec {
+                    order,
+                    named,
+                    pick,
+                    seen: (base + first, base + end),
+                });
+            }
+            specs.seen.extend(seen);
+        }
+        self.scratch.air_specs = specs;
+    }
+
+    /// What `air_engage_target` gives `row` now: its worked-out pick when nothing it
+    /// rested on has changed since, else picked again.
+    pub(crate) fn air_engage_target_specced(&self, row: usize) -> Option<usize> {
+        let specs = &self.scratch.air_specs;
+        let units = &self.state.units;
+        if let Some(spec) = specs
+            .by_row
+            .get(row)
+            .and_then(|&i| specs.picks.get(i as usize))
+        {
+            let (a, b) = spec.seen;
+            if units.order_head[row] == spec.order
+                && self
+                    .state
+                    .orders
+                    .front(units, row)
+                    .is_some_and(|o| o.target == spec.named)
+                && specs.seen[a as usize..b as usize]
+                    .iter()
+                    .all(|&t| !specs.changed[t as usize])
+            {
+                return spec.pick.map(|t| t as usize);
+            }
+        }
+        self.air_engage_target(row)
+    }
+
+    /// What of `row` its chasers' counts read (see `ChaseState`).
+    pub(crate) fn chase_state(&self, row: usize) -> Option<ChaseState> {
+        let units = &self.state.units;
+        if !units.slots.is_alive(row) || !self.is_air(row) {
+            return None;
+        }
+        Some(ChaseState {
+            target: self
+                .state
+                .orders
+                .front(units, row)
+                .and_then(|o| units.row(o.target)),
+            run: units.has_flag(row, flag::AIR_RUN),
+        })
+    }
+
+    /// Notes the marks whose chasers a row's orders changed: the one it was on and the
+    /// one it is on now.
+    pub(crate) fn note_chase_change(
+        &mut self,
+        before: Option<ChaseState>,
+        after: Option<ChaseState>,
+    ) {
+        if before == after {
+            return;
+        }
+        let changed = &mut self.scratch.air_specs.changed;
+        for t in [before, after]
+            .into_iter()
+            .flatten()
+            .filter_map(|s| s.target)
+        {
+            if let Some(c) = changed.get_mut(t) {
+                *c = true;
+            }
+        }
     }
 }

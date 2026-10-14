@@ -228,6 +228,8 @@ pub(crate) struct Scratch {
     pub shielded: Vec<usize>,
     /// The aircraft on each unit, listed at the start of `run_orders`.
     pub chasers: crate::air_pick::Chasers,
+    /// Fighters' picks worked out on the pool before the orders run.
+    pub air_specs: crate::air_pick::AirSpecs,
 }
 
 /// Radius props occupy in the spatial index.
