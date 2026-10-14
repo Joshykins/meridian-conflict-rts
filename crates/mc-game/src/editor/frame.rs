@@ -39,13 +39,13 @@ impl Editor {
             dt,
         );
         let browsing = self.browser.as_ref().is_some_and(|b| b.browser.is_open());
-        ui.interactive = !browsing && !self.confirm_exit;
-        let bottom = ui.size.y - 180.0;
+        ui.interactive = !browsing && !self.confirm_exit && !self.reloading();
+        let bottom = ui.size.y - (144.0 + Self::tool_rows(ui.size.x) as f32 * 44.0);
         self.top_bar(&mut ui, renderer, &mut event);
         self.tools_panel(&mut ui, bottom);
         let card = self.properties(&mut ui, renderer);
         let outliner = self.outliner(&mut ui, bottom);
-        if !browsing {
+        if !browsing && !self.reloading() {
             self.world_input(&mut ui, renderer, bottom, card, outliner);
         }
         self.draw_regions(&mut ui, renderer);

@@ -124,3 +124,6 @@ Read by the ignored probe tests in mc-sim, never by the game (docs/AI_COMMANDER.
 - `--mission-pilot`: with `--bench` or `--screenshot` on Vela, execute the
   authoring smoke route using ordinary Company orders. No teleports or forced
   triggers; does not control normal interactive play.
+
+- `--editor-headless`: with `--editor MAP`, serve the editor mailbox and render
+  the real editor offscreen at ten frames per second. Use `op=close` to stop.

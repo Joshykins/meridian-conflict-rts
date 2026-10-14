@@ -63,6 +63,41 @@ result with the native renderer. scripts/editor.sh --mcp serves the same API
 over MCP stdio. A request timeout means the outcome is unknown; inspect state
 before retrying an edit.
 
+For a native editor without opening a window, use:
+
+    meridian --editor vela_m1 --editor-headless --size 1280x720
+
+It serves the same mailbox and renders at ten frames per second. State, edit,
+undo, save, camera, screenshot and reload work normally. Playtest requires the
+windowed editor. Close with {"op":"close"}; unsaved work refuses to close unless
+{"op":"close","discard":true} is explicitly requested.
+
+## Reload
+
+Reload data and Reload shaders are in the editor tool panel. The current renderer
+stays visible while its replacement builds. The camera can still move, while
+edits and playtests wait for completion. Invalid data, shaders or model files
+report an error in the editor and leave the document, undo history and current
+view intact. Successful data reload also updates sound definitions.
+
+    scripts/editor.sh '{"op":"reload","resources":{"data":true}}'
+    scripts/editor.sh '{"op":"reload","resources":{"shaders":true}}'
+    scripts/editor.sh '{"op":"state"}'
+
+State includes reloading and message; wait for reloading to become false, and
+inspect message to distinguish completion from failure. The initial reload
+reply only accepts the request.
+
+For rebuilt models, request the exact calls for a rendered mesh, run the existing
+mc-models helper with that binary request, and send its binary response:
+
+    scripts/editor.sh '{"op":"model_calls","key":"tank_light"}'
+    scripts/editor.sh '{"op":"reload","resources":{"calls":"CALLS.bin","models":"MODELS.bin"}}'
+
+Paths are on the editor host (Windows for the native editor). The model files use
+the same bounded protocol as the shot server. Every requested model must resolve
+before replacements are applied. Rust gameplay changes still require a rebuild.
+
 ## Mission checkpoints
 
 Compiled Rust authoring in mc-missions produces deterministic event definitions.
@@ -100,5 +135,5 @@ civilian evacuation cars, physical ARC cargo drops, queued comms and checkpoint
 recovery. Add --resume to restore every checkpoint into a fresh world during the
 route. Use --mission-pilot with a headless screenshot to inspect later beats.
 Full encounter balance and visual review remain in progress. Component prop editing, the remaining terrain
-and paint tools, resizing, free camera and reload controls are tracked in
+and paint tools, resizing and free camera are tracked in
 EDITOR-IMPLEMENTATION.md and are not yet available in this slice.

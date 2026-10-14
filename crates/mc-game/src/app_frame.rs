@@ -456,6 +456,7 @@ impl App {
                 }
             }
         }
+        self.reload_editor()?;
         // The pointer says what a click would do; outside a match it is the plain arrow.
         let pointer = match &self.stage {
             Stage::Match(game) => game.pointer(),

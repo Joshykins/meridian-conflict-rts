@@ -5,9 +5,14 @@ mod document;
 mod frame;
 mod interaction;
 mod panels;
+mod preview;
+mod reload;
 mod save;
+pub(crate) use reload::ReloadRequest;
 mod screenshot;
+mod server;
 pub(crate) use screenshot::screenshot;
+pub(crate) use server::serve;
 
 use crate::game::{FrameCtx, GameStart};
 use crate::ui::{id, palette, rgb, type_scale, ButtonKind, Rect, Ui};
@@ -54,6 +59,7 @@ pub(crate) struct Editor {
     confirm_exit: bool,
     browser: Option<browser::Browse>,
     api: api::Api,
+    reload: reload::Reload,
 }
 
 fn config() -> MatchConfig {
@@ -84,6 +90,7 @@ impl Editor {
         pool: Arc<Pool>,
         viewport: Vec2,
     ) -> Result<Self, String> {
+        mc_render::models::remote::keep_meshes();
         let map = Arc::new(MapFile::open(path).map_err(|e| e.to_string())?);
         let doc = Document::open(path)?;
         let size = Vec2::from(map.info().size_metres().to_f32());
@@ -117,50 +124,19 @@ impl Editor {
             confirm_exit: false,
             browser: None,
             api: api::Api::new(),
+            reload: Default::default(),
         };
         editor.refresh_units()?;
         Ok(editor)
     }
 
     fn refresh_units(&mut self) -> Result<(), String> {
-        let info = &self.doc.map.info;
-        let (w, h) = info.size_cells();
-        let mut terrain = mc_map::Heightfield::from_samples(
-            w,
-            h,
-            self.doc.map.samples().to_vec(),
-            info.min_z,
-            info.z_step,
-            info.water_level,
-        );
-        terrain = terrain.with_decks(self.doc.map.decks.clone());
-        let data = mc_sim::world::MapData {
-            name: info.name.clone(),
-            content_id: self.map.content_id(),
-            ore: self.doc.map.ore.clone(),
-            starts: self.doc.map.starts.clone(),
-            props: self.doc.map.props.clone(),
-        };
-        let mut world = World::with_terrain(
-            terrain,
-            data,
+        self.frame = preview::build(
+            &self.doc,
+            self.map.content_id(),
             self.blueprints.clone(),
             self.pool.clone(),
-            &config(),
-        )
-        .map_err(|e| e.to_string())?;
-        for unit in &self.doc.placed.units {
-            let bp = self
-                .blueprints
-                .id_of(&unit.blueprint)
-                .ok_or_else(|| format!("Unknown unit {}", unit.blueprint))?;
-            world
-                .spawn_unit(bp, unit.owner, unit.at, unit.heading, true)
-                .map_err(|e| e.to_string())?;
-        }
-        world.write_render_frame(None, &mut self.frame);
-        // Preview construction must never alter the authoring ground.
-        self.frame.terrain_edits.clear();
+        )?;
         self.fresh = true;
         Ok(())
     }

@@ -109,6 +109,48 @@ pub fn replace(calls: &[Call], models: Response) -> usize {
     swapped
 }
 
+/// Saves only the meshes a reload will replace. Dropping it rolls back a failed
+/// renderer build; committing keeps the replacements for subsequent renderers.
+pub struct Checkpoint(Option<Vec<(Call, Option<Model>)>>);
+
+pub fn checkpoint(calls: &[Call]) -> Checkpoint {
+    let kept = kept_lock();
+    Checkpoint(Some(
+        calls
+            .iter()
+            .map(|call| {
+                let previous = kept.as_ref().and_then(|entries| {
+                    entries
+                        .iter()
+                        .find(|(c, _)| c == call)
+                        .map(|(_, model)| model.clone())
+                });
+                (call.clone(), previous)
+            })
+            .collect(),
+    ))
+}
+impl Checkpoint {
+    pub fn commit(mut self) {
+        self.0 = None;
+    }
+}
+impl Drop for Checkpoint {
+    fn drop(&mut self) {
+        let Some(previous) = self.0.take() else {
+            return;
+        };
+        if let Some(kept) = kept_lock().as_mut() {
+            for (call, model) in previous {
+                kept.retain(|(c, _)| *c != call);
+                if let Some(model) = model {
+                    kept.push((call, model));
+                }
+            }
+        }
+    }
+}
+
 /// What a shot server asks for.
 pub type Request = Vec<Call>;
 /// One entry per call, in the request's order; None for a key no model is made for.
@@ -282,6 +324,26 @@ mod tests {
             ]
         );
         assert_eq!(response[0], build(&request[0]));
+    }
+
+    #[test]
+    fn failed_renderer_reload_restores_cached_model() {
+        keep_meshes();
+        let call = Call::prop("reload_checkpoint_test");
+        let original = build_model("tank_light").unwrap();
+        let replacement = build_model("tree_pine").unwrap();
+        replace(std::slice::from_ref(&call), vec![Some(original.clone())]);
+        {
+            let _rollback = checkpoint(std::slice::from_ref(&call));
+            replace(std::slice::from_ref(&call), vec![Some(replacement.clone())]);
+            assert_eq!(through(call.clone(), || None), Some(replacement.clone()));
+        }
+        assert_eq!(through(call.clone(), || None), Some(original));
+        let accepted = checkpoint(std::slice::from_ref(&call));
+        replace(std::slice::from_ref(&call), vec![Some(replacement.clone())]);
+        accepted.commit();
+        assert_eq!(through(call.clone(), || None), Some(replacement));
+        kept_lock().as_mut().unwrap().retain(|(c, _)| *c != call);
     }
 
     #[test]

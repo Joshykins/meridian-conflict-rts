@@ -12,18 +12,37 @@ use std::time::{Duration, Instant};
 #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
 enum Request {
     State,
-    Edit { actions: Vec<Command> },
+    Edit {
+        actions: Vec<Command>,
+    },
     Undo,
     Redo,
-    Save { name: Option<String> },
-    Camera { at: [f32; 2], zoom: f32, yaw: f32 },
+    Save {
+        name: Option<String>,
+    },
+    Camera {
+        at: [f32; 2],
+        zoom: f32,
+        yaw: f32,
+    },
     Shot,
     Test,
+    Close {
+        #[serde(default)]
+        discard: bool,
+    },
+    Reload {
+        resources: super::ReloadRequest,
+    },
+    ModelCalls {
+        key: String,
+    },
 }
 
 pub(super) struct Api {
     dir: PathBuf,
     pub(super) enabled: bool,
+    pub(super) headless: bool,
     polled: Instant,
     shot: Option<String>,
 }
@@ -37,6 +56,7 @@ impl Api {
         Self {
             dir,
             enabled: true,
+            headless: false,
             polled: Instant::now() - Duration::from_secs(1),
             shot: None,
         }
@@ -120,7 +140,18 @@ impl Drop for Api {
 impl Editor {
     pub(super) fn api_frame(&mut self, renderer: &mut Renderer) -> Option<Event> {
         if let Some(id) = self.api.shot.clone() {
-            if let Some(result) = renderer.take_capture() {
+            let capture = if self.api.headless {
+                renderer.read_pixels().map(|rgba| {
+                    Ok(mc_render::Shot {
+                        width: self.camera.viewport.x as u32,
+                        height: self.camera.viewport.y as u32,
+                        rgba,
+                    })
+                })
+            } else {
+                renderer.take_capture()
+            };
+            if let Some(result) = capture {
                 self.api.shot = None;
                 let response = result.map_err(str::to_owned).and_then(|shot| {
                     let path = self.api.dir.join(format!("{id}.png"));
@@ -136,9 +167,19 @@ impl Editor {
         let (id, request) = self.api.poll()?;
         let mut event = None;
         let result=request.and_then(|request| {
+            if self.reloading() && !matches!(request,Request::State|Request::Shot|Request::Camera{..}) {return Err("Reload is running; wait for state to report completion".into());}
             match request {
+                Request::Reload{resources}=>self.request_reload(resources)?,
+                Request::ModelCalls{key}=>{
+                    let calls=mc_render::models::remote::kept_calls(&key);
+                    if calls.is_empty(){return Err("No rendered model calls match that key".into());}
+                    let path=self.api.dir.join(format!("{id}.calls.bin"));
+                    let bytes=mc_render::models::remote::encode_request(&calls).map_err(|e|e.to_string())?;
+                    std::fs::write(&path,bytes).map_err(|e|e.to_string())?;
+                    return Ok(json!({"ok":true,"calls":path,"count":calls.len()}));
+                }
                 Request::State => return Ok(json!({"ok":true,"map":self.doc.map.info.name,"source":self.doc.source,
-                    "dirty":self.doc.dirty,"placed":self.doc.placed,"camera":{"at":self.camera.focus.to_array(),"zoom":self.camera.distance,"yaw":self.camera.yaw.to_degrees()}})),
+                    "dirty":self.doc.dirty,"reloading":self.reloading(),"message":self.message,"destination":self.doc.destination,"placed":self.doc.placed,"camera":{"at":self.camera.focus.to_array(),"zoom":self.camera.distance,"yaw":self.camera.yaw.to_degrees()}})),
                 Request::Edit {actions} => {
                     if let Some(rect)=self.doc.apply(&actions,&self.blueprints)? {renderer.edit_terrain(&self.doc.map,rect).map_err(|e|e.to_string())?;}
                     if actions.iter().any(|a|!matches!(a,Command::Terrain{..})){self.refresh_units()?;}
@@ -156,8 +197,15 @@ impl Editor {
                     self.camera.focus=glam::Vec2::from(at).extend(renderer.ground_height(at.into()));
                     self.camera.distance=zoom;self.camera.yaw=yaw.to_radians();self.camera.clamp_focus();
                 }
-                Request::Shot=>{renderer.capture_next_frame();self.api.shot=Some(id.clone());}
-                Request::Test=>{event=Some(Event::Test(Box::new(self.test()?)));}
+                Request::Shot=>{if !self.api.headless {renderer.capture_next_frame();} self.api.shot=Some(id.clone());}
+                Request::Test=>{
+                    if self.api.headless{return Err("Playtests require a windowed editor; --mission-pilot checks the route offscreen".into());}
+                    event=Some(Event::Test(Box::new(self.test()?)));
+                }
+                Request::Close{discard}=>{
+                    if self.doc.dirty && !discard {return Err("Save edits before closing, or explicitly set discard to true".into());}
+                    event=Some(Event::Leave);
+                }
             }
             Ok(json!({"ok":true}))
         });

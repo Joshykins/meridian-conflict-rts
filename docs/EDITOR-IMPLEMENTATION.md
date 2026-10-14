@@ -32,8 +32,8 @@ playable mission, authored and revised through the editor and its API.
 - Focused validation passed: terrain roundtrip/seams (3), mission/decoder (6),
   document transaction/undo (2), match options (2), local resume clock (1), and
   complete authored references/dialogue (1). Quick format/clippy gate passed.
-- Native Windows landing inspection exposed cinematic HUD clipping; shared HUD
-  correction is implemented and awaits the next screenshot pass.
+- Native Windows landing inspection exposed cinematic HUD clipping; the shared
+  HUD correction is verified in the Company landing screenshot.
 
 - Added optional backward-compatible prop tints and Company skin variants.
 - Fixed campaign units appearing in the skirmish production inventory.
@@ -46,10 +46,18 @@ playable mission, authored and revised through the editor and its API.
   unloading, base structures, queued dialogue waits, radio cues and camera pans.
 - Protected story actors and mission AI settings survive snapshot restoration.
 
+- Full gate passed on 477e6641. Windows and Linux determinism hashes match for
+  commander AI and the every-domain matrix, including mission events.
+- Added asynchronous data/sound, shader and model reload with cache rollback,
+  an offscreen native editor service, and responsive authoring controls.
+- Reload failure and model-cache recovery regression tests and quick gate pass.
+  Native data reload preserves an unsaved point and camera; final capture and
+  error-path screenshots are being checked.
+
 ## Still required before final delivery
 - Component doodads, general destructible/reclaimable props.
 - Ground cover painting, water/climate controls, remaining brushes and resize.
-- Free camera, catalogue/gizmo improvements and reload UI/API.
+- Free camera and catalogue/gizmo improvements; native reload success/error review.
 - Propaganda components and encounter balance; native review of evacuation,
   allied arrivals and later mission beats.
 - Full checks, determinism matrix/cross-platform verification, final native

@@ -11,6 +11,8 @@ pub(crate) use local::{local_checkpoint_start, local_mission_start, local_start,
 #[path = "app_frame.rs"]
 mod frame_view;
 
+#[path = "app_editor.rs"]
+mod editor_reload;
 mod preferences;
 
 use crate::audio::Audio;

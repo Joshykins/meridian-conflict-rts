@@ -15,18 +15,20 @@ impl Editor {
             rgb(palette::TEXT, 1.0),
             "MAP EDITOR",
         );
-        ui.text(
-            250.0,
-            43.0,
-            type_scale::BODY,
-            rgb(palette::DIM, 1.0),
-            &format!(
-                "{}{}",
-                self.doc.map.info.name,
-                if self.doc.dirty { " *" } else { "" }
-            ),
-        );
-        let mut x = w - 810.0;
+        if w > 1450.0 {
+            ui.text(
+                250.0,
+                43.0,
+                type_scale::BODY,
+                rgb(palette::DIM, 1.0),
+                &format!(
+                    "{}{}",
+                    self.doc.map.info.name,
+                    if self.doc.dirty { " *" } else { "" }
+                ),
+            );
+        }
+        let mut x = (w - 810.0).max(230.0);
         for (i, label) in ["Save", "Undo", "Redo", "Test", "Save As", "Open", "Exit"]
             .iter()
             .enumerate()
@@ -81,9 +83,15 @@ impl Editor {
             x += 108.0;
         }
     }
+    pub(super) fn tool_rows(width: f32) -> usize {
+        12usize.div_ceil(((width - 68.0) / 112.0).floor().max(1.0) as usize)
+    }
     pub(super) fn tools_panel(&mut self, ui: &mut Ui, bottom: f32) {
         let w = ui.size.x;
-        ui.panel(Rect::new(18.0, bottom, w - 36.0, 162.0));
+        let columns = (((w - 68.0) / 112.0).floor().max(1.0) as usize).min(12);
+        let rows = Self::tool_rows(w);
+        let step = (w - 68.0) / columns as f32;
+        ui.panel(Rect::new(18.0, bottom, w - 36.0, ui.size.y - bottom - 18.0));
         ui.text(
             34.0,
             bottom + 23.0,
@@ -92,8 +100,18 @@ impl Editor {
             "AUTHORING TOOLS",
         );
         for (i, label) in [
-            "Select", "Raise", "Lower", "Flatten", "Smooth", "Unit", "Region", "Point", "Camera",
+            "Select",
+            "Raise",
+            "Lower",
+            "Flatten",
+            "Smooth",
+            "Unit",
+            "Region",
+            "Point",
+            "Camera",
             "Move",
+            "Reload data",
+            "Reload shaders",
         ]
         .iter()
         .enumerate()
@@ -105,19 +123,34 @@ impl Editor {
             };
             if ui.button(
                 id("editor_tool", i),
-                Rect::new(34.0 + i as f32 * 112.0, bottom + 42.0, 102.0, 40.0),
+                Rect::new(
+                    34.0 + (i % columns) as f32 * step,
+                    bottom + 42.0 + (i / columns) as f32 * 44.0,
+                    step - 8.0,
+                    36.0,
+                ),
                 label,
                 kind,
                 true,
             ) {
-                self.tool = i;
-                self.region_start = None;
+                if i < 10 {
+                    self.tool = i;
+                    self.region_start = None;
+                } else if let Err(e) = self.request_reload(ReloadRequest {
+                    data: i == 10,
+                    shaders: i == 11,
+                    ..Default::default()
+                }) {
+                    self.message = e;
+                }
             }
         }
+        let y = bottom + 54.0 + rows as f32 * 44.0;
+        let width = (w - 102.0) * 0.5;
         let mut radius = (self.radius - 8.0) / 504.0;
         if ui.slider(
             id("editor_radius", 0),
-            Rect::new(34.0, bottom + 96.0, 450.0, 28.0),
+            Rect::new(34.0, y, width, 28.0),
             "Brush radius",
             &mut radius,
         ) {
@@ -126,22 +159,15 @@ impl Editor {
         let mut strength = self.strength / 64.0;
         if ui.slider(
             id("editor_strength", 0),
-            Rect::new(510.0, bottom + 96.0, 420.0, 28.0),
+            Rect::new(68.0 + width, y, width, 28.0),
             "Strength",
             &mut strength,
         ) {
             self.strength = strength * 64.0;
         }
-        ui.text(
-            970.0,
-            bottom + 114.0,
-            type_scale::BODY,
-            rgb(palette::DIM, 1.0),
-            "WASD pan  |  Q/E orbit  |  Wheel zoom",
-        );
         ui.text_fit_left(
             34.0,
-            bottom + 131.0,
+            y + 50.0,
             w - 68.0,
             type_scale::BODY,
             rgb(palette::TEXT, 1.0),
