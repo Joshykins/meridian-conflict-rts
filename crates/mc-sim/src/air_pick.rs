@@ -22,9 +22,11 @@ use crate::World;
 use mc_core::Fx;
 use mc_data::cat;
 
-/// How far a fighter looks first for a mark (`air_spread_pick`), metres, and
-/// how much further each look after: a thin ring at a time is all it checks.
-const SCRAMBLE_PROBE: Fx = Fx::from_int(128);
+/// How far a fighter looks first for a mark (`air_spread_pick`), metres; each look
+/// after reaches twice as far. Marks are weighed nearest first whatever the rings, so
+/// they only set how many are measured: in a crowded sky a thin first ring holds the
+/// few that decide.
+const SCRAMBLE_PROBE: Fx = Fx::from_int(48);
 
 /// Most marks one fighter's pick weighs (`air_spread_pick`), nearest first. A
 /// deliberate cap, as an AI's budget: in a sky of tens of thousands every mark near a
@@ -309,7 +311,7 @@ impl World {
                 break;
             }
             inner = r;
-            radius = r + SCRAMBLE_PROBE;
+            radius = r * 2;
         }
         best.map(|(_, t)| t)
     }
@@ -334,7 +336,7 @@ impl World {
                     .orders
                     .front(units, other)
                     .is_some_and(|o| o.target == id)
-                && units.pos[other].distance(at) <= vision + self.bp(other).radius
+                && (units.pos[other] - at).shorter_than(Fx(vision.0 + self.bp(other).radius.0 + 1))
             {
                 seen += 1;
                 if seen == 3 {
