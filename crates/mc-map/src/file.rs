@@ -19,6 +19,7 @@ use std::path::Path;
 
 pub struct MapFile {
     file: File,
+    path: std::path::PathBuf,
     info: MapInfo,
     content_id: u64,
     dir: Vec<DirEntry>,
@@ -34,8 +35,13 @@ pub struct MapFile {
 }
 
 impl MapFile {
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
     pub fn open(path: impl AsRef<Path>) -> Result<MapFile, MapError> {
-        let file = File::open(path)?;
+        let path = path.as_ref().to_owned();
+        let file = File::open(&path)?;
         let file_len = file.metadata()?.len();
         let mut header = [0u8; HEADER_LEN];
         read_exact_at(&file, &mut header, 0).map_err(eof_is_corrupt)?;
@@ -161,6 +167,7 @@ impl MapFile {
 
         Ok(MapFile {
             file,
+            path,
             info,
             content_id,
             dir,

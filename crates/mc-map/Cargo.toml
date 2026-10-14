@@ -9,6 +9,8 @@ mc-core = { workspace = true }
 # The Last Harvest lays its regions' relief by the renderer's own wander
 # (`mc_data::regions::wander`); the tests read the maps' sidecars.
 mc-data = { workspace = true }
+serde = { workspace = true }
+ron = { workspace = true }
 
 [[bin]]
 name = "mc-bake"

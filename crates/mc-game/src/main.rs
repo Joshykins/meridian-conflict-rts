@@ -13,6 +13,8 @@ mod adjacency_marks;
 mod ambience;
 mod app;
 mod audio;
+mod campaign;
+mod campaign_checkpoints;
 mod chronicle;
 mod cine;
 mod clipboard;
@@ -21,6 +23,7 @@ mod crash;
 mod dash_marks;
 mod destruct_marks;
 mod edict_marks;
+mod editor;
 mod formation_drag;
 mod game;
 mod gravitic_marks;
@@ -205,6 +208,8 @@ straight into a match instead.
   --opening              with --loading: the run's opening screen instead of a map's
   --standing-down        with --loading: the screen out of a match, back to the front end
   --cursor X,Y           with --ui: where the pointer is, in pixels
+  --editor MAP           open a map name or .mcmap path in the map editor
+  --editor-apply FILE    apply a JSON command array to the map folder and save; optional screenshot
   --smoke                open the front end, play a default skirmish for a few seconds, return
                          to the front end and exit: an unattended check of every stage change
   --crash-screen FILE    the crash screen for a saved report, as a crashed run starts it (with
@@ -288,6 +293,8 @@ fn run() -> Result<(), String> {
     let mut loading_screen = loading::Screen::Briefing;
     let mut cursor: Option<[f32; 2]> = None;
     let mut smoke = false;
+    let mut editor_path = None;
+    let mut editor_actions = None;
     let mut crash_test = None;
     let mut crash_screen: Option<crash::Summary> = None;
     let mut dump_sounds: Option<String> = None;
@@ -448,6 +455,8 @@ fn run() -> Result<(), String> {
             "--follow" => follow = value("--follow")?.parse().map_err(|_| "--follow takes a number of ticks")?,
             "--alpha" => alpha = value("--alpha")?.parse::<f32>().map_err(|_| "--alpha takes a number from 0 to 1")?.clamp(0.0, 1.0),
             "--smoke" => smoke = true,
+            "--editor-apply" => editor_actions = Some(value("--editor-apply")?),
+            "--editor" => editor_path = Some(args.next().ok_or("--editor needs a map name or path")?),
             "--dump-sounds" => dump_sounds = Some(value("--dump-sounds")?),
             "--crash-screen" => crash_screen = Some(crash::Summary { path: value("--crash-screen")?.into(), title: "The game crashed".into(), message: String::new(), hint: None }),
             "--crash-title" | "--crash-message" | "--crash-hint" => {
@@ -516,6 +525,26 @@ fn run() -> Result<(), String> {
         ));
     }
 
+    if let Some(actions) = editor_actions {
+        let name = editor_path
+            .as_deref()
+            .ok_or("--editor-apply requires --editor MAP")?;
+        let path = setup::find_map(Some(name))?;
+        editor::apply_file(&path, std::path::Path::new(&actions), &blueprints)?;
+        if shot.is_none() {
+            return Ok(());
+        }
+    }
+    if let (Some(name), Some(shot)) = (&editor_path, &mut shot) {
+        let path = if std::path::Path::new(name).is_file() {
+            std::path::PathBuf::from(name)
+        } else {
+            setup::find_map(Some(name))?
+        };
+        (shot.width, shot.height) = size;
+        shot.camera = camera;
+        return editor::screenshot(&path, blueprints, pool, shot);
+    }
     if let Some(times) = loading_at {
         let mut shot = shot
             .take()
@@ -552,6 +581,7 @@ fn run() -> Result<(), String> {
             pool,
             force_no_vsync: !vsync,
             direct: None,
+            editor: editor_path,
             smoke,
         });
     }
@@ -643,6 +673,7 @@ fn run() -> Result<(), String> {
             map: map.name().to_owned(),
             map_id: map.content_id(),
             sky: Default::default(),
+            mission: None,
         }
         .encode()
     };
@@ -741,6 +772,7 @@ fn run() -> Result<(), String> {
         pool,
         force_no_vsync: !vsync,
         direct: Some(start),
+        editor: None,
         smoke: false,
     })
 }

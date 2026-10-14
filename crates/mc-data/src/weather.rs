@@ -585,7 +585,11 @@ impl MapConfig {
     /// The config beside `map_path` (`foo.mcmap` -> `foo.ron`). A missing file
     /// is the defaults; one that does not parse is an error the caller reports.
     pub fn for_map(map_path: &Path) -> Result<MapConfig, String> {
-        let path = map_path.with_extension("ron");
+        let path = if map_path.file_name().is_some_and(|n| n == "terrain.mcmap") {
+            map_path.with_file_name("map.ron")
+        } else {
+            map_path.with_extension("ron")
+        };
         let Ok(text) = std::fs::read_to_string(&path) else {
             return Ok(MapConfig::default());
         };

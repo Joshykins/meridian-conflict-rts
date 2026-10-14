@@ -1,0 +1,142 @@
+[
+  {
+    "action": "unit",
+    "name": "merrick",
+    "group": "company",
+    "blueprint": "company_merrick",
+    "owner": 0,
+    "at": [
+      3368,
+      7988
+    ],
+    "heading": 0
+  },
+  {
+    "action": "point",
+    "name": "beach",
+    "at": [
+      3368,
+      7988
+    ]
+  },
+  {
+    "action": "point",
+    "name": "offshore",
+    "at": [
+      2848,
+      9148
+    ]
+  },
+  {
+    "action": "point",
+    "name": "bridge_west",
+    "at": [
+      5248,
+      7698
+    ]
+  },
+  {
+    "action": "point",
+    "name": "camp",
+    "at": [
+      6468,
+      7568
+    ]
+  },
+  {
+    "action": "point",
+    "name": "square",
+    "at": [
+      7738,
+      8008
+    ]
+  },
+  {
+    "action": "point",
+    "name": "warehouse",
+    "at": [
+      7648,
+      8378
+    ]
+  },
+  {
+    "action": "point",
+    "name": "harbour",
+    "at": [
+      8223,
+      7698
+    ]
+  },
+  {
+    "action": "point",
+    "name": "flank",
+    "at": [
+      8248,
+      8488
+    ]
+  },
+  {
+    "action": "point",
+    "name": "spaceport",
+    "at": [
+      8938,
+      6648
+    ]
+  },
+  {
+    "action": "point",
+    "name": "escape",
+    "at": [
+      10848,
+      4548
+    ]
+  },
+  {
+    "action": "camera",
+    "name": "landing",
+    "at": [
+      3368,
+      7988
+    ],
+    "distance": 1100,
+    "yaw": 0
+  },
+  {
+    "action": "camera",
+    "name": "square",
+    "at": [
+      7738,
+      8008
+    ],
+    "distance": 1000,
+    "yaw": 15
+  },
+  {
+    "action": "camera",
+    "name": "arc_arrival",
+    "at": [
+      7658,
+      8348
+    ],
+    "distance": 1700,
+    "yaw": 0
+  },
+  {
+    "action": "camera",
+    "name": "dig_site",
+    "at": [
+      9348,
+      6748
+    ],
+    "distance": 1200,
+    "yaw": -25
+  },
+  {
+    "action": "point",
+    "name": "escape_pad",
+    "at": [
+      9128,
+      6608
+    ]
+  }
+]

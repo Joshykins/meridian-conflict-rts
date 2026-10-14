@@ -59,6 +59,7 @@ pub(crate) mod craters;
 mod crush_fx;
 mod cull_lists;
 mod edict_fx;
+mod editor;
 mod effect_barriers;
 mod elevator_fx;
 mod fallen_trees;

@@ -16,11 +16,13 @@
 pub mod bake;
 pub mod city;
 pub mod deck;
+pub mod edit;
 pub mod file;
 pub mod format;
 pub mod heightfield;
 pub mod landmark;
 mod noise;
+pub mod placed;
 #[cfg(test)]
 mod test_util;
 pub mod wreckage;

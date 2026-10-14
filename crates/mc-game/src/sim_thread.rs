@@ -110,6 +110,7 @@ pub struct SimStatus {
     pub error: Option<String>,
     /// Survival's rounds and nodes; None in any other match.
     pub survival: Option<mc_sim::SurvivalStatus>,
+    pub mission: Option<mc_sim::mission::Status>,
     /// The Shaper the first watched unit is, or is a piece of: its selection card.
     pub shaper: Option<ShaperPick>,
     /// A replay being watched: its length, and the tick a seek is running to.
@@ -330,6 +331,7 @@ pub fn status_of(world: &World, worst: u64) -> SimStatus {
         ally_mine_plans: Vec::new(),
         error: None,
         survival: world.survival_status(),
+        mission: world.mission_status(),
         shaper: None,
         replay: None,
         zone_map: None,
@@ -507,6 +509,7 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
             let mut back = RenderFrame::default();
             let mut recent: std::collections::VecDeque<u64> = Default::default();
             let mut snapshot_at = None;
+            let mut checkpoints = crate::campaign_checkpoints::Recorder::default();
             let mut commands: Vec<PlayerCommand> = Vec::new();
             let mut prefetched = setup.prefetched;
             let mut is_paused = false;
@@ -626,6 +629,9 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                                     ),
                                 );
                             }
+                            if let Some(mission) = options.mission {
+                                if let Err(e) = world.as_mut().unwrap().begin_mission(mission) { return fail(e.to_string()); }
+                            }
                             if let Some(survival) = options.survival {
                                 if let Err(e) = world.as_mut().unwrap().begin_survival(survival) {
                                     return fail(e.to_string());
@@ -681,6 +687,9 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                                 mc_sim::state_hash::combine(&sections)
                             };
                             if !held {
+                                if net.is_none() && scrub.is_none() {
+                                    if let Err(e)=checkpoints.record(world) {return fail(format!("Mission checkpoint could not be saved: {e}"));}
+                                }
                                 session.report_hash(bundle.tick, hash);
                                 crate::crash::sim_tick(bundle.tick);
                                 if let Some(r) = &mut recorder {

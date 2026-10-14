@@ -84,6 +84,7 @@ mod bore;
 pub mod placement;
 pub use mc_core::print_heads;
 pub mod lens;
+pub mod mission;
 mod ranks;
 pub mod reclaim;
 mod reclaim_area;

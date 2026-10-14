@@ -47,6 +47,9 @@ impl State {
         columns("fires", &self.fires)?;
         columns("pads", &self.pads)?;
         self.city.validate()?;
+        if let Some(mission) = &self.mission {
+            mission.validate(self.players.len())?;
+        }
         Ok(())
     }
 

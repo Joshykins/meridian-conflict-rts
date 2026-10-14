@@ -654,6 +654,7 @@ impl Lineup {
             map: card.name.clone(),
             map_id: card.map.content_id(),
             sky: self.sky,
+            mission: None,
         })
     }
 

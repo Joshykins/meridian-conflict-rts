@@ -391,6 +391,27 @@ impl LocalSession {
         Self::from_start(start, None, pacing)
     }
 
+    /// Resume a local match at a saved simulation boundary. No commands or timer
+    /// debt from the previous session survive. Recording a partial run is refused.
+    pub fn resume(
+        start: MatchStart,
+        local: PlayerId,
+        pacing: Pacing,
+        next_tick: u32,
+        blob: Vec<u8>,
+    ) -> Result<LocalSession, NetError> {
+        if next_tick == 0 || blob.len() > crate::MAX_SNAPSHOT_LEN {
+            return Err(NetError::Limit("invalid local checkpoint boundary"));
+        }
+        let mut session = Self::new(start, local, pacing)?;
+        session.next_tick = next_tick;
+        session.events.push(SessionEvent::SnapshotLoaded {
+            tick: next_tick - 1,
+            blob,
+        });
+        Ok(session)
+    }
+
     /// Records to `path`. Call before the first `poll`.
     pub fn record_to(&mut self, path: impl AsRef<Path>) -> io::Result<()> {
         let file = io::BufWriter::new(std::fs::File::create(path)?);
@@ -765,6 +786,30 @@ mod tests {
                 }
             })
             .collect()
+    }
+
+    #[test]
+    fn local_checkpoint_restores_before_resuming_at_the_next_tick() {
+        let mut session =
+            LocalSession::resume(start(), PlayerId(0), Pacing::PerPoll(2), 42, vec![1, 2, 3])
+                .unwrap();
+        let events = session.poll();
+        assert!(matches!(events[0], SessionEvent::Started(_)));
+        assert_eq!(
+            events[1],
+            SessionEvent::SnapshotLoaded {
+                tick: 41,
+                blob: vec![1, 2, 3]
+            }
+        );
+        assert_eq!(
+            ticks(&events).iter().map(|b| b.tick).collect::<Vec<_>>(),
+            vec![42, 43]
+        );
+        assert!(session
+            .record_to_writer(Box::new(Vec::<u8>::new()))
+            .is_err());
+        assert!(LocalSession::resume(start(), PlayerId(0), Pacing::PerPoll(1), 0, vec![]).is_err());
     }
 
     #[test]

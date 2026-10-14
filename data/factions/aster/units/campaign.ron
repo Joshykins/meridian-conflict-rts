@@ -1,0 +1,20 @@
+[
+    (
+        key: "company_merrick", name: "Merrick", role: "Company command walker",
+        tech: 1, categories: ["Land", "DirectFire"],
+        health: 11000, regen: 10,
+        cost: (materials: 18000, energy: 5000000, time: 6000000),
+        radius: 10.4, height: 24, vision: 600, radar: 0,
+        motion: (layer: Amphibious, size: 0, speed: 30, accel: 30, turn: 150),
+        weapons: [(
+            name: "Vulcan Machine Gun", damage: 40, splash: 2, range: 360,
+            reload: 0.2, speed: 720, trajectory: Direct,
+            turret_turn: 36, muzzle: (8.8, -4.8, 15.52), pivot: (-0.48, -4.8, 15.68),
+            spread: 0.4, sweep: 30, targets: ["Land", "Naval"], color: Orange,
+            flash: 1.3, impact: 1.3, tracer: 0.7, spin_up: 0.6, rounds: 8, casings: 5,
+            sounds: (fire: "aster_minigun", impact: "shell_light"),
+        )],
+        mesh: "commander", icon: Commander,
+        sounds: (death: "commander_death", moving: "walker_heavy", step: "footstep_commander"),
+    ),
+]

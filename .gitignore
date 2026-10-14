@@ -18,3 +18,5 @@ __pycache__/
 
 # meridian-server run from the repository root (README)
 /meridian-data/
+
+maps/**/*.mcmap

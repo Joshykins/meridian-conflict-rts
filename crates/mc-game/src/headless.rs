@@ -86,8 +86,13 @@ pub fn run_sim(
         .as_deref()
         .map(crate::replay::Playback::open)
         .transpose()?;
+    let mission = match &playback {
+        Some(p) => p.mission.clone(),
+        None => crate::campaign::definition(map)?,
+    };
     let config = match &playback {
         Some(p) => p.config.clone(),
+        None if mission.is_some() => crate::campaign::config(),
         None => setup::match_config(opts, map),
     };
     let mut world =
@@ -102,8 +107,13 @@ pub fn run_sim(
     if let Some(survival) = survival {
         world.begin_survival(survival).map_err(|e| e.to_string())?;
     }
+    let has_mission = mission.is_some();
+    if let Some(mission) = mission {
+        world.begin_mission(mission).map_err(|e| e.to_string())?;
+    }
     let opening = match playback {
         Some(_) => Vec::new(),
+        None if has_mission => Vec::new(),
         None => setup::opening_commands(opts, map, blueprints, &config),
     };
     // A replay plays as far as it was recorded.
@@ -309,6 +319,7 @@ pub fn screenshot(
         true,
         shot.report.is_some().then_some(&mut chronicle),
     )?;
+    let mission_presentation = crate::campaign::Presentation::load(&map);
     // A selected factory gets a queue to show: a few of its first two products.
     if let Some(key) = &shot.select {
         let u = &world.state.units;
@@ -602,7 +613,8 @@ pub fn screenshot(
     let mut view = crate::game::View::new(
         0,
         setup::TEAM_COLORS,
-        opts.scene != setup::Scene::Formations
+        world.state.mission.is_none()
+            && opts.scene != setup::Scene::Formations
             && std::env::var_os("MERIDIAN_NO_PROFILER").is_none(),
     );
     view.formation_panel = opts.scene == setup::Scene::Formations;
@@ -1081,6 +1093,7 @@ pub fn screenshot(
         // The report, like the in-match menu, has the pointer to itself.
         ui.interactive = report.is_none();
         hud.draw(&mut ui, &scene, 0.016);
+        mission_presentation.draw(&mut ui, view.status.mission.as_ref());
         crate::hud::cursor_hint(&mut ui, &view, &world.blueprints, &[]);
         prefab_shot.hint(&mut ui, &view, &prefab_sites);
         crate::warp_marks::cursor_card(&mut ui, &field, pointer);

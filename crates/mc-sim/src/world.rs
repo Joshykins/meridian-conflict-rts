@@ -131,6 +131,8 @@ pub struct State {
     /// Survival mode's rounds, engine and nodes. None in any other match.
     #[serde(default)]
     pub survival: Option<crate::survival::Survival>,
+    #[serde(default)]
+    pub mission: Option<crate::mission::Mission>,
     /// Finished hulls driving off their factory's pad while it prints the next (`orders.rs`).
     #[serde(default)]
     pub rollouts: std::collections::BTreeMap<UnitId, crate::orders::Rollout>,
@@ -467,6 +469,7 @@ impl World {
             winner: None,
             mines: Default::default(),
             survival: None,
+            mission: None,
             rollouts: Default::default(),
             batches: Default::default(),
             next_batch: 0,
@@ -933,6 +936,8 @@ impl World {
             self.run_survival()?;
         }
         phase(&mut self.timings, "survival");
+        self.run_mission()?;
+        phase(&mut self.timings, "mission");
 
         {
             let _t = mc_core::perf_span!("fn.check_victory");
@@ -1122,6 +1127,9 @@ impl World {
     }
 
     fn check_victory(&mut self) {
+        if self.state.mission.is_some() {
+            return;
+        }
         if self.state.winner.is_some() || self.state.players.len() < 2 {
             return;
         }
@@ -1173,6 +1181,17 @@ impl World {
             return Err(SimError::Snapshot(
                 "snapshot is from a different match".into(),
             ));
+        }
+        if let Some(mission) = &state.mission {
+            mission
+                .definition
+                .validate(
+                    &self.blueprints,
+                    state.players.len(),
+                    base_terrain.size_metres(),
+                    self.map.props.len(),
+                )
+                .map_err(|e| SimError::Snapshot(e.to_string()))?;
         }
         // Pathing restores over unedited terrain classes; blockers come from its own state.
         self.nav = Nav::restore(&base_terrain, self.pool.clone(), &nav)?;

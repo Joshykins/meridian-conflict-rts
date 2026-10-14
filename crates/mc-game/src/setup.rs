@@ -265,50 +265,35 @@ fn roots() -> Vec<PathBuf> {
 
 /// Every `.mcmap` in the nearest `maps/` directory, sorted by name.
 pub fn list_maps() -> Vec<PathBuf> {
-    let Some(dir) = roots()
+    let mut dirs: Vec<PathBuf> = roots()
         .into_iter()
         .map(|r| r.join("maps"))
-        .find(|d| d.is_dir())
-    else {
-        return Vec::new();
-    };
-    let mut maps: Vec<PathBuf> = std::fs::read_dir(dir)
-        .into_iter()
-        .flatten()
-        .flatten()
-        .map(|e| e.path())
-        .filter(|p| p.extension().is_some_and(|e| e == "mcmap"))
+        .filter(|d| d.is_dir())
+        .take(1)
         .collect();
+    if let Some(dir) = crate::settings::config_dir() {
+        dirs.push(dir.join("maps"));
+    }
+    let mut maps = Vec::new();
+    for dir in dirs {
+        for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+            let path = entry.path();
+            if path.extension().is_some_and(|e| e == "mcmap") {
+                maps.push(path);
+            } else if path.is_dir() && path.join("terrain.mcmap").is_file() {
+                maps.push(path.join("terrain.mcmap"));
+            }
+        }
+    }
     maps.sort();
+    maps.dedup();
     maps
 }
 
-/// Which file in `maps/` holds each map content found so far: finding one
-/// opens every map there, and the loading screen, the minimap and the match
-/// each ask.
-static MAP_PATHS: std::sync::Mutex<std::collections::BTreeMap<u64, PathBuf>> =
-    std::sync::Mutex::new(std::collections::BTreeMap::new());
-
-/// The settings file of `map` (`maps/<stem>.ron`: its weather and time of
-/// day), found by matching the map's content against the files in `maps/`.
+/// Presentation configuration beside the exact map opened.
 pub fn map_config(map: &MapFile) -> mc_data::weather::MapConfig {
-    let known = MAP_PATHS
-        .lock()
-        .ok()
-        .and_then(|m| m.get(&map.content_id()).cloned());
-    let path = known.or_else(|| {
-        let path = list_maps().into_iter().find(|path| {
-            MapFile::open(path).is_ok_and(|other| other.content_id() == map.content_id())
-        })?;
-        if let Ok(mut m) = MAP_PATHS.lock() {
-            m.insert(map.content_id(), path.clone());
-        }
-        Some(path)
-    });
-    let Some(path) = path else {
-        return Default::default();
-    };
-    mc_data::weather::MapConfig::for_map(&path).unwrap_or_else(|e| {
+    let path = map.path();
+    mc_data::weather::MapConfig::for_map(path).unwrap_or_else(|e| {
         log::warn!("{e}; playing fair weather in the afternoon");
         Default::default()
     })
@@ -327,7 +312,11 @@ pub fn backdrop_map() -> Option<PathBuf> {
 
 pub fn find_map(name: Option<&str>) -> Result<PathBuf, String> {
     let candidates: Vec<PathBuf> = match name {
-        Some(n) => vec![PathBuf::from(n), PathBuf::from(format!("maps/{n}.mcmap"))],
+        Some(n) => vec![
+            PathBuf::from(n),
+            PathBuf::from(format!("maps/{n}.mcmap")),
+            PathBuf::from(format!("maps/{n}/terrain.mcmap")),
+        ],
         None => vec![
             PathBuf::from("maps/crosswater.mcmap"),
             PathBuf::from("maps/meridian_basin.mcmap"),

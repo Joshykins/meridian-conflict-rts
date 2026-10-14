@@ -22,6 +22,7 @@ pub struct Playback {
     path: PathBuf,
     pub config: MatchConfig,
     pub survival: Option<mc_sim::SurvivalConfig>,
+    pub mission: Option<mc_sim::mission::Definition>,
     /// The weather and time of day the match was played under.
     pub sky: mc_data::weather::SkyChoice,
     /// `replay.held` carried out so far.
@@ -42,6 +43,7 @@ impl Playback {
         Ok(Playback {
             config: options.config,
             survival: options.survival,
+            mission: options.mission,
             sky: options.sky,
             replay,
             path: path.to_owned(),

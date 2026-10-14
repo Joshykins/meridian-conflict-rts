@@ -82,9 +82,13 @@ impl MapCard {
 pub fn open_card(path: &Path, config: &MapConfig) -> Option<MapCard> {
     match MapFile::open(path) {
         Ok(map) => Some(MapCard::new(
-            path.file_stem()
-                .map(|s| s.to_string_lossy().into_owned())
-                .unwrap_or_default(),
+            if path.file_name().is_some_and(|n| n == "terrain.mcmap") {
+                path.parent().and_then(Path::file_name)
+            } else {
+                path.file_stem()
+            }
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_default(),
             Arc::new(map),
             config,
         )),
