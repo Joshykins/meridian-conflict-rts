@@ -33,6 +33,9 @@ pub(super) fn export(doc: &Document, folder: &Path) -> Result<(), String> {
                 std::fs::copy(config, staged.join("map.ron")).map_err(|e| e.to_string())?;
             }
         }
+        let config = ron::ser::to_string_pretty(&doc.config, ron::ser::PrettyConfig::default())
+            .map_err(|e| e.to_string())?;
+        std::fs::write(staged.join("map.ron"), config).map_err(|e| e.to_string())?;
         let mut placed = doc.placed.clone();
         let mut order: Vec<usize> = (0..doc.map.props.len()).collect();
         order.sort_by_key(|&i| {

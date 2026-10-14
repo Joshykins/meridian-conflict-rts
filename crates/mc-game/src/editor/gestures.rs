@@ -7,6 +7,8 @@ impl Editor {
         renderer: &mc_render::Renderer,
     ) -> Option<Command> {
         match self.tool {
+            22..=25 => None,
+            26 => self.climate_wall(at),
             1..=4 => Some(Command::Terrain {
                 at,
                 radius: self.radius,

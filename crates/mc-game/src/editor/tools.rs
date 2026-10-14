@@ -20,6 +20,7 @@ const GROUPS: &[(&str, &[usize])] = &[
     ("Terrain", &[1, 2, 3, 4, 13, 14, 15, 16]),
     ("Paint", &[17, 18, 19, 20, 21]),
     ("Objects", &[0, 5, 6, 7, 8, 9]),
+    ("Environment", &[22, 23, 24, 25, 26]),
     ("Camera / Reload", &[12, 10, 11]),
 ];
 const LABELS: &[&str] = &[
@@ -45,6 +46,11 @@ const LABELS: &[&str] = &[
     "Ice",
     "Trail",
     "Road",
+    "Water",
+    "Climate",
+    "Weather",
+    "Time",
+    "Climate wall",
 ];
 impl Editor {
     pub(super) fn choose_tool(&mut self, name: &str) -> Result<(), String> {
@@ -78,9 +84,9 @@ impl Editor {
             if ui.button(
                 id("editor_tool_group", i),
                 Rect::new(
-                    34.0 + i as f32 * (w - 68.0) / 4.0,
+                    34.0 + i as f32 * (w - 68.0) / GROUPS.len() as f32,
                     bottom + 36.0,
-                    (w - 68.0) / 4.0 - 8.0,
+                    (w - 68.0) / GROUPS.len() as f32 - 8.0,
                     30.0,
                 ),
                 label,
@@ -119,7 +125,15 @@ impl Editor {
         let y = bottom + 54.0 + rows as f32 * 44.0;
         let width = (w - 102.0) * 0.5;
         let mut radius = (self.radius - 8.0) / 504.0;
-        if self.tool == 21 {
+        if self.tool >= 22 {
+            ui.text(
+                34.0,
+                y + 20.0,
+                type_scale::BODY,
+                rgb(palette::TEXT, 1.0),
+                "Adjust the environment in the properties panel. Changes apply immediately.",
+            );
+        } else if self.tool == 21 {
             ui.text(
                 34.0,
                 y + 20.0,
@@ -153,7 +167,7 @@ impl Editor {
                 rgb(palette::TEXT, 1.0),
                 "Choose the surface in Paint Properties.",
             );
-        } else if self.tool != 21 {
+        } else if self.tool < 21 {
             let mut strength = self.strength / 64.0;
             if ui.slider(
                 id("editor_strength", 0),

@@ -2,6 +2,32 @@
 use super::*;
 impl Editor {
     pub(super) fn draw_regions(&self, ui: &mut Ui, renderer: &mc_render::Renderer) {
+        if (22..=26).contains(&self.tool) {
+            for wall in self.doc.config.walls().segments() {
+                let a = Vec2::from(wall.a);
+                let b = Vec2::from(wall.b);
+                if let (Some(a), Some(b)) = (
+                    self.camera.project(
+                        a.extend(
+                            renderer
+                                .ground_height(a)
+                                .max(self.doc.map.info.water_level.to_f32())
+                                + 3.0,
+                        ),
+                    ),
+                    self.camera.project(
+                        b.extend(
+                            renderer
+                                .ground_height(b)
+                                .max(self.doc.map.info.water_level.to_f32())
+                                + 3.0,
+                        ),
+                    ),
+                ) {
+                    ui.o.line(a.to_array(), b.to_array(), 3.0, rgb(0xAA88FF, 1.0));
+                }
+            }
+        }
         for region in &self.doc.placed.regions {
             let a = Vec2::from(region.min.to_f32());
             let b = Vec2::from(region.max.to_f32());

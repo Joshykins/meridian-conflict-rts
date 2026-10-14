@@ -7,7 +7,7 @@ user's meridian-conflict/maps directory. Open lists both shipped and user maps.
 WASD pans, Q/E orbits, Page Up/Down tilts, and the wheel zooms. Free camera
 keeps the current eye position: WASD flies, Q/E changes height, arrows look,
 Shift boosts movement and the wheel changes speed. Toggle it off to restore
-the previous orbit view. The bottom panel groups Terrain, Paint, Objects and
+the previous orbit view. The bottom panel groups Terrain, Paint, Objects, Environment and
 Camera / Reload tools.
 Raise, Lower, Flatten, Smooth, Cliff and Noise edit terrain at the cursor.
 Ramp connects the existing heights at two clicked endpoints, with the brush
@@ -64,7 +64,7 @@ Examples:
 
 An edit request has 1–512 actions and is one atomic undo step. Invalid actions
 leave the entire request unapplied. Requests are limited to 256 KiB. Supported
-actions are terrain, ramp, stamp, paint, road, unit, region, point, camera, transform, properties and delete; the
+actions are water, time, climate, weather, climate_regions, terrain, ramp, stamp, paint, road, unit, region, point, camera, transform, properties and delete; the
 authoritative schema is editor/document.rs. Coordinates are world metres,
 headings/yaw are degrees, and owner is the zero-based player slot.
 
@@ -119,6 +119,29 @@ sentinel across the map, so that first edit uploads the entire snow layer.
 
 Ground values are 0–8 in the order above; road kinds are 0–5. Tool names use
 lowercase labels with underscores, such as free_camera and reload_data.
+
+## Environment
+
+Water changes the sea level live, including water picking, ship previews and the
+terrain-following cloud floor. Climate and Weather select a region; Add region
+creates another and Remove region also removes its incident walls. Climate Wall
+takes two clicked endpoints and explicit left/right region numbers. Draw walls
+to the map edge or another wall; use the blend controls for softer transitions.
+Time selects a day period or adjusts the clock in fifteen-minute steps.
+
+Environment changes are atomic undoable commands, included in saves and private
+playtests. Saving map.ron preserves survival layouts, browser metadata, weather
+tweaks in untouched regions and all other configuration fields. A weather preset
+explicitly replaces that region's prior tweaks. Water is stored in terrain.mcmap.
+
+    {"op":"edit","actions":[{"action":"water","level":30},{"action":"time","hour":17.5}]}
+    {"op":"edit","actions":[{"action":"climate","region":0,"value":"Tropical"},{"action":"weather","region":0,"preset":"Clear"}]}
+    {"op":"edit","actions":[{"action":"climate_regions","regions":[{"name":"West","climate":"Desert"},{"name":"East","climate":"Polar"}],"walls":[{"line":[[8000,0],[8000,16384]],"left":0,"right":1}],"blend":100}]}
+
+The state response includes environment and water_level. Region indices are
+zero-based in the API. There are at most eight climate regions and 32 wall
+segments. Map configuration input is bounded to 1 MiB; malformed files are
+reported instead of silently replacing them with defaults.
 
 ## Reload
 
@@ -206,6 +229,6 @@ at tick 5347 before the next choreography pass. The expanded route includes
 civilian evacuation cars, physical ARC cargo drops, queued comms and checkpoint
 recovery. Add --resume to restore every checkpoint into a fresh world during the
 route. Use --mission-pilot with a headless screenshot to inspect later beats.
-Full encounter balance and visual review remain in progress. Component prop editing, water/climate controls, decorative cliff regeneration,
+Full encounter balance and visual review remain in progress. Component prop editing, decorative cliff regeneration,
 resizing and remaining gizmos are tracked in
 EDITOR-IMPLEMENTATION.md and are not yet available in this slice.

@@ -205,10 +205,7 @@ impl Editor {
             self.complain_reload(error);
             return Ok(());
         }
-        reloaded
-            .ready
-            .renderer
-            .set_map_look(&crate::setup::map_config(&reloaded.ready.map).look());
+        self.apply_environment(&mut reloaded.ready.renderer);
         if let Some(sounds) = reloaded.sounds.take() {
             audio.set_library(sounds);
         }

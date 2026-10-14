@@ -14,6 +14,11 @@ impl Renderer {
 #[derive(Default)]
 pub(super) struct EditorState {
     cover: Option<crate::ground_cover::GroundCover>,
+    environment: Option<(
+        mc_data::weather::MapLook,
+        Vec<mc_data::weather::Weather>,
+        f32,
+    )>,
 }
 impl Renderer {
     /// Update an inclusive rectangle in a source layer's sample grid.
@@ -99,4 +104,50 @@ fn upload(
         &bytes,
         false,
     )
+}
+
+impl Renderer {
+    /// Refresh water and the terrain-following atmosphere after authoring edits.
+    #[track_caller]
+    pub fn edit_water(&mut self, level: mc_core::Fx) -> Result<(), crate::gpu::GpuError> {
+        let tiles = &self.tile_cache;
+        self.sky
+            .edit_floor(&self.gpu, level.to_f32(), |xy| tiles.overview_height(xy))?;
+        self.map_info.water_level = level;
+        Ok(())
+    }
+}
+
+impl Renderer {
+    /// Authoring changes only restart weather when its parameters change.
+    pub fn edit_environment(&mut self, config: &mc_data::weather::MapConfig) {
+        let look = config.look();
+        let weather = config.weathers(&mc_data::weather::SkyChoice::default());
+        let hour = config.hour(None);
+        if self
+            .editor
+            .environment
+            .as_ref()
+            .is_none_or(|(old, _, _)| old != &look)
+        {
+            self.set_map_look(&look);
+        }
+        if self
+            .editor
+            .environment
+            .as_ref()
+            .is_none_or(|(_, old, _)| old != &weather)
+        {
+            self.set_weathers(&weather);
+        }
+        if self
+            .editor
+            .environment
+            .as_ref()
+            .is_none_or(|(_, _, old)| *old != hour)
+        {
+            self.set_hour(hour);
+        }
+        self.editor.environment = Some((look, weather, hour));
+    }
 }

@@ -1,4 +1,5 @@
 //! The authoring document and undoable commands shared by the UI and mailbox.
+mod environment;
 mod objects;
 mod paint;
 pub(super) use paint::Paint;
@@ -27,6 +28,25 @@ pub(super) enum Brush {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 pub(super) enum Command {
+    Water {
+        level: f32,
+    },
+    Time {
+        hour: f32,
+    },
+    Climate {
+        region: usize,
+        value: mc_data::weather::Climate,
+    },
+    Weather {
+        region: usize,
+        preset: mc_data::weather::WeatherPreset,
+    },
+    ClimateRegions {
+        regions: Vec<mc_data::regions::Region>,
+        walls: Vec<mc_data::regions::Wall>,
+        blend: f32,
+    },
     Terrain {
         at: [f32; 2],
         radius: f32,
@@ -106,6 +126,8 @@ pub(super) enum Command {
 pub(super) struct Update {
     pub terrain: Option<[u32; 4]>,
     pub objects: bool,
+    pub environment: bool,
+    pub water: bool,
     pub cover: Vec<(mc_map::edit::Layer, [u32; 4])>,
 }
 
@@ -113,11 +135,13 @@ struct Change {
     heights: Vec<(u32, u32, u16, u16)>,
     placed: Option<(Placed, Placed)>,
     layers: Vec<paint::Change>,
+    environment: Option<(environment::State, environment::State)>,
 }
 
 pub(super) struct Document {
     pub map: EditMap,
     pub placed: Placed,
+    pub config: mc_data::weather::MapConfig,
     pub source: PathBuf,
     pub destination: Option<PathBuf>,
     pub dirty: bool,
@@ -146,6 +170,7 @@ impl Document {
         Ok(Self {
             map,
             placed,
+            config: mc_data::weather::MapConfig::for_map(path)?,
             source: path.to_owned(),
             destination: folder.then(|| path.parent().unwrap().to_owned()),
             dirty: false,
@@ -164,6 +189,7 @@ impl Document {
         if commands.is_empty() || commands.len() > 512 {
             return Err("A batch needs 1 to 512 actions".into());
         }
+        let mut environment = environment::State::from_doc(self);
         let mut placed = self.placed.clone();
         let mut patches = BTreeMap::new();
         let mut layers = paint::Patches::default();
@@ -197,10 +223,11 @@ impl Document {
                     width,
                     kind,
                 } => layers.road(&self.map, *from, *to, *width, *kind)?,
+                command if environment.apply(command)? => {}
                 _ => objects::apply(command, &mut placed, blueprints)?,
             }
         }
-        self.commit(placed, patches, layers)
+        self.commit(placed, patches, layers, environment)
     }
 
     fn commit(
@@ -208,11 +235,14 @@ impl Document {
         placed: Placed,
         patches: BTreeMap<(u32, u32), u16>,
         layers: paint::Patches,
+        environment: environment::State,
     ) -> Result<Update, String> {
         placed
             .validate(&self.map.info, self.map.props.len())
             .map_err(|e| e.to_string())?;
         let mut change = Change {
+            environment: (environment != environment::State::from_doc(self))
+                .then(|| (environment::State::from_doc(self), environment)),
             heights: vec![],
             layers: layers.changes(&self.map),
             placed: (placed != self.placed).then(|| (self.placed.clone(), placed.clone())),
@@ -226,7 +256,11 @@ impl Document {
         }
         let rect = self.restore(&change, true)?;
         self.placed = placed;
-        if change.placed.is_some() || !change.heights.is_empty() || !change.layers.is_empty() {
+        if change.environment.is_some()
+            || change.placed.is_some()
+            || !change.heights.is_empty()
+            || !change.layers.is_empty()
+        {
             self.undo.push(change);
             self.redo.clear();
             self.dirty = true;
@@ -248,7 +282,20 @@ impl Document {
         if let Some((old, new)) = &change.placed {
             self.placed = if forward { new.clone() } else { old.clone() };
         }
+        if let Some((old, new)) = &change.environment {
+            let state = if forward { new } else { old };
+            self.config = state.config.clone();
+            self.map.info.water_level = state.water;
+        }
         Ok(Update {
+            environment: change
+                .environment
+                .as_ref()
+                .is_some_and(|(a, b)| a.config != b.config),
+            water: change
+                .environment
+                .as_ref()
+                .is_some_and(|(a, b)| a.water != b.water),
             terrain: rect,
             objects: change.placed.is_some(),
             cover: change
@@ -304,3 +351,6 @@ pub(super) mod tests;
 
 #[cfg(test)]
 mod paint_tests;
+
+#[cfg(test)]
+mod environment_tests;

@@ -89,9 +89,15 @@ playable mission, authored and revised through the editor and its API.
   route still wins at tick 6150. Windows/Linux determinism hashes match
   (commander AI b914c756d95136a4, every-domain b01c6a3bb0badef6).
 
+- Added undoable live water, time, climate, weather and climate-wall authoring.
+  Configuration serialization preserves every checked-in map's settings, including
+  survival layouts. Environment changes share UI/API commands and private playtests.
+  Native water/climate-wall/dusk screenshots, repeated saves and Undo pass; the
+  restored document environment and terrain hash match the original exactly.
+
 ## Still required before final delivery
 - Component doodads, general destructible/reclaimable props.
-- Water/climate controls, decorative cliff regeneration and resize.
+- Decorative cliff regeneration and resize.
 - Remaining gizmo/snapping improvements.
 - Propaganda components and encounter balance; human playtest and cinematic review.
 - Full checks, determinism matrix/cross-platform verification, final native

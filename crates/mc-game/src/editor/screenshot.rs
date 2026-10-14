@@ -28,7 +28,7 @@ pub(crate) fn screenshot(
         scene,
     )
     .map_err(|e| e.to_string())?;
-    renderer.set_map_look(&crate::setup::map_config(&editor.map).look());
+    editor.apply_environment(&mut renderer);
     let mut settings = crate::settings::Settings::default();
     settings.apply_quality(shot.quality.unwrap_or_default());
     settings

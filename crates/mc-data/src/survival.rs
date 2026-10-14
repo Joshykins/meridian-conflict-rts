@@ -69,7 +69,7 @@ impl Domain {
 }
 
 /// A place a defender may begin.
-#[derive(Clone, Debug, Default, PartialEq, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct SpawnZone {
     pub name: String,
@@ -82,7 +82,7 @@ pub struct SpawnZone {
 /// One way the engine's forces come. `path` runs from the engine's side
 /// toward the defenders; the last leg to wherever they started is added when
 /// the match is set up.
-#[derive(Clone, Debug, Default, PartialEq, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct FrontLayout {
     pub name: String,
@@ -137,7 +137,7 @@ impl SiteKind {
 /// Somewhere the engine raises a Shaper, which grows there: its print
 /// platforms in an arc in front of it (across `facing`), its lesser
 /// structures at the sides and behind.
-#[derive(Clone, Debug, Default, PartialEq, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct NodeSiteLayout {
     pub name: String,
@@ -174,7 +174,7 @@ impl NodeSiteLayout {
 
 /// A print bay built into the facility: a printed unit stands at `at` while
 /// the beam from `emitter` (x, y, metres over the ground at `at`) builds it.
-#[derive(Clone, Debug, Default, PartialEq, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct BayLayout {
     pub at: (f32, f32),
@@ -191,7 +191,7 @@ pub struct BayLayout {
 }
 
 /// A gun raised for the facility's side when the match begins.
-#[derive(Clone, Debug, Default, PartialEq, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct GuardLayout {
     /// Blueprint key.
@@ -200,7 +200,7 @@ pub struct GuardLayout {
     pub facing: f32,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct SurvivalLayout {
     /// The facility's heart: where its replication ray leaves, and what the

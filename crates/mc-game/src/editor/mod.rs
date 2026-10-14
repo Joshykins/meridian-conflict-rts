@@ -4,6 +4,7 @@ mod browser;
 mod cameras;
 mod catalogue;
 mod document;
+mod environment;
 mod frame;
 mod gestures;
 mod interaction;
@@ -52,6 +53,7 @@ pub(crate) struct Editor {
     tool: usize,
     tool_group: usize,
     paint: tools::PaintSettings,
+    environment: environment::Controls,
     radius: f32,
     strength: f32,
     stamp_asset: String,
@@ -129,6 +131,7 @@ impl Editor {
             tool: 0,
             tool_group: 0,
             paint: Default::default(),
+            environment: Default::default(),
             radius: 96.0,
             strength: 8.0,
             stamp_asset: "crater.json".into(),
@@ -185,6 +188,10 @@ impl Editor {
         renderer
             .edit_terrain(&self.doc.map, [0, 0, w, h])
             .map_err(|e| e.to_string())?;
+        self.apply_environment(renderer);
+        renderer
+            .edit_water(self.doc.map.info.water_level)
+            .map_err(|e| e.to_string())?;
         self.fresh = true;
         Ok(())
     }
@@ -232,9 +239,17 @@ impl Editor {
                 .edit_cover(&self.doc.map, layer, rect)
                 .map_err(|e| e.to_string())?;
         }
+        if update.environment {
+            self.apply_environment(renderer);
+        }
+        if update.water || update.terrain.is_some() {
+            renderer
+                .edit_water(self.doc.map.info.water_level)
+                .map_err(|e| e.to_string())?;
+        }
         // Unit origins come from the simulation mirror; rebuild them when the
         // ground changes too. Props sample the live height tiles in the shader.
-        if update.objects || update.terrain.is_some() {
+        if update.objects || update.water || update.terrain.is_some() {
             self.refresh_units()?;
         }
         Ok(())

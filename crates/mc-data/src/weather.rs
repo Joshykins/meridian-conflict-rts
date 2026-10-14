@@ -321,8 +321,8 @@ impl SkyChoice {
 }
 
 /// A map's own settings file, `maps/<stem>.ron`.
-#[derive(Clone, Debug, PartialEq, Deserialize)]
-#[serde(try_from = "MapConfigFile")]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(try_from = "MapConfigFile", into = "MapConfigFile")]
 pub struct MapConfig {
     /// The map's regions: one, the map's own climate and weather, on a map without
     /// regions; two or more on a map that lists them.
@@ -368,7 +368,7 @@ impl Default for MapConfig {
 }
 
 /// `MapConfig` as a map's file writes it, before its regions and walls are checked.
-#[derive(Default, Deserialize)]
+#[derive(Default, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 struct MapConfigFile {
     /// The map's own weather, tweaks to it and climate: on a map without regions.
@@ -385,6 +385,26 @@ struct MapConfigFile {
     style: Option<MapStyle>,
     strata_lift: f32,
     blend: f32,
+}
+
+impl From<MapConfig> for MapConfigFile {
+    fn from(config: MapConfig) -> Self {
+        let own = (!config.has_regions()).then(|| config.regions[0].clone());
+        Self {
+            weather: own.as_ref().map(|r| r.weather),
+            tweaks: own.as_ref().map(|r| r.tweaks),
+            climate: own.as_ref().map(|r| r.climate),
+            regions: config.has_regions().then_some(config.regions),
+            walls: config.walls.walls().to_vec(),
+            time: config.time,
+            hour: config.hour,
+            survival: config.survival,
+            biome: config.biome,
+            style: config.style,
+            strata_lift: config.strata_lift,
+            blend: config.blend,
+        }
+    }
 }
 
 impl TryFrom<MapConfigFile> for MapConfig {
@@ -590,15 +610,50 @@ impl MapConfig {
         } else {
             map_path.with_extension("ron")
         };
-        let Ok(text) = std::fs::read_to_string(&path) else {
-            return Ok(MapConfig::default());
+        use std::io::Read;
+        let file = match std::fs::File::open(&path) {
+            Ok(file) => file,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Self::default()),
+            Err(e) => return Err(format!("{}: {e}", path.display())),
         };
+        let mut text = String::new();
+        file.take(1_048_577)
+            .read_to_string(&mut text)
+            .map_err(|e| format!("{}: {e}", path.display()))?;
+        if text.len() > 1_048_576 {
+            return Err(format!(
+                "{}: map configuration exceeds 1 MiB",
+                path.display()
+            ));
+        }
         MapConfig::parse(&text).map_err(|e| format!("{}: {e}", path.display()))
     }
 
     /// The map's regions: one, without a name, on a map without regions.
     pub fn regions(&self) -> &[Region] {
         &self.regions
+    }
+
+    /// Replace regional authoring without losing survival or browser metadata.
+    /// One region is the map's own climate and cannot have walls.
+    pub fn set_regions(
+        &mut self,
+        mut regions: Vec<Region>,
+        walls: Vec<Wall>,
+    ) -> Result<(), RegionError> {
+        if regions.is_empty() || regions.len() > MAX_REGIONS {
+            return Err(RegionError::Regions(regions.len()));
+        }
+        if regions.len() == 1 {
+            if !walls.is_empty() {
+                return Err(RegionError::WallsWithoutRegions);
+            }
+            regions[0].name.clear();
+        }
+        let walls = Walls::new(walls, regions.len())?;
+        self.regions = regions;
+        self.walls = walls;
+        Ok(())
     }
 
     /// Whether the map is parted into regions, each with a weather to pick.
@@ -957,3 +1012,6 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod serialization_tests;
