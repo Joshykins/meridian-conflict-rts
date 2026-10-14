@@ -24,84 +24,92 @@ pub struct Event {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[repr(u32)]
 pub enum Condition {
-    Elapsed(u32),
+    Elapsed(u32) = 0,
     After {
         event: String,
         ticks: u32,
-    },
+    } = 1,
     Inside {
         unit: String,
         region: String,
-    },
-    DeadGroup(String),
-    Unloaded(String),
-    DeadUnit(String),
+    } = 2,
+    DeadGroup(String) = 3,
+    Unloaded(String) = 4,
+    DeadUnit(String) = 5,
     HealthBelow {
         unit: String,
         percent: u8,
-    },
-    All(Vec<Condition>),
-    Any(Vec<Condition>),
+    } = 6,
+    All(Vec<Condition>) = 7,
+    Any(Vec<Condition>) = 8,
     /// All queued comms have finished in simulation time.
-    DialogueIdle,
+    DialogueIdle = 9,
+    AliveGroup(String) = 10,
+    Objective {
+        line: String,
+        status: Objective,
+    } = 11,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[repr(u32)]
 pub enum Action {
-    Spawn(String),
+    Spawn(String) = 0,
     Load {
         group: String,
         carrier: String,
-    },
+    } = 1,
     Land {
         unit: String,
         point: String,
         unload: bool,
-    },
-    TakeOff(String),
-    Despawn(String),
-    Controls(bool),
+    } = 2,
+    TakeOff(String) = 3,
+    Despawn(String) = 4,
+    Controls(bool) = 5,
     Move {
         group: String,
         point: String,
         attack: bool,
-    },
+    } = 6,
     Team {
         player: u8,
         team: u8,
-    },
+    } = 7,
     Say {
         line: String,
         ticks: u32,
-    },
+    } = 8,
     Objective {
         line: String,
         status: Objective,
-    },
+    } = 9,
     Camera {
         name: String,
         ticks: u32,
-    },
-    Checkpoint(u16),
-    Win,
-    Lose,
-    Arrive(String),
+    } = 10,
+    Checkpoint(u16) = 11,
+    Win = 12,
+    Lose = 13,
+    Arrive(String) = 14,
     Protect {
         unit: String,
         enabled: bool,
-    },
+    } = 15,
     Ai {
         player: u8,
         config: Option<crate::AiConfig>,
-    },
+    } = 16,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[repr(u32)]
 pub enum Objective {
-    Active,
-    Complete,
-    Failed,
+    Active = 0,
+    Complete = 1,
+    Failed = 2,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -151,6 +159,16 @@ impl Mission {
         let tick = world.state.tick;
         match condition {
             Condition::DialogueIdle => self.dialogue.is_empty(),
+            Condition::Objective { line, status } => self.objectives.get(line) == Some(status),
+            Condition::AliveGroup(name) => self.groups.get(name).is_some_and(|ids| {
+                ids.iter().any(|id| {
+                    world
+                        .state
+                        .units
+                        .row(*id)
+                        .is_some_and(|row| world.state.units.health[row] > Fx::ZERO)
+                })
+            }),
             Condition::Elapsed(n) => tick.saturating_sub(self.began) >= *n,
             Condition::After { event, ticks } => self
                 .fired

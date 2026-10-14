@@ -13,7 +13,7 @@ impl Pilot {
         if !m.controls || m.outcome.is_some() {
             return vec![];
         }
-        let next = route(m);
+        let next = route(&m.fired);
         if self.target == next && !world.tick_count().is_multiple_of(200) {
             return vec![];
         }
@@ -51,7 +51,7 @@ impl Pilot {
         }]
     }
 }
-fn route(m: &mc_sim::mission::Mission) -> &'static str {
+fn route(fired: &std::collections::BTreeMap<String, u32>) -> &'static str {
     for (event, region) in [
         ("roadblock_clear", "first_contact"),
         ("pdf_linkup", "junction"),
@@ -63,9 +63,36 @@ fn route(m: &mc_sim::mission::Mission) -> &'static str {
         ("flank", "harbour"),
         ("base_destroyed", "spaceport"),
     ] {
-        if !m.fired.contains_key(event) {
+        if event == "holdouts_rescued" && fired.contains_key("holdouts_lost") {
+            continue;
+        }
+        if !fired.contains_key(event) {
             return region;
         }
     }
     "spaceport"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn a_lost_optional_force_does_not_strand_the_pilot_at_the_warehouse() {
+        let mut fired = [
+            "roadblock_clear",
+            "pdf_linkup",
+            "bridge_clear",
+            "miners_freed",
+            "betrayal",
+            "breakout",
+        ]
+        .into_iter()
+        .map(|n| (n.into(), 1))
+        .collect();
+        assert_eq!(route(&fired), "warehouse");
+        fired.insert("holdouts_lost".into(), 2);
+        assert_eq!(route(&fired), "harbour");
+        fired.insert("flank".into(), 3);
+        assert_eq!(route(&fired), "spaceport");
+    }
 }

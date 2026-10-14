@@ -132,9 +132,14 @@ impl Definition {
                 unit: name,
                 percent,
             } => unit(name) && *percent <= 100,
-            Condition::DeadGroup(name) | Condition::Unloaded(name) => {
-                self.placed.units.iter().any(|u| u.group == *name)
-            }
+            Condition::Objective { line, .. } => self
+                .events
+                .iter()
+                .flat_map(|e| &e.actions)
+                .any(|a| matches!(a,Action::Objective {line:known,..} if known==line)),
+            Condition::DeadGroup(name)
+            | Condition::AliveGroup(name)
+            | Condition::Unloaded(name) => self.placed.units.iter().any(|u| u.group == *name),
             Condition::All(cs) | Condition::Any(cs) => {
                 if cs.is_empty() || cs.len() > 32 {
                     return Err("invalid condition list".into());

@@ -83,6 +83,12 @@ playable mission, authored and revised through the editor and its API.
   poses, and default mission stills use the authored cue. Full gate passes in
   257 s, including 867 simulation integration tests and 348 game tests.
 
+- Fixed the optional holdouts encounter so rescue and loss cannot both fire.
+  Objective/AliveGroup predicates and checkpoint regressions cover either order;
+  the pilot continues past a failed optional rescue. The full six-checkpoint
+  route still wins at tick 6150. Windows/Linux determinism hashes match
+  (commander AI b914c756d95136a4, every-domain b01c6a3bb0badef6).
+
 ## Still required before final delivery
 - Component doodads, general destructible/reclaimable props.
 - Water/climate controls, decorative cliff regeneration and resize.

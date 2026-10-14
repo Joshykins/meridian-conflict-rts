@@ -481,6 +481,11 @@ fn holdouts(s: &Script) {
         "holdouts_rescued",
         C::All(vec![
             after("holdouts_refuse", 0),
+            C::AliveGroup("holdouts".into()),
+            C::Objective {
+                line: "m1.obj.07".into(),
+                status: O::Active,
+            },
             dead("warehouse_attackers"),
             inside("warehouse"),
         ]),
@@ -493,7 +498,14 @@ fn holdouts(s: &Script) {
     );
     s.event(
         "holdouts_lost",
-        C::All(vec![after("holdouts_refuse", 0), dead("holdouts")]),
+        C::All(vec![
+            after("holdouts_refuse", 0),
+            dead("holdouts"),
+            C::Objective {
+                line: "m1.obj.07".into(),
+                status: O::Active,
+            },
+        ]),
         vec![
             objective("m1.obj.07", O::Failed),
             say("m1.hold.06"),

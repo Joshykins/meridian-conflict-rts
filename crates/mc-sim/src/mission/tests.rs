@@ -280,3 +280,5 @@ fn protected_story_actor_and_ai_settings_survive_a_checkpoint() {
     restored.damage_unit(row, Fx::from_int(100_000), 1, UnitId::NONE);
     assert_eq!(restored.state.units.health[row], Fx::ZERO);
 }
+
+mod outcomes;

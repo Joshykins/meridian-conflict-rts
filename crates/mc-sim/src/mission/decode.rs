@@ -6,17 +6,20 @@ use serde::{
 };
 use std::{fmt, marker::PhantomData};
 #[derive(Deserialize)]
+#[repr(u32)]
 enum Tag {
-    Elapsed,
-    After,
-    Inside,
-    DeadGroup,
-    Unloaded,
-    DeadUnit,
-    HealthBelow,
-    All,
-    Any,
-    DialogueIdle,
+    Elapsed = 0,
+    After = 1,
+    Inside = 2,
+    DeadGroup = 3,
+    Unloaded = 4,
+    DeadUnit = 5,
+    HealthBelow = 6,
+    All = 7,
+    Any = 8,
+    DialogueIdle = 9,
+    AliveGroup = 10,
+    Objective = 11,
 }
 const TAGS: &[&str] = &[
     "Elapsed",
@@ -29,6 +32,8 @@ const TAGS: &[&str] = &[
     "All",
     "Any",
     "DialogueIdle",
+    "AliveGroup",
+    "Objective",
 ];
 
 impl<'de> Deserialize<'de> for Condition {
@@ -55,6 +60,11 @@ struct After {
 struct Inside {
     unit: String,
     region: String,
+}
+#[derive(Deserialize)]
+struct ObjectiveState {
+    line: String,
+    status: super::Objective,
 }
 #[derive(Deserialize)]
 struct Health {
@@ -87,6 +97,15 @@ impl<'de> Visitor<'de> for Seed {
                 Condition::Inside {
                     unit: a.unit,
                     region: a.region,
+                }
+            }
+            Tag::AliveGroup => Condition::AliveGroup(v.newtype_variant()?),
+            Tag::Objective => {
+                let a: ObjectiveState =
+                    v.struct_variant(&["line", "status"], Fields(PhantomData))?;
+                Condition::Objective {
+                    line: a.line,
+                    status: a.status,
                 }
             }
             Tag::DeadGroup => Condition::DeadGroup(v.newtype_variant()?),
@@ -158,6 +177,11 @@ mod tests {
     #[test]
     fn structured_conditions_roundtrip_in_binary_and_ron() {
         let original = Condition::All(vec![
+            Condition::AliveGroup("holdouts".into()),
+            Condition::Objective {
+                line: "rescue".into(),
+                status: super::super::Objective::Active,
+            },
             Condition::After {
                 event: "landed".into(),
                 ticks: 80,

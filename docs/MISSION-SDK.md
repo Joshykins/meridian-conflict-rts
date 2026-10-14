@@ -28,9 +28,14 @@ the actual comms queue drains, so concurrent radio interruptions cannot make
 the next story beat run ahead of the text.
 
 Conditions include elapsed time, time after another event, a named unit inside
-a region, group death, unit death or low health, unloaded cargo, dialogue idle,
+a region, group death or surviving members, unit death or low health, unloaded
+cargo, objective status, dialogue idle,
 and bounded All/Any combinations. Times are simulation ticks (10 per second).
 Condition decoding bounds nesting before recursive values are constructed.
+Use an Active objective condition on mutually exclusive success/failure events;
+a rescue also requires AliveGroup so a dead force cannot be rescued later.
+Once either branch changes the objective status, the other branch stays closed.
+Wire enum numbers are explicit and new variants are appended.
 
 ## Actions
 
