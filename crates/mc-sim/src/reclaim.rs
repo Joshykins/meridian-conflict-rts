@@ -347,7 +347,7 @@ impl World {
         gone
     }
 
-    fn credit(&mut self, row: usize, materials: Fx) {
+    pub(crate) fn credit(&mut self, row: usize, materials: Fx) {
         let player = &mut self.state.players[self.state.units.owner[row] as usize];
         player.materials += materials;
         player.reclaimed_materials += materials;
@@ -490,6 +490,11 @@ impl World {
             if self.reclaim_ready(row, e.pos) {
                 let power = self.tool_power(row);
                 self.drain_wreck(row, e.row as usize, power, 0);
+            }
+        } else if let Some(p) = self.nearest_salvage_prop(row, pos, range) {
+            let (at, _, _) = self.city_shapes.outline(p);
+            if self.reclaim_ready(row, at.xy()) {
+                self.drain_prop(row, p, self.tool_power(row), 0);
             }
         }
         Ok(())

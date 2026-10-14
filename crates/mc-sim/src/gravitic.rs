@@ -322,7 +322,7 @@ impl World {
         self.prop_index.query(front, width * 4, kind::PROP, |e| {
             let prop = e.row as usize;
             if e.pos.distance(front) <= width * 4
-                && self.map.props[prop].kind.is_tree()
+                && self.is_scenery_tree(prop)
                 && self.is_prop_alive(prop)
             {
                 trees.push(prop);
@@ -364,7 +364,7 @@ impl World {
             self.prop_index.query(mark, radius, kind::PROP, |e| {
                 let prop = e.row as usize;
                 if e.pos.distance(mark) <= radius
-                    && self.map.props[prop].kind.is_tree()
+                    && self.is_scenery_tree(prop)
                     && self.is_prop_alive(prop)
                 {
                     trees.push(prop);

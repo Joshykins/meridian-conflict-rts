@@ -40,6 +40,7 @@ fn config() -> MatchConfig {
 
 fn map() -> MapData {
     MapData {
+        doodads: Default::default(),
         name: "test".into(),
         content_id: 1,
         ore: Vec::new(),

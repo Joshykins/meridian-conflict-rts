@@ -42,6 +42,7 @@ fn strait() -> World {
         Fx::from_int(WATER),
     );
     let map = MapData {
+        doodads: Default::default(),
         name: "strait".into(),
         content_id: 1,
         ore: Vec::new(),

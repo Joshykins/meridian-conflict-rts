@@ -36,6 +36,7 @@ fn world() -> World {
     let terrain =
         Heightfield::from_samples(CELLS, CELLS, samples, Fx::ZERO, Fx::ratio(1, 64), Fx::ZERO);
     let map = MapData {
+        doodads: Default::default(),
         name: "hill".into(),
         content_id: 1,
         ore: Vec::new(),

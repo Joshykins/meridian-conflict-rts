@@ -31,6 +31,7 @@ fn world_on(terrain: Heightfield) -> World {
         Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
     );
     let map = MapData {
+        doodads: Default::default(),
         name: "range".into(),
         content_id: 1,
         ore: Vec::new(),
@@ -87,6 +88,8 @@ fn roster_is_tier_gated_and_every_aircraft_has_a_factory() {
             .motion
             .is_some_and(|m| m.layer == mc_data::MoveLayer::Air)
             && !bp.carried_drone
+            // Authored campaign craft arrive through mission events.
+            && !bp.mission_only
             // Lift ships are raised by engineers on a lot of their own.
             && !bp.built_on_site()
         {
@@ -579,6 +582,7 @@ fn all_aa_structures_can_be_placed_on_water_and_stand_at_its_surface() {
         spawn_commanders: false,
     };
     let map = MapData {
+        doodads: Default::default(),
         name: "water".into(),
         content_id: 2,
         ore: Vec::new(),

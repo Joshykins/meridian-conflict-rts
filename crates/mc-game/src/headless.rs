@@ -86,8 +86,13 @@ pub fn run_sim(
         .as_deref()
         .map(crate::replay::Playback::open)
         .transpose()?;
+    let mission = match &playback {
+        Some(p) => p.mission.clone(),
+        None => crate::campaign::definition(map)?,
+    };
     let config = match &playback {
         Some(p) => p.config.clone(),
+        None if mission.is_some() => crate::campaign::config(),
         None => setup::match_config(opts, map),
     };
     let mut world =
@@ -102,8 +107,17 @@ pub fn run_sim(
     if let Some(survival) = survival {
         world.begin_survival(survival).map_err(|e| e.to_string())?;
     }
+    let has_mission = mission.is_some();
+    if opts.mission_pilot && mission.as_ref().is_none_or(|m| m.key != "vela_m1") {
+        return Err("--mission-pilot requires the Vela mission map".into());
+    }
+    let mut mission_pilot = mc_missions::Pilot::default();
+    if let Some(mission) = mission {
+        world.begin_mission(mission).map_err(|e| e.to_string())?;
+    }
     let opening = match playback {
         Some(_) => Vec::new(),
+        None if has_mission => Vec::new(),
         None => setup::opening_commands(opts, map, blueprints, &config),
     };
     // A replay plays as far as it was recorded.
@@ -133,10 +147,14 @@ pub fn run_sim(
         if let Some(p) = &mut playback {
             p.step(&mut world, t)?;
         } else {
-            let commands = match t {
-                0 => opening.clone(),
-                1 => setup::scene_orders(opts, map, blueprints, &world),
-                _ => setup::late_orders(opts, &world, t),
+            let commands = if opts.mission_pilot {
+                mission_pilot.commands(&world)
+            } else {
+                match t {
+                    0 => opening.clone(),
+                    1 => setup::scene_orders(opts, map, blueprints, &world),
+                    _ => setup::late_orders(opts, &world, t),
+                }
             };
             world.tick(&commands).map_err(|e| e.to_string())?;
         }
@@ -309,6 +327,7 @@ pub fn screenshot(
         true,
         shot.report.is_some().then_some(&mut chronicle),
     )?;
+    let mut mission_presentation = crate::campaign::Presentation::load(&map);
     // A selected factory gets a queue to show: a few of its first two products.
     if let Some(key) = &shot.select {
         let u = &world.state.units;
@@ -602,7 +621,8 @@ pub fn screenshot(
     let mut view = crate::game::View::new(
         0,
         setup::TEAM_COLORS,
-        opts.scene != setup::Scene::Formations
+        world.state.mission.is_none()
+            && opts.scene != setup::Scene::Formations
             && std::env::var_os("MERIDIAN_NO_PROFILER").is_none(),
     );
     view.formation_panel = opts.scene == setup::Scene::Formations;
@@ -907,6 +927,18 @@ pub fn screenshot(
         })
         .transpose()?;
     let audio = crate::audio::Audio::silent();
+    if shot.camera.is_none() {
+        // A still captures the authored cue after its presentation pan settles.
+        // Explicit --camera remains available for inspecting other action.
+        mission_presentation.update(
+            view.status.mission.as_ref(),
+            &mut camera,
+            &renderer,
+            &audio,
+            1.4,
+        );
+    }
+
     let input = crate::ui::Input {
         cursor: shot
             .cursor
@@ -1080,7 +1112,9 @@ pub fn screenshot(
         };
         // The report, like the in-match menu, has the pointer to itself.
         ui.interactive = report.is_none();
+        mission_presentation.signs(&mut ui, &map, &camera, &renderer, &view.frame);
         hud.draw(&mut ui, &scene, 0.016);
+        mission_presentation.draw(&mut ui, view.status.mission.as_ref());
         crate::hud::cursor_hint(&mut ui, &view, &world.blueprints, &[]);
         prefab_shot.hint(&mut ui, &view, &prefab_sites);
         crate::warp_marks::cursor_card(&mut ui, &field, pointer);

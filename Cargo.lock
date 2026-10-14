@@ -1901,6 +1901,7 @@ dependencies = [
  "mc-data",
  "mc-jobs",
  "mc-map",
+ "mc-missions",
  "mc-music",
  "mc-net",
  "mc-render",
@@ -1941,6 +1942,21 @@ version = "0.1.0"
 dependencies = [
  "mc-core",
  "mc-data",
+ "ron",
+ "serde",
+]
+
+[[package]]
+name = "mc-missions"
+version = "0.1.0"
+dependencies = [
+ "mc-core",
+ "mc-data",
+ "mc-jobs",
+ "mc-map",
+ "mc-sim",
+ "ron",
+ "serde",
 ]
 
 [[package]]
@@ -2036,6 +2052,7 @@ dependencies = [
  "mc-jobs",
  "mc-map",
  "mc-path",
+ "ron",
  "serde",
 ]
 

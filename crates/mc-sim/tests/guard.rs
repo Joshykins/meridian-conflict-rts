@@ -24,6 +24,7 @@ fn field() -> World {
         Fx::from_int(5),
     );
     let map = MapData {
+        doodads: Default::default(),
         name: "field".into(),
         content_id: 1,
         ore: Vec::new(),

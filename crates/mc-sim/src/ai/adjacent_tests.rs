@@ -28,6 +28,7 @@ fn world() -> World {
     World::with_terrain(
         Heightfield::flat(256, 256, Fx::from_int(20)),
         MapData {
+            doodads: Default::default(),
             name: "adjacency test".into(),
             content_id: 5,
             ore: Vec::new(),

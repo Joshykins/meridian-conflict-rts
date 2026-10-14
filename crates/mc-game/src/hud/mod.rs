@@ -574,6 +574,9 @@ impl Hud {
         self.actions.clear();
         let (w, h) = (ui.size.x, ui.size.y);
         let view = s.view;
+        if view.status.mission.as_ref().is_some_and(|m| !m.controls) {
+            return Vec::new();
+        }
 
         // The range's map browser has the unit pictures' slots: nothing else is
         // drawn until it has gone, then the pictures go back.
@@ -608,7 +611,11 @@ impl Hud {
         let speed_hits = self.speed_hits(ui);
         self.fold_end(ui, fold);
         let fold = self.fold_begin(ui, free_camera::Part::Left);
-        let mut under_economy = self.economy(ui, s, dt);
+        let mut under_economy = if view.status.mission.is_some() {
+            EDGE
+        } else {
+            self.economy(ui, s, dt)
+        };
         if !view.observing {
             let card = Rect::new(EDGE, under_economy + GAP, COMMANDER_W, COMMANDER_H);
             if builders::commander_card(self, ui, s, card, dt) {

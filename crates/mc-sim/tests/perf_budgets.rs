@@ -28,6 +28,7 @@ fn world_with(size_cells: u32, props: Vec<mc_map::Prop>) -> World {
     );
     let terrain = Heightfield::flat(size_cells, size_cells, Fx::from_int(20));
     let map = MapData {
+        doodads: Default::default(),
         name: "perf".into(),
         content_id: 1,
         ore: Vec::new(),
@@ -233,6 +234,7 @@ fn ring_world(players: u8, fog: bool, threads: Option<usize>, ai: bool) -> World
         .map(|p| ring_point(p, players, 3000.0))
         .collect();
     let map = MapData {
+        doodads: Default::default(),
         name: "ring".into(),
         content_id: 1,
         ore: Vec::new(),

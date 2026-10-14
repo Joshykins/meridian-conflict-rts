@@ -4,7 +4,7 @@
 //! (mc-render `shaders/regions.wgsl`), so the ground, the sea, the sky and the map
 //! previews agree on every line.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::weather::{Climate, Weather, WeatherPreset, WeatherTweaks};
 
@@ -13,7 +13,7 @@ use crate::weather::{Climate, Weather, WeatherPreset, WeatherTweaks};
 pub const MAX_REGIONS: usize = 8;
 
 /// One region of a map: its name, its climate and its weather.
-#[derive(Clone, Debug, Default, PartialEq, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Region {
     /// What skirmish set-up calls it ("Weather: Alaska"). Empty on a map without regions.
@@ -31,7 +31,7 @@ impl Region {
 }
 
 /// A climate wall: a line between two regions.
-#[derive(Clone, Debug, PartialEq, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Wall {
     /// The line in map metres (x, y; y north), two points or more. It ends on or

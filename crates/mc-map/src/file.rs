@@ -19,8 +19,10 @@ use std::path::Path;
 
 pub struct MapFile {
     file: File,
+    path: std::path::PathBuf,
     info: MapInfo,
     content_id: u64,
+    authoring: crate::placed::Loaded,
     dir: Vec<DirEntry>,
     overview: Vec<u16>,
     props: Vec<Prop>,
@@ -31,11 +33,30 @@ pub struct MapFile {
     streets: Vec<u8>,
     wrecks: Vec<MapWreck>,
     decks: Vec<Deck>,
+    tints: Vec<[u8; 3]>,
+    // Fields drop in declaration order: close file before releasing its owner.
+    _lifetimes: Vec<Box<dyn Send + Sync>>,
 }
 
 impl MapFile {
+    /// Keep a source resource alive until the map and all its streaming readers
+    /// release it. Its destructor runs after this map's file handle closes.
+    pub fn with_lifetime(mut self, owner: impl Send + Sync + 'static) -> Self {
+        self._lifetimes.push(Box::new(owner));
+        self
+    }
+
+    pub fn prop_tints(&self) -> &[[u8; 3]] {
+        &self.tints
+    }
+
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
     pub fn open(path: impl AsRef<Path>) -> Result<MapFile, MapError> {
-        let file = File::open(path)?;
+        let path = path.as_ref().to_owned();
+        let file = File::open(&path)?;
         let file_len = file.metadata()?.len();
         let mut header = [0u8; HEADER_LEN];
         read_exact_at(&file, &mut header, 0).map_err(eof_is_corrupt)?;
@@ -159,8 +180,20 @@ impl MapFile {
             }
         };
 
+        let tints = match layout.tints_offset {
+            0 => Vec::new(),
+            at => section(at, layout.prop_count as usize * 3)?
+                .as_chunks::<3>()
+                .0
+                .to_vec(),
+        };
+
+        let authoring = crate::placed::Loaded::read(&path, &info, props.len(), content_id)?;
         Ok(MapFile {
+            authoring,
+            _lifetimes: Vec::new(),
             file,
+            path,
             info,
             content_id,
             dir,
@@ -173,6 +206,7 @@ impl MapFile {
             streets,
             wrecks,
             decks,
+            tints,
         })
     }
 
@@ -186,11 +220,25 @@ impl MapFile {
         &self.info.name
     }
 
-    /// Identifies the map content. Replays and netplay compare it so everyone
-    /// simulates on the same terrain.
+    /// Identifies terrain and the captured authoring document. Replays and
+    /// netplay compare it so different placed objects cannot share a match.
+    /// Legacy maps without authoring retain their original terrain identity.
     #[inline]
     pub fn content_id(&self) -> u64 {
-        self.content_id
+        self.authoring.content_id
+    }
+
+    /// Validated placements captured when the map opens. Never reread a mutable
+    /// sidecar after the map has been selected or its identity exchanged.
+    pub fn placed(&self) -> &crate::placed::Placed {
+        &self.authoring.placed
+    }
+    /// Captured authored components for one baked prop.
+    pub fn doodad(&self, index: usize) -> Option<&crate::placed::Doodad> {
+        self.authoring
+            .by_prop
+            .get(&(index as u32))
+            .map(|&i| &self.authoring.placed.doodads[i])
     }
 
     #[inline]
@@ -310,6 +358,7 @@ impl MapFile {
             &self.ways,
             &self.streets,
             &self.decks,
+            &self.tints,
         );
         if computed == self.content_id {
             Ok(())

@@ -214,7 +214,7 @@ impl World {
             if out > behind
                 && out <= ahead
                 && outside <= Fx::from_int(TREE_REACH)
-                && self.map.props[prop].kind.is_tree()
+                && self.is_scenery_tree(prop)
                 && self.is_prop_alive(prop)
             {
                 trees.push(prop);

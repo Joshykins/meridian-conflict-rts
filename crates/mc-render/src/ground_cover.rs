@@ -5,6 +5,7 @@
 //! ways layer the trails trodden into it, one with a streets layer its city's
 //! roads, pavements, yards and fields.
 
+mod edit;
 use crate::keep::{kept, Kept};
 use mc_map::{MapFile, PropKind};
 use std::sync::Mutex;
@@ -35,10 +36,10 @@ pub struct GroundCover {
     /// each one sample's own (read unfiltered). All zero on a map without
     /// one: ground of the terrain's own on a road of no kind.
     pub streets: Vec<u8>,
-    /// On a map with a snow layer, the first layer's mips below its own texels,
+    /// The first layer's mips below its own texels,
     /// each half the last (width, height, RGBA8): the polar sea reads how much of
     /// the land's ice lies within a few hundred metres from them (sea.wgsl
-    /// `ice_near`), smooth at any distance. None on a map without a snow layer.
+    /// `ice_near`), smooth at any distance. Reserved on every map for live paint.
     pub mips: Vec<(u32, u32, Vec<u8>)>,
 }
 
@@ -71,13 +72,47 @@ pub fn ground_cover(map: &MapFile) -> GroundCover {
 }
 
 fn ground_cover_made(map: &MapFile) -> GroundCover {
-    let size = map.info().size_metres().to_f32();
+    make(
+        CoverSource {
+            info: map.info(),
+            props: map.props(),
+            snow: map.snow(),
+            ways: map.ways(),
+            streets: map.streets(),
+        },
+        |cell, dims| crate::cliff_blocks::crag_field(map, cell, dims),
+    )
+}
+pub(crate) fn edited(map: &mc_map::edit::EditMap) -> GroundCover {
+    fn some(bytes: &[u8]) -> Option<&[u8]> {
+        (!bytes.is_empty()).then_some(bytes)
+    }
+    make(
+        CoverSource {
+            info: &map.info,
+            props: &map.props,
+            snow: some(&map.snow),
+            ways: some(&map.ways),
+            streets: some(&map.streets),
+        },
+        |cell, dims| crate::cliff_blocks::crag_edited(map, cell, dims),
+    )
+}
+struct CoverSource<'a> {
+    info: &'a mc_map::MapInfo,
+    props: &'a [mc_map::Prop],
+    snow: Option<&'a [u8]>,
+    ways: Option<&'a [u8]>,
+    streets: Option<&'a [u8]>,
+}
+fn make(map: CoverSource<'_>, crags: impl FnOnce(f32, (usize, usize)) -> Vec<f32>) -> GroundCover {
+    let size = map.info.size_metres().to_f32();
     let cell = (size[0].max(size[1]) / MAX_TEXELS as f32).max(MIN_CELL_M);
     let w = ((size[0] / cell).ceil() as usize).max(1);
     let h = ((size[1] / cell).ceil() as usize).max(1);
     let mut crown = vec![0f32; w * h];
     let mut needle = vec![0f32; w * h];
-    for p in map.props().iter().filter(|p| p.kind.is_tree()) {
+    for p in map.props.iter().filter(|p| p.kind.is_tree()) {
         let xy = p.pos.to_f32();
         let scale = p.scale_milli as f32 / 1000.0;
         let (reach, conifer) = crown_of(p.kind);
@@ -101,8 +136,8 @@ fn ground_cover_made(map: &MapFile) -> GroundCover {
         texels[i * 4 + 1] =
             ((needle[i] / crown[i].max(1e-4)).clamp(0.0, 1.0) * 255.0).round() as u8;
     }
-    if let Some(snow) = map.snow() {
-        let (sw, sh) = map.info().snow_dims();
+    if let Some(snow) = map.snow {
+        let (sw, sh) = map.info.snow_dims();
         let pitch = (mc_map::CELL_SIZE_M as u32 * mc_map::format::SNOW_STRIDE) as f32;
         let ice: Vec<u8> = snow.iter().step_by(2).copied().collect();
         let lying: Vec<u8> = snow.iter().skip(1).step_by(2).copied().collect();
@@ -117,8 +152,8 @@ fn ground_cover_made(map: &MapFile) -> GroundCover {
         });
     }
     let mut ways = vec![0u8; w * h * 4];
-    if let Some(layer) = map.ways() {
-        let (sw, sh) = map.info().snow_dims();
+    if let Some(layer) = map.ways {
+        let (sw, sh) = map.info.snow_dims();
         let pitch = (mc_map::CELL_SIZE_M as u32 * mc_map::format::SNOW_STRIDE) as f32;
         for c in 0..3 {
             let channel: Vec<u8> = layer.iter().skip(c).step_by(3).copied().collect();
@@ -127,21 +162,16 @@ fn ground_cover_made(map: &MapFile) -> GroundCover {
             });
         }
     }
-    for (i, crag) in crate::cliff_blocks::crag_field(map, cell, (w, h))
-        .into_iter()
-        .enumerate()
-    {
+    for (i, crag) in crags(cell, (w, h)).into_iter().enumerate() {
         ways[i * 4 + 3] = (crag * 255.0).round() as u8;
     }
-    let streets = match map.streets() {
-        Some(layer) => streets_at_texels(layer, map.info().streets_dims(), cell, (w, h)),
+    let streets = match map.streets {
+        Some(layer) => streets_at_texels(layer, map.info.streets_dims(), cell, (w, h)),
         None => vec![0u8; w * h * 4],
     };
-    let mips = if map.snow().is_some() {
-        mips_of(&texels, (w, h), ICE_MIPS)
-    } else {
-        Vec::new()
-    };
+    // Reserve ice mips on every map so the editor can introduce snow/ice
+    // without rebuilding descriptors or the renderer.
+    let mips = mips_of(&texels, (w, h), ICE_MIPS);
     GroundCover {
         width: w as u32,
         height: h as u32,
@@ -191,6 +221,16 @@ fn streets_at_texels(
     cell: f32,
     (w, h): (usize, usize),
 ) -> Vec<u8> {
+    streets_region(layer, (sw, sh), cell, [0, 0], (w, h))
+}
+
+fn streets_region(
+    layer: &[u8],
+    (sw, sh): (u32, u32),
+    cell: f32,
+    origin: [u32; 2],
+    (w, h): (usize, usize),
+) -> Vec<u8> {
     let pitch = mc_map::CELL_SIZE_M as f32;
     let at = |x: usize, y: usize| {
         let i = (y.min(sh as usize - 1) * sw as usize + x.min(sw as usize - 1)) * 4;
@@ -200,8 +240,8 @@ fn streets_at_texels(
     for y in 0..h {
         for x in 0..w {
             let (sx, sy) = (
-                (x as f32 + 0.5) * cell / pitch,
-                (y as f32 + 0.5) * cell / pitch,
+                ((x + origin[0] as usize) as f32 + 0.5) * cell / pitch,
+                ((y + origin[1] as usize) as f32 + 0.5) * cell / pitch,
             );
             let (x0, y0) = (sx.floor() as usize, sy.floor() as usize);
             let (fx, fy) = (sx.fract(), sy.fract());

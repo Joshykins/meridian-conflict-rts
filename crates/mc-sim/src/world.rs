@@ -131,6 +131,8 @@ pub struct State {
     /// Survival mode's rounds, engine and nodes. None in any other match.
     #[serde(default)]
     pub survival: Option<crate::survival::Survival>,
+    #[serde(default)]
+    pub mission: Option<crate::mission::Mission>,
     /// Finished hulls driving off their factory's pad while it prints the next (`orders.rs`).
     #[serde(default)]
     pub rollouts: std::collections::BTreeMap<UnitId, crate::orders::Rollout>,
@@ -172,6 +174,7 @@ pub struct MapData {
     pub ore: Vec<mc_map::OreRegion>,
     pub starts: Vec<FxVec2>,
     pub props: Vec<Prop>,
+    pub doodads: std::collections::BTreeMap<u32, mc_map::placed::Doodad>,
 }
 
 pub struct World {
@@ -307,6 +310,13 @@ impl World {
     ) -> Result<World, SimError> {
         let terrain = Heightfield::load(map_file).map_err(|e| SimError::Setup(e.to_string()))?;
         let map = MapData {
+            doodads: map_file
+                .placed()
+                .doodads
+                .iter()
+                .cloned()
+                .map(|d| (d.prop_index, d))
+                .collect(),
             name: map_file.info().name.clone(),
             content_id: map_file.content_id(),
             ore: map_file.ore_regions().to_vec(),
@@ -433,8 +443,9 @@ impl World {
         prop_index.build();
 
         let mut nav = Nav::new(&terrain, pool.clone())?;
-        crate::lots::block_buildings(&mut nav, &map.props, size);
-        let (city, city_shapes) = crate::city::build(&map.props, &terrain);
+        crate::doodads::validate(&map.props, &map.doodads)?;
+        crate::lots::block_buildings(&mut nav, &map.props, size, &map.doodads);
+        let (city, city_shapes) = crate::city::build(&map.props, &terrain, &map.doodads);
         let state = State {
             tick: 0,
             rng: Rng::new(config.seed),
@@ -467,6 +478,7 @@ impl World {
             winner: None,
             mines: Default::default(),
             survival: None,
+            mission: None,
             rollouts: Default::default(),
             batches: Default::default(),
             next_batch: 0,
@@ -933,6 +945,8 @@ impl World {
             self.run_survival()?;
         }
         phase(&mut self.timings, "survival");
+        self.run_mission()?;
+        phase(&mut self.timings, "mission");
 
         {
             let _t = mc_core::perf_span!("fn.check_victory");
@@ -1122,6 +1136,9 @@ impl World {
     }
 
     fn check_victory(&mut self) {
+        if self.state.mission.is_some() {
+            return;
+        }
         if self.state.winner.is_some() || self.state.players.len() < 2 {
             return;
         }
@@ -1173,6 +1190,25 @@ impl World {
             return Err(SimError::Snapshot(
                 "snapshot is from a different match".into(),
             ));
+        }
+        for (row, &prop) in state.city.prop.iter().enumerate() {
+            let total = Fx::from_int(self.map.doodads.get(&prop).map_or(0, |d| d.reclaim as i32));
+            if state.city.salvage[row] > total
+                || (state.city.salvage[row] != total && !state.city.is_touched(row))
+            {
+                return Err(SimError::Snapshot("invalid doodad salvage".into()));
+            }
+        }
+        if let Some(mission) = &state.mission {
+            mission
+                .definition
+                .validate(
+                    &self.blueprints,
+                    state.players.len(),
+                    base_terrain.size_metres(),
+                    self.map.props.len(),
+                )
+                .map_err(|e| SimError::Snapshot(e.to_string()))?;
         }
         // Pathing restores over unedited terrain classes; blockers come from its own state.
         self.nav = Nav::restore(&base_terrain, self.pool.clone(), &nav)?;

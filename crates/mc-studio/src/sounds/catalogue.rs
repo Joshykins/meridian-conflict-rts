@@ -177,6 +177,7 @@ fn interface_about(sfx: Sfx) -> &'static str {
         Sfx::Order => "Units taking an order",
         Sfx::Victory => "Winning",
         Sfx::Defeat => "Losing",
+        Sfx::Radio => "Mission radio squelch",
     }
 }
 

@@ -22,6 +22,7 @@ fn world() -> World {
     let blueprints =
         Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
     let map = MapData {
+        doodads: Default::default(),
         name: "small".into(),
         content_id: 1,
         ore: Vec::new(),

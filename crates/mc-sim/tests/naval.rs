@@ -37,6 +37,7 @@ fn sea_with(fog: bool, rise: impl Fn(usize) -> u16) -> World {
     let terrain =
         Heightfield::from_samples(256, 256, samples, Fx::ZERO, Fx::ONE, Fx::from_int(WATER));
     let map = MapData {
+        doodads: Default::default(),
         name: "sea".into(),
         content_id: 1,
         ore: Vec::new(),
@@ -459,6 +460,7 @@ fn the_ai_never_puts_a_sonar_on_land() {
             .collect(),
     };
     let map = MapData {
+        doodads: Default::default(),
         name: "flat".into(),
         content_id: 1,
         ore: vec![

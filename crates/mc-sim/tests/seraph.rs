@@ -38,6 +38,7 @@ fn world(rough: Option<((i32, i32), (i32, i32))>) -> World {
     }
     let terrain = Heightfield::from_samples(CELLS, CELLS, samples, Fx::ZERO, Fx::ONE, Fx::ZERO);
     let map = MapData {
+        doodads: Default::default(),
         name: "seraph".into(),
         content_id: 1,
         ore: Vec::new(),

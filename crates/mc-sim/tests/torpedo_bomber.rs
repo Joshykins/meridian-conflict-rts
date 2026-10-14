@@ -28,6 +28,7 @@ fn sea(fog: bool) -> World {
     let terrain =
         Heightfield::from_samples(256, 256, samples, Fx::ZERO, Fx::ONE, Fx::from_int(WATER));
     let map = MapData {
+        doodads: Default::default(),
         name: "sea".into(),
         content_id: 1,
         ore: Vec::new(),

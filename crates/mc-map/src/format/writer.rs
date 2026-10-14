@@ -27,6 +27,7 @@ pub struct MapWriter {
     ways: Vec<u8>,
     streets: Vec<u8>,
     decks: Vec<Deck>,
+    tints: Vec<[u8; 3]>,
     pos: u64,
 }
 
@@ -48,9 +49,20 @@ impl MapWriter {
             ways: Vec::new(),
             streets: Vec::new(),
             decks: Vec::new(),
+            tints: Vec::new(),
             pos: reserved as u64,
             info,
         })
+    }
+
+    /// RGB multipliers, in the same order as props passed to finish. Empty
+    /// preserves the legacy untinted map format and content ID.
+    pub fn set_prop_tints(&mut self, tints: Vec<[u8; 3]>) -> Result<(), MapError> {
+        if tints.len() > MAX_PROPS {
+            return Err(MapError::Invalid("too many prop tints".into()));
+        }
+        self.tints = tints;
+        Ok(())
     }
 
     pub fn info(&self) -> &MapInfo {
@@ -104,6 +116,7 @@ impl MapWriter {
 
     /// Carries over a map's renderer layers (snow, ways, streets) when rewriting it.
     pub fn keep_layers(&mut self, file: &MapFile) -> Result<(), MapError> {
+        self.set_prop_tints(file.prop_tints().to_vec())?;
         if let Some(snow) = file.snow() {
             self.set_snow(snow.to_vec())?;
         }
@@ -266,6 +279,14 @@ impl MapWriter {
             let (tx, ty) = info.tile_of(p.pos);
             ty * info.tiles_w + tx
         };
+        if !self.tints.is_empty() {
+            if self.tints.len() != props.len() {
+                return Err(MapError::Invalid("one tint is required per prop".into()));
+            }
+            let mut order: Vec<usize> = (0..props.len()).collect();
+            order.sort_by_key(|&i| tile_index(&props[i]));
+            self.tints = order.iter().map(|&i| self.tints[i]).collect();
+        }
         props.sort_by_key(tile_index);
         for (i, p) in props.iter().enumerate() {
             let entry = &mut self.dir[tile_index(p) as usize];
@@ -342,6 +363,13 @@ impl MapWriter {
             layout.decks_offset = at;
             layout.deck_count = self.decks.len() as u32;
             self.out.write_all(&bytes)?;
+            at += bytes.len() as u64;
+        }
+        if !self.tints.is_empty() {
+            layout.tints_offset = at;
+            for tint in &self.tints {
+                self.out.write_all(tint)?;
+            }
         }
 
         let id = content_id(
@@ -356,6 +384,7 @@ impl MapWriter {
             &self.ways,
             &self.streets,
             &self.decks,
+            &self.tints,
         );
         self.out.seek(SeekFrom::Start(0))?;
         self.out.write_all(&write_header(&info, id, &layout))?;

@@ -52,6 +52,7 @@ fn world_with(edit: impl FnOnce(&mut Blueprints)) -> World {
         spawn_commanders: false,
     };
     let map = MapData {
+        doodads: Default::default(),
         name: "edict".into(),
         content_id: 1,
         ore: Vec::new(),

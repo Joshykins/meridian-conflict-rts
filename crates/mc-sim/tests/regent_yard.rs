@@ -27,6 +27,7 @@ fn world() -> World {
     // 1024 cells of 8 m: 8 km a side, room for the Regent to get under way.
     let terrain = Heightfield::flat(1024, 1024, Fx::from_int(GROUND));
     let map = MapData {
+        doodads: Default::default(),
         name: "range".into(),
         content_id: 1,
         ore: Vec::new(),

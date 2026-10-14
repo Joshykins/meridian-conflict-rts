@@ -25,6 +25,7 @@ fn world(fog: bool) -> World {
     // 2048 cells of 8 m: 16 km a side.
     let terrain = Heightfield::flat(2048, 2048, Fx::from_int(20));
     let map = MapData {
+        doodads: Default::default(),
         name: "range".into(),
         content_id: 1,
         ore: Vec::new(),

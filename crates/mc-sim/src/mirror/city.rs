@@ -12,7 +12,7 @@ pub struct StructureView {
     pub prop: u32,
     /// Health left: 255 whole, 0 down.
     pub health: u8,
-    /// `crate::city::BURNING`, `GUTTED` (a fire burned out in it) and `DOWN`.
+    /// `crate::city::BURNING`, `GUTTED` (a fire burned out in it) `DOWN` and `RECLAIMED`.
     pub flags: u8,
     /// The tick it caught fire, its fire went out or it came down (its last
     /// change of `flags`); 0 for one never alight.
@@ -29,7 +29,10 @@ impl World {
                 prop: s.prop[r],
                 health: s.health_byte(r),
                 flags: s.flags[r]
-                    & (crate::city::BURNING | crate::city::GUTTED | crate::city::DOWN),
+                    & (crate::city::BURNING
+                        | crate::city::GUTTED
+                        | crate::city::DOWN
+                        | crate::city::RECLAIMED),
                 since: s.since[r],
             }
         }));

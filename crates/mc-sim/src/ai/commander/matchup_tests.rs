@@ -63,6 +63,7 @@ fn arena(b: &Arc<Blueprints>, sea: bool) -> World {
     let mut w = World::with_terrain(
         terrain,
         MapData {
+            doodads: Default::default(),
             name: "arena".into(),
             content_id: 3,
             ore: Vec::new(),

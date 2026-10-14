@@ -47,6 +47,8 @@ pub enum FrontEvent {
     LaunchNet(Box<multiplayer::lobby::Launch>),
     /// Open the test range.
     Range,
+    Editor,
+    Campaign(bool),
     /// Watch a replay, jumping to the tick if one is given.
     Replay(std::path::PathBuf, Option<u32>),
     Quit,
@@ -78,6 +80,7 @@ const ARRIVE: f32 = 0.42;
 const LAUNCH_FADE: f32 = 0.62;
 
 pub struct Front {
+    notice: Option<String>,
     screen: Screen,
     target: Screen,
     /// Presence of the current screen, 0..1.
@@ -117,6 +120,7 @@ impl Front {
         maps: ReadAhead,
     ) -> Front {
         Front {
+            notice: None,
             screen: Screen::Menu,
             target: Screen::Menu,
             enter: 0.0,
@@ -134,6 +138,12 @@ impl Front {
             launching: None,
             quitting: None,
         }
+    }
+
+    pub(crate) fn complain(&mut self, message: String) {
+        self.notice = Some(message);
+        self.launching = None;
+        self.enter = 1.0;
     }
 
     /// Leaving for a match: the maps read ahead, for the front end it comes back to.
@@ -303,6 +313,15 @@ impl Front {
                     Some(MenuAction::Skirmish) => self.go(Screen::Setup(Mode::Skirmish), settings),
                     Some(MenuAction::Survival) => self.go(Screen::Setup(Mode::Survival), settings),
                     Some(MenuAction::Multiplayer) => self.go(Screen::Multiplayer, settings),
+                    Some(MenuAction::Campaign) => {
+                        self.launching = Some((Launching::Event(FrontEvent::Campaign(false)), 0.0))
+                    }
+                    Some(MenuAction::ContinueCampaign) => {
+                        self.launching = Some((Launching::Event(FrontEvent::Campaign(true)), 0.0))
+                    }
+                    Some(MenuAction::Editor) => {
+                        self.launching = Some((Launching::Event(FrontEvent::Editor), 0.0))
+                    }
                     Some(MenuAction::Range) => self.launching = Some((Launching::Range, 0.0)),
                     Some(MenuAction::History) => self.go(Screen::History, settings),
                     Some(MenuAction::Options) => self.go(Screen::Options, settings),
@@ -437,6 +456,35 @@ impl Front {
                 out.event = Some(FrontEvent::Quit);
             }
         }
+        if let Some(notice) = &self.notice {
+            let r = Rect::new(
+                460.0,
+                ui.size.y - 145.0,
+                (ui.size.x - 490.0).min(850.0),
+                116.0,
+            );
+            ui.panel(r);
+            let lines = ui.wrap(super::type_scale::BODY, notice, r.w - 32.0);
+            for (i, line) in lines.iter().enumerate() {
+                ui.text(
+                    r.x + 16.0,
+                    r.y + 25.0 + i as f32 * 20.0,
+                    super::type_scale::BODY,
+                    rgb(super::palette::TEXT, 1.0),
+                    line,
+                );
+            }
+            if ui.button(
+                super::id("front_notice", 0),
+                Rect::new(r.x + r.w - 110.0, r.y + 76.0, 94.0, 28.0),
+                "Dismiss",
+                super::ButtonKind::Secondary,
+                true,
+            ) {
+                self.notice = None;
+            }
+        }
+
         out
     }
 }

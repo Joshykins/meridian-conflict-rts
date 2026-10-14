@@ -30,6 +30,7 @@ const CLAIMED: i64 = 1 << 40;
 pub(crate) enum HeadWork {
     Wreck(usize),
     Unit(usize),
+    Prop(usize),
 }
 
 impl World {
@@ -76,6 +77,13 @@ impl World {
                 }
                 let bp = self.blueprints.unit(wrecks.blueprint[w]);
                 Some((wrecks.pos[w], wrecks.z[w] + bp.height / 2, bp.radius))
+            }
+            HeadWork::Prop(p) => {
+                if self.state.city.salvage[p] <= Fx::ZERO {
+                    return None;
+                }
+                let (at, radius, height) = self.city_shapes.outline(p);
+                Some((at.xy(), at.z + height / 2, radius))
             }
             HeadWork::Unit(t) => {
                 let units = &self.state.units;
@@ -165,6 +173,7 @@ impl World {
             done |= match work {
                 HeadWork::Wreck(w) => self.drain_wreck(row, w, power, i as u8),
                 HeadWork::Unit(t) => self.drain_unit(row, t, power, i as u8),
+                HeadWork::Prop(p) => self.drain_prop(row, p, power, i as u8),
             };
         }
         done
@@ -229,15 +238,20 @@ impl World {
         let heads = self.bp(row).reclaimer.map_or(0, |r| r.heads().len());
         let mut taken = [usize::MAX; MAX_RECLAIM_HEADS];
         let mut jobs = [None; MAX_RECLAIM_HEADS];
+        let prop = self.nearest_salvage_prop(row, self.state.units.pos[row], self.work_range(row));
         for i in 0..heads {
-            let Some(w) = self.head_pick_wreck(row, i, &taken[..i]) else {
+            let work = if let Some(w) = self.head_pick_wreck(row, i, &taken[..i]) {
+                taken[i] = w;
+                HeadWork::Wreck(w)
+            } else if let Some(p) = prop {
+                HeadWork::Prop(p)
+            } else {
                 self.state.units.weapon_cooldown[row][i] = 0;
                 continue;
             };
-            taken[i] = w;
-            if let Some((pos, z, _)) = self.head_target(HeadWork::Wreck(w)) {
+            if let Some((pos, z, _)) = self.head_target(work) {
                 if self.head_ready(row, i, pos, z) {
-                    jobs[i] = Some(HeadWork::Wreck(w));
+                    jobs[i] = Some(work);
                 }
             }
         }

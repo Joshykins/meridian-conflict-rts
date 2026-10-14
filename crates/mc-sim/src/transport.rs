@@ -536,7 +536,7 @@ impl World {
     }
 
     /// Takes the unit in `row` into the hold of `ship`.
-    fn stow(&mut self, row: usize, ship: usize) -> Result<(), SimError> {
+    pub(crate) fn stow(&mut self, row: usize, ship: usize) -> Result<(), SimError> {
         self.clear_orders(row)?;
         self.stop_moving(row);
         let t = self.transport(ship).expect("lift ship");
