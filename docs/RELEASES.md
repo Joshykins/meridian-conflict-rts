@@ -130,8 +130,9 @@ it must not need the GPU driver the game needs. The game never updates itself.
   the picked channel's build: its number and date, how it stands (up to date, an
   update downloading with its speed and time left, offline), its server (a connection
   to it answers or not), what is installed, and **Play** at the foot. To the right,
-  the latest news over the backdrop (`crates/mc-launcher/assets/backdrop.png`), and
-  under it **Patch Notes** (the channel's history), **News** and **Builds**; the
+  an open window onto the backdrop (`crates/mc-launcher/assets/backdrop.png`, framed
+  by `FRAMING` in `paint/backdrop.rs`) with the latest news on a strip along its foot,
+  and under it **Patch Notes** (the channel's history), **News** and **Builds**; the
   news's links along the foot.
 - **Updates:** on opening, the launcher reads each channel's newest build and history
   and the news. When the picked channel names a build that is not installed, it

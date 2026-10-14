@@ -234,6 +234,11 @@ impl Painter {
         self.gradient(r, c0, c1, true);
     }
 
+    /// Top `c0` to bottom `c1`.
+    pub(crate) fn gradient_v(&mut self, r: Rect, c0: Color, c1: Color) {
+        self.gradient(r, c0, c1, false);
+    }
+
     fn gradient(&mut self, r: Rect, c0: Color, c1: Color, across: bool) {
         if (c0[3] <= 0.0 && c1[3] <= 0.0) || r.w <= 0.0 || r.h <= 0.0 {
             return;

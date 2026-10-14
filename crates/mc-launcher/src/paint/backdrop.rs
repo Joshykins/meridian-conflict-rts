@@ -1,10 +1,28 @@
-//! The picture behind the launcher (`assets/backdrop.png`, a frame of the
-//! game), scaled to cover the window and graded down, and a blurred copy the
-//! glass panels frost.
+//! The picture behind the launcher (`assets/backdrop.png`: the ARC fleet over
+//! the coast, the Dominion leading), framed so its subject fills the open
+//! window at the top right, graded down, and a blurred copy the glass panels
+//! frost.
 
 use tiny_skia::{FilterQuality, Pattern, Pixmap, PixmapPaint, Shader, SpreadMode, Transform};
 
 const ART: &[u8] = include_bytes!("../../assets/backdrop.png");
+
+/// How the art is framed: scaled to cover the window, then `zoom` times
+/// more, with the point `focus` of the art (fractions of its width and
+/// height) put as near the point `spot` of the window as its edges allow.
+struct Framing {
+    zoom: f32,
+    focus: (f32, f32),
+    spot: (f32, f32),
+}
+
+/// The Dominion (centred at 58% across and 20% down the art) in the middle
+/// of the open window above the news strip, a little larger than covering.
+const FRAMING: Framing = Framing {
+    zoom: 1.10,
+    focus: (0.583, 0.198),
+    spot: (0.667, 0.180),
+};
 
 pub(crate) struct Backdrop {
     art: Option<Pixmap>,
@@ -69,15 +87,21 @@ fn decode(bytes: &[u8]) -> Option<Pixmap> {
     Some(px)
 }
 
-/// `art` scaled to cover `w` x `h`, its right side kept (the left is under
-/// the panels), graded darker towards the left and the foot; and a blurred copy.
+/// `art` scaled and placed by [`FRAMING`] to cover `w` x `h`, graded darker
+/// towards the left and the foot; and a blurred copy.
 fn fit(art: Option<&Pixmap>, w: u32, h: u32) -> (Pixmap, Pixmap) {
     let mut out = Pixmap::new(w, h).expect("a backdrop of the window's size");
     out.fill(tiny_skia::Color::from_rgba8(8, 9, 11, 255));
     if let Some(art) = art {
-        let k = (w as f32 / art.width() as f32).max(h as f32 / art.height() as f32);
-        let dx = w as f32 - art.width() as f32 * k;
-        let dy = (h as f32 - art.height() as f32 * k) * 0.5;
+        let (aw, ah) = (art.width() as f32, art.height() as f32);
+        let (w, h) = (w as f32, h as f32);
+        let k = (w / aw).max(h / ah) * FRAMING.zoom;
+        // The focus lands on its spot unless that would bare an edge.
+        let place = |art_len: f32, win: f32, focus: f32, spot: f32| {
+            (spot * win - focus * art_len * k).clamp(win - art_len * k, 0.0)
+        };
+        let dx = place(aw, w, FRAMING.focus.0, FRAMING.spot.0);
+        let dy = place(ah, h, FRAMING.focus.1, FRAMING.spot.1);
         out.draw_pixmap(
             0,
             0,

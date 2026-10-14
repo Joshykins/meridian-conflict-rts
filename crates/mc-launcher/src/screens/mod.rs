@@ -17,12 +17,13 @@ const MARGIN: f32 = 24.0;
 const COLUMN_W: f32 = 404.0;
 const FOOT_H: f32 = 44.0;
 /// The open window onto the backdrop, top right, with the latest news on it.
-const HERO_H: f32 = 232.0;
+const HERO_H: f32 = 270.0;
+/// The news strip along the hero's foot.
+const HERO_STRIP: f32 = 48.0;
 
 /// The latest news item (or, with none, the newest build) over the art.
 fn hero(ui: &mut Ui, app: &mut App, r: Rect) {
-    // Only a frame: the art is the point. A shade along its foot for the type.
-    ui.p.gradient_h(Rect::new(r.x, r.y, r.w * 0.75, r.h), ink(0.55), ink(0.0));
+    // Only a frame: the art is the point. The news runs along a strip at its foot.
     ui.p.bevel(r, 10.0, 0.7);
     let item = app.news.as_ref().and_then(|n| {
         n.peek(|r| {
@@ -49,23 +50,36 @@ fn hero(ui: &mut Ui, app: &mut App, r: Rect) {
             )
         }
     };
-    let x = r.x + 32.0;
+    let strip = Rect::new(
+        r.x + 1.0,
+        r.bottom() - HERO_STRIP,
+        r.w - 2.0,
+        HERO_STRIP - 1.0,
+    );
+    ui.p.gradient_v(
+        Rect::new(strip.x, strip.y - 28.0, strip.w, 28.0),
+        ink(0.0),
+        ink(0.55),
+    );
+    ui.p.fill(strip, ink(0.55));
+    ui.p.hline(strip.x, strip.y, strip.w, rgb(palette::LINE, 0.12));
+    let (x, y) = (strip.x + 20.0, strip.mid_y());
     ui.p.text(
         x,
-        r.bottom() - 128.0,
+        y - 11.0,
         type_scale::MICRO,
         rgb(palette::ACCENT, 1.0),
         &over,
     );
-    ui.p.text_fit(
-        x,
-        r.bottom() - 94.0,
-        r.w - 64.0,
-        type_scale::HERO,
-        rgb(0xFFFFFF, 1.0),
-        &title,
-    );
-    // The body's first words, as a teaser.
+    let more = if page == Page::News {
+        "All news"
+    } else {
+        "Patch notes"
+    };
+    let more_x = strip.right() - 20.0 - ui.p.text_width(type_scale::CAPTION, more);
+    let title_end =
+        ui.p.text(x, y + 9.0, type_scale::ITEM, rgb(0xFFFFFF, 1.0), &title);
+    // The body's first words, as a teaser, after the title.
     let first = crate::notes::parse(&body)
         .into_iter()
         .find_map(|b| match b {
@@ -73,27 +87,22 @@ fn hero(ui: &mut Ui, app: &mut App, r: Rect) {
             crate::notes::Block::Heading(_) => None,
         })
         .unwrap_or_default();
-    let lines = ui.p.wrap(type_scale::BODY, &first, (r.w - 64.0).min(440.0));
-    for (i, l) in lines.iter().take(2).enumerate() {
-        ui.p.text(
-            x,
-            r.bottom() - 56.0 + i as f32 * 21.0,
+    let tx = title_end + 24.0;
+    if more_x - 24.0 - tx > 80.0 {
+        ui.p.text_fit(
+            tx,
+            y + 9.0,
+            more_x - 24.0 - tx,
             type_scale::BODY,
-            rgb(palette::TEXT, 0.85),
-            l,
+            rgb(palette::TEXT, 0.8),
+            &first,
         );
     }
-    let more = if page == Page::News {
-        "All news"
-    } else {
-        "Patch notes"
-    };
-    let more_x = r.right() - 32.0 - ui.p.text_width(type_scale::CAPTION, more);
     if app.page != page
         && ui.link(
             id("hero-more", 0),
             more_x,
-            r.bottom() - 24.0,
+            y + 9.0,
             type_scale::CAPTION,
             more,
         )
