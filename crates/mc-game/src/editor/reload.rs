@@ -131,11 +131,7 @@ impl Editor {
                 blueprints.clone(),
                 self.pool.clone(),
             )?;
-            let folder =
-                std::env::temp_dir().join(format!("meridian-editor-reload-{}", std::process::id()));
-            self.doc.export(&folder)?;
-            let map =
-                Arc::new(MapFile::open(folder.join("terrain.mcmap")).map_err(|e| e.to_string())?);
+            let map = super::snapshot::map(&self.doc, "reload")?;
             let job = Job::start(Order {
                 target,
                 map: MapSource::Loaded(map),

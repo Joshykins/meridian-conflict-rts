@@ -23,6 +23,8 @@ Named objects have stable numeric IDs. Reapplying a named placement updates
 that object; deleting and creating a new object allocates another ID. Names
 are unique within each kind, so a region and a camera may both be called square.
 
+Renderers and playtests stream from private snapshots, released when their last
+reader finishes, so native file handles cannot lock the authored folder.
 Save and Save As publish the terrain and placement files together, preserving
 other assets in the folder. Save As refuses an existing unrelated destination.
 Undo and Redo operate on command batches. Test exports a private copy; leaving

@@ -33,9 +33,18 @@ pub struct MapFile {
     wrecks: Vec<MapWreck>,
     decks: Vec<Deck>,
     tints: Vec<[u8; 3]>,
+    // Fields drop in declaration order: close file before releasing its owner.
+    _lifetimes: Vec<Box<dyn Send + Sync>>,
 }
 
 impl MapFile {
+    /// Keep a source resource alive until the map and all its streaming readers
+    /// release it. Its destructor runs after this map's file handle closes.
+    pub fn with_lifetime(mut self, owner: impl Send + Sync + 'static) -> Self {
+        self._lifetimes.push(Box::new(owner));
+        self
+    }
+
     pub fn prop_tints(&self) -> &[[u8; 3]] {
         &self.tints
     }
@@ -179,6 +188,7 @@ impl MapFile {
         };
 
         Ok(MapFile {
+            _lifetimes: Vec::new(),
             file,
             path,
             info,

@@ -14,6 +14,7 @@ mod save;
 pub(crate) use reload::ReloadRequest;
 mod screenshot;
 mod server;
+mod snapshot;
 pub(crate) use screenshot::screenshot;
 pub(crate) use server::serve;
 
@@ -97,8 +98,8 @@ impl Editor {
         viewport: Vec2,
     ) -> Result<Self, String> {
         mc_render::models::remote::keep_meshes();
-        let map = Arc::new(MapFile::open(path).map_err(|e| e.to_string())?);
         let doc = Document::open(path)?;
+        let map = snapshot::map(&doc, "view")?;
         let size = Vec2::from(map.info().size_metres().to_f32());
         let mut camera = Camera::new(size, viewport);
         if let Some(start) = map.start_positions().first() {
@@ -214,10 +215,7 @@ impl Editor {
     fn test(&mut self) -> Result<GameStart, String> {
         // Playtests get a private map copy, so neither sim flattening nor test
         // saves can mutate the authored document.
-        let folder =
-            std::env::temp_dir().join(format!("meridian-editor-test-{}", std::process::id()));
-        self.doc.export(&folder)?;
-        let map = Arc::new(MapFile::open(folder.join("terrain.mcmap")).map_err(|e| e.to_string())?);
+        let map = snapshot::map(&self.doc, "test")?;
         let request = crate::ui::setup::MatchRequest {
             map: map.clone(),
             config: config(),

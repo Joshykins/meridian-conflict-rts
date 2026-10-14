@@ -61,7 +61,13 @@ playable mission, authored and revised through the editor and its API.
   and successful rebuilt-model reload are verified.
 - Added cliff/noise terrain brushes, two-point ramps and bounded heightmap stamp
   assets, including a crater example. Ramp/stamp atomicity and undo tests pass;
-  native terrain-tool review is next.
+  native live terrain preview and Undo are verified.
+
+- Native repeated save exposed Windows/WSL streaming-handle locks during folder
+  replacement. The disposable backup was recovered. Editor rendering, reloads and
+  tests now read unique private snapshots, owned until their last file reader
+  exits. Six consecutive native saves pass, and Undo + Save reproduces the
+  original terrain bytes exactly. Snapshot lifetime/cleanup regression passes.
 
 ## Still required before final delivery
 - Component doodads, general destructible/reclaimable props.

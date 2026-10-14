@@ -233,10 +233,14 @@ impl Editor {
             Ok(json!({"ok":true}))
         });
         if self.api.shot.as_deref() != Some(&id) {
-            self.api.answer(
-                &id,
-                result.unwrap_or_else(|e| json!({"ok":false,"error":e})),
-            );
+            let response = match result {
+                Ok(value) => value,
+                Err(error) => {
+                    self.message = error.clone();
+                    json!({"ok":false,"error":error})
+                }
+            };
+            self.api.answer(&id, response);
         }
         event
     }
