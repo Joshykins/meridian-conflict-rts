@@ -377,3 +377,48 @@ fn a_dozen_zeniths_behind_missile_defence_bring_it_down() {
         "{t} s: Regent {hp:.2}, {standing} Zeniths standing"
     );
 }
+
+/// Where `regent`'s move order went when it is sent to `x, y`.
+fn sent_to(w: &mut World, regent: UnitId, x: i32, y: i32) -> FxVec2 {
+    let cmd = PlayerCommand {
+        player: 0,
+        command: Command::FormationMove {
+            units: vec![regent],
+            target: FxVec2::from_ints(x, y),
+            queue: false,
+            attack_move: false,
+            facing: None,
+            together: true,
+            spacing: 1,
+            shape: 0,
+        },
+    };
+    w.tick(&[cmd]).unwrap();
+    let row = w.state.units.row(regent).unwrap();
+    w.state.orders.front(&w.state.units, row).unwrap().pos
+}
+
+/// A Regent ordered alongside another parked one goes there: the room it needs is its
+/// hull, a beam wide, not the disc of its 1.9 km radius (mark 2 of 20261014-005113: every
+/// click within 3.8 km of a parked Regent sent the ship 4 km off somewhere else).
+#[test]
+fn a_regent_parks_abreast_another_a_beam_apart() {
+    let mut w = world();
+    add(&mut w, REGENT, 0, 6000, 6000, 0);
+    let regent = add(&mut w, REGENT, 0, 12000, 7100, 180);
+    settle(&mut w);
+    // Flying west to lie 1.1 km off the parked one's beam: 200 m between their sides.
+    assert_eq!(
+        sent_to(&mut w, regent, 6500, 7100),
+        FxVec2::from_ints(6500, 7100)
+    );
+    // Onto its hull, it is found the nearest room clear of it: a beam over, not a radius.
+    let click = FxVec2::from_ints(6500, 6500);
+    let shifted = sent_to(&mut w, regent, 6500, 6500);
+    assert_ne!(shifted, click);
+    assert!(shifted.distance(click) <= Fx::from_int(1000), "{shifted:?}");
+    assert!(
+        (shifted.y - Fx::from_int(6000)).abs() > Fx::from_int(906),
+        "{shifted:?}"
+    );
+}

@@ -95,6 +95,35 @@ pub(crate) fn closest_pass(
         .unwrap_or((enter, Fx::MAX))
 }
 
+/// How far apart two hulls' sides stand, each given by its `spine`: the distance between
+/// the spines less both half widths. Two discs are their rims apart; a long hull beside
+/// another is its side's distance from the other's, not its radius's.
+pub(crate) fn spines_gap(one: (FxVec2, FxVec2, Fx), other: (FxVec2, FxVec2, Fx)) -> Fx {
+    let ((a, b, half_a), (c, d, half_c)) = (one, other);
+    if a == b && c == d {
+        return a.distance(c) - half_a - half_c;
+    }
+    // Spines that cross touch; otherwise they are nearest at an end of one of them.
+    let (ab, cd) = (b - a, d - c);
+    let denom = ab.cross(cd);
+    if denom != Fx::ZERO {
+        let t = (c - a).cross(cd) / denom;
+        let u = (c - a).cross(ab) / denom;
+        if t >= Fx::ZERO && t <= Fx::ONE && u >= Fx::ZERO && u <= Fx::ONE {
+            return -half_a - half_c;
+        }
+    }
+    let apart_sq = [
+        to_segment_sq(a, c, d),
+        to_segment_sq(b, c, d),
+        to_segment_sq(c, a, b),
+        to_segment_sq(d, a, b),
+    ]
+    .into_iter()
+    .fold(Fx::MAX, Fx::min);
+    apart_sq.sqrt() - half_a - half_c
+}
+
 /// The square of how far `p` is from the segment `a..b`.
 fn to_segment_sq(p: FxVec2, a: FxVec2, b: FxVec2) -> Fx {
     let d = b - a;
@@ -155,5 +184,21 @@ mod tests {
         );
         assert_eq!(t, Fx::HALF);
         assert_eq!(d, Fx::from_int(3600));
+    }
+
+    #[test]
+    fn hulls_side_by_side_are_their_sides_apart() {
+        let hull = |y| (v(-1500, y), v(1500, y), Fx::from_int(450));
+        // Two long hulls abreast, 1000 m between spines: 100 m between their sides.
+        assert_eq!(spines_gap(hull(0), hull(1000)), Fx::from_int(100));
+        // Crossed, they overlap by both half widths.
+        let across = (v(0, -1500), v(0, 1500), Fx::from_int(450));
+        assert_eq!(spines_gap(hull(0), across), Fx::from_int(-900));
+        // A disc off a hull's end is measured from the end.
+        let disc = (v(1700, 0), v(1700, 0), Fx::from_int(50));
+        assert_eq!(spines_gap(hull(0), disc), Fx::from_int(-300));
+        // Two discs: their rims.
+        let other = (v(1700, 300), v(1700, 300), Fx::from_int(50));
+        assert_eq!(spines_gap(disc, other), Fx::from_int(200));
     }
 }

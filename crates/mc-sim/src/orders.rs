@@ -1002,7 +1002,7 @@ impl World {
                 fit(target.x, min_x, max_x, size_m.x),
                 fit(target.y, min_y, max_y, size_m.y),
             );
-            let center = self.clear_formation_destination(center, rotated, &rows, spacing);
+            let center = self.clear_formation_destination(center, facing, rotated, &rows, spacing);
             out.push(FormationLayout {
                 offsets: laid.offsets,
                 rows,
@@ -2907,6 +2907,7 @@ impl World {
             let rally = self.clamp_to_map(rally);
             let rally = self.clear_formation_destination(
                 rally,
+                (rally - exit).angle(),
                 &[FxVec2::ZERO],
                 &[t],
                 self.bp(t).radius * 2 + Fx::from_int(6),
