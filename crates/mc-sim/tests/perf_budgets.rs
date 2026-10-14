@@ -334,6 +334,26 @@ fn armies(
     w
 }
 
+/// The fighter `MERIDIAN_SCALE_FIGHTER` names (the Raptor by default) `total` times,
+/// shared out between `players` sides as square blocks `gap` metres apart on a ring of
+/// `radius` metres, each sent at the middle: the air war of the 64 000 a side goal.
+fn air_armies(players: u8, total: u32, radius: f32, gap: i32, threads: Option<usize>) -> World {
+    let mut w = ring_world(players, true, threads, false);
+    let key = std::env::var("MERIDIAN_SCALE_FIGHTER")
+        .unwrap_or_else(|_| "aster_t3_air_superiority".into());
+    let per = total / players as u32;
+    let side = (per as f32).sqrt().ceil() as i32 * gap;
+    let mut orders = Vec::new();
+    for p in 0..players {
+        let at = ring_point(p, players, radius);
+        let corner = (at.x.floor_int() - side / 2, at.y.floor_int() - side / 2);
+        let ids = block(&mut w, &key, p, per, corner, gap, 0);
+        orders.push(attack_move(p, ids, (8192, 8192)));
+    }
+    w.tick(&orders).unwrap();
+    w
+}
+
 /// Eight armies of 500 meeting in the middle: the counter budgets catch a
 /// query that stops scaling with the crowd around it.
 #[test]
@@ -367,7 +387,8 @@ fn eight_armies_clash() {
 /// one battle per two sides as a big match plays; `:idle` spreads the armies
 /// 20 m apart on that ring and gives no orders; `:ai` makes every side an AI
 /// with a commander and the army to run; `:clash` is `:pairs` with the ring
-/// drawn in so two armies' front ranks start 200 m apart, in a fight at once. A fourth field sets the metres
+/// drawn in so two armies' front ranks start 200 m apart, in a fight at once; `:air`
+/// is fighters only (`air_armies`), `2:128000:air` the 64 000 a side goal. A fourth field sets the metres
 /// between units as they spawn (`2:32000:ai:16`: formation spacing, where the
 /// default packs them overlapping, the worst crowd to untangle).
 ///
@@ -391,6 +412,10 @@ fn zz_scale_probe() {
             Some(&"idle") => armies(players, total, 3000.0, gap(20), Plan::Idle, threads),
             Some(&"pairs") => armies(players, total, 3000.0, gap(6), Plan::Pairs, threads),
             Some(&"ai") => armies(players, total, 3000.0, gap(6), Plan::Ai, threads),
+            Some(&"air") => {
+                let half = ((total / players as u32) as f32).sqrt() as i32 * gap(20) / 2;
+                air_armies(players, total, (half + 1500) as f32, gap(20), threads)
+            }
             Some(&"clash") => {
                 // `armies` lays each army out within this of its point on the ring.
                 let half = ((total / players as u32 / 3) as f32).sqrt() as i32 * gap(6) + 50;

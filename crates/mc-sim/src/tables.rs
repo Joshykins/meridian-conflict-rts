@@ -18,10 +18,12 @@ use serde::{Deserialize, Serialize};
 pub type UnitId = Handle;
 pub type WreckId = Handle;
 
-/// Room for the 30 000 units of a 32-player match. Handles index rows in 16 bits.
-pub const MAX_UNITS: usize = 32_768;
-pub const MAX_PROJECTILES: usize = 32_768;
-pub const MAX_WRECKS: usize = 32_768;
+/// Room for 64 000 fighters a side in a two-sided match, with their bases, or the
+/// 30 000 units of a 32-player one. Handles index rows in `slots::INDEX_BITS` bits.
+pub const MAX_UNITS: usize = 147_456;
+/// Shots in flight: about one each for every unit at the cap.
+pub const MAX_PROJECTILES: usize = 262_144;
+pub const MAX_WRECKS: usize = 131_072;
 pub const MAX_STAINS: usize = 32_768;
 /// Incendiary patches. A Hellkite pass is 24 bombs that burn 20 s, so one bomber keeps ~50
 /// alight and a big air war a few thousand. When it is full the patch nearest to burning out
@@ -29,7 +31,7 @@ pub const MAX_STAINS: usize = 32_768;
 pub const MAX_FIRES: usize = 8_192;
 /// Poured structure lots. They stay after the building dies.
 pub const MAX_PADS: usize = 32_768;
-pub const MAX_ORDERS: usize = 262_144;
+pub const MAX_ORDERS: usize = 1_048_576;
 pub const MAX_FLATTENS: usize = 32_768;
 
 pub const NO_ORDER: u32 = u32::MAX;

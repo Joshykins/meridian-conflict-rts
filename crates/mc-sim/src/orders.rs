@@ -20,10 +20,6 @@ use mc_data::{cat, BlueprintId, MoveLayer};
 mod capital;
 mod upgrade;
 
-/// How far a fighter looks first for a mark (`air_spread_pick`), metres, and
-/// how much further each look after: a thin ring at a time is all it checks.
-const SCRAMBLE_PROBE: Fx = Fx::from_int(128);
-
 /// Longest production queue per factory: far past what anyone queues by hand, but a
 /// hard limit all the same, so no factory can fill the order table.
 pub(crate) const MAX_FACTORY_QUEUE: usize = 1000;
@@ -1285,6 +1281,7 @@ impl World {
             let _span = mc_core::perf_span!("orders.fight_lines");
             self.fight_lines()
         };
+        self.list_chasers();
         // Units spawned while orders run start acting next tick.
         let rows = self.state.units.slots.rows();
         for row in 0..rows {
@@ -1582,175 +1579,7 @@ impl World {
         self.air_engage_target_within(row, self.bp(row).vision)
     }
 
-    /// What the aircraft flies at: the target its order names, else a detected enemy
-    /// within `reach`.
-    fn air_engage_target_within(&self, row: usize, reach: Fx) -> Option<usize> {
-        let bp = self.bp(row);
-        // A lift ship never flies at anything: its guns shoot what comes in reach.
-        if bp.weapons.is_empty() || bp.transport.is_some() {
-            return None;
-        }
-        let units = &self.state.units;
-        // Holding position, it only flies at what an order names: no sorties,
-        // no breaking off a route.
-        let chases = self.chases(row);
-        if let Some(o) = self.state.orders.front(units, row) {
-            if o.kind == OrderKind::Attack
-                || (chases && matches!(o.kind, OrderKind::AttackMove | OrderKind::Patrol))
-            {
-                if let Some(t) = units.row(o.target) {
-                    if self.air_can_harass(row, t) {
-                        return Some(t);
-                    }
-                }
-            }
-        }
-        if !chases {
-            return None;
-        }
-        let fighter = bp.has(cat::ANTI_AIR) && bp.motion.is_some_and(|m| !m.hover);
-        if !fighter {
-            for id in units.weapon_target[row] {
-                if let Some(t) = units.row(id) {
-                    if self.air_can_harass(row, t) {
-                        return Some(t);
-                    }
-                }
-            }
-        }
-        let mask = bp.weapons.iter().fold(0u32, |acc, w| acc | w.target_mask);
-        if mask == 0 {
-            return None;
-        }
-        if fighter {
-            return self.air_spread_pick(row, mask, reach);
-        }
-        let friends = self.team_mask(units.owner[row]);
-        self.index
-            .nearest_foe(units.pos[row], reach, kind::UNIT, friends, |e| {
-                self.unit_entry_is_current(e)
-                    && self.air_can_harass(row, e.row as usize)
-                    && self.hittable(e.row as usize, mask)
-                    && self.fires_at_will(row)
-            })
-            .map(|e| e.row as usize)
-    }
-
-    /// A fighter looking for something to fight takes the nearest enemy that no
-    /// friendly fighter is on yet, or one a few hundred metres further than a
-    /// crowded one: a swarm meeting a swarm splits into pairs, each turning after
-    /// its own opponent, rather than piling onto the first few it sees while the
-    /// rest of the enemy flies free. Orders run in row order, so a fighter sees the
-    /// picks the fighters before it made this tick.
-    fn air_spread_pick(&self, row: usize, mask: u32, reach: Fx) -> Option<usize> {
-        if !self.fires_at_will(row) {
-            return None;
-        }
-        let units = &self.state.units;
-        let pos = units.pos[row];
-        let crowd = self.bp(row).vision / 4;
-        let friends = self.team_mask(units.owner[row]);
-        // What it may go after further than `inner` and within `r` (and within
-        // `reach` of its edge), with its distance.
-        let within = |inner: Fx, r: Fx| {
-            let mut near: Vec<(Fx, usize)> = Vec::new();
-            let kinds = crate::combat::target_kinds(mask);
-            self.index.query_foes(pos, r, kinds, friends, |e| {
-                let t = e.row as usize;
-                // In the ring, `inner < distance <= reach + e.radius`, decided
-                // on the squared length: a wider ring reads the inner ones again.
-                let d = pos - e.pos;
-                if !d.shorter_than(Fx(inner.0 + 1))
-                    && d.shorter_than(Fx(reach.0 + e.radius.0 + 1))
-                    && self.unit_entry_is_current(e)
-                    && self.air_can_harass(row, t)
-                    && self.hittable(t, mask)
-                {
-                    near.push((d.length(), t));
-                }
-                true
-            });
-            near
-        };
-        // Marks are scored nearest first, and a score is the distance plus some
-        // crowd, so once one is further than the best score none after it can
-        // win. The search widens a ring at a time only while one could: a
-        // fighter near an enemy army looks at its nearest marks, not the army.
-        let vision = self.bp(row).vision;
-        let mut best: Option<(Fx, usize)> = None;
-        let mut inner = Fx::from_int(-1);
-        let mut radius = SCRAMBLE_PROBE;
-        loop {
-            let r = radius.min(reach);
-            let last = r >= reach;
-            let mut ring: Vec<(Fx, usize)> = within(inner, r)
-                .into_iter()
-                .filter(|&(d, _)| last || d <= r)
-                .collect();
-            ring.sort_unstable();
-            mc_core::perf_count!("scramble.candidates", ring.len());
-            let chasing = if ring.is_empty() {
-                Default::default()
-            } else {
-                self.air_pursuers(row, r)
-            };
-            for (distance, t) in ring {
-                if best.is_some_and(|(s, _)| distance > s) {
-                    return best.map(|(_, t)| t);
-                }
-                // Other friendly fighters on it within this one's sight of it, up to three.
-                let id = units.id(t);
-                let pursuers = chasing.get(&id).map_or(0, |on| {
-                    on.iter()
-                        .filter(|&&(at, r)| at.distance(units.pos[t]) <= vision + r)
-                        .take(3)
-                        .count()
-                }) as i32;
-                let score = distance + crowd * pursuers;
-                if best.is_none_or(|(s, b)| score < s || (score == s && t < b)) {
-                    best = Some((score, t));
-                }
-            }
-            if last || best.is_some_and(|(s, _)| s <= r) {
-                break;
-            }
-            inner = r;
-            radius = r + SCRAMBLE_PROBE;
-        }
-        best.map(|(_, t)| t)
-    }
-
-    /// The other friendly fighters on an attack run that could be in `row`'s
-    /// sight of a mark within `reach` of it, by the mark they fly at, with
-    /// where they are and their radius: gathered once for all its candidates.
-    fn air_pursuers(
-        &self,
-        row: usize,
-        reach: Fx,
-    ) -> std::collections::BTreeMap<UnitId, Vec<(FxVec2, Fx)>> {
-        let units = &self.state.units;
-        let owner = units.owner[row];
-        let around = reach + self.bp(row).vision + self.index.max_radius();
-        let mut chasing = std::collections::BTreeMap::<UnitId, Vec<(FxVec2, Fx)>>::new();
-        let foes = !self.team_mask(owner);
-        self.index
-            .query_foes(units.pos[row], around, kind::AIRCRAFT, foes, |e| {
-                let other = e.row as usize;
-                if other != row
-                    && self.unit_entry_is_current(e)
-                    && !self.are_enemies(owner, units.owner[other])
-                    && units.has_flag(other, flag::AIR_RUN)
-                {
-                    if let Some(o) = self.state.orders.front(units, other) {
-                        chasing.entry(o.target).or_default().push((e.pos, e.radius));
-                    }
-                }
-                true
-            });
-        chasing
-    }
-
-    fn air_can_harass(&self, shooter: usize, target: usize) -> bool {
+    pub(crate) fn air_can_harass(&self, shooter: usize, target: usize) -> bool {
         let units = &self.state.units;
         if !units.slots.is_alive(target) || units.has_flag(target, flag::IN_FACTORY) {
             return false;
@@ -1774,7 +1603,11 @@ impl World {
             // Keep the detected target through the full egress/return arc, even
             // outside acquisition range. Hidden targets are searched for at
             // their last detected position; their hidden movement is not read.
-            self.state.orders.order[head as usize].target = self.state.units.id(target);
+            let id = self.state.units.id(target);
+            let named = &mut self.state.orders.order[head as usize].target;
+            if std::mem::replace(named, id) != id {
+                self.scratch.chasers.add(target, row);
+            }
         }
         if self.bp(row).is_capital_ship() {
             self.capital_engage(row, target)

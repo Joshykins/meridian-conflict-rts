@@ -226,6 +226,8 @@ pub(crate) struct Scratch {
     /// index and again after the tick's commands: blast and shot checks look
     /// only at these. It can still hold a row that has died since.
     pub shielded: Vec<usize>,
+    /// The aircraft on each unit, listed at the start of `run_orders`.
+    pub chasers: crate::air_pick::Chasers,
 }
 
 /// Radius props occupy in the spatial index.

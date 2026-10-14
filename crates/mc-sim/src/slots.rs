@@ -7,7 +7,7 @@
 
 use serde::{Deserialize, Serialize};
 
-/// `index | generation << 16`. `Handle::NONE` never resolves.
+/// `index | generation << INDEX_BITS`. `Handle::NONE` never resolves.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize)]
 pub struct Handle(pub u32);
 
@@ -17,22 +17,29 @@ impl Default for Handle {
     }
 }
 
+/// Bits of a handle that name its row: room for 262 144 rows a table.
+pub const INDEX_BITS: u32 = 18;
+const INDEX_MASK: u32 = (1 << INDEX_BITS) - 1;
+/// Generations count up to this and wrap to 0. The top one is never used, so no live
+/// handle can equal `Handle::NONE`.
+const GENERATIONS: u16 = (1 << (32 - INDEX_BITS)) - 1;
+
 impl Handle {
     pub const NONE: Handle = Handle(u32::MAX);
 
     #[inline]
     pub fn new(index: usize, generation: u16) -> Handle {
-        Handle(index as u32 | (generation as u32) << 16)
+        Handle(index as u32 | (generation as u32) << INDEX_BITS)
     }
 
     #[inline]
     pub fn index(self) -> usize {
-        (self.0 & 0xFFFF) as usize
+        (self.0 & INDEX_MASK) as usize
     }
 
     #[inline]
     pub fn generation(self) -> u16 {
-        (self.0 >> 16) as u16
+        (self.0 >> INDEX_BITS) as u16
     }
 
     #[inline]
@@ -52,7 +59,10 @@ pub struct Slots {
 
 impl Slots {
     pub fn new(capacity: usize) -> Slots {
-        assert!(capacity <= 0xFFFF, "handle index is 16 bits");
+        assert!(
+            capacity <= INDEX_MASK as usize,
+            "handle index is {INDEX_BITS} bits"
+        );
         Slots {
             generation: Vec::new(),
             alive: Vec::new(),
@@ -83,8 +93,7 @@ impl Slots {
     pub fn free(&mut self, row: usize) {
         debug_assert!(self.alive[row]);
         self.alive[row] = false;
-        // Generation 0xFFFF is skipped so no live handle can equal `Handle::NONE`.
-        self.generation[row] = (self.generation[row] + 1) % 0xFFFF;
+        self.generation[row] = (self.generation[row] + 1) % GENERATIONS;
         self.free.push(row as u32);
         self.live -= 1;
     }
@@ -140,8 +149,11 @@ impl Slots {
                 self.generation.len()
             ));
         }
-        if rows > self.capacity as usize || self.capacity > 0xFFFF {
+        if rows > self.capacity as usize || self.capacity > INDEX_MASK {
             return Err(format!("{rows} rows over a capacity of {}", self.capacity));
+        }
+        if let Some(row) = self.generation.iter().position(|&g| g >= GENERATIONS) {
+            return Err(format!("row {row} has generation {}", self.generation[row]));
         }
         let mut listed = vec![false; rows];
         for &row in &self.free {
