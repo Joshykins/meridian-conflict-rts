@@ -12,6 +12,9 @@ use std::time::{Duration, Instant};
 #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
 enum Request {
     State,
+    Tool {
+        name: String,
+    },
     Catalogue {
         query: String,
     },
@@ -183,6 +186,7 @@ impl Editor {
                     self.catalogue=Some(super::catalogue::Catalogue::with_query(query));
                     return Ok(json!({"ok":true,"units":units}));
                 }
+                Request::Tool{name}=>self.choose_tool(&name)?,
                 Request::ChooseUnit{blueprint}=>self.choose_unit(&blueprint)?,
                 Request::Reload{resources}=>self.request_reload(resources)?,
                 Request::ModelCalls{key}=>{

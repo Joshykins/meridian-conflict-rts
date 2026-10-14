@@ -992,6 +992,7 @@ pub struct Renderer {
     noise: Image,
     terrain_materials: Image,
     ground_cover: Image,
+    editor: editor::EditorState,
     /// Sun, sky and weather (sky.rs).
     sky: crate::sky::Sky,
     /// The nuclear blasts' half-size march and its composite (nuke_volume.rs).
@@ -2580,6 +2581,7 @@ impl Renderer {
             noise,
             terrain_materials,
             ground_cover,
+            editor: Default::default(),
             sky,
             nuke_volume,
             wake_shells,

@@ -1,5 +1,7 @@
 //! The authoring document and undoable commands shared by the UI and mailbox.
 mod objects;
+mod paint;
+pub(super) use paint::Paint;
 mod properties;
 mod stamp;
 mod terrain;
@@ -41,6 +43,20 @@ pub(super) enum Command {
         radius: f32,
         strength: f32,
         asset: String,
+    },
+    Paint {
+        at: [f32; 2],
+        radius: f32,
+        paint: Paint,
+        value: u8,
+        #[serde(default)]
+        heading: f32,
+    },
+    Road {
+        from: [f32; 2],
+        to: [f32; 2],
+        width: f32,
+        kind: u8,
     },
     Unit {
         name: String,
@@ -86,11 +102,13 @@ pub(super) enum Command {
 pub(super) struct Update {
     pub terrain: Option<[u32; 4]>,
     pub objects: bool,
+    pub cover: Vec<(mc_map::edit::Layer, [u32; 4])>,
 }
 
 struct Change {
     heights: Vec<(u32, u32, u16, u16)>,
     placed: Option<(Placed, Placed)>,
+    layers: Vec<paint::Change>,
 }
 
 pub(super) struct Document {
@@ -144,6 +162,7 @@ impl Document {
         }
         let mut placed = self.placed.clone();
         let mut patches = BTreeMap::new();
+        let mut layers = paint::Patches::default();
         for command in commands {
             match command {
                 Command::Terrain {
@@ -161,22 +180,37 @@ impl Document {
                     strength,
                     asset,
                 } => self.stamp(*at, *radius, *strength, asset, &mut patches)?,
+                Command::Paint {
+                    at,
+                    radius,
+                    paint,
+                    value,
+                    heading,
+                } => layers.brush(&self.map, *at, *radius, *paint, *value, *heading)?,
+                Command::Road {
+                    from,
+                    to,
+                    width,
+                    kind,
+                } => layers.road(&self.map, *from, *to, *width, *kind)?,
                 _ => objects::apply(command, &mut placed, blueprints)?,
             }
         }
-        self.commit(placed, patches)
+        self.commit(placed, patches, layers)
     }
 
     fn commit(
         &mut self,
         placed: Placed,
         patches: BTreeMap<(u32, u32), u16>,
+        layers: paint::Patches,
     ) -> Result<Update, String> {
         placed
             .validate(&self.map.info, self.map.props.len())
             .map_err(|e| e.to_string())?;
         let mut change = Change {
             heights: vec![],
+            layers: layers.changes(&self.map),
             placed: (placed != self.placed).then(|| (self.placed.clone(), placed.clone())),
         };
         let width = self.map.info.size_cells().0 + 1;
@@ -188,7 +222,7 @@ impl Document {
         }
         let rect = self.restore(&change, true)?;
         self.placed = placed;
-        if change.placed.is_some() || !change.heights.is_empty() {
+        if change.placed.is_some() || !change.heights.is_empty() || !change.layers.is_empty() {
             self.undo.push(change);
             self.redo.clear();
             self.dirty = true;
@@ -213,6 +247,11 @@ impl Document {
         Ok(Update {
             terrain: rect,
             objects: change.placed.is_some(),
+            cover: change
+                .layers
+                .iter()
+                .map(|patch| patch.restore(&mut self.map, forward))
+                .collect(),
         })
     }
 
@@ -258,3 +297,6 @@ impl Document {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod paint_tests;

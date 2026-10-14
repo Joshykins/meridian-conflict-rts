@@ -1,9 +1,11 @@
 //! Authoring copy of a baked map. Shared tile edges have one canonical sample,
 //! so a brush can cross a tile boundary without opening a crack.
+mod layers;
 use crate::{
     encode_tile, Deck, MapError, MapFile, MapInfo, MapWreck, MapWriter, OreRegion, Prop,
     TILE_CELLS, TILE_SAMPLES, TILE_SAMPLE_COUNT,
 };
+pub use layers::Layer;
 use mc_core::FxVec2;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};

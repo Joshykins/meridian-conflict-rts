@@ -1,7 +1,7 @@
 use super::*;
 use std::sync::atomic::{AtomicU64, Ordering};
 static SERIAL: AtomicU64 = AtomicU64::new(0);
-fn fixture() -> (PathBuf, Document, mc_data::Blueprints) {
+pub(super) fn fixture() -> (PathBuf, Document, mc_data::Blueprints) {
     let folder = std::env::temp_dir().join(format!(
         "mc-editor-test-{}-{}",
         std::process::id(),

@@ -215,6 +215,10 @@ pub struct TileCache {
 }
 
 impl TileCache {
+    pub(crate) fn source(&self) -> &MapFile {
+        &self.map
+    }
+
     pub fn new(map: Arc<MapFile>, cliffs: CliffBlocks) -> TileCache {
         let (tiles_w, tiles_h) = map.size_tiles();
         let info = map.info();

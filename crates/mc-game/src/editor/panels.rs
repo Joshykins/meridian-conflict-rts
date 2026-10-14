@@ -69,117 +69,12 @@ impl Editor {
             x += 108.0;
         }
     }
-    pub(super) fn tool_rows(width: f32) -> usize {
-        17usize.div_ceil(((width - 68.0) / 112.0).floor().max(1.0) as usize)
-    }
-    pub(super) fn tools_panel(&mut self, ui: &mut Ui, bottom: f32) {
-        let w = ui.size.x;
-        let rows = Self::tool_rows(w);
-        let columns = 17usize.div_ceil(rows);
-        let step = (w - 68.0) / columns as f32;
-        ui.panel(Rect::new(18.0, bottom, w - 36.0, ui.size.y - bottom - 18.0));
-        ui.text(
-            34.0,
-            bottom + 23.0,
-            type_scale::CAPTION,
-            rgb(palette::DIM, 1.0),
-            "AUTHORING TOOLS",
-        );
-        for (i, label) in [
-            "Select",
-            "Raise",
-            "Lower",
-            "Flatten",
-            "Smooth",
-            "Unit",
-            "Region",
-            "Point",
-            "Camera",
-            "Move",
-            "Reload data",
-            "Reload shaders",
-            "Free camera",
-            "Cliff",
-            "Noise",
-            "Ramp",
-            "Stamp",
-        ]
-        .iter()
-        .enumerate()
-        {
-            let kind = if self.tool == i || (i == 12 && self.camera.pitch_free.is_some()) {
-                ButtonKind::Primary
-            } else {
-                ButtonKind::Secondary
-            };
-            if ui.button(
-                id("editor_tool", i),
-                Rect::new(
-                    34.0 + (i % columns) as f32 * step,
-                    bottom + 42.0 + (i / columns) as f32 * 44.0,
-                    step - 8.0,
-                    36.0,
-                ),
-                label,
-                kind,
-                true,
-            ) {
-                if !(10..13).contains(&i) {
-                    self.tool = i;
-                    self.region_start = None;
-                    if i == 5 && self.doc.placed.units.iter().any(|u| u.name == self.name) {
-                        self.name = format!("{}_{}", self.blueprint, self.doc.placed.next_id);
-                        self.selected = None;
-                    }
-                } else if i == 12 {
-                    self.navigation.toggle(&mut self.camera);
-                    self.message = if self.camera.pitch_free.is_some() {
-                        "Free camera: WASD fly; Q/E height; arrows look; Shift faster; wheel speed."
-                    } else {
-                        "Orbit camera: WASD pan; Q/E turn; Page Up/Down tilt; wheel zoom."
-                    }
-                    .into();
-                } else if let Err(e) = self.request_reload(ReloadRequest {
-                    data: i == 10,
-                    shaders: i == 11,
-                    ..Default::default()
-                }) {
-                    self.message = e;
-                }
-            }
-        }
-        let y = bottom + 54.0 + rows as f32 * 44.0;
-        let width = (w - 102.0) * 0.5;
-        let mut radius = (self.radius - 8.0) / 504.0;
-        if ui.slider(
-            id("editor_radius", 0),
-            Rect::new(34.0, y, width, 28.0),
-            &format!("Brush radius: {:.0} m", self.radius),
-            &mut radius,
-        ) {
-            self.radius = 8.0 + radius * 504.0;
-        }
-        let mut strength = self.strength / 64.0;
-        if ui.slider(
-            id("editor_strength", 0),
-            Rect::new(68.0 + width, y, width, 28.0),
-            &format!("Strength: {:.0} m", self.strength),
-            &mut strength,
-        ) {
-            self.strength = strength * 64.0;
-        }
-        ui.text_fit_left(
-            34.0,
-            y + 50.0,
-            w - 68.0,
-            type_scale::BODY,
-            rgb(palette::TEXT, 1.0),
-            &self.message,
-        );
-    }
     pub(super) fn properties(&mut self, ui: &mut Ui, renderer: &mut mc_render::Renderer) -> Rect {
+        if (17..=21).contains(&self.tool) {
+            return self.paint_properties(ui);
+        }
         let w = ui.size.x;
-        let card = Rect::new(w - 350.0, 100.0, 332.0, 412.0);
+        let card = Rect::new(w - 350.0, 100.0, 332.0, 388.0);
         ui.panel(card);
         ui.text(
             card.x + 16.0,
@@ -201,7 +96,7 @@ impl Editor {
         .into_iter()
         .enumerate()
         {
-            let y = card.y + 47.0 + i as f32 * 62.0;
+            let y = card.y + 47.0 + i as f32 * 56.0;
             ui.text(
                 card.x + 16.0,
                 y,
@@ -236,7 +131,7 @@ impl Editor {
     fn property_actions(&mut self, ui: &mut Ui, card: Rect, renderer: &mut mc_render::Renderer) {
         if ui.button(
             id("editor_owner", 0),
-            Rect::new(card.x + 16.0, card.y + 300.0, 190.0, 34.0),
+            Rect::new(card.x + 16.0, card.y + 280.0, 190.0, 34.0),
             &format!("Player slot: {}", self.owner + 1),
             ButtonKind::Secondary,
             true,
@@ -245,7 +140,7 @@ impl Editor {
         }
         if ui.button(
             id("editor_delete", 0),
-            Rect::new(card.x + 218.0, card.y + 300.0, 96.0, 34.0),
+            Rect::new(card.x + 218.0, card.y + 280.0, 96.0, 34.0),
             "Delete",
             ButtonKind::Secondary,
             self.selected.is_some(),
@@ -258,7 +153,7 @@ impl Editor {
         }
         if ui.button(
             id("editor_rotate", 0),
-            Rect::new(card.x + 16.0, card.y + 338.0, 298.0, 27.0),
+            Rect::new(card.x + 16.0, card.y + 318.0, 298.0, 27.0),
             &format!("Heading: {:.0}°  (+15°)", self.heading),
             ButtonKind::Secondary,
             true,
@@ -284,7 +179,7 @@ impl Editor {
 
         if ui.button(
             id("editor_apply_properties", 0),
-            Rect::new(card.x + 16.0, card.y + 374.0, 298.0, 30.0),
+            Rect::new(card.x + 16.0, card.y + 350.0, 298.0, 30.0),
             "Apply to selection",
             ButtonKind::Secondary,
             self.selected.is_some(),
@@ -400,84 +295,7 @@ impl Editor {
             if let Some(hit) = renderer.pick_ground(origin, dir) {
                 if input.pressed {
                     let at = [hit.x, hit.y];
-                    let command = match self.tool {
-                        1..=4 => Some(Command::Terrain {
-                            at,
-                            radius: self.radius,
-                            strength: self.strength,
-                            brush: [Brush::Raise, Brush::Lower, Brush::Flatten, Brush::Smooth]
-                                [self.tool - 1],
-                        }),
-                        13 | 14 => Some(Command::Terrain {
-                            at,
-                            radius: self.radius,
-                            strength: self.strength,
-                            brush: if self.tool == 13 {
-                                Brush::Cliff
-                            } else {
-                                Brush::Noise
-                            },
-                        }),
-                        15 => {
-                            match self.region_start.take() {
-                                None => {
-                                    self.region_start = Some(at);
-                                    self.message="Click the other endpoint to connect the two terrain heights.".into();
-                                    None
-                                }
-                                Some(from) => Some(Command::Ramp {
-                                    from,
-                                    to: at,
-                                    width: self.radius,
-                                }),
-                            }
-                        }
-                        16 => Some(Command::Stamp {
-                            at,
-                            radius: self.radius,
-                            strength: self.strength,
-                            asset: self.stamp_asset.clone(),
-                        }),
-                        5 => Some(Command::Unit {
-                            name: self.name.clone(),
-                            group: self.group.clone(),
-                            blueprint: self.blueprint.clone(),
-                            owner: self.owner,
-                            at,
-                            heading: self.heading,
-                        }),
-                        6 => match self.region_start.take() {
-                            None => {
-                                self.region_start = Some(at);
-                                self.message = "Click the opposite corner of the region.".into();
-                                None
-                            }
-                            Some(a) => Some(Command::Region {
-                                name: self.name.clone(),
-                                min: [a[0].min(at[0]), a[1].min(at[1])],
-                                max: [a[0].max(at[0]), a[1].max(at[1])],
-                            }),
-                        },
-                        7 => Some(Command::Point {
-                            name: self.name.clone(),
-                            at,
-                        }),
-                        8 => Some(Command::Camera {
-                            name: self.name.clone(),
-                            at,
-                            distance: self.camera.distance.round().clamp(25.0, 300_000.0) as u32,
-                            yaw: self.camera.yaw.to_degrees(),
-                        }),
-                        9 => self.selected.map(|id| Command::Transform {
-                            id,
-                            at,
-                            heading: self.heading,
-                        }),
-                        _ => {
-                            self.pick(input.cursor, renderer);
-                            None
-                        }
-                    };
+                    let command = self.world_command(at, input.cursor, renderer);
                     if let Some(command) = command {
                         let placing = matches!(command, Command::Unit { .. });
                         match self.apply(command, renderer) {

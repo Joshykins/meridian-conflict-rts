@@ -69,11 +69,19 @@ playable mission, authored and revised through the editor and its API.
   exits. Six consecutive native saves pass, and Undo + Save reproduces the
   original terrain bytes exactly. Snapshot lifetime/cleanup regression passes.
 
+- Added shared edit/history refresh, including grounded unit previews after
+  terrain changes and all supported player slots. Regression passes.
+- Added sparse undoable ground/snow/ice/trail paint and two-point roads, compact
+  tool families, and live cover subrectangle/mip uploads. Saved-map texture
+  equality and optional-layer undo tests pass. Native paint, high-slot unit
+  placement, Save and Undo are verified; the restored terrain hash is identical.
+- Native evacuation, ARC carrier arrival and ending dialogue screenshots are
+  captured. Full human encounter and cinematic composition review remain.
+
 ## Still required before final delivery
 - Component doodads, general destructible/reclaimable props.
-- Ground cover painting, water/climate controls, decorative cliff regeneration and resize.
+- Water/climate controls, decorative cliff regeneration and resize.
 - Remaining gizmo/snapping improvements and persistent full camera poses.
-- Propaganda components and encounter balance; native review of evacuation,
-  allied arrivals and later mission beats.
+- Propaganda components and encounter balance; human playtest and cinematic review.
 - Full checks, determinism matrix/cross-platform verification, final native
   screenshots, docs reconciliation, and the pull request to dev.

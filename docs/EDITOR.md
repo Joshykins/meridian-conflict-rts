@@ -7,7 +7,8 @@ user's meridian-conflict/maps directory. Open lists both shipped and user maps.
 WASD pans, Q/E orbits, Page Up/Down tilts, and the wheel zooms. Free camera
 keeps the current eye position: WASD flies, Q/E changes height, arrows look,
 Shift boosts movement and the wheel changes speed. Toggle it off to restore
-the previous orbit view. The bottom panel selects a tool.
+the previous orbit view. The bottom panel groups Terrain, Paint, Objects and
+Camera / Reload tools.
 Raise, Lower, Flatten, Smooth, Cliff and Noise edit terrain at the cursor.
 Ramp connects the existing heights at two clicked endpoints, with the brush
 radius as its half-width. Stamp reads a named JSON heightmap from the map's
@@ -61,7 +62,7 @@ Examples:
 
 An edit request has 1–512 actions and is one atomic undo step. Invalid actions
 leave the entire request unapplied. Requests are limited to 256 KiB. Supported
-actions are terrain, ramp, stamp, unit, region, point, camera, transform, properties and delete; the
+actions are terrain, ramp, stamp, paint, road, unit, region, point, camera, transform, properties and delete; the
 authoritative schema is editor/document.rs. Coordinates are world metres,
 headings/yaw are degrees, and owner is the zero-based player slot.
 
@@ -94,6 +95,28 @@ horizontal half-width and its original aspect ratio is retained.
 All terrain tools share sample-level undo and the live tile/overview upload path.
 Cliff edits make a steep plateau in the heightfield; regeneration of decorative
 cliff block props remains a separate pending task.
+
+## Paint
+
+Ground paints Natural, Paving, Lawn, Yard, Ballast, Field, Rubble, Earth or
+Spaceport apron, preserving road data beneath it. Snow, Ice and Trail paint
+coverage from 0 (erase) to 255, with feathered circular brushes. Trail heading
+controls the direction of its texture. Road uses two endpoints, a width in
+metres and a type: erase, Street, Avenue, Highway, Country lane or Railway.
+
+Paint changes upload only the affected cover texture rectangle and its ice
+mips. Undo restores individual changed bytes and removes a newly introduced
+layer when necessary. Introducing a snow layer changes the automatic-snow
+sentinel across the map, so that first edit uploads the entire snow layer.
+
+    {"op":"tool","name":"ground"}
+    {"op":"edit","actions":[{"action":"paint","paint":"ground","at":[4000,8500],"radius":160,"value":3}]}
+    {"op":"edit","actions":[{"action":"paint","paint":"snow","at":[4200,8500],"radius":160,"value":255}]}
+    {"op":"edit","actions":[{"action":"paint","paint":"trail","at":[4500,8500],"radius":64,"value":220,"heading":90}]}
+    {"op":"edit","actions":[{"action":"road","from":[3900,8500],"to":[4500,8500],"width":16,"kind":1}]}
+
+Ground values are 0–8 in the order above; road kinds are 0–5. Tool names use
+lowercase labels with underscores, such as free_camera and reload_data.
 
 ## Reload
 
@@ -169,6 +192,6 @@ at tick 5347 before the next choreography pass. The expanded route includes
 civilian evacuation cars, physical ARC cargo drops, queued comms and checkpoint
 recovery. Add --resume to restore every checkpoint into a fresh world during the
 route. Use --mission-pilot with a headless screenshot to inspect later beats.
-Full encounter balance and visual review remain in progress. Component prop editing, the remaining terrain
-and paint tools, resizing and remaining gizmos are tracked in
+Full encounter balance and visual review remain in progress. Component prop editing, water/climate controls, decorative cliff regeneration,
+resizing and remaining gizmos are tracked in
 EDITOR-IMPLEMENTATION.md and are not yet available in this slice.

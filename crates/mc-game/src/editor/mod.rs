@@ -4,6 +4,7 @@ mod browser;
 mod catalogue;
 mod document;
 mod frame;
+mod gestures;
 mod interaction;
 mod navigation;
 mod overlays;
@@ -15,6 +16,7 @@ pub(crate) use reload::ReloadRequest;
 mod screenshot;
 mod server;
 mod snapshot;
+mod tools;
 pub(crate) use screenshot::screenshot;
 pub(crate) use server::serve;
 
@@ -47,6 +49,8 @@ pub(crate) struct Editor {
     frame: RenderFrame,
     fresh: bool,
     tool: usize,
+    tool_group: usize,
+    paint: tools::PaintSettings,
     radius: f32,
     strength: f32,
     stamp_asset: String,
@@ -122,6 +126,8 @@ impl Editor {
             frame: Default::default(),
             fresh: true,
             tool: 0,
+            tool_group: 0,
+            paint: Default::default(),
             radius: 96.0,
             strength: 8.0,
             stamp_asset: "crater.json".into(),
@@ -218,6 +224,11 @@ impl Editor {
         if let Some(rect) = update.terrain {
             renderer
                 .edit_terrain(&self.doc.map, rect)
+                .map_err(|e| e.to_string())?;
+        }
+        for (layer, rect) in update.cover {
+            renderer
+                .edit_cover(&self.doc.map, layer, rect)
                 .map_err(|e| e.to_string())?;
         }
         // Unit origins come from the simulation mirror; rebuild them when the
