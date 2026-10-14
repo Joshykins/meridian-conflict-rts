@@ -268,9 +268,9 @@ MERIDIAN_CHANNEL=dev|playtest|release at compile time: who the build is for (def
 dev). It is part of the build's name, which replays record and network players must
 share (docs/RELEASES.md). A release build has no unit or map marked `playtest: true`.
 
-MERIDIAN_STORE=URL at compile time: the build store a published build updates from and
-fetches old replays' builds from. MERIDIAN_LAUNCHER (set by the launcher,
-MeridianConflict.exe, for the game it starts) is the install they go into.
+MERIDIAN_STORE=URL at compile time: the build store a published build's install has.
+MERIDIAN_LAUNCHER (set by the launcher, MeridianConflict.exe, for the game it starts)
+is the launcher that keeps it up to date and runs old replays in their own builds.
 
 MERIDIAN_SERVER_PLAYTEST=HOST[:PORT], MERIDIAN_SERVER_RELEASE=HOST[:PORT] at compile time:
 the server a playtest or a release build plays on until another is typed (none: the

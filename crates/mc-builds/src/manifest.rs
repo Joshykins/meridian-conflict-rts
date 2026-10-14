@@ -14,6 +14,8 @@ use crate::{hex, unhex, Error, Result, PUBLIC_KEY};
 pub const MAX_MANIFEST: u64 = 4 << 20;
 const MAX_FILES: usize = 20_000;
 const MAX_FILE: u64 = 4 << 30;
+/// The longest patch notes a build may carry.
+pub const MAX_NOTES: usize = 32 << 10;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Manifest {
@@ -28,6 +30,9 @@ pub struct Manifest {
     pub platform: String,
     /// When it was published, in Unix seconds.
     pub created: u64,
+    /// What changed, as the launcher shows it (docs/RELEASES.md, *Patch notes*).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub notes: String,
     pub files: Vec<Entry>,
 }
 
@@ -81,7 +86,7 @@ impl Manifest {
 
     /// Checks the signature against the release key, then parses.
     pub fn verify(bytes: &[u8], signature: &[u8]) -> Result<Manifest> {
-        verify_with(bytes, signature, &public_key())?;
+        verify_signed(bytes, signature)?;
         Manifest::parse(bytes)
     }
 
@@ -99,6 +104,9 @@ impl Manifest {
         }
         if self.files.len() > MAX_FILES {
             return bad("too many files");
+        }
+        if self.notes.len() > MAX_NOTES {
+            return bad("notes too long");
         }
         let mut seen = BTreeSet::new();
         for e in &self.files {
@@ -143,6 +151,11 @@ pub fn public_key() -> VerifyingKey {
     VerifyingKey::from_bytes(&bytes).expect("signing.pub holds a public key")
 }
 
+/// Checks a signature file's contents against the release key.
+pub(crate) fn verify_signed(bytes: &[u8], signature: &[u8]) -> Result<()> {
+    verify_with(bytes, signature, &public_key())
+}
+
 fn verify_with(bytes: &[u8], signature: &[u8], key: &VerifyingKey) -> Result<()> {
     let text = std::str::from_utf8(signature).map_err(|_| Error::Signature)?;
     let sig = unhex::<64>(text).ok_or(Error::Signature)?;
@@ -163,6 +176,7 @@ pub(crate) mod tests {
             sim: "00000000000000ff".into(),
             platform: crate::platform().into(),
             created: 1,
+            notes: String::new(),
             files: vec![Entry {
                 path: crate::game_exe(),
                 size: 3,

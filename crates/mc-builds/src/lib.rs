@@ -16,10 +16,12 @@
 //! every file it downloads is checked against its manifest's hash.
 //!
 //! - [`manifest`]: what a build is made of, signed.
+//! - [`feed`]: each channel's recent builds with their notes, and the news.
 //! - [`fetch`]: reading a store (through `curl`, on every supported system).
 //! - [`versions`]: the builds installed side by side under an install's `versions/`.
 //! - [`pack`]: writing a build into a store (the publishing side, `mc-release`).
 
+pub mod feed;
 pub mod fetch;
 pub mod manifest;
 pub mod pack;

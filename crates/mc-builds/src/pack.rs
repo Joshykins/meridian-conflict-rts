@@ -10,6 +10,7 @@ use ed25519_dalek::SigningKey;
 use mc_core::Channel;
 use sha2::{Digest, Sha256};
 
+use crate::feed::History;
 use crate::manifest::{Entry, Manifest};
 use crate::{hex, unhex, Error, Result};
 
@@ -36,7 +37,14 @@ pub struct Packed {
 
 /// Packs every file under `stage` into `store`'s blobs (those it lacks) and
 /// returns the build's manifest. Nothing is signed or named yet: [`publish`].
-pub fn pack(stage: &Path, store: &Path, id: Identity, created: u64) -> Result<Packed> {
+/// `notes` are its patch notes (docs/RELEASES.md, *Patch notes*).
+pub fn pack(
+    stage: &Path,
+    store: &Path,
+    id: Identity,
+    notes: String,
+    created: u64,
+) -> Result<Packed> {
     let mut files = Vec::new();
     walk(stage, &mut files)?;
     std::fs::create_dir_all(store.join("blobs"))?;
@@ -72,6 +80,7 @@ pub fn pack(stage: &Path, store: &Path, id: Identity, created: u64) -> Result<Pa
         sim: id.sim,
         platform: id.platform,
         created,
+        notes,
         files: entries,
     };
     // What a player's install will refuse, refuse here.
@@ -154,8 +163,9 @@ fn walk(dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
 }
 
 /// Signs `m` into the store: its own manifest always, and with `newest` also
-/// as its channel's newest build (written last, so a player never sees a
-/// channel naming a build whose manifest is not there yet).
+/// at the head of its channel's history and as its channel's newest build
+/// (written last, so a player never sees a channel naming a build whose
+/// manifest is not there yet).
 pub fn publish(store: &Path, m: &Manifest, key: &SigningKey, newest: bool) -> Result<()> {
     let bytes = m.to_bytes();
     let sig = Manifest::sign(&bytes, key);
@@ -164,16 +174,31 @@ pub fn publish(store: &Path, m: &Manifest, key: &SigningKey, newest: bool) -> Re
         let channel = m
             .channel()
             .ok_or_else(|| Error::Malformed(format!("channel {}", m.channel)))?;
-        paths.push(Manifest::channel_path(channel, &m.platform));
+        let at = History::path(channel, &m.platform);
+        // This machine wrote it: trusted as it is.
+        let history = match std::fs::read(store.join(&at)) {
+            Ok(bytes) => History::parse(&bytes)?,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => History::default(),
+            Err(e) => return Err(e.into()),
+        };
+        // The manifest goes first, the history after it, the pointer last.
+        write_signed(store, &paths[0], &bytes, &sig)?;
+        crate::feed::sign_into(store, &at, &history.with(m), key)?;
+        paths = vec![Manifest::channel_path(channel, &m.platform)];
     }
     for p in paths {
-        let path = store.join(&p);
-        if let Some(dir) = path.parent() {
-            std::fs::create_dir_all(dir)?;
-        }
-        std::fs::write(&path, &bytes)?;
-        std::fs::write(store.join(format!("{p}.sig")), &sig)?;
+        write_signed(store, &p, &bytes, &sig)?;
     }
+    Ok(())
+}
+
+fn write_signed(store: &Path, path: &str, bytes: &[u8], sig: &str) -> Result<()> {
+    let to = store.join(path);
+    if let Some(dir) = to.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    std::fs::write(&to, bytes)?;
+    std::fs::write(store.join(format!("{path}.sig")), sig)?;
     Ok(())
 }
 

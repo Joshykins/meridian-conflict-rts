@@ -29,6 +29,8 @@ ash = "0.38"
 winit = "0.30"
 raw-window-handle = "0.6"
 ash-window = "0.13"
+# The launcher's window: its CPU-drawn frames go straight to the screen (mc-launcher).
+softbuffer = { version = "0.4", default-features = false, features = ["x11", "x11-dlopen", "wayland", "wayland-dlopen"] }
 fontdue = "0.9"
 # Faction crests: vector art rasterised for the interface (ui/emblem).
 tiny-skia = { version = "0.11", default-features = false, features = ["std", "simd"] }

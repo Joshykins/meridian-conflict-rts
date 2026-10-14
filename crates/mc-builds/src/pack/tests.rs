@@ -41,6 +41,7 @@ fn packed_builds_install_and_share_their_files() {
         &root.join("a"),
         &store_dir,
         identity("0.1.0-playtest+aaaaaaaaaa", 1),
+        "- The first build".into(),
         1,
     )
     .unwrap();
@@ -56,6 +57,7 @@ fn packed_builds_install_and_share_their_files() {
         &root.join("b"),
         &store_dir,
         identity("0.1.0-playtest+bbbbbbbbbb", 2),
+        String::new(),
         2,
     )
     .unwrap();
@@ -116,6 +118,7 @@ fn a_damaged_blob_is_refused() {
         &root.join("a"),
         &store_dir,
         identity("0.1.0-playtest+cccccccccc", 1),
+        String::new(),
         1,
     )
     .unwrap();
@@ -142,5 +145,54 @@ fn a_damaged_blob_is_refused() {
     let r = versions.install(&store, &a.manifest, &mut |_| {}, &AtomicBool::new(false));
     assert!(r.is_err());
     assert!(!versions.has(&a.manifest.build));
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn a_damaged_install_is_found_and_repaired() {
+    let root = scratch("repair");
+    let store_dir = root.join("store");
+    let key = SigningKey::from_bytes(&[5; 32]);
+    stage(&root.join("a"), b"game one");
+    let a = pack(
+        &root.join("a"),
+        &store_dir,
+        identity("0.1.0-playtest+dddddddddd", 3),
+        "- Notes for three".into(),
+        3,
+    )
+    .unwrap();
+    publish(&store_dir, &a.manifest, &key, true).unwrap();
+    // The history names it, with its notes.
+    let at = store_dir.join(History::path(Channel::Playtest, crate::platform()));
+    let history = History::parse(&std::fs::read(at).unwrap()).unwrap();
+    assert_eq!(history.builds[0].build, a.manifest.build);
+    assert_eq!(history.builds[0].notes, "- Notes for three");
+
+    let store = Store::new(&file_url(&store_dir)).unwrap();
+    let versions = Versions::new(&root.join("install"));
+    let never = AtomicBool::new(false);
+    versions
+        .install(&store, &a.manifest, &mut |_| {}, &never)
+        .unwrap();
+    let dir = versions.dir(&a.manifest.key());
+    std::fs::write(dir.join("data/same.ron"), b"broken").unwrap();
+    std::fs::remove_file(dir.join("data/factions/unit.ron")).unwrap();
+    let bad = versions.verify(&a.manifest, &mut |_| {}, &never).unwrap();
+    let mut paths: Vec<&str> = bad.iter().map(|e| e.path.as_str()).collect();
+    paths.sort_unstable();
+    assert_eq!(paths, ["data/factions/unit.ron", "data/same.ron"]);
+    versions
+        .repair(&store, &a.manifest, &bad, &mut |_| {}, &never)
+        .unwrap();
+    assert!(versions
+        .verify(&a.manifest, &mut |_| {}, &never)
+        .unwrap()
+        .is_empty());
+    let (usage, total) = versions.usage();
+    assert_eq!(usage.len(), 1);
+    assert_eq!(usage[0].1, total, "a lone build holds everything it takes");
+    versions.remove(&a.manifest.key()).unwrap();
+    assert!(versions.installed().is_empty());
     let _ = std::fs::remove_dir_all(&root);
 }

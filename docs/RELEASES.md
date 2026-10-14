@@ -83,8 +83,12 @@ recorded it. The store is a plain tree of files on Cloudflare R2, read over HTTP
 ```text
 blobs/<sha256>.zst                           one file's bytes, zstd-packed, shared by
                                              every build that has that file
-builds/windows-x64/<build>.json (+ .sig)     a build's manifest: every file by hash
+builds/windows-x64/<build>.json (+ .sig)     a build's manifest: every file by hash,
+                                             and its patch notes
 channels/<channel>/windows-x64.json (+ .sig) the channel's newest build
+channels/<channel>/windows-x64-history.json (+ .sig)
+                                             the channel's last 20 builds and their notes
+news.json (+ .sig)                           the launcher's news and its row of links
 ```
 
 A build is a folder: `meridian.exe`, `data/`, `maps/` and
@@ -101,7 +105,8 @@ trust a new one's updates (players would install afresh); leaked, anyone holding
 bucket's write key too could publish. `mc-release keygen` made it, once.
 
 Downloads go through the system's `curl` (in Windows 10 and later, and every Linux),
-so the game carries no TLS stack.
+so neither the game nor the launcher carries a TLS stack. The history and the news
+are signed like manifests, so the links the launcher opens are ours.
 
 ## An install and the launcher
 
@@ -111,27 +116,81 @@ What a player unzips and runs:
 MeridianConflict.exe      the launcher (crates/mc-launcher)
 versions/<build>/         each installed build, whole; a file shared with another
                           build is a hard link, so an old build costs only what changed
-versions/current          the build the launcher starts
+versions/current-<channel>  the build the launcher starts on that channel
+launcher.json             the channel the player picked
 replays/                  the game runs here: recordings and marks
-launcher.log              what the last start did
+launcher.log              what the last run of the launcher did
 ```
 
-- **Starting:** the launcher starts the current build, in the install's folder, with
-  `MERIDIAN_LAUNCHER` naming itself, and exits. It keeps the 8 builds used last.
-- **Updates:** a game the launcher started looks for its channel's newest build as the
-  front end opens and downloads it in the background (`crates/mc-game/src/builds.rs`).
-  A card at the foot of the menu then says *Build N is ready* with **Restart**, which
-  starts the launcher and quits. An update brings the launcher it was published with;
-  the game puts it beside the running one as `MeridianConflict.exe.new`, and the
-  launcher swaps it in on its next start.
-- **Old replays:** Match History shows, for a recording this build does not play as
-  recorded (`docs/REPLAYS.md`, *Older builds*), **Download Its Build** with its
-  progress, then **Watch in Its Build**. That starts `MeridianConflict --replay FILE`
-  and quits; the launcher plays the replay in that build with `--replay-only`
-  (leaving the replay quits it, and it never writes the settings file, which is the
-  newer build's), then starts the current build again on Match History
-  (`--open history`). Started by hand with a replay whose build is not installed, the
-  launcher downloads it first.
+The launcher is a window in the game's look, drawn on the CPU (tiny-skia and fontdue
+into a softbuffer window): it is what repairs an install whose game will not start, so
+it must not need the GPU driver the game needs. The game never updates itself.
+
+- **The window:** down the left, the brand, the channel picker (Release, Playtest) and
+  the picked channel's build: its number and date, how it stands (up to date, an
+  update downloading with its speed and time left, offline), its server (a connection
+  to it answers or not), what is installed, and **Play** at the foot. To the right,
+  the latest news over the backdrop (`crates/mc-launcher/assets/backdrop.png`), and
+  under it **Patch Notes** (the channel's history), **News** and **Builds**; the
+  news's links along the foot.
+- **Updates:** on opening, the launcher reads each channel's newest build and history
+  and the news. When the picked channel names a build that is not installed, it
+  downloads it at once and **Play** waits for it (a network match needs everyone on
+  one build); a failed download leaves Play on the installed build with *Try the
+  update again*. A channel with nothing installed offers **Install**. A finished
+  update becomes its channel's current build; when it brings a different launcher
+  (`launcher/MeridianConflict.exe` in the build), that goes beside the running one as
+  `MeridianConflict.exe.new` and the launcher restarts into it at once.
+- **Starting:** **Play** starts the current build, in the install's folder, with
+  `MERIDIAN_LAUNCHER` naming the launcher, and the launcher closes. It keeps the 8
+  builds used last, and never one a channel starts.
+- **Builds:** every installed build with what removing it would free (files it shares
+  are counted once). **Check Files** reads every file against the signed manifest and
+  downloads the damaged or missing ones again (a repaired file gets a copy of its own:
+  another build linked to the old one keeps it); **Remove** takes a build no channel
+  starts. Buttons open the install folder, the game's logs and crash reports
+  (`%APPDATA%\meridian-conflict`) and the replays.
+- **Old replays:** Match History shows **Watch in Its Build** for a recording this
+  build does not play as recorded (`docs/REPLAYS.md`, *Older builds*). That starts
+  `MeridianConflict --replay FILE` and quits; the launcher fetches that build if it is
+  missing (its progress on a card in the window), hides, plays the replay in it with
+  `--replay-only` (leaving the replay quits it, and it never writes the settings file,
+  which is the newer build's), then starts the current build again on Match History
+  (`--open history`).
+- **Looking at it:** `MeridianConflict --screenshot DIR` draws the window in each of
+  its states (up to date, updating, news, builds with a check running, a channel to
+  install, offline, an old replay) at 1x and 1.5x, from sample builds in a scratch
+  install, with no window and no store.
+
+### Patch notes
+
+Each build carries its notes in its manifest, and the channel's history keeps the last
+20. They are plain text with a little shape, which the launcher sets out:
+
+```text
+# Units                      a heading
+- Wardens turn faster        a bullet; a following line carries it on
+A line of its own            a paragraph; a blank line ends it
+```
+
+`scripts/release.sh` takes them from `--notes FILE`; without it, it drafts one bullet
+per commit since the channel's last build (each subject up to its first colon), shows
+them, and publishes those. Write real notes for anything players will read.
+
+### News
+
+`release/news.json` holds the news and the launcher's links:
+
+```json
+{
+  "items": [{ "date": "2026-10-14", "title": "Rimehold is out", "body": "- Four defenders ..." }],
+  "links": [{ "label": "Discord", "url": "https://..." }]
+}
+```
+
+Items newest first; the first shows over the backdrop. Bodies are patch-note text.
+Links must be `https://`. `scripts/release.sh news` checks and signs it into the store
+and uploads it; it reaches every launcher on its next start, without a build.
 
 A dev build (no store) and a game started without the launcher have no install: Match
 History names the build a recording needs and the command below instead.
@@ -174,9 +233,9 @@ scripts/release.sh playtest
 
 builds the tip of the channel's branch (`playtest`, or `master` for release) for Windows with the channel, the store's URL and the
 channel's server from `release/config.sh`, stages it (a release leaves out
-playtest-only maps), packs and signs it into the local copy of the store
+playtest-only maps), packs and signs it with its patch notes into the local copy of the store
 (`~/.local/share/meridian-release/store`), uploads what R2 lacks (blobs, then the
-build's manifest, then the channel's pointer, last), and writes
+build's manifest, then the channel's history, then the channel's pointer, last), and writes
 `target/dist/MeridianConflict-Playtest-Build<N>.zip`: the launcher with this build
 installed, to hand to a new player. Players who have an install get it as an update.
 `--no-upload` stops before uploading: the zip still works, and a later run uploads.

@@ -11,7 +11,8 @@ use std::time::Duration;
 
 use mc_core::Channel;
 
-use crate::manifest::{Manifest, MAX_MANIFEST};
+use crate::feed::{History, News, MAX_FEED};
+use crate::manifest::{verify_signed, Manifest, MAX_MANIFEST};
 use crate::{Error, Result};
 
 /// At most this many downloads at once.
@@ -119,6 +120,24 @@ impl Store {
             )));
         }
         Ok(m)
+    }
+
+    /// A file and its signature, verified against the release key.
+    fn signed(&self, path: &str, max: u64) -> Result<Vec<u8>> {
+        let bytes = self.bytes(path, max)?;
+        let sig = self.bytes(&format!("{path}.sig"), 1024)?;
+        verify_signed(&bytes, &sig)?;
+        Ok(bytes)
+    }
+
+    /// `channel`'s last builds and their notes; empty before the first.
+    pub fn history(&self, channel: Channel) -> Result<History> {
+        History::parse(&self.signed(&History::path(channel, crate::platform()), MAX_FEED)?)
+    }
+
+    /// The news and the launcher's links.
+    pub fn news(&self) -> Result<News> {
+        News::parse(&self.signed(News::PATH, MAX_FEED)?)
     }
 
     /// Downloads every job, up to [`PARALLEL`] at once. `progress` hears the
