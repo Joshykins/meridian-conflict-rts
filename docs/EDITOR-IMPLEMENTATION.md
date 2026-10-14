@@ -149,8 +149,12 @@ playable mission, authored and revised through the editor and its API.
   and preserve the authoring document on Stop. The local session regression
   verifies all intervening tick bundles and commands are retained.
 
+- Added move-axis, rotation-ring and uniform-scale handles, ground/grid snapping,
+  right-click cancellation and one Undo per drag. Shared transform/scale commands
+  preserve components and reject invalid batches atomically. Native handle and
+  transformed-object screenshots plus exact Undo/Save baseline verification pass.
+
 ## Still required before final delivery
-- Remaining gizmo/snapping improvements.
 - Propaganda components and encounter balance; human playtest and cinematic review.
 - Full checks, determinism matrix/cross-platform verification, final native
   screenshots, docs reconciliation, and the pull request to dev.

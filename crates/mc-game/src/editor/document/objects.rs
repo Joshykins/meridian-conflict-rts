@@ -90,6 +90,20 @@ pub(super) fn apply(
                 return Err("Select a unit, point, camera or region to transform".into());
             }
         }
+        Command::Scale { id, factor } => {
+            if !factor.is_finite() || !(0.05..=16.0).contains(factor) {
+                return Err("Scale factor must be 0.05 to 16".into());
+            }
+            let r = placed
+                .regions
+                .iter_mut()
+                .find(|r| r.id == *id)
+                .ok_or("Scale applies to doodads and regions")?;
+            let centre = (r.min + r.max) * Fx::HALF;
+            let half = (r.max - r.min) * Fx::HALF * Fx::from_f32(*factor);
+            r.min = centre - half;
+            r.max = centre + half;
+        }
         Command::Properties {
             id,
             name,

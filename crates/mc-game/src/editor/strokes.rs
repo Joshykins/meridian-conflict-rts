@@ -39,6 +39,9 @@ impl Editor {
             && ui.cursor.y < bottom
             && !card.contains(ui.cursor)
             && !outliner.contains(ui.cursor);
+        if self.gizmo_input(ui, renderer, viewport && !self.confirm_exit) {
+            return;
+        }
         if !viewport || self.confirm_exit {
             self.stroke.last = None;
             return;
@@ -83,7 +86,9 @@ impl Editor {
                 }
             }
         } else if input.pressed {
-            if let Some(command) = self.world_command([hit.x, hit.y], input.cursor, renderer) {
+            if let Some(command) =
+                self.world_command(self.gizmo.snap([hit.x, hit.y]), input.cursor, renderer)
+            {
                 let placing = matches!(command, Command::Unit { .. } | Command::Doodad { .. });
                 match self.apply(command, renderer) {
                     Err(e) => self.message = e,

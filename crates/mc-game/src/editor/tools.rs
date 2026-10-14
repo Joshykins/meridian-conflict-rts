@@ -129,7 +129,10 @@ impl Editor {
         let y = bottom + 54.0 + rows as f32 * 44.0;
         let width = (w - 102.0) * 0.5;
         let mut radius = (self.radius - 8.0) / 504.0;
-        if self.tool == 29 {
+        let object_tool = matches!(self.tool, 0 | 5..=9 | 27);
+        if object_tool {
+            self.gizmo_controls(ui, y);
+        } else if self.tool == 29 {
             ui.text(
                 34.0,
                 y + 20.0,
@@ -169,7 +172,8 @@ impl Editor {
         ) {
             self.radius = 8.0 + radius * 504.0;
         }
-        if (18..=20).contains(&self.tool) {
+        if object_tool {
+        } else if (18..=20).contains(&self.tool) {
             let mut value = self.paint.value as f32 / 255.0;
             if ui.slider(
                 id("editor_paint_value", 0),

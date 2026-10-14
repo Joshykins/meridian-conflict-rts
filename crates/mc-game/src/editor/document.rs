@@ -131,6 +131,10 @@ pub(super) enum Command {
         #[serde(default)]
         free: bool,
     },
+    Scale {
+        id: u64,
+        factor: f32,
+    },
     Transform {
         id: u64,
         at: [f32; 2],

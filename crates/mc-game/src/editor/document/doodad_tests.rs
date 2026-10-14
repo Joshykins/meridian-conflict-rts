@@ -98,3 +98,68 @@ fn invalid_component_batch_changes_neither_props_nor_other_objects() {
     assert_eq!(doc.placed.doodads[0].health, 0);
     std::fs::remove_dir_all(folder).unwrap();
 }
+
+#[test]
+fn scale_and_move_preserve_components_and_undo_atomically() {
+    let (folder, mut doc, bp) = super::tests::fixture();
+    doc.apply(
+        &[Command::Doodad {
+            name: "sign".into(),
+            kind: "CityBillboard".into(),
+            at: [400.0, 400.0],
+            heading: 0.0,
+            scale: 1.0,
+            tint: [100, 200, 255],
+            blocking: true,
+            health: 120,
+            reclaim: 80,
+            footprint: Some([8.0, 2.0, 15.0]),
+        }],
+        &bp,
+    )
+    .unwrap();
+    let before = doc.placed.clone();
+    let prop = doc.map.props[before.doodads[0].prop_index as usize];
+    let id = before.doodads[0].id;
+    doc.apply(
+        &[
+            Command::Transform {
+                id,
+                at: [416.0, 432.0],
+                heading: 90.0,
+            },
+            Command::Scale { id, factor: 2.0 },
+        ],
+        &bp,
+    )
+    .unwrap();
+    assert_eq!(doc.placed, before);
+    let changed = doc.map.props[before.doodads[0].prop_index as usize];
+    assert_eq!(changed.scale_milli, 2000);
+    assert_eq!(changed.pos.to_f32(), [416.0, 432.0]);
+    assert!(doc
+        .apply(
+            &[
+                Command::Transform {
+                    id,
+                    at: [500.0, 500.0],
+                    heading: 0.0
+                },
+                Command::Scale { id, factor: 20.0 }
+            ],
+            &bp
+        )
+        .is_err());
+    assert_eq!(
+        doc.map.props[before.doodads[0].prop_index as usize],
+        changed
+    );
+    doc.undo().unwrap();
+    assert_eq!(doc.map.props[before.doodads[0].prop_index as usize], prop);
+    doc.redo().unwrap();
+    assert_eq!(
+        doc.map.props[before.doodads[0].prop_index as usize],
+        changed
+    );
+    std::fs::remove_dir_all(folder).unwrap();
+}

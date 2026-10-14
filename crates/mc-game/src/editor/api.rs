@@ -12,6 +12,10 @@ use std::time::{Duration, Instant};
 #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
 enum Request {
     State,
+    Gizmo {
+        mode: String,
+        grid: f32,
+    },
     Debug {
         action: crate::game::DebugAction,
     },
@@ -208,6 +212,7 @@ impl Editor {
             if self.reloading() && !matches!(request,Request::State|Request::Shot|Request::Camera{..}) {return Err("Reload is running; wait for state to report completion".into());}
             if self.doc.stroking() && !matches!(request,Request::State|Request::Shot|Request::Camera{..}){self.finish_stroke(renderer)?;}
             match request {
+                Request::Gizmo { mode, grid } => self.configure_gizmo(&mode, grid)?,
                 Request::Debug { action } => game.ok_or("No playtest is running")?.editor_debug(action)?,
                 Request::Catalogue{query}=>{
                     if query.len()>128 {return Err("Search is limited to 128 bytes".into());}

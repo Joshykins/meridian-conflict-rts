@@ -336,3 +336,22 @@ Debug requests require a running editor playtest. Time targets use ticks
 (10 per second); state reports the current tick, local slot, pause/speed,
 and reveal/jump status. Pausing before a jump keeps the simulation stopped
 at exactly the target so a screenshot or inspection can follow.
+
+## Transform handles
+
+Select an object, then choose Move, Rotate or Scale in the bottom panel.
+Drag the centre square to move on the ground, or the red/green endpoints to
+constrain movement to a world axis. Rotate uses the gold ring; scale uses the
+diagonal blue handle. A guide previews the target during the drag and release
+publishes one undo step. Right click cancels. Scaling applies to doodads and
+regions; rotation applies to doodads, units and cameras.
+
+Grid cycles off, 1, 4 and 16 metres and also snaps new object placement. With
+grid enabled, rotation snaps to 15 degrees and scale to quarter increments.
+Objects remain grounded after movement and terrain edits.
+
+    {"op":"gizmo","mode":"rotate","grid":4}
+    {"op":"edit","actions":[{"action":"transform","id":1,"at":[3400,7900],"heading":90},{"action":"scale","id":1,"factor":1.5}]}
+
+Scale is relative to the current doodad or region size. The command preserves
+its stable ID and all components; invalid transforms reject the whole batch.

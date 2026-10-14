@@ -37,6 +37,7 @@ impl Editor {
             dt,
         );
         self.draw_regions(&mut ui, renderer);
+        self.draw_gizmo(&mut ui, renderer);
         let browsing = self.browser.as_ref().is_some_and(|b| b.browser.is_open());
         ui.interactive =
             !browsing && self.catalogue.is_none() && !self.confirm_exit && !self.reloading();

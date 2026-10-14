@@ -53,6 +53,18 @@ pub(super) fn apply(
             p.pos = at;
             p.heading = Angle::from_radians_f32(heading.to_radians());
         }
+        Command::Scale { id, factor } => {
+            let Some(d) = placed.doodads.iter().find(|d| d.id == *id) else {
+                return Ok(false);
+            };
+            let props = state.get_or_insert_with(|| State::from_map(map));
+            let p = &mut props.props[d.prop_index as usize];
+            let scale = f32::from(p.scale_milli) * factor;
+            if !factor.is_finite() || *factor <= 0.0 || !(50.0..=16_000.0).contains(&scale) {
+                return Err("Resulting doodad scale must be 0.05 to 16".into());
+            }
+            p.scale_milli = scale.round() as u16;
+        }
         Command::Delete { id } => {
             let Some(index) = placed.doodads.iter().position(|d| d.id == *id) else {
                 return Ok(false);

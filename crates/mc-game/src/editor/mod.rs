@@ -8,6 +8,7 @@ mod doodads;
 mod environment;
 mod frame;
 mod gestures;
+mod gizmo;
 mod interaction;
 mod map_bounds;
 mod map_controls;
@@ -59,6 +60,7 @@ pub(crate) struct Editor {
     tool: usize,
     tool_group: usize,
     stroke: strokes::Stroke,
+    gizmo: gizmo::Gizmo,
     paint: tools::PaintSettings,
     environment: environment::Controls,
     doodad: doodads::Controls,
@@ -144,6 +146,7 @@ impl Editor {
             tool: 0,
             tool_group: 0,
             stroke: Default::default(),
+            gizmo: Default::default(),
             paint: Default::default(),
             environment: Default::default(),
             doodad: Default::default(),
