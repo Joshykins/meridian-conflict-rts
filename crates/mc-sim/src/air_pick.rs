@@ -11,8 +11,10 @@
 //! So the picks are first worked out on the pool from the tick's starting state
 //! (`speculate_air_picks`), each noting the marks whose chasers it counted. As the
 //! orders then run, every mark whose chasers change is noted (`note_chase_change`), and
-//! a fighter takes its worked-out pick only when none of the marks it counted changed;
-//! otherwise it picks again there and then. The picks come out as if made in turn.
+//! a fighter takes its worked-out pick when none of the marks it counted changed. When
+//! some did, it counts their chasers again and scores the marks it weighed anew; only
+//! when that could let in a mark it never weighed does it pick again there and then.
+//! The picks come out as if made in turn.
 
 use crate::spatial::kind;
 use crate::tables::*;
@@ -40,8 +42,9 @@ pub(crate) struct AirSpecs {
     /// Per row: its pick's index in `picks`, or `END`.
     by_row: Vec<u32>,
     picks: Vec<Spec>,
-    /// The marks each pick counted the chasers of (`Spec::seen` ranges over it).
-    seen: Vec<u32>,
+    /// The marks each pick weighed, in the order it weighed them (`Spec::seen` ranges
+    /// over it).
+    seen: Vec<Weighed>,
     /// Per row: its chasers have changed since the picks were made.
     changed: Vec<bool>,
 }
@@ -53,6 +56,32 @@ struct Spec {
     named: UnitId,
     pick: Option<u32>,
     seen: (u32, u32),
+    stop: Stop,
+}
+
+/// A mark a pick weighed: its distance, and how many of the fighter's friends were on it.
+#[derive(Clone, Copy)]
+struct Weighed {
+    mark: u32,
+    distance: Fx,
+    chasers: u8,
+}
+
+/// Why a pick stopped weighing marks, and so which it never weighed.
+#[derive(Clone, Copy, Default)]
+enum Stop {
+    /// Every mark in reach was weighed, or as many as the budget lets one be.
+    #[default]
+    Weighed,
+    /// Those it did not weigh are at least this far.
+    Beyond(Fx),
+}
+
+/// What a pick worked out ahead weighed, and why it stopped.
+#[derive(Default)]
+struct Trace {
+    marks: Vec<Weighed>,
+    stop: Stop,
 }
 
 /// What of a unit its chasers' counts read: the mark its front order names, and
@@ -124,12 +153,12 @@ impl World {
         self.engage_within(row, reach, &mut None)
     }
 
-    /// `air_engage_target_within`, noting in `seen` the marks whose chasers it counted.
+    /// `air_engage_target_within`, noting in `trace` the marks it weighed.
     fn engage_within(
         &self,
         row: usize,
         reach: Fx,
-        seen: &mut Option<&mut Vec<u32>>,
+        trace: &mut Option<&mut Trace>,
     ) -> Option<usize> {
         let bp = self.bp(row);
         // A lift ship never flies at anything: its guns shoot what comes in reach.
@@ -169,7 +198,7 @@ impl World {
             return None;
         }
         if fighter {
-            return self.air_spread_pick(row, mask, reach, seen);
+            return self.air_spread_pick(row, mask, reach, trace);
         }
         let friends = self.team_mask(units.owner[row]);
         self.index
@@ -193,8 +222,11 @@ impl World {
         row: usize,
         mask: u32,
         reach: Fx,
-        seen: &mut Option<&mut Vec<u32>>,
+        trace: &mut Option<&mut Trace>,
     ) -> Option<usize> {
+        if let Some(trace) = trace {
+            trace.stop = Stop::Weighed;
+        }
         if !self.fires_at_will(row) {
             return None;
         }
@@ -242,19 +274,38 @@ impl World {
             ring.sort_unstable();
             mc_core::perf_count!("scramble.candidates", ring.len());
             for (distance, t) in ring {
-                if best.is_some_and(|(s, _)| distance > s) || weighed == PICK_BUDGET {
+                if best.is_some_and(|(s, _)| distance > s) {
+                    if let Some(trace) = trace {
+                        trace.stop = Stop::Beyond(distance);
+                    }
+                    return best.map(|(_, t)| t);
+                }
+                if weighed == PICK_BUDGET {
                     return best.map(|(_, t)| t);
                 }
                 weighed += 1;
-                if let Some(seen) = seen {
-                    seen.push(t as u32);
+                let chasers = self.air_pursuers(row, t);
+                if let Some(trace) = trace {
+                    trace.marks.push(Weighed {
+                        mark: t as u32,
+                        distance,
+                        chasers: chasers as u8,
+                    });
                 }
-                let score = distance + crowd * self.air_pursuers(row, t);
+                let score = distance + crowd * chasers;
                 if best.is_none_or(|(s, b)| score < s || (score == s && t < b)) {
                     best = Some((score, t));
                 }
             }
-            if last || best.is_some_and(|(s, _)| s <= r) {
+            if last {
+                break;
+            }
+            if best.is_some_and(|(s, _)| s <= r) {
+                // What lies past this ring is further than `r`; `Beyond` takes it as at
+                // least `r`, which only ever asks for a fresh pick needlessly.
+                if let Some(trace) = trace {
+                    trace.stop = Stop::Beyond(r);
+                }
                 break;
             }
             inner = r;
@@ -297,14 +348,16 @@ impl World {
     /// Works out on the pool the pick of every aircraft whose front order flies it at
     /// what it finds (attack-move, patrol), from the state the orders start from.
     pub(crate) fn speculate_air_picks(&mut self) {
+        let _span = mc_core::perf_span!("orders.speculate");
         let mut specs = std::mem::take(&mut self.scratch.air_specs);
         let units = &self.state.units;
         let rows = units.slots.rows();
         let this = &*self;
-        let made: Vec<(Vec<(u32, u32, UnitId, Option<u32>, u32)>, Vec<u32>)> =
+        type Made = (u32, u32, UnitId, Option<u32>, u32, Stop);
+        let made: Vec<(Vec<Made>, Vec<Weighed>)> =
             self.pool.parallel_map_chunks(rows, 256, |_, range| {
                 let mut picks = Vec::new();
-                let mut seen = Vec::new();
+                let mut trace = Trace::default();
                 for row in range {
                     if !units.slots.is_alive(row)
                         || !units.is_active(row)
@@ -320,13 +373,20 @@ impl World {
                     if !matches!(o.kind, OrderKind::AttackMove | OrderKind::Patrol) {
                         continue;
                     }
-                    let first = seen.len() as u32;
+                    let first = trace.marks.len() as u32;
                     let pick = this
-                        .engage_within(row, this.bp(row).vision, &mut Some(&mut seen))
+                        .engage_within(row, this.bp(row).vision, &mut Some(&mut trace))
                         .map(|t| t as u32);
-                    picks.push((row as u32, units.order_head[row], o.target, pick, first));
+                    picks.push((
+                        row as u32,
+                        units.order_head[row],
+                        o.target,
+                        pick,
+                        first,
+                        trace.stop,
+                    ));
                 }
-                (picks, seen)
+                (picks, trace.marks)
             });
         specs.by_row.clear();
         specs.by_row.resize(rows, END);
@@ -342,13 +402,14 @@ impl World {
                 .map(|p| p.4)
                 .chain(std::iter::once(seen.len() as u32))
                 .collect();
-            for ((row, order, named, pick, first), end) in picks.into_iter().zip(ends) {
+            for ((row, order, named, pick, first, stop), end) in picks.into_iter().zip(ends) {
                 specs.by_row[row as usize] = specs.picks.len() as u32;
                 specs.picks.push(Spec {
                     order,
                     named,
                     pick,
                     seen: (base + first, base + end),
+                    stop,
                 });
             }
             specs.seen.extend(seen);
@@ -367,18 +428,45 @@ impl World {
             .and_then(|&i| specs.picks.get(i as usize))
         {
             let (a, b) = spec.seen;
+            let weighed = &specs.seen[a as usize..b as usize];
             if units.order_head[row] == spec.order
                 && self
                     .state
                     .orders
                     .front(units, row)
                     .is_some_and(|o| o.target == spec.named)
-                && specs.seen[a as usize..b as usize]
-                    .iter()
-                    .all(|&t| !specs.changed[t as usize])
             {
-                return spec.pick.map(|t| t as usize);
+                if weighed.iter().all(|w| !specs.changed[w.mark as usize]) {
+                    mc_core::perf_count!("air_picks.taken");
+                    return spec.pick.map(|t| t as usize);
+                }
+                // Score what it weighed again, the changed marks' chasers counted anew, in
+                // the order and by the rule `air_spread_pick` scores them.
+                let crowd = self.bp(row).vision / 4;
+                let mut best: Option<(Fx, usize)> = None;
+                for w in weighed {
+                    let t = w.mark as usize;
+                    let chasers = if specs.changed[t] {
+                        self.air_pursuers(row, t)
+                    } else {
+                        w.chasers as i32
+                    };
+                    let score = w.distance + crowd * chasers;
+                    if best.is_none_or(|(s, b)| score < s || (score == s && t < b)) {
+                        best = Some((score, t));
+                    }
+                }
+                // A mark it never weighed is at least `beyond` off, so scores no better.
+                let whole = match spec.stop {
+                    Stop::Weighed => true,
+                    Stop::Beyond(beyond) => best.is_some_and(|(s, _)| s < beyond),
+                };
+                if whole {
+                    mc_core::perf_count!("air_picks.rescored");
+                    return best.map(|(_, t)| t);
+                }
             }
+            mc_core::perf_count!("air_picks.again");
         }
         self.air_engage_target(row)
     }
