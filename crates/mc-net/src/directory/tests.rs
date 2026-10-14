@@ -93,6 +93,18 @@ fn every_message_round_trips() {
 }
 
 #[test]
+fn the_version_moves_with_the_seat_limit() {
+    // A server built with another MAX_PLAYERS hangs up on a CreateRoom it thinks
+    // has too many seats, after signing in: a new seat limit is a new version,
+    // so the mismatch is refused, with a reason, at sign-in instead.
+    assert_eq!(
+        (DIRECTORY_VERSION, MAX_PLAYERS),
+        (2, 32),
+        "MAX_PLAYERS changed: bump DIRECTORY_VERSION and this pair"
+    );
+}
+
+#[test]
 fn refusal_codes_are_frozen() {
     let all = [
         (DirRefuseReason::Other, 0),

@@ -120,6 +120,14 @@ impl Share {
             }
         }
         if !self.online() {
+            // The link went while the server was opening the room: no answer is coming.
+            if self.busy {
+                log::warn!("the server link dropped while it opened a game");
+                self.say(
+                    "The server went away before the game opened. Try again once it is back."
+                        .to_owned(),
+                );
+            }
             self.lan = true;
         }
         let name_ok = mc_net::check_name(callsign);

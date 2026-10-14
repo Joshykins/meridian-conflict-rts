@@ -49,7 +49,9 @@ use crate::relay::{RoomPhase, RoomStatus};
 use crate::wire::{Dec, Enc, NetError, Result};
 
 /// Bumped on any incompatible change to the directory messages. Checked first in `DirHello`.
-pub const DIRECTORY_VERSION: u32 = 1;
+/// The messages' limits count: a `CreateRoom` for more seats than a server's
+/// `MAX_PLAYERS` is malformed there and it hangs up, so 2 is MAX_PLAYERS 32.
+pub const DIRECTORY_VERSION: u32 = 2;
 /// The longest player name, in characters (names are ASCII, so also in bytes).
 pub const MAX_PLAYER_NAME: usize = 24;
 /// Every new player's name until they choose one. A server gives a name to the
