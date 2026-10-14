@@ -116,6 +116,10 @@ Read by the ignored probe tests in mc-sim, never by the game (docs/AI_COMMANDER.
 
 ## Map editor
 
+| Variable | Values | Purpose |
+|---|---|---|
+| `MERIDIAN_DEV` | `1` | A developer's run (`play.sh` sets it): the main menu also offers The Contract, Continue Campaign and Map Editor. Without it a player sees neither the campaign nor the editor (`ui/menu.rs`). |
+
 - --editor MAP: open a map name or .mcmap path in the editor.
 - The editor mailbox lives in the settings directory under editor/<process-id>.
   Requests are bounded to 256 KiB; each edit batch is one undo step.

@@ -11,6 +11,10 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# A developer's run: the main menu also offers what is still being made (the
+# campaign and the map editor). A packaged build run on its own never shows them.
+export MERIDIAN_DEV=1
+
 build_only=false
 args=()
 for a in "$@"; do
@@ -32,6 +36,7 @@ if [ "$platform" = Linux ] && { [ -n "${WSL_INTEROP:-}${WSL_DISTRO_NAME:-}" ] ||
 
     exec powershell.exe -NoProfile -Command "
     \$env:CARGO_TARGET_DIR = \"\$env:LOCALAPPDATA\\meridian-conflict-target\"
+    \$env:MERIDIAN_DEV = '1'
     Set-Location '$repo'
     cargo build --release -p mc-game
     if (\$LASTEXITCODE -ne 0) { exit \$LASTEXITCODE }

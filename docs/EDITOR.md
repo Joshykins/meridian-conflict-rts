@@ -1,6 +1,7 @@
 # Map editor
 
-Open Map Editor from the main menu, or launch with --editor MAP. A shipped
+Open Map Editor from the main menu of a run from play.sh (`MERIDIAN_DEV=1`;
+a packaged build run on its own does not offer it), or launch with --editor MAP. A shipped
 flat map opens as a source document; Save writes a new folder beneath the
 user's meridian-conflict/maps directory. Open lists both shipped and user maps.
 
@@ -49,7 +50,8 @@ terrain identities unchanged.
 
 To bake the checked-in Vela mission terrain, run scripts/vela.sh. The generated
 terrain is ignored by Git; the authored placement, map configuration and dialogue
-are tracked. The Contract and Continue Campaign appear in the main menu.
+are tracked. The Contract and Continue Campaign appear in the main menu of a run from
+play.sh.
 
 ## Editor API
 

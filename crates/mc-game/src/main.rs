@@ -233,6 +233,7 @@ MERIDIAN_PROP_DETAIL=a,b,c, MERIDIAN_CLOUD_RES=1-4, MERIDIAN_SHADOW_SIZE=512-409
 MERIDIAN_SHADOW_DISTANCE=metres, MERIDIAN_GTAO=0|1, MERIDIAN_GRASS=0,
 MERIDIAN_GRASS_DENSITY=0-1, MERIDIAN_WATER_REFLECTIONS=0|1.
 MERIDIAN_FOLLOW_FRAMES=2-16: headless frames a followed tick is drawn in (default 2).
+MERIDIAN_DEV=1 (play.sh sets it): the main menu also offers the campaign and the map editor.
 
 On AMD GPUs every draw is marked so a lost device's error log names the draw the GPU
 stopped in (models drawn one at a time, a little slower); MERIDIAN_GPU_CRUMBS=0 turns it off,

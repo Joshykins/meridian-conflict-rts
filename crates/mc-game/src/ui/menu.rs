@@ -22,6 +22,26 @@ pub enum MenuAction {
     Quit,
 }
 
+impl MenuAction {
+    /// Still being made: only a run from play.sh, which sets `MERIDIAN_DEV=1`, offers it.
+    fn in_development(self) -> bool {
+        matches!(
+            self,
+            MenuAction::Campaign | MenuAction::ContinueCampaign | MenuAction::Editor
+        )
+    }
+}
+
+/// The entries this run offers.
+fn shown() -> Vec<&'static Entry> {
+    static DEV: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    let dev = *DEV.get_or_init(|| std::env::var_os("MERIDIAN_DEV").is_some_and(|v| v == "1"));
+    ENTRIES
+        .iter()
+        .filter(|e| dev || !e.action.is_some_and(MenuAction::in_development))
+        .collect()
+}
+
 struct Entry {
     label: &'static str,
     blurb: &'static str,
@@ -183,7 +203,8 @@ fn entries(ui: &mut Ui, state: &mut MenuState, enter: f32) -> Option<MenuAction>
     let k = arrive(enter, 0.1);
     ui.fade = k;
     ui.shift = Vec2::new(-24.0 * (1.0 - k), 0.0);
-    let n = ENTRIES.len() as f32;
+    let shown = shown();
+    let n = shown.len() as f32;
     let panel = Rect::new(
         MARGIN,
         MARGIN + BRAND_H + 12.0,
@@ -197,10 +218,10 @@ fn entries(ui: &mut Ui, state: &mut MenuState, enter: f32) -> Option<MenuAction>
     // entry's number picks it directly.
     let before = state.selected;
     if ui.input.key(Key::Down) {
-        state.selected = (state.selected + 1) % ENTRIES.len();
+        state.selected = (state.selected + 1) % shown.len();
     }
     if ui.input.key(Key::Up) {
-        state.selected = (state.selected + ENTRIES.len() - 1) % ENTRIES.len();
+        state.selected = (state.selected + shown.len() - 1) % shown.len();
     }
     let digit = ui
         .input
@@ -208,7 +229,7 @@ fn entries(ui: &mut Ui, state: &mut MenuState, enter: f32) -> Option<MenuAction>
         .chars()
         .filter_map(|c| c.to_digit(10))
         .map(|d| d as usize)
-        .find(|d| (1..=ENTRIES.len()).contains(d));
+        .find(|d| (1..=shown.len()).contains(d));
     if let Some(d) = digit {
         state.selected = d - 1;
     }
@@ -217,7 +238,7 @@ fn entries(ui: &mut Ui, state: &mut MenuState, enter: f32) -> Option<MenuAction>
     }
 
     let mut chosen = None;
-    for (i, entry) in ENTRIES.iter().enumerate() {
+    for (i, entry) in shown.iter().enumerate() {
         // Tiles arrive one after another.
         let t = arrive(enter, 0.15 + i as f32 * 0.06);
         ui.fade = t;
@@ -270,7 +291,7 @@ fn entries(ui: &mut Ui, state: &mut MenuState, enter: f32) -> Option<MenuAction>
         let ink_k: f32 = if available { 1.0 } else { 0.55 };
         glyph(
             ui,
-            i,
+            entry.action,
             Vec2::new(tr.x + 26.0, tr.mid_y()),
             9.0,
             rgb(
@@ -316,12 +337,15 @@ fn entries(ui: &mut Ui, state: &mut MenuState, enter: f32) -> Option<MenuAction>
 }
 
 /// Each entry's glyph, drawn in the order card's line weight.
-fn glyph(ui: &mut Ui, entry: usize, c: Vec2, r: f32, color: super::Color) {
+fn glyph(ui: &mut Ui, action: Option<MenuAction>, c: Vec2, r: f32, color: super::Color) {
     use crate::hud::icons::{self, Glyph};
     let t = (r * 0.17).max(1.4);
-    match entry {
-        0 => icons::glyph(ui, Glyph::Attack, c, r, color),
-        1 => {
+    match action {
+        Some(MenuAction::Campaign) => icons::glyph(ui, Glyph::Move, c, r, color),
+        Some(MenuAction::ContinueCampaign) => icons::glyph(ui, Glyph::Repeat, c, r, color),
+        Some(MenuAction::Editor) => icons::glyph(ui, Glyph::Prefab, c, r, color),
+        Some(MenuAction::Skirmish) => icons::glyph(ui, Glyph::Attack, c, r, color),
+        Some(MenuAction::Survival) => {
             // A held point under fire from three sides.
             ui.arc(c, r * 0.34, 0.0, TAU, t, color);
             ui.disc(c, t * 0.9, color);
@@ -331,8 +355,8 @@ fn glyph(ui: &mut Ui, entry: usize, c: Vec2, r: f32, color: super::Color) {
                 ui.stroke(c + d * r * 0.62, c + d * r, t, color);
             }
         }
-        2 => icons::glyph(ui, Glyph::GroundAttack, c, r, color),
-        3 => {
+        Some(MenuAction::Range) => icons::glyph(ui, Glyph::GroundAttack, c, r, color),
+        Some(MenuAction::Multiplayer) => {
             // Two stations and the link between them.
             ui.arc(c - Vec2::X * r * 0.5, r * 0.42, 0.0, TAU, t, color);
             ui.arc(c + Vec2::X * r * 0.5, r * 0.42, 0.0, TAU, t, color);
@@ -343,7 +367,7 @@ fn glyph(ui: &mut Ui, entry: usize, c: Vec2, r: f32, color: super::Color) {
                 color,
             );
         }
-        4 => {
+        Some(MenuAction::History) => {
             ui.arc(c, r * 0.9, 0.0, TAU, t, color);
             ui.triangle(
                 c + Vec2::new(-r * 0.3, -r * 0.45),
@@ -352,7 +376,7 @@ fn glyph(ui: &mut Ui, entry: usize, c: Vec2, r: f32, color: super::Color) {
                 color,
             );
         }
-        5 => {
+        Some(MenuAction::Options) => {
             // Three sliders.
             for (row, knob) in [(-0.6, 0.3), (0.0, -0.4), (0.6, 0.1)] {
                 let y = c.y + row * r;
@@ -360,7 +384,7 @@ fn glyph(ui: &mut Ui, entry: usize, c: Vec2, r: f32, color: super::Color) {
                 ui.disc(Vec2::new(c.x + knob * r, y), t * 1.4, color);
             }
         }
-        _ => {
+        Some(MenuAction::Quit) | None => {
             // Out through a door.
             let door = [
                 c + Vec2::new(r * 0.2, -r * 0.9),
