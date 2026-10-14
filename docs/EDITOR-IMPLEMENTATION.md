@@ -134,11 +134,22 @@ playable mission, authored and revised through the editor and its API.
   in the render mirror; it is fixed and covered by a mirror regression.
 - A terrain-cache regression now covers discarding simulation flattening before
   reapplying authored overview heights. This final ordering fix awaits the next
-  native build. An intermittent blank minimap occurred in offscreen game
-  captures (one of six probe frames); investigate before final delivery.
+  native build. The suspected blank minimap was re-inspected in the original
+  captures and is correctly rendered; no minimap defect was reproduced.
+
+- Added authored player names, factions, teams, starts and controllers, with a
+  chosen playtest slot and mission key in map.ron. Native second-slot testing
+  and Undo/Save preserve the baseline document.
+- Added transactional crop/extend with clipped regions, preserved stable IDs,
+  exact overlap samples and full Undo/Redo. Native resize and restored-baseline
+  captures pass; full gate passes in 193 seconds.
+- Added reveal/fog, pause, speed, catalogue spawning and forward time jumps to
+  playtests. Native checks reach exactly tick 600 paused at 400%, reveal six
+  spawned units or only the three local units under fog, reject invalid inputs,
+  and preserve the authoring document on Stop. The local session regression
+  verifies all intervening tick bundles and commands are retained.
 
 ## Still required before final delivery
-- Map resize/crop/extend and player configuration.
 - Remaining gizmo/snapping improvements.
 - Propaganda components and encounter balance; human playtest and cinematic review.
 - Full checks, determinism matrix/cross-platform verification, final native

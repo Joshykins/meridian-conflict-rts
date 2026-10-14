@@ -340,7 +340,10 @@ impl Editor {
         let map = snapshot::map(&self.doc, "test")?;
         let request = crate::ui::setup::MatchRequest {
             map: map.clone(),
-            config: config(&self.doc.placed, &self.doc.config),
+            config: MatchConfig {
+                fog: true,
+                ..config(&self.doc.placed, &self.doc.config)
+            },
             colors: crate::setup::TEAM_COLORS,
             survival: None,
             sky: Default::default(),

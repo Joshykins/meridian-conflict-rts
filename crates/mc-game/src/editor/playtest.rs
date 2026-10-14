@@ -4,11 +4,11 @@ use super::*;
 impl Editor {
     pub(crate) fn poll_test(
         &mut self,
-        game: &crate::game::Game,
+        game: &mut crate::game::Game,
         renderer: &mut mc_render::Renderer,
     ) -> bool {
         self.api.test_state = Some(game.editor_test_state());
-        matches!(self.api_frame(renderer), Some(Event::StopTest))
+        matches!(self.api_frame(renderer, Some(game)), Some(Event::StopTest))
     }
 
     pub(crate) fn prepare_test_renderer(

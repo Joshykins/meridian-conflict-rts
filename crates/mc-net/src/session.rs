@@ -165,7 +165,7 @@ pub trait Session {
         false
     }
 
-    /// Playback only: the caller's world now stands after tick `from - 1`
+    /// Playback or local forward-only debug seeking: the caller's world now stands after tick `from - 1`
     /// (a snapshot was restored, or it is where it was). Ticks carry on from
     /// `from`, and every tick up to `to` is released as fast as the budget
     /// allows, paused or not; then the clock goes on as before. Returns
@@ -341,6 +341,7 @@ pub struct LocalSession {
     local: Option<PlayerId>,
     pending: BTreeMap<PlayerId, Vec<Vec<u8>>>,
     next_tick: u32,
+    rush_until: Option<u32>,
     clock: TickClock,
     /// The pacing to return to after a pause.
     pacing: Pacing,
@@ -364,6 +365,7 @@ impl LocalSession {
             local,
             pending: BTreeMap::new(),
             next_tick: 0,
+            rush_until: None,
             clock: TickClock::new(pacing),
             pacing,
             paused: false,
@@ -478,6 +480,14 @@ impl LocalSession {
 }
 
 impl Session for LocalSession {
+    fn seek(&mut self, from: u32, to: u32) -> bool {
+        if self.finished || from != self.next_tick || to < from {
+            return false;
+        }
+        self.rush_until = (to > from).then_some(to);
+        true
+    }
+
     fn submit(&mut self, commands: Vec<Vec<u8>>) -> Result<(), NetError> {
         match self.local {
             Some(slot) => self.submit_as(slot, commands),
@@ -495,7 +505,11 @@ impl Session for LocalSession {
                 .events
                 .budget()
                 .saturating_sub(self.events.queued_ticks() as u32);
-            for _ in 0..self.clock.due(room) {
+            let due = self.rush_until.map_or_else(
+                || self.clock.due(room),
+                |to| to.saturating_sub(self.next_tick).min(room),
+            );
+            for _ in 0..due {
                 let bundle = TickBundle::new(self.next_tick, std::mem::take(&mut self.pending));
                 self.next_tick += 1;
                 self.record(|w| w.bundle(&bundle));
@@ -505,6 +519,11 @@ impl Session for LocalSession {
                     self.record(|w| w.flush());
                 }
                 self.events.push(SessionEvent::TickReady(bundle));
+            }
+            if self.rush_until.is_some_and(|to| self.next_tick >= to) {
+                self.rush_until = None;
+                // Return to the previous clock without banking the skipped wall time.
+                self.clock.next_due = Instant::now() + self.clock.interval().unwrap_or_default();
             }
             // On pause the clock mints nothing, so orders are carried out held.
             if self.paused && !self.pending.is_empty() {

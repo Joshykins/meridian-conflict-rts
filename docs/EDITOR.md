@@ -311,3 +311,28 @@ regions and bridge spans are clipped. Player starts keep their indices and
 are clamped inside the new map. Camera markers and climate walls move with
 the terrain. A crop that removes a required survival location is rejected.
 The full before/after document is retained for this infrequent undo operation.
+
+
+## Playtest toolbox
+
+Test opens a small Playtest panel; Hide folds it away and Stop test returns to
+the authored document. Reveal toggles between full battlefield visibility and
+the selected player's fog. Pause and Speed use the local match clock.
+Advance 60 sec or Jump to seconds executes every intervening simulation tick,
+including mission triggers and combat, then returns to the prior pause/speed.
+Jumps run forward and are limited to one hour from match start.
+
+Search or scroll the unit catalogue, choose a player and count, and Spawn at
+camera places a temporary group in the test. Counts are capped at 64 per API
+request. These units disappear on Stop; they do not change placed.ron.
+
+    {"op":"debug","action":{"tool":"reveal","on":false}}
+    {"op":"debug","action":{"tool":"pause","on":true}}
+    {"op":"debug","action":{"tool":"speed","percent":400}}
+    {"op":"debug","action":{"tool":"jump","tick":600}}
+    {"op":"debug","action":{"tool":"spawn","blueprint":"aster_t1_tank","owner":0,"at":[3400,7900],"heading":90,"count":5}}
+
+Debug requests require a running editor playtest. Time targets use ticks
+(10 per second); state reports the current tick, local slot, pause/speed,
+and reveal/jump status. Pausing before a jump keeps the simulation stopped
+at exactly the target so a screenshot or inspection can follow.

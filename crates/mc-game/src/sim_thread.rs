@@ -168,6 +168,8 @@ pub struct Watch {
     /// An observer is drawing an AI's map of the zones: the zones and their truth are
     /// published (`SimStatus::zone_map`).
     pub zones: bool,
+    /// Local authoring playtests can inspect the whole battlefield.
+    pub reveal: bool,
 }
 
 pub struct SimHandle {
@@ -452,7 +454,7 @@ fn write_ally_mine_plans(world: &World, side: Option<u8>, out: &mut Vec<(u8, Pla
 /// Whose eyes the render frame is drawn through: the player's own, or, for an
 /// observer in a fogged match, whichever side it chose (`None`: all of them).
 fn eyes(fog: bool, local: Option<u8>, watch: &Watch) -> Option<u8> {
-    if fog {
+    if fog && !watch.reveal {
         local.or(watch.perspective)
     } else {
         None
@@ -560,9 +562,14 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                 }
                 // Asked before the world is built (a replay opened at a mark): kept until it is.
                 let asked = world.as_ref().and_then(|_| seek_asked.lock().unwrap().take());
-                if let (Some(to), Some(s), Some(world)) = (asked, &mut scrub, world.as_mut()) {
-                    if let Err(e) = s.seek(world, &setup.map, session.as_mut(), to) {
-                        log::warn!("could not jump to tick {to}: {e}");
+                if let (Some(to), Some(world)) = (asked, world.as_mut()) {
+                    if let Some(s) = &mut scrub {
+                        if let Err(e) = s.seek(world, &setup.map, session.as_mut(), to) {
+                            log::warn!("could not jump to tick {to}: {e}");
+                        }
+                    } else if owns_clock && world.state.cheats && to <= 36_000
+                        && !session.seek(world.tick_count(), to) {
+                        log::warn!("could not advance playtest to tick {to}");
                     }
                 }
                 for note in notes_rx.try_iter() {

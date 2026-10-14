@@ -12,6 +12,9 @@ use std::time::{Duration, Instant};
 #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
 enum Request {
     State,
+    Debug {
+        action: crate::game::DebugAction,
+    },
     Tool {
         name: String,
     },
@@ -166,7 +169,11 @@ impl Drop for Api {
 }
 
 impl Editor {
-    pub(super) fn api_frame(&mut self, renderer: &mut Renderer) -> Option<Event> {
+    pub(super) fn api_frame(
+        &mut self,
+        renderer: &mut Renderer,
+        game: Option<&mut crate::game::Game>,
+    ) -> Option<Event> {
         if let Some(id) = self.api.shot.clone() {
             let capture = if self.api.headless {
                 renderer.read_pixels().map(|rgba| {
@@ -195,12 +202,13 @@ impl Editor {
         let (id, request) = self.api.poll()?;
         let mut event = None;
         let result=request.and_then(|request| {
-            if self.api.test_state.is_some() && !matches!(request, Request::State | Request::Shot | Request::Stop) {
+            if self.api.test_state.is_some() && !matches!(request, Request::State | Request::Shot | Request::Stop | Request::Debug { .. }) {
                 return Err("Stop the playtest before editing the document".into());
             }
             if self.reloading() && !matches!(request,Request::State|Request::Shot|Request::Camera{..}) {return Err("Reload is running; wait for state to report completion".into());}
             if self.doc.stroking() && !matches!(request,Request::State|Request::Shot|Request::Camera{..}){self.finish_stroke(renderer)?;}
             match request {
+                Request::Debug { action } => game.ok_or("No playtest is running")?.editor_debug(action)?,
                 Request::Catalogue{query}=>{
                     if query.len()>128 {return Err("Search is limited to 128 bytes".into());}
                     let units=self.catalogue_entries(&query);

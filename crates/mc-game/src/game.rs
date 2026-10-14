@@ -4,6 +4,7 @@
 //! touches the simulation directly. Player intent leaves as `Command`s.
 #[path = "game_editor.rs"]
 mod editor_test;
+pub(crate) use editor_test::DebugAction;
 #[path = "game_frame.rs"]
 mod frame_view;
 
@@ -453,6 +454,7 @@ pub struct Game {
     prefabs: prefab_desk::Prefabs,
     /// The test range's live desk: requests from outside the game (`game_live.rs`).
     live: live_desk::Live,
+    editor_tools: Option<editor_test::Tools>,
     /// Orders on the map: their lines, the ghosts of planned structures, the one being dragged.
     orders: OrderMap,
     /// A move held on the right button: its formation shows, a drag turns it (`formation_drag.rs`).
@@ -632,6 +634,7 @@ impl Game {
             place_from: None,
             prefabs: prefab_desk::Prefabs::load(),
             live: live_desk::Live::default(),
+            editor_tools: None,
             orders: OrderMap::default(),
             formation_drag: None,
             pointer: Pointer::Arrow,
@@ -711,7 +714,9 @@ impl Game {
 
     pub fn window_event(&mut self, event: &WindowEvent, r: &Renderer, audio: &Audio) {
         // Keys typed into the issue note or a prefab's name are not orders.
-        if (self.hud.issues.typing() || self.hud.prefabs.typing())
+        if (self.hud.issues.typing()
+            || self.hud.prefabs.typing()
+            || self.editor_tools.as_ref().is_some_and(|t| t.typing))
             && matches!(event, WindowEvent::KeyboardInput { .. })
         {
             self.keys.clear();
@@ -814,7 +819,7 @@ impl Game {
                 }
             }
             // Over the HUD the wheel scrolls the HUD, which reads it from the interface's input.
-            WindowEvent::MouseWheel { .. } if self.hud.covers(self.cursor) => {}
+            WindowEvent::MouseWheel { .. } if self.editor_covers(self.cursor) => {}
             WindowEvent::MouseWheel { delta, .. } if self.hud.free.on => {
                 self.free_camera_wheel(match delta {
                     MouseScrollDelta::LineDelta(_, y) => *y,
@@ -1199,7 +1204,7 @@ impl Game {
             // A left press drops a move held on the right button.
             (MouseButton::Left, true) if self.formation_drag.take().is_some() => {}
             (MouseButton::Left, true) => {
-                if !self.hud.covers(self.cursor) {
+                if !self.editor_covers(self.cursor) {
                     // With shift held, a press on an order picks it up.
                     let field = Field {
                         view: &self.view,
@@ -1253,7 +1258,7 @@ impl Game {
             (MouseButton::Right, true) => {
                 if self.orders.dragging() {
                     self.orders.cancel();
-                } else if self.hud.covers(self.cursor) {
+                } else if self.editor_covers(self.cursor) {
                 } else if let Some(pos) = (self.view.mode == Mode::Normal)
                     .then(|| {
                         self.orders.patrol_post_at(

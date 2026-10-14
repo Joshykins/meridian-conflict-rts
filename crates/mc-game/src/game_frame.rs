@@ -42,7 +42,11 @@ impl Game {
         // Keyboard camera. Alt owns the view: the usual keys must not pan underneath an orbit.
         let cine = self.hud.free.on;
         self.cine.hand_back_lift(&mut self.camera);
-        if self.orbit_saved.is_none() && !self.hud.browser_open() && !self.hud.net.typing() && !cine
+        if self.orbit_saved.is_none()
+            && !self.hud.browser_open()
+            && !self.hud.net.typing()
+            && !cine
+            && memory.editing.is_none()
         {
             self.keyboard_camera(dt);
         }
@@ -118,7 +122,7 @@ impl Game {
         self.result_frame(dt);
 
         // Selection and hover marks.
-        let over_ui = self.menu.is_some() || self.hud.covers(self.cursor);
+        let over_ui = self.menu.is_some() || self.editor_covers(self.cursor);
         let hover_unit = if self.view.mode == Mode::Normal && !over_ui {
             self.unit_at(self.cursor).and_then(|i| {
                 let u = &self.view.frame.units[i];
@@ -148,6 +152,7 @@ impl Game {
             || self.watched.everyone != everyone
             || self.watched.perspective != self.view.perspective
             || self.watched.zones != self.mind_map_on()
+            || self.watched.reveal != self.editor_tools.as_ref().is_some_and(|t| t.reveal)
         {
             self.watched = Watch {
                 units: watch.collect(),
@@ -155,6 +160,7 @@ impl Game {
                 everyone,
                 perspective: self.view.perspective,
                 zones: self.mind_map_on(),
+                reveal: self.editor_tools.as_ref().is_some_and(|t| t.reveal),
             };
             self.sim.watch.lock().unwrap().clone_from(&self.watched);
         }
@@ -533,7 +539,7 @@ impl Game {
         }
 
         // The in-match menu, over everything; the settings screen over that.
-        let mut event = None;
+        let mut event = self.editor_panel(&mut ui).then_some(GameEvent::Leave);
         // A match that is already over for this machine (decided, out of step, link lost) is
         // left, not given up.
         let surrender = link

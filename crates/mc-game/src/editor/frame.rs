@@ -18,7 +18,7 @@ impl Editor {
                 self.message = error;
             }
         }
-        let mut event = self.api_frame(renderer);
+        let mut event = self.api_frame(renderer, None);
         if self.catalogue.is_none() && memory.editing == Some(id("editor_catalogue_search", 0)) {
             memory.editing = None;
         }
