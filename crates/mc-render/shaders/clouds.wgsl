@@ -282,14 +282,16 @@ fn cs_light(@builtin(global_invocation_id) id: vec3<u32>, @builtin(num_workgroup
 // base a cloud can wander down to.
 const SHADE_BELOW: f32 = 300.0;
 // Taps through fair-weather cloud, then on up through storm towers.
-const SHADE_STEPS: i32 = 10;
+const SHADE_STEPS: i32 = 6;
 const SHADE_STORM_STEPS: i32 = 5;
-// A new start offset each time a texel is taken, folded into what it had: the
-// taps are hundreds of metres apart and a fixed offset would band the shade.
-// Ten taps miss or catch a heap from one offset to the next, so the texel keeps
-// most of what it had: at a quarter of the texels a frame it answers in about
-// forty frames, while a cloud drifts a few metres, a fraction of a texel (tens
-// of metres). At 0.68 a take the shade on the ground shimmered.
+// Lengths of the sun's ray whose columns are looked at first, for where along
+// it the cloud can be at all (`cs_shade`).
+const SHADE_SCAN: i32 = 8;
+// A new start offset each time a texel is taken, folded into what it had: a
+// fixed offset would band the shade. The taps can still miss or catch a wisp
+// from one offset to the next, so the texel keeps most of what it had: at a
+// quarter of the texels a frame it answers in about forty frames, while a cloud
+// drifts a few metres, a fraction of a texel (tens of metres).
 const SHADE_BLEND: f32 = 0.1;
 // Erosion drawn this many times its size: the shade's texels are coarse.
 const SHADE_DETAIL: f32 = 2.0;
@@ -327,10 +329,35 @@ fn cs_shade(@builtin(global_invocation_id) invocation: vec3<u32>, @builtin(num_w
     // two offsets, and the shade on the ground shimmered.)
     let takes = select(frame, frame / 4u, stagger);
     let jitter = fract(hash21(vec2<f32>(id.xy) + 0.5) + f32(takes) * 0.618034);
+    // Where along the ray the cloud can be: each length's column says how low its
+    // base hangs and how high its heap can reach (`cloud_shape`'s own bounds), so
+    // the taps go there, not into the empty air up to `fair_top`. Spread over all
+    // of it they were hundreds of metres apart: a thin cloud was caught by one tap
+    // a take or none, its shade flickered and came out far too light.
+    var lo = fair_len;
+    var hi = 0.0;
+    let cell = fair_len / f32(SHADE_SCAN);
+    for (var k = 0; k < SHADE_SCAN; k++) {
+        let a = cell * f32(k);
+        let c0 = column_base(column_at(start.xy + d.xy * (a + cell * 0.5)));
+        if c0.y <= 0.0 {
+            continue;
+        }
+        let top = c0.x + c0.y * (1.0 + TOP_LUMP * 0.5);
+        let t0 = max((c0.x - start.z) / d.z, a);
+        let t1 = min((top - start.z) / d.z, a + cell);
+        if t1 > t0 {
+            lo = min(lo, t0);
+            hi = max(hi, t1);
+        }
+    }
     var tau = 0.0;
-    let dt = fair_len / f32(SHADE_STEPS);
+    let dt = max(hi - lo, 0.0) / f32(SHADE_STEPS);
     for (var k = 0; k < SHADE_STEPS; k++) {
-        let p = start + d * (dt * (f32(k) + jitter));
+        if dt <= 0.0 {
+            break;
+        }
+        let p = start + d * (lo + dt * (f32(k) + jitter));
         tau += cloud_at(p, SHADE_DETAIL).sigma * dt;
     }
     // Above the fair tops only a storm's towers reach.
