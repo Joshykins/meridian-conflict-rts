@@ -16,6 +16,14 @@ use mc_data::cat;
 /// how much further each look after: a thin ring at a time is all it checks.
 const SCRAMBLE_PROBE: Fx = Fx::from_int(128);
 
+/// Most marks one fighter's pick weighs (`air_spread_pick`), nearest first. A
+/// deliberate cap, as an AI's budget: in a sky of tens of thousands every mark near a
+/// fighter already has one of its friends on it, and scoring the crowd added in (up to
+/// three times a quarter of its sight) meant weighing every enemy within most of a
+/// kilometre, thousands a pick. Past this it takes the best of the nearest; a fight of
+/// a few dozen never reaches it.
+const PICK_BUDGET: usize = 48;
+
 const END: u32 = u32::MAX;
 
 /// The aircraft whose front order names each unit, by the unit's row: listed at the
@@ -170,6 +178,7 @@ impl World {
         let mut best: Option<(Fx, usize)> = None;
         let mut inner = Fx::from_int(-1);
         let mut radius = SCRAMBLE_PROBE;
+        let mut weighed = 0;
         loop {
             let r = radius.min(reach);
             let last = r >= reach;
@@ -180,9 +189,10 @@ impl World {
             ring.sort_unstable();
             mc_core::perf_count!("scramble.candidates", ring.len());
             for (distance, t) in ring {
-                if best.is_some_and(|(s, _)| distance > s) {
+                if best.is_some_and(|(s, _)| distance > s) || weighed == PICK_BUDGET {
                     return best.map(|(_, t)| t);
                 }
+                weighed += 1;
                 let score = distance + crowd * self.air_pursuers(row, t);
                 if best.is_none_or(|(s, b)| score < s || (score == s && t < b)) {
                     best = Some((score, t));

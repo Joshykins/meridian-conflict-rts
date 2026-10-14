@@ -819,7 +819,11 @@ pub fn screenshot(
             let u = &frame.units[i];
             mc_render::Mark {
                 unit_index: i as u32,
-                kind: 0,
+                kind: crate::game::mark_flat(
+                    world
+                        .blueprints
+                        .unit(mc_data::BlueprintId(u.blueprint as u16)),
+                ),
                 work: crate::game::unit_bar_work(u, &view.status.queues, &frame.wings),
                 shield: crate::game::unit_bar_shield(u.unit_id, &frame.shields),
                 fuel: crate::game::unit_bar_fuel(u.unit_id, &frame.fuel),

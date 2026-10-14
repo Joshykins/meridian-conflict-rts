@@ -222,7 +222,8 @@ impl Renderer {
         self.tile_cache
             .update(camera, &self.pool, &mut self.upload_scratch);
 
-        // Ringed marks first, then those that only show bars: the ring draw takes the front run.
+        // Ringed marks first, those laid over the ground then the flat ones, then those
+        // that only show bars: the ring draws take the front runs.
         let (ringed, bare): (Vec<&Mark>, Vec<&Mark>) = input
             .marks
             .iter()
@@ -230,9 +231,14 @@ impl Renderer {
             .take(MAX_MARKS)
             .filter(|m| m.unit_index < self.sim_units)
             .partition(|m| m.kind & Mark::BARS_ONLY == 0);
-        let ringed_count = ringed.len() as u32;
-        let marks: Vec<Mark> = ringed
+        let (draped, flat): (Vec<&Mark>, Vec<&Mark>) = ringed
             .into_iter()
+            .partition(|m| m.kind & crate::gpu_consts::mark::FLAT == 0);
+        let ringed_count = draped.len() as u32;
+        let flat_count = flat.len() as u32;
+        let marks: Vec<Mark> = draped
+            .into_iter()
+            .chain(flat)
             .chain(bare)
             .map(|m| Mark {
                 unit_index: m.unit_index | 0x8000_0000,
@@ -1101,6 +1107,17 @@ impl Renderer {
                 self.marks_set,
                 ringed_count * ring_cells,
             );
+            if flat_count > 0 {
+                device.cmd_bind_pipeline(
+                    cmd,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.pipelines.ring_flat,
+                );
+                bind_pass_set(self.marks_set);
+                device.cmd_bind_vertex_buffers(cmd, 0, &[self.quad_vb.buffer], &[0]);
+                device.cmd_bind_index_buffer(cmd, self.quad_ib.buffer, 0, vk::IndexType::UINT32);
+                device.cmd_draw_indexed(cmd, 6, flat_count, 0, 0, ringed_count);
+            }
             self.timers.end(&device, cmd);
             // Ore veins glow through the ground, and through trees and units,
             // while the mine survey is up.

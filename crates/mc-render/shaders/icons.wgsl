@@ -695,10 +695,21 @@ struct RingOut {
 @vertex
 fn vs_ring(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u32) -> RingOut {
     let cells = RING_GRID * RING_GRID;
-    let mark = marks[instance / cells];
     let cell = instance % cells;
     let at = (vec2<f32>(f32(cell % RING_GRID), f32(cell / RING_GRID)) + corner * 0.5 + 0.5)
         / f32(RING_GRID) * 2.0 - 1.0;
+    return ring_vertex(marks[instance / cells], at);
+}
+
+// A mark that lies flat under its unit (`MARK_FLAT`, an aircraft's): one quad. These
+// follow the grid marks in `marks`, drawn with the first instance at the first of them.
+@vertex
+fn vs_ring_flat(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u32) -> RingOut {
+    return ring_vertex(marks[instance], corner);
+}
+
+// A corner of the mark: `at` runs -1 to 1 across it.
+fn ring_vertex(mark: Mark, at: vec2<f32>) -> RingOut {
     let e = load_entity(mark.unit_index);
     let model = models[e.blueprint];
     let c = entity_center(e);

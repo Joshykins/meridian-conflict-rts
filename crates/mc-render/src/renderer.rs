@@ -3534,8 +3534,20 @@ impl Renderer {
         self.clear_lots(frame, time);
         // Before the events: a Lance's strike and a shell's landing read this tick's Shapers.
         self.progenitor_tick(frame, time);
+        // A shot or a hit far past what the camera shows makes a flash and sparks gone
+        // in under a second, out of sight: a sky-wide air war is tens of thousands a
+        // tick. Their craters and the clouds they stir are still made.
+        let reach = camera.distance * 3.0 + 1500.0;
         for event in &frame.events {
-            self.effects_of(event, time);
+            let far = match event {
+                SimEvent::ShotFired { pos, .. } | SimEvent::Impact { pos, .. } => {
+                    Vec3::from(pos.to_f32()).distance(camera.focus) > reach
+                }
+                _ => false,
+            };
+            if !far {
+                self.effects_of(event, time);
+            }
             self.stir_clouds(event, time);
             self.impact_crater(event, time);
         }

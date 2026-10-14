@@ -1609,6 +1609,10 @@ shared! {
         pub const BARS_ONLY: u32 = 4;
         /// What a click would take apart: ringed in the Materials red-orange (`MATERIALS_*`).
         pub const RECLAIM: u32 = 8;
+        /// Lies flat under the unit (an aircraft's): drawn as one quad, not a ground grid
+        /// (icons.wgsl `vs_ring_flat`). A selection of tens of thousands of fighters was
+        /// tens of millions of grid vertices.
+        pub const FLAT: u32 = 16;
     }
 
     /// Effect kinds (sprites.wgsl `Effect::params.z`, lights.rs `effect`). The older kinds

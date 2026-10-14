@@ -113,6 +113,8 @@ pub struct Pipelines {
     pub water: vk::Pipeline,
     pub icon: vk::Pipeline,
     pub ring: vk::Pipeline,
+    /// The selection marks that lie flat, a quad each (`vs_ring_flat`).
+    pub ring_flat: vk::Pipeline,
     pub range: vk::Pipeline,
     pub shockwave: vk::Pipeline,
     /// The climate walls' curtain of light (curtain.wgsl).
@@ -1150,6 +1152,15 @@ impl Pipelines {
                 Depth::Test,
                 none,
             )?,
+            ring_flat: scene(
+                icons,
+                c"vs_ring_flat",
+                c"fs_ring",
+                VertexKind::Vec2,
+                Blend::Alpha,
+                Depth::Test,
+                none,
+            )?,
             range: scene(
                 ranges,
                 c"vs_range",
@@ -1341,6 +1352,7 @@ impl Pipelines {
                 self.water,
                 self.icon,
                 self.ring,
+                self.ring_flat,
                 self.range,
                 self.shockwave,
                 self.curtain,

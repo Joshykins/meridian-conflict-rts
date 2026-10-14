@@ -1060,7 +1060,8 @@ impl Game {
         let unknown = u.owner_flags & STATE_UNIDENTIFIED != 0;
         Mark {
             unit_index: i as u32,
-            kind: mark_kind(hover, self.is_enemy((u.owner_flags & 0xFF) as u8)),
+            kind: mark_kind(hover, self.is_enemy((u.owner_flags & 0xFF) as u8))
+                | mark_flat(self.blueprints.unit(BlueprintId(u.blueprint as u16))),
             // Like a factory's, an enemy launcher's assembly line is not shown.
             work: if unknown
                 || (self.is_enemy((u.owner_flags & 0xFF) as u8)
@@ -4743,6 +4744,18 @@ impl Game {
 
 fn mark_kind(hover: bool, enemy: bool) -> u32 {
     (if hover { mark::HOVER } else { 0 }) | (if enemy { mark::ENEMY } else { 0 })
+}
+
+/// `mark::FLAT` for a unit whose selection mark lies flat under it (an aircraft's).
+pub(crate) fn mark_flat(bp: &mc_data::UnitBlueprint) -> u32 {
+    if bp
+        .motion
+        .is_some_and(|m| m.layer == mc_data::MoveLayer::Air)
+    {
+        mark::FLAT
+    } else {
+        0
+    }
 }
 
 /// Construction fill for the unit bar, or a negative if the unit is not building.
