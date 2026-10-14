@@ -28,14 +28,19 @@
 // (written by the resolve, read by the composite).
 @group(1) @binding(3) var cloud_history: texture_2d<f32>;
 @group(1) @binding(4) var cloud_now: texture_2d<f32>;
-// This frame's half of the march (`fs_march`), half as wide as `cloud_march`.
-@group(1) @binding(6) var cloud_march_half: texture_2d<u32>;
+// This frame's part of the march (`fs_march`), `MARCH_STRIDE` times smaller each way
+// than `cloud_march`.
+@group(1) @binding(6) var cloud_march_part: texture_2d<u32>;
 // The column map (cloud_shape.wgsl), near and far: written by `cs_columns`, read by
 // everything after.
 @group(1) @binding(7) var cloud_columns_out: texture_storage_2d_array<rgba16float, write>;
 @group(1) @binding(8) var cloud_columns: texture_2d_array<f32>;
 @group(1) @binding(11) var cloud_columns_far_out: texture_storage_2d_array<rgba16float, write>;
 @group(1) @binding(12) var cloud_columns_far: texture_2d_array<f32>;
+// The nearest (x) and farthest (y) any march texel within two of each one went
+// (`cs_reach`), for the composite's `upsample`.
+@group(1) @binding(13) var cloud_reach_out: texture_storage_2d<rg32float, write>;
+@group(1) @binding(14) var cloud_reach: texture_2d<f32>;
 // The light volume (cloud_shape.wgsl `sun_through`): written by `cs_light`.
 @group(1) @binding(9) var cloud_light_out: texture_storage_3d<rgba16float, write>;
 @group(1) @binding(10) var cloud_light: texture_3d<f32>;
@@ -174,7 +179,28 @@ fn night_sky(d: vec3<f32>, mu: f32, px: f32) -> vec3<f32> {
 // them must not vanish round the bomber that laid it), and right in front of the
 // eye so flying through the layer never whites out the screen. (The middle of the screen is see-through
 // in the composite instead, a hologram of the cloud.)
-fn clearing(p: vec3<f32>) -> f32 {
+// A bubble of clear air round the eye (`clearing`), as big as the view is close:
+// down among the clouds the battle stays in sight; from high up it is too small to
+// reach them. Down among the clouds it clears the cloud near the eye, so the view
+// is never a whiteout, but stops short of the ground being looked at: the cloud
+// there is at the height aircraft fly, and they fly through it (a bubble reaching
+// the ground cleared every cloud round the battle). From high above it shrinks back
+// and the layer is seen whole. The same for every sample of a frame: worked out
+// once a ray.
+fn eye_bubble() -> f32 {
+    let eye = globals.camera.xyz;
+    let above = eye.z - cloud_floor(eye.xy);
+    let among = 1.0 - smoothstep(atmos.layer.y + 300.0, atmos.layer.y + 2500.0, above);
+    // From above it is only big enough that a tower top reaching the eye does
+    // not white out the screen, and its edge is ragged: a clean sphere up to
+    // 1200 m across sliced every tall cloud near the camera into a smooth wall
+    // with a hard rim, which showed as bands and streaks as the view moved.
+    return mix(clamp(atmos.view.z * 0.12, 250.0, 600.0), max(atmos.view.z * 0.45, 120.0), among);
+}
+
+// How much of the cloud at `p` is kept (1 all): thinned over the selection and in
+// the bubble round the eye, `bubble` across (`eye_bubble`).
+fn clearing(p: vec3<f32>, bubble: f32) -> f32 {
     var keep = 1.0;
     let n = u32(atmos.counts.x);
     for (var i = 0u; i < n; i++) {
@@ -187,22 +213,7 @@ fn clearing(p: vec3<f32>) -> f32 {
         let storm = weather_at(p.xy).y;
         keep = mix(keep, 1.0, max(smoothstep(0.25, 0.55, storm), smoothstep(0.05, 0.3, -storm)));
     }
-    // A bubble of clear air round the eye, as big as the view is close: down
-    // among the clouds the battle stays in sight; from high up it is too
-    // small to reach them.
-    // Down among the clouds it clears the cloud near the eye, so the view is
-    // never a whiteout, but stops short of the ground being looked at: the
-    // cloud there is at the height aircraft fly, and they fly through it (a
-    // bubble reaching the ground cleared every cloud round the battle). From
-    // high above it shrinks back and the layer is seen whole.
     let eye = globals.camera.xyz;
-    let above = eye.z - cloud_floor(eye.xy);
-    let among = 1.0 - smoothstep(atmos.layer.y + 300.0, atmos.layer.y + 2500.0, above);
-    // From above it is only big enough that a tower top reaching the eye does
-    // not white out the screen, and its edge is ragged: a clean sphere up to
-    // 1200 m across sliced every tall cloud near the camera into a smooth wall
-    // with a hard rim, which showed as bands and streaks as the view moved.
-    let bubble = mix(clamp(atmos.view.z * 0.12, 250.0, 600.0), max(atmos.view.z * 0.45, 120.0), among);
     let far = distance(p, eye);
     // Past the most its ragged edge reaches: no noise to look up.
     if far >= bubble * 1.35 {
@@ -271,8 +282,8 @@ fn cs_light(@builtin(global_invocation_id) id: vec3<u32>, @builtin(num_workgroup
 // base a cloud can wander down to.
 const SHADE_BELOW: f32 = 300.0;
 // Taps through fair-weather cloud, then on up through storm towers.
-const SHADE_STEPS: i32 = 16;
-const SHADE_STORM_STEPS: i32 = 8;
+const SHADE_STEPS: i32 = 10;
+const SHADE_STORM_STEPS: i32 = 5;
 // A new start offset every frame, folded into what the texel had: the taps
 // are tens of metres apart and a fixed offset would band the shade.
 const SHADE_BLEND: f32 = 0.25;
@@ -348,21 +359,42 @@ var<private> march_depth: f32;
 // How far the march went: to the scene, or 1e9 over the sky (the composite's upsample).
 var<private> march_reach: f32;
 
-// Which texels of row `y` are marched this frame: those whose x is this odd or even.
-// Half a frame, flipping each frame, a checkerboard in all: every texel is marched
-// every other frame, and `fs_fill` fills the rest from the four marched round it.
-fn march_phase(y: i32) -> i32 {
-    return (y + i32(atmos.frame.x)) & 1;
+// The finest the march's stride inside cloud need be, metres (`march`).
+const MARCH_FINE: f32 = 50.0;
+
+// One texel of each `MARCH_STRIDE`-square block is marched a frame, each in turn,
+// and `fs_fill` fills the rest from the marched ones round them; the resolve folds
+// each new march into what the texel had.
+const MARCH_STRIDE: i32 = i32(CLOUD_MARCH_STRIDE);
+
+// Which texel of each block is marched this frame: in a Bayer order, so frames one
+// after another march texels far apart and the blocks never show.
+fn march_offset() -> vec2<i32> {
+    var k = i32(atmos.frame.x) % (MARCH_STRIDE * MARCH_STRIDE);
+    var at = vec2<i32>(0);
+    var half = MARCH_STRIDE / 2;
+    while half > 0 {
+        let q = k & 3;
+        at += vec2<i32>(select(0, half, q == 1 || q == 2), select(0, half, q == 1 || q == 3));
+        k = k >> 2u;
+        half = half / 2;
+    }
+    return at;
 }
 
-// Drawn half as wide as the march (`cloud_march_half`): each texel marches the ray
-// of the full march's texel it stands for this frame (`march_phase`).
+// Whether march texel `px` is marched this frame.
+fn marched_now(px: vec2<i32>) -> bool {
+    return all((px - march_offset() + MARCH_STRIDE) % MARCH_STRIDE == vec2<i32>(0));
+}
+
+// Drawn `MARCH_STRIDE` times smaller each way than the march (`cloud_march_part`):
+// each texel marches the ray of the texel of its block marched this frame.
 @fragment
-fn fs_march(half: FullOut) -> @location(0) vec4<u32> {
+fn fs_march(part: FullOut) -> @location(0) vec4<u32> {
     let full = vec2<f32>(textureDimensions(cloud_history));
-    let y = floor(half.clip.y);
-    var in = half;
-    in.clip = vec4<f32>(floor(half.clip.x) * 2.0 + f32(march_phase(i32(y))) + 0.5, y + 0.5, half.clip.zw);
+    var in = part;
+    let at = floor(part.clip.xy) * f32(MARCH_STRIDE) + vec2<f32>(march_offset()) + 0.5;
+    in.clip = vec4<f32>(at, part.clip.zw);
     in.uv = in.clip.xy / full;
     march_depth = 0.0;
     march_reach = 1.0e9;
@@ -483,6 +515,7 @@ fn mist_march(eye: vec3<f32>, rd: vec3<f32>, t_scene: f32, jitter: f32) -> Mist 
     var through = 1.0;
     var depth_sum = 0.0;
     var weight_sum = 0.0;
+    let bubble = eye_bubble();
     for (var i = 0; i < MIST_STEPS; i++) {
         if t >= t1 || through < 0.02 {
             break;
@@ -491,7 +524,7 @@ fn mist_march(eye: vec3<f32>, rd: vec3<f32>, t_scene: f32, jitter: f32) -> Mist 
         var sigma = mist_at(p);
         if sigma > 0.0 {
             // Where the player looks through, thinned like the clouds.
-            sigma *= mix(0.15, 1.0, clearing(p));
+            sigma *= mix(0.15, 1.0, clearing(p, bubble));
             // The sun's share is shaded by the clouds above.
             let shade = cloud_shadow(p);
             let lit = diffuse * mix(0.6, 1.0, shade) + glow * shade;
@@ -535,75 +568,17 @@ fn with_mist(cloud: vec4<f32>, in: FullOut) -> vec4<f32> {
 }
 
 // Nuclear fireballs light the cloud round them in their own colour: white-hot in the
-// flash, then yellow and orange, sinking to a dull red as the fire goes out. Each is a
-// centre and reach, and a colour with its brightness, gathered once a ray from the
-// blasts in `globals.nukes` (shapes mirrored from nuke.wgsl / renderer/nuke_fx.rs).
-const FIRE_SLOTS: u32 = 16u;
-var<private> fire_at: array<vec4<f32>, 16>;
-var<private> fire_light: array<vec3<f32>, 16>;
-var<private> fire_count: u32;
-
-fn fire_tint(heat: f32) -> vec3<f32> {
-    let h = clamp(heat, 0.0, 1.0);
-    var c = mix(vec3<f32>(0.9, 0.16, 0.03), vec3<f32>(1.0, 0.45, 0.08), smoothstep(0.0, 0.4, h));
-    c = mix(c, vec3<f32>(1.0, 0.78, 0.4), smoothstep(0.4, 0.75, h));
-    return mix(c, vec3<f32>(1.0, 0.96, 0.9), smoothstep(0.75, 1.0, h));
-}
-
-// A Regency nova's light on the clouds (nova.wgsl `plasma_color`): white, rose, red,
-// crimson.
-fn plasma_tint(heat: f32) -> vec3<f32> {
-    let h = clamp(heat, 0.0, 1.0);
-    var c = mix(vec3<f32>(0.85, 0.035, 0.05), vec3<f32>(1.0, 0.19, 0.09), smoothstep(0.0, 0.4, h));
-    c = mix(c, vec3<f32>(1.0, 0.6, 0.64), smoothstep(0.4, 0.75, h));
-    return mix(c, vec3<f32>(1.0, 0.95, 0.97), smoothstep(0.75, 1.0, h));
-}
-
-fn gather_fires() {
-    fire_count = 0u;
-    let count = min(u32(globals.nuke_view.z), FIRE_SLOTS);
-    for (var i = 0u; i < count; i++) {
-        let a = globals.nukes[i * 4u];
-        let b = globals.nukes[i * 4u + 1u];
-        let c = globals.nukes[i * 4u + 2u];
-        // A salvo's fire folded in and bursts near it (nuke_fx.rs).
-        let d = globals.nukes[i * 4u + 3u];
-        let age = max(globals.camera.w - a.w, 0.0);
-        let scale = max(b.x, 0.05);
-        let k = sqrt(max(scale, 0.3));
-        // nuke.wgsl head_radius, head_height, heat_left.
-        let rc = scale * (240.0 * sqrt(1.0 - exp(-age * 3.0)) + 430.0 * (1.0 - exp(-age / 26.0)));
-        let hc = min(scale, pow(scale, 0.6)) * 1700.0 * (1.0 - exp(-pow(age / 30.0, 1.35)));
-        let heat = max(exp(-age / (2.5 * k)) * 0.5 + exp(-age / (16.0 * k)) * 0.5, d.x);
-        let glare = max(exp(-age / (1.6 * k)), d.x * d.x * d.x * 0.6);
-        let blaze = exp(-age / (6.0 * k));
-        let power = 30.0 * glare + 7.0 * blaze + 1.2 * heat * heat;
-        if power < 0.02 {
-            continue;
-        }
-        let temp = 0.3 * exp(-age * 2.0) + 0.75 * heat + 0.1;
-        let lean = c.xy * clamp(hc / (1600.0 * min(scale, pow(scale, 0.6))), 0.0, 1.0);
-        fire_at[fire_count] = vec4<f32>(a.xyz + vec3<f32>(lean, hc), rc);
-        // A Regency nova's threads glow on for half a minute (nova.wgsl `nova_glow`).
-        if u32(d.y + 0.5) == NUKE_LOOK_PLASMA {
-            let threads = 0.4 * exp(-age / (8.0 * k)) + 0.6 * exp(-age / (28.0 * k));
-            fire_light[fire_count] = plasma_tint(temp) * (power + 0.8 * threads);
-        } else {
-            fire_light[fire_count] = fire_tint(temp) * power;
-        }
-        fire_count++;
-    }
-}
-
-// The fireballs' light on the cloud at `p`: from the ball's surface out, falling off
-// over a few hundred metres (further for a bigger blast).
+// flash, then yellow and orange, sinking to a dull red as the fire goes out
+// (`Atmosphere::fires`, sky/fires.rs). Their light on the cloud at `p`: from the ball's
+// surface out, falling off over a few hundred metres (further for a bigger blast).
 fn fire_glow(p: vec3<f32>) -> vec3<f32> {
     var glow = vec3<f32>(0.0);
-    for (var i = 0u; i < fire_count; i++) {
-        let f = fire_at[i];
+    let count = min(u32(atmos.fire_count.x), CLOUD_FIRES_SLOTS);
+    for (var i = 0u; i < count; i++) {
+        let f = atmos.fires[i * 2u];
         let out = max(distance(p, f.xyz) - f.w * 0.85, 0.0);
         let reach = 200.0 + f.w * 0.5;
-        glow += fire_light[i] * exp(-out / reach);
+        glow += atmos.fires[i * 2u + 1u].rgb * exp(-out / reach);
     }
     return glow;
 }
@@ -672,10 +647,11 @@ fn march(in: FullOut) -> vec4<f32> {
     // wide where the ray enters: from the strategic view a texel spans some
     // 170 m, and a quarter stride (25 m) spent dozens of fully lit samples a
     // texel crossing a deck's soft top, detail no one could see. Half the coarse
-    // stride at the finest: with the frame's jitter folded into the history
-    // (`fs_resolve`) it converges on the same picture as a quarter did, and a
-    // whole-map view through an overcast deck marched in 10 ms, not 12.
-    let fine_dt = clamp(t0 * texel_angle, dt * 0.5, dt);
+    // stride at the finest, and never over `MARCH_FINE`: a low eye looking out to
+    // the horizon crosses tens of kilometres of layer, its coarse stride hundreds
+    // of metres, and half that stepped over the erosion's lumps (tens of metres)
+    // here on one frame and there on the next, every edge a spray of speckles.
+    let fine_dt = clamp(t0 * texel_angle, min(dt * 0.5, MARCH_FINE), dt);
     let light_lod = smoothstep(25.0, 45.0, t0 * texel_angle);
     let jitter = ign(in.clip.xy);
     var t = t0 + dt * jitter;
@@ -683,15 +659,18 @@ fn march(in: FullOut) -> vec4<f32> {
     var light = vec3<f32>(0.0);
     var depth_sum = 0.0;
     var weight_sum = 0.0;
+    let bubble = eye_bubble();
     // The erosion's smallest lumps (about a sixteenth of its period) kept to
     // two march texels or more where the ray enters the cloud.
     let detail = max(1.0, t0 * texel_angle * 32.0 / DETAIL_PERIOD);
     let flash_count = u32(atmos.counts.y);
-    gather_fires();
-    // Coarse steps through clear air; on finding cloud, back up and go on at a
-    // quarter of the stride until it has been clear for two coarse steps. At
-    // the coarse stride alone a thin part was hit on some frames and missed on
-    // others, and the clouds' edges crawled.
+    // Coarse steps through clear air; on finding cloud, back up and go on at the
+    // fine stride until it has been clear for a while. At the coarse stride alone
+    // a thin part was hit on some frames and missed on others, and the clouds'
+    // edges crawled. Found is the cloud's body before the erosion carves it
+    // (`CloudSample::body`), not only what is left: a fringe the erosion has worn
+    // thinner than a coarse step lies inside the body, and stepping coarsely
+    // through it found it on one frame and missed it the next.
     var fine = 0;
     for (var i = 0; i < 240; i++) {
         if t >= t1 || through < 0.015 {
@@ -712,18 +691,18 @@ fn march(in: FullOut) -> vec4<f32> {
             continue;
         }
         var c = cloud_shape(p, at, c0, detail, true);
-        if c.sigma > 0.0 && fine == 0 {
+        if (c.sigma > 0.0 || c.body > 0.0) && fine == 0 {
             fine = 8;
             t = max(t - dt * 0.75, t0);
             continue;
         }
         if c.sigma <= 0.0 {
-            fine = max(fine - 1, 0);
+            fine = select(max(fine - 1, 0), 8, c.body > 0.0);
         } else {
             fine = 8;
             // Where the player looks through, the cloud keeps its shape and its
             // light but lets the ground show: thinned, not removed.
-            let keep = clearing(p);
+            let keep = clearing(p, bubble);
             let sigma_full = c.sigma;
             c.sigma = sigma_full * mix(0.025, 1.0, keep * keep);
             // Light from the sun: through the coarse cloud toward it (`sun_through`,
@@ -734,17 +713,19 @@ fn march(in: FullOut) -> vec4<f32> {
             // deck's or a sheet's flat top, which it turned into one even fleece
             // from edge to edge; and faded out zoomed out, where a march texel is
             // tens of metres wide and the lumps are smaller than it.
-            var crease = 0.0;
-            var past = 0.0;
-            if light_lod < 1.0 {
-                let short = DETAIL_PERIOD * detail * 0.06;
+            let short = DETAIL_PERIOD * detail * 0.06;
+            let past = short * 2.0 * (1.0 - light_lod);
+            var sunward = sun_through(p + sun * past, through > 0.3);
+            // Deep in the cloud, where hardly any sunlight comes straight through, or
+            // behind enough of it that little of what is lit here shows, the crease
+            // would darken nothing anyone could see: not looked up.
+            if light_lod < 1.0 && sunward.y > 0.05 && through > 0.4 {
                 let fade = (1.0 - light_lod) * (1.0 - 0.8 * c.flat);
-                crease = cloud_shape(p + sun * short, at, c0, detail, false).sigma * short * 2.0 * fade;
-                past = short * 2.0 * (1.0 - light_lod);
+                let crease = cloud_shape(p + sun * short, at, c0, detail, false).sigma * short * 2.0 * fade;
+                sunward *= exp(-crease * LIGHT_OCTAVES);
             }
             // Beer's law with the light scattered many times approximated by
             // ever-softer octaves (Hillaire 2016), and the dark "powder" rims.
-            let sunward = sun_through(p + sun * past, crease);
             let sunlit = sunward.x * (phase + mie_peak(CLOUD_DROPLET_UM) * phase_soft) + sunward.y * 0.3 * phase_soft + sunward.z * 0.25 * 0.0796;
             // Powder darkens thin cloud only looking toward the sun (its
             // in-scatter has not built up yet there). From above, with the sun
@@ -765,7 +746,7 @@ fn march(in: FullOut) -> vec4<f32> {
                 let r = distance(p, fl.xyz);
                 glow += vec3<f32>(0.62, 0.7, 1.0) * fl.w * 26.0 * exp(-r / 520.0);
             }
-            if fire_count > 0u {
+            if atmos.fire_count.x > 0.0 {
                 glow += fire_glow(p);
             }
             // Shell bursts, flak and explosions under or in the cloud (sky.rs `set_glows`).
@@ -1020,17 +1001,24 @@ fn fs_rain(in: RainOut) -> @location(0) vec4<f32> {
 
 // ---- Carried over from frame to frame --------------------------------------------
 
-// Catmull-Rom from nine texels in five bilinear taps (the corners are dropped:
-// they weigh next to nothing). Negative lobes can overshoot, so the caller clamps.
-fn sample_sharp(tex: texture_2d<f32>, uv: vec2<f32>) -> vec4<f32> {
+// A cubic of the Mitchell-Netravali family (B, C) from nine texels in five bilinear
+// taps (the corners are dropped: they weigh next to nothing). Negative lobes can
+// overshoot, so the caller clamps.
+fn sample_cubic(tex: texture_2d<f32>, uv: vec2<f32>, b: f32, c: f32) -> vec4<f32> {
     let size = vec2<f32>(textureDimensions(tex));
     let at = uv * size;
     let centre = floor(at - 0.5) + 0.5;
     let f = at - centre;
-    let w0 = f * (-0.5 + f * (1.0 - 0.5 * f));
-    let w1 = 1.0 + f * f * (-2.5 + 1.5 * f);
-    let w2 = f * (0.5 + f * (2.0 - 1.5 * f));
-    let w3 = f * f * (-0.5 + 0.5 * f);
+    // The kernel at 1 + f, f, 1 - f and 2 - f texels out.
+    let near = vec3<f32>(12.0 - 9.0 * b - 6.0 * c, -18.0 + 12.0 * b + 6.0 * c, 6.0 - 2.0 * b) / 6.0;
+    let far = vec4<f32>(-b - 6.0 * c, 6.0 * b + 30.0 * c, -12.0 * b - 48.0 * c, 8.0 * b + 24.0 * c) / 6.0;
+    let x0 = 1.0 + f;
+    let x2 = 1.0 - f;
+    let x3 = 2.0 - f;
+    let w0 = ((far.x * x0 + far.y) * x0 + far.z) * x0 + far.w;
+    let w1 = (near.x * f + near.y) * f * f + near.z;
+    let w2 = (near.x * x2 + near.y) * x2 * x2 + near.z;
+    let w3 = ((far.x * x3 + far.y) * x3 + far.z) * x3 + far.w;
     let w12 = w1 + w2;
     let o12 = w2 / w12;
     let p0 = (centre - 1.0) / size;
@@ -1045,33 +1033,11 @@ fn sample_sharp(tex: texture_2d<f32>, uv: vec2<f32>) -> vec4<f32> {
     return sum / weight;
 }
 
-// Cubic B-spline as four bilinear taps (all weights positive, no ringing).
-fn sample_smooth(tex: texture_2d<f32>, uv: vec2<f32>) -> vec4<f32> {
-    let size = vec2<f32>(textureDimensions(tex));
-    let at = uv * size - 0.5;
-    let centre = floor(at);
-    let f = at - centre;
-    let f2 = f * f;
-    let f3 = f2 * f;
-    let w0 = (1.0 - 3.0 * f + 3.0 * f2 - f3) / 6.0;
-    let w1 = (4.0 - 6.0 * f2 + 3.0 * f3) / 6.0;
-    let w2 = (1.0 + 3.0 * f + 3.0 * f2 - 3.0 * f3) / 6.0;
-    let w3 = f3 / 6.0;
-    let g0 = w0 + w1;
-    let g1 = w2 + w3;
-    let p0 = (centre - 0.5 + w1 / g0) / size;
-    let p1 = (centre + 1.5 + w3 / g1) / size;
-    return (textureSampleLevel(tex, clamp_sampler, vec2<f32>(p0.x, p0.y), 0.0) * g0.x
-        + textureSampleLevel(tex, clamp_sampler, vec2<f32>(p1.x, p0.y), 0.0) * g1.x) * g0.y
-        + (textureSampleLevel(tex, clamp_sampler, vec2<f32>(p0.x, p1.y), 0.0) * g0.x
-        + textureSampleLevel(tex, clamp_sampler, vec2<f32>(p1.x, p1.y), 0.0) * g1.x) * g1.y;
-}
-
 @fragment
 fn fs_resolve(in: FullOut) -> @location(0) vec4<f32> {
     let px = vec2<i32>(in.clip.xy);
-    // Marched this frame (`march_phase`), or filled in from the four round it.
-    let marched = (px.x & 1) == march_phase(px.y);
+    // Marched this frame (`marched_now`), or filled in from the marched round it.
+    let marched = marched_now(px);
     let last = vec2<i32>(textureDimensions(cloud_march)) - vec2<i32>(1);
     let now = march_texel(px);
     if atmos.frame.y < 0.5 {
@@ -1148,7 +1114,7 @@ fn fs_resolve(in: FullOut) -> @location(0) vec4<f32> {
     if moved < 0.25 {
         history = textureLoad(cloud_history, px, 0);
     } else {
-        history = sample_sharp(cloud_history, uv);
+        history = sample_cubic(cloud_history, uv, 0.0, 0.5);
     }
     // Never carry a bad value on: it spreads a texel a frame through the
     // neighbourhood clamp and the sharp resample, and whites out the view.
@@ -1160,22 +1126,29 @@ fn fs_resolve(in: FullOut) -> @location(0) vec4<f32> {
         mix(mean - spread * k, max(lo, mean - spread * k), motion),
         mix(mean + spread * k, min(hi, mean + spread * k), motion),
     );
-    // A filled texel brings nothing new (it is its neighbours' average): it keeps its
-    // history, clamped as above; a marched one counts twice, being marched every
-    // other frame, so the clouds keep the pace they settle and follow at.
-    return mix(before, now, mix(0.06, 0.14, motion) * select(0.0, 2.0, marched));
+    // A filled texel brings nothing new (it is its neighbours' blend): it keeps its
+    // history, clamped as above; a marched one counts for every frame it was not, so
+    // the clouds keep the pace they settle and follow at.
+    let gain = f32(MARCH_STRIDE * MARCH_STRIDE);
+    return mix(before, now, min(mix(0.06, 0.14, motion) * select(0.0, gain, marched), 1.0));
 }
 
 // The march at full size (`cloud_march`, read by the resolve, the composite and
-// `past_clouds`): this frame's marched texels from `cloud_march_half`, and between
-// them the average of the four marched round each that went about as far (as the
-// resolve's neighbourhood does), so a treetop's texel is not filled with the sky's.
+// `past_clouds`): this frame's marched texels from `cloud_march_part`, and between
+// them a blend of the four marched round each, weighted by how near, from those
+// that went about as far (as the resolve's neighbourhood does), so a treetop's
+// texel is not filled with the sky's.
 @fragment
 fn fs_fill(in: FullOut) -> @location(0) vec4<u32> {
     let px = vec2<i32>(in.clip.xy);
-    let last = vec2<i32>(textureDimensions(cloud_march_half)) - vec2<i32>(1);
-    if (px.x & 1) == march_phase(px.y) {
-        return textureLoad(cloud_march_half, min(vec2<i32>(px.x >> 1u, px.y), last), 0);
+    let last = vec2<i32>(textureDimensions(cloud_march_part)) - vec2<i32>(1);
+    // Where this texel sits among the blocks' marched texels: the one up and to
+    // the left (part coordinates), and how far on toward the next, 0 to 1.
+    let rel = px - march_offset() + MARCH_STRIDE;
+    let cell = rel / MARCH_STRIDE - vec2<i32>(1);
+    let frac = vec2<f32>(rel % MARCH_STRIDE) / f32(MARCH_STRIDE);
+    if all(frac == vec2<f32>(0.0)) {
+        return textureLoad(cloud_march_part, clamp(cell, vec2<i32>(0), last), 0);
     }
     // How far this texel's march would have gone: to the nearest scene at its
     // corners, as `march` finds it.
@@ -1193,48 +1166,65 @@ fn fs_fill(in: FullOut) -> @location(0) vec4<u32> {
     if depth > 0.0 {
         reach = distance(unproject(in.uv, depth), globals.camera.xyz);
     }
-    // Left and right in this row; above and below, whose rows march the other half.
-    let rows = i32(size.y) - 1;
-    var at = array<vec2<i32>, 4>(
-        vec2<i32>(px.x - 1, px.y),
-        vec2<i32>(px.x + 1, px.y),
-        vec2<i32>(px.x, px.y - 1),
-        vec2<i32>(px.x, px.y + 1),
-    );
     var sum = vec4<f32>(0.0);
     var depth_sum = 0.0;
-    var hits = 0.0;
-    var n = 0.0;
+    var depth_weight = 0.0;
+    var weight = 0.0;
     var nearest = vec4<u32>(0u);
     var apart = 1.0e9;
     for (var i = 0; i < 4; i++) {
-        let q = at[i];
-        if q.x < 0 || q.y < 0 || q.y > rows || (q.x >> 1u) > last.x {
+        let side = vec2<i32>(i & 1, i >> 1u);
+        let q = cell + side;
+        if any(q < vec2<i32>(0)) || any(q > last) {
             continue;
         }
-        let v = textureLoad(cloud_march_half, vec2<i32>(q.x >> 1u, q.y), 0);
+        let v = textureLoad(cloud_march_part, q, 0);
         let off = abs(log2(max(bitcast<f32>(v.w), 0.1) / max(reach, 0.1)));
         if off < apart {
             apart = off;
             nearest = v;
         }
-        if off > 0.3 {
+        let k = mix(1.0 - frac, frac, vec2<f32>(side));
+        let w = k.x * k.y;
+        if off > 0.3 || w <= 0.0 {
             continue;
         }
-        sum += vec4<f32>(unpack2x16float(v.x), unpack2x16float(v.y));
+        sum += vec4<f32>(unpack2x16float(v.x), unpack2x16float(v.y)) * w;
         let d = bitcast<f32>(v.z);
         if d > 0.0 {
-            depth_sum += d;
-            hits += 1.0;
+            depth_sum += d * w;
+            depth_weight += w;
         }
-        n += 1.0;
+        weight += w;
     }
-    if n == 0.0 {
+    if weight <= 0.0 {
         return vec4<u32>(nearest.xyz, bitcast<u32>(reach));
     }
-    let c = sum / n;
-    let d = select(0.0, depth_sum / max(hits, 1.0), hits > n * 0.5);
+    let c = sum / weight;
+    let d = select(0.0, depth_sum / max(depth_weight, 1e-6), depth_weight > weight * 0.5);
     return vec4<u32>(pack2x16float(c.rg), pack2x16float(c.ba), bitcast<u32>(d), bitcast<u32>(reach));
+}
+
+// `cloud_reach`: over the five by five march texels round each, which hold every
+// texel the composite's cubic reads for a pixel nearest that one.
+@compute @workgroup_size(8, 8)
+fn cs_reach(@builtin(global_invocation_id) id: vec3<u32>) {
+    let size = textureDimensions(cloud_march);
+    if any(id.xy >= size) {
+        return;
+    }
+    let last = vec2<i32>(size) - vec2<i32>(1);
+    var near = 1.0e30;
+    var far = 0.0;
+    for (var y = -2; y <= 2; y++) {
+        for (var x = -2; x <= 2; x++) {
+            let at = clamp(vec2<i32>(id.xy) + vec2<i32>(x, y), vec2<i32>(0), last);
+            let there = bitcast<f32>(textureLoad(cloud_march, at, 0).w);
+            near = min(near, there);
+            far = max(far, there);
+        }
+    }
+    textureStore(cloud_reach_out, vec2<i32>(id.xy), vec4<f32>(near, far, 0.0, 0.0));
 }
 
 // ---- Laid over the picture ------------------------------------------------------
@@ -1257,6 +1247,23 @@ fn to_screen(p: vec3<f32>) -> vec3<f32> {
     return vec3<f32>((c.x / w * 0.5 + 0.5) * globals.viewport.x, (0.5 - c.y / w * 0.5) * globals.viewport.y, c.z / w);
 }
 
+// `upsample` where every texel round the pixel marched as far as it did: a cubic
+// between a B-spline and Catmull-Rom (Mitchell-Netravali B 0.4, C 0.3), kept inside
+// the four texels round the pixel so its lobes cannot ring. The B-spline alone
+// blurred a texel and a half on top of the march's own coarse size, every cloud's
+// edge soft as cotton wool; Catmull-Rom alone drew a lone dark texel in a storm as
+// a square. `centre` is the texel left of and above the pixel.
+fn upsample_whole(uv: vec2<f32>, centre: vec2<f32>, last: vec2<i32>) -> vec4<f32> {
+    var lo = textureLoad(cloud_now, clamp(vec2<i32>(centre), vec2<i32>(0), last), 0);
+    var hi = lo;
+    for (var i = 1; i < 4; i++) {
+        let c = textureLoad(cloud_now, clamp(vec2<i32>(centre) + vec2<i32>(i & 1, i >> 1u), vec2<i32>(0), last), 0);
+        lo = min(lo, c);
+        hi = max(hi, c);
+    }
+    return clamp(sample_cubic(cloud_now, uv, 0.4, 0.3), lo, hi);
+}
+
 // The accumulated clouds at a full-size pixel whose scene depth is `depth`. The
 // march texels are several pixels wide, and one straddling a treetop and the
 // sky marched to the sky (the farthest of its corners): its cloud and rain,
@@ -1268,6 +1275,18 @@ fn upsample(uv: vec2<f32>, depth: f32) -> vec4<f32> {
     let size = vec2<f32>(textureDimensions(cloud_now));
     let at = uv * size - 0.5;
     let centre = floor(at);
+    var reach = 1.0e9;
+    if depth > 0.0 {
+        reach = distance(unproject(uv, depth), globals.camera.xyz);
+    }
+    let last = vec2<i32>(size) - vec2<i32>(1);
+    // All of a piece (`cloud_reach`: every texel round went within a ninth of an
+    // octave of the pixel's own reach, as the test below would find texel by texel).
+    let range = textureLoad(cloud_reach, clamp(vec2<i32>(uv * size), vec2<i32>(0), last), 0).xy;
+    let spread = abs(log2(max(range, vec2<f32>(0.1)) / max(reach, 0.1)));
+    if max(spread.x, spread.y) < 0.11 {
+        return upsample_whole(uv, centre, last);
+    }
     let f = at - centre;
     let f2 = f * f;
     let f3 = f2 * f;
@@ -1283,11 +1302,6 @@ fn upsample(uv: vec2<f32>, depth: f32) -> vec4<f32> {
         (1.0 + 3.0 * f.y + 3.0 * f2.y - 3.0 * f3.y) / 6.0,
         f3.y / 6.0,
     );
-    var reach = 1.0e9;
-    if depth > 0.0 {
-        reach = distance(unproject(uv, depth), globals.camera.xyz);
-    }
-    let last = vec2<i32>(size) - vec2<i32>(1);
     let base = vec2<i32>(centre) - vec2<i32>(1);
     var ok = array<f32, 16>();
     var worst = 1.0;
@@ -1305,21 +1319,9 @@ fn upsample(uv: vec2<f32>, depth: f32) -> vec4<f32> {
             nearest_at = px;
         }
     }
-    // All of a piece (nearly every pixel): a cubic between a B-spline and
-    // Catmull-Rom (near Mitchell-Netravali), kept inside the four texels round
-    // the pixel so its lobes cannot ring. The B-spline alone blurred a texel
-    // and a half on top of the march's own coarse size, every cloud's edge
-    // soft as cotton wool; Catmull-Rom alone drew a lone dark texel in a storm
-    // as a square.
+    // All of a piece after all.
     if worst > 0.9 {
-        var lo = textureLoad(cloud_now, clamp(vec2<i32>(centre), vec2<i32>(0), last), 0);
-        var hi = lo;
-        for (var i = 1; i < 4; i++) {
-            let c = textureLoad(cloud_now, clamp(vec2<i32>(centre) + vec2<i32>(i & 1, i >> 1u), vec2<i32>(0), last), 0);
-            lo = min(lo, c);
-            hi = max(hi, c);
-        }
-        return clamp(mix(sample_smooth(cloud_now, uv), sample_sharp(cloud_now, uv), 0.6), lo, hi);
+        return upsample_whole(uv, centre, last);
     }
     var sum = vec4<f32>(0.0);
     var weight = 0.0;
@@ -1392,6 +1394,21 @@ fn fs_composite(in: FullOut) -> @location(0) vec4<f32> {
         light = mix(light, ghost, holo);
         cover = mix(cover, cover * 0.14, holo);
     }
+    return vec4<f32>(light, cover);
+}
+
+// Lightning strokes over the picture, added to it (drawn only while a flash lasts,
+// sky.rs `draw_composite`). In the composite itself the strokes' loop, never run
+// without a flash, still held so many registers that the composite ran at a third
+// of the pace.
+@fragment
+fn fs_bolts(in: FullOut) -> @location(0) vec4<f32> {
+    if globals.camera.z < globals.map.z {
+        discard;
+    }
+    let scene = textureLoad(scene_depth, vec2<i32>(in.clip.xy), 0);
+    let cloud = textureSampleLevel(cloud_now, clamp_sampler, in.uv, 0.0);
+    var light = vec3<f32>(0.0);
     // Output pixels, as `to_screen` gives, so a bolt is as thin at any render scale.
     let pixel = in.clip.xy / globals.scene.z;
     let flash_count = u32(atmos.counts.y);
@@ -1425,5 +1442,5 @@ fn fs_composite(in: FullOut) -> @location(0) vec4<f32> {
         let halo = exp(-near / 14.0) * 0.12 + exp(-near / 90.0) * 0.02;
         light += vec3<f32>(0.8, 0.86, 1.0) * bolt.w * (core * 26.0 + halo * 4.0) * mix(0.35, 1.0, cloud.a);
     }
-    return vec4<f32>(light, cover);
+    return vec4<f32>(light, 0.0);
 }

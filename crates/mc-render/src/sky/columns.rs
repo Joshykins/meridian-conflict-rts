@@ -11,8 +11,9 @@ use crate::gpu_consts::cloud_columns::LAYERS;
 /// `columns_rect`).
 const NEAR_RES: u32 = 1024;
 const FAR_RES: u32 = 512;
-/// A frame bakes one row in this many: the air drifts a metre or so in a few frames.
-const STAGGER: u32 = 4;
+/// A frame bakes one row in this many: the air drifts a metre or two in that many
+/// frames.
+const STAGGER: u32 = 8;
 
 pub(super) struct Columns {
     /// `LAYERS` each; written by `cs_columns`, read in GENERAL.

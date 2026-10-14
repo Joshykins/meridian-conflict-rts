@@ -740,6 +740,11 @@ struct Atmosphere {
     // x the height over the cloud floor a Nimbus's seeded clouds sit at (sky/seed.rs):
     // where the weather's storm is below zero (clouds.wgsl `cloud_at`).
     seeded: vec4<f32>,
+    // The nuclear fireballs lighting the clouds (sky/fires.rs): per fireball its centre
+    // and reach, then its colour and brightness.
+    fires: array<vec4<f32>, CLOUD_FIRES_SLOTS * 2u>,
+    // x how many of `fires` are burning.
+    fire_count: vec4<f32>,
 }
 
 // How much faster a wheeling storm's eye turns than its rim (sky.rs `VORTEX_SHEAR`).

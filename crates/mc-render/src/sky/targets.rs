@@ -1,10 +1,11 @@
 //! Cloud targets rebuilt when window size or cloud quality changes.
 
 use super::*;
+use crate::gpu_consts::cloud_march::STRIDE;
 
 impl Sky {
     /// Size-dependent targets: the march, its two histories, the half of the march
-    /// marched each frame (`MARCH_HALF`), and the depth it stops at. The march and the
+    /// marched each frame (`MARCH_PART`), and the depth it stops at. The march and the
     /// histories also go into the scene set (bindings 36-38), for the effects drawn past
     /// the clouds (bindings.wgsl `past_clouds`).
     pub fn resize(
@@ -29,12 +30,17 @@ impl Sky {
         let div = cloud_divisor.clamp(1, 4);
         let (w, h) = (width.div_ceil(div).max(1), height.div_ceil(div).max(1));
         for k in 0..4 {
-            let march = k == 0 || k == MARCH_HALF;
-            // Half as wide: each row marches every other texel (clouds.wgsl `march_phase`).
-            let tw = if k == MARCH_HALF { w.div_ceil(2) } else { w };
+            let march = k == 0 || k == MARCH_PART;
+            // The part marched each frame, `STRIDE` times smaller each way (clouds.wgsl
+            // `fs_march`).
+            let (tw, th) = if k == MARCH_PART {
+                (w.div_ceil(STRIDE), h.div_ceil(STRIDE))
+            } else {
+                (w, h)
+            };
             let image = gpu.image(&ImageDesc {
                 width: tw,
-                height: h,
+                height: th,
                 format: if march {
                     CLOUD_MARCH_FORMAT
                 } else {
@@ -46,7 +52,7 @@ impl Sky {
                 array: false,
             })?;
             let views = [image.view];
-            // SAFETY: `image` was just made at `tw`x`h` in the format of the pass it is paired
+            // SAFETY: `image` was just made at `tw`x`th` in the format of the pass it is paired
             // with (`CLOUD_MARCH_FORMAT` for the march and its fill, `HDR_FORMAT` for the
             // resolve); the create info and `views` live to the end of the call.
             let fb = unsafe {
@@ -59,7 +65,7 @@ impl Sky {
                         })
                         .attachments(&views)
                         .width(tw)
-                        .height(h)
+                        .height(th)
                         .layers(1),
                     None,
                 )
@@ -99,7 +105,19 @@ impl Sky {
             write_image(gpu, *set, 2, sampled, self.targets[0].view, read);
             write_image(gpu, *set, 3, sampled, self.targets[1 + (1 - k)].view, read);
             write_image(gpu, *set, 4, sampled, self.targets[1 + k].view, read);
-            write_image(gpu, *set, 6, sampled, self.targets[MARCH_HALF].view, read);
+            write_image(gpu, *set, 6, sampled, self.targets[MARCH_PART].view, read);
+        }
+        let reach = self.reach.resize(gpu, (w, h))?;
+        for set in self.draw_sets {
+            write_image(
+                gpu,
+                set,
+                13,
+                vk::DescriptorType::STORAGE_IMAGE,
+                reach,
+                vk::ImageLayout::GENERAL,
+            );
+            write_image(gpu, set, 14, sampled, reach, vk::ImageLayout::GENERAL);
         }
         for (binding, target) in [(36, 0), (37, 1), (38, 2)] {
             write_image(

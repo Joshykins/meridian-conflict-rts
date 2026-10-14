@@ -11,7 +11,7 @@ const RES: u32 = 256;
 const SLICES: u32 = 48;
 /// A frame refreshes one slice in this many: clouds drift and the sun moves slowly,
 /// so the light a few frames old is the light now.
-const STAGGER: u32 = 8;
+const STAGGER: u32 = 16;
 
 pub(super) struct LightVolume {
     /// r the optical depth toward the sun; written by `cs_light`, read in GENERAL.

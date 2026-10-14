@@ -784,6 +784,20 @@ shared! {
         pub const LAYERS: u32 = 6;
     }
 
+    /// The clouds' march (mc-render sky.rs `record_march`, clouds.wgsl `fs_march`).
+    pub mod cloud_march as "CLOUD_MARCH_" {
+        /// Each frame marches one texel of each `STRIDE` by `STRIDE` block, each in
+        /// turn; the part marched is drawn `STRIDE` times smaller each way.
+        pub const STRIDE: u32 = 2;
+    }
+
+    /// The nuclear fireballs lighting the clouds (mc-render sky/fires.rs,
+    /// `Atmosphere::fires`), gathered once a frame.
+    pub mod cloud_fires as "CLOUD_FIRES_" {
+        /// Fireballs at most.
+        pub const SLOTS: u32 = 16;
+    }
+
     /// What stirs the weather (sky.rs `Disturber`, clouds_sim.wgsl `cs_force`). The wake
     /// and blast kinds are still spelled out on both sides; new ones are declared here.
     pub mod disturber as "DISTURBER_" {

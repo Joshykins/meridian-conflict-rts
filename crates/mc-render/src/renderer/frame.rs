@@ -313,6 +313,8 @@ impl Renderer {
             self.tree_blasts.upload(input.time, &camera.frustum());
         let (nukes, strategic, nuke_view) =
             self.nuke_frame(input.time, input.alpha.clamp(0.0, 1.0), camera, view_proj);
+        self.sky
+            .set_fires(&nukes, nuke_view[2] as usize, input.time);
         let mut settling = [[0.0; 4]; settle::SLOTS as usize * 2];
         let settling_count = self.tile_cache.settling(input.time, &mut settling);
         let climate = self.climate_globals();

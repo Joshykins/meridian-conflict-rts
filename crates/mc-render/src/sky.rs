@@ -19,7 +19,9 @@
 mod blast;
 mod columns;
 mod cut;
+mod fires;
 mod light;
+mod reach;
 mod regions;
 mod seed;
 pub(crate) use seed::SeedCell;
@@ -71,11 +73,13 @@ const DRAW_SET: &[Binding] = &[
     (10, vk::DescriptorType::SAMPLED_IMAGE),
     (11, vk::DescriptorType::STORAGE_IMAGE),
     (12, vk::DescriptorType::SAMPLED_IMAGE),
+    (13, vk::DescriptorType::STORAGE_IMAGE),
+    (14, vk::DescriptorType::SAMPLED_IMAGE),
 ];
 
-/// The target the march draws this frame's half of its texels into (`Sky::resize`);
+/// The target the march draws this frame's part of its texels into (`Sky::resize`);
 /// `fs_fill` lays them out at full size in target 0.
-const MARCH_HALF: usize = 3;
+const MARCH_PART: usize = 3;
 
 const SHADE_RES: u32 = 512;
 const NOISE_RES: u32 = 128;
@@ -170,6 +174,11 @@ pub(crate) struct Atmosphere {
     pub(crate) mist: [f32; 4],
     /// x the height over the cloud floor a Nimbus's seeded clouds sit at (sky/seed.rs).
     pub(crate) seeded: [f32; 4],
+    /// The nuclear fireballs lighting the clouds (`fires.rs`): per fireball its centre
+    /// and reach, then its colour and brightness.
+    pub(crate) fires: [[f32; 4]; fires::SLOTS * 2],
+    /// x how many of `fires` are burning.
+    pub(crate) fire_count: [f32; 4],
 }
 
 /// A storm as clouds_sim.wgsl reads it.
@@ -195,6 +204,8 @@ const _: () = assert!(
             + crate::gpu_consts::regions::MAX as usize * 32
             + crate::gpu_consts::regions::WALL_SEGMENTS as usize * 32
             + 64
+            + fires::SLOTS * 32
+            + 16
 );
 
 /// Something stirring the weather this frame. Mirrors clouds_sim.wgsl.
@@ -501,6 +512,8 @@ pub struct Sky {
     columns: columns::Columns,
     /// How much cloud lies toward the sun from each point of the layer (`light.rs`).
     light: light::LightVolume,
+    /// How far the march texels round each one went, for the composite (`reach.rs`).
+    reach: reach::ReachRange,
     /// The march this frame, then two histories it is folded into in turn.
     targets: Vec<Image>,
     target_fbs: Vec<vk::Framebuffer>,
@@ -526,6 +539,8 @@ pub struct Sky {
     fill_pipeline: vk::Pipeline,
     resolve_pipeline: vk::Pipeline,
     composite_pipeline: vk::Pipeline,
+    /// Lightning strokes, drawn after the composite while a flash lasts.
+    bolts_pipeline: vk::Pipeline,
     rain_pipeline: vk::Pipeline,
     modules: [vk::ShaderModule; 2],
     /// The march target's pass, then the histories' (`bloom_down`'s format).
@@ -566,6 +581,8 @@ pub struct Sky {
     rng: Rng,
     last_time: Option<f32>,
     step: f32,
+    /// Seconds the weather has not been stepped through yet (`record_sim`).
+    sim_owed: f32,
     reset: bool,
     /// Storms a map this size carries in usual weather.
     usual_storms: f32,
@@ -818,7 +835,7 @@ impl Sky {
         let sim_module = gpu.shader(crate::shader_reload::spirv!("clouds_sim"))?;
         let draw_module = gpu.shader(crate::shader_reload::spirv!("clouds"))?;
         // All at once (`warm`): after a shader change the march alone compiles for seconds.
-        let [advect, force, noise_pipeline, shade_pipeline, sky_pipeline, march_pipeline, fill_pipeline, resolve_pipeline, composite_pipeline, rain_pipeline] =
+        let [advect, force, noise_pipeline, shade_pipeline, sky_pipeline, march_pipeline, fill_pipeline, resolve_pipeline, composite_pipeline, bolts_pipeline, rain_pipeline] =
             crate::warm::warmed(
                 gpu,
                 || {
@@ -899,6 +916,13 @@ impl Sky {
                         Blend::Premultiplied,
                         Depth::Off,
                     )?;
+                    let bolts_pipeline = graphics(
+                        c"fs_bolts",
+                        draw_pipeline_layout,
+                        passes.scene_over,
+                        Blend::Additive,
+                        Depth::Off,
+                    )?;
                     let rain_pipeline = pipelines::graphics_pipeline(
                         gpu,
                         &PipelineDesc {
@@ -923,6 +947,7 @@ impl Sky {
                         fill_pipeline,
                         resolve_pipeline,
                         composite_pipeline,
+                        bolts_pipeline,
                         rain_pipeline,
                     ])
                 },
@@ -931,6 +956,7 @@ impl Sky {
 
         let columns = columns::Columns::new(gpu, draw_module, draw_pipeline_layout)?;
         let light = light::LightVolume::new(gpu, draw_module, draw_pipeline_layout)?;
+        let reach = reach::ReachRange::new(gpu, draw_module, draw_pipeline_layout)?;
         for set in draw_sets {
             let [near, far] = columns.views();
             write_image(gpu, set, 7, T::STORAGE_IMAGE, near, general);
@@ -976,6 +1002,7 @@ impl Sky {
             shade,
             columns,
             light,
+            reach,
             targets: Vec::new(),
             target_fbs: Vec::new(),
             march_size: (0, 0),
@@ -999,6 +1026,7 @@ impl Sky {
             fill_pipeline,
             resolve_pipeline,
             composite_pipeline,
+            bolts_pipeline,
             rain_pipeline,
             modules: [sim_module, draw_module],
             march_pass: passes.cloud_march,
@@ -1027,6 +1055,7 @@ impl Sky {
             rng,
             last_time: None,
             step: 0.0,
+            sim_owed: 0.0,
             reset: true,
             usual_storms,
             parked_storm,
@@ -1721,6 +1750,14 @@ impl Sky {
                 &[],
             );
         };
+        // The weather is stepped every other frame, over both frames' time: it moves
+        // a few metres a second, and a frame late is nothing anyone sees.
+        self.sim_owed += self.step;
+        let run = self.reset || self.frame_index.is_multiple_of(2);
+        let step = self.sim_owed;
+        if run {
+            self.sim_owed = 0.0;
+        }
         // SAFETY: the renderer calls `record_sim` with its recording `cmd`, outside any render
         // pass; the pipelines were made with `sim_pipeline_layout` and the 8-byte push is its
         // range; the state image has TRANSFER_SRC and is in GENERAL, `focus_texel` is clamped
@@ -1728,7 +1765,7 @@ impl Sky {
         // `readback`'s 128 bytes exactly.
         unsafe {
             let push = |reset: u32| {
-                let data: [u32; 2] = [self.step.to_bits(), reset];
+                let data: [u32; 2] = [step.to_bits(), reset];
                 dev.cmd_push_constants(
                     cmd,
                     self.sim_pipeline_layout,
@@ -1737,7 +1774,7 @@ impl Sky {
                     bytemuck::bytes_of(&data),
                 );
             };
-            if !self.reset {
+            if run && !self.reset {
                 dev.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::COMPUTE, self.advect);
                 dev.cmd_bind_descriptor_sets(
                     cmd,
@@ -1751,23 +1788,25 @@ impl Sky {
                 dev.cmd_dispatch(cmd, groups, groups, 1);
                 barrier(vk::PipelineStageFlags::COMPUTE_SHADER);
             }
-            dev.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::COMPUTE, self.force);
-            dev.cmd_bind_descriptor_sets(
-                cmd,
-                vk::PipelineBindPoint::COMPUTE,
-                self.sim_pipeline_layout,
-                0,
-                &[self.sim_sets[1]],
-                &[],
-            );
-            push(self.reset as u32);
-            dev.cmd_dispatch(cmd, groups, groups, 1);
-            barrier(
-                vk::PipelineStageFlags::VERTEX_SHADER
-                    | vk::PipelineStageFlags::FRAGMENT_SHADER
-                    | vk::PipelineStageFlags::COMPUTE_SHADER
-                    | vk::PipelineStageFlags::TRANSFER,
-            );
+            if run {
+                dev.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::COMPUTE, self.force);
+                dev.cmd_bind_descriptor_sets(
+                    cmd,
+                    vk::PipelineBindPoint::COMPUTE,
+                    self.sim_pipeline_layout,
+                    0,
+                    &[self.sim_sets[1]],
+                    &[],
+                );
+                push(self.reset as u32);
+                dev.cmd_dispatch(cmd, groups, groups, 1);
+                barrier(
+                    vk::PipelineStageFlags::VERTEX_SHADER
+                        | vk::PipelineStageFlags::FRAGMENT_SHADER
+                        | vk::PipelineStageFlags::COMPUTE_SHADER
+                        | vk::PipelineStageFlags::TRANSFER,
+                );
+            }
             // A 4x4 block round the focus, for the rain's sound next frame.
             let copy = [vk::BufferImageCopy::default()
                 .image_subresource(vk::ImageSubresourceLayers {
@@ -1862,34 +1901,35 @@ impl Sky {
         let dev = &gpu.device;
         let k = self.history();
         let set = self.draw_sets[k];
-        for (name, fb, pass, pipeline, w) in [
+        let stride = crate::gpu_consts::cloud_march::STRIDE;
+        for (name, fb, pass, pipeline, (w, h)) in [
             (
                 "clouds.march",
-                self.target_fbs[MARCH_HALF],
+                self.target_fbs[MARCH_PART],
                 self.march_pass,
                 self.march_pipeline,
-                w.div_ceil(2),
+                (w.div_ceil(stride), h.div_ceil(stride)),
             ),
             (
                 "clouds.fill",
                 self.target_fbs[0],
                 self.march_pass,
                 self.fill_pipeline,
-                w,
+                (w, h),
             ),
             (
                 "clouds.resolve",
                 self.target_fbs[1 + k],
                 self.resolve_pass,
                 self.resolve_pipeline,
-                w,
+                (w, h),
             ),
         ] {
             time(Some(name));
             // SAFETY: the renderer calls `record_march` with its recording `cmd`, outside any
             // render pass, after `resize` (`w` > 0); each framebuffer was made for the pass it
-            // is paired with at the size it is drawn at (`MARCH_HALF` half as wide as
-            // `march_size`), the render area, and each pass is ended in this block.
+            // is paired with at the size it is drawn at (`MARCH_PART` `STRIDE` times smaller
+            // each way than `march_size`), the render area, and each pass is ended in this block.
             unsafe {
                 dev.cmd_begin_render_pass(
                     cmd,
@@ -1942,6 +1982,10 @@ impl Sky {
             }
             time(None);
         }
+        time(Some("clouds.reach"));
+        self.reach
+            .record(gpu, cmd, self.draw_pipeline_layout, [scene_set, set]);
+        time(None);
     }
 
     /// Rain falling round the camera when zoomed in: inside `scene_over`, depth-tested.
@@ -1992,6 +2036,10 @@ impl Sky {
                 &[],
             );
             dev.cmd_draw(cmd, 3, 1, 0, 0);
+            if self.flashes.iter().any(|f| f.bolt.is_some()) {
+                dev.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.bolts_pipeline);
+                dev.cmd_draw(cmd, 3, 1, 0, 0);
+            }
         }
     }
 
@@ -2011,12 +2059,14 @@ impl Sky {
                 self.fill_pipeline,
                 self.resolve_pipeline,
                 self.composite_pipeline,
+                self.bolts_pipeline,
                 self.rain_pipeline,
             ] {
                 dev.destroy_pipeline(p, None);
             }
             self.columns.destroy(gpu);
             self.light.destroy(gpu);
+            self.reach.destroy(gpu);
             for m in self.modules {
                 dev.destroy_shader_module(m, None);
             }
@@ -2232,8 +2282,8 @@ mod shots {
             // SKY_STIR: a jet flying west to east through the view, a blast at the focus.
             let stir = std::env::var("SKY_STIR").is_ok();
             let mut sums: Vec<f32> = Vec::new();
-            // Each timed scope's sum over the last 20 frames (SKY_SCOPES).
-            let mut scope_sums: Vec<(&str, f32)> = Vec::new();
+            // Each timed scope's times over the last 20 frames (SKY_SCOPES).
+            let mut scope_times: Vec<(&str, Vec<f32>)> = Vec::new();
             let mut previous: Option<Vec<u8>> = None;
             // SKY_PAN: metres a second the camera scrolls east, as a player would.
             let pan: f32 = std::env::var("SKY_PAN")
@@ -2365,9 +2415,9 @@ mod shots {
                 }
                 if i + 20 >= frames {
                     for s in &renderer.stats.gpu_scopes {
-                        match scope_sums.iter_mut().find(|(n, _)| *n == s.name) {
-                            Some((_, sum)) => *sum += s.ms,
-                            None => scope_sums.push((s.name, s.ms)),
+                        match scope_times.iter_mut().find(|(n, _)| *n == s.name) {
+                            Some((_, times)) => times.push(s.ms),
+                            None => scope_times.push((s.name, vec![s.ms])),
                         }
                     }
                     for (k, (_, ms)) in renderer.stats.gpu_passes.iter().enumerate() {
@@ -2396,14 +2446,19 @@ mod shots {
                 frames,
                 started.elapsed()
             );
-            // SKY_SCOPES: every timed scope of the last frame, with its draw statistics
-            // when MERIDIAN_GPU_STATS=1 (renderer/gpu_timers.rs).
+            // SKY_SCOPES: every timed scope, its median over the last 20 frames (other
+            // work on the GPU comes in bursts, which a mean takes in) and its fastest,
+            // with the last frame's draw statistics when MERIDIAN_GPU_STATS=1
+            // (renderer/gpu_timers.rs).
             if std::env::var("SKY_SCOPES").is_ok() {
                 for s in &renderer.stats.gpu_scopes {
-                    let ms = scope_sums
-                        .iter()
-                        .find(|(n, _)| *n == s.name)
-                        .map_or(s.ms, |(_, sum)| sum / 20.0);
+                    let (ms, fastest) = scope_times.iter_mut().find(|(n, _)| *n == s.name).map_or(
+                        (s.ms, s.ms),
+                        |(_, times)| {
+                            times.sort_by(f32::total_cmp);
+                            (times[times.len() / 2], times[0])
+                        },
+                    );
                     let stats = s.stats.as_ref().map_or(String::new(), |d| {
                         format!(
                             " tris {} verts {} frags {}",
@@ -2411,10 +2466,11 @@ mod shots {
                         )
                     });
                     println!(
-                        "{name}:   {}{} {:.2} ms{stats}",
+                        "{name}:   {}{} {:.2} ms (fastest {:.2}){stats}",
                         "  ".repeat(s.depth as usize),
                         s.name,
-                        ms
+                        ms,
+                        fastest
                     );
                 }
             }

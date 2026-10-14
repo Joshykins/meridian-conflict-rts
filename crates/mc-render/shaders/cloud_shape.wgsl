@@ -411,11 +411,10 @@ fn cloud_shape(p: vec3<f32>, at: ColumnAt, c0: vec4<f32>, detail: f32, grey: boo
 
 // How far under the cloud base the volume starts, metres.
 const LIGHT_BELOW: f32 = 300.0;
-// How far toward the sun the light is tapped at the sample itself, metres (two
-// taps, the second twice the first): the light changes fastest across a cloud's
-// sunlit face and the gaps beside it, and read from the volume alone it was blurred
-// over a texel or two, the lumps and the shreds lit flat.
-const SUN_NEAR: f32 = 210.0;
+// How far toward the sun the light is tapped at the sample itself, metres: the
+// light changes fastest across a cloud's sunlit face, and read from the volume
+// alone it was blurred over a texel or two, the lumps lit flat.
+const SUN_NEAR: f32 = 70.0;
 // The light scattered once, then many times, approximated by ever-softer octaves
 // (Hillaire 2016): each sees this share of the cloud in the way.
 const LIGHT_OCTAVES: vec3<f32> = vec3<f32>(1.0, 0.3, 0.06);
@@ -428,14 +427,14 @@ fn light_span() -> vec2<f32> {
 }
 
 // The optical depth toward the sun from `p` through the coarse cloud, over the
-// kilometre past `SUN_NEAR`: two taps, the second twice the first, so a cloud's
-// far side sits in its own shade.
+// kilometre past `SUN_NEAR`: three taps, each twice as long as the last, so a
+// cloud's far side sits in its own shade.
 fn sun_taps(p: vec3<f32>) -> f32 {
     let sun = globals.sun.xyz;
     var tau = 0.0;
     var reach = 0.0;
-    for (var k = 0; k < 2; k++) {
-        let seg = SUN_NEAR * 4.0 / 3.0 * exp2(f32(k));
+    for (var k = 1; k < 4; k++) {
+        let seg = SUN_NEAR * exp2(f32(k));
         tau += cloud_at(p + sun * (reach + seg * 0.5), 0.0).sigma * seg;
         reach += seg;
     }
@@ -443,13 +442,16 @@ fn sun_taps(p: vec3<f32>) -> f32 {
 }
 
 // How much sunlight reaches `p` through the coarse cloud, at each octave
-// (`LIGHT_OCTAVES`), past `tau` more of the cloud's own in the way: a tap over the
-// first `SUN_NEAR` metres, then the light volume from there. Off its ground (cloud
-// far out over the horizon, a few texels on screen) the volume's taps themselves.
-fn sun_through(p: vec3<f32>, tau: f32) -> vec3<f32> {
+// (`LIGHT_OCTAVES`): a tap over the first `SUN_NEAR` metres (if `near_tap`; behind
+// enough cloud that little of what is lit shows, the volume alone), then the light
+// volume from there. Off its ground (cloud far out over the horizon, a few texels on
+// screen) the volume's taps themselves.
+fn sun_through(p: vec3<f32>, near_tap: bool) -> vec3<f32> {
     let sun = globals.sun.xyz;
-    let near = tau + (cloud_at(p + sun * (SUN_NEAR / 6.0), 0.0).sigma
-        + cloud_at(p + sun * (SUN_NEAR * 2.0 / 3.0), 0.0).sigma * 2.0) * SUN_NEAR / 3.0;
+    var near = 0.0;
+    if near_tap {
+        near = cloud_at(p + sun * (SUN_NEAR * 0.5), 0.0).sigma * SUN_NEAR;
+    }
     let q = p + sun * SUN_NEAR;
     let rect = columns_rect(false);
     let uv = (q.xy - rect.xy) / rect.zw;
