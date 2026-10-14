@@ -98,6 +98,19 @@ pub(super) const QUARRY_FLOOR: f64 = 4.0;
 /// The ramp down into it: from the rim to the floor.
 pub(super) const QUARRY_RAMP: (P, P) = ((7_000.0, 3_700.0), (7_000.0, 3_380.0));
 
+/// The island's mountains: each massif's middle, reach and peak. Their
+/// outlines are warped and their faces ridged and eroded, and the design's
+/// roads keep valleys through them.
+const MASSIFS: [(P, f64, f64); 7] = [
+    ((2_050.0, 2_750.0), 1_150.0, 290.0),
+    ((3_950.0, 1_950.0), 1_300.0, 380.0),
+    ((5_450.0, 2_500.0), 1_050.0, 330.0),
+    ((6_650.0, 1_800.0), 850.0, 240.0),
+    ((1_350.0, 4_300.0), 700.0, 160.0),
+    ((4_750.0, 4_150.0), 600.0, 110.0),
+    ((7_150.0, 5_700.0), 450.0, 90.0),
+];
+
 /// The cays: middle, radius, height.
 pub(super) const ISLANDS: [(P, f64, f64); 3] = [
     ((2_500.0, 7_380.0), 380.0, 7.0),
@@ -130,16 +143,16 @@ impl Terrain {
         let run = 150.0 + 150.0 * beach;
         let sand = 3.0 * smoothstep(0.0, run, d).powf(0.8);
         let inland = smoothstep(run * 0.8, run + 420.0, d);
+        // The low country above the sand: green from about 12 m, rolling.
         let roll = self.cont.fbm(x / 1_100.0, y / 1_100.0, 4, 0.5);
-        let hills = smoothstep(5_200.0, 3_200.0, y)
-            * smoothstep(200.0, 1_400.0, d)
-            * (16.0 + 22.0 * self.ridge.fbm(x / 1_500.0, y / 1_500.0, 3, 0.5).abs());
-        let mut h = sand + inland * (7.0 + 4.0 * roll) + hills;
+        let swale = self.mtn_height.fbm(x / 420.0, y / 420.0, 3, 0.5);
+        let mut h = sand + inland * (13.0 + 6.0 * roll + 3.5 * swale);
         h += 1.2 * self.detail.fbm(x / 140.0, y / 140.0, 2, 0.5) * inland;
+        h += self.vl_mountains(p, d);
         // The town on its slope up from the quay.
         let ((tx, ty), rx, ry) = TOWN;
         let town = 1.0 - smoothstep(0.75, 1.15, ((x - tx) / rx).hypot((y - ty) / ry));
-        let town_z = 4.0 + (6_500.0 - y).max(0.0) * 0.007;
+        let town_z = 5.0 + (6_500.0 - y).max(0.0) * 0.016;
         h += (town_z - h) * town;
         // The quay's sheer wall at the harbour.
         h += (town_z.min(4.0) - h) * quayness(p) * (1.0 - smoothstep(0.0, 120.0, d));
@@ -154,13 +167,56 @@ impl Terrain {
         // The rise the guns are dug into.
         h += 12.0 * bump(dist(p, RISE) / 260.0);
         // The spaceport's plateau.
+        // The spaceport's plateau: a rounded table, its edge wandering.
         let ((px, py), hx, hy) = PLATEAU;
-        let out = ((x - px).abs() - hx)
-            .max(0.0)
-            .hypot(((y - py).abs() - hy).max(0.0));
-        h += (PLATEAU_Z - h) * (1.0 - smoothstep(0.0, 420.0, out));
+        let e = (((x - px) / hx).powi(4) + ((y - py) / hy).powi(4)).powf(0.25);
+        let out = (e - 1.0) * hx.min(hy) + 70.0 * self.crag.fbm(x / 500.0 + 8.0, y / 500.0, 3, 0.5);
+        h += (PLATEAU_Z - h) * (1.0 - smoothstep(0.0, 380.0, out));
         let h = self.vl_river(p, h);
         self.vl_quarry(p, h)
+    }
+
+    /// How much the mountains raise `p`, `d` metres inland: the massifs'
+    /// warped cones, ridged and eroded, kept off the coast, the design's roads,
+    /// the plateau, the quarry and the town.
+    pub(super) fn vl_mountains(&self, p: P, d: f64) -> f64 {
+        let (x, y) = p;
+        let (wx, wy) = (
+            self.warp_x.get(x / 1_800.0, y / 1_800.0) * 520.0,
+            self.warp_y.get(x / 1_800.0, y / 1_800.0) * 520.0,
+        );
+        let q = (x + wx, y + wy);
+        let mut mass = 0.0_f64;
+        for (c, r, peak) in MASSIFS {
+            let t = (dist(q, c) / r).min(1.0);
+            mass = mass.max(peak * (1.0 - t).powf(1.6));
+        }
+        if mass <= 0.0 {
+            return 0.0;
+        }
+        let ridges = self.mtn.ridged(q.0 / 1_100.0, q.1 / 1_100.0, 5, 0.5);
+        let crags = self.crag.fbm(q.0 / 300.0, q.1 / 300.0, 3, 0.5);
+        // Foothills everywhere inland, the massifs over them.
+        let foot = 28.0
+            * self
+                .ridge
+                .ridged(q.0 / 700.0 + 4.0, q.1 / 700.0 - 9.0, 4, 0.5)
+                .powf(1.5);
+        let mut m = mass * (0.3 + 0.8 * ridges) + foot + 8.0 * crags * smoothstep(20.0, 80.0, mass);
+        m +=
+            0.5 * self.erosion.at(x + ORIGIN, y + ORIGIN).max(-40.0) * smoothstep(10.0, 60.0, mass);
+        let keep = smoothstep(120.0, 1_000.0, d)
+            * smoothstep(130.0, 950.0, super::plan::design_road_distance(p)).powf(0.8)
+            * smoothstep(QUARRY.1 + 150.0, QUARRY.1 + 650.0, dist(p, QUARRY.0))
+            * smoothstep(250.0, 1_000.0, dist(p, PLATEAU.0))
+            * smoothstep(250.0, 650.0, dist(p, TOWN.0) - TOWN.1)
+            * smoothstep(
+                100.0,
+                900.0,
+                river_distance(p).min(dist(p, LAGOON.0) - LAGOON.1),
+            )
+            .powf(0.8);
+        m.max(0.0) * keep
     }
 
     /// The sea floor `d` metres out: white sand shelving off the beach, the
@@ -178,8 +234,10 @@ impl Terrain {
         // From the waterline down: no lip at the shore.
         let flat =
             -0.15 - 3.0 * smoothstep(0.0, bank, d).powf(0.6) + ripple * smoothstep(0.0, 40.0, d);
-        let deep = -(38.0 + 20.0 * self.tilt.fbm(p.0 / 2_400.0, p.1 / 2_400.0, 3, 0.5).abs());
-        let mut h = (flat + (deep - flat) * smoothstep(bank, bank + 300.0, d)).min(-0.4);
+        // Past the reef's edge the floor drops away to the ocean's deep blue.
+        let deep = -(70.0 + 30.0 * self.tilt.fbm(p.0 / 2_400.0, p.1 / 2_400.0, 3, 0.5).abs())
+            - 0.02 * (d - bank).max(0.0);
+        let mut h = (flat + (deep - flat) * smoothstep(bank, bank + 260.0, d)).min(-0.4);
         // The harbour's approach dredged deep.
         let ((hl, hl_y), (hh, _)) = HARBOUR;
         if p.0 > hl - 60.0 && p.0 < hh + 60.0 && p.1 > hl_y {
@@ -189,11 +247,14 @@ impl Terrain {
         for &(c, r, top) in &ISLANDS {
             let wob = 1.0 + 0.2 * self.coast.fbm(p.0 / 160.0 + c.0, p.1 / 160.0, 3, 0.5);
             let t = dist(p, c) / (r * wob);
-            let shoal = -1.8 * smoothstep(1.0, 2.2, t) - 0.3;
+            // The cay, and the sand shoaling off it out to twice its reach.
             let rise = if t < 1.0 {
                 0.6 + top * (1.0 - t * t)
+            } else if t < 2.2 {
+                // down the shoal, then off its edge into the deep
+                -0.3 - 1.8 * smoothstep(1.0, 1.6, t) - 140.0 * smoothstep(1.6, 2.2, t)
             } else {
-                shoal
+                f64::MIN
             };
             h = h.max(rise);
         }
@@ -204,7 +265,9 @@ impl Terrain {
         let off = (r - ring + wob).abs();
         if r < ring + width + 400.0 {
             let lagoon = -4.5 + 1.2 * self.detail.fbm(p.0 / 90.0, p.1 / 90.0, 2, 0.5);
-            let reef = -0.9 - 2.5 * smoothstep(width, width + 260.0, off);
+            let reef = -0.9
+                - 2.5 * smoothstep(width, width + 200.0, off)
+                - 140.0 * smoothstep(width + 200.0, width + 400.0, off);
             let cay = smoothstep(
                 0.32,
                 0.48,
@@ -217,8 +280,9 @@ impl Terrain {
             h = h.max(a);
         }
         // Deep water off every edge.
-        let e = p.0.min(p.1).min(SIZE - p.0).min(SIZE - p.1);
-        h + (-50.0 - h) * (1.0 - smoothstep(80.0, 420.0, e))
+        let (wx, wy) = (p.0 + ORIGIN, p.1 + ORIGIN);
+        let e = wx.min(wy).min(MAP_SIZE - wx).min(MAP_SIZE - wy);
+        h + (-110.0 - h) * (1.0 - smoothstep(150.0, 900.0, e))
     }
 
     /// The creek's channel and its valley cut into the land, its lagoon, and
@@ -234,7 +298,8 @@ impl Terrain {
                         .fbm(p.0 / 160.0 - 21.0, p.1 / 160.0 + 5.0, 3, 0.5));
         let wind = 10.0 * self.detail.fbm(p.0 / 220.0 + 3.0, p.1 / 220.0, 2, 0.5);
         let d = (river_distance(p) + wind).min(dist(p, lc) - ragged + RIVER_BED);
-        if d > 600.0 {
+        // Past here the valley's sides stand over any land: nothing to cut.
+        if d > 1_200.0 {
             return h;
         }
         let bed = if d < RIVER_BED {
@@ -242,12 +307,17 @@ impl Terrain {
         } else if d < RIVER_BANK {
             -3.2 + 4.2 * smoothstep(RIVER_BED, RIVER_BANK, d)
         } else {
-            1.0 + (d - RIVER_BANK) * 0.06
+            // Up out of the sand quickly: green banks, not beaches, inland.
+            // and the valley's sides steepening away from the water, so the
+            // land meets them on a slope, never at a wall.
+            1.0 + 13.0 * smoothstep(RIVER_BANK, RIVER_BANK + 110.0, d)
+                + (d - RIVER_BANK) * 0.05
+                + 0.0016 * (d - 250.0).max(0.0).powi(2)
         };
         let mut h = h.min(bed);
         // The bridge's abutments: the road held level with the deck's ends.
         for end in [BRIDGE_X - BRIDGE_HALF_SPAN, BRIDGE_X + BRIDGE_HALF_SPAN] {
-            let k = 1.0 - smoothstep(10.0, 70.0, dist(p, (end, ROAD_Y)));
+            let k = 1.0 - smoothstep(10.0, 150.0, dist(p, (end, ROAD_Y)));
             let out = if end < BRIDGE_X {
                 p.0 < end + 4.0
             } else {

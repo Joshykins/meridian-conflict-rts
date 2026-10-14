@@ -258,17 +258,22 @@ impl Terrain {
         };
     }
 
-    /// Whether `p` is farmland: the country south of the coast either side of
-    /// the river, off the hills' woods, the river's banks, the town, the
-    /// spaceport and the quarry.
+    /// Whether `p` is farmland: low, open ground within reach of a road, off
+    /// the mountains, the creek's banks and the set pieces; woods break it up.
     pub(super) fn vl_farmed(&self, p: P) -> bool {
-        let west = p.0 > 1_700.0 && p.0 < 3_100.0 && p.1 > 2_600.0 && p.1 < 5_200.0;
-        let east = p.0 > 3_900.0 && p.0 < 6_000.0 && p.1 > 2_300.0 && p.1 < 4_900.0;
-        if !(west || east) || river_distance(p) < 180.0 {
+        let d = self.vl_inland(p);
+        if d < 350.0 || river_distance(p) < 180.0 || design_road_distance(p) > 700.0 {
+            return false;
+        }
+        if self.vl_mountains(p, d) > 6.0 {
             return false;
         }
         let ((px, py), hx, hy) = PLATEAU;
         if (p.0 - px).abs() < hx + 300.0 && (p.1 - py).abs() < hy + 300.0 {
+            return false;
+        }
+        let ((tx, ty), rx, ry) = super::shape::TOWN;
+        if ((p.0 - tx) / (rx + 200.0)).hypot((p.1 - ty) / (ry + 200.0)) < 1.0 {
             return false;
         }
         if dist(p, QUARRY.0) < QUARRY.1 + 200.0 {
@@ -278,9 +283,25 @@ impl Terrain {
         if (p.0 - cx).abs() < chx + 60.0 && (p.1 - cy).abs() < chy + 60.0 {
             return false;
         }
-        // Woods break the farms up.
-        self.vl_inland(p) > 400.0 && self.forest.fbm(p.0 / 900.0, p.1 / 900.0, 4, 0.5) < 0.0
+        self.forest.fbm(p.0 / 700.0, p.1 / 700.0, 4, 0.5) < 0.05
     }
+}
+
+/// Distance from `p` to the nearest of the design's country roads (not the
+/// town's streets): the valleys the mountains keep open.
+pub(super) fn design_road_distance(p: P) -> f64 {
+    [
+        COAST_WEST,
+        COAST_EAST,
+        SOUTH_WEST,
+        SOUTH_EAST,
+        HARBOUR_ROAD,
+        QUARRY_ROAD,
+    ]
+    .iter()
+    .flat_map(|line| line.windows(2))
+    .map(|w| super::super::siege::grid::dist_to_segment(p, w[0], w[1]))
+    .fold(f64::MAX, f64::min)
 }
 
 /// An upright rectangle round `c`.

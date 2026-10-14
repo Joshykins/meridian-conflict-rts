@@ -97,8 +97,8 @@ pub enum Layout {
     /// "Vela": the campaign's first mission on the ocean colony (see
     /// `vela.rs`): a coast road from a beach to the town of Port Calder, its
     /// spaceport on the plateau behind and the quarry beside it; farms,
-    /// woods and islands round them. Not mirrored. Two starts: the beach,
-    /// then the spaceport. Exactly 8 km.
+    /// woods and islands round them, open ocean round the island. Not
+    /// mirrored. Two starts: the beach, then the spaceport. Exactly 12 km.
     Vela,
 }
 
@@ -393,11 +393,11 @@ impl BakeParams {
         }
         if self.layout == Layout::Vela
             && (self.players != 2
-                || (self.tiles_w as i32 * TILE_SIZE_M) as f64 != vela::SIZE
+                || (self.tiles_w as i32 * TILE_SIZE_M) as f64 != vela::MAP_SIZE
                 || self.tiles_h != self.tiles_w)
         {
             return Err(MapError::Invalid(
-                "the Vela layout has exactly 2 starts (the beach and the spaceport) on an 8 km map"
+                "the Vela layout has exactly 2 starts (the beach and the spaceport) on a 12 km map"
                     .into(),
             ));
         }

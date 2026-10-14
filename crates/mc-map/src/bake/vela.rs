@@ -1,6 +1,6 @@
 //! "Vela": the campaign's first mission, The Contract, on the ocean colony.
 //!
-//! [`Layout::Vela`], 8 km. The sea lies along the north and the west. The
+//! [`Layout::Vela`], 12 km: one island in the middle of the ocean. The
 //! Company lands on a beach in the north-west and drives east along the coast
 //! road, past the junction where the planetary defence force meets it, over a
 //! ridge and down to the bridge across the river, with guns dug into the rise
@@ -30,15 +30,29 @@ mod tests;
 
 use shape::{PLATEAU, QUARRY};
 
-/// The map's side, metres.
+/// The island's design square, metres: every place in this layout is given in
+/// it. The map is bigger, the design square in its middle, open ocean round it.
 pub(super) const SIZE: f64 = 8_192.0;
+/// The map's side, metres, and where the design square's corner lies on it.
+pub(super) const MAP_SIZE: f64 = 12_288.0;
+pub(super) const ORIGIN: f64 = (MAP_SIZE - SIZE) / 2.0;
+
+/// A point on the map, in the design square.
+pub(super) fn design(p: P) -> P {
+    (p.0 - ORIGIN, p.1 - ORIGIN)
+}
+
+/// A point in the design square, on the map.
+fn on_map(p: P) -> P {
+    (p.0 + ORIGIN, p.1 + ORIGIN)
+}
 
 /// Where the coast road crosses the river, on the bridge.
 pub(super) const ROAD_Y: f64 = 5_600.0;
 pub(super) const BRIDGE_X: f64 = 3_380.0;
 pub(super) const BRIDGE_HALF_SPAN: f64 = crate::city::COLONY_BRIDGE_M as f64 / 2.0;
 /// The bridge's road over the river's zero.
-pub(super) const DECK_TOP: f64 = 9.0;
+pub(super) const DECK_TOP: f64 = 12.0;
 
 /// The starts: the beach landing zone, then the spaceport's apron.
 pub(super) const BEACH_START: P = (1_320.0, 5_940.0);
@@ -93,17 +107,23 @@ const LOT_EASE: f64 = 18.0;
 impl Terrain {
     pub(super) fn setup_vela(&mut self) {
         self.start_outer = 2.0 * START_CORE;
+        // The mountains' water erosion first: the plan levels its lots to the
+        // eroded land.
+        self.erode_alpine();
         let g = BUILD_CELL_M as f64;
         let snap = |p: P| ((p.0 / g).round() * g, (p.1 / g).round() * g);
-        let starts = [snap(BEACH_START), snap(PORT_START)];
+        let starts = [snap(on_map(BEACH_START)), snap(on_map(PORT_START))];
         self.pads = starts
             .iter()
-            .map(|&(x, y)| Pad {
-                x,
-                y,
-                core: START_CORE,
-                outer: 2.0 * START_CORE,
-                height: self.vela_land(x, y),
+            .map(|&(x, y)| {
+                let (dx, dy) = design((x, y));
+                Pad {
+                    x,
+                    y,
+                    core: START_CORE,
+                    outer: 2.0 * START_CORE,
+                    height: self.vela_land(dx, dy),
+                }
             })
             .collect();
         self.starts = starts.to_vec();
@@ -114,6 +134,7 @@ impl Terrain {
 
     /// The ground with the plan cut in: each lot's ground levelled to it.
     pub(super) fn natural_vela(&self, x: f64, y: f64) -> f64 {
+        let (x, y) = design((x, y));
         let h = self.vela_land(x, y);
         let h = if shape::in_harbour((x, y)) {
             h.min(-6.0)
@@ -168,8 +189,10 @@ impl Terrain {
         if shape::beachness(p) > 0.2 && self.vl_inland(p) < 380.0 {
             return (0.0, 0.0);
         }
+        // Off the plateau's table, its rounded outline the land's own.
         let ((px, py), hx, hy) = PLATEAU;
-        if (x - px).abs() < hx + 100.0 && (y - py).abs() < hy + 100.0 {
+        let e = (((x - px) / hx).powi(4) + ((y - py) / hy).powi(4)).powf(0.25);
+        if e + 0.12 * self.crag.fbm(x / 500.0 + 8.0, y / 500.0, 3, 0.5) < 1.05 {
             return (0.0, 0.0);
         }
         if dist(p, QUARRY.0) < QUARRY.1 + 60.0 {
@@ -197,7 +220,9 @@ impl Terrain {
         let creek = 1.0 - smoothstep(40.0, 160.0, shape::river_distance(p));
         let density = (strand * 0.45 + inland * (0.4 + 0.6 * jungle) * (1.0 - 0.7 * clearing))
             .max(0.8 * creek)
-            * (1.0 - smoothstep(0.35, 0.6, slope));
+            * (1.0 - smoothstep(0.35, 0.6, slope))
+            // Thinning out up the mountains to bare rock and scrub on the tops.
+            * (1.0 - 0.85 * smoothstep(140.0, 260.0, height));
         let palms = (1.0 - inland) + inland * 0.2;
         (density * open, palms.clamp(0.0, 1.0))
     }
@@ -252,7 +277,7 @@ impl Terrain {
         let mut out = Vec::with_capacity(n * n * 4);
         for j in 0..n {
             for i in 0..n {
-                let p = (x0 + i as f64 * cell, y0 + j as f64 * cell);
+                let p = design((x0 + i as f64 * cell, y0 + j as f64 * cell));
                 out.extend(self.vela_street(p).bytes());
             }
         }
@@ -319,7 +344,7 @@ impl Terrain {
             |a: f64| Angle((a / std::f64::consts::TAU * 65536.0).rem_euclid(65536.0) as u16);
         let prop = |kind, at: P, heading, scale: f64| crate::format::Prop {
             kind,
-            pos: FxVec2::new(fx(at.0), fx(at.1)),
+            pos: FxVec2::new(fx(at.0 + ORIGIN), fx(at.1 + ORIGIN)),
             heading: angle(heading),
             scale_milli: (scale * 1000.0).round() as u16,
             wear_milli: 0,
@@ -337,8 +362,14 @@ impl Terrain {
         use mc_core::{Fx, FxVec2};
         let fx = |v: f64| Fx((v * 65_536.0).round() as i64);
         vec![crate::deck::Deck {
-            a: FxVec2::new(fx(BRIDGE_X - BRIDGE_HALF_SPAN), fx(ROAD_Y)),
-            b: FxVec2::new(fx(BRIDGE_X + BRIDGE_HALF_SPAN), fx(ROAD_Y)),
+            a: FxVec2::new(
+                fx(BRIDGE_X - BRIDGE_HALF_SPAN + ORIGIN),
+                fx(ROAD_Y + ORIGIN),
+            ),
+            b: FxVec2::new(
+                fx(BRIDGE_X + BRIDGE_HALF_SPAN + ORIGIN),
+                fx(ROAD_Y + ORIGIN),
+            ),
             half: fx(crate::city::COLONY_BRIDGE_HALF_M as f64),
             top: fx(DECK_TOP),
         }]

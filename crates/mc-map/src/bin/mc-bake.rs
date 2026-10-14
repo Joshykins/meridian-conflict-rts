@@ -17,7 +17,7 @@
 //! mc-bake --layout spires --size-km 12 --seed 17 --name "Thousand Spires" -o maps/thousand_spires.mcmap
 //! mc-bake --layout harvest --size-km 24 --seed 41 --name "The Last Harvest" -o maps/last_harvest.mcmap
 //! mc-bake --layout rimehold --size-km 20 --seed 43 --name "Rimehold" -o maps/rimehold.mcmap
-//! mc-bake --layout vela --size-km 8 --seed 5 --name "Vela" -o maps/vela.mcmap
+//! mc-bake --layout vela --size-km 12 --seed 5 --name "Vela" -o maps/vela.mcmap
 //! ```
 //!
 //! Every layout but the survival and siege ones (each lays its own with its plan) is then
@@ -90,8 +90,8 @@ usage: mc-bake -o <file.mcmap> [options]
                    sites; 4 defender starts and the Heart's; exactly 20 km
                    vela: \"Vela\", the campaign's first mission: a coast road
                    from a beach to Port Calder, its spaceport and quarry,
-                   farms and islands; 2 starts (the beach, the spaceport);
-                   exactly 8 km
+                   farms and islands, open ocean round them; 2 starts (the
+                   beach, the spaceport); exactly 12 km
   --players <n>    start positions, 1-32 (default: 2 up to 8 km, 4 up to 24 km,
                    else 8; islands and alpine: always 2; the 8-player layouts
                    take exactly 8, crosswater and antarctic 4, tripoint 3, siege
@@ -237,8 +237,8 @@ fn parse_args() -> Result<Args, String> {
     if args.layout == Layout::Vela && args.players.is_some_and(|n| n != 2) {
         return Err("--layout vela has exactly 2 starts (--players 2)".into());
     }
-    if args.layout == Layout::Vela && args.size_km != 8 {
-        return Err("--layout vela is exactly 8 km (--size-km 8)".into());
+    if args.layout == Layout::Vela && args.size_km != 12 {
+        return Err("--layout vela is exactly 12 km (--size-km 12)".into());
     }
     if args.layout == Layout::Threshold && args.players.is_some_and(|n| n != 4) {
         return Err("--layout threshold has exactly 4 starts (--players 4)".into());

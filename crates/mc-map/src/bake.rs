@@ -1438,5 +1438,5 @@ mod test_maps {
     pub(super) static RIMEHOLD: LazyLock<Terrain> =
         LazyLock::new(|| Terrain::new(&BakeParams::rimehold("t", 10, 43)));
     pub(super) static VELA: LazyLock<Terrain> =
-        LazyLock::new(|| Terrain::new(&BakeParams::vela("t", 4, 5)));
+        LazyLock::new(|| Terrain::new(&BakeParams::vela("t", 6, 5)));
 }

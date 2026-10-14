@@ -1,6 +1,16 @@
 use super::shape::{in_harbour, ATOLL, HARBOUR, ISLANDS};
 use super::*;
 use crate::bake::test_maps::VELA;
+use crate::bake::Terrain;
+
+/// The ground at design point (x, y).
+fn height(t: &Terrain, x: f64, y: f64) -> f64 {
+    t.height(x + ORIGIN, y + ORIGIN)
+}
+
+fn slope(t: &Terrain, x: f64, y: f64) -> f64 {
+    t.slope(x + ORIGIN, y + ORIGIN)
+}
 
 /// Every building stands on ground cut level to it (fences follow the land).
 #[test]
@@ -14,7 +24,7 @@ fn lots_stand_on_level_ground() {
         .filter(|l| l.kind != PropKind::ColonyFence)
     {
         for p in lot.rect.corners().into_iter().chain([lot.rect.c]) {
-            let off = (t.height(p.0, p.1) - lot.level).abs();
+            let off = (height(t, p.0, p.1) - lot.level).abs();
             if off > worst.0 {
                 worst = (off, p, lot.kind);
             }
@@ -65,9 +75,9 @@ fn roads_are_dry_and_drivable() {
             if on_bridge {
                 continue;
             }
-            let h = t.height(p.0, p.1);
+            let h = height(t, p.0, p.1);
             assert!(h > 0.5, "a road is under water at {p:?} ({h:.1} m)");
-            let slope = t.slope(p.0, p.1);
+            let slope = slope(t, p.0, p.1);
             assert!(slope < 0.2, "a road climbs {slope:.2} at {p:?}");
         }
     }
@@ -78,14 +88,14 @@ fn roads_are_dry_and_drivable() {
 fn the_bridge_lands_on_the_road() {
     let t = &*VELA;
     for x in [BRIDGE_X - BRIDGE_HALF_SPAN, BRIDGE_X + BRIDGE_HALF_SPAN] {
-        let h = t.height(x, ROAD_Y);
+        let h = height(t, x, ROAD_Y);
         assert!(
             (h - DECK_TOP).abs() < 0.6,
             "the bridge's end at x {x} stands on {h:.2} m"
         );
     }
     assert!(
-        t.height(BRIDGE_X, ROAD_Y) < -1.0,
+        height(t, BRIDGE_X, ROAD_Y) < -1.0,
         "no river under the bridge"
     );
 }
@@ -99,27 +109,28 @@ fn the_coast_is_where_the_script_wants_it() {
     let mid = ((lo.0 + hi.0) / 2.0, (lo.1 + hi.1) / 2.0);
     assert!(in_harbour(mid));
     assert!(
-        t.height(mid.0, mid.1) < -3.0,
+        height(t, mid.0, mid.1) < -3.0,
         "the harbour is dry: {:.1}",
-        t.height(mid.0, mid.1)
+        height(t, mid.0, mid.1)
     );
     for (c, _, _) in ISLANDS {
         assert!(
-            t.height(c.0, c.1) > 2.0,
+            height(t, c.0, c.1) > 2.0,
             "the island at {c:?} is under water"
         );
     }
-    assert!(t.height(BEACH_START.0, BEACH_START.1) > 1.0);
+    assert!(height(t, BEACH_START.0, BEACH_START.1) > 1.0);
     // The atoll's lagoon is shallow water, and the sea off the island deep.
     let (c, _, _) = ATOLL;
-    let lagoon = t.height(c.0, c.1);
+    let lagoon = height(t, c.0, c.1);
     assert!(
         (-7.0..-1.0).contains(&lagoon),
         "the lagoon is {lagoon:.1} m"
     );
     assert!(
-        t.height(4_000.0, 120.0) < -20.0,
-        "the sea south of the island is shallow"
+        height(t, 4_000.0, -400.0) < -40.0,
+        "the sea south of the island is shallow: {:.1} m",
+        height(t, 4_000.0, -400.0)
     );
 }
 
@@ -138,5 +149,41 @@ fn the_set_pieces_stand() {
         count(PropKind::ColonyTower),
         1,
         "the ops tower over the square"
+    );
+}
+
+/// No wall anywhere on the island: the land never drops more than two and a
+/// half times what it runs across 16 m, but at the quarry's cut benches and the bridge's abutments.
+#[test]
+fn the_land_has_no_walls() {
+    let t = &*VELA;
+    let (q, r) = super::shape::QUARRY;
+    let mut worst = (0.0_f64, (0.0, 0.0));
+    let mut y = 40.0;
+    while y < SIZE - 40.0 {
+        let mut x = 40.0;
+        while x < SIZE - 40.0 {
+            let p = (x, y);
+            let near_bridge =
+                (x - BRIDGE_X).abs() < BRIDGE_HALF_SPAN + 160.0 && (y - ROAD_Y).abs() < 160.0;
+            if dist(p, q) > r + 40.0 && !near_bridge && height(t, x, y) > 0.0 {
+                let h = height(t, x, y);
+                let drop = [(16.0, 0.0), (0.0, 16.0)]
+                    .iter()
+                    .map(|&(dx, dy)| (height(t, x + dx, y + dy) - h).abs() / 16.0)
+                    .fold(0.0, f64::max);
+                if drop > worst.0 {
+                    worst = (drop, p);
+                }
+            }
+            x += 24.0;
+        }
+        y += 24.0;
+    }
+    assert!(
+        worst.0 < 2.5,
+        "a wall: the land drops {:.2} per metre at {:?}",
+        worst.0,
+        worst.1
     );
 }
