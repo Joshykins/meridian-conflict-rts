@@ -19,7 +19,8 @@
 use crate::spatial::kind;
 use crate::tables::*;
 use crate::World;
-use mc_core::Fx;
+use mc_core::fx::isqrt as isqrt_u128;
+use mc_core::{Fx, FxVec2};
 use mc_data::cat;
 
 /// How far a fighter looks first for a mark (`air_spread_pick`), metres; each look
@@ -37,6 +38,12 @@ const SCRAMBLE_PROBE: Fx = Fx::from_int(48);
 const PICK_BUDGET: usize = 48;
 
 const END: u32 = u32::MAX;
+
+/// `d`'s length squared, exactly (`FxVec2::length` is its square root rounded down).
+fn squared(d: FxVec2) -> u128 {
+    let (x, y) = (d.x.0 as i128, d.y.0 as i128);
+    (x * x + y * y) as u128
+}
 
 /// Fighters' picks worked out ahead of the orders (`World::speculate_air_picks`).
 #[derive(Default)]
@@ -77,6 +84,25 @@ enum Stop {
     Weighed,
     /// Those it did not weigh are at least this far.
     Beyond(Fx),
+}
+
+/// Where a search for a mark takes up (`World::spread_from`): nothing weighed yet, or
+/// what a worked-out pick weighed, scored anew.
+struct Resume<'a> {
+    weighed: &'a [Weighed],
+    best: Option<(Fx, usize)>,
+    /// Marks not yet weighed lie further than this.
+    inner: Fx,
+}
+
+impl Default for Resume<'_> {
+    fn default() -> Self {
+        Resume {
+            weighed: &[],
+            best: None,
+            inner: Fx::from_int(-1),
+        }
+    }
 }
 
 /// What a pick worked out ahead weighed, and why it stopped.
@@ -232,49 +258,90 @@ impl World {
         if !self.fires_at_will(row) {
             return None;
         }
+        mc_core::perf_count!("air_picks.spread");
+        self.spread_from(row, mask, reach, Resume::default(), trace)
+    }
+
+    /// `air_spread_pick`'s search, from `from`: the marks weighed already, the best of
+    /// them, and how far out the rest lie.
+    fn spread_from(
+        &self,
+        row: usize,
+        mask: u32,
+        reach: Fx,
+        from: Resume<'_>,
+        trace: &mut Option<&mut Trace>,
+    ) -> Option<usize> {
         let units = &self.state.units;
         let pos = units.pos[row];
         let crowd = self.bp(row).vision / 4;
         let friends = self.team_mask(units.owner[row]);
         // What it may go after further than `inner` and within `r` (and within
-        // `reach` of its edge), with its distance.
+        // `reach` of its edge), by its squared distance (`squared`).
         let within = |inner: Fx, r: Fx| {
-            let mut near: Vec<(Fx, usize)> = Vec::new();
+            let mut near: Vec<(u128, usize)> = Vec::new();
             let kinds = crate::combat::target_kinds(mask);
-            self.index.query_foes(pos, r, kinds, friends, |e| {
-                let t = e.row as usize;
-                // In the ring, `inner < distance <= reach + e.radius`, decided
-                // on the squared length: a wider ring reads the inner ones again.
-                let d = pos - e.pos;
-                if !d.shorter_than(Fx(inner.0 + 1))
-                    && d.shorter_than(Fx(reach.0 + e.radius.0 + 1))
-                    && self.unit_entry_is_current(e)
-                    && self.air_can_harass(row, t)
-                    && self.hittable(t, mask)
-                {
-                    near.push((d.length(), t));
-                }
-                true
-            });
+            self.index
+                .query_foes_ring(pos, inner, r, kinds, friends, |e| {
+                    let t = e.row as usize;
+                    // In the ring, `inner < distance <= reach + e.radius`, decided
+                    // on the squared length: a wider ring reads the inner ones again.
+                    let d = pos - e.pos;
+                    if !d.shorter_than(Fx(inner.0 + 1))
+                        && d.shorter_than(Fx(reach.0 + e.radius.0 + 1))
+                        && !from.weighed.iter().any(|w| w.mark as usize == t)
+                        && self.unit_entry_is_current(e)
+                        && self.air_can_harass(row, t)
+                        && self.hittable(t, mask)
+                    {
+                        near.push((squared(d), t));
+                    }
+                    true
+                });
             near
         };
         // Marks are scored nearest first, and a score is the distance plus some
         // crowd, so once one is further than the best score none after it can
         // win. The search widens a ring at a time only while one could: a
         // fighter near an enemy army looks at its nearest marks, not the army.
-        let mut best: Option<(Fx, usize)> = None;
-        let mut inner = Fx::from_int(-1);
-        let mut radius = SCRAMBLE_PROBE;
-        let mut weighed = 0;
+        let mut best = from.best;
+        let mut inner = from.inner;
+        // Each ring reaches as far again past the last as that one did past its own.
+        let mut step = SCRAMBLE_PROBE;
+        let mut radius = inner.max(Fx::ZERO) + step;
+        let mut weighed = from.weighed.len();
         loop {
             let r = radius.min(reach);
             let last = r >= reach;
-            let mut ring: Vec<(Fx, usize)> = within(inner, r)
+            // `distance <= r`: the length is the square root rounded down.
+            let past = squared(FxVec2::new(Fx(r.0 + 1), Fx::ZERO));
+            let mut ring: Vec<(u128, usize)> = within(inner, r)
                 .into_iter()
-                .filter(|&(d, _)| last || d <= r)
+                .filter(|&(sq, _)| last || sq < past)
+                .collect();
+            mc_core::perf_count!("scramble.candidates", ring.len());
+            // Only as many as the budget has left can be weighed: those nearest, with any
+            // as far as the last of them by the rounded length (the weighing order is by
+            // length, then row). Only these are measured and sorted.
+            let left = PICK_BUDGET - weighed;
+            if ring.len() > left {
+                ring.select_nth_unstable(left - 1);
+                let edge = isqrt_u128(ring[left - 1].0) + 1;
+                let tie = edge * edge;
+                let mut k = left;
+                for i in left..ring.len() {
+                    if ring[i].0 < tie {
+                        ring.swap(k, i);
+                        k += 1;
+                    }
+                }
+                ring.truncate(k);
+            }
+            let mut ring: Vec<(Fx, usize)> = ring
+                .into_iter()
+                .map(|(sq, t)| (Fx(isqrt_u128(sq) as i64), t))
                 .collect();
             ring.sort_unstable();
-            mc_core::perf_count!("scramble.candidates", ring.len());
             for (distance, t) in ring {
                 if best.is_some_and(|(s, _)| distance > s) {
                     if let Some(trace) = trace {
@@ -299,7 +366,7 @@ impl World {
                     best = Some((score, t));
                 }
             }
-            if last {
+            if last || weighed == PICK_BUDGET {
                 break;
             }
             if best.is_some_and(|(s, _)| s <= r) {
@@ -311,7 +378,8 @@ impl World {
                 break;
             }
             inner = r;
-            radius = r * 2;
+            step = step * 2;
+            radius = r + step;
         }
         best.map(|(_, t)| t)
     }
@@ -466,6 +534,22 @@ impl World {
                 if whole {
                     mc_core::perf_count!("air_picks.rescored");
                     return best.map(|(_, t)| t);
+                }
+                // A mark it never weighed could now win: the search goes on from where
+                // it stopped, past what it weighed.
+                if let (Stop::Beyond(beyond), false) = (spec.stop, weighed.is_empty()) {
+                    mc_core::perf_count!("air_picks.resumed");
+                    let mask = self
+                        .bp(row)
+                        .weapons
+                        .iter()
+                        .fold(0u32, |acc, w| acc | w.target_mask);
+                    let from = Resume {
+                        weighed,
+                        best,
+                        inner: Fx(beyond.0 - 1),
+                    };
+                    return self.spread_from(row, mask, self.bp(row).vision, from, &mut None);
                 }
             }
             mc_core::perf_count!("air_picks.again");

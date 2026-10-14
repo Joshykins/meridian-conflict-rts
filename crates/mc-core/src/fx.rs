@@ -260,7 +260,7 @@ impl fmt::Display for Fx {
 
 /// `n.isqrt()`, taken in 64 bits when `n` fits.
 #[inline]
-pub(crate) fn isqrt(n: u128) -> u128 {
+pub fn isqrt(n: u128) -> u128 {
     match u64::try_from(n) {
         Ok(n) => n.isqrt() as u128,
         Err(_) => n.isqrt(),

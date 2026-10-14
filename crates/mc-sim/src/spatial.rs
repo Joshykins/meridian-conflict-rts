@@ -165,10 +165,17 @@ impl Layer {
 
     /// Visits the entries of cells `x0..=x1` by `y0..=y1`; false from `visit` stops.
     #[inline]
+    /// Entries whose centre is within `inner` of `center` may be passed over unvisited
+    /// (a ring query's caller has read them already); `Fx` below zero for none.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "the scan's inputs and its three counters, all used on every entry"
+    )]
     fn scan(
         &self,
         center: FxVec2,
         radius: Fx,
+        inner: Fx,
         skip: PlayerMask,
         tested: &mut u64,
         hits: &mut u64,
@@ -191,11 +198,19 @@ impl Layer {
                 continue;
             }
             let xs = &self.cell_x[a..b];
-            let first = a + xs.partition_point(|&x| x < x0);
-            for (i, e) in self.sorted[first..b].iter().enumerate() {
-                if self.cell_x[first + i] > x1 {
+            let (sx0, sx1) = self.inside(center, inner, cy);
+            let mut j = a + xs.partition_point(|&x| x < x0);
+            while j < b {
+                let cx = self.cell_x[j];
+                if cx > x1 {
                     break;
                 }
+                if (sx0..=sx1).contains(&cx) {
+                    j = a + xs.partition_point(|&x| x <= sx1);
+                    continue;
+                }
+                let e = &self.sorted[j];
+                j += 1;
                 if skip & owner_bit(e.owner) != 0 {
                     continue;
                 }
@@ -210,6 +225,32 @@ impl Layer {
             }
         }
         true
+    }
+
+    /// The columns of row `cy` whose cells lie wholly within `inner` of `center` (less
+    /// a metre), as an inclusive range; empty when none do. Cells on the map's edge
+    /// hold what lies past it too, and are never in it.
+    fn inside(&self, center: FxVec2, inner: Fx, cy: u32) -> (u32, u32) {
+        let none = (1, 0);
+        let inner = inner - Fx::ONE;
+        if inner <= Fx::ZERO || cy == 0 || cy + 1 >= self.height {
+            return none;
+        }
+        let side = Fx::from_int(1 << self.shift);
+        let (lo, hi) = (side * cy as i32, side * (cy as i32 + 1));
+        let fy = (lo - center.y).abs().max((hi - center.y).abs());
+        if fy >= inner {
+            return none;
+        }
+        let w = (inner * inner - fy * fy).sqrt();
+        // Columns whose cells run from at least `center.x - w` to at most `center.x + w`.
+        let first = ((center.x - w) / side).ceil_int().max(1);
+        let last = ((center.x + w) / side).floor_int() - 1;
+        let last = last.min(self.width as i32 - 2);
+        if first > last {
+            return none;
+        }
+        (first as u32, last as u32)
     }
 }
 
@@ -488,6 +529,21 @@ impl SpatialIndex {
         radius: Fx,
         kinds: u8,
         friends: PlayerMask,
+        visit: impl FnMut(&Entry) -> bool,
+    ) {
+        self.query_foes_ring(center, Fx::from_int(-1), radius, kinds, friends, visit);
+    }
+
+    /// [`query_foes`](Self::query_foes) for a caller that has read what lies within
+    /// `inner` already: entries there may be passed over unvisited, whole cells at a
+    /// time. Those it visits come in the order `query_foes` visits them.
+    pub fn query_foes_ring(
+        &self,
+        center: FxVec2,
+        inner: Fx,
+        radius: Fx,
+        kinds: u8,
+        friends: PlayerMask,
         mut visit: impl FnMut(&Entry) -> bool,
     ) {
         let (mut tested, mut hits, mut cells) = (0u64, 0u64, 0i64);
@@ -510,6 +566,7 @@ impl SpatialIndex {
                         if !layer.scan(
                             center,
                             radius,
+                            inner,
                             0,
                             &mut tested,
                             &mut hits,
@@ -531,6 +588,7 @@ impl SpatialIndex {
                 if !layer.scan(
                     center,
                     radius,
+                    inner,
                     friends,
                     &mut tested,
                     &mut hits,
@@ -559,6 +617,7 @@ impl SpatialIndex {
         let floor = BIG_FLOORS
             .iter()
             .rposition(|&floor| Fx::from_int(floor) <= wider_than);
+        let inner = Fx::from_int(-1);
         let (mut tested, mut hits, mut cells) = (0u64, 0u64, 0i64);
         mc_core::perf_count!("spatial.queries");
         let mut keep = |e: &Entry| e.radius <= wider_than || visit(e);
@@ -571,6 +630,7 @@ impl SpatialIndex {
                 if !layer.scan(
                     center,
                     radius,
+                    inner,
                     0,
                     &mut tested,
                     &mut hits,

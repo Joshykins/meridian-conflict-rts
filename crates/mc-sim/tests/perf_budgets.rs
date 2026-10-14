@@ -395,7 +395,9 @@ fn eight_armies_clash() {
 /// With `MERIDIAN_SCALE_SERIAL=1` the tick runs on this thread alone and the
 /// table ends with its CPU time per tick, which a machine busy with other
 /// work barely moves: the number to compare two versions by.
-/// `MERIDIAN_SCALE_TICKS` plays that many ticks of each case instead of 300.
+/// `MERIDIAN_SCALE_TICKS` plays that many ticks of each case instead of 300, and
+/// `MERIDIAN_SCALE_EVERY=N` prints every Nth tick's time, its orders phase and the
+/// units left, to see a fight's course (the approach, the merge, the melee).
 #[test]
 #[ignore]
 fn zz_scale_probe() {
@@ -425,8 +427,26 @@ fn zz_scale_probe() {
             _ => armies(players, total, 900.0, gap(6), Plan::Pile, threads),
         };
         let cpu_before = thread_cpu_ns();
+        let every: u32 = std::env::var("MERIDIAN_SCALE_EVERY").map_or(0, |n| n.parse().unwrap());
         let report = w
-            .perf_ticks(&format!("scale {case}"), ticks, |_, _| Vec::new())
+            .perf_ticks(&format!("scale {case}"), ticks, |t, w| {
+                if every > 0 && t > 0 && t % every == 0 {
+                    let phase = |name| {
+                        w.timings
+                            .phases
+                            .iter()
+                            .find(|(n, _)| *n == name)
+                            .map_or(0.0, |(_, ns)| *ns as f64 / 1e6)
+                    };
+                    println!(
+                        "   tick {t:>4}: {:>7.1} ms, orders {:>7.1}, units {}",
+                        w.timings.total_ns as f64 / 1e6,
+                        phase("orders"),
+                        w.state.units.slots.live()
+                    );
+                }
+                Vec::new()
+            })
             .unwrap();
         println!("{}", report.text());
         if serial {
