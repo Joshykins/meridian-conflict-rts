@@ -26,7 +26,7 @@ use mc_sim::mirror::{
 };
 use mc_sim::tables::{flag, OrderKind};
 use mc_sim::{Command, FireState, Handle, RenderFrame};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Instant;
@@ -202,8 +202,9 @@ pub struct View {
     pub local: u8,
     pub frame: RenderFrame,
     pub status: SimStatus,
-    /// Unit id -> index in `frame.units`.
-    pub index_of: HashMap<u32, usize>,
+    /// Unit id -> index in `frame.units`: filled with 100 000 ids a pull, so hashed the
+    /// quick way (`fast_hash.rs`).
+    pub index_of: crate::fast_hash::IdMap<u32, usize>,
     /// `index_of` and the queues by handle row, and the selection found in the frame
     /// once per pull (`unit_rows.rs`).
     pub rows: crate::unit_rows::Rows,
@@ -263,7 +264,7 @@ impl View {
             local,
             frame: RenderFrame::default(),
             status: SimStatus::default(),
-            index_of: HashMap::new(),
+            index_of: Default::default(),
             rows: Default::default(),
             selection: Default::default(),
             mode: Mode::Normal,
