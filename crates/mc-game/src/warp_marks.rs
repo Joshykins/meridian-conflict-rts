@@ -17,6 +17,7 @@ use crate::hud::{whole, ENERGY};
 use crate::nuke_marks::{dashed, ground_ring, project, surface, tag};
 use crate::orders::Field;
 use crate::ui::{self, ink, palette, rgb, type_scale, Rect, Ui};
+use crate::unit_rows::{UnitList, STUN_SHOWN};
 use glam::{Vec2, Vec3};
 use mc_data::BlueprintId;
 use mc_sim::mirror::{UnitInstance, KIND_GHOST, KIND_PROP, KIND_WRECK};
@@ -238,12 +239,14 @@ fn bolt(ui: &mut Ui, c: Vec2, h: f32, color: ui::Color) {
 /// Stunned units, ours and those we see: a bolt and STUNNED, with the seconds for ours.
 fn stuns(ui: &mut Ui, field: &Field, alpha: f32) {
     let view = field.view;
-    for u in &view.frame.units {
+    // Those stunned now or at the tick before, listed once per pull.
+    for i in view.listed_units(UnitList::Stunned) {
+        let u = &view.frame.units[i];
         if u.owner_flags & (KIND_WRECK | KIND_GHOST | KIND_PROP) != 0 || u.in_warp() {
             continue;
         }
         let k = u.stun(alpha);
-        if k <= 0.01 {
+        if k <= STUN_SHOWN {
             continue;
         }
         let over = at(u, alpha) + Vec3::Z * (u.radius * 0.8 + 6.0);

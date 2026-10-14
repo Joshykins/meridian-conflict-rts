@@ -10,7 +10,8 @@
 //! queues, or of the fuel list), so the answers are always those the slower ways give.
 
 use crate::game::View;
-use mc_sim::mirror::{FuelView, UnitInstance, UnitOrders, KIND_WRECK};
+use mc_sim::mirror::{FuelView, UnitInstance, UnitOrders, KIND_GHOST, KIND_PROP, KIND_WRECK};
+use mc_sim::tables::OrderKind;
 use mc_sim::Handle;
 use std::cell::{Ref, RefCell};
 
@@ -96,6 +97,70 @@ impl Table {
     }
 }
 
+/// Queues the interface looks through every frame for the few that matter: listed once
+/// per pull (`View::listed_queues`).
+#[derive(Clone, Copy)]
+pub enum QueueList {
+    /// Factories forming a batch.
+    Batches = 0,
+    /// Units whose target the ground hides (`line_of_fire.rs`).
+    Hidden = 1,
+    /// Factories and engineers making something, their bar off their queue.
+    Working = 2,
+}
+
+impl QueueList {
+    fn holds(self, q: &UnitOrders) -> bool {
+        match self {
+            QueueList::Batches => q.batch.is_some(),
+            QueueList::Hidden => q.hidden_target.is_some(),
+            QueueList::Working => {
+                q.progress > 0.0
+                    && q.orders.first().is_some_and(|o| {
+                        matches!(
+                            o.kind,
+                            OrderKind::Build
+                                | OrderKind::Produce
+                                | OrderKind::Upgrade
+                                | OrderKind::Assist
+                        )
+                    })
+            }
+        }
+    }
+}
+
+const QUEUE_LISTS: [QueueList; 3] = [QueueList::Batches, QueueList::Hidden, QueueList::Working];
+
+/// Units the interface looks through every frame for the few that matter: listed once
+/// per pull (`View::listed_units`).
+#[derive(Clone, Copy)]
+pub enum UnitList {
+    /// Sites going up, structures upgrading and launchers assembling: work their own bar
+    /// shows (`unit_bar_work` without queues).
+    Rising = 0,
+    /// Stunned now or at the tick before (`UnitInstance::stun`).
+    Stunned = 1,
+}
+
+impl UnitList {
+    fn holds(self, u: &UnitInstance) -> bool {
+        match self {
+            UnitList::Rising => crate::game::unit_bar_work(u, &[], &[]) >= 0.0,
+            UnitList::Stunned => {
+                u.owner_flags & (KIND_WRECK | KIND_GHOST | KIND_PROP) == 0
+                    && (u.fx[2] > STUN_SHOWN || u.fx[3] > STUN_SHOWN)
+            }
+        }
+    }
+}
+
+const UNIT_LISTS: [UnitList; 2] = [UnitList::Rising, UnitList::Stunned];
+
+/// The least stun that shows (`warp_marks::stuns`): a stun between two ticks is never
+/// more than the larger of them.
+pub const STUN_SHOWN: f32 = 0.01;
+
 /// The tables, kept in `View::rows` and rebuilt each time a frame is pulled.
 #[derive(Default)]
 pub struct Rows {
@@ -107,8 +172,10 @@ pub struct Rows {
     fuel: Table,
     /// The frame's tick when they were filled.
     tick: u32,
-    /// The indices in `status.queues` of the factories forming a batch.
-    batches: Vec<u32>,
+    /// Indices in `status.queues`, by `QueueList`.
+    queue_lists: [Vec<u32>; QUEUE_LISTS.len()],
+    /// Indices in `frame.units`, by `UnitList`.
+    unit_lists: [Vec<u32>; UNIT_LISTS.len()],
     /// By blueprint id: the indices in `frame.units` of its units (wrecks aside), in order.
     by_kind: Vec<Vec<u32>>,
     /// The blueprint ids with units in the frame, ascending.
@@ -158,12 +225,24 @@ impl Rows {
             self.by_kind[bp].push(i as u32);
         }
         self.kinds.sort_unstable();
-        self.batches.clear();
-        self.batches.extend(
-            (queues.iter().enumerate())
-                .filter(|(_, q)| q.batch.is_some())
-                .map(|(i, _)| i as u32),
-        );
+        for list in QUEUE_LISTS {
+            let out = &mut self.queue_lists[list as usize];
+            out.clear();
+            out.extend(
+                (queues.iter().enumerate())
+                    .filter(|(_, q)| list.holds(q))
+                    .map(|(i, _)| i as u32),
+            );
+        }
+        for list in UNIT_LISTS {
+            let out = &mut self.unit_lists[list as usize];
+            out.clear();
+            out.extend(
+                (units.iter().enumerate())
+                    .filter(|(_, u)| list.holds(u))
+                    .map(|(i, _)| i as u32),
+            );
+        }
     }
 }
 
@@ -337,19 +416,27 @@ impl View {
         out
     }
 
-    /// The queues of the factories forming a batch (`UnitOrders::batch`), in order: a few
-    /// among tens of thousands.
-    pub fn batch_queues(&self) -> Box<dyn Iterator<Item = &UnitOrders> + '_> {
+    /// The queues `list` holds, in order: a few among tens of thousands.
+    pub fn listed_queues(&self, list: QueueList) -> Box<dyn Iterator<Item = &UnitOrders> + '_> {
         let queues = &self.status.queues;
-        if self.rows.generation == 0 {
-            // Never pulled (a view filled by hand): every queue is looked at.
-            return Box::new(queues.iter().filter(|q| q.batch.is_some()));
+        if !self.rows_current() || queues.len() != self.rows.queues.len {
+            // Not the lists' status (a view filled by hand): every queue is looked at.
+            return Box::new(queues.iter().filter(move |q| list.holds(q)));
         }
-        Box::new(
-            (self.rows.batches.iter())
-                .filter_map(|&i| queues.get(i as usize))
-                .filter(|q| q.batch.is_some()),
-        )
+        Box::new((self.rows.queue_lists[list as usize].iter()).map(|&i| &queues[i as usize]))
+    }
+
+    /// The indices in `frame.units` of the units `list` holds, in order.
+    pub fn listed_units(&self, list: UnitList) -> Box<dyn Iterator<Item = usize> + '_> {
+        let units = &self.frame.units;
+        if !self.rows_current() || units.len() != self.rows.units.len {
+            return Box::new(
+                (units.iter().enumerate())
+                    .filter(move |(_, u)| list.holds(u))
+                    .map(|(i, _)| i),
+            );
+        }
+        Box::new((self.rows.unit_lists[list as usize].iter()).map(|&i| i as usize))
     }
 
     /// Changes with each pull: what figures kept until the next one go by.
@@ -416,10 +503,14 @@ mod tests {
         let gen1 = Handle::new(5, 1).0;
         view.frame.units = vec![unit(5, 1), unit(9, 2), unit(gen1, 2), unit(7, 3)];
         view.frame.units[3].owner_flags = KIND_WRECK;
+        // Unit 9 is going up and stunned; its target is hidden.
+        view.frame.units[1].owner_flags = (mc_sim::tables::flag::UNDER_CONSTRUCTION as u32) << 8;
+        view.frame.units[1].fx[3] = 0.5;
         view.index_of = [(5, 0), (9, 1), (gen1, 2)].into_iter().collect();
         view.status.queues = vec![
             UnitOrders {
                 unit_id: 9,
+                hidden_target: Some([0.0; 3]),
                 ..Default::default()
             },
             UnitOrders {
@@ -441,6 +532,20 @@ mod tests {
         assert_eq!(view.fuel(9).map(|f| f.fill), Some(0.5));
         // The wreck's blueprint 3 is not counted.
         assert!(view.in_frame(|bp| bp.0 == 2) && !view.in_frame(|bp| bp.0 == 3));
+        let listed = |view: &View| {
+            (
+                view.listed_units(UnitList::Rising).collect::<Vec<_>>(),
+                view.listed_units(UnitList::Stunned).collect::<Vec<_>>(),
+                (view.listed_queues(QueueList::Hidden))
+                    .map(|q| q.unit_id)
+                    .collect::<Vec<_>>(),
+            )
+        };
+        assert_eq!(listed(&view), (vec![1], vec![1], vec![9]));
+        // A view filled by hand since is looked through whole, with the same answers.
+        view.frame.tick += 1;
+        assert_eq!(listed(&view), (vec![1], vec![1], vec![9]));
+        view.frame.tick -= 1;
         assert_eq!(view.units_of(|bp| bp.0 != 1), [1, 2]);
         assert!(view.fuel(gen1).is_none());
         assert_eq!(view.unit_index(9), Some(1));

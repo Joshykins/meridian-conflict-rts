@@ -36,18 +36,15 @@ pub fn draw_hidden(ui: &mut Ui, field: &Field, alpha: f32) {
     let camera = field.camera;
     let mut tags: Vec<Vec2> = Vec::new();
     let mut lines = 0;
-    for queue in &view.status.queues {
+    // The few whose target the ground hides, listed once per pull.
+    for queue in view.listed_queues(crate::unit_rows::QueueList::Hidden) {
         let Some(target) = queue.hidden_target else {
             continue;
         };
         if !view.selection.contains(&queue.unit_id) || lines >= MAX_LINES {
             continue;
         }
-        let Some(unit) = view
-            .index_of
-            .get(&queue.unit_id)
-            .map(|&i| &view.frame.units[i])
-        else {
+        let Some(unit) = view.unit(queue.unit_id) else {
             continue;
         };
         let from = Vec3::from(unit.prev_pos).lerp(Vec3::from(unit.pos), alpha)

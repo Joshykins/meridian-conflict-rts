@@ -8,11 +8,11 @@
 use super::{unit_bar_shield, unit_bar_work, View};
 use crate::orders::Field;
 use crate::ui::{palette, rgb, style, Rect, Style, Ui};
+use crate::unit_rows::{QueueList, UnitList};
 use glam::{Vec2, Vec3};
 use mc_render::Mark;
 use mc_sim::mirror::{UnitInstance, KIND_WRECK, STATE_UNIDENTIFIED};
-use mc_sim::tables::{flag, OrderKind};
-use std::collections::HashSet;
+use mc_sim::tables::flag;
 
 const UNDER: u32 = (flag::UNDER_CONSTRUCTION as u32) << 8;
 /// The construction bar as it reaches the screen (`icons.wgsl` `fs_bar`, after tone mapping).
@@ -32,10 +32,23 @@ fn rising(u: &UnitInstance) -> bool {
 /// Appends a bars-only mark for every friendly unit at work that `marks` does not
 /// already hold. `friend` says whose work shows: the viewer's side and its allies.
 pub(crate) fn bar_marks(view: &View, friend: impl Fn(u8) -> bool, marks: &mut Vec<Mark>) {
-    let mut marked: HashSet<u32> = marks.iter().map(|m| m.unit_index).collect();
     let units = &view.frame.units;
+    // One bit per unit: a mark each, however many tens of thousands are selected.
+    let mut marked = vec![0u64; units.len().div_ceil(64) + 1];
+    let mut mark = |i: usize| {
+        let (word, bit) = (i / 64, 1u64 << (i % 64));
+        if word >= marked.len() {
+            marked.resize(word + 1, 0);
+        }
+        let new = marked[word] & bit == 0;
+        marked[word] |= bit;
+        new
+    };
+    for m in marks.iter() {
+        mark(m.unit_index as usize);
+    }
     let mut push = |i: usize, work: f32, marks: &mut Vec<Mark>| {
-        if work >= 0.0 && marked.insert(i as u32) {
+        if work >= 0.0 && mark(i) {
             marks.push(Mark {
                 unit_index: i as u32,
                 kind: Mark::BARS_ONLY,
@@ -45,24 +58,17 @@ pub(crate) fn bar_marks(view: &View, friend: impl Fn(u8) -> bool, marks: &mut Ve
             });
         }
     };
-    // Sites, upgrades and launchers read their progress off the unit itself.
-    for (i, u) in units.iter().enumerate() {
+    // Sites, upgrades and launchers read their progress off the unit itself: those at
+    // work are listed once per pull.
+    for i in view.listed_units(UnitList::Rising) {
+        let u = &units[i];
         if shown(u, &friend) {
             push(i, unit_bar_work(u, &[], &[]), marks);
         }
     }
     // Factories and engineers, off their queue.
-    for q in &view.status.queues {
-        let working = q.orders.first().is_some_and(|o| {
-            matches!(
-                o.kind,
-                OrderKind::Build | OrderKind::Produce | OrderKind::Upgrade | OrderKind::Assist
-            )
-        });
-        if !working || q.progress <= 0.0 {
-            continue;
-        }
-        let Some(&i) = view.index_of.get(&q.unit_id) else {
+    for q in view.listed_queues(QueueList::Working) {
+        let Some(i) = view.unit_index(q.unit_id) else {
             continue;
         };
         if shown(&units[i], &friend) {
@@ -74,7 +80,7 @@ pub(crate) fn bar_marks(view: &View, friend: impl Fn(u8) -> bool, marks: &mut Ve
         if w.queue.is_empty() || w.progress <= 0.0 {
             continue;
         }
-        let Some(&i) = view.index_of.get(&w.unit_id) else {
+        let Some(i) = view.unit_index(w.unit_id) else {
             continue;
         };
         if shown(&units[i], &friend) {
@@ -104,14 +110,16 @@ pub(crate) fn draw_tags(ui: &mut Ui, field: &Field, alpha: f32, friend: impl Fn(
     let camera = field.camera;
     let eye = camera.eye();
     let scale = camera.projection_scale();
-    for u in &view.frame.units {
+    let projector = camera.projector();
+    for i in view.listed_units(UnitList::Rising) {
+        let u = &view.frame.units[i];
         if !rising(u) || !shown(u, &friend) {
             continue;
         }
         let p = Vec3::from(u.prev_pos).lerp(Vec3::from(u.pos), alpha);
         let ground = field.renderer.ground_height(Vec2::new(p.x, p.y));
         let feet = Vec3::new(p.x, p.y, p.z.max(ground));
-        let Some(at) = camera.project(feet) else {
+        let Some(at) = projector.project(feet) else {
             continue;
         };
         let px = scale / feet.distance(eye).max(1.0);
