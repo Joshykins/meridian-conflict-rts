@@ -45,7 +45,7 @@ pub(super) fn batch_groups(field: &Field, middle_of: &dyn Fn(&[u32]) -> Seen) ->
                 formation: 0,
                 middle,
                 selected: factory_lit || members.iter().any(|id| view.selection.contains(id)),
-                members,
+                members: members.into(),
                 batch: Some(Filling {
                     group: b.group,
                     count: b.count,

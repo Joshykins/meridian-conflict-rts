@@ -21,6 +21,7 @@ mod crash;
 mod dash_marks;
 mod destruct_marks;
 mod edict_marks;
+mod fast_hash;
 mod formation_drag;
 mod game;
 mod gravitic_marks;

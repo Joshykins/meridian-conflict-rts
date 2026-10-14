@@ -90,6 +90,14 @@ impl Picked {
         &self.rows
     }
 
+    /// Whether the unit at `index` in `frame.units` is one of `rows`: for a unit found by
+    /// `View::unit_index`, whether it is selected.
+    pub fn has(&self, index: usize) -> bool {
+        self.bits
+            .get(index / 64)
+            .is_some_and(|w| w & 1 << (index % 64) != 0)
+    }
+
     /// `rows` in the order of `frame.units`: as a pass over the frame meets the
     /// selection, without looking at the units that are not in it.
     pub fn in_frame_order(&self) -> impl Iterator<Item = usize> + '_ {
@@ -286,6 +294,7 @@ mod tests {
         assert_eq!(picked.rows(), &[2, 1, 0]);
         assert_eq!(picked.kinds(), &[1, 2]);
         assert_eq!(picked.in_frame_order().collect::<Vec<_>>(), [0, 1, 2]);
+        assert!(picked.has(0) && picked.has(2) && !picked.has(3));
         drop(picked);
         view.selection = vec![9].into();
         assert_eq!(view.picked().rows(), &[1]);

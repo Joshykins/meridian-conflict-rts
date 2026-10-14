@@ -89,11 +89,13 @@ pub(super) fn guard_look(blueprints: &Blueprints, unit: &UnitInstance) -> GuardL
 /// aircraft in it orbits, with the aircraft's circle when any flies.
 pub(super) fn selection_guard_look(field: &Field) -> GuardLook {
     let view = field.view;
-    let looks = view
-        .selection
-        .iter()
-        .filter_map(|id| view.index_of.get(id))
-        .map(|&i| guard_look(field.blueprints, &view.frame.units[i]))
+    let picked = view.picked();
+    // A look is the blueprint's: a run of one blueprint is looked at once.
+    let mut last = None;
+    let looks = (picked.rows().iter())
+        .map(|&i| &view.frame.units[i as usize])
+        .filter(|u| last.replace(u.blueprint) != Some(u.blueprint))
+        .map(|u| guard_look(field.blueprints, u))
         .filter(|l| l.circle > 0.0);
     looks.fold(GuardLook::stance(0.0), |seen, l| {
         if seen.circle == 0.0 {

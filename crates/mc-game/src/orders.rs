@@ -7,6 +7,7 @@
 //! side's. A drag leaves as one `Command::RelocateOrder` for every unit that
 //! holds the order, so a group's shared waypoint moves for the whole group.
 
+use crate::fast_hash::IdSet;
 use crate::game::{Mode, View};
 use crate::hud;
 use crate::ui::{self, palette, Ui};
@@ -16,16 +17,20 @@ use mc_data::{BlueprintId, Blueprints};
 use mc_map::MapFile;
 use mc_render::{Camera, Renderer};
 use mc_sim::command::{MAX_COMMAND_UNITS, MAX_GUARD_RADIUS, MIN_GUARD_RADIUS};
-use mc_sim::mirror::{UnitInstance, KIND_GHOST, KIND_PROP, KIND_WRECK, STATE_RADAR};
+use mc_sim::mirror::{UnitInstance, KIND_GHOST};
 use mc_sim::tables::OrderKind;
 use mc_sim::{Command, Handle};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
+mod air_guides;
+mod grabs;
 mod guard_rings;
+mod kept_groups;
 mod lots;
 pub(crate) mod mine_reach;
 mod muster;
 mod reclaim_rings;
+mod routes;
 mod settling;
 mod sites;
 mod wall_line;
@@ -36,6 +41,7 @@ use lots::{footprints_overlap, line_centres, snap_footprint};
 pub(crate) use reclaim_rings::reclaim_radius;
 pub use sites::{placement_ghost, prefab_sites, site, site_verdict};
 
+use air_guides::{aircraft_guides, AirBox};
 use guard_rings::{guard_look, guard_ring, orbit_ring, selection_guard_look, GuardLook};
 
 /// How near a waypoint a press has to be to pick it up, in pixels.
@@ -102,7 +108,13 @@ pub struct OrderMap {
     /// `Game::send`, which only borrows the map.
     ordered: std::cell::RefCell<Vec<u32>>,
     /// (unit, group) pairs a unit has left for good, while its queue may still show the old one.
-    left: HashSet<(u32, u64)>,
+    left: crate::fast_hash::IdSet<(u32, u64)>,
+    /// When the kept groups were brought up to date, and their members as found.
+    groups_kept: kept_groups::GroupsKept,
+    /// Which queues' lines are drawn (`routes.rs`).
+    routes: routes::Routes,
+    /// The orders a press could pick up, each once (`grabs.rs`).
+    grabs: grabs::Grabs,
     /// Where the selected aircraft are, for their height guides.
     air_box: AirBox,
 }
@@ -202,22 +214,15 @@ pub fn patrol_start(view: &View) -> Option<Vec2> {
     let mut sum = Vec2::ZERO;
     let mut n = 0.0;
     for id in &view.selection {
-        let queued = view
-            .shift
-            .then(|| crate::sim_thread::queue_of(&view.status.queues, *id))
-            .flatten()
-            .and_then(|q| {
-                q.route()
-                    .rev()
-                    .find(|o| !matches!(o.kind, OrderKind::Produce | OrderKind::Upgrade))
-            });
+        let queued = view.shift.then(|| view.queue(*id)).flatten().and_then(|q| {
+            q.route()
+                .rev()
+                .find(|o| !matches!(o.kind, OrderKind::Produce | OrderKind::Upgrade))
+        });
         let p = match queued {
             Some(o) if o.formation != 0 => Some(Vec2::from(o.pos)),
             Some(o) => Some(Vec2::from(o.pos) + Vec2::from(o.offset)),
-            None => view
-                .index_of
-                .get(id)
-                .map(|&i| Vec2::new(view.frame.units[i].pos[0], view.frame.units[i].pos[1])),
+            None => view.unit(*id).map(|u| Vec2::new(u.pos[0], u.pos[1])),
         };
         if let Some(p) = p {
             sum += p;
@@ -231,17 +236,20 @@ pub fn patrol_start(view: &View) -> Option<Vec2> {
 /// however many units fly it. Posts inserted but not yet in the queues are counted.
 pub fn patrol_legs(view: &View) -> Vec<(FxVec2, FxVec2)> {
     let mut legs = Vec::new();
-    for queue in view
-        .status
-        .queues
-        .iter()
+    // The last queue's posts: a group's members, met one after another, fly the same loop.
+    let (mut posts, mut last): (Vec<FxVec2>, Vec<FxVec2>) = (Vec::new(), Vec::new());
+    let patrols = |q: &&mc_sim::mirror::UnitOrders| q.route().any(|o| o.kind == OrderKind::Patrol);
+    for queue in (view.status.queues.iter())
+        .filter(patrols)
         .filter(|q| view.selection.contains(&q.unit_id))
     {
-        let mut posts: Vec<FxVec2> = queue
-            .route()
-            .filter(|o| o.kind == OrderKind::Patrol)
-            .map(|o| o.at)
-            .collect();
+        posts.clear();
+        posts.extend(
+            queue
+                .route()
+                .filter(|o| o.kind == OrderKind::Patrol)
+                .map(|o| o.at),
+        );
         for &(after, point) in &view.patrol_inserts {
             if !posts.contains(&point) {
                 if let Some(i) = posts.iter().position(|&p| p == after) {
@@ -249,7 +257,7 @@ pub fn patrol_legs(view: &View) -> Vec<(FxVec2, FxVec2)> {
                 }
             }
         }
-        if posts.len() < 2 {
+        if posts.len() < 2 || posts == last {
             continue;
         }
         for i in 0..posts.len() {
@@ -258,6 +266,7 @@ pub fn patrol_legs(view: &View) -> Vec<(FxVec2, FxVec2)> {
                 legs.push(leg);
             }
         }
+        std::mem::swap(&mut posts, &mut last);
     }
     legs
 }
@@ -279,118 +288,6 @@ pub fn patrol_insert_leg(view: &View, ground: Vec2) -> Option<(FxVec2, FxVec2)> 
         }
     }
     best.map(|(_, leg)| leg)
-}
-
-/// The box round the selected aircraft, where they were and are this tick, kept for the
-/// `Picked::stamp` it was found for: when it is all off one side of the screen, so is
-/// every guide, and none of the units is looked at.
-#[derive(Default)]
-struct AirBox {
-    stamp: Option<u64>,
-    /// Corners, world metres; `None` with no aircraft selected.
-    corners: Option<(Vec3, Vec3)>,
-}
-
-/// Whether every one of `points`, projected, lies past the same edge of the screen.
-fn all_off_one_side(points: &[Option<Vec2>], viewport: Vec2) -> bool {
-    let Some(points) = points.iter().copied().collect::<Option<Vec<Vec2>>>() else {
-        // Something behind the camera: no shortcut.
-        return false;
-    };
-    let past = |edge: &dyn Fn(Vec2) -> bool| points.iter().all(|&p| edge(p));
-    past(&|p| p.x < 0.0)
-        || past(&|p| p.y < 0.0)
-        || past(&|p| p.x > viewport.x)
-        || past(&|p| p.y > viewport.y)
-}
-
-/// Height guides for the selected aircraft: a line down to the spot on the ground
-/// each one is over. Radar-only contacts have no visible hull to anchor one to.
-fn aircraft_guides(ui: &mut Ui, field: &Field, alpha: f32, kept: &mut AirBox) {
-    let view = field.view;
-    let blueprints = field.blueprints;
-    let air = |bp: BlueprintId| {
-        (blueprints.unit(bp).motion).is_some_and(|m| m.layer == mc_data::MoveLayer::Air)
-    };
-    let picked = view.picked();
-    if kept.stamp != Some(picked.stamp()) {
-        kept.stamp = Some(picked.stamp());
-        kept.corners = None;
-        for &i in picked.rows() {
-            let unit = &view.frame.units[i as usize];
-            if air(BlueprintId(unit.blueprint as u16)) {
-                let (a, b) = (Vec3::from(unit.prev_pos), Vec3::from(unit.pos));
-                let (lo, hi) = kept.corners.unwrap_or((a, a));
-                kept.corners = Some((lo.min(a).min(b), hi.max(a).max(b)));
-            }
-        }
-    }
-    let Some((lo, hi)) = kept.corners else {
-        return;
-    };
-    let viewport = field.camera.viewport;
-    let on_screen = |p: Vec2| p.cmpge(Vec2::ZERO).all() && p.cmple(viewport).all();
-    let projector = field.camera.projector();
-    // A guide runs straight down to the surface, which is never under the sea's: when the
-    // line from an aircraft down to that is wholly off one side of the screen, so is its
-    // guide, and the ground under it need not be found.
-    let lowest = field.map.info().water_level.to_f32() + 1.0;
-    let corners: Vec<Option<Vec2>> = (0..8)
-        .map(|k| {
-            let z = if k & 4 == 0 { hi.z } else { lowest.min(lo.z) };
-            let x = if k & 1 == 0 { lo.x } else { hi.x };
-            let y = if k & 2 == 0 { lo.y } else { hi.y };
-            projector.project(Vec3::new(x, y, z))
-        })
-        .collect();
-    if all_off_one_side(&corners, viewport) {
-        return;
-    }
-    let mut drawn = 0;
-    for i in picked.in_frame_order() {
-        if drawn >= MAX_AIR_GUIDES {
-            return;
-        }
-        let unit = &view.frame.units[i];
-        if unit.owner_flags & (KIND_GHOST | KIND_PROP | KIND_WRECK | STATE_RADAR) != 0
-            || !air(BlueprintId(unit.blueprint as u16))
-        {
-            continue;
-        }
-        let position = Vec3::from(unit.prev_pos).lerp(Vec3::from(unit.pos), alpha);
-        let bottom = position.truncate().extend(lowest.min(position.z));
-        if all_off_one_side(
-            &[projector.project(position), projector.project(bottom)],
-            viewport,
-        ) {
-            continue;
-        }
-        let ground = position
-            .truncate()
-            .extend(field.renderer.surface_height(position.truncate()) + 1.0);
-        if position.z <= ground.z {
-            continue;
-        }
-        let (Some(top), Some(foot)) = (projector.project(position), projector.project(ground))
-        else {
-            continue;
-        };
-        if !(on_screen(top) || on_screen(foot))
-            || top.abs().max_element() >= 20_000.0
-            || foot.abs().max_element() >= 20_000.0
-        {
-            continue;
-        }
-        drawn += 1;
-        let team = field.view.colors[(unit.owner_flags & 0xFF) as usize % mc_core::MAX_PLAYERS];
-        let color = [team[0], team[1], team[2], 0.7];
-        ui.stroke(top / ui.s, foot / ui.s, 1.0, color);
-        if on_screen(foot) {
-            let c = foot / ui.s;
-            ui.stroke(c - Vec2::X * 3.0, c + Vec2::X * 3.0, 1.0, color);
-            ui.stroke(c - Vec2::Y * 3.0, c + Vec2::Y * 3.0, 1.0, color);
-        }
-    }
 }
 
 /// Where an order line's next leg starts: the unit's own drawn point, or the ground
@@ -515,13 +412,10 @@ impl OrderMap {
             if let Some((centre, g)) =
                 (view.circle_from.zip(ground)).filter(|&(c, g)| dragged(c, g))
             {
-                let selected = (view.selection.iter())
-                    .filter_map(|id| view.index_of.get(id))
-                    .map(|&i| {
-                        field
-                            .blueprints
-                            .unit(BlueprintId(view.frame.units[i].blueprint as u16))
-                    });
+                // The widest any of their guns allows: asked of each blueprint once.
+                let picked = view.picked();
+                let selected = (picked.kinds().iter())
+                    .map(|&bp| field.blueprints.unit(BlueprintId(bp as u16)));
                 let radius = bombard_radius(selected, centre.distance(g));
                 ground_ring(ui, field, centre, radius, ui::rgb(palette::BAD, 0.9));
                 if let Some(c) = project(centre) {
@@ -607,43 +501,22 @@ impl OrderMap {
     /// The order a press at `cursor` would pick up: the nearest waypoint in reach,
     /// or else the planned structure the pointer is over. While a structure is
     /// being placed only plans count, where a click could not build anyway.
-    fn pick(&self, field: &Field, cursor: Vec2) -> Option<(Key, Vec2)> {
+    fn pick(&mut self, field: &Field, cursor: Vec2) -> Option<(Key, Vec2)> {
         let Field {
             view,
             camera,
             renderer,
             ..
         } = field;
-        let planned = |key: Key| {
-            view.status
-                .plans
-                .iter()
-                .any(|p| p.at == key.at && p.blueprint == key.blueprint)
-        };
         let mut best: Option<(f32, Key, Vec2)> = None;
         if view.mode == Mode::Normal {
-            for order in view
-                .status
-                .queues
-                .iter()
-                .flat_map(|q| q.route())
-                .filter(|o| draggable(o.kind))
-            {
-                let key = Key {
-                    kind: order.kind,
-                    at: order.at,
-                    blueprint: if order.kind == OrderKind::Build {
-                        order.blueprint
-                    } else {
-                        BlueprintId(0)
-                    },
-                };
-                // A structure that has been begun is on the map, not in the plans.
-                if order.kind == OrderKind::Build && !planned(key) {
-                    continue;
-                }
-                let at = self.shown(key, order.pos);
-                let Some(p) = camera.project(at.extend(renderer.surface_height(at) + 1.0)) else {
+            // Each different order once: a group's members all carry the same ones.
+            let projector = camera.projector();
+            let mut grabs = std::mem::take(&mut self.grabs);
+            for &(key, pos) in grabs.orders(view) {
+                let at = self.shown(key, pos);
+                let Some(p) = projector.project(at.extend(renderer.surface_height(at) + 1.0))
+                else {
                     continue;
                 };
                 let d = p.distance(cursor);
@@ -651,6 +524,7 @@ impl OrderMap {
                     best = Some((d, key, at));
                 }
             }
+            self.grabs = grabs;
         }
         if best.is_none() {
             let ground = Self::ground_under(field, cursor)?.truncate();
@@ -735,7 +609,7 @@ impl OrderMap {
     /// pointer could pick up, and which dropped orders the sim has caught up with.
     pub fn update(&mut self, field: &Field, cursor: Vec2, over_ui: bool) {
         let _t = mc_core::perf_span!("ui.orders_update");
-        self.keep_groups(field.view);
+        self.keep_groups_now(field.view);
         let status = &field.view.status;
         // A guard in hand round a unit: keep up with where its centre has got to, so the
         // drop names it where it is now.
@@ -885,105 +759,6 @@ impl OrderMap {
         self.ordered.borrow_mut().extend(units.iter().map(|h| h.0));
     }
 
-    /// Brings the kept groups up to date: a unit whose current order belongs to a group is
-    /// in that group, and out of any other; one that was ordered elsewhere leaves; an idle
-    /// one stays where it was. The dead, and groups of fewer than two, drop away.
-    fn keep_groups(&mut self, view: &View) {
-        // The group each unit is in (one at most), looked up by unit: a side of thousands
-        // in a few big groups costs a pass over its queues, not a search of every group's
-        // members for every unit.
-        let mut group_of: HashMap<u32, u64> = self
-            .kept
-            .iter()
-            .flat_map(|(&formation, members)| members.iter().map(move |&id| (id, formation)))
-            .collect();
-        for id in self.ordered.take() {
-            if let Some(formation) = group_of.remove(&id) {
-                self.left.insert((id, formation));
-            }
-        }
-        // Units that joined a group just now, in the order met: they go on the end of it.
-        let mut joining: Vec<(u64, u32)> = Vec::new();
-        for queue in &view.status.queues {
-            let Some(front) = queue.orders.first() else {
-                continue;
-            };
-            let id = queue.unit_id;
-            let joined = front.formation != 0
-                && !matches!(front.kind, OrderKind::Produce | OrderKind::Upgrade)
-                && !self.left.contains(&(id, front.formation));
-            if joined {
-                if group_of.insert(id, front.formation) != Some(front.formation) {
-                    joining.push((front.formation, id));
-                }
-            } else if front.formation == 0 {
-                // Walking on its own now: out of every group.
-                group_of.remove(&id);
-            }
-        }
-        group_of.retain(|id, _| view.index_of.contains_key(id));
-        for (formation, members) in self.kept.iter_mut() {
-            members.retain(|id| group_of.get(id) == Some(formation));
-        }
-        for (formation, id) in joining {
-            if group_of.get(&id) == Some(&formation) {
-                self.kept.entry(formation).or_default().push(id);
-            }
-        }
-        self.kept.retain(|_, members| members.len() > 1);
-        let live: HashSet<u64> = self.kept.keys().copied().collect();
-        self.left
-            .retain(|(id, formation)| live.contains(formation) && view.index_of.contains_key(id));
-    }
-
-    /// Each kept command group: the middle of its members (the world, interpolated) and who
-    /// they are; and each batch forming at a factory, a group like any other.
-    fn groups(&self, field: &Field, alpha: f32) -> Vec<Group> {
-        let view = field.view;
-        let middle_of = |members: &[u32]| {
-            let mut middle = Vec3::ZERO;
-            let mut found = Vec::new();
-            for id in members {
-                let Some(unit) = view.index_of.get(id).map(|&i| &view.frame.units[i]) else {
-                    continue;
-                };
-                middle += Vec3::from(unit.prev_pos).lerp(Vec3::from(unit.pos), alpha);
-                found.push(*id);
-            }
-            (middle / found.len().max(1) as f32, found)
-        };
-        let batches = muster::batch_groups(field, &middle_of);
-        self.kept
-            .iter()
-            .filter_map(|(&formation, members)| {
-                let (middle, found) = middle_of(members);
-                (found.len() > 1).then(|| Group {
-                    formation,
-                    middle,
-                    selected: found.iter().any(|id| view.selection.contains(id)),
-                    members: found,
-                    batch: None,
-                })
-            })
-            .chain(batches)
-            .collect()
-    }
-
-    /// The group whose count badge is under `cursor` (pixels): who a click there selects.
-    pub fn group_at(&self, field: &Field, cursor: Vec2) -> Option<Vec<u32>> {
-        let scale = self.scale.max(0.4);
-        self.groups(field, 1.0)
-            .into_iter()
-            .filter(|g| !g.members.is_empty())
-            .filter_map(|g| {
-                let p = field.camera.project(g.middle)?;
-                let d = p.distance(cursor) / scale;
-                (d <= badge_radius(g.members.len()) + 3.0).then_some((d, g.members))
-            })
-            .min_by(|a, b| a.0.total_cmp(&b.0))
-            .map(|(_, members)| members)
-    }
-
     /// The order lines, one for each unit walking on its own and one for each group,
     /// through the waypoints: the selection's, and with shift held the whole side's.
     /// Every command group wears the count of its members in its middle, always.
@@ -1001,29 +776,30 @@ impl OrderMap {
         let on_screen =
             |p: Vec2| p.cmpge(Vec2::splat(-40.0)).all() && p.cmple(viewport + 40.0).all();
         let sane = |p: Vec2| p.abs().max_element() < 20_000.0;
-        let ground = |p: Vec2| camera.project(p.extend(renderer.surface_height(p) + 1.0));
+        let projector = camera.projector();
+        let ground = |p: Vec2| projector.project(p.extend(renderer.surface_height(p) + 1.0));
         let t = ui.time;
         let groups = self.groups(field, alpha);
         muster::links(ui, field);
         let mut budget = MAX_LINES;
         let mut nodes = MAX_NODES;
         // Legs and waypoints several units share are drawn once.
-        let mut legs: HashSet<(Origin, u8, FxVec2)> = HashSet::new();
-        let mut drawn: HashSet<(u8, FxVec2)> = HashSet::new();
+        let mut legs: IdSet<(Origin, u8, FxVec2)> = IdSet::default();
+        let mut drawn: IdSet<(u8, FxVec2)> = IdSet::default();
         let mut markers: Vec<(Vec2, u32, f32, bool)> = Vec::new();
         // Aircraft circles on guard: centre and radius in world metres, strength, lively.
         let mut rings: Vec<(Vec2, f32, f32, u32, bool)> = Vec::new();
         let mut guards: Vec<(Vec2, f32, f32, u32)> = Vec::new();
-        let mut guarded: HashSet<(i64, i64)> = HashSet::new();
-        for queue in &view.status.queues {
-            let Some(unit) = view
-                .index_of
-                .get(&queue.unit_id)
-                .map(|&i| &view.frame.units[i])
-            else {
+        let mut guarded: IdSet<(i64, i64)> = IdSet::default();
+        // Only the queues whose lines draw anything another has not (`routes.rs`).
+        let picked = view.picked();
+        for q in self.routes.drawn(view, camera.focus.truncate()) {
+            let queue = &view.status.queues[q as usize];
+            let Some(i) = view.unit_index(queue.unit_id) else {
                 continue;
             };
-            let selected = view.selection.contains(&queue.unit_id);
+            let unit = &view.frame.units[i];
+            let selected = picked.has(i);
             if !selected && !view.shift {
                 continue;
             }
@@ -1067,7 +843,7 @@ impl OrderMap {
             // Where the line so far ends on screen, worked out only for a leg that is
             // drawn: a group's members share their legs, and thousands of them each
             // finding the ground under every waypoint was most of this pass.
-            let mut from = Leg::Projected(camera.project(start));
+            let mut from = Leg::Projected(projector.project(start));
             // Where the line so far ends, world metres: a circling guard's line stops at its circle.
             let mut from_world = start.truncate();
             // A patrol is a loop: its last post runs back to its first.
@@ -1099,14 +875,7 @@ impl OrderMap {
                     }
                 }
             }
-            // Production and refits hold up what is queued behind them; a factory's
-            // standing orders are its products' way out.
-            let route = queue
-                .orders
-                .iter()
-                .take_while(|o| !matches!(o.kind, OrderKind::Produce | OrderKind::Upgrade))
-                .chain(&queue.standing);
-            for order in route.take(24) {
+            for order in routes::drawn_route(queue) {
                 let tone = if order.kind == OrderKind::Guard {
                     guard.tone
                 } else {
@@ -1321,7 +1090,7 @@ struct Group {
     formation: u64,
     /// The middle of its members, world metres.
     middle: Vec3,
-    members: Vec<u32>,
+    members: std::rc::Rc<[u32]>,
     selected: bool,
     /// Units forming up in a factory's batch: how full it is.
     batch: Option<Filling>,
