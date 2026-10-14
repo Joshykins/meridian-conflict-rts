@@ -92,6 +92,7 @@
 pub mod client;
 pub mod directory;
 pub mod lan;
+mod origin;
 pub mod protocol;
 pub mod relay;
 pub mod replay;
@@ -108,6 +109,7 @@ pub use directory::{
     DEFAULT_PLAYER_NAME, DIRECTORY_VERSION, IDENTITY_FILE, MAX_PLAYER_NAME,
 };
 pub use lan::{LanBeacon, LanGame, LanInfo, LanScanner, LAN_PORT};
+pub use origin::{Origin, Peeked, ORIGIN_SINCE};
 pub use protocol::{
     ContentId, Hello, Link, LobbyPlayer, LobbyState, MatchConfig, MatchStart, Message, PeerStat,
     PlayerCommands, PlayerSetup, RefuseReason, Role, TickBundle, Welcome, MAX_BUILD_LEN,

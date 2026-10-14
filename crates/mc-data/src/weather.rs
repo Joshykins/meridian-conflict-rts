@@ -353,6 +353,9 @@ pub struct MapConfig {
     pub mission: Option<String>,
     /// Authored roster; empty retains the match setup roster.
     pub players: Vec<crate::map_settings::MapPlayer>,
+    /// Only playtest and dev builds list the map: a release build has no
+    /// `playtest: true` map in any list (mc-game `setup::list_maps`).
+    pub playtest: bool,
 }
 
 impl Default for MapConfig {
@@ -369,6 +372,7 @@ impl Default for MapConfig {
             blend: 0.0,
             mission: None,
             players: Vec::new(),
+            playtest: false,
         }
     }
 }
@@ -393,6 +397,7 @@ struct MapConfigFile {
     blend: f32,
     mission: Option<String>,
     players: Vec<crate::map_settings::MapPlayer>,
+    playtest: bool,
 }
 
 impl From<MapConfig> for MapConfigFile {
@@ -413,6 +418,7 @@ impl From<MapConfig> for MapConfigFile {
             blend: config.blend,
             mission: config.mission,
             players: config.players,
+            playtest: config.playtest,
         }
     }
 }
@@ -461,6 +467,7 @@ impl TryFrom<MapConfigFile> for MapConfig {
             blend: file.blend.max(0.0),
             mission: file.mission,
             players: file.players,
+            playtest: file.playtest,
         })
     }
 }

@@ -35,6 +35,7 @@ pub mod teams;
 #[cfg(test)]
 pub(crate) mod test_maps;
 mod text_input;
+mod updates;
 
 use crate::audio::{Audio, Sfx};
 use glam::Vec2;

@@ -13,6 +13,8 @@ mod adjacency_marks;
 mod ambience;
 mod app;
 mod audio;
+mod build_info;
+mod builds;
 mod campaign;
 mod campaign_checkpoints;
 mod chronicle;
@@ -69,18 +71,13 @@ use mc_map::MapFile;
 use setup::{Options, Scene};
 use std::sync::Arc;
 
-/// `<version>+<commit>`: network players must match (build.rs).
-pub const BUILD: &str = env!("MERIDIAN_BUILD");
-
-/// The number of commits up to this build, empty outside a git checkout (build.rs).
-const BUILD_NUMBER: &str = env!("MERIDIAN_BUILD_NUMBER");
+pub use build_info::BUILD;
 
 /// "Build N" for the menu and the opening screen; "Dev build" where there is no number.
 fn build_label() -> String {
-    if BUILD_NUMBER.is_empty() {
-        "Dev build".to_owned()
-    } else {
-        format!("Build {BUILD_NUMBER}")
+    match build_info::number() {
+        Some(n) => format!("Build {n}"),
+        None => "Dev build".to_owned(),
     }
 }
 
@@ -226,6 +223,13 @@ straight into a match instead.
                          as a failed Vulkan call is)
   --dump-sounds DIR      write the synthesised sound set as WAV files and exit
   --dump-cursors FILE.png  write every mouse pointer, over dark, grass and bright ground, and exit
+  --replay-only          with --replay: an old build playing an old replay for a newer one
+                         (MeridianConflict --replay starts it so): leaving the replay quits,
+                         and the settings file is left as it was
+  --open SCREEN          open the front end on SCREEN (menu | skirmish | survival |
+                         multiplayer | history | settings) instead of the menu
+  --version              print the build's name, number, channel, commit and simulation
+                         fingerprint, and exit
 
 Graphics presets (Auto, Low, Medium, High, Ultra) are in Settings > Display. These override
 a preset's scenery for A/B measurements (docs/SWITCHES.md): MERIDIAN_SIMPLE_SHADING=0|1,
@@ -260,8 +264,19 @@ first when no record was kept.
 MERIDIAN_GROUPS=KEY,KEY,... with --screenshot: control groups 2, 3, ... hold player 0's
 units whose blueprint key contains each KEY (group 1 is the selection).
 
-MERIDIAN_BUILD=NAME at compile time names the build in the replays it records
-(default: the package version with -dev).
+MERIDIAN_CHANNEL=dev|playtest|release at compile time: who the build is for (default
+dev). It is part of the build's name, which replays record and network players must
+share (docs/RELEASES.md). A release build has no unit or map marked `playtest: true`.
+
+MERIDIAN_STORE=URL at compile time: the build store a published build updates from and
+fetches old replays' builds from. MERIDIAN_LAUNCHER (set by the launcher,
+MeridianConflict.exe, for the game it starts) is the install they go into.
+
+MERIDIAN_SERVER_PLAYTEST=HOST[:PORT], MERIDIAN_SERVER_RELEASE=HOST[:PORT] at compile time:
+the server a playtest or a release build plays on until another is typed (none: the
+multiplayer screen opens on the local network, as a dev build's always does).
+
+MERIDIAN_MP_SERVER=HOST:PORT with --ui: the multiplayer screen connects to that server.
 ";
 
 fn main() {
@@ -303,6 +318,8 @@ fn run() -> Result<(), String> {
     let mut editor_path = None;
     let mut editor_headless = false;
     let mut editor_actions = None;
+    let mut replay_only = false;
+    let mut open: Option<ui::front::Screen> = None;
     let mut crash_test = None;
     let mut crash_screen: Option<crash::Summary> = None;
     let mut dump_sounds: Option<String> = None;
@@ -467,6 +484,11 @@ fn run() -> Result<(), String> {
             "--editor-headless" => editor_headless=true,
             "--editor-apply" => editor_actions = Some(value("--editor-apply")?),
             "--editor" => editor_path = Some(args.next().ok_or("--editor needs a map name or path")?),
+            "--replay-only" => {
+                replay_only = true;
+                settings::keep_unsaved();
+            }
+            "--open" => open = Some(ui::front::Screen::parse(&value("--open")?).ok_or("--open takes menu, skirmish, survival, multiplayer, history or settings")?),
             "--dump-sounds" => dump_sounds = Some(value("--dump-sounds")?),
             "--crash-screen" => crash_screen = Some(crash::Summary { path: value("--crash-screen")?.into(), title: "The game crashed".into(), message: String::new(), hint: None }),
             "--crash-title" | "--crash-message" | "--crash-hint" => {
@@ -487,6 +509,10 @@ fn run() -> Result<(), String> {
                 print!("{USAGE}");
                 return Ok(());
             }
+            "--version" => {
+                print!("{}", build_info::version_text());
+                return Ok(());
+            }
             other => return Err(format!("unknown option {other}\n\n{USAGE}")),
         }
     }
@@ -505,7 +531,9 @@ fn run() -> Result<(), String> {
     let data_dir = Blueprints::locate_data_dir().ok_or(
         "could not find the data/ directory next to the executable or above the working directory",
     )?;
-    let blueprints = Arc::new(Blueprints::load(&data_dir).map_err(|e| e.to_string())?);
+    let blueprints = Arc::new(
+        Blueprints::load_for(&data_dir, build_info::channel()).map_err(|e| e.to_string())?,
+    );
     // The sound library is data too, and a unit file naming a sound that is not in it is an error here, not silence later.
     let sounds = mc_data::SoundLibrary::load(&data_dir).map_err(|e| e.to_string())?;
     sounds.check(&blueprints).map_err(|e| e.to_string())?;
@@ -604,6 +632,8 @@ fn run() -> Result<(), String> {
             direct: None,
             editor: editor_path,
             smoke,
+            open,
+            replay_only,
         });
     }
 
@@ -795,6 +825,8 @@ fn run() -> Result<(), String> {
         direct: Some(start),
         editor: None,
         smoke: false,
+        open,
+        replay_only,
     })
 }
 

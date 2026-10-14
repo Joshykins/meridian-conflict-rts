@@ -16,6 +16,7 @@ mc-jobs = { workspace = true }
 mc-map = { workspace = true }
 mc-missions = { workspace = true }
 mc-net = { workspace = true }
+mc-builds = { workspace = true }
 mc-music = { workspace = true }
 mc-sim = { workspace = true }
 mc-render = { workspace = true }

@@ -1,0 +1,9 @@
+# The crates the simulation is built from: mc-sim and every workspace crate it
+# depends on. build.rs fingerprints their sources (MERIDIAN_SIM); a test checks
+# that every mc-* dependency of a listed crate is listed too.
+mc-sim
+mc-core
+mc-data
+mc-jobs
+mc-map
+mc-path

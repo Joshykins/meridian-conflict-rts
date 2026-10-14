@@ -392,6 +392,7 @@ impl App {
                 } else {
                     game_event
                 } {
+                    Some(GameEvent::Leave) if self.args.replay_only => quit = true,
                     Some(GameEvent::Leave) => {
                         // What was left, and how long it was played.
                         let detail = format!(
@@ -439,7 +440,8 @@ impl App {
                             .ok_or("the data/ directory is gone".to_owned())
                             .and_then(|dir| {
                                 let blueprints =
-                                    Blueprints::load(&dir).map_err(|e| e.to_string())?;
+                                    Blueprints::load_for(&dir, crate::build_info::channel())
+                                        .map_err(|e| e.to_string())?;
                                 let sounds =
                                     mc_data::SoundLibrary::load(&dir).map_err(|e| e.to_string())?;
                                 sounds.check(&blueprints).map_err(|e| e.to_string())?;

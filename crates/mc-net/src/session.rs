@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 
 use mc_core::{PlayerId, TICKS_PER_SECOND};
 
+use crate::origin::Origin;
 use crate::protocol::{
     check_commands, LobbyState, MatchStart, PeerStat, RefuseReason, TickBundle, Welcome,
 };
@@ -414,25 +415,24 @@ impl LocalSession {
         Ok(session)
     }
 
-    /// Records to `path`. Call before the first `poll`.
-    pub fn record_to(&mut self, path: impl AsRef<Path>) -> io::Result<()> {
+    /// Records to `path`, as made by `origin`. Call before the first `poll`.
+    pub fn record_to(&mut self, path: impl AsRef<Path>, origin: &Origin) -> io::Result<()> {
         let file = io::BufWriter::new(std::fs::File::create(path)?);
-        self.record_to_writer(Box::new(file))
+        self.record_to_writer(Box::new(file), origin)
     }
 
-    /// Names the build in the recording (`ReplayWriter::build`). Call after `record_to`.
-    pub fn stamp_build(&mut self, name: &str) {
-        self.record(|w| w.build(name));
-    }
-
-    pub fn record_to_writer(&mut self, out: Box<dyn Write + Send>) -> io::Result<()> {
+    pub fn record_to_writer(
+        &mut self,
+        out: Box<dyn Write + Send>,
+        origin: &Origin,
+    ) -> io::Result<()> {
         if self.next_tick != 0 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "recording must start before tick 0",
             ));
         }
-        self.replay = Some(ReplayWriter::new(out, &self.start)?);
+        self.replay = Some(ReplayWriter::new(out, origin, &self.start)?);
         Ok(())
     }
 
@@ -826,7 +826,10 @@ mod tests {
             vec![42, 43]
         );
         assert!(session
-            .record_to_writer(Box::new(Vec::<u8>::new()))
+            .record_to_writer(
+                Box::new(Vec::<u8>::new()),
+                &crate::origin::Origin::default()
+            )
             .is_err());
         assert!(LocalSession::resume(start(), PlayerId(0), Pacing::PerPoll(1), 0, vec![]).is_err());
     }
@@ -941,7 +944,7 @@ mod tests {
             held: vec![held(2), held(5)],
             hashes: BTreeMap::from([(2, 22)]),
             complete: true,
-            build: None,
+            origin: Origin::default(),
             notes: Vec::new(),
         };
         let mut s = ReplaySession::new(replay, Pacing::PerPoll(2));
@@ -975,7 +978,7 @@ mod tests {
             held: vec![held(3), held(20)],
             hashes: BTreeMap::new(),
             complete: true,
-            build: None,
+            origin: Origin::default(),
             notes: vec![(0, vec![1]), (15, vec![2])],
         };
         let mut s = ReplaySession::new(replay, Pacing::RealTime).keep_open();
@@ -1030,7 +1033,7 @@ mod tests {
             held: Vec::new(),
             hashes: BTreeMap::from([(2, 22)]),
             complete: true,
-            build: None,
+            origin: Origin::default(),
             notes: Vec::new(),
         };
         let mut s = ReplaySession::new(replay, Pacing::PerPoll(5));

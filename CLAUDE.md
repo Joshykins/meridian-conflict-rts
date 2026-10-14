@@ -14,6 +14,10 @@ and all of them land on one `dev` branch. The rules below exist so that no
 session ever loses, commits or rewrites another session's work, and so that no
 session waits on another's build.
 
+**`dev` is where work lands.** `playtest` and `master` are the published
+channels' branches; only `scripts/channel.sh` moves them (promotions and
+hotfixes, docs/RELEASES.md). Never commit to them directly.
+
 **Work in a worktree of your own.**
 - A task that edits code or takes shots starts with
   `scripts/worktree.sh start <topic>` and works in the directory it prints:

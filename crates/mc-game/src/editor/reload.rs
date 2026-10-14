@@ -66,7 +66,9 @@ fn resources(
     let mut caches = Caches::default();
     let dir = Blueprints::locate_data_dir().ok_or("Cannot locate data/")?;
     let blueprints = if request.data {
-        Arc::new(Blueprints::load(&dir).map_err(|e| e.to_string())?)
+        Arc::new(
+            Blueprints::load_for(&dir, crate::build_info::channel()).map_err(|e| e.to_string())?,
+        )
     } else {
         previous.clone()
     };
