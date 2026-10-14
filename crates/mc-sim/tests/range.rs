@@ -16,6 +16,7 @@ fn world(cheats: bool) -> World {
     );
     let terrain = Heightfield::flat(256, 256, Fx::from_int(20));
     let map = MapData {
+        doodads: Default::default(),
         name: "range".into(),
         content_id: 1,
         ore: Vec::new(),

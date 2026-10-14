@@ -269,7 +269,7 @@ impl Game {
             (MouseButton::Right, p) => self.right_down = p,
             (MouseButton::Middle, p) => self.middle_down = p,
             (MouseButton::Left, true) => {
-                if self.hud.covers(self.cursor) || self.cine.locked {
+                if self.editor_covers(self.cursor) || self.cine.locked {
                     return;
                 }
                 // Lock on: a unit, the ground, or (on the sky) let go.
@@ -477,7 +477,7 @@ impl Game {
             return CursorMode::Grabbed;
         }
         if self.pointer_moved.elapsed().as_secs_f32() > POINTER_IDLE
-            && !self.hud.covers(self.cursor)
+            && !self.editor_covers(self.cursor)
         {
             return CursorMode::Hidden;
         }
@@ -493,7 +493,7 @@ impl Game {
 
     /// The pointer in the free camera: a unit under it can be locked on.
     pub(super) fn free_camera_pointer(&self) -> Pointer {
-        if !self.hud.covers(self.cursor) && self.unit_at(self.cursor).is_some() {
+        if !self.editor_covers(self.cursor) && self.unit_at(self.cursor).is_some() {
             Pointer::Select
         } else {
             Pointer::Arrow

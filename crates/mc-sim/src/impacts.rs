@@ -625,7 +625,7 @@ impl World {
             }
             if on_land {
                 for prop in felled {
-                    if self.map.props[prop].kind.is_tree() {
+                    if self.is_scenery_tree(prop) {
                         self.state.props_dead[prop / 64] |= 1 << (prop % 64);
                     }
                 }
@@ -757,7 +757,7 @@ impl World {
                 true
             });
         for prop in felled {
-            if self.map.props[prop].kind.is_tree() {
+            if self.is_scenery_tree(prop) {
                 self.state.props_dead[prop / 64] |= 1 << (prop % 64);
             }
         }

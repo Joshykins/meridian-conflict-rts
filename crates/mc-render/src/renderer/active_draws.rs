@@ -5,6 +5,7 @@
 use mc_sim::mirror::UnitInstance;
 use std::ops::Range;
 
+#[derive(Clone)]
 pub(super) struct ActiveDraws {
     models: Vec<[u32; 2]>,
     statics: Vec<bool>,
@@ -53,6 +54,13 @@ impl ActiveDraws {
         }
     }
 
+    pub(super) fn with_statics(&self, statics: &[UnitInstance]) -> Self {
+        let mut out = self.clone();
+        out.statics.fill(false);
+        Self::mark(&out.models, &mut out.statics, statics.iter());
+        out.units.copy_from_slice(&out.statics);
+        out
+    }
     pub(super) fn set_units(&mut self, units: &[UnitInstance]) {
         self.units.copy_from_slice(&self.statics);
         Self::mark(&self.models, &mut self.units, units.iter());

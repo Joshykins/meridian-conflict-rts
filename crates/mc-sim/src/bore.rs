@@ -61,7 +61,7 @@ impl World {
                 let prop = e.row as usize;
                 let t = ((e.pos - from.xy()).dot(seg.xy()) / len_sq).clamp(Fx::ZERO, Fx::ONE);
                 if e.pos.distance_sq((from + seg * t).xy()) <= burn_width * burn_width
-                    && self.map.props[prop].kind.is_tree()
+                    && self.is_scenery_tree(prop)
                     && self.is_prop_alive(prop)
                 {
                     trees.push(prop);

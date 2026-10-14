@@ -114,9 +114,38 @@ pub(super) fn cliff_rocks(map: &MapFile, first_model: u32, first_id: u32) -> Vec
     let Some(ground) = Ground::load(map) else {
         return Vec::new();
     };
-    let info = map.info();
+    generate(&ground, map.info(), map.snow(), first_model, first_id)
+}
+pub(super) fn edited(
+    map: &mc_map::edit::EditMap,
+    first_model: u32,
+    first_id: u32,
+) -> Vec<UnitInstance> {
+    let ground = Ground {
+        heights: map
+            .samples()
+            .iter()
+            .map(|&s| map.info.min_z.to_f32() + s as f32 * map.info.z_step.to_f32())
+            .collect(),
+        stride: map.info.size_cells().0 as usize + 1,
+        size: Vec2::from(map.info.size_metres().to_f32()),
+    };
+    generate(
+        &ground,
+        &map.info,
+        (!map.snow.is_empty()).then_some(map.snow.as_slice()),
+        first_model,
+        first_id,
+    )
+}
+fn generate(
+    ground: &Ground,
+    info: &mc_map::MapInfo,
+    snow: Option<&[u8]>,
+    first_model: u32,
+    first_id: u32,
+) -> Vec<UnitInstance> {
     let water = info.water_level.to_f32();
-    let snow = map.snow();
     let (snow_w, _) = info.snow_dims();
     // The snow layer's samples span the map, edge to edge.
     let snow_step = ground.size.x / (snow_w.max(2) - 1) as f32;

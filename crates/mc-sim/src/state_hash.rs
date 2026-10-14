@@ -20,12 +20,13 @@ pub const SECTIONS: [&str; SECTION_COUNT] = [
     "mines",
     "factories",
     "survival",
+    "mission",
     "terrain",
     "ai",
     "navigation",
     "fog",
 ];
-pub const SECTION_COUNT: usize = 15;
+pub const SECTION_COUNT: usize = 16;
 
 /// What writes one section into its hasher.
 type Section<'a> = &'a (dyn Fn(&mut StateHasher) + Sync);
@@ -139,6 +140,11 @@ impl World {
             &|h| {
                 if let Some(survival) = &s.survival {
                     survival.hash(h);
+                }
+            },
+            &|h| {
+                if let Some(mission) = &s.mission {
+                    mission.hash(h);
                 }
             },
             &|h| {

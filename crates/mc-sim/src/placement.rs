@@ -90,6 +90,13 @@ pub struct SiteMap {
 
 impl SiteMap {
     pub fn new(ground: &Heightfield, props: &[Prop]) -> SiteMap {
+        Self::with_components(ground, props, &Default::default())
+    }
+    fn with_components(
+        ground: &Heightfield,
+        props: &[Prop],
+        components: &crate::doodads::Components,
+    ) -> SiteMap {
         let (w, h) = ground.size_cells();
         let water = ground.water_level();
         let size = ground.size_metres();
@@ -119,8 +126,8 @@ impl SiteMap {
             }
         });
         debug_assert!(cells.iter().all(|c| c & CITY == 0));
-        for p in props {
-            for (min, max) in prop_cells(p, size) {
+        for (i, p) in props.iter().enumerate() {
+            for (min, max) in prop_cells(p, size, components.get(&(i as u32))) {
                 for y in min.1..=max.1.min(h - 1) {
                     for x in min.0..=max.0.min(w - 1) {
                         cells[(y * w + x) as usize] |= CITY;
@@ -133,7 +140,18 @@ impl SiteMap {
 
     /// The sites of a map file, from its unedited ground.
     pub fn for_map(map: &MapFile) -> Result<SiteMap, mc_map::MapError> {
-        Ok(SiteMap::new(&Heightfield::load(map)?, map.props()))
+        let components = map
+            .placed()
+            .doodads
+            .iter()
+            .cloned()
+            .map(|d| (d.prop_index, d))
+            .collect();
+        Ok(Self::with_components(
+            &Heightfield::load(map)?,
+            map.props(),
+            &components,
+        ))
     }
 
     fn cell(&self, x: u32, y: u32) -> u8 {

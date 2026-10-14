@@ -30,6 +30,7 @@ fn ore_square(x: i32, y: i32, half: i32) -> mc_map::OreRegion {
 fn flat_world(threads: usize, commanders: bool, ai: bool) -> World {
     let terrain = Heightfield::flat(MAP_CELLS, MAP_CELLS, Fx::from_int(20));
     let map = MapData {
+        doodads: Default::default(),
         name: "flat".into(),
         content_id: 1,
         ore: [

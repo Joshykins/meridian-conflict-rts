@@ -64,6 +64,7 @@ pub(crate) fn world_sites(
     );
     let terrain = Heightfield::flat(768, 768, Fx::from_int(20));
     let map = MapData {
+        doodads: Default::default(),
         name: "survival".into(),
         content_id: 1,
         ore: Vec::new(),

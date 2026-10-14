@@ -66,6 +66,9 @@ impl World {
                 return self.take_area_wreck(row, w);
             }
         }
+        if let Some(p) = self.nearest_salvage_prop(row, o.pos, o.radius.max(Fx::from_int(8))) {
+            return self.run_reclaim_prop(row, p);
+        }
         let units = &self.state.units;
         let pos = units.pos[row];
         let spot = self.clamp_to_map(o.pos + o.offset);

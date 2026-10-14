@@ -39,6 +39,7 @@ fn world_with(fog: bool) -> World {
     let samples = vec![GROUND as u16; stride * stride];
     let terrain = Heightfield::from_samples(CELLS, CELLS, samples, Fx::ZERO, Fx::ONE, Fx::ZERO);
     let map = MapData {
+        doodads: Default::default(),
         name: "gravitic".into(),
         content_id: 1,
         ore: Vec::new(),

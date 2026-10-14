@@ -44,24 +44,52 @@ impl CullLists {
     ) -> Result<Self, GpuError> {
         let storage = vk::BufferUsageFlags::STORAGE_BUFFER;
         let lists = cull_list::COUNT as u64;
-        Ok(CullLists {
+        let mut result = CullLists {
             draws,
-            vis: gpu.device_buffer(entities * 4, storage)?,
-            counters: gpu.device_buffer(slot_count as u64 * lists * 4, storage)?,
-            commands: gpu.device_buffer(
+            vis: Buffer::null(),
+            counters: Buffer::null(),
+            commands: Buffer::null(),
+            visible: Buffer::null(),
+            sway: Buffer::null(),
+            pulled: Buffer::null(),
+            slot_count,
+        };
+        let allocation = (|| {
+            result.vis = gpu.device_buffer(entities * 4, storage)?;
+            result.counters = gpu.device_buffer(slot_count as u64 * lists * 4, storage)?;
+            result.commands = gpu.device_buffer(
                 slot_count as u64 * lists * COMMAND_BYTES,
                 storage | vk::BufferUsageFlags::INDIRECT_BUFFER,
-            )?,
-            visible: gpu.device_buffer((entities + units + (lists - 1) * entities) * 4, storage)?,
-            sway: gpu.device_buffer(entities * 16, storage)?,
-            pulled: gpu.device_buffer(
+            )?;
+            result.visible =
+                gpu.device_buffer((entities + units + (lists - 1) * entities) * 4, storage)?;
+            result.sway = gpu.device_buffer(entities * 16, storage)?;
+            result.pulled = gpu.device_buffer(
                 slot_count as u64 * lists * PULLED_BYTES,
                 storage | vk::BufferUsageFlags::INDIRECT_BUFFER,
-            )?,
-            slot_count,
-        })
+            )?;
+            Ok::<_, GpuError>(())
+        })();
+        if let Err(error) = allocation {
+            result.destroy(gpu);
+            return Err(error);
+        }
+        Ok(result)
     }
 
+    pub(super) fn for_statics(
+        &self,
+        gpu: &Gpu,
+        statics: &[mc_sim::mirror::UnitInstance],
+    ) -> Result<Self, GpuError> {
+        Self::new(
+            gpu,
+            self.slot_count,
+            (statics.len() + super::MAX_DYNAMIC) as u64,
+            super::MAX_DYNAMIC as u64,
+            self.draws.with_statics(statics),
+        )
+    }
     /// The cull set's bindings 5 to 8, in order (11 is `sway`).
     pub(super) fn bindings(&self) -> [&Buffer; 4] {
         [&self.vis, &self.counters, &self.commands, &self.visible]

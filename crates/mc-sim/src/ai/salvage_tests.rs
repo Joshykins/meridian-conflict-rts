@@ -29,6 +29,7 @@ fn world() -> World {
     World::with_terrain(
         Heightfield::flat(256, 256, Fx::from_int(20)),
         MapData {
+            doodads: Default::default(),
             name: "salvage".into(),
             content_id: 11,
             ore: Vec::new(),

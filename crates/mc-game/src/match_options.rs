@@ -30,6 +30,7 @@ pub struct MatchOptions {
     /// The weather and time of day the host picked; every machine (and a replay)
     /// shows the match under it. Presentation only: the sim never reads it.
     pub sky: SkyChoice,
+    pub mission: Option<mc_sim::mission::Definition>,
 }
 
 /// One person's own choices for their seat, sent as their lobby setup.
@@ -64,12 +65,31 @@ impl SeatChoice {
 
 impl MatchOptions {
     pub fn encode(&self) -> Result<Vec<u8>, String> {
-        bincode::serialize(self).map_err(|e| e.to_string())
+        let mut bytes = b"MCOPT2\0".to_vec();
+        bytes.extend(bincode::serialize(self).map_err(|e| e.to_string())?);
+        if bytes.len() as u64 > MAX_OPTIONS_BYTES {
+            return Err("Match options exceed 1 MiB".into());
+        }
+        Ok(bytes)
     }
 
     pub fn decode(bytes: &[u8]) -> Result<MatchOptions, String> {
-        mc_sim::decode_untrusted(bytes, MAX_OPTIONS_BYTES)
-            .map_err(|e| format!("the host sent unreadable match options: {e}"))
+        if let Some(body) = bytes.strip_prefix(b"MCOPT2\0") {
+            mc_sim::decode_untrusted(body, MAX_OPTIONS_BYTES)
+                .map_err(|e| format!("the host sent unreadable match options: {e}"))
+        } else {
+            let old: LegacyOptions = mc_sim::decode_untrusted(bytes, MAX_OPTIONS_BYTES)
+                .map_err(|e| format!("unreadable legacy match options: {e}"))?;
+            Ok(Self {
+                config: old.config,
+                survival: old.survival,
+                colors: old.colors,
+                map: old.map,
+                map_id: old.map_id,
+                sky: old.sky,
+                mission: None,
+            })
+        }
     }
 
     /// The match every machine builds from a session's start message. Seats a person
@@ -121,6 +141,31 @@ mod tests {
     }
 
     #[test]
+    fn old_replays_decode_without_a_mission() {
+        let legacy = LegacyOptions {
+            config: MatchConfig {
+                seed: 1,
+                players: vec![seat("old", Controller::Human)],
+                cheats: false,
+                fog: true,
+                spawn_commanders: true,
+            },
+            survival: None,
+            colors: crate::setup::TEAM_COLORS,
+            map: "old-map".into(),
+            map_id: 7,
+            sky: Default::default(),
+        };
+        let bytes = bincode::serialize(&legacy).unwrap();
+        let decoded = MatchOptions::decode(&bytes).unwrap();
+        assert_eq!(decoded.map_id, 7);
+        assert!(decoded.mission.is_none());
+        let versioned = decoded.encode().unwrap();
+        assert!(versioned.starts_with(b"MCOPT2\0"));
+        assert_eq!(MatchOptions::decode(&versioned).unwrap().map, "old-map");
+    }
+
+    #[test]
     fn a_joined_seat_takes_its_persons_name_and_choices() {
         let options = MatchOptions {
             config: MatchConfig {
@@ -135,6 +180,7 @@ mod tests {
             map: "twin_shoals".into(),
             map_id: 9,
             sky: SkyChoice::default(),
+            mission: None,
         };
         let start = mc_net::MatchStart {
             content: Default::default(),
@@ -167,4 +213,15 @@ mod tests {
         // Garbage from another machine is an error, never a panic.
         assert!(MatchOptions::decode(&[0xFF; 40]).is_err());
     }
+}
+
+// Original replay/network options, before versioned mission definitions.
+#[derive(Serialize, Deserialize)]
+struct LegacyOptions {
+    config: MatchConfig,
+    survival: Option<SurvivalConfig>,
+    colors: crate::setup::Palette,
+    map: String,
+    map_id: u64,
+    sky: SkyChoice,
 }

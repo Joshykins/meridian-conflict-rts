@@ -147,9 +147,14 @@ pub(crate) fn place_cells_of(footprint: (u8, u8), pos: FxVec2) -> ((u32, u32), (
 
 /// City buildings and precursor artifacts are solid. Their cells are blocked,
 /// once, before the match starts.
-pub(crate) fn block_buildings(nav: &mut Nav, props: &[Prop], map_size: FxVec2) {
-    for p in props {
-        for (min, max) in prop_cells(p, map_size) {
+pub(crate) fn block_buildings(
+    nav: &mut Nav,
+    props: &[Prop],
+    map_size: FxVec2,
+    components: &crate::doodads::Components,
+) {
+    for (i, p) in props.iter().enumerate() {
+        for (min, max) in prop_cells(p, map_size, components.get(&(i as u32))) {
             nav.block_cells(min, max);
         }
     }
@@ -158,7 +163,14 @@ pub(crate) fn block_buildings(nav: &mut Nav, props: &[Prop], map_size: FxVec2) {
 /// The cell rectangles a map prop makes solid: a city building's lot on the
 /// build grid, or a precursor artifact's or a landmark's solid parts
 /// (`Prop::solid_runs`), a row at a time. Nothing for trees and rocks.
-pub(crate) fn prop_cells(p: &Prop, map_size: FxVec2) -> Vec<((u32, u32), (u32, u32))> {
+pub(crate) fn prop_cells(
+    p: &Prop,
+    map_size: FxVec2,
+    component: Option<&mc_map::placed::Doodad>,
+) -> Vec<((u32, u32), (u32, u32))> {
+    if let Some(cells) = component.and_then(|d| crate::doodads::cells(p, d, map_size)) {
+        return cells;
+    }
     if !p.kind.solid_plan().is_empty() {
         let cell = mc_map::CELL_SIZE_M;
         let cells = (
@@ -256,12 +268,10 @@ impl World {
             let map_size = self.terrain.size_metres();
             for (i, p) in self.map.props.iter().enumerate() {
                 // A city block that came down left rubble its cells stay open over.
-                if !(p.kind.is_building() || !p.kind.solid_plan().is_empty())
-                    || !self.is_prop_alive(i)
-                {
+                if !self.is_prop_alive(i) {
                     continue;
                 }
-                for cells in prop_cells(p, map_size) {
+                for cells in prop_cells(p, map_size, self.map.doodads.get(&(i as u32))) {
                     if released.iter().any(|&r| cells_overlap(r, cells)) {
                         restore.push(cells);
                     }
@@ -282,13 +292,21 @@ impl World {
     /// still stands on: another structure, or a solid prop that is not one.
     pub(crate) fn open_prop_cells(&mut self, prop: usize, middle: FxVec3, reach: Fx) {
         let map_size = self.terrain.size_metres();
-        let released = prop_cells(&self.map.props[prop], map_size);
+        let released = prop_cells(
+            &self.map.props[prop],
+            map_size,
+            self.map.doodads.get(&(prop as u32)),
+        );
         for &(min, max) in &released {
             self.nav.unblock_cells(min, max);
         }
         let mut restore = Vec::new();
-        let mut keep = |p: &Prop| {
-            for cells in prop_cells(p, map_size) {
+        let mut keep = |i: usize| {
+            for cells in prop_cells(
+                &self.map.props[i],
+                map_size,
+                self.map.doodads.get(&(i as u32)),
+            ) {
                 if released.iter().any(|&r| cells_overlap(r, cells)) {
                     restore.push(cells);
                 }
@@ -302,11 +320,11 @@ impl World {
             reach + Fx::from_int(mc_map::CELL_SIZE_M * 2),
         );
         for (row, _, _) in near {
-            keep(&self.map.props[self.state.city.prop[row] as usize]);
+            keep(self.state.city.prop[row] as usize);
         }
         for &other in &self.city_shapes.other_solids {
             if self.is_prop_alive(other as usize) {
-                keep(&self.map.props[other as usize]);
+                keep(other as usize);
             }
         }
         for (min, max) in restore {

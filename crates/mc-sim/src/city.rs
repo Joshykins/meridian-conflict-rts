@@ -33,7 +33,9 @@ pub const GUTTED: u8 = 2;
 pub const DOWN: u8 = 4;
 /// Flag: listed in [`Structures::touched`].
 const LISTED: u8 = 8;
-const KNOWN_FLAGS: u8 = BURNING | GUTTED | DOWN | LISTED;
+/// Flag: all authored salvage was collected; hide the rubble as well.
+pub const RECLAIMED: u8 = 16;
+const KNOWN_FLAGS: u8 = BURNING | GUTTED | DOWN | LISTED | RECLAIMED;
 
 /// Below this share of its health (thousandths) a structure that burns catches fire.
 pub const BURN_AT_PERMILLE: i64 = 550;
@@ -97,6 +99,8 @@ pub struct Structures {
     pub health: Vec<i32>,
     /// Health whole: the kind's times the square of the prop's scale.
     pub max: Vec<i32>,
+    /// Authored materials still available, including after destruction.
+    pub salvage: Vec<Fx>,
     /// `BURNING`, `GUTTED`, `DOWN`.
     pub flags: Vec<u8>,
     /// The tick its flags last changed: it caught fire, went out or came down.
@@ -126,7 +130,11 @@ impl Structures {
         (self.health[row].max(0) as i64 * 255 / max) as u8
     }
 
-    fn touch(&mut self, row: usize) {
+    pub(crate) fn is_touched(&self, row: usize) -> bool {
+        self.flags[row] & LISTED != 0
+    }
+
+    pub(crate) fn touch(&mut self, row: usize) {
         if self.flags[row] & LISTED == 0 {
             self.flags[row] |= LISTED;
             self.touched.push(row as u32);
@@ -134,20 +142,38 @@ impl Structures {
     }
 
     /// The table for `props`: one row per structure that can be hit, worn as the map says.
-    fn new(props: &[Prop]) -> Structures {
+    fn new(props: &[Prop], components: &crate::doodads::Components) -> Structures {
         let mut s = Structures::default();
         for (i, p) in props.iter().enumerate() {
-            let Some(kind) = mc_map::city::structure(p.kind).filter(|k| k.health > 0) else {
-                continue;
+            let max = if let Some(d) = components.get(&(i as u32)) {
+                if d.health == 0 && (d.blocking || d.reclaim > 0) {
+                    i64::from(i32::MAX)
+                } else {
+                    i64::from(d.health)
+                }
+            } else {
+                let scale = i64::from(p.scale_milli);
+                mc_map::city::structure(p.kind).map_or(0, |kind| {
+                    if kind.health == 0 {
+                        0
+                    } else {
+                        (i64::from(kind.health) * scale * scale / 1_000_000)
+                            .clamp(1, i64::from(i32::MAX))
+                    }
+                })
             };
-            let scale = p.scale_milli as i64;
-            let max = (kind.health as i64 * scale * scale / 1_000_000).clamp(1, i32::MAX as i64);
+            if max == 0 {
+                continue;
+            }
             // A map's worst wear leaves it standing on its last point: what it
             // wants knocked down it lays as rubble.
             let worn = (max * p.wear_milli.min(1000) as i64 / 1000).min(max - 1);
             let row = s.prop.len();
             s.prop.push(i as u32);
             s.max.push(max as i32);
+            s.salvage.push(Fx::from_int(
+                components.get(&(i as u32)).map_or(0, |d| d.reclaim as i32),
+            ));
             s.health.push((max - worn) as i32);
             s.flags.push(0);
             s.since.push(0);
@@ -164,6 +190,7 @@ impl Structures {
             let r = row as usize;
             h.write_u64(row as u64 | (self.flags[r] as u64) << 32);
             h.write_u64(self.health[r] as u32 as u64 | (self.since[r] as u64) << 32);
+            h.write_u64(self.salvage[r].0 as u64);
         }
     }
 
@@ -176,6 +203,7 @@ impl Structures {
         if [
             self.health.len(),
             self.max.len(),
+            self.salvage.len(),
             self.flags.len(),
             self.since.len(),
         ]
@@ -197,6 +225,9 @@ impl Structures {
             let (health, max, flags) = (self.health[r], self.max[r], self.flags[r]);
             let down = flags & DOWN != 0;
             if max <= 0
+                || self.salvage[r] < Fx::ZERO
+                || self.salvage[r] > Fx::from_int(1_000_000)
+                || (flags & RECLAIMED != 0 && (!down || self.salvage[r] != Fx::ZERO))
                 || health > max
                 || health < 0
                 || flags & !KNOWN_FLAGS != 0
@@ -322,7 +353,12 @@ pub struct CityShapes {
 }
 
 impl CityShapes {
-    pub(crate) fn new(table: &Structures, props: &[Prop], terrain: &Heightfield) -> CityShapes {
+    pub(crate) fn new(
+        table: &Structures,
+        props: &[Prop],
+        terrain: &Heightfield,
+        components: &crate::doodads::Components,
+    ) -> CityShapes {
         let size = terrain.size_metres();
         let dims = (
             (size.x.ceil_int() / BUCKET_M).max(1),
@@ -337,18 +373,17 @@ impl CityShapes {
         c.bucket_top = vec![Fx::MIN; cover.len()];
         for (row, &prop) in table.prop.iter().enumerate() {
             let p = &props[prop as usize];
-            let kind = mc_map::city::structure(p.kind).expect("a structure row is a city kind");
             let scale = Fx::from_int(p.scale_milli as i32) / 1000;
             let ground = terrain.height_at(p.pos);
             let (sin, cos) = (p.heading.sin(), p.heading.cos());
             c.first.push(c.parts.len() as u32);
             let (mut lo, mut hi) = (p.pos, p.pos);
             let mut tallest = Fx::ZERO;
-            for (&(cx, cy, hx, hy), &top) in kind.plan.iter().zip(kind.tops) {
-                let (cx, cy) = (Fx::from_int(cx) * scale, Fx::from_int(cy) * scale);
-                let half = FxVec2::new(Fx::from_int(hx) * scale, Fx::from_int(hy) * scale);
+            for part in mc_map::placed::prop_parts(p, components.get(&prop)) {
+                let (cx, cy) = (part.centre.x * scale, part.centre.y * scale);
+                let half = part.half * scale;
                 let mid = FxVec2::new(p.pos.x + cx * cos - cy * sin, p.pos.y + cx * sin + cy * cos);
-                let top = Fx::from_int(top) * scale;
+                let top = part.top * scale;
                 tallest = tallest.max(top);
                 let part = Part {
                     mid,
@@ -392,8 +427,9 @@ impl CityShapes {
         c.other_solids = props
             .iter()
             .enumerate()
-            .filter(|(_, p)| {
-                !p.kind.is_city() && (p.kind.is_building() || !p.kind.solid_plan().is_empty())
+            .filter(|(i, p)| {
+                table.prop.binary_search(&(*i as u32)).is_err()
+                    && !crate::lots::prop_cells(p, size, components.get(&(*i as u32))).is_empty()
             })
             .map(|(i, _)| i as u32)
             .collect();
@@ -572,9 +608,13 @@ impl CityShapes {
 }
 
 /// What a city row is built from: the state table and the map's shapes.
-pub(crate) fn build(props: &[Prop], terrain: &Heightfield) -> (Structures, CityShapes) {
-    let table = Structures::new(props);
-    let shapes = CityShapes::new(&table, props, terrain);
+pub(crate) fn build(
+    props: &[Prop],
+    terrain: &Heightfield,
+    components: &crate::doodads::Components,
+) -> (Structures, CityShapes) {
+    let table = Structures::new(props, components);
+    let shapes = CityShapes::new(&table, props, terrain, components);
     (table, shapes)
 }
 
@@ -583,6 +623,10 @@ impl World {
     /// sets it alight at once if it burns. A standing structure only.
     pub(crate) fn damage_structure(&mut self, row: usize, damage: Fx, ignite: bool) {
         let tick = self.state.tick;
+        let prop = self.state.city.prop[row];
+        if self.map.doodads.get(&prop).is_some_and(|d| d.health == 0) {
+            return;
+        }
         let s = &mut self.state.city;
         if s.is_down(row) || damage <= Fx::ZERO {
             return;

@@ -60,12 +60,57 @@ fn terrain() -> Heightfield {
 fn world(threads: usize) -> World {
     let blueprints =
         Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+    let mut props = city();
+    let salvage_prop = props.len() as u32;
+    props.push(mc_map::Prop {
+        kind: mc_map::PropKind::CityBillboard,
+        pos: FxVec2::from_ints(100, 3650),
+        heading: Angle::ZERO,
+        scale_milli: 1000,
+        wear_milli: 0,
+    });
     let map = MapData {
+        doodads: [
+            (
+                0,
+                mc_map::placed::Doodad {
+                    id: 1,
+                    name: "matrix_billboard".into(),
+                    prop_index: 0,
+                    tint: [255; 3],
+                    blocking: true,
+                    health: 1400,
+                    reclaim: 0,
+                    footprint: Some(mc_map::placed::Footprint {
+                        half: FxVec2::from_ints(12, 3),
+                        height: Fx::from_int(15),
+                    }),
+                },
+            ),
+            (
+                salvage_prop,
+                mc_map::placed::Doodad {
+                    id: 2,
+                    name: "matrix_salvage".into(),
+                    prop_index: salvage_prop,
+                    tint: [255; 3],
+                    blocking: true,
+                    health: 0,
+                    reclaim: 10_000,
+                    footprint: Some(mc_map::placed::Footprint {
+                        half: FxVec2::from_ints(8, 3),
+                        height: Fx::from_int(10),
+                    }),
+                },
+            ),
+        ]
+        .into_iter()
+        .collect(),
         name: "determinism".into(),
         content_id: 1,
         ore: Vec::new(),
         starts: vec![FxVec2::from_ints(800, 500), FxVec2::from_ints(800, 3600)],
-        props: city(),
+        props,
     };
     let player = |name: &str, team| PlayerSetup {
         name: name.into(),
@@ -82,14 +127,68 @@ fn world(threads: usize) -> World {
         fog: true,
         spawn_commanders: false,
     };
-    World::with_terrain(
+    let mut world = World::with_terrain(
         terrain(),
         map,
         Arc::new(blueprints),
         Arc::new(Pool::new(threads)),
         &config,
     )
-    .unwrap()
+    .unwrap();
+    use mc_sim::mission::{Action, Condition, Definition, Event, Objective};
+    world
+        .begin_mission(Definition {
+            key: "determinism_mission".into(),
+            placed: mc_map::placed::Placed {
+                next_id: 3,
+                doodads: world.map.doodads.values().cloned().collect(),
+                ..Default::default()
+            },
+            events: vec![
+                Event {
+                    name: "opening".into(),
+                    when: Condition::Elapsed(0),
+                    actions: vec![
+                        Action::Say {
+                            line: "matrix.comms".into(),
+                            ticks: 400,
+                        },
+                        Action::Objective {
+                            line: "matrix.objective".into(),
+                            status: Objective::Active,
+                        },
+                        Action::Checkpoint(1),
+                    ],
+                },
+                Event {
+                    name: "prop_destroyed".into(),
+                    when: Condition::PropDead("matrix_billboard".into()),
+                    actions: vec![Action::Say {
+                        line: "matrix.prop".into(),
+                        ticks: 10,
+                    }],
+                },
+                Event {
+                    name: "after_snapshot".into(),
+                    when: Condition::All(vec![
+                        Condition::After {
+                            event: "opening".into(),
+                            ticks: 400,
+                        },
+                        Condition::DialogueIdle,
+                    ]),
+                    actions: vec![
+                        Action::Objective {
+                            line: "matrix.objective".into(),
+                            status: Objective::Complete,
+                        },
+                        Action::Checkpoint(2),
+                    ],
+                },
+            ],
+        })
+        .unwrap();
+    world
 }
 
 /// City blocks (`city.rs`): houses round where the warhead lands, which it brings
@@ -105,7 +204,7 @@ fn city() -> Vec<mc_map::Prop> {
         wear_milli,
     };
     let mut props = vec![
-        at(PropKind::CityHouse, 840, 3300, 0, 0),
+        at(PropKind::CityBillboard, 840, 3300, 0, 0),
         at(PropKind::CityHouse, 960, 3300, 0, 300),
         at(PropKind::CityTenement, 900, 3390, 0x4000, 0),
         at(PropKind::CityOffice, 900, 3200, 0x2000, 0),
@@ -315,6 +414,18 @@ fn setup(w: &mut World) {
             blueprint: w.blueprints.id_of("aster_t2_tank").unwrap(),
             pos: WRECK_FIELD,
             count: 9,
+        },
+    });
+    spawns.push(PlayerCommand {
+        player: 1,
+        command: Command::DebugSpawn {
+            owner: 1,
+            blueprint: w.blueprints.id_of("aster_t2_reclaimer").unwrap(),
+            pos: FxVec2::from_ints(100, 3600),
+            heading: Angle::ZERO,
+            count: 1,
+            flags: 0,
+            build: 1000,
         },
     });
     w.tick(&spawns).unwrap();
@@ -1066,6 +1177,15 @@ fn reference() -> Vec<u64> {
     assert!(on_blocks > 0, "no shot met a city block");
     assert!(alight > 0, "no city block caught fire");
     assert!(down > 0, "no city block came down");
+    assert!(
+        !w.is_prop_alive(0),
+        "the authored billboard survived the warhead"
+    );
+    let salvage = w.state.city.salvage.last().unwrap();
+    assert!(
+        *salvage < Fx::from_int(10_000),
+        "authored salvage was never collected"
+    );
     // The factory's scouts formed up, waited across the snapshot and left together.
     assert!(held_at_snapshot > 0, "no batch was waiting at the snapshot");
     assert!(batches_sent > 0, "no batch filled and left");

@@ -3,7 +3,7 @@
 //! instead of after a build of the game. [`reload_from`] compiles every shader
 //! in a directory exactly as the build does (`shader_prelude`); from then on
 //! each `spirv!` in the crate hands out the rebuilt SPIR-V, so the next renderer
-//! built in this process uses it. The game itself never calls this.
+//! built in this process uses it. The editor and shot server share this reload path.
 
 use crate::shader_prelude::{compile, Preludes, PRELUDES};
 use std::borrow::Cow;
@@ -16,6 +16,27 @@ type Spirv = BTreeMap<String, Vec<u8>>;
 
 /// The rebuilt shaders, once `reload_from` has run.
 static REBUILT: RwLock<Option<Arc<Spirv>>> = RwLock::new(None);
+
+/// Restores the last working shader cache unless a replacement renderer commits.
+pub struct Checkpoint(Option<Option<Arc<Spirv>>>);
+
+pub fn checkpoint() -> Checkpoint {
+    Checkpoint(Some(
+        REBUILT.read().unwrap_or_else(|p| p.into_inner()).clone(),
+    ))
+}
+impl Checkpoint {
+    pub fn commit(mut self) {
+        self.0 = None;
+    }
+}
+impl Drop for Checkpoint {
+    fn drop(&mut self) {
+        if let Some(previous) = self.0.take() {
+            *REBUILT.write().unwrap_or_else(|p| p.into_inner()) = previous;
+        }
+    }
+}
 
 /// Why the shaders could not be rebuilt; the ones built before stay in use.
 #[derive(Debug)]

@@ -43,6 +43,7 @@ fn world_with(fog: bool) -> World {
     World::with_terrain(
         Heightfield::flat(1024, 1024, Fx::from_int(20)),
         MapData {
+            doodads: Default::default(),
             name: "commander test".into(),
             content_id: 9,
             ore: Vec::new(),

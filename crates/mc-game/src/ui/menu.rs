@@ -14,6 +14,9 @@ pub enum MenuAction {
     Multiplayer,
     Survival,
     Range,
+    Editor,
+    Campaign,
+    ContinueCampaign,
     History,
     Options,
     Quit,
@@ -25,7 +28,17 @@ struct Entry {
     action: Option<MenuAction>,
 }
 
-const ENTRIES: [Entry; 7] = [
+const ENTRIES: [Entry; 10] = [
+    Entry {
+        label: "The Contract",
+        blurb: "Vela • begin Merrick's first mission",
+        action: Some(MenuAction::Campaign),
+    },
+    Entry {
+        label: "Continue Campaign",
+        blurb: "Resume the latest mission checkpoint",
+        action: Some(MenuAction::ContinueCampaign),
+    },
     Entry {
         label: "Skirmish",
         blurb: "Command your battlefield",
@@ -40,6 +53,11 @@ const ENTRIES: [Entry; 7] = [
         label: "Test Range",
         blurb: "One unit on a pad: attack it, build it, break it, reset",
         action: Some(MenuAction::Range),
+    },
+    Entry {
+        label: "Map Editor",
+        blurb: "Build and play your missions",
+        action: Some(MenuAction::Editor),
     },
     Entry {
         label: "Multiplayer",

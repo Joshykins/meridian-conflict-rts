@@ -31,6 +31,7 @@ fn world() -> World {
         spawn_commanders: false,
     };
     let map = MapData {
+        doodads: Default::default(),
         name: "flat".into(),
         content_id: 1,
         ore: Vec::new(),

@@ -211,9 +211,14 @@ pub struct TileCache {
     /// Where the terrain is drawn finer than its samples (`select_nodes`).
     pub cliffs: CliffBlocks,
     frame: u64,
+    editor_tiles: std::collections::BTreeMap<(u32, u32), Vec<u16>>,
 }
 
 impl TileCache {
+    pub(crate) fn source(&self) -> &MapFile {
+        &self.map
+    }
+
     pub fn new(map: Arc<MapFile>, cliffs: CliffBlocks) -> TileCache {
         let (tiles_w, tiles_h) = map.size_tiles();
         let info = map.info();
@@ -239,7 +244,78 @@ impl TileCache {
             arrived: Vec::new(),
             synced: false,
             frame: 0,
+            editor_tiles: Default::default(),
         }
+    }
+
+    /// Patch authoring changes into resident tiles, and retain them for tiles
+    /// which stream in later (including reads already in flight).
+    pub(crate) fn edit_terrain(
+        &mut self,
+        doc: &mc_map::edit::EditMap,
+        rect: [u32; 4],
+        uploads: &mut Vec<TerrainUpload>,
+    ) -> Result<(), mc_map::MapError> {
+        let (w, h) = doc.info.size_cells();
+        if doc.info.tiles_w != self.tiles_w
+            || doc.info.tiles_h != self.tiles_h
+            || rect[0] > rect[2]
+            || rect[1] > rect[3]
+            || rect[2] > w
+            || rect[3] > h
+        {
+            return Err(mc_map::MapError::Invalid(
+                "invalid editor terrain patch".into(),
+            ));
+        }
+        let tx0 = rect[0].saturating_sub(1) / TILE_CELLS;
+        let ty0 = rect[1].saturating_sub(1) / TILE_CELLS;
+        let tx1 = (rect[2] / TILE_CELLS).min(self.tiles_w - 1);
+        let ty1 = (rect[3] / TILE_CELLS).min(self.tiles_h - 1);
+        for ty in ty0..=ty1 {
+            for tx in tx0..=tx1 {
+                let samples = doc.tile(tx, ty)?;
+                let slot = self.index[(ty * self.tiles_w + tx) as usize];
+                if slot != 0 {
+                    uploads.push(TerrainUpload::Tile {
+                        layer: slot as u32 - 1,
+                        samples: samples.clone(),
+                    });
+                }
+                self.editor_tiles.insert((tx, ty), samples);
+            }
+        }
+        let (ow, oh) = self.overview_dims;
+        for y in rect[1].div_ceil(OVERVIEW_STRIDE)..=(rect[3] / OVERVIEW_STRIDE).min(oh - 1) {
+            for x in rect[0].div_ceil(OVERVIEW_STRIDE)..=(rect[2] / OVERVIEW_STRIDE).min(ow - 1) {
+                let sample =
+                    doc.samples()[(y * OVERVIEW_STRIDE * (w + 1) + x * OVERVIEW_STRIDE) as usize];
+                self.overview[(y * ow + x) as usize] = sample;
+                let z = doc.info.sample_to_height(sample).to_f32();
+                self.height_span.0 = self.height_span.0.min(z - 60.0);
+                self.height_span.1 = self.height_span.1.max(z + 60.0);
+            }
+        }
+        uploads.push(TerrainUpload::OverviewPatch {
+            x: 0,
+            y: 0,
+            w: 0,
+            h: 0,
+            sample: 0,
+        });
+        Ok(())
+    }
+
+    /// Drop simulation flattening before reapplying the authored samples.
+    /// Doing it in the opposite order rewinds the overview to the original file.
+    pub(crate) fn restore_editor(
+        &mut self,
+        doc: &mc_map::edit::EditMap,
+        uploads: &mut Vec<TerrainUpload>,
+    ) -> Result<(), mc_map::MapError> {
+        self.apply_edits(&[], 0.0, uploads);
+        let (w, h) = doc.info.size_cells();
+        self.edit_terrain(doc, [0, 0, w, h], uploads)
     }
 
     pub fn tiles(&self) -> (u32, u32) {
@@ -265,6 +341,9 @@ impl TileCache {
                 log::error!("failed to read map tile {tile:?}");
                 continue;
             };
+            if let Some(edited) = self.editor_tiles.get(&tile) {
+                samples.clone_from(edited);
+            }
             for e in &self.edits[..self.committed] {
                 patch_tile(&mut samples, tile, e);
             }
@@ -536,6 +615,40 @@ fn patch_tile(samples: &mut [u16], tile: (u32, u32), e: &FlattenRecord) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn stopping_a_playtest_restores_authored_tiles_and_overview_after_flattening() {
+        let path =
+            std::env::temp_dir().join(format!("mc-editor-rewind-{}.mcmap", std::process::id()));
+        mc_map::bake::bake(&mc_map::bake::BakeParams::square("rewind", 2, 17), &path).unwrap();
+        let map = Arc::new(MapFile::open(&path).unwrap());
+        let mut doc = mc_map::edit::EditMap::load(&map).unwrap();
+        let authored = doc.samples()[0].saturating_add(100);
+        doc.set_sample(0, 0, authored).unwrap();
+        let mut cache = TileCache::new(map, CliffBlocks::none());
+        let mut uploads = Vec::new();
+        cache
+            .edit_terrain(&doc, [0, 0, 0, 0], &mut uploads)
+            .unwrap();
+        cache.apply_edits(
+            &[FlattenRecord {
+                min_x: 0,
+                min_y: 0,
+                max_x: 8,
+                max_y: 8,
+                sample: authored.saturating_sub(50),
+            }],
+            0.0,
+            &mut uploads,
+        );
+        assert_ne!(cache.overview[0], authored);
+        cache.restore_editor(&doc, &mut uploads).unwrap();
+        cache.apply_edits(&[], 1.0, &mut uploads);
+        assert!(cache.edits.is_empty());
+        assert_eq!(cache.overview[0], authored);
+        assert_eq!(cache.editor_tiles[&(0, 0)][0], authored);
+        drop(cache);
+        std::fs::remove_file(path).unwrap();
+    }
 
     #[test]
     fn selection_is_bounded_and_covers_the_view() {

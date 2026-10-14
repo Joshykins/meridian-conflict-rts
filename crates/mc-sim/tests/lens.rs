@@ -32,6 +32,7 @@ fn world() -> World {
         Fx::ZERO,
     );
     let map = MapData {
+        doodads: Default::default(),
         name: "lens".into(),
         content_id: 1,
         ore: Vec::new(),

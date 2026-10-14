@@ -55,14 +55,25 @@ pub(super) struct Shape {
 }
 
 impl Shape {
-    fn of(p: &Prop) -> Option<Shape> {
-        let s = city::structure(p.kind).filter(|s| s.health > 0)?;
+    fn of(p: &Prop, component: Option<&mc_map::placed::Doodad>) -> Option<Shape> {
+        let native = city::structure(p.kind);
+        if !component.map_or_else(
+            || native.is_some_and(|s| s.health > 0),
+            |d| d.health > 0 || d.blocking,
+        ) {
+            return None;
+        }
+        let parts = mc_map::placed::prop_parts(p, component);
+        if parts.is_empty() {
+            return None;
+        }
+
         let scale = p.scale_milli as f32 / 1000.0;
         let (mut lo, mut hi) = (Vec2::splat(f32::MAX), Vec2::splat(f32::MIN));
-        for &(cx, cy, hx, hy) in s.plan {
+        for part in &parts {
             let (c, h) = (
-                Vec2::new(cx as f32, cy as f32),
-                Vec2::new(hx as f32, hy as f32),
+                Vec2::from(part.centre.to_f32()),
+                Vec2::from(part.half.to_f32()),
             );
             lo = lo.min(c - h);
             hi = hi.max(c + h);
@@ -75,9 +86,15 @@ impl Shape {
             centre: origin + along.rotate(mid),
             half: (hi - lo) * 0.5 * scale,
             along,
-            top: s.tops.iter().copied().max().unwrap_or(0) as f32 * scale,
-            glazing: s.glazing as f32 / 255.0,
-            burns: s.burns,
+            top: parts
+                .iter()
+                .map(|p| p.top)
+                .max()
+                .unwrap_or_default()
+                .to_f32()
+                * scale,
+            glazing: native.map_or(0.0, |s| s.glazing as f32 / 255.0),
+            burns: native.is_some_and(|s| s.burns),
         })
     }
 
@@ -167,10 +184,19 @@ pub(super) fn heaps(
     blueprint: u32,
     height: impl Fn(Vec2) -> f32,
 ) -> (Vec<UnitInstance>, Vec<(u32, u32)>) {
+    heaps_for(map.props(), |i| map.doodad(i), first, blueprint, height)
+}
+pub(super) fn heaps_for<'a>(
+    props: &[Prop],
+    component: impl Fn(usize) -> Option<&'a mc_map::placed::Doodad>,
+    first: u32,
+    blueprint: u32,
+    height: impl Fn(Vec2) -> f32,
+) -> (Vec<UnitInstance>, Vec<(u32, u32)>) {
     let mut instances = Vec::new();
     let mut list = Vec::new();
-    for (i, p) in map.props().iter().enumerate() {
-        let Some(shape) = Shape::of(p) else {
+    for (i, p) in props.iter().enumerate() {
+        let Some(shape) = Shape::of(p, component(i)) else {
             continue;
         };
         // Heaps across the narrow way, end to end along the long one.
@@ -224,29 +250,45 @@ impl CityFx {
         staged: usize,
         heaps: Vec<(u32, u32)>,
     ) -> Result<CityFx, GpuError> {
+        Self::from_props(
+            gpu,
+            Vec2::from(map.info().size_metres().to_f32()),
+            map.props(),
+            |i| map.doodad(i),
+            staged,
+            heaps,
+        )
+    }
+    pub(super) fn from_props<'a>(
+        gpu: &Gpu,
+        size: Vec2,
+        source: &[Prop],
+        component: impl Fn(usize) -> Option<&'a mc_map::placed::Doodad>,
+        staged: usize,
+        heaps: Vec<(u32, u32)>,
+    ) -> Result<Self, GpuError> {
         // A word for each of the map's props, and for each prop a shot stages after them.
-        let props = (map.props().len() + staged).max(1);
+        let props = (source.len() + staged).max(1);
         let buffer = gpu.host_buffer((props * 4) as u64, vk::BufferUsageFlags::STORAGE_BUFFER)?;
         buffer.write(0, &vec![0u8; props * 4]);
-        let size = Vec2::from(map.info().size_metres().to_f32());
         let buckets_wide = (size.x / BUCKET).ceil().max(1.0) as usize;
         let buckets_high = (size.y / BUCKET).ceil().max(1.0) as usize;
         let mut parts = Vec::new();
         let mut buckets = vec![Vec::new(); buckets_wide * buckets_high];
-        for (i, p) in map.props().iter().enumerate() {
-            let Some(s) = city::structure(p.kind).filter(|s| s.health > 0) else {
+        for (i, p) in source.iter().enumerate() {
+            let Some(_) = Shape::of(p, component(i)) else {
                 continue;
             };
             let scale = p.scale_milli as f32 / 1000.0;
             let along = Vec2::from_angle(p.heading.to_radians_f32());
             let origin = Vec2::from(p.pos.to_f32());
-            for (&(cx, cy, hx, hy), &top) in s.plan.iter().zip(s.tops) {
+            for shape in mc_map::placed::prop_parts(p, component(i)) {
                 let part = Part {
                     prop: i as u32,
-                    centre: origin + along.rotate(Vec2::new(cx as f32, cy as f32) * scale),
-                    half: Vec2::new(hx as f32, hy as f32) * scale,
+                    centre: origin + along.rotate(Vec2::from(shape.centre.to_f32()) * scale),
+                    half: Vec2::from(shape.half.to_f32()) * scale,
                     along,
-                    top: top as f32 * scale,
+                    top: shape.top.to_f32() * scale,
                 };
                 let r = part.half.length();
                 let lo = ((part.centre - r) / BUCKET).floor().max(Vec2::ZERO);
@@ -264,7 +306,11 @@ impl CityFx {
             buckets,
             buckets_wide,
             dead: Vec::new(),
-            shapes: map.props().iter().map(Shape::of).collect(),
+            shapes: source
+                .iter()
+                .enumerate()
+                .map(|(i, p)| Shape::of(p, component(i)))
+                .collect(),
             looks: vec![0; props],
             buffer,
             marked: Vec::new(),
@@ -284,14 +330,19 @@ impl CityFx {
 
     /// Hides, in `bits` (one per static entity), every rubble heap whose
     /// building still stands (`dead`: the sim's dead props).
-    pub(super) fn hide_heaps(&mut self, dead: &[u32], bits: &mut [u32]) {
+    pub(super) fn hide_heaps(&mut self, dead: &[u32], city: &[StructureView], bits: &mut [u32]) {
         self.dead.clear();
         self.dead.extend_from_slice(dead);
+        let reclaimed: std::collections::BTreeSet<_> = city
+            .iter()
+            .filter(|s| s.flags & mc_sim::city::RECLAIMED != 0)
+            .map(|s| s.prop)
+            .collect();
         for &(entity, prop) in &self.heaps {
             let down = dead
                 .get(prop as usize / 32)
                 .is_some_and(|w| w & (1 << (prop % 32)) != 0);
-            if !down {
+            if !down || reclaimed.contains(&prop) {
                 if let Some(w) = bits.get_mut(entity as usize / 32) {
                     *w |= 1 << (entity % 32);
                 }
@@ -758,3 +809,6 @@ impl Renderer {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

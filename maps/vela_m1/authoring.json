@@ -1,0 +1,2669 @@
+[
+  {
+    "action": "stamp",
+    "at": [
+      7072,
+      7584
+    ],
+    "radius": 160,
+    "strength": 8,
+    "asset": "route-refinement.json"
+  },
+  {
+    "action": "unit",
+    "name": "merrick",
+    "group": "company",
+    "blueprint": "company_merrick",
+    "owner": 0,
+    "at": [
+      3368.0,
+      7988.0
+    ],
+    "heading": 0.0
+  },
+  {
+    "action": "unit",
+    "name": "company_tank_1",
+    "group": "company",
+    "blueprint": "company_t1_tank",
+    "owner": 0,
+    "at": [
+      3298.0,
+      7948.0
+    ],
+    "heading": 0.0
+  },
+  {
+    "action": "unit",
+    "name": "company_tank_2",
+    "group": "company",
+    "blueprint": "company_t1_tank",
+    "owner": 0,
+    "at": [
+      3326.0,
+      7948.0
+    ],
+    "heading": 0.0
+  },
+  {
+    "action": "unit",
+    "name": "company_tank_3",
+    "group": "company",
+    "blueprint": "company_t1_tank",
+    "owner": 0,
+    "at": [
+      3354.0,
+      7948.0
+    ],
+    "heading": 0.0
+  },
+  {
+    "action": "unit",
+    "name": "company_tank_4",
+    "group": "company",
+    "blueprint": "company_t1_tank",
+    "owner": 0,
+    "at": [
+      3382.0,
+      7948.0
+    ],
+    "heading": 0.0
+  },
+  {
+    "action": "unit",
+    "name": "company_tank_5",
+    "group": "company",
+    "blueprint": "company_t1_tank",
+    "owner": 0,
+    "at": [
+      3298.0,
+      7918.0
+    ],
+    "heading": 0.0
+  },
+  {
+    "action": "unit",
+    "name": "company_tank_6",
+    "group": "company",
+    "blueprint": "company_t1_tank",
+    "owner": 0,
+    "at": [
+      3326.0,
+      7918.0
+    ],
+    "heading": 0.0
+  },
+  {
+    "action": "unit",
+    "name": "company_tank_7",
+    "group": "company",
+    "blueprint": "company_t1_tank",
+    "owner": 0,
+    "at": [
+      3354.0,
+      7918.0
+    ],
+    "heading": 0.0
+  },
+  {
+    "action": "unit",
+    "name": "company_tank_8",
+    "group": "company",
+    "blueprint": "company_t1_tank",
+    "owner": 0,
+    "at": [
+      3382.0,
+      7918.0
+    ],
+    "heading": 0.0
+  },
+  {
+    "action": "unit",
+    "name": "company_scout_1",
+    "group": "company",
+    "blueprint": "company_t1_scout",
+    "owner": 0,
+    "at": [
+      3348.0,
+      8028.0
+    ],
+    "heading": 0.0
+  },
+  {
+    "action": "unit",
+    "name": "company_artillery_1",
+    "group": "company",
+    "blueprint": "company_t1_artillery",
+    "owner": 0,
+    "at": [
+      3248.0,
+      7998.0
+    ],
+    "heading": 0.0
+  },
+  {
+    "action": "unit",
+    "name": "company_scout_2",
+    "group": "company",
+    "blueprint": "company_t1_scout",
+    "owner": 0,
+    "at": [
+      3383.0,
+      8028.0
+    ],
+    "heading": 0.0
+  },
+  {
+    "action": "unit",
+    "name": "company_artillery_2",
+    "group": "company",
+    "blueprint": "company_t1_artillery",
+    "owner": 0,
+    "at": [
+      3283.0,
+      7998.0
+    ],
+    "heading": 0.0
+  },
+  {
+    "action": "unit",
+    "name": "roadblock_1",
+    "group": "roadblock",
+    "blueprint": "aster_t1_tank",
+    "owner": 1,
+    "at": [
+      3808.0,
+      7828.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "roadblock_2",
+    "group": "roadblock",
+    "blueprint": "aster_t1_tank",
+    "owner": 1,
+    "at": [
+      3833.0,
+      7828.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "checkpoints_1",
+    "group": "checkpoints",
+    "blueprint": "aster_t1_tank",
+    "owner": 1,
+    "at": [
+      4788.0,
+      7698.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "checkpoints_2",
+    "group": "checkpoints",
+    "blueprint": "aster_t1_tank",
+    "owner": 1,
+    "at": [
+      4813.0,
+      7698.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "checkpoints_3",
+    "group": "checkpoints",
+    "blueprint": "aster_t1_tank",
+    "owner": 1,
+    "at": [
+      4838.0,
+      7698.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "checkpoints_4",
+    "group": "checkpoints",
+    "blueprint": "aster_t1_tank",
+    "owner": 1,
+    "at": [
+      4788.0,
+      7724.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "bridge_guns_1",
+    "group": "bridge_guns",
+    "blueprint": "aster_t1_point_defense",
+    "owner": 1,
+    "at": [
+      5658.0,
+      7748.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "bridge_guns_2",
+    "group": "bridge_guns",
+    "blueprint": "aster_t1_point_defense",
+    "owner": 1,
+    "at": [
+      5738.0,
+      7748.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "camp_guards_1",
+    "group": "camp_guards",
+    "blueprint": "aster_t1_tank",
+    "owner": 1,
+    "at": [
+      6488.0,
+      7528.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "camp_guards_2",
+    "group": "camp_guards",
+    "blueprint": "aster_t1_tank",
+    "owner": 1,
+    "at": [
+      6513.0,
+      7528.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "camp_guards_3",
+    "group": "camp_guards",
+    "blueprint": "aster_t1_tank",
+    "owner": 1,
+    "at": [
+      6538.0,
+      7528.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "pdf_1",
+    "group": "pdf",
+    "blueprint": "aster_t1_tank",
+    "owner": 2,
+    "at": [
+      4328.0,
+      7748.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "pdf_2",
+    "group": "pdf",
+    "blueprint": "aster_t1_tank",
+    "owner": 2,
+    "at": [
+      4353.0,
+      7748.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "pdf_3",
+    "group": "pdf",
+    "blueprint": "aster_t1_tank",
+    "owner": 2,
+    "at": [
+      4378.0,
+      7748.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "pdf_4",
+    "group": "pdf",
+    "blueprint": "aster_t1_tank",
+    "owner": 2,
+    "at": [
+      4328.0,
+      7774.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "square_ambush_1",
+    "group": "square_ambush",
+    "blueprint": "aster_t1_tank",
+    "owner": 2,
+    "at": [
+      7678.0,
+      8088.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "square_ambush_2",
+    "group": "square_ambush",
+    "blueprint": "aster_t1_tank",
+    "owner": 2,
+    "at": [
+      7738.0,
+      8088.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "square_ambush_3",
+    "group": "square_ambush",
+    "blueprint": "aster_t1_tank",
+    "owner": 2,
+    "at": [
+      7798.0,
+      8088.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "square_ambush_4",
+    "group": "square_ambush",
+    "blueprint": "aster_t1_tank",
+    "owner": 2,
+    "at": [
+      7678.0,
+      8168.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "square_ambush_5",
+    "group": "square_ambush",
+    "blueprint": "aster_t1_tank",
+    "owner": 2,
+    "at": [
+      7738.0,
+      8168.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "square_ambush_6",
+    "group": "square_ambush",
+    "blueprint": "aster_t1_tank",
+    "owner": 2,
+    "at": [
+      7798.0,
+      8168.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "warehouse_attackers_1",
+    "group": "warehouse_attackers",
+    "blueprint": "aster_t1_tank",
+    "owner": 2,
+    "at": [
+      8048.0,
+      8388.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "warehouse_attackers_2",
+    "group": "warehouse_attackers",
+    "blueprint": "aster_t1_tank",
+    "owner": 2,
+    "at": [
+      8073.0,
+      8388.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "warehouse_attackers_3",
+    "group": "warehouse_attackers",
+    "blueprint": "aster_t1_tank",
+    "owner": 2,
+    "at": [
+      8098.0,
+      8388.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "harbour_defence_1",
+    "group": "harbour_defence",
+    "blueprint": "aster_t1_tank",
+    "owner": 1,
+    "at": [
+      8218.0,
+      7648.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "harbour_defence_2",
+    "group": "harbour_defence",
+    "blueprint": "aster_t1_tank",
+    "owner": 1,
+    "at": [
+      8243.0,
+      7648.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "harbour_defence_3",
+    "group": "harbour_defence",
+    "blueprint": "aster_t1_tank",
+    "owner": 1,
+    "at": [
+      8268.0,
+      7648.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "harbour_defence_4",
+    "group": "harbour_defence",
+    "blueprint": "aster_t1_tank",
+    "owner": 1,
+    "at": [
+      8218.0,
+      7674.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "spaceport_1",
+    "group": "spaceport",
+    "blueprint": "aster_t1_point_defense",
+    "owner": 1,
+    "at": [
+      8748.0,
+      6798.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "spaceport_2",
+    "group": "spaceport",
+    "blueprint": "aster_t1_point_defense",
+    "owner": 1,
+    "at": [
+      8858.0,
+      6798.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "spaceport_3",
+    "group": "spaceport",
+    "blueprint": "aster_t1_point_defense",
+    "owner": 1,
+    "at": [
+      8968.0,
+      6798.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "spaceport_4",
+    "group": "spaceport",
+    "blueprint": "aster_t1_point_defense",
+    "owner": 1,
+    "at": [
+      8748.0,
+      6668.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "spaceport_tank_45",
+    "group": "spaceport",
+    "blueprint": "aster_t1_tank",
+    "owner": 1,
+    "at": [
+      8928.0,
+      6668.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "spaceport_tank_46",
+    "group": "spaceport",
+    "blueprint": "aster_t1_tank",
+    "owner": 1,
+    "at": [
+      8953.0,
+      6668.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "spaceport_tank_47",
+    "group": "spaceport",
+    "blueprint": "aster_t1_tank",
+    "owner": 1,
+    "at": [
+      8978.0,
+      6668.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "arc_air_1",
+    "group": "arc_air",
+    "blueprint": "aster_t1_bomber",
+    "owner": 3,
+    "at": [
+      6748.0,
+      9248.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "arc_air_2",
+    "group": "arc_air",
+    "blueprint": "aster_t1_bomber",
+    "owner": 3,
+    "at": [
+      6838.0,
+      9248.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "arc_air_3",
+    "group": "arc_air",
+    "blueprint": "aster_t1_bomber",
+    "owner": 3,
+    "at": [
+      6928.0,
+      9248.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "arc_gunship_51",
+    "group": "arc_air",
+    "blueprint": "aster_t1_rotor_gunship",
+    "owner": 3,
+    "at": [
+      6848.0,
+      9148.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "arc_gunship_52",
+    "group": "arc_air",
+    "blueprint": "aster_t1_rotor_gunship",
+    "owner": 3,
+    "at": [
+      6918.0,
+      9148.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "arc_gunship_53",
+    "group": "arc_air",
+    "blueprint": "aster_t1_rotor_gunship",
+    "owner": 3,
+    "at": [
+      6988.0,
+      9148.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "arc_west_1",
+    "group": "arc_west",
+    "blueprint": "aster_t1_tank",
+    "owner": 3,
+    "at": [
+      7188.0,
+      7888.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "arc_west_2",
+    "group": "arc_west",
+    "blueprint": "aster_t1_tank",
+    "owner": 3,
+    "at": [
+      7213.0,
+      7888.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "arc_west_3",
+    "group": "arc_west",
+    "blueprint": "aster_t1_tank",
+    "owner": 3,
+    "at": [
+      7238.0,
+      7888.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "arc_west_4",
+    "group": "arc_west",
+    "blueprint": "aster_t1_tank",
+    "owner": 3,
+    "at": [
+      7188.0,
+      7914.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "arc_west_5",
+    "group": "arc_west",
+    "blueprint": "aster_t1_tank",
+    "owner": 3,
+    "at": [
+      7213.0,
+      7914.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "arc_warehouses_1",
+    "group": "arc_warehouses",
+    "blueprint": "aster_t1_tank",
+    "owner": 3,
+    "at": [
+      7528.0,
+      8428.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "arc_warehouses_2",
+    "group": "arc_warehouses",
+    "blueprint": "aster_t1_tank",
+    "owner": 3,
+    "at": [
+      7553.0,
+      8428.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "arc_warehouses_3",
+    "group": "arc_warehouses",
+    "blueprint": "aster_t1_tank",
+    "owner": 3,
+    "at": [
+      7578.0,
+      8428.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "arc_warehouses_4",
+    "group": "arc_warehouses",
+    "blueprint": "aster_t1_tank",
+    "owner": 3,
+    "at": [
+      7528.0,
+      8454.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "holdouts_1",
+    "group": "holdouts",
+    "blueprint": "aster_t1_tank",
+    "owner": 4,
+    "at": [
+      7648.0,
+      8368.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "holdouts_2",
+    "group": "holdouts",
+    "blueprint": "aster_t1_tank",
+    "owner": 4,
+    "at": [
+      7673.0,
+      8368.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "holdouts_3",
+    "group": "holdouts",
+    "blueprint": "aster_t1_tank",
+    "owner": 4,
+    "at": [
+      7698.0,
+      8368.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "pdf_column_1",
+    "group": "pdf_column",
+    "blueprint": "aster_t1_tank",
+    "owner": 2,
+    "at": [
+      8248.0,
+      8488.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "pdf_column_2",
+    "group": "pdf_column",
+    "blueprint": "aster_t1_tank",
+    "owner": 2,
+    "at": [
+      8273.0,
+      8488.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "pdf_column_3",
+    "group": "pdf_column",
+    "blueprint": "aster_t1_tank",
+    "owner": 2,
+    "at": [
+      8298.0,
+      8488.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "pdf_column_4",
+    "group": "pdf_column",
+    "blueprint": "aster_t1_tank",
+    "owner": 2,
+    "at": [
+      8248.0,
+      8514.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "company_bombers_1",
+    "group": "company_bombers",
+    "blueprint": "company_t1_bomber",
+    "owner": 0,
+    "at": [
+      3148.0,
+      8748.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "company_bombers_2",
+    "group": "company_bombers",
+    "blueprint": "company_t1_bomber",
+    "owner": 0,
+    "at": [
+      3238.0,
+      8748.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "company_bombers_3",
+    "group": "company_bombers",
+    "blueprint": "company_t1_bomber",
+    "owner": 0,
+    "at": [
+      3328.0,
+      8748.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "bastion_landing",
+    "group": "landing_ship",
+    "blueprint": "company_t3_lift_ship",
+    "owner": 0,
+    "at": [
+      3198.0,
+      8328.0
+    ],
+    "heading": 270.0
+  },
+  {
+    "action": "unit",
+    "name": "mara_bastion",
+    "group": "escape_ship",
+    "blueprint": "aster_t3_lift_ship",
+    "owner": 1,
+    "at": [
+      9128.0,
+      6608.0
+    ],
+    "heading": 90.0
+  },
+  {
+    "action": "region",
+    "name": "first_contact",
+    "min": [
+      3598.0,
+      7548.0
+    ],
+    "max": [
+      4098.0,
+      8048.0
+    ]
+  },
+  {
+    "action": "region",
+    "name": "junction",
+    "min": [
+      4038.0,
+      7478.0
+    ],
+    "max": [
+      4558.0,
+      7998.0
+    ]
+  },
+  {
+    "action": "region",
+    "name": "ridge",
+    "min": [
+      4688.0,
+      7408.0
+    ],
+    "max": [
+      5208.0,
+      7928.0
+    ]
+  },
+  {
+    "action": "region",
+    "name": "camp",
+    "min": [
+      6168.0,
+      7268.0
+    ],
+    "max": [
+      6768.0,
+      7868.0
+    ]
+  },
+  {
+    "action": "region",
+    "name": "square",
+    "min": [
+      7588.0,
+      7858.0
+    ],
+    "max": [
+      7888.0,
+      8158.0
+    ]
+  },
+  {
+    "action": "region",
+    "name": "breakout",
+    "min": [
+      7613.0,
+      8238.0
+    ],
+    "max": [
+      7933.0,
+      8558.0
+    ]
+  },
+  {
+    "action": "region",
+    "name": "warehouse",
+    "min": [
+      7448.0,
+      8178.0
+    ],
+    "max": [
+      7848.0,
+      8578.0
+    ]
+  },
+  {
+    "action": "region",
+    "name": "harbour",
+    "min": [
+      7963.0,
+      7438.0
+    ],
+    "max": [
+      8483.0,
+      7958.0
+    ]
+  },
+  {
+    "action": "region",
+    "name": "spaceport",
+    "min": [
+      8378.0,
+      6178.0
+    ],
+    "max": [
+      9478.0,
+      7278.0
+    ]
+  },
+  {
+    "action": "point",
+    "name": "beach",
+    "at": [
+      3368.0,
+      7988.0
+    ]
+  },
+  {
+    "action": "point",
+    "name": "offshore",
+    "at": [
+      2848.0,
+      9148.0
+    ]
+  },
+  {
+    "action": "point",
+    "name": "bridge_west",
+    "at": [
+      5248.0,
+      7698.0
+    ]
+  },
+  {
+    "action": "point",
+    "name": "camp",
+    "at": [
+      6468.0,
+      7568.0
+    ]
+  },
+  {
+    "action": "point",
+    "name": "square",
+    "at": [
+      7738.0,
+      8008.0
+    ]
+  },
+  {
+    "action": "point",
+    "name": "warehouse",
+    "at": [
+      7648.0,
+      8378.0
+    ]
+  },
+  {
+    "action": "point",
+    "name": "harbour",
+    "at": [
+      8223.0,
+      7698.0
+    ]
+  },
+  {
+    "action": "point",
+    "name": "flank",
+    "at": [
+      8248.0,
+      8488.0
+    ]
+  },
+  {
+    "action": "point",
+    "name": "spaceport",
+    "at": [
+      8938.0,
+      6648.0
+    ]
+  },
+  {
+    "action": "point",
+    "name": "escape",
+    "at": [
+      10848.0,
+      4548.0
+    ]
+  },
+  {
+    "action": "camera",
+    "name": "landing",
+    "at": [
+      3368.0,
+      7988.0
+    ],
+    "distance": 1100,
+    "yaw": 0.0,
+    "height": null,
+    "pitch": null,
+    "free": false
+  },
+  {
+    "action": "camera",
+    "name": "square",
+    "at": [
+      7738.0,
+      8008.0
+    ],
+    "distance": 1000,
+    "yaw": 15.0018310546875,
+    "height": null,
+    "pitch": null,
+    "free": false
+  },
+  {
+    "action": "camera",
+    "name": "arc_arrival",
+    "at": [
+      7658.0,
+      8348.0
+    ],
+    "distance": 1700,
+    "yaw": 0.0,
+    "height": null,
+    "pitch": null,
+    "free": false
+  },
+  {
+    "action": "camera",
+    "name": "dig_site",
+    "at": [
+      9048,
+      5315
+    ],
+    "distance": 650,
+    "yaw": 200,
+    "height": null,
+    "pitch": null,
+    "free": false
+  },
+  {
+    "action": "point",
+    "name": "escape_pad",
+    "at": [
+      9128.0,
+      6608.0
+    ]
+  },
+  {
+    "action": "unit",
+    "name": "miners_car_1",
+    "group": "miners",
+    "blueprint": "vela_evacuation_car",
+    "owner": 5,
+    "at": [
+      6410.0,
+      7520.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "miners_car_2",
+    "group": "miners",
+    "blueprint": "vela_evacuation_car",
+    "owner": 5,
+    "at": [
+      6424.0,
+      7520.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "miners_car_3",
+    "group": "miners",
+    "blueprint": "vela_evacuation_car",
+    "owner": 5,
+    "at": [
+      6438.0,
+      7520.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "miners_car_4",
+    "group": "miners",
+    "blueprint": "vela_evacuation_car",
+    "owner": 5,
+    "at": [
+      6452.0,
+      7520.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "miners_car_5",
+    "group": "miners",
+    "blueprint": "vela_evacuation_car",
+    "owner": 5,
+    "at": [
+      6466.0,
+      7520.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "miners_car_6",
+    "group": "miners",
+    "blueprint": "vela_evacuation_car",
+    "owner": 5,
+    "at": [
+      6480.0,
+      7520.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "arc_west_transport",
+    "group": "arc_west_ship",
+    "blueprint": "aster_t3_lift_ship",
+    "owner": 3,
+    "at": [
+      7000.0,
+      7900.0
+    ],
+    "heading": 90.0
+  },
+  {
+    "action": "unit",
+    "name": "arc_warehouse_transport",
+    "group": "arc_warehouse_ship",
+    "blueprint": "aster_t3_lift_ship",
+    "owner": 3,
+    "at": [
+      7390.0,
+      8650.0
+    ],
+    "heading": 90.0
+  },
+  {
+    "action": "point",
+    "name": "arc_west_drop",
+    "at": [
+      7180.0,
+      7888.0
+    ]
+  },
+  {
+    "action": "point",
+    "name": "arc_warehouse_drop",
+    "at": [
+      7528.0,
+      8428.0
+    ]
+  },
+  {
+    "action": "unit",
+    "name": "spaceport_factory",
+    "group": "spaceport",
+    "blueprint": "aster_t1_land_factory",
+    "owner": 1,
+    "at": [
+      9120.0,
+      6670.0
+    ],
+    "heading": 180.0
+  },
+  {
+    "action": "unit",
+    "name": "spaceport_power_1",
+    "group": "spaceport",
+    "blueprint": "aster_t1_power",
+    "owner": 1,
+    "at": [
+      9270.0,
+      6540.0
+    ],
+    "heading": 0.0
+  },
+  {
+    "action": "unit",
+    "name": "spaceport_power_2",
+    "group": "spaceport",
+    "blueprint": "aster_t1_power",
+    "owner": 1,
+    "at": [
+      9320.0,
+      6540.0
+    ],
+    "heading": 0.0
+  },
+  {
+    "action": "unit",
+    "name": "spaceport_radar",
+    "group": "spaceport",
+    "blueprint": "aster_t1_radar",
+    "owner": 1,
+    "at": [
+      9200.0,
+      6850.0
+    ],
+    "heading": 0.0
+  },
+  {
+    "action": "doodad",
+    "name": "reach_welcome",
+    "kind": "CityBillboard",
+    "at": [
+      3490,
+      7920
+    ],
+    "heading": 0,
+    "scale": 2,
+    "tint": [
+      120,
+      200,
+      255
+    ],
+    "blocking": false,
+    "health": 120,
+    "reclaim": 0,
+    "footprint": [
+      6,
+      2,
+      12
+    ]
+  },
+  {
+    "action": "doodad",
+    "name": "reach_harrow",
+    "kind": "CityBillboard",
+    "at": [
+      4350,
+      7795
+    ],
+    "heading": 90,
+    "scale": 2,
+    "tint": [
+      120,
+      200,
+      255
+    ],
+    "blocking": false,
+    "health": 120,
+    "reclaim": 0,
+    "footprint": [
+      6,
+      2,
+      12
+    ]
+  },
+  {
+    "action": "doodad",
+    "name": "reach_safe",
+    "kind": "CityBillboard",
+    "at": [
+      5020,
+      7670
+    ],
+    "heading": 0,
+    "scale": 2,
+    "tint": [
+      200,
+      165,
+      95
+    ],
+    "blocking": false,
+    "health": 120,
+    "reclaim": 0,
+    "footprint": [
+      6,
+      2,
+      12
+    ]
+  },
+  {
+    "action": "doodad",
+    "name": "reach_property",
+    "kind": "CityBillboard",
+    "at": [
+      7270,
+      7860
+    ],
+    "heading": 90,
+    "scale": 2,
+    "tint": [
+      120,
+      200,
+      255
+    ],
+    "blocking": false,
+    "health": 120,
+    "reclaim": 0,
+    "footprint": [
+      6,
+      2,
+      12
+    ]
+  },
+  {
+    "action": "doodad",
+    "name": "reach_future",
+    "kind": "CityBillboard",
+    "at": [
+      7725,
+      8100
+    ],
+    "heading": 0,
+    "scale": 2,
+    "tint": [
+      120,
+      200,
+      255
+    ],
+    "blocking": false,
+    "health": 120,
+    "reclaim": 0,
+    "footprint": [
+      6,
+      2,
+      12
+    ]
+  },
+  {
+    "action": "doodad",
+    "name": "rebel_free",
+    "kind": "CityBillboard",
+    "at": [
+      6485,
+      7620
+    ],
+    "heading": 90,
+    "scale": 2,
+    "tint": [
+      235,
+      110,
+      85
+    ],
+    "blocking": false,
+    "health": 120,
+    "reclaim": 0,
+    "footprint": [
+      6,
+      2,
+      12
+    ]
+  },
+  {
+    "action": "doodad",
+    "name": "rebel_speaker",
+    "kind": "CityBillboard",
+    "at": [
+      7600,
+      8350
+    ],
+    "heading": 0,
+    "scale": 2,
+    "tint": [
+      235,
+      110,
+      85
+    ],
+    "blocking": false,
+    "health": 120,
+    "reclaim": 0,
+    "footprint": [
+      6,
+      2,
+      12
+    ]
+  },
+  {
+    "action": "doodad",
+    "name": "rebel_cleanup",
+    "kind": "CityBillboard",
+    "at": [
+      8030,
+      8040
+    ],
+    "heading": 90,
+    "scale": 2,
+    "tint": [
+      235,
+      110,
+      85
+    ],
+    "blocking": false,
+    "health": 120,
+    "reclaim": 0,
+    "footprint": [
+      6,
+      2,
+      12
+    ]
+  },
+  {
+    "action": "doodad",
+    "name": "rebel_mural",
+    "kind": "CityBillboard",
+    "at": [
+      7805,
+      7950
+    ],
+    "heading": 0,
+    "scale": 2,
+    "tint": [
+      235,
+      110,
+      85
+    ],
+    "blocking": false,
+    "health": 120,
+    "reclaim": 0,
+    "footprint": [
+      6,
+      2,
+      12
+    ]
+  },
+  {
+    "action": "doodad",
+    "name": "rebel_ore",
+    "kind": "CityBillboard",
+    "at": [
+      8250,
+      7780
+    ],
+    "heading": 90,
+    "scale": 2,
+    "tint": [
+      235,
+      110,
+      85
+    ],
+    "blocking": false,
+    "health": 120,
+    "reclaim": 0,
+    "footprint": [
+      6,
+      2,
+      12
+    ]
+  },
+  {
+    "action": "doodad",
+    "name": "reach_pdf",
+    "kind": "CityBillboard",
+    "at": [
+      8920,
+      6690
+    ],
+    "heading": 0,
+    "scale": 2,
+    "tint": [
+      120,
+      200,
+      255
+    ],
+    "blocking": false,
+    "health": 120,
+    "reclaim": 0,
+    "footprint": [
+      6,
+      2,
+      12
+    ]
+  },
+  {
+    "action": "doodad",
+    "name": "rebel_home",
+    "kind": "CityBillboard",
+    "at": [
+      8660,
+      7050
+    ],
+    "heading": 90,
+    "scale": 2,
+    "tint": [
+      235,
+      110,
+      85
+    ],
+    "blocking": false,
+    "health": 120,
+    "reclaim": 0,
+    "footprint": [
+      6,
+      2,
+      12
+    ]
+  },
+  {
+    "action": "doodad",
+    "name": "rebel_harbour",
+    "kind": "CityBillboard",
+    "at": [
+      8160,
+      7960
+    ],
+    "heading": 0,
+    "scale": 2,
+    "tint": [
+      235,
+      110,
+      85
+    ],
+    "blocking": false,
+    "health": 120,
+    "reclaim": 0,
+    "footprint": [
+      6,
+      2,
+      12
+    ]
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_0_0",
+    "kind": "ColonyFence",
+    "at": [
+      8982,
+      5370
+    ],
+    "heading": 0,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_0_1",
+    "kind": "ColonyFence",
+    "at": [
+      8994,
+      5370
+    ],
+    "heading": 0,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_0_2",
+    "kind": "ColonyFence",
+    "at": [
+      9006,
+      5370
+    ],
+    "heading": 0,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_0_3",
+    "kind": "ColonyFence",
+    "at": [
+      9018,
+      5370
+    ],
+    "heading": 0,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_0_4",
+    "kind": "ColonyFence",
+    "at": [
+      9030,
+      5370
+    ],
+    "heading": 0,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_0_7",
+    "kind": "ColonyFence",
+    "at": [
+      9066,
+      5370
+    ],
+    "heading": 0,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_0_8",
+    "kind": "ColonyFence",
+    "at": [
+      9078,
+      5370
+    ],
+    "heading": 0,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_0_9",
+    "kind": "ColonyFence",
+    "at": [
+      9090,
+      5370
+    ],
+    "heading": 0,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_0_10",
+    "kind": "ColonyFence",
+    "at": [
+      9102,
+      5370
+    ],
+    "heading": 0,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_0_11",
+    "kind": "ColonyFence",
+    "at": [
+      9114,
+      5370
+    ],
+    "heading": 0,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_1_0",
+    "kind": "ColonyFence",
+    "at": [
+      8982,
+      5226
+    ],
+    "heading": 0,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_1_1",
+    "kind": "ColonyFence",
+    "at": [
+      8994,
+      5226
+    ],
+    "heading": 0,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_1_2",
+    "kind": "ColonyFence",
+    "at": [
+      9006,
+      5226
+    ],
+    "heading": 0,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_1_3",
+    "kind": "ColonyFence",
+    "at": [
+      9018,
+      5226
+    ],
+    "heading": 0,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_1_4",
+    "kind": "ColonyFence",
+    "at": [
+      9030,
+      5226
+    ],
+    "heading": 0,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_1_5",
+    "kind": "ColonyFence",
+    "at": [
+      9042,
+      5226
+    ],
+    "heading": 0,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_1_6",
+    "kind": "ColonyFence",
+    "at": [
+      9054,
+      5226
+    ],
+    "heading": 0,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_1_7",
+    "kind": "ColonyFence",
+    "at": [
+      9066,
+      5226
+    ],
+    "heading": 0,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_1_8",
+    "kind": "ColonyFence",
+    "at": [
+      9078,
+      5226
+    ],
+    "heading": 0,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_1_9",
+    "kind": "ColonyFence",
+    "at": [
+      9090,
+      5226
+    ],
+    "heading": 0,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_1_10",
+    "kind": "ColonyFence",
+    "at": [
+      9102,
+      5226
+    ],
+    "heading": 0,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_1_11",
+    "kind": "ColonyFence",
+    "at": [
+      9114,
+      5226
+    ],
+    "heading": 0,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_2_0",
+    "kind": "ColonyFence",
+    "at": [
+      8976,
+      5232
+    ],
+    "heading": 90,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_2_1",
+    "kind": "ColonyFence",
+    "at": [
+      8976,
+      5244
+    ],
+    "heading": 90,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_2_2",
+    "kind": "ColonyFence",
+    "at": [
+      8976,
+      5256
+    ],
+    "heading": 90,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_2_3",
+    "kind": "ColonyFence",
+    "at": [
+      8976,
+      5268
+    ],
+    "heading": 90,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_2_4",
+    "kind": "ColonyFence",
+    "at": [
+      8976,
+      5280
+    ],
+    "heading": 90,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_2_5",
+    "kind": "ColonyFence",
+    "at": [
+      8976,
+      5292
+    ],
+    "heading": 90,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_2_6",
+    "kind": "ColonyFence",
+    "at": [
+      8976,
+      5304
+    ],
+    "heading": 90,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_2_7",
+    "kind": "ColonyFence",
+    "at": [
+      8976,
+      5316
+    ],
+    "heading": 90,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_2_8",
+    "kind": "ColonyFence",
+    "at": [
+      8976,
+      5328
+    ],
+    "heading": 90,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_2_9",
+    "kind": "ColonyFence",
+    "at": [
+      8976,
+      5340
+    ],
+    "heading": 90,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_2_10",
+    "kind": "ColonyFence",
+    "at": [
+      8976,
+      5352
+    ],
+    "heading": 90,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_2_11",
+    "kind": "ColonyFence",
+    "at": [
+      8976,
+      5364
+    ],
+    "heading": 90,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_3_0",
+    "kind": "ColonyFence",
+    "at": [
+      9120,
+      5232
+    ],
+    "heading": 90,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_3_1",
+    "kind": "ColonyFence",
+    "at": [
+      9120,
+      5244
+    ],
+    "heading": 90,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_3_2",
+    "kind": "ColonyFence",
+    "at": [
+      9120,
+      5256
+    ],
+    "heading": 90,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_3_3",
+    "kind": "ColonyFence",
+    "at": [
+      9120,
+      5268
+    ],
+    "heading": 90,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_3_4",
+    "kind": "ColonyFence",
+    "at": [
+      9120,
+      5280
+    ],
+    "heading": 90,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_3_5",
+    "kind": "ColonyFence",
+    "at": [
+      9120,
+      5292
+    ],
+    "heading": 90,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_3_6",
+    "kind": "ColonyFence",
+    "at": [
+      9120,
+      5304
+    ],
+    "heading": 90,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_3_7",
+    "kind": "ColonyFence",
+    "at": [
+      9120,
+      5316
+    ],
+    "heading": 90,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_3_8",
+    "kind": "ColonyFence",
+    "at": [
+      9120,
+      5328
+    ],
+    "heading": 90,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_3_9",
+    "kind": "ColonyFence",
+    "at": [
+      9120,
+      5340
+    ],
+    "heading": 90,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_3_10",
+    "kind": "ColonyFence",
+    "at": [
+      9120,
+      5352
+    ],
+    "heading": 90,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_fence_3_11",
+    "kind": "ColonyFence",
+    "at": [
+      9120,
+      5364
+    ],
+    "heading": 90,
+    "scale": 1,
+    "tint": [
+      255,
+      255,
+      255
+    ],
+    "blocking": false,
+    "health": 300,
+    "reclaim": 0,
+    "footprint": null
+  },
+  {
+    "action": "doodad",
+    "name": "dig_light_0",
+    "kind": "CityStreetLight",
+    "at": [
+      8985,
+      5360
+    ],
+    "heading": 0,
+    "scale": 1,
+    "tint": [
+      255,
+      220,
+      160
+    ],
+    "blocking": false,
+    "health": 150,
+    "reclaim": 0,
+    "footprint": [
+      1,
+      1,
+      12
+    ]
+  },
+  {
+    "action": "doodad",
+    "name": "dig_light_1",
+    "kind": "CityStreetLight",
+    "at": [
+      9110,
+      5360
+    ],
+    "heading": 0,
+    "scale": 1,
+    "tint": [
+      255,
+      220,
+      160
+    ],
+    "blocking": false,
+    "health": 150,
+    "reclaim": 0,
+    "footprint": [
+      1,
+      1,
+      12
+    ]
+  },
+  {
+    "action": "doodad",
+    "name": "dig_light_2",
+    "kind": "CityStreetLight",
+    "at": [
+      8985,
+      5240
+    ],
+    "heading": 0,
+    "scale": 1,
+    "tint": [
+      255,
+      220,
+      160
+    ],
+    "blocking": false,
+    "health": 150,
+    "reclaim": 0,
+    "footprint": [
+      1,
+      1,
+      12
+    ]
+  },
+  {
+    "action": "doodad",
+    "name": "dig_light_3",
+    "kind": "CityStreetLight",
+    "at": [
+      9110,
+      5240
+    ],
+    "heading": 0,
+    "scale": 1,
+    "tint": [
+      255,
+      220,
+      160
+    ],
+    "blocking": false,
+    "health": 150,
+    "reclaim": 0,
+    "footprint": [
+      1,
+      1,
+      12
+    ]
+  },
+  {
+    "action": "stamp",
+    "at": [
+      9058,
+      5332
+    ],
+    "radius": 32,
+    "strength": 14,
+    "asset": "dig-pit.json"
+  },
+  {
+    "action": "paint",
+    "at": [
+      9058,
+      5332
+    ],
+    "radius": 40,
+    "paint": "ground",
+    "value": 7,
+    "heading": 0
+  }
+]

@@ -513,6 +513,11 @@ pub(crate) struct Unit {
     pub wreck_fraction: Option<f64>,
     #[serde(default)]
     pub effects: crate::EffectSettings,
+    #[serde(default)]
+    pub skin: Option<String>,
+    /// Available to scenario authors, excluded from skirmish production/catalogues.
+    #[serde(default)]
+    pub mission_only: bool,
     pub mesh: String,
     pub icon: IconKind,
     /// Lamps on the hull (`crate::LightMount`); left out, the renderer's usual set.
@@ -2752,6 +2757,7 @@ impl Unit {
                 .wreck_fraction
                 .unwrap_or_else(|| default_wreck(self.tech))),
             visual: Visual {
+                skin: self.skin.clone(),
                 effects: self.effects,
                 mesh: self.mesh.clone(),
                 icon: self.icon,
@@ -2760,6 +2766,7 @@ impl Unit {
             sounds: self.sounds.clone(),
             lore: String::new(),
             refit: None,
+            mission_only: self.mission_only,
             scrap: false,
             carried_drone: false,
         })

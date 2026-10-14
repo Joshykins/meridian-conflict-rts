@@ -29,6 +29,7 @@ fn coast() -> World {
         Fx::from_int(5),
     );
     let map = MapData {
+        doodads: Default::default(),
         name: "coast".into(),
         content_id: 1,
         ore: Vec::new(),

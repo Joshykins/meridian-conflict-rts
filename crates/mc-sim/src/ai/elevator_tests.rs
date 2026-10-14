@@ -38,6 +38,7 @@ fn world() -> World {
     World::with_terrain(
         Heightfield::flat(1024, 1024, Fx::from_int(20)),
         MapData {
+            doodads: Default::default(),
             name: "elevator AI test".into(),
             content_id: 11,
             ore: Vec::new(),

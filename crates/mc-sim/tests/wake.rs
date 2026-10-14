@@ -35,6 +35,7 @@ fn world(wall: Option<((usize, usize), (usize, usize))>, trees: &[(i32, i32)]) -
     }
     let terrain = Heightfield::from_samples(CELLS, CELLS, samples, Fx::ZERO, Fx::ONE, Fx::ZERO);
     let map = MapData {
+        doodads: Default::default(),
         name: "wake".into(),
         content_id: 1,
         ore: Vec::new(),

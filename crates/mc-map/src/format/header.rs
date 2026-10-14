@@ -16,6 +16,7 @@ pub(crate) fn content_id(
     ways: &[u8],
     streets: &[u8],
     decks: &[Deck],
+    tints: &[[u8; 3]],
 ) -> u64 {
     let mut h = StateHasher::new();
     h.write_u32(VERSION);
@@ -89,6 +90,12 @@ pub(crate) fn content_id(
             d.hash(&mut h);
         }
     }
+    if !tints.is_empty() {
+        h.write_u64(tints.len() as u64);
+        for rgb in tints {
+            h.write_u8s(rgb);
+        }
+    }
     h.finish()
 }
 
@@ -127,6 +134,7 @@ pub(crate) fn write_header(info: &MapInfo, content_id: u64, layout: &Layout) -> 
     put(216, &layout.streets_offset.to_le_bytes());
     put(224, &layout.decks_offset.to_le_bytes());
     put(232, &layout.deck_count.to_le_bytes());
+    put(236, &layout.tints_offset.to_le_bytes());
     h
 }
 
@@ -172,6 +180,7 @@ pub(crate) fn parse_header(bytes: &[u8; HEADER_LEN]) -> Result<(MapInfo, u64, La
     let streets_offset = r.u64()?;
     let decks_offset = r.u64()?;
     let deck_count = r.u32()?;
+    let tints_offset = r.u64()?;
     let info = MapInfo {
         name,
         tiles_w,
@@ -212,6 +221,7 @@ pub(crate) fn parse_header(bytes: &[u8; HEADER_LEN]) -> Result<(MapInfo, u64, La
         streets_offset,
         decks_offset,
         deck_count,
+        tints_offset,
     };
     Ok((info, content_id, layout))
 }

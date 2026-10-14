@@ -41,6 +41,7 @@ fn islands(bridge: bool) -> World {
     let mut w = World::with_terrain(
         Heightfield::from_samples(512, 512, samples, Fx::ZERO, Fx::ONE, Fx::from_int(20)),
         MapData {
+            doodads: Default::default(),
             name: "islands".into(),
             content_id: 5,
             ore: Vec::new(),
