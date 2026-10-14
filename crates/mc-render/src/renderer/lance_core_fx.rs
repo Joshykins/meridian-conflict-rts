@@ -72,7 +72,10 @@ impl Renderer {
         let hidden = KIND_WRECK | KIND_GHOST | STATE_RADAR;
         let reach = camera.distance * 2.5 + 600.0;
         let focus = camera.focus.truncate();
-        for u in units {
+        let rows = self
+            .unit_kinds
+            .rows_where(|b| matches!(self.plasma_fx.cores.cores.get(b as usize), Some(Some(_))));
+        for u in rows.iter().map(|&i| &units[i]) {
             if u.owner_flags & hidden != 0 || u.recoil.max(u.prev_recoil) < 0.01 {
                 continue;
             }

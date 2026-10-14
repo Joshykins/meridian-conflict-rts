@@ -87,7 +87,10 @@ impl Renderer {
         let focus = camera.focus.truncate();
         let life = self.tick_seconds.clamp(0.03, 0.25) * 2.0;
         let mut drawn = 0usize;
-        for u in units {
+        let rows = self
+            .unit_kinds
+            .rows_where(|b| matches!(self.orb_fx.places.get(b as usize), Some(Some(_))));
+        for u in rows.iter().map(|&i| &units[i]) {
             if u.owner_flags & hidden != 0 {
                 continue;
             }

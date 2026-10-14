@@ -208,6 +208,9 @@ pub struct View {
     /// `index_of` and the queues by handle row, and the selection found in the frame
     /// once per pull (`unit_rows.rs`).
     pub rows: crate::unit_rows::Rows,
+    /// The selection's marks on the ground and bars, as last made, and the selection and
+    /// frame they were made for (`Picked::stamp`): they change only with those.
+    selection_marks: (Option<u64>, Vec<Mark>),
     pub selection: crate::selected::Selection,
     pub mode: Mode,
     pub formation_panel: bool,
@@ -266,6 +269,7 @@ impl View {
             status: SimStatus::default(),
             index_of: Default::default(),
             rows: Default::default(),
+            selection_marks: Default::default(),
             selection: Default::default(),
             mode: Mode::Normal,
             formation_panel: false,
@@ -4269,10 +4273,16 @@ impl Game {
             };
             self.sim.watch.lock().unwrap().clone_from(&self.watched);
         }
-        // The selection as found in the frame once per pull (`unit_rows.rs`).
-        let mut marks: Vec<Mark> = (self.view.picked().rows().iter())
-            .map(|&i| self.unit_mark(i as usize, false))
-            .collect();
+        // The selection as found in the frame once per pull (`unit_rows.rs`), its marks
+        // made once for it.
+        let stamp = self.view.picked().stamp();
+        if self.view.selection_marks.0 != Some(stamp) {
+            let made: Vec<Mark> = (self.view.picked().rows().iter())
+                .map(|&i| self.unit_mark(i as usize, false))
+                .collect();
+            self.view.selection_marks = (Some(stamp), made);
+        }
+        let mut marks = self.view.selection_marks.1.clone();
         if let Some(i) = hover_unit {
             if !self
                 .view
@@ -4681,7 +4691,13 @@ impl Game {
         let survey = !self.hud.free.on
             && (placing_mine || mine_selected || (self.ctrl && !self.alt && self.menu.is_none()));
         renderer.set_ore_highlight(if survey { 1.0 } else { 0.0 });
-        renderer.set_ore_claims(&hud::ore_claims(&self.blueprints, &self.view.frame.units));
+        let mines = self
+            .view
+            .units_of(|bp| self.blueprints.unit(bp).mine.is_some());
+        renderer.set_ore_claims(&hud::ore_claims(
+            &self.blueprints,
+            mines.iter().map(|&i| &self.view.frame.units[i]),
+        ));
         // Adjacency conduits: the selection's and the pointer's lit, and the placing
         // site's would-be links drawn as planned (`hud::adjacency`).
         let lit: Vec<u32> = self

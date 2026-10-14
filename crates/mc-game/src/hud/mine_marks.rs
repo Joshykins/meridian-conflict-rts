@@ -38,9 +38,12 @@ pub(super) struct Sighted {
 
 /// Core mines in sight (or remembered). Anyone's; a mine's territory does not
 /// care whose the next one is.
-pub(super) fn mines_in_sight(blueprints: &Blueprints, units: &[UnitInstance]) -> Vec<Sighted> {
+pub(super) fn mines_in_sight<'a>(
+    blueprints: &Blueprints,
+    units: impl IntoIterator<Item = &'a UnitInstance>,
+) -> Vec<Sighted> {
     units
-        .iter()
+        .into_iter()
         .filter(|u| u.owner_flags & (KIND_WRECK | KIND_GHOST) == 0)
         .filter_map(|u| {
             let m = blueprints.unit(BlueprintId(u.blueprint as u16)).mine?;
@@ -55,7 +58,10 @@ pub(super) fn mines_in_sight(blueprints: &Blueprints, units: &[UnitInstance]) ->
 }
 
 /// The reach of every mine in sight, for the ore the renderer dims under it.
-pub fn ore_claims(blueprints: &Blueprints, units: &[UnitInstance]) -> Vec<mc_render::OreClaim> {
+pub fn ore_claims<'a>(
+    blueprints: &Blueprints,
+    units: impl IntoIterator<Item = &'a UnitInstance>,
+) -> Vec<mc_render::OreClaim> {
     mines_in_sight(blueprints, units)
         .into_iter()
         .map(|m| mc_render::OreClaim {
@@ -68,7 +74,11 @@ pub fn ore_claims(blueprints: &Blueprints, units: &[UnitInstance]) -> Vec<mc_ren
 
 /// Which ore fields, in map order, are spoken for: the middle lies in the
 /// reach of a mine in sight.
-pub fn ore_claimed(map: &MapFile, blueprints: &Blueprints, units: &[UnitInstance]) -> Vec<bool> {
+pub fn ore_claimed<'a>(
+    map: &MapFile,
+    blueprints: &Blueprints,
+    units: impl IntoIterator<Item = &'a UnitInstance>,
+) -> Vec<bool> {
     let mines = mines_in_sight(blueprints, units);
     ore_centres(map)
         .into_iter()

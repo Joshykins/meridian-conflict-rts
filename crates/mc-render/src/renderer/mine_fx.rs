@@ -30,7 +30,13 @@ impl Renderer {
         let reach = camera.distance * 2.5 + 400.0;
         let focus = camera.focus.truncate();
         let previous = (self.effect_origin, self.effect_settings);
-        for u in units {
+        let rows = self.unit_kinds.rows_where(|b| {
+            self.blueprints
+                .units
+                .get(b as usize)
+                .is_some_and(|bp| bp.mine.is_some())
+        });
+        for u in rows.iter().map(|&i| &units[i]) {
             let [blows, step, _] = u.gait;
             if step <= 0.0 || u.owner_flags & (KIND_WRECK | KIND_GHOST | STATE_RADAR) != 0 {
                 continue;

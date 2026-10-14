@@ -889,9 +889,15 @@ impl Renderer {
     /// houses are turned, for the charging glow (`Renderer::weapon_charging`).
     pub(super) fn note_gun_hulls(&mut self, units: &[UnitInstance], houses: &[HousePose]) {
         let blueprints = self.blueprints.clone();
+        let rows = self.unit_kinds.rows_where(|b| {
+            blueprints
+                .units
+                .get(b as usize)
+                .is_some_and(|bp| bp.weapons.iter().any(|w| w.charge_ticks > 0))
+        });
         let guns = &mut self.water_fx.guns;
         guns.clear();
-        for u in units {
+        for u in rows.iter().map(|&i| &units[i]) {
             if u.owner_flags & (KIND_WRECK | KIND_GHOST | KIND_PROP) != 0 {
                 continue;
             }
@@ -1473,10 +1479,20 @@ impl Renderer {
             | ((mc_sim::tables::flag::IN_FACTORY | mc_sim::tables::flag::UNDER_CONSTRUCTION)
                 as u32)
                 << 8;
-        let mut sinking_now = Vec::new();
-        for u in units {
+        let sinking_now: Vec<UnitInstance> = units
+            .iter()
+            .filter(|u| u.owner_flags & KIND_WRECK != 0 && u.packed == WRECK_SINKING)
+            .copied()
+            .collect();
+        // What can throw a wake: a hull or a hover; of a sky of fighters, none.
+        let rows = self.unit_kinds.rows_where(|b| {
+            blueprints.units.get(b as usize).is_some_and(|bp| {
+                bp.motion
+                    .is_some_and(|m| matches!(m.layer, MoveLayer::Naval | MoveLayer::Hover))
+            })
+        });
+        for u in rows.iter().map(|&i| &units[i]) {
             if u.owner_flags & KIND_WRECK != 0 && u.packed == WRECK_SINKING {
-                sinking_now.push(*u);
                 continue;
             }
             if u.owner_flags & hidden != 0 || u.build < 1.0 {

@@ -68,6 +68,7 @@ pub(crate) mod fog_field;
 mod footfalls;
 pub(crate) mod foundations;
 mod frame;
+mod fx_share;
 pub(crate) mod grass;
 pub(crate) mod gravitic_engine_fx;
 mod gravitic_fx;
@@ -122,6 +123,7 @@ mod survival_fx;
 mod terrain_lit;
 mod trail_fx;
 mod tree_wind;
+mod unit_kinds;
 mod wake_fx;
 pub(crate) mod wake_shell;
 mod warp_fx;
@@ -190,6 +192,13 @@ const SHOCKWAVE_LON: u32 = 64;
 // Three times what it was: a giant's salvo of heavy rockets lays a dozen trail puffs each a
 // tick, and at 8192 the ring came round in two seconds and ate every longer-lived puff
 // (rocket trails, the storm's thunderhead) long before its time.
+/// Most falling or burning hulls that trail smoke and fire in a tick (`fx_share`).
+const CRASH_TRAILS: usize = 1500;
+/// Most damaged units that smoke in a tick (`fx_share`).
+const SMOKERS: usize = 2000;
+/// Most shots, hits and discharges a tick whose flash and sparks are drawn, the nearest
+/// the camera's focus (`upload_sim`).
+const SMALL_EVENTS: usize = 3000;
 pub const MAX_PUFFS: usize = 24576 + nuke_fx::NUKE_PUFF_SLOTS;
 /// Tail of the puff buffer. Smoke over a fire is rewritten here every frame,
 /// so a carpet cannot wrap the ring and erase a column halfway through.
@@ -884,6 +893,8 @@ pub struct Renderer {
 
     globals: Buffer,
     dynamic: staged_buffer::StagedBuffer,
+    /// The frame's units by blueprint, for the effects of a few kinds (`unit_kinds.rs`).
+    unit_kinds: unit_kinds::UnitKinds,
     statics: Buffer,
     model_table: Buffer,
     slot_table: Buffer,
@@ -2575,6 +2586,7 @@ impl Renderer {
             samplers,
             globals,
             dynamic,
+            unit_kinds: Default::default(),
             statics,
             model_table,
             slot_table,
@@ -3365,6 +3377,7 @@ impl Renderer {
                 units.len()
             );
         }
+        self.unit_kinds.rebuild(units, self.blueprints.units.len());
         let patched = self.titan_charge.patch(units, time);
         let patched = self.capital_fx.swing.patch(&self.blueprints, patched);
         let patched = self.wing_fx.ease(patched);
@@ -3398,10 +3411,22 @@ impl Renderer {
         }
         drop(part);
         let part = mc_core::perf_span!("cpu.upload.lists");
-        self.note_gun_hulls(units, houses);
-        self.stake_strikes(units, time);
-        self.upload_welds(frame);
-        self.upload_shields(frame, camera.eye());
+        {
+            let _t = mc_core::perf_span!("lists.note_gun_hulls");
+            self.note_gun_hulls(units, houses);
+        }
+        {
+            let _t = mc_core::perf_span!("lists.stake_strikes");
+            self.stake_strikes(units, time);
+        }
+        {
+            let _t = mc_core::perf_span!("lists.upload_welds");
+            self.upload_welds(frame);
+        }
+        {
+            let _t = mc_core::perf_span!("lists.upload_shields");
+            self.upload_shields(frame, camera.eye());
+        }
         self.lights.tick(frame, &self.blueprints);
 
         let projectiles = &frame.projectiles[..frame.projectiles.len().min(MAX_PROJECTILES)];
@@ -3534,18 +3559,38 @@ impl Renderer {
         self.clear_lots(frame, time);
         // Before the events: a Lance's strike and a shell's landing read this tick's Shapers.
         self.progenitor_tick(frame, time);
-        // A shot or a hit far past what the camera shows makes a flash and sparks gone
-        // in under a second, out of sight: a sky-wide air war is tens of thousands a
-        // tick. Their craters and the clouds they stir are still made.
+        // A shot, a hit or a charged shell's discharge makes a flash and sparks gone in
+        // under a second. Far past what the camera shows they are out of sight, and of a
+        // sky-wide air war's tens of thousands a tick only the nearest `SMALL_EVENTS`
+        // are drawn (a deliberate cap: they are cosmetic, and the shots themselves are
+        // drawn whatever). Their craters and the clouds they stir are still made.
         let reach = camera.distance * 3.0 + 1500.0;
-        for event in &frame.events {
-            let far = match event {
-                SimEvent::ShotFired { pos, .. } | SimEvent::Impact { pos, .. } => {
-                    Vec3::from(pos.to_f32()).distance(camera.focus) > reach
+        let small: Vec<(f32, usize)> = frame
+            .events
+            .iter()
+            .enumerate()
+            .filter_map(|(i, event)| match event {
+                SimEvent::ShotFired { pos, .. }
+                | SimEvent::Impact { pos, .. }
+                | SimEvent::ShellDischarge { to: pos, .. } => {
+                    Some((Vec3::from(pos.to_f32()).distance(camera.focus), i))
                 }
-                _ => false,
-            };
-            if !far {
+                _ => None,
+            })
+            .collect();
+        let mut drawn = vec![true; frame.events.len()];
+        for &(d, i) in &small {
+            drawn[i] = d <= reach;
+        }
+        let mut near: Vec<(f32, usize)> = small.into_iter().filter(|&(d, _)| d <= reach).collect();
+        if near.len() > SMALL_EVENTS {
+            near.select_nth_unstable_by(SMALL_EVENTS, |a, b| a.0.total_cmp(&b.0));
+            for &(_, i) in &near[SMALL_EVENTS..] {
+                drawn[i] = false;
+            }
+        }
+        for (event, drawn) in frame.events.iter().zip(drawn) {
+            if drawn {
                 self.effects_of(event, time);
             }
             self.stir_clouds(event, time);
@@ -3582,37 +3627,127 @@ impl Renderer {
         self.sky.set_flyers(flyers.into_iter());
         drop(part);
         let _part = mc_core::perf_span!("cpu.upload.weapon_fx");
-        self.ground_fires(&frame.fires, time);
-        self.flush_rail_misses(time);
-        self.rail_wakes(projectiles, time, camera);
-        self.write_fade_beams(time);
-        self.write_plasma_fx(units, time);
-        self.regency_guns_tick(units, &frame.houses, time);
-        self.regency_trails(projectiles, time);
-        self.gravitic_tick(projectiles, time);
-        self.excavation_tick(units, time, camera);
-        self.star_core_tick(units, time, camera);
-        self.orb_tick(units, frame.tick, time, camera);
-        self.nanite_repair_tick(frame, time, camera);
-        self.elevator_tick(units, &frame.events, time, camera);
-        self.lance_core_tick(units, time, camera);
-        self.bolt_rifle_tick(units, &frame.houses, time);
-        self.arc_howitzer_tick(units, &frame.houses, time);
-        self.write_bore_strokes(time);
-        self.heavy_rail_tick(units, &frame.houses, projectiles, time);
+        {
+            let _t = mc_core::perf_span!("wfx.ground_fires");
+            self.ground_fires(&frame.fires, time);
+        }
+        {
+            let _t = mc_core::perf_span!("wfx.flush_rail_misses");
+            self.flush_rail_misses(time);
+        }
+        {
+            let _t = mc_core::perf_span!("wfx.rail_wakes");
+            self.rail_wakes(projectiles, time, camera);
+        }
+        {
+            let _t = mc_core::perf_span!("wfx.write_fade_beams");
+            self.write_fade_beams(time);
+        }
+        {
+            let _t = mc_core::perf_span!("wfx.write_plasma_fx");
+            self.write_plasma_fx(units, time);
+        }
+        {
+            let _t = mc_core::perf_span!("wfx.regency_guns_tick");
+            self.regency_guns_tick(units, &frame.houses, time);
+        }
+        {
+            let _t = mc_core::perf_span!("wfx.regency_trails");
+            self.regency_trails(projectiles, time);
+        }
+        {
+            let _t = mc_core::perf_span!("wfx.gravitic_tick");
+            self.gravitic_tick(projectiles, time);
+        }
+        {
+            let _t = mc_core::perf_span!("wfx.excavation_tick");
+            self.excavation_tick(units, time, camera);
+        }
+        {
+            let _t = mc_core::perf_span!("wfx.star_core_tick");
+            self.star_core_tick(units, time, camera);
+        }
+        {
+            let _t = mc_core::perf_span!("wfx.orb_tick");
+            self.orb_tick(units, frame.tick, time, camera);
+        }
+        {
+            let _t = mc_core::perf_span!("wfx.nanite_repair_tick");
+            self.nanite_repair_tick(frame, time, camera);
+        }
+        {
+            let _t = mc_core::perf_span!("wfx.elevator_tick");
+            self.elevator_tick(units, &frame.events, time, camera);
+        }
+        {
+            let _t = mc_core::perf_span!("wfx.lance_core_tick");
+            self.lance_core_tick(units, time, camera);
+        }
+        {
+            let _t = mc_core::perf_span!("wfx.bolt_rifle_tick");
+            self.bolt_rifle_tick(units, &frame.houses, time);
+        }
+        {
+            let _t = mc_core::perf_span!("wfx.arc_howitzer_tick");
+            self.arc_howitzer_tick(units, &frame.houses, time);
+        }
+        {
+            let _t = mc_core::perf_span!("wfx.write_bore_strokes");
+            self.write_bore_strokes(time);
+        }
+        {
+            let _t = mc_core::perf_span!("wfx.heavy_rail_tick");
+            self.heavy_rail_tick(units, &frame.houses, projectiles, time);
+        }
         // Before the strokes are written (`emp_tick`): its lightning is among them.
-        self.gravitic_engine_tick(frame, time, camera);
-        self.emp_tick(frame, units, time, camera);
-        self.great_gun_tick(projectiles, time);
-        self.missile_trails(projectiles, time, camera);
-        self.nuke_tick(frame, time, camera);
-        self.write_regency_trails(time);
-        self.edict_tick(frame, time, camera);
-        self.lens_tick(frame, time);
-        self.surge_tick(time);
-        self.stream_bursts(projectiles, time, camera);
-        self.sea_tick(units, projectiles, time, camera);
-        self.warp_tick(frame, time, camera);
+        {
+            let _t = mc_core::perf_span!("wfx.gravitic_engine_tick");
+            self.gravitic_engine_tick(frame, time, camera);
+        }
+        {
+            let _t = mc_core::perf_span!("wfx.emp_tick");
+            self.emp_tick(frame, units, time, camera);
+        }
+        {
+            let _t = mc_core::perf_span!("wfx.great_gun_tick");
+            self.great_gun_tick(projectiles, time);
+        }
+        {
+            let _t = mc_core::perf_span!("wfx.missile_trails");
+            self.missile_trails(projectiles, time, camera);
+        }
+        {
+            let _t = mc_core::perf_span!("wfx.nuke_tick");
+            self.nuke_tick(frame, time, camera);
+        }
+        {
+            let _t = mc_core::perf_span!("wfx.write_regency_trails");
+            self.write_regency_trails(time);
+        }
+        {
+            let _t = mc_core::perf_span!("wfx.edict_tick");
+            self.edict_tick(frame, time, camera);
+        }
+        {
+            let _t = mc_core::perf_span!("wfx.lens_tick");
+            self.lens_tick(frame, time);
+        }
+        {
+            let _t = mc_core::perf_span!("wfx.surge_tick");
+            self.surge_tick(time);
+        }
+        {
+            let _t = mc_core::perf_span!("wfx.stream_bursts");
+            self.stream_bursts(projectiles, time, camera);
+        }
+        {
+            let _t = mc_core::perf_span!("wfx.sea_tick");
+            self.sea_tick(units, projectiles, time, camera);
+        }
+        {
+            let _t = mc_core::perf_span!("wfx.warp_tick");
+            self.warp_tick(frame, time, camera);
+        }
     }
 
     /// The rounds of a stream gun's shot (`Weapon::rounds`) have no sim impact of their
@@ -4283,14 +4418,18 @@ impl Renderer {
                 << 8;
         let reach = camera.distance * 2.5 + 300.0;
         let wind = self.sky.wind_heading();
+        let smoking = |u: &UnitInstance| {
+            u.owner_flags & hidden == 0
+                && u.build >= 1.0
+                && u.health < 0.9
+                && Vec3::from(u.pos).distance(camera.focus) <= reach
+        };
+        let share = fx_share::Share::new(units.iter().filter(|u| smoking(u)).count(), SMOKERS);
         for u in units {
-            if u.owner_flags & hidden != 0 || u.build < 1.0 || u.health >= 0.9 {
+            if !smoking(u) || !share.takes(u.unit_id) {
                 continue;
             }
             let (from, to) = (Vec3::from(u.prev_pos), Vec3::from(u.pos));
-            if to.distance(camera.focus) > reach {
-                continue;
-            }
             let Some(site) = self.burn_sites.get(u.blueprint as usize) else {
                 continue;
             };
@@ -4378,15 +4517,30 @@ impl Renderer {
     /// (`UnitBlueprint::scrap`) is cold metal and trails nothing.
     fn aircraft_crash_trails(&mut self, units: &[UnitInstance], time: f32, camera: &Camera) {
         self.forget_falling_hulls(time);
-        for u in units {
+        let blueprints = self.blueprints.clone();
+        let state = |u: &UnitInstance| {
             let falling = u.owner_flags & KIND_WRECK != 0
                 && u.packed == mc_sim::mirror::WRECK_FALLING
-                && !self
-                    .blueprints
+                && !blueprints
                     .unit(mc_data::BlueprintId(u.blueprint as u16))
                     .scrap;
             let burning = u.owner_flags & (KIND_WRECK | STATE_RADAR) == 0
                 && u.packed & mc_sim::mirror::UNIT_BURNING != 0;
+            (falling, burning)
+        };
+        let reach = camera.distance * 3.0 + 400.0;
+        let share = fx_share::Share::new(
+            units
+                .iter()
+                .filter(|u| {
+                    let (falling, burning) = state(u);
+                    (falling || burning) && Vec3::from(u.pos).distance(camera.focus) <= reach
+                })
+                .count(),
+            CRASH_TRAILS,
+        );
+        for u in units {
+            let (falling, burning) = state(u);
             if !falling && !burning {
                 continue;
             }
@@ -4404,7 +4558,7 @@ impl Renderer {
             }
             let from = Vec3::from(u.prev_pos);
             let to = Vec3::from(u.pos);
-            if to.distance(camera.focus) > camera.distance * 3.0 + 400.0 {
+            if to.distance(camera.focus) > reach || !share.takes(u.unit_id) {
                 continue;
             }
             let samples = (from.distance(to) / 2.0).ceil().clamp(1.0, 16.0) as usize;

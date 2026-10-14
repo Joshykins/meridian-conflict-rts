@@ -107,7 +107,10 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
     // Ore fields are baked into the chart image (`ui::preview`); the ones a
     // mine in sight has in its reach are dimmed, as on the ground, so the ore
     // still free stands out.
-    let claimed = super::ore_claimed(s.map, s.blueprints, &view.frame.units);
+    // The mines in the frame: of an army of a hundred thousand, those few.
+    let mine_rows = view.units_of(|bp| s.blueprints.unit(bp).mine.is_some());
+    let mine_units = || mine_rows.iter().map(|&i| &view.frame.units[i]);
+    let claimed = super::ore_claimed(s.map, s.blueprints, mine_units());
     for (region, _) in s
         .map
         .ore_regions()
@@ -132,12 +135,8 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
     // survey (placing or selecting a mine, or Ctrl).
     let survey = matches!(view.mode, crate::game::Mode::Place(bp) if s.blueprints.unit(bp).mine.is_some())
         || s.show_reclaim
-        || view
-            .frame
-            .units
-            .iter()
-            .any(|u| view.selection.contains(&u.unit_id) && s.bp(u).mine.is_some());
-    let mut mines = super::mines_in_sight(s.blueprints, &view.frame.units);
+        || view.picks_any(|bp| s.blueprints.unit(bp).mine.is_some());
+    let mut mines = super::mines_in_sight(s.blueprints, mine_units());
     // In id order, so the territories a full chart leaves out stay the same ones.
     mines.sort_unstable_by_key(|m| m.id);
     let (line, fill) = if survey { (0.95, 0.22) } else { (0.45, 0.08) };
@@ -185,14 +184,14 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
     // Reach: the side's radar cover and shield domes, the selection's guns and eyes.
     let metre = chart_pos(s, chart, Vec2::new(1000.0, 0.0)).x - chart_pos(s, chart, Vec2::ZERO).x;
     let metre = metre / 1000.0;
-    let reach_marks = view.frame.units.iter().filter(|u| {
+    let reaching = view.units_of(|bp| {
+        let bp = s.blueprints.unit(bp);
+        bp.radar.to_f32() > 0.0 || bp.shield.is_some_and(|sh| !sh.is_hull())
+    });
+    let reach_marks = reaching.iter().map(|&i| &view.frame.units[i]).filter(|u| {
         (u.owner_flags & 0xFF) as u8 == view.local
             && u.owner_flags & KIND_WRECK == 0
             && !has_flag(u, flag::UNDER_CONSTRUCTION | flag::IN_FACTORY)
-            && {
-                let bp = s.bp(u);
-                bp.radar.to_f32() > 0.0 || bp.shield.is_some_and(|sh| !sh.is_hull())
-            }
     });
     for u in reach_marks.take(MAX_COVER_RINGS) {
         let bp = s.bp(u);
@@ -240,22 +239,19 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
     let key = (
         view.frame.tick,
         view.frame.units.len(),
-        view.selection
-            .iter()
-            .fold(view.selection.len() as u64, |h, &id| {
-                h.rotate_left(5) ^ id as u64
-            }),
+        view.picked().stamp(),
         [chart.x, chart.y, chart.w, chart.h].map(f32::to_bits),
     );
     if hud.chart_marks.key != Some(key) {
         let mut marks = Marks::new(chart);
+        let picked = view.picked();
         for (i, u) in view.frame.units.iter().enumerate() {
             if u.owner_flags & KIND_WRECK != 0 || has_flag(u, flag::IN_FACTORY) {
                 continue;
             }
             let p = chart_pos(s, chart, Vec2::new(u.pos[0], u.pos[1]));
             let unknown = u.owner_flags & STATE_UNIDENTIFIED != 0;
-            let layer = if view.selection.contains(&u.unit_id) {
+            let layer = if picked.has(i) {
                 Layer::Selected
             } else if !unknown && s.bp(u).is_structure() {
                 Layer::Structure

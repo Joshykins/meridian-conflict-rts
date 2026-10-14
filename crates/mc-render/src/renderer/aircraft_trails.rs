@@ -53,11 +53,10 @@ impl Renderer {
             })
             .filter(|u| in_reach(u))
             .count();
-        // Two ports a jet is the common case. Past a puff a port for each, only every
-        // `stride`th jet trails, the same ones tick after tick (by id), so the trails
-        // that are drawn run unbroken.
+        // Two ports a jet is the common case. Past a puff a port for each, only a share
+        // of the jets trail (`fx_share`).
         let most_samples = (TRAIL_PUFFS / (flying.max(1) * 2)).clamp(1, 16) as f32;
-        let stride = (flying * 2).div_ceil(TRAIL_PUFFS).max(1) as u32;
+        let share = super::fx_share::Share::new(flying * 2, TRAIL_PUFFS);
         for u in units {
             if u.owner_flags & hidden != 0 || u.build < 1.0 {
                 continue;
@@ -70,9 +69,7 @@ impl Renderer {
             let hover_flight = bp.motion.is_some_and(|m| m.hover);
             let assault = bp.visual.mesh == "assault_air";
             let capital = bp.is_capital_ship();
-            if !capital
-                && (!in_reach(u) || (u.unit_id.wrapping_mul(0x9E37_79B9) >> 16) % stride != 0)
-            {
+            if !capital && (!in_reach(u) || !share.takes(u.unit_id)) {
                 continue;
             }
             // The ports are placed on the model as authored; a blueprint drawn bigger or

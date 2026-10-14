@@ -69,7 +69,10 @@ impl Renderer {
         let focus = camera.focus.truncate();
         let close = camera.distance < 1400.0;
         let mut digs = Vec::new();
-        for u in units {
+        let rows = self
+            .unit_kinds
+            .rows_where(|b| matches!(self.regency_mine_fx.beams.get(b as usize), Some(Some(_))));
+        for u in rows.iter().map(|&i| &units[i]) {
             if u.owner_flags & hidden != 0 {
                 continue;
             }

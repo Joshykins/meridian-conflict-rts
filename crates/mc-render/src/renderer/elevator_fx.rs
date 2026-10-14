@@ -302,7 +302,13 @@ impl Renderer {
             | STATE_RADAR
             | (mc_sim::tables::flag::UNDER_CONSTRUCTION as u32) << 8;
         let saved = (self.effect_origin, self.effect_settings);
-        for u in units {
+        let rows = self.unit_kinds.rows_where(|b| {
+            self.blueprints
+                .units
+                .get(b as usize)
+                .is_some_and(|bp| bp.elevator.is_some())
+        });
+        for u in rows.iter().map(|&i| &units[i]) {
             if u.owner_flags & hidden != 0 {
                 continue;
             }

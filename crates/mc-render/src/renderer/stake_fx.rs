@@ -25,7 +25,10 @@ impl StakeFx {
 impl Renderer {
     /// Once a tick: the stakes that struck the ground during it, each at its moment.
     pub(super) fn stake_strikes(&mut self, units: &[UnitInstance], time: f32) {
-        for u in units {
+        let rows = self
+            .unit_kinds
+            .rows_where(|b| matches!(self.stake_fx.scales.get(b as usize), Some(Some(_))));
+        for u in rows.iter().map(|&i| &units[i]) {
             if u.owner_flags & (KIND_WRECK | KIND_GHOST | KIND_PROP) != 0
                 || u.deploy <= u.prev_deploy
             {
