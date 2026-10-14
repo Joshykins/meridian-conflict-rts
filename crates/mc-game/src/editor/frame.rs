@@ -14,18 +14,11 @@ impl Editor {
             ..
         } = ctx;
         let mut event = self.api_frame(renderer);
-        if memory.editing.is_none() {
-            let axis =
-                |a, b| (self.held.contains(&a) as i32 - self.held.contains(&b) as i32) as f32;
-            self.camera.pan(
-                Vec2::new(
-                    axis(KeyCode::KeyD, KeyCode::KeyA),
-                    axis(KeyCode::KeyS, KeyCode::KeyW),
-                ) * dt
-                    * 600.0,
-            );
-            self.camera
-                .orbit(axis(KeyCode::KeyE, KeyCode::KeyQ) * dt, 0.0);
+        if self.catalogue.is_none() && memory.editing == Some(id("editor_catalogue_search", 0)) {
+            memory.editing = None;
+        }
+        if memory.editing.is_none() && self.catalogue.is_none() && !self.confirm_exit {
+            self.navigation.update(&mut self.camera, &self.held, dt);
         }
         overlay.clear();
         let mut ui = Ui::new(
@@ -38,18 +31,20 @@ impl Editor {
             time,
             dt,
         );
+        self.draw_regions(&mut ui, renderer);
         let browsing = self.browser.as_ref().is_some_and(|b| b.browser.is_open());
-        ui.interactive = !browsing && !self.confirm_exit && !self.reloading();
+        ui.interactive =
+            !browsing && self.catalogue.is_none() && !self.confirm_exit && !self.reloading();
         let bottom = ui.size.y - (144.0 + Self::tool_rows(ui.size.x) as f32 * 44.0);
         self.top_bar(&mut ui, renderer, &mut event);
         self.tools_panel(&mut ui, bottom);
         let card = self.properties(&mut ui, renderer);
         let outliner = self.outliner(&mut ui, bottom);
-        if !browsing && !self.reloading() {
+        if !browsing && self.catalogue.is_none() && !self.reloading() {
             self.world_input(&mut ui, renderer, bottom, card, outliner);
         }
-        self.draw_regions(&mut ui, renderer);
         ui.interactive = true;
+        self.catalogue_frame(&mut ui);
         self.exit_dialog(&mut ui, &mut event);
         if let Some(open) = self.browser_frame(&mut ui) {
             event = Some(open);

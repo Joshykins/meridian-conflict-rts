@@ -51,13 +51,16 @@ playable mission, authored and revised through the editor and its API.
 - Added asynchronous data/sound, shader and model reload with cache rollback,
   an offscreen native editor service, and responsive authoring controls.
 - Reload failure and model-cache recovery regression tests and quick gate pass.
-  Native data reload preserves an unsaved point and camera; final capture and
-  error-path screenshots are being checked.
+  Native data and shader reload preserve camera and document; malformed model
+  rejection, subsequent undo and native screenshots are verified.
+
+- Added free camera, searchable unit catalogue, stable-ID property editing,
+  repeated unit stamping and labelled authoring guides behind the panels.
 
 ## Still required before final delivery
 - Component doodads, general destructible/reclaimable props.
 - Ground cover painting, water/climate controls, remaining brushes and resize.
-- Free camera and catalogue/gizmo improvements; native reload success/error review.
+- Remaining gizmo/snapping improvements and free camera/catalogue native review.
 - Propaganda components and encounter balance; native review of evacuation,
   allied arrivals and later mission beats.
 - Full checks, determinism matrix/cross-platform verification, final native

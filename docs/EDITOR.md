@@ -4,11 +4,17 @@ Open Map Editor from the main menu, or launch with --editor MAP. A shipped
 flat map opens as a source document; Save writes a new folder beneath the
 user's meridian-conflict/maps directory. Open lists both shipped and user maps.
 
-WASD pans, Q/E orbits, and the wheel zooms. The bottom panel selects a tool.
+WASD pans, Q/E orbits, Page Up/Down tilts, and the wheel zooms. Free camera
+keeps the current eye position: WASD flies, Q/E changes height, arrows look,
+Shift boosts movement and the wheel changes speed. Toggle it off to restore
+the previous orbit view. The bottom panel selects a tool.
 Raise, Lower, Flatten and Smooth stamp terrain at the cursor. Unit, Region,
 Point and Camera create named placements. A region uses two opposite corners.
 Select picks an object in the viewport or outliner; Move places that selection
-at the cursor, and the heading button rotates a selected unit.
+at the cursor, and the heading button rotates a selected unit. Browse opens a
+searchable unit catalogue including mission-only variants. Apply to selection
+changes an object's name and, for units, blueprint, group and player without
+changing its ID. Repeated Unit clicks place separate units.
 
 Named objects have stable numeric IDs. Reapplying a named placement updates
 that object; deleting and creating a new object allocates another ID. Names
@@ -50,7 +56,7 @@ Examples:
 
 An edit request has 1–512 actions and is one atomic undo step. Invalid actions
 leave the entire request unapplied. Requests are limited to 256 KiB. Supported
-actions are terrain, unit, region, point, camera, transform and delete; the
+actions are terrain, unit, region, point, camera, transform, properties and delete; the
 authoritative schema is editor/document.rs. Coordinates are world metres,
 headings/yaw are degrees, and owner is the zero-based player slot.
 
@@ -98,6 +104,18 @@ Paths are on the editor host (Windows for the native editor). The model files us
 the same bounded protocol as the shot server. Every requested model must resolve
 before replacements are applied. Rust gameplay changes still require a rebuild.
 
+The catalogue and free camera are also available to tools:
+
+    scripts/editor.sh '{"op":"catalogue","query":"company"}'
+    scripts/editor.sh '{"op":"choose_unit","blueprint":"company_t1_tank"}'
+    scripts/editor.sh '{"op":"camera","at":[7738,8008],"zoom":25,"yaw":0,"height":120,"pitch":15}'
+
+Omit height and pitch to return to orbit. Both are required for a free pose;
+height is the focus altitude in metres and pitch is degrees below the horizon.
+Properties uses {"action":"properties","id":1,"name":"lead","group":"company",
+"owner":0,"blueprint":"company_merrick"}. Omit unit-only fields when renaming a
+point, region or camera. Invalid or duplicate names leave the batch unchanged.
+
 ## Mission checkpoints
 
 Compiled Rust authoring in mc-missions produces deterministic event definitions.
@@ -135,5 +153,5 @@ civilian evacuation cars, physical ARC cargo drops, queued comms and checkpoint
 recovery. Add --resume to restore every checkpoint into a fresh world during the
 route. Use --mission-pilot with a headless screenshot to inspect later beats.
 Full encounter balance and visual review remain in progress. Component prop editing, the remaining terrain
-and paint tools, resizing and free camera are tracked in
+and paint tools, resizing and remaining gizmos are tracked in
 EDITOR-IMPLEMENTATION.md and are not yet available in this slice.

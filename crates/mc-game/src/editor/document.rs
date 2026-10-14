@@ -1,4 +1,5 @@
 //! The authoring document and undoable commands shared by the UI and mailbox.
+mod properties;
 use mc_core::{Angle, Fx, FxVec2};
 use mc_map::edit::EditMap;
 use mc_map::placed::{Placed, PlacedUnit, Region};
@@ -52,6 +53,13 @@ pub(super) enum Command {
         id: u64,
         at: [f32; 2],
         heading: f32,
+    },
+    Properties {
+        id: u64,
+        name: String,
+        group: Option<String>,
+        owner: Option<u8>,
+        blueprint: Option<String>,
     },
     Delete {
         id: u64,
@@ -234,6 +242,21 @@ impl Document {
                         return Err("Select a unit, point, camera or region to transform".into());
                     }
                 }
+                Command::Properties {
+                    id,
+                    name,
+                    group,
+                    owner,
+                    blueprint,
+                } => properties::apply(
+                    &mut placed,
+                    *id,
+                    name,
+                    group.as_deref(),
+                    *owner,
+                    blueprint.as_deref(),
+                    blueprints,
+                )?,
                 Command::Delete { id } => {
                     placed.units.retain(|u| u.id != *id);
                     placed.regions.retain(|r| r.id != *id);

@@ -12,6 +12,12 @@ use std::time::{Duration, Instant};
 #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
 enum Request {
     State,
+    Catalogue {
+        query: String,
+    },
+    ChooseUnit {
+        blueprint: String,
+    },
     Edit {
         actions: Vec<Command>,
     },
@@ -24,6 +30,8 @@ enum Request {
         at: [f32; 2],
         zoom: f32,
         yaw: f32,
+        height: Option<f32>,
+        pitch: Option<f32>,
     },
     Shot,
     Test,
@@ -169,6 +177,13 @@ impl Editor {
         let result=request.and_then(|request| {
             if self.reloading() && !matches!(request,Request::State|Request::Shot|Request::Camera{..}) {return Err("Reload is running; wait for state to report completion".into());}
             match request {
+                Request::Catalogue{query}=>{
+                    if query.len()>128 {return Err("Search is limited to 128 bytes".into());}
+                    let units=self.catalogue_entries(&query);
+                    self.catalogue=Some(super::catalogue::Catalogue::with_query(query));
+                    return Ok(json!({"ok":true,"units":units}));
+                }
+                Request::ChooseUnit{blueprint}=>self.choose_unit(&blueprint)?,
                 Request::Reload{resources}=>self.request_reload(resources)?,
                 Request::ModelCalls{key}=>{
                     let calls=mc_render::models::remote::kept_calls(&key);
@@ -179,7 +194,7 @@ impl Editor {
                     return Ok(json!({"ok":true,"calls":path,"count":calls.len()}));
                 }
                 Request::State => return Ok(json!({"ok":true,"map":self.doc.map.info.name,"source":self.doc.source,
-                    "dirty":self.doc.dirty,"reloading":self.reloading(),"message":self.message,"destination":self.doc.destination,"placed":self.doc.placed,"camera":{"at":self.camera.focus.to_array(),"zoom":self.camera.distance,"yaw":self.camera.yaw.to_degrees()}})),
+                    "dirty":self.doc.dirty,"reloading":self.reloading(),"message":self.message,"destination":self.doc.destination,"placed":self.doc.placed,"camera":{"at":self.camera.focus.to_array(),"zoom":self.camera.distance,"yaw":self.camera.yaw.to_degrees(),"pitch":self.camera.pitch_free.map(f32::to_degrees)}})),
                 Request::Edit {actions} => {
                     if let Some(rect)=self.doc.apply(&actions,&self.blueprints)? {renderer.edit_terrain(&self.doc.map,rect).map_err(|e|e.to_string())?;}
                     if actions.iter().any(|a|!matches!(a,Command::Terrain{..})){self.refresh_units()?;}
@@ -190,11 +205,19 @@ impl Editor {
                     self.refresh_units()?;
                 }
                 Request::Save {name}=> {if let Some(name)=name {self.save_as(name)?;}else{self.save()?;}}
-                Request::Camera {at,zoom,yaw}=>{
+                Request::Camera {at,zoom,yaw,height,pitch}=>{
                     if at.iter().chain([&zoom,&yaw]).any(|v|!v.is_finite()) || zoom<25.0 || zoom>300_000.0 {
                         return Err("Invalid camera coordinates".into());
                     }
-                    self.camera.focus=glam::Vec2::from(at).extend(renderer.ground_height(at.into()));
+                    match (height,pitch) {
+                        (Some(z),Some(p)) if z.is_finite() && (-10_000.0..=300_000.0).contains(&z) && p.is_finite() && (-89.0..=89.0).contains(&p)=>{
+                            self.navigation.enter(&mut self.camera);
+                            self.camera.pitch_free=Some(p.to_radians());
+                        },
+                        (None,None)=>self.navigation.exit(&mut self.camera),
+                        _=>return Err("Free camera requires finite height and pitch (-89 to 89 degrees)".into())
+                    }
+                    self.camera.focus=glam::Vec2::from(at).extend(height.unwrap_or_else(||renderer.ground_height(at.into())));
                     self.camera.distance=zoom;self.camera.yaw=yaw.to_radians();self.camera.clamp_focus();
                 }
                 Request::Shot=>{if !self.api.headless {renderer.capture_next_frame();} self.api.shot=Some(id.clone());}

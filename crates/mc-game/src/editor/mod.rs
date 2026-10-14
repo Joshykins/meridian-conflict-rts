@@ -1,9 +1,12 @@
 //! In-game map authoring. The document outlives playtests and owns all edits.
 mod api;
 mod browser;
+mod catalogue;
 mod document;
 mod frame;
 mod interaction;
+mod navigation;
+mod overlays;
 mod panels;
 mod preview;
 mod reload;
@@ -60,6 +63,8 @@ pub(crate) struct Editor {
     browser: Option<browser::Browse>,
     api: api::Api,
     reload: reload::Reload,
+    navigation: navigation::Navigation,
+    catalogue: Option<catalogue::Catalogue>,
 }
 
 fn config() -> MatchConfig {
@@ -125,6 +130,8 @@ impl Editor {
             browser: None,
             api: api::Api::new(),
             reload: Default::default(),
+            navigation: Default::default(),
+            catalogue: None,
         };
         editor.refresh_units()?;
         Ok(editor)

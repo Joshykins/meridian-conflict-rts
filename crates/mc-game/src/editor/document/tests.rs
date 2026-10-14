@@ -116,3 +116,30 @@ fn save_as_export_and_failed_save_preserve_assets_and_document() {
     assert!(!doc.dirty);
     std::fs::remove_dir_all(folder).unwrap();
 }
+
+#[test]
+fn editing_properties_preserves_identity_and_rejects_duplicate_names_atomically() {
+    let (folder, mut doc, bp) = fixture();
+    doc.apply(&[unit("first"), unit("second")], &bp).unwrap();
+    let id = doc.placed.units[0].id;
+    let edit = |name: &str| Command::Properties {
+        id,
+        name: name.into(),
+        group: Some("guards".into()),
+        owner: Some(2),
+        blueprint: None,
+    };
+    let before = doc.placed.clone();
+    assert!(doc.apply(&[edit("second")], &bp).is_err());
+    assert_eq!(doc.placed, before);
+    doc.apply(&[edit("renamed")], &bp).unwrap();
+    assert_eq!(doc.placed.units[0].id, id);
+    assert_eq!(doc.placed.units[0].name, "renamed");
+    assert_eq!(doc.placed.units[0].owner, 2);
+    doc.undo().unwrap();
+    assert_eq!(doc.placed, before);
+    doc.redo().unwrap();
+    assert_eq!(doc.placed.units.len(), 2);
+    assert_eq!(doc.placed.units[0].id, id);
+    std::fs::remove_dir_all(folder).unwrap();
+}

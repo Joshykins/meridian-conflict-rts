@@ -84,11 +84,11 @@ impl Editor {
         }
     }
     pub(super) fn tool_rows(width: f32) -> usize {
-        12usize.div_ceil(((width - 68.0) / 112.0).floor().max(1.0) as usize)
+        13usize.div_ceil(((width - 68.0) / 112.0).floor().max(1.0) as usize)
     }
     pub(super) fn tools_panel(&mut self, ui: &mut Ui, bottom: f32) {
         let w = ui.size.x;
-        let columns = (((w - 68.0) / 112.0).floor().max(1.0) as usize).min(12);
+        let columns = (((w - 68.0) / 112.0).floor().max(1.0) as usize).min(13);
         let rows = Self::tool_rows(w);
         let step = (w - 68.0) / columns as f32;
         ui.panel(Rect::new(18.0, bottom, w - 36.0, ui.size.y - bottom - 18.0));
@@ -112,11 +112,12 @@ impl Editor {
             "Move",
             "Reload data",
             "Reload shaders",
+            "Free camera",
         ]
         .iter()
         .enumerate()
         {
-            let kind = if self.tool == i {
+            let kind = if self.tool == i || (i == 12 && self.camera.pitch_free.is_some()) {
                 ButtonKind::Primary
             } else {
                 ButtonKind::Secondary
@@ -136,6 +137,18 @@ impl Editor {
                 if i < 10 {
                     self.tool = i;
                     self.region_start = None;
+                    if i == 5 && self.doc.placed.units.iter().any(|u| u.name == self.name) {
+                        self.name = format!("{}_{}", self.blueprint, self.doc.placed.next_id);
+                        self.selected = None;
+                    }
+                } else if i == 12 {
+                    self.navigation.toggle(&mut self.camera);
+                    self.message = if self.camera.pitch_free.is_some() {
+                        "Free camera: WASD fly; Q/E height; arrows look; Shift faster; wheel speed."
+                    } else {
+                        "Orbit camera: WASD pan; Q/E turn; Page Up/Down tilt; wheel zoom."
+                    }
+                    .into();
                 } else if let Err(e) = self.request_reload(ReloadRequest {
                     data: i == 10,
                     shaders: i == 11,
@@ -176,7 +189,7 @@ impl Editor {
     }
     pub(super) fn properties(&mut self, ui: &mut Ui, renderer: &mut mc_render::Renderer) -> Rect {
         let w = ui.size.x;
-        let card = Rect::new(w - 350.0, 100.0, 332.0, 370.0);
+        let card = Rect::new(w - 350.0, 100.0, 332.0, 412.0);
         ui.panel(card);
         ui.text(
             card.x + 16.0,
@@ -204,11 +217,29 @@ impl Editor {
             );
             ui.text_field(
                 id("editor_field", i),
-                Rect::new(card.x + 16.0, y + 9.0, 300.0, 34.0),
+                Rect::new(
+                    card.x + 16.0,
+                    y + 9.0,
+                    if i == 1 { 210.0 } else { 300.0 },
+                    34.0,
+                ),
                 value,
                 128,
             );
         }
+        if ui.button(
+            id("editor_browse_units", 0),
+            Rect::new(card.x + 232.0, card.y + 118.0, 82.0, 34.0),
+            "Browse",
+            ButtonKind::Secondary,
+            true,
+        ) {
+            self.catalogue = Some(Default::default());
+        }
+        self.property_actions(ui, card, renderer);
+        card
+    }
+    fn property_actions(&mut self, ui: &mut Ui, card: Rect, renderer: &mut mc_render::Renderer) {
         if ui.button(
             id("editor_owner", 0),
             Rect::new(card.x + 16.0, card.y + 300.0, 190.0, 34.0),
@@ -257,7 +288,29 @@ impl Editor {
             }
         }
 
-        card
+        if ui.button(
+            id("editor_apply_properties", 0),
+            Rect::new(card.x + 16.0, card.y + 374.0, 298.0, 30.0),
+            "Apply to selection",
+            ButtonKind::Secondary,
+            self.selected.is_some(),
+        ) {
+            if let Some(id) = self.selected {
+                let unit = self.doc.placed.units.iter().any(|u| u.id == id);
+                if let Err(e) = self.apply(
+                    Command::Properties {
+                        id,
+                        name: self.name.clone(),
+                        group: unit.then(|| self.group.clone()),
+                        owner: unit.then_some(self.owner),
+                        blueprint: unit.then(|| self.blueprint.clone()),
+                    },
+                    renderer,
+                ) {
+                    self.message = e;
+                }
+            }
+        }
     }
     pub(super) fn outliner(&mut self, ui: &mut Ui, bottom: f32) -> Rect {
         let input = ui.input;
@@ -347,7 +400,7 @@ impl Editor {
             && !outliner.contains(ui.cursor);
         if viewport && !self.confirm_exit {
             if input.scroll != 0.0 {
-                self.camera.zoom((-input.scroll * 0.13).exp(), None);
+                self.navigation.wheel(&mut self.camera, input.scroll);
             }
             let (origin, dir) = self.camera.ray(input.cursor);
             if let Some(hit) = renderer.pick_ground(origin, dir) {
@@ -402,36 +455,16 @@ impl Editor {
                         }
                     };
                     if let Some(command) = command {
-                        if let Err(e) = self.apply(command, renderer) {
-                            self.message = e;
+                        let placing = matches!(command, Command::Unit { .. });
+                        match self.apply(command, renderer) {
+                            Err(e) => self.message = e,
+                            Ok(()) if placing => {
+                                self.name =
+                                    format!("{}_{}", self.blueprint, self.doc.placed.next_id)
+                            }
+                            Ok(()) => {}
                         }
                     }
-                }
-            }
-        }
-    }
-    pub(super) fn draw_regions(&self, ui: &mut Ui, renderer: &mc_render::Renderer) {
-        for region in &self.doc.placed.regions {
-            let a = Vec2::from(region.min.to_f32());
-            let b = Vec2::from(region.max.to_f32());
-            let points = [a, Vec2::new(b.x, a.y), b, Vec2::new(a.x, b.y)];
-            let projected: Vec<_> = points
-                .iter()
-                .filter_map(|p| {
-                    self.camera
-                        .project(p.extend(renderer.ground_height(*p) + 2.0))
-                })
-                .collect();
-            if projected.len() == 4 {
-                for i in 0..4 {
-                    let a = projected[i] / ui.s;
-                    let b = projected[(i + 1) % 4] / ui.s;
-                    ui.o.line(
-                        (a * ui.s).to_array(),
-                        (b * ui.s).to_array(),
-                        2.0,
-                        rgb(0x66DDBB, 1.0),
-                    );
                 }
             }
         }
