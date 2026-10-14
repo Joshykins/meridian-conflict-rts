@@ -255,6 +255,9 @@ pub struct Picked {
     key: Option<(u64, u32, usize, usize)>,
     /// Counts the rebuilds: what a panel's figures kept for this selection go by.
     stamp: u64,
+    /// Counts the changes of selection: what figures kept for the same units, a tick
+    /// old, go by.
+    units: u64,
     ids: Vec<u32>,
     /// Index in `frame.units` of each selected unit found there, in selection order.
     rows: Vec<u32>,
@@ -305,11 +308,19 @@ impl Picked {
         self.stamp
     }
 
+    /// Changes each time the selection does, not with the frame.
+    pub fn units(&self) -> u64 {
+        self.units
+    }
+
     fn rebuild(&mut self, view: &View, key: (u64, u32, usize, usize)) {
         self.key = Some(key);
         self.stamp += 1;
-        self.ids.clear();
-        self.ids.extend_from_slice(&view.selection);
+        if self.ids[..] != view.selection[..] {
+            self.units += 1;
+            self.ids.clear();
+            self.ids.extend_from_slice(&view.selection);
+        }
         self.rows.clear();
         self.bits.clear();
         self.bits.resize(view.frame.units.len().div_ceil(64), 0);

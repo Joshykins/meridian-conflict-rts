@@ -822,7 +822,11 @@ impl Hud {
         // What is worked out from the units is kept while they and the frame stay the
         // same (`selection/kept.rs`); for the unit under the pointer it is not. Never
         // before the first pull: a deck drawn by hand (tests) changes its frame in place.
-        let mut shown = (!selected.is_empty()).then_some(selection::Shown::Selection(stamp));
+        let units_picked = view.picked().units();
+        let mut shown = (!selected.is_empty()).then_some(selection::Shown::Selection {
+            stamp,
+            units: units_picked,
+        });
         let units: Vec<&UnitInstance> = if closing && deck_k > 0.01 {
             inspect_only = self.deck_inspect;
             shown = Some(selection::Shown::Closing {

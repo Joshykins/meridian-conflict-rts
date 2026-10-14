@@ -6,24 +6,40 @@
 //! times a second, or when the selection does. Here they are worked out once for each
 //! (`Shown`), and asked of the blueprints once each where the blueprint alone decides
 //! (`kinds`). Nothing shown changes: the same functions give the same answers, less often.
+//! The panel's figures for a selection of thousands are counted a share a frame
+//! (`tally.rs`), the last tick's standing meanwhile: a tick late at most.
 
-use super::{families, ordered_as, Family, Order};
+use super::tally::{self, Summary, Tally};
+use super::{families, Family, Order};
 use crate::game::Mode;
-use crate::hud::economy::{self, Flow};
 use crate::hud::priority::Mix;
 use crate::hud::{cargo, elevator, gravitic, silo, titan, Scene};
 use mc_data::{BlueprintId, UnitBlueprint};
 use mc_sim::mirror::{CargoView, ElevatorView, UnitInstance};
-use mc_sim::FireState;
 
 /// What the deck shows, as far as what is kept for it goes.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(in crate::hud) enum Shown {
-    /// The selection, by `Picked::stamp` (which changes with every pull and selection).
-    Selection(u64),
+    /// The selection, by `Picked::stamp` (which changes with every pull and selection), and
+    /// `Picked::units` (with every selection).
+    Selection { stamp: u64, units: u64 },
     /// What it showed last, going away: by the pull, and which units those were.
     Closing { pulls: u64, units: u64 },
 }
+
+impl Shown {
+    /// Which units, whatever the tick.
+    fn units(self) -> (bool, u64) {
+        match self {
+            Shown::Selection { units, .. } => (false, units),
+            Shown::Closing { units, .. } => (true, units),
+        }
+    }
+}
+
+/// Units past which the panel's figures are counted a share a frame (`SHARES` of them).
+const SHARED_FROM: usize = 8192;
+const SHARES: usize = 3;
 
 /// The order card: its families and their orders.
 type Card = Vec<(Family, Vec<Order>)>;
@@ -53,31 +69,6 @@ impl<K: PartialEq, V> Memo<K, V> {
     }
 }
 
-/// The selection panel's figures for many units (`info`).
-#[derive(Clone, Default)]
-pub(super) struct Summary {
-    /// The one lift ship among them, when every other unit was taken out of a hold.
-    pub(super) base: Option<u32>,
-    /// A tile per blueprint: how many, and whether any of them is paused; most numerous
-    /// first, then by blueprint.
-    pub(super) types: Vec<(u32, usize, bool)>,
-    pub(super) can_save: bool,
-    pub(super) kills: u32,
-    pub(super) reclaimed: f32,
-    /// The mean.
-    pub(super) health: f32,
-    /// The emptiest tank among them.
-    pub(super) low_fuel: Option<f32>,
-    pub(super) economy: (Flow, Flow),
-    /// Every one of them is a core mine with its view: the mine panel instead of tiles.
-    pub(super) all_mines: bool,
-    /// Of those that shoot (they or what they make, `ordered_as`), how many hold their
-    /// fire, and how many there are: the order card's Hold Fire.
-    held: (usize, usize),
-    /// Their priorities, for the order card's Priority.
-    mix: Mix,
-}
-
 /// The panels beside the order card, and the first unit each is for (by id) and how many.
 #[derive(Clone, Default)]
 pub(in crate::hud) struct Panels {
@@ -98,8 +89,15 @@ pub(in crate::hud) struct Kept {
     /// Counts the changes of the units the deck last showed (`Hud::deck_units`).
     pub(in crate::hud) closing: u64,
     kinds: Memo<Shown, Vec<u32>>,
-    summary: Memo<Shown, Summary>,
-    card: Memo<(Shown, Mode, bool), Card>,
+    /// The last summary finished, and what for.
+    summary: Option<(Shown, Summary)>,
+    /// The one being counted.
+    tally: Option<Tally>,
+    /// A share was counted this frame: the deck asks for the figures several times.
+    counted: bool,
+    /// Counts the summaries finished: the order card's Hold Fire goes by them.
+    summaries: u64,
+    card: Memo<(Shown, Mode, bool, u64), Card>,
     panels: Memo<Shown, Panels>,
 }
 
@@ -124,13 +122,14 @@ impl Kept {
     /// Sets what the deck shows this frame, before anything asks.
     pub(in crate::hud) fn show(&mut self, shown: Option<Shown>) {
         self.shown = shown;
+        self.counted = false;
     }
 
     /// The blueprints of `units`, each once (`kinds_of`).
     pub(in crate::hud) fn kinds(&mut self, s: &Scene, units: &[&UnitInstance]) -> &[u32] {
         let shown = self.shown;
         self.kinds.get(shown, || match shown {
-            Some(Shown::Selection(_)) => s.view.picked().kinds().to_vec(),
+            Some(Shown::Selection { .. }) => s.view.picked().kinds().to_vec(),
             _ => kinds_of(units),
         })
     }
@@ -145,18 +144,57 @@ impl Kept {
         self.kinds(s, units).iter().any(|&k| test(bp_of(s, k)))
     }
 
+    /// The selection panel's figures. For thousands of units, the frames after a tick
+    /// count a share each and show the last tick's meanwhile.
     pub(super) fn summary(&mut self, s: &Scene, units: &[&UnitInstance]) -> Summary {
         let kinds = self.kinds(s, units).to_vec();
-        (self.summary.get(self.shown, || summary(s, units, &kinds))).clone()
+        let Some(shown) = self.shown else {
+            return tally::summary(s, units, &kinds);
+        };
+        if let Some((_, sum)) = self.summary.as_ref().filter(|(key, _)| *key == shown) {
+            return sum.clone();
+        }
+        // The same units' figures, a tick old, to show while these are counted.
+        let meanwhile = (self.summary.as_ref()).filter(|(key, _)| key.units() == shown.units());
+        if let Some((_, sum)) = meanwhile.filter(|_| self.counted) {
+            return sum.clone();
+        }
+        // A count the next tick overtook before it was done: this one is done at once, so
+        // the figures never fall more than a tick behind.
+        let (mut count, overtaken) = match self.tally.take() {
+            Some(t) if t.key() == Some(shown) => (t, false),
+            last => (Tally::new(Some(shown)), last.is_some()),
+        };
+        let upto = match meanwhile {
+            Some(_) if !overtaken && units.len() > SHARED_FROM => {
+                count.done() + units.len().div_ceil(SHARES)
+            }
+            _ => units.len(),
+        };
+        count.count(s, units, upto);
+        self.counted = true;
+        if count.done() < units.len() {
+            if let Some((_, sum)) = meanwhile {
+                let sum = sum.clone();
+                self.tally = Some(count);
+                return sum;
+            }
+            count.count(s, units, units.len());
+        }
+        let sum = count.finish(s, units, &kinds);
+        self.summaries += 1;
+        self.summary = Some((shown, sum.clone()));
+        sum
     }
 
     /// The order card's families (`families`); the lit orders follow the mode.
     pub(super) fn card(&mut self, s: &Scene, units: &[&UnitInstance]) -> Card {
         let kinds = self.kinds(s, units).to_vec();
         let (held, of) = self.summary(s, units).held;
-        let key = self
-            .shown
-            .map(|shown| (shown, s.view.mode, s.view.formation_panel));
+        let key = (self.shown).map(|shown| {
+            let panel = s.view.formation_panel;
+            (shown, s.view.mode, panel, self.summaries)
+        });
         let holding = held * 2 > of;
         (self
             .card
@@ -196,81 +234,4 @@ impl Kept {
         };
         self.panels.get(self.shown, work).clone()
     }
-}
-
-/// `Summary`, in one pass over `units` (two for a lift ship's hold).
-fn summary(s: &Scene, units: &[&UnitInstance], kinds: &[u32]) -> Summary {
-    let any = |test: &dyn Fn(&UnitBlueprint) -> bool| kinds.iter().any(|&k| test(bp_of(s, k)));
-    let mut out = Summary::default();
-    let mut health = 0.0;
-    // What they make and spend together.
-    let (mut materials, mut energy) = (Flow::default(), Flow::default());
-    // For each blueprint met, as `out.types`: whether it shoots (it or what it makes),
-    // takes a priority, and sends reclaimers, asked once.
-    let mut traits: Vec<(bool, bool, bool)> = Vec::new();
-    // Units come in runs of one blueprint: the tile is looked for only when the run ends.
-    let mut at = usize::MAX;
-    for u in units {
-        if out.types.get(at).is_none_or(|t| t.0 != u.blueprint) {
-            at = match out.types.iter().position(|t| t.0 == u.blueprint) {
-                Some(i) => i,
-                None => {
-                    let bp = s.bp(u);
-                    out.types.push((u.blueprint, 0, false));
-                    traits.push((
-                        ordered_as(s.blueprints, bp).any(|b| !b.weapons.is_empty()),
-                        mc_sim::focus::prioritizable(s.blueprints, bp),
-                        bp.sends_reclaimers(),
-                    ));
-                    out.types.len() - 1
-                }
-            };
-        }
-        let tile = &mut out.types[at];
-        tile.1 += 1;
-        tile.2 |= u.paused();
-        let (shoots, prioritizable, reclaims) = traits[at];
-        out.kills += u.kill_count();
-        health += u.health;
-        if let Some(f) = s.view.fuel(u.unit_id) {
-            let fill = f.fill.clamp(0.0, 1.0);
-            out.low_fuel = Some(out.low_fuel.map_or(fill, |low: f32| low.min(fill)));
-        }
-        if reclaims {
-            out.reclaimed += s.queue_of(u).map_or(0.0, |q| q.reclaimed);
-        }
-        let (m, e) = economy::flows(s, u, s.bp(u));
-        materials.add(m);
-        energy.add(e);
-        if shoots {
-            out.held.0 += usize::from(u.fire_state() == FireState::HoldFire);
-            out.held.1 += 1;
-        }
-        out.mix.add(s, u, prioritizable);
-    }
-    out.types
-        .sort_by_key(|&(bp, n, _)| (std::cmp::Reverse(n), bp));
-    out.health = health / units.len().max(1) as f32;
-    out.economy = (materials, energy);
-    // A lift ship with units picked out of its hold: the ship's panel stays up.
-    if any(&|bp| bp.transport.is_some()) {
-        let mut bases = units.iter().filter(|u| s.bp(u).transport.is_some());
-        if let (Some(base), None) = (bases.next(), bases.next()) {
-            if units
-                .iter()
-                .all(|u| u.unit_id == base.unit_id || u.stored())
-            {
-                out.base = Some(base.unit_id);
-            }
-        }
-    }
-    let structures = any(&|bp| bp.built_on_site() && !bp.is_mobile());
-    out.can_save = crate::hud::prefabs::can_save(s, units, structures);
-    // A mine's view comes only with a mine's blueprint (`World::mine_view`).
-    out.all_mines = !units.is_empty()
-        && kinds.iter().all(|&k| bp_of(s, k).mine.is_some())
-        && units
-            .iter()
-            .all(|u| s.queue_of(u).is_some_and(|q| q.mine.is_some()));
-    out
 }

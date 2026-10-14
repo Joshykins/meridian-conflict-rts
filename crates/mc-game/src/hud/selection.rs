@@ -24,6 +24,7 @@ mod pause_order;
 mod repeat_order;
 mod shaper;
 mod status;
+mod tally;
 
 use details::details_card;
 use formation::formation_panel;

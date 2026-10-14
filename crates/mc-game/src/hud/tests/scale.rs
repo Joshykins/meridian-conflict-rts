@@ -1,7 +1,7 @@
 //! Probe: what the HUD costs the CPU a frame with 64 000 fighters selected, among as many
 //! of the enemy's, all in one command group. It prints the HUD's spans for frames between
-//! the sim's ticks and for frames just after a tick (a pull), when what is kept for the
-//! selection is worked out again. Run:
+//! the sim's ticks, with a tick (a pull) before every frame, and with one every sixth
+//! frame, as at 60 frames a second. Run:
 //!
 //!     cargo test --profile gate -p mc-game zz_hud_64k -- --ignored --nocapture
 
@@ -70,14 +70,12 @@ fn zz_hud_64k_selected() {
     };
     pull(&mut rig);
     rig.settle();
-    let time = |rig: &mut Rig, pulls: bool| {
-        let mut report = mc_core::perf::Report::new(if pulls {
-            "HUD, a frame after each pull"
-        } else {
-            "HUD, frames between pulls"
-        });
-        for _ in 0..30 {
-            if pulls {
+    // Frames with a pull every `every` frames: never, every frame, and as at 60 frames a
+    // second with the sim's ten ticks a second.
+    let time = |rig: &mut Rig, every: Option<usize>, title: &str| {
+        let mut report = mc_core::perf::Report::new(title);
+        for frame in 0..36 {
+            if every.is_some_and(|n| frame % n == 0) {
                 pull(rig);
             }
             let scope = mc_core::perf::Scope::begin();
@@ -89,6 +87,7 @@ fn zz_hud_64k_selected() {
         }
         println!("{}", report.text());
     };
-    time(&mut rig, false);
-    time(&mut rig, true);
+    time(&mut rig, None, "HUD, frames between pulls");
+    time(&mut rig, Some(1), "HUD, a pull every frame");
+    time(&mut rig, Some(6), "HUD, a pull every sixth frame");
 }
