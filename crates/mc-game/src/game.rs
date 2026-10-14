@@ -4268,12 +4268,9 @@ impl Game {
             };
             self.sim.watch.lock().unwrap().clone_from(&self.watched);
         }
-        let mut marks: Vec<Mark> = self
-            .view
-            .selection
-            .iter()
-            .filter_map(|id| self.view.index_of.get(id).copied())
-            .map(|i| self.unit_mark(i, false))
+        // The selection as found in the frame once per pull (`unit_rows.rs`).
+        let mut marks: Vec<Mark> = (self.view.picked().rows().iter())
+            .map(|&i| self.unit_mark(i as usize, false))
             .collect();
         if let Some(i) = hover_unit {
             if !self
@@ -4455,13 +4452,7 @@ impl Game {
 
         // Range rings: what the selection reaches, and what the thing being placed would.
         // Units in a lift ship's hold reach nothing until they are out.
-        let selected = self
-            .view
-            .selection
-            .iter()
-            .filter_map(|id| self.view.index_of.get(id))
-            .map(|&i| &self.view.frame.units[i])
-            .filter(|u| !u.stored());
+        let selected = (self.view.picked_units().into_iter()).filter(|u| !u.stored());
         // A survival Shaper's rings are its level's, not its blueprint's.
         let shaper = crate::rings::shaper(&self.view, self.hud.survival.shaper_focus);
         let selected = selected.filter(|u| shaper.as_ref().is_none_or(|s| s.0 != u.unit_id));
