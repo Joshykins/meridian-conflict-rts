@@ -16,6 +16,7 @@ use crate::bake::bays::{inside, polyline_at};
 use crate::bake::canyon::{smooth_closed, smooth_open};
 use crate::bake::sites::{FILL, FILL_MOST, LANE_DEEP, LOW_CUT, PRINTER_ROOM, SHOULDER};
 use crate::noise::bump;
+use crate::CELL_SIZE_M;
 use std::f64::consts::PI;
 
 /// The hold's coast: coves and headlands round it, the crossings' landings.
@@ -117,19 +118,23 @@ type Neck = (&'static [(f64, f64)], f64, f64);
 
 const NECKS: [Neck; 1] = [(&CAUSEWAY, 620.0, 9.0)];
 
-/// Under a bridge's deck the ground's sides meet it over this many metres. A
-/// landing (its projector, `HARDLIGHT_BRIDGE`'s head and ramp, at the bridge's
-/// scale) stands clear of the ground beside it: from its edge the ground drops
-/// this far at once (under anything the model hangs on its walls) and falls away
-/// at [`BANK`] for this far out, then goes back to the ground over
-/// [`LANDING_SIDE`]; lower ground is left as it is. Past the ramp's foot the
-/// ground is level with it for this far, then goes back to the ground over this
-/// many, so nothing rises steeply behind it.
+/// Under a bridge's deck the ground's sides meet it over this many metres. Beside
+/// a landing (its projector, `HARDLIGHT_BRIDGE`'s head and ramp, at the bridge's
+/// scale) the ground is a shoulder no higher than the projector and no more than
+/// [`SHOULDER_DROP`] under it, both falling away at [`BANK`] for this far out, then
+/// back to the ground over [`LANDING_SIDE`]: the projector's walls stand out of it
+/// and nothing rises past them (the renderer draws no crag there,
+/// `cliff_blocks`). The projector's exact surface stops one cell inside its edge,
+/// so the ground's drop is under its walls. Past the ramp's foot its line carries on down onto lower ground, and
+/// higher ground is cut back to it for this far, then rejoins over this many. The
+/// ground beside the deck banks up to it only from this far past each end, so it
+/// meets the projector's side unraised.
 const LANDING_SIDE: f64 = 140.0;
-const SIDE_DROP: f64 = 6.0;
 const SIDE_KEEP: f64 = 50.0;
+const SHOULDER_DROP: f64 = 10.0;
 const FOOT_LEVEL: f64 = 60.0;
 const FOOT_BLEND: f64 = 320.0;
+const END_BLEND: f64 = 80.0;
 /// Under the deck the ground keeps level for this far past its end (so the
 /// bridge's model, set on the ground at the end, stands at the deck's height),
 /// then falls away at this grade, too gentle for a crag (the terrain's rock relief
@@ -566,38 +571,55 @@ impl Terrain {
             if off > b.half() + 10.0 + SIDE_KEEP + LANDING_SIDE {
                 continue;
             }
-            let side = 1.0 - smoothstep(b.half() + 10.0, b.half() + LANDING_SIDE, off);
             let len = b.length();
+            // Metres out from the projector's edge (a cell inside the model's).
+            let d = off - (b.half() + 10.0 - CELL_SIZE_M as f64);
             if (0.0..=len).contains(&along) {
-                // Under the deck: the bank down from the nearer end.
-                let under = (along.min(len - along) - LEVEL_UNDER).max(0.0);
-                let shaped = h.min(DECK_TOP - UNDER_DECK).max(DECK_TOP - BANK * under);
-                h += (shaped - h) * side;
+                // Under the deck: the bank down from the nearer end, its sides
+                // spreading only past the end's first stretch.
+                let under = along.min(len - along);
+                let axis = h
+                    .min(DECK_TOP - UNDER_DECK)
+                    .max(DECK_TOP - BANK * (under - LEVEL_UNDER).max(0.0));
+                let spread = 1.0 - smoothstep(b.half() + 10.0, b.half() + LANDING_SIDE, off);
+                let banked = h + (axis - h) * spread;
+                let near = if d <= 0.0 {
+                    axis
+                } else {
+                    shoulder(h, axis - BANK * d, d)
+                };
+                h = near + (banked - near) * smoothstep(0.0, END_BLEND, under);
                 continue;
             }
             // Inland of the landing, metres: past the hold's end backward, past the far one forward.
             let inland = if along < 0.0 { -along } else { along - len };
             let plan = HARDLIGHT_BRIDGE;
             let (head, run) = (plan.head * b.scale(), plan.run * b.scale());
-            // The projector's surface, and its foot's level past it.
             let surf = DECK_TOP - plan.grade * (inland - head).clamp(0.0, run);
             let past = inland - head - run;
-            let d = off - (b.half() + 10.0);
-            let shaped = if d <= 0.0 {
-                surf
-            } else {
-                let bank = surf - SIDE_DROP - BANK * d;
-                // Higher ground is cut to the bank; lower ground is left on the
-                // projector (its walls stand clear) and filled up past its foot.
-                let fall = if h > bank {
-                    bank
-                } else {
-                    h + (bank - h) * smoothstep(0.0, 40.0, past)
-                };
-                fall + (h - fall) * smoothstep(SIDE_KEEP, SIDE_KEEP + LANDING_SIDE, d)
-            };
-            let back = smoothstep(FOOT_LEVEL, FOOT_LEVEL + FOOT_BLEND, past);
-            h = shaped + (h - shaped) * back;
+            if past <= 0.0 && d <= 0.0 {
+                // On the projector: its surface, so the model lies flush on it.
+                h = surf;
+                continue;
+            }
+            let out = d.max(0.0);
+            let away = smoothstep(SIDE_KEEP, SIDE_KEEP + LANDING_SIDE, out);
+            if past <= 0.0 {
+                // Beside the projector: its shoulder.
+                h = shoulder(h, surf - BANK * out, out);
+                continue;
+            }
+            // Past the foot: lower ground built up along the ramp's line carried
+            // on down (its shoulders at the bank's grade, coming in from the
+            // foot's corners), higher ground cut to the foot's level a while.
+            let fill = surf - plan.grade * past - BANK * out;
+            let cut = surf - BANK * out;
+            if h < fill {
+                h += (fill - h) * (1.0 - smoothstep(0.0, 40.0, out - past));
+            } else if h > cut {
+                let back = away.max(smoothstep(FOOT_LEVEL, FOOT_LEVEL + FOOT_BLEND, past));
+                h = cut + (h - cut) * back;
+            }
         }
         h
     }
@@ -886,4 +908,12 @@ pub(super) fn gate_frame(g: (f64, f64), p: (f64, f64)) -> (f64, f64) {
     let (s, c) = SEA_GATE_HEADING.sin_cos();
     let (dx, dy) = (p.0 - g.0, p.1 - g.1);
     (dx * c + dy * s, dy * c - dx * s)
+}
+
+/// The ground `h` as a bridge projector's shoulder `out` metres from its edge,
+/// `top` the shoulder's top there: no higher than it and no more than
+/// [`SHOULDER_DROP`] under it, going back to the ground further out.
+fn shoulder(h: f64, top: f64, out: f64) -> f64 {
+    let held = h.clamp(top - SHOULDER_DROP, top);
+    held + (h - held) * smoothstep(SIDE_KEEP, SIDE_KEEP + LANDING_SIDE, out)
 }

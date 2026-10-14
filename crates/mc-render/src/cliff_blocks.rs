@@ -22,6 +22,10 @@ const CRAG_TO: f32 = 1.1;
 /// The field is softened over about this many metres, so the relief comes in
 /// gently at a crag's foot and rim.
 const SOFTEN_M: f32 = 16.0;
+/// Metres round a hard-light bridge's projectors where the ground is never a
+/// crag: the bake leaves the ground beside a projector's walls to fall away
+/// sheer, and rock raised out of it would stand up past them.
+const PROJECTOR_CLEAR: f32 = 60.0;
 
 /// The crag field over `(w, h)` texels `cell` metres across, 0-1: the steepest
 /// ground in each texel, softened. Read tile by tile, so no more than one tile's
@@ -69,7 +73,43 @@ pub(crate) fn crag_field(map: &MapFile, cell: f32, (w, h): (usize, usize)) -> Ve
         h,
         ((SOFTEN_M / cell).round() as usize).max(1),
     );
+    clear_projectors(map, &mut field, cell, (w, h));
     field
+}
+
+/// Clears the crag field over each bridge's projectors (`HARDLIGHT_BRIDGE`'s head
+/// and ramp at both ends of every deck, scaled as the deck is), the deck's ends
+/// and [`PROJECTOR_CLEAR`] round them.
+fn clear_projectors(map: &MapFile, field: &mut [f32], cell: f32, (w, h): (usize, usize)) {
+    let plan = mc_map::landmark::HARDLIGHT_BRIDGE;
+    for deck in map.decks() {
+        let (a, b) = (Vec2::from(deck.a.to_f32()), Vec2::from(deck.b.to_f32()));
+        let len = a.distance(b).max(1.0);
+        let dir = (b - a) / len;
+        let reach = (plan.head + plan.run) as f32 * len / plan.span as f32 + PROJECTOR_CLEAR;
+        let half = deck.half.to_f32() + PROJECTOR_CLEAR;
+        let side = dir.perp() * half;
+        let corners = [a - dir * reach, b + dir * reach].map(|end| [end - side, end + side]);
+        let (lo, hi) = corners
+            .iter()
+            .flatten()
+            .fold((Vec2::MAX, Vec2::MIN), |(lo, hi), &c| {
+                (lo.min(c), hi.max(c))
+            });
+        let span = |lo: f32, hi: f32, n: usize| {
+            ((lo / cell).max(0.0) as usize).min(n)..((hi / cell).max(0.0) as usize + 1).min(n)
+        };
+        for cy in span(lo.y, hi.y, h) {
+            for cx in span(lo.x, hi.x, w) {
+                let p = (Vec2::new(cx as f32, cy as f32) + 0.5) * cell - a;
+                let (along, off) = (p.dot(dir), p.perp_dot(dir).abs());
+                let near_end = along < PROJECTOR_CLEAR || along > len - PROJECTOR_CLEAR;
+                if off <= half && along >= -reach && along <= len + reach && near_end {
+                    field[cy * w + cx] = 0.0;
+                }
+            }
+        }
+    }
 }
 
 fn smoothstep(a: f32, b: f32, x: f32) -> f32 {

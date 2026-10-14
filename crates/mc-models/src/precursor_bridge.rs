@@ -38,10 +38,11 @@ const DROP: f32 = GRADE * RUN;
 /// The authored radius: the half diagonal, projectors included.
 const RADIUS: f32 = 1_060.0;
 /// How far past the road a projector runs either side, its plates over the ground
-/// (a step too low to see a unit sink) and its foot, well into the ground.
+/// (a step too low to see a unit sink) and its foot, down past the shore beside
+/// it (the map leaves lower ground beside a projector as it is).
 const PAST: f32 = 8.0;
 const TOP: f32 = 0.35;
-const FOOT: f32 = -DROP - 26.0;
+const FOOT: f32 = -80.0;
 /// The plates: the dark border left round them, the joint between, and how
 /// proud of the core they stand.
 const PLATES: (f32, f32, f32) = (3.0, 1.6, 0.12);
