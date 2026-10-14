@@ -20,6 +20,6 @@ impl Share {
 
     /// Whether the unit `unit_id` emits this tick.
     pub(super) fn takes(self, unit_id: u32) -> bool {
-        self.stride == 1 || (unit_id.wrapping_mul(0x9E37_79B9) >> 16) % self.stride == 0
+        self.stride == 1 || (unit_id.wrapping_mul(0x9E37_79B9) >> 16).is_multiple_of(self.stride)
     }
 }
