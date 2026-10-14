@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Publishes the tip of a channel's branch (playtest: playtest, release: master;
-# scripts/channel.sh moves them) as that channel's newest build
+# Publishes the tip of a channel's branch (playtest, release) as that channel's
+# newest build. scripts/channel.sh promote and land run it, so a promotion
+# builds, publishes and pushes in one pass
 # (docs/RELEASES.md). Run from WSL:
 #
 #   scripts/release.sh playtest|release [--notes FILE] [--no-upload] [--from REF]
@@ -37,7 +38,7 @@ usage="usage: scripts/release.sh playtest|release [--notes FILE] [--no-upload] [
 channel=${1:-}
 case $channel in
     playtest) ref=playtest ;;
-    release) ref=master ;;
+    release) ref=release ;;
     news) ;;
     *) echo "$usage" >&2; exit 2 ;;
 esac

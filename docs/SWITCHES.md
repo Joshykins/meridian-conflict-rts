@@ -103,6 +103,8 @@ See `docs/RELEASES.md`.
 | `MERIDIAN_LAUNCHER` | the launcher's path | Set by the launcher for the game it starts: Match History's Watch in Its Build asks it to fetch and run an old replay's build. |
 | `MeridianConflict --replay FILE` | a replay | The launcher plays FILE in the build that recorded it (fetching it first), then starts the current build on Match History. |
 | `MeridianConflict --screenshot DIR` | a folder | The launcher draws its window in each of its states into DIR as PNGs (1x and 1.5x) and exits. |
+| `MERIDIAN_TEST_JOBS` | a number (default 6) | How many test binaries `scripts/check.sh` runs at once (CI uses 3). |
+| `MERIDIAN_TEST_LIMIT` | seconds (default 300) | How long `scripts/check.sh` lets one test binary run before it fails the check as hung. |
 | `MERIDIAN_RELEASE_STORE` | a folder | Where `scripts/release.sh` keeps its copy of the build store (default `~/.local/share/meridian-release/store`). |
 | `--replay-only` | with `--replay` | An old build playing a replay for a newer one: leaving the replay quits, and the settings file is never written. |
 | `--open SCREEN` | `menu`, `skirmish`, `survival`, `multiplayer`, `history`, `settings` | The front end opens on that screen. |

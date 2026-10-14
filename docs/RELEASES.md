@@ -200,13 +200,30 @@ History names the build a recording needs and the command below instead.
 
 | Branch | Channel | Moves by |
 |---|---|---|
-| `dev` | dev, never published | every session landing (`scripts/worktree.sh land`) |
+| `dev` | dev, never published; GitHub's default branch | every session landing (`scripts/worktree.sh land`), and pull requests |
 | `playtest` | playtest | `scripts/channel.sh promote playtest` (to `dev`), a playtest hotfix |
-| `master` | release | `scripts/channel.sh promote release` (to `playtest`), a release hotfix |
+| `release` | release | `scripts/channel.sh promote release` (to `playtest`), a release hotfix |
 
-Each branch is contained in the one below it (`master` in `playtest` in `dev`), so a
+Each branch is contained in the one below it (`release` in `playtest` in `dev`), so a
 promotion is a fast-forward: release gets exactly what playtesters played, and
-playtest exactly what was on `dev`.
+playtest exactly what was on `dev`. Work from outside (Codex, a cloud session, a
+contributor) comes in as a pull request into `dev`.
+
+**A promotion is one pass.** On the machine that publishes (it has the release key,
+the R2 credentials, the baked maps and a Windows toolchain):
+
+```bash
+scripts/channel.sh promote playtest --notes notes.md
+```
+
+fetches origin (and stops if `playtest` or `dev` moved there from another machine),
+fast-forwards `playtest` to `dev`, runs `scripts/release.sh playtest` (build, pack,
+sign, upload: *Publishing* below), and only then pushes `dev`, `playtest` and a tag
+`builds/playtest-<N>` to GitHub. If the build or the upload fails, `playtest` goes
+back where it was and nothing is pushed. `--notes FILE` is the patch notes (without
+it they are drafted from the commits); `--no-upload` is a trial: it builds the zip,
+then puts the branch back and publishes and pushes nothing. `promote release` is the
+same from `playtest` to `release`.
 
 A hotfix is a fix for a published build that cannot wait for `dev`'s next promotion:
 
@@ -214,17 +231,21 @@ A hotfix is a fix for a published build that cannot wait for `dev`'s next promot
 scripts/channel.sh hotfix release crash-on-load
 ```
 
-makes a worktree (`../mc-hotfix-crash-on-load`) on a branch from `master`. Fix and
-commit there, then `scripts/channel.sh land` from inside it: it runs
-`scripts/check.sh`, fast-forwards `master`, and merges `master` down into `playtest`
-and `playtest` into `dev`, in scratch worktrees, so the fix is not lost at the next
-promotion. A merge that stops on a conflict is left in `../mc-merge-<branch>`:
-resolve and commit there, and `scripts/channel.sh merge-down release` finishes it.
-`scripts/release.sh release` then publishes the fix, and `scripts/channel.sh finish`
-removes the hotfix worktree. A playtest hotfix is the same with `playtest`.
+makes a worktree (`../mc-hotfix-crash-on-load`) on a branch from `release`. Fix and
+commit there, then `scripts/channel.sh land` from inside it (it takes `--notes` too):
+it runs `scripts/check.sh`, fast-forwards `release`, publishes it, merges `release`
+down into `playtest` and `playtest` into `dev` in scratch worktrees (so the fix is not
+lost at the next promotion), and pushes all three with the build's tag. A merge that
+stops on a conflict is left in `../mc-merge-<branch>`: resolve and commit there, run
+`scripts/channel.sh merge-down release`, and push. `scripts/channel.sh finish` removes
+the hotfix worktree. A playtest hotfix is the same with `playtest`.
 
-`scripts/channel.sh status` shows where the three stand. Nothing here pushes to
-GitHub: `git push origin dev playtest master` when you want them there.
+`scripts/channel.sh status` shows where the three stand, here and on origin.
+
+**CI** (`.github/workflows/check.yml`) runs `scripts/check.sh` on GitHub's Linux
+runners for every push to the three branches and every pull request into them. It
+checks; it never builds for players or publishes. Publishing stays on the machine
+above, so the release key never leaves it.
 
 ## Publishing
 
@@ -232,7 +253,7 @@ GitHub: `git push origin dev playtest master` when you want them there.
 scripts/release.sh playtest
 ```
 
-builds the tip of the channel's branch (`playtest`, or `master` for release) for Windows with the channel, the store's URL and the
+(which `channel.sh promote` and `land` run for you) builds the tip of the channel's branch (`playtest` or `release`) for Windows with the channel, the store's URL and the
 channel's server from `release/config.sh`, stages it (a release leaves out
 playtest-only maps), packs and signs it with its patch notes into the local copy of the store
 (`~/.local/share/meridian-release/store`), uploads what R2 lacks (blobs, then the
