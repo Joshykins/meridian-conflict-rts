@@ -69,17 +69,24 @@ pub(crate) struct Editor {
     catalogue: Option<catalogue::Catalogue>,
 }
 
-fn config() -> MatchConfig {
+fn config(placed: &mc_map::placed::Placed) -> MatchConfig {
     MatchConfig {
         seed: 7,
         cheats: true,
         fog: false,
         spawn_commanders: false,
-        players: ["Company", "Rebels", "PDF", "ARC", "Holdouts", "Miners"]
+        players: (0..placed
+            .units
             .iter()
-            .enumerate()
-            .map(|(i, name)| PlayerSetup {
-                name: (*name).into(),
+            .map(|u| usize::from(u.owner) + 1)
+            .max()
+            .unwrap_or(6)
+            .max(6))
+            .map(|i| PlayerSetup {
+                name: ["Company", "Rebels", "PDF", "ARC", "Holdouts", "Miners"]
+                    .get(i)
+                    .map(|s| (*s).to_owned())
+                    .unwrap_or_else(|| format!("Player {}", i + 1)),
                 faction: "Aster".into(),
                 ai: Default::default(),
                 team: if i == 1 { 1 } else { 0 },
@@ -180,16 +187,44 @@ impl Editor {
         command: Command,
         renderer: &mut mc_render::Renderer,
     ) -> Result<(), String> {
-        let objects = !command.is_terrain();
-        if let Some(rect) = self.doc.apply(&[command], &self.blueprints)? {
+        self.apply_batch(&[command], renderer)
+    }
+
+    fn apply_batch(
+        &mut self,
+        commands: &[Command],
+        renderer: &mut mc_render::Renderer,
+    ) -> Result<(), String> {
+        let update = self.doc.apply(commands, &self.blueprints)?;
+        self.sync_update(update, renderer)?;
+        self.message = "Edit applied. Undo restores this action.".into();
+        Ok(())
+    }
+
+    fn history(&mut self, redo: bool, renderer: &mut mc_render::Renderer) -> Result<(), String> {
+        let update = if redo {
+            self.doc.redo()?
+        } else {
+            self.doc.undo()?
+        };
+        self.sync_update(update, renderer)
+    }
+
+    fn sync_update(
+        &mut self,
+        update: document::Update,
+        renderer: &mut mc_render::Renderer,
+    ) -> Result<(), String> {
+        if let Some(rect) = update.terrain {
             renderer
                 .edit_terrain(&self.doc.map, rect)
                 .map_err(|e| e.to_string())?;
         }
-        if objects {
+        // Unit origins come from the simulation mirror; rebuild them when the
+        // ground changes too. Props sample the live height tiles in the shader.
+        if update.objects || update.terrain.is_some() {
             self.refresh_units()?;
         }
-        self.message = "Edit applied. Undo restores this action.".into();
         Ok(())
     }
 
@@ -218,7 +253,7 @@ impl Editor {
         let map = snapshot::map(&self.doc, "test")?;
         let request = crate::ui::setup::MatchRequest {
             map: map.clone(),
-            config: config(),
+            config: config(&self.doc.placed),
             colors: crate::setup::TEAM_COLORS,
             survival: None,
             sky: Default::default(),

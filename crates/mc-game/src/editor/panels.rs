@@ -47,21 +47,7 @@ impl Editor {
             ) {
                 let result = match i {
                     0 => self.save(),
-                    1 | 2 => {
-                        let result = if i == 1 {
-                            self.doc.undo()
-                        } else {
-                            self.doc.redo()
-                        };
-                        result.and_then(|rect| {
-                            if let Some(rect) = rect {
-                                renderer
-                                    .edit_terrain(&self.doc.map, rect)
-                                    .map_err(|e| e.to_string())?;
-                            }
-                            self.refresh_units()
-                        })
-                    }
+                    1 | 2 => self.history(i == 2, renderer),
                     3 => self
                         .test()
                         .map(|start| *event = Some(Event::Test(Box::new(start)))),

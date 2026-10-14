@@ -23,8 +23,14 @@ pub(super) fn build(
         starts: doc.map.starts.clone(),
         props: doc.map.props.clone(),
     };
-    let mut world = World::with_terrain(terrain, data, blueprints.clone(), pool, &config())
-        .map_err(|e| e.to_string())?;
+    let mut world = World::with_terrain(
+        terrain,
+        data,
+        blueprints.clone(),
+        pool,
+        &config(&doc.placed),
+    )
+    .map_err(|e| e.to_string())?;
     for unit in &doc.placed.units {
         let bp = blueprints
             .id_of(&unit.blueprint)

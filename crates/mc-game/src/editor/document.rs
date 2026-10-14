@@ -82,13 +82,10 @@ pub(super) enum Command {
     },
 }
 
-impl Command {
-    pub(super) fn is_terrain(&self) -> bool {
-        matches!(
-            self,
-            Self::Terrain { .. } | Self::Ramp { .. } | Self::Stamp { .. }
-        )
-    }
+#[derive(Default)]
+pub(super) struct Update {
+    pub terrain: Option<[u32; 4]>,
+    pub objects: bool,
 }
 
 struct Change {
@@ -141,7 +138,7 @@ impl Document {
         &mut self,
         commands: &[Command],
         blueprints: &mc_data::Blueprints,
-    ) -> Result<Option<[u32; 4]>, String> {
+    ) -> Result<Update, String> {
         if commands.is_empty() || commands.len() > 512 {
             return Err("A batch needs 1 to 512 actions".into());
         }
@@ -174,7 +171,7 @@ impl Document {
         &mut self,
         placed: Placed,
         patches: BTreeMap<(u32, u32), u16>,
-    ) -> Result<Option<[u32; 4]>, String> {
+    ) -> Result<Update, String> {
         placed
             .validate(&self.map.info, self.map.props.len())
             .map_err(|e| e.to_string())?;
@@ -199,7 +196,7 @@ impl Document {
         Ok(rect)
     }
 
-    fn restore(&mut self, change: &Change, forward: bool) -> Result<Option<[u32; 4]>, String> {
+    fn restore(&mut self, change: &Change, forward: bool) -> Result<Update, String> {
         let mut rect: Option<[u32; 4]> = None;
         for &(x, y, old, new) in &change.heights {
             self.map
@@ -213,21 +210,24 @@ impl Document {
         if let Some((old, new)) = &change.placed {
             self.placed = if forward { new.clone() } else { old.clone() };
         }
-        Ok(rect)
+        Ok(Update {
+            terrain: rect,
+            objects: change.placed.is_some(),
+        })
     }
 
-    pub fn undo(&mut self) -> Result<Option<[u32; 4]>, String> {
+    pub fn undo(&mut self) -> Result<Update, String> {
         let Some(change) = self.undo.pop() else {
-            return Ok(None);
+            return Ok(Update::default());
         };
         let rect = self.restore(&change, false)?;
         self.redo.push(change);
         self.dirty = true;
         Ok(rect)
     }
-    pub fn redo(&mut self) -> Result<Option<[u32; 4]>, String> {
+    pub fn redo(&mut self) -> Result<Update, String> {
         let Some(change) = self.redo.pop() else {
-            return Ok(None);
+            return Ok(Update::default());
         };
         let rect = self.restore(&change, true)?;
         self.undo.push(change);

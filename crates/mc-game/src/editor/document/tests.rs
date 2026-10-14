@@ -192,3 +192,34 @@ fn ramps_and_heightmap_stamps_are_sparse_atomic_and_undoable() {
     assert!(doc.apply(&[stamp("../good.json")], &bp).is_err());
     std::fs::remove_dir_all(folder).unwrap();
 }
+
+#[test]
+fn terrain_updates_rebuild_grounded_preview_and_high_player_slots_work() {
+    let (folder, mut doc, bp) = fixture();
+    let mut tank = unit("high_slot");
+    if let Command::Unit { owner, .. } = &mut tank {
+        *owner = (mc_core::MAX_PLAYERS - 1) as u8;
+    }
+    assert!(doc.apply(&[tank], &bp).unwrap().objects);
+    let bp = std::sync::Arc::new(bp);
+    let pool = std::sync::Arc::new(mc_jobs::Pool::new(0));
+    let before = super::super::preview::build(&doc, 0, bp.clone(), pool.clone()).unwrap();
+    let update = doc
+        .apply(
+            &[Command::Terrain {
+                at: [500.0, 500.0],
+                radius: 128.0,
+                strength: 100.0,
+                brush: Brush::Cliff,
+            }],
+            &bp,
+        )
+        .unwrap();
+    assert!(update.terrain.is_some());
+    let after = super::super::preview::build(&doc, 0, bp.clone(), pool.clone()).unwrap();
+    assert!(after.units[0].pos[2] > before.units[0].pos[2] + 90.0);
+    doc.undo().unwrap();
+    let restored = super::super::preview::build(&doc, 0, bp, pool).unwrap();
+    assert_eq!(before.units[0].pos, restored.units[0].pos);
+    std::fs::remove_dir_all(folder).unwrap();
+}

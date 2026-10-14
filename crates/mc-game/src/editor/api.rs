@@ -195,15 +195,8 @@ impl Editor {
                 }
                 Request::State => return Ok(json!({"ok":true,"map":self.doc.map.info.name,"source":self.doc.source,
                     "dirty":self.doc.dirty,"reloading":self.reloading(),"message":self.message,"destination":self.doc.destination,"placed":self.doc.placed,"camera":{"at":self.camera.focus.to_array(),"zoom":self.camera.distance,"yaw":self.camera.yaw.to_degrees(),"pitch":self.camera.pitch_free.map(f32::to_degrees)}})),
-                Request::Edit {actions} => {
-                    if let Some(rect)=self.doc.apply(&actions,&self.blueprints)? {renderer.edit_terrain(&self.doc.map,rect).map_err(|e|e.to_string())?;}
-                    if actions.iter().any(|a|!a.is_terrain()){self.refresh_units()?;}
-                }
-                Request::Undo|Request::Redo => {
-                    let rect=if matches!(request,Request::Undo){self.doc.undo()?}else{self.doc.redo()?};
-                    if let Some(rect)=rect {renderer.edit_terrain(&self.doc.map,rect).map_err(|e|e.to_string())?;}
-                    self.refresh_units()?;
-                }
+                Request::Edit {actions} => self.apply_batch(&actions,renderer)?,
+                Request::Undo|Request::Redo => self.history(matches!(request,Request::Redo),renderer)?,
                 Request::Save {name}=> {if let Some(name)=name {self.save_as(name)?;}else{self.save()?;}}
                 Request::Camera {at,zoom,yaw,height,pitch}=>{
                     if at.iter().chain([&zoom,&yaw]).any(|v|!v.is_finite()) || zoom<25.0 || zoom>300_000.0 {
