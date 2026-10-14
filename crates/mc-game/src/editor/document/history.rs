@@ -13,6 +13,7 @@ impl Document {
             return false;
         };
         self.undo.push(Change {
+            bounds: None,
             children,
             props: None,
             heights: vec![],

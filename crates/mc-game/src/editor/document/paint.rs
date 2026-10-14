@@ -16,6 +16,7 @@ pub(super) struct Patches {
     bytes: BTreeMap<(Layer, usize), u8>,
     introduced: BTreeSet<Layer>,
 }
+#[derive(Clone)]
 pub(super) struct Change {
     layer: Layer,
     absent: bool,

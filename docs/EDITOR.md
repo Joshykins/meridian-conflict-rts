@@ -70,7 +70,7 @@ Examples:
 
 An edit request has 1–512 actions and is one atomic undo step. Invalid actions
 leave the entire request unapplied. Requests are limited to 256 KiB. Supported
-actions are players, mission, water, time, climate, weather, climate_regions, terrain, ramp, stamp, paint, road, unit, doodad, region, point, camera, transform, properties and delete; the
+actions are bounds, players, mission, water, time, climate, weather, climate_regions, terrain, ramp, stamp, paint, road, unit, doodad, region, point, camera, transform, properties and delete; the
 authoritative schema is editor/document.rs. Coordinates are world metres,
 headings/yaw are degrees, and owner is the zero-based player slot.
 
@@ -289,3 +289,25 @@ A computer slot selected for testing is controlled by you during that test.
 Slot, team and start indices are zero-based. Names are limited to 64 bytes.
 A null mission key disables the mission; an empty players array uses the
 match setup roster. Playtests never write normal campaign progress.
+
+
+## Crop and extend
+
+Map > Bounds sets the width, height and origin in 2048-metre tiles. Positive
+origin values crop from the west/south; negative values add space there.
+Choose the elevation for newly added ground, then Apply bounds. Each edge can
+have 1–40 tiles. The current scene remains usable while the replacement builds;
+a failed rebuild leaves the current document, camera and undo history intact.
+
+    {"op":"edit","actions":[{"action":"bounds","origin":[-1,-1],"tiles":[8,8],"fill":-20}]}
+
+Bounds must be the only action in that request. Poll state until reloading is
+false, then inspect message and bounds to confirm completion. Undo and Redo
+rebuild the scene in the same way.
+
+The overlap retains exact height samples and paint bytes. Objects outside a
+crop are removed; retained objects keep their IDs and names. Ore polygons,
+regions and bridge spans are clipped. Player starts keep their indices and
+are clamped inside the new map. Camera markers and climate walls move with
+the terrain. A crop that removes a required survival location is rejected.
+The full before/after document is retained for this infrequent undo operation.

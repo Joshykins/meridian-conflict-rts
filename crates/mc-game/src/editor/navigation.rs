@@ -15,6 +15,13 @@ impl Default for Navigation {
     }
 }
 impl Navigation {
+    pub fn reframe(&mut self, size: Vec2, delta: Vec2) {
+        if let Some(orbit) = &mut self.orbit {
+            orbit.map_size = size;
+            orbit.focus -= delta.extend(0.0);
+            orbit.clamp_focus();
+        }
+    }
     pub fn enter(&mut self, camera: &mut Camera) {
         if self.orbit.is_some() {
             return;
@@ -122,5 +129,16 @@ mod tests {
         assert_eq!(camera.focus, original.focus);
         assert_eq!(camera.distance, original.distance);
         assert!(camera.pitch_free.is_none());
+    }
+    #[test]
+    fn resize_translates_the_saved_orbit_before_leaving_free_camera() {
+        let mut camera = Camera::new(Vec2::splat(2048.0), Vec2::new(1280.0, 720.0));
+        camera.focus = Vec3::new(500.0, 600.0, 50.0);
+        let mut nav = Navigation::default();
+        nav.enter(&mut camera);
+        nav.reframe(Vec2::splat(6144.0), Vec2::splat(-2048.0));
+        nav.exit(&mut camera);
+        assert_eq!(camera.map_size, Vec2::splat(6144.0));
+        assert_eq!(camera.focus, Vec3::new(2548.0, 2648.0, 50.0));
     }
 }

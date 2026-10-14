@@ -4,6 +4,7 @@ use mc_map::{
     placed::{Doodad, Footprint},
     Prop, PropKind,
 };
+#[derive(Clone)]
 pub(super) struct State {
     pub props: Vec<Prop>,
     tints: Vec<[u8; 3]>,

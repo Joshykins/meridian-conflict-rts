@@ -1,4 +1,5 @@
 //! The authoring document and undoable commands shared by the UI and mailbox.
+mod bounds;
 mod doodads;
 mod environment;
 mod objects;
@@ -30,6 +31,11 @@ pub(super) enum Brush {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 pub(super) enum Command {
+    Bounds {
+        origin: [i32; 2],
+        tiles: [u32; 2],
+        fill: f32,
+    },
     Players {
         slots: Vec<mc_data::map_settings::MapPlayer>,
     },
@@ -145,6 +151,7 @@ pub(super) enum Command {
 #[derive(Default)]
 pub(super) struct Update {
     pub terrain: Option<[u32; 4]>,
+    pub reframe: Option<[f32; 2]>,
     pub objects: bool,
     pub props: bool,
     pub environment: bool,
@@ -152,7 +159,9 @@ pub(super) struct Update {
     pub cover: Vec<(mc_map::edit::Layer, [u32; 4])>,
 }
 
+#[derive(Clone)]
 struct Change {
+    bounds: Option<std::sync::Arc<bounds::Change>>,
     props: Option<(doodads::State, doodads::State)>,
     children: Vec<Change>,
     heights: Vec<(u32, u32, u16, u16)>,
@@ -161,6 +170,7 @@ struct Change {
     environment: Option<(environment::State, environment::State)>,
 }
 
+#[derive(Clone)]
 pub(super) struct Document {
     pub map: EditMap,
     pub placed: Placed,
@@ -208,6 +218,17 @@ impl Document {
     ) -> Result<Update, String> {
         if commands.is_empty() || commands.len() > 512 {
             return Err("A batch needs 1 to 512 actions".into());
+        }
+        if commands.iter().any(|c| matches!(c, Command::Bounds { .. })) {
+            let [Command::Bounds {
+                origin,
+                tiles,
+                fill,
+            }] = commands
+            else {
+                return Err("Resize must be the only action in its batch".into());
+            };
+            return self.resize(*origin, *tiles, *fill);
         }
         let mut environment = environment::State::from_doc(self);
         let mut placed = self.placed.clone();
@@ -285,6 +306,7 @@ impl Document {
             )
             .map_err(|e| e.to_string())?;
         let mut change = Change {
+            bounds: None,
             children: vec![],
             props: props
                 .filter(|p| !p.matches(&self.map))
@@ -322,6 +344,9 @@ impl Document {
     }
 
     fn restore(&mut self, change: &Change, forward: bool) -> Result<Update, String> {
+        if let Some(bounds) = &change.bounds {
+            return Ok(bounds.restore(self, forward));
+        }
         if !change.children.is_empty() {
             return self.restore_children(&change.children, forward);
         }
@@ -347,6 +372,7 @@ impl Document {
             self.map.info.water_level = state.water;
         }
         Ok(Update {
+            reframe: None,
             props: change.props.is_some()
                 || change
                     .placed
@@ -430,3 +456,6 @@ mod doodad_tests;
 
 #[cfg(test)]
 mod player_tests;
+
+#[cfg(test)]
+mod bounds_tests;

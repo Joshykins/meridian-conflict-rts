@@ -14,6 +14,7 @@ pub(crate) struct ReloadRequest {
 #[derive(Default)]
 pub(super) struct Reload {
     requested: Option<ReloadRequest>,
+    document: Option<(Document, [f32; 2])>,
     pending: Option<Pending>,
 }
 #[derive(Default)]
@@ -32,6 +33,7 @@ impl Caches {
     }
 }
 struct Pending {
+    document: Option<(Document, [f32; 2])>,
     caches: Caches,
     sounds: Option<mc_data::SoundLibrary>,
     job: Job,
@@ -39,6 +41,7 @@ struct Pending {
     frame: RenderFrame,
 }
 pub(crate) struct Reloaded {
+    document: Option<(Document, [f32; 2])>,
     caches: Caches,
     pub sounds: Option<mc_data::SoundLibrary>,
     pub ready: Ready,
@@ -111,11 +114,27 @@ impl Editor {
         self.message = "Preparing reload; the current view remains available.".into();
         Ok(())
     }
+    pub(super) fn request_document(
+        &mut self,
+        document: Document,
+        delta: [f32; 2],
+    ) -> Result<(), String> {
+        if self.reloading() {
+            return Err("A renderer rebuild is already running".into());
+        }
+        self.reload.document = Some((document, delta));
+        self.reload.requested = Some(ReloadRequest::default());
+        self.message =
+            "Preparing resized map; the current document stays available until ready.".into();
+        Ok(())
+    }
     pub(crate) fn begin_reload(&mut self, target: mc_render::Target) {
         let Some(request) = self.reload.requested.take() else {
             return;
         };
+        let document = self.reload.document.take();
         let result = (|| {
+            let doc = document.as_ref().map_or(&self.doc, |(doc, _)| doc);
             let (blueprints, caches) = resources(&request, &self.blueprints)?;
             let sounds = if request.data {
                 let dir = Blueprints::locate_data_dir().ok_or("Cannot locate data/")?;
@@ -126,12 +145,12 @@ impl Editor {
                 None
             };
             let frame = preview::build(
-                &self.doc,
+                doc,
                 self.map.content_id(),
                 blueprints.clone(),
                 self.pool.clone(),
             )?;
-            let map = super::snapshot::map(&self.doc, "reload")?;
+            let map = super::snapshot::map(doc, "reload")?;
             let job = Job::start(Order {
                 target,
                 map: MapSource::Loaded(map),
@@ -141,6 +160,7 @@ impl Editor {
                 pictures: None,
             });
             Ok::<_, String>(Pending {
+                document,
                 caches,
                 sounds,
                 job,
@@ -163,6 +183,7 @@ impl Editor {
         let pending = self.reload.pending.take()?;
         match result {
             Ok(ready) => Some(Reloaded {
+                document: pending.document,
                 caches: pending.caches,
                 sounds: pending.sounds,
                 ready,
@@ -183,6 +204,13 @@ impl Editor {
         audio: &crate::audio::Audio,
         window: bool,
     ) -> Result<(), String> {
+        let doc = reloaded.document.as_ref().map_or(&self.doc, |(doc, _)| doc);
+        // Export orders props by tile; the live document and preview frame retain
+        // authoring order. Install that order in the candidate before publication.
+        if let Err(error) = reloaded.ready.renderer.edit_props(&doc.map, &doc.placed) {
+            self.complain_reload(error.to_string());
+            return Ok(());
+        }
         if window {
             old.release_window();
         }
@@ -205,7 +233,13 @@ impl Editor {
             self.complain_reload(error);
             return Ok(());
         }
-        self.apply_environment(&mut reloaded.ready.renderer);
+        reloaded.ready.renderer.edit_environment(
+            &reloaded
+                .document
+                .as_ref()
+                .map_or(&self.doc, |(doc, _)| doc)
+                .config,
+        );
         if let Some(sounds) = reloaded.sounds.take() {
             audio.set_library(sounds);
         }
@@ -215,11 +249,22 @@ impl Editor {
     }
     fn publish_reload(&mut self, reloaded: Reloaded) -> mc_render::Renderer {
         reloaded.caches.commit();
+        let resized = reloaded.document.is_some();
+        if let Some((document, delta)) = reloaded.document {
+            self.doc = document;
+            self.camera.map_size = Vec2::from(self.doc.map.info.size_metres().to_f32());
+            self.camera.focus -= Vec2::from(delta).extend(0.0);
+            self.camera.clamp_focus();
+            self.navigation
+                .reframe(self.camera.map_size, Vec2::from(delta));
+            self.selected = None;
+            self.region_start = None;
+        }
         self.map = reloaded.ready.map;
         self.blueprints = reloaded.blueprints;
         self.frame = reloaded.frame;
         self.fresh = true;
-        self.message = "Reload complete. Document, camera and undo history preserved.".into();
+        self.message = if resized { "Map bounds applied. Cropped objects removed; start positions kept inside. Undo restores the original." } else { "Reload complete. Document, camera and undo history preserved." }.into();
         reloaded.ready.renderer
     }
     pub(crate) fn current_blueprints(&self) -> Arc<Blueprints> {
@@ -286,6 +331,41 @@ mod tests {
         assert!(editor.doc.dirty);
         assert!(editor.doc.can_undo());
         assert_eq!(editor.camera.distance, 1234.0);
+        let mut candidate = editor.doc.clone();
+        candidate
+            .apply(
+                &[Command::Bounds {
+                    origin: [-1, -1],
+                    tiles: [3, 3],
+                    fill: -20.0,
+                }],
+                &bp,
+            )
+            .unwrap();
+        candidate.placed.units.push(mc_map::placed::PlacedUnit {
+            id: candidate.placed.next_id,
+            name: "invalid candidate".into(),
+            group: "".into(),
+            blueprint: "missing blueprint".into(),
+            owner: 0,
+            at: mc_core::FxVec2::from_ints(500, 500),
+            heading: mc_core::Angle::ZERO,
+        });
+        candidate.placed.next_id += 1;
+        let tiles = editor.doc.map.info.tiles_w;
+        editor
+            .request_document(candidate, [-2048.0, -2048.0])
+            .unwrap();
+        editor.begin_reload(mc_render::Target::Headless {
+            width: 1280,
+            height: 720,
+        });
+        assert!(!editor.reloading());
+        assert!(editor.message.starts_with("Reload failed:"));
+        assert_eq!(editor.doc.map.info.tiles_w, tiles);
+        assert_eq!(editor.doc.placed, before);
+        assert_eq!(editor.camera.distance, 1234.0);
+        assert!(!editor.doc.history_reframes(false));
         editor.doc.undo().unwrap();
         assert!(editor.doc.placed.points.is_empty());
         drop(editor);

@@ -223,7 +223,7 @@ impl Editor {
                     return Ok(json!({"ok":true,"calls":path,"count":calls.len()}));
                 }
                 Request::State => return Ok(json!({"ok":true,"map":self.doc.map.info.name,"source":self.doc.source,
-                    "playtest":self.api.test_state,"test_slot":self.map_controls.test_slot,"dirty":self.doc.dirty,"reloading":self.reloading(),"message":self.message,"destination":self.doc.destination,"placed":self.doc.placed,"environment":self.doc.config,"water_level":self.doc.map.info.water_level.to_f32(),"camera":{"at":self.camera.focus.to_array(),"zoom":self.camera.distance,"yaw":self.camera.yaw.to_degrees(),"pitch":self.camera.pitch_free.map(f32::to_degrees)}})),
+                    "bounds":{"tiles":[self.doc.map.info.tiles_w,self.doc.map.info.tiles_h],"metres":self.doc.map.info.size_metres().to_f32()},"playtest":self.api.test_state,"test_slot":self.map_controls.test_slot,"dirty":self.doc.dirty,"reloading":self.reloading(),"message":self.message,"destination":self.doc.destination,"placed":self.doc.placed,"environment":self.doc.config,"water_level":self.doc.map.info.water_level.to_f32(),"camera":{"at":self.camera.focus.to_array(),"zoom":self.camera.distance,"yaw":self.camera.yaw.to_degrees(),"pitch":self.camera.pitch_free.map(f32::to_degrees)}})),
                 Request::Edit {actions} => self.apply_batch(&actions,renderer)?,
                 Request::Undo|Request::Redo => self.history(matches!(request,Request::Redo),renderer)?,
                 Request::Save {name}=> {if let Some(name)=name {self.save_as(name)?;}else{self.save()?;}}

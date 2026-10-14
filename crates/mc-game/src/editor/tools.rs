@@ -21,7 +21,7 @@ const GROUPS: &[(&str, &[usize])] = &[
     ("Paint", &[17, 18, 19, 20, 21]),
     ("Objects", &[0, 5, 27, 6, 7, 8, 9]),
     ("Environment", &[22, 23, 24, 25, 26]),
-    ("Map", &[28]),
+    ("Map", &[28, 29]),
     ("Camera / Reload", &[12, 10, 11]),
 ];
 const LABELS: &[&str] = &[
@@ -54,6 +54,7 @@ const LABELS: &[&str] = &[
     "Climate wall",
     "Doodad",
     "Players",
+    "Bounds",
 ];
 impl Editor {
     pub(super) fn choose_tool(&mut self, name: &str) -> Result<(), String> {
@@ -128,7 +129,15 @@ impl Editor {
         let y = bottom + 54.0 + rows as f32 * 44.0;
         let width = (w - 102.0) * 0.5;
         let mut radius = (self.radius - 8.0) / 504.0;
-        if self.tool == 28 {
+        if self.tool == 29 {
+            ui.text(
+                34.0,
+                y + 20.0,
+                type_scale::BODY,
+                rgb(palette::TEXT, 1.0),
+                "Set tile dimensions and origin in Map Bounds; Apply publishes one undo step.",
+            );
+        } else if self.tool == 28 {
             ui.text(
                 34.0,
                 y + 20.0,

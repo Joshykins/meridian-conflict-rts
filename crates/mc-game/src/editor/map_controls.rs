@@ -2,6 +2,7 @@
 use super::*;
 #[derive(Default)]
 pub(super) struct Controls {
+    pub bounds: super::map_bounds::Controls,
     slot: usize,
     pub test_slot: u8,
     name: String,

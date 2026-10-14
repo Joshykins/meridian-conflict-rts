@@ -9,6 +9,7 @@ mod environment;
 mod frame;
 mod gestures;
 mod interaction;
+mod map_bounds;
 mod map_controls;
 mod navigation;
 mod overlays;
@@ -228,6 +229,14 @@ impl Editor {
         commands: &[Command],
         renderer: &mut mc_render::Renderer,
     ) -> Result<(), String> {
+        if commands.iter().any(|c| matches!(c, Command::Bounds { .. })) {
+            let mut document = self.doc.clone();
+            let update = document.apply(commands, &self.blueprints)?;
+            return self.request_document(
+                document,
+                update.reframe.ok_or("Resize did not produce new bounds")?,
+            );
+        }
         let update = self.doc.apply(commands, &self.blueprints)?;
         self.sync_update(update, renderer)?;
         self.message = "Edit applied. Undo restores this action.".into();
@@ -235,6 +244,18 @@ impl Editor {
     }
 
     fn history(&mut self, redo: bool, renderer: &mut mc_render::Renderer) -> Result<(), String> {
+        if self.doc.history_reframes(redo) {
+            let mut document = self.doc.clone();
+            let update = if redo {
+                document.redo()?
+            } else {
+                document.undo()?
+            };
+            return self.request_document(
+                document,
+                update.reframe.ok_or("Resize history lost its bounds")?,
+            );
+        }
         let update = if redo {
             self.doc.redo()?
         } else {
