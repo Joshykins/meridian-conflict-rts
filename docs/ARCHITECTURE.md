@@ -492,7 +492,7 @@ invulnerable unit, and the mirror marks it `SHIELD_VEIL` so it is drawn apart fr
   land a kilometre wide, east from the base, which stands at grade on the mainland facing west; and three hard-light
   bridges (`PropKind::PrecursorBridge`, `mc-models/src/precursor_bridge.rs`, to `landmark::HARDLIGHT_BRIDGE`), north
   from the highlands, south from the fells and west from Wester Isle, their decks 52 m over the water, projected
-  from a platform on a landing the bake levels at each end. Walls across the four hold every land way; ships sail
+  from a ramp at each end (`HARDLIGHT_BRIDGE`'s head and ramp) that the bake shapes the landing to. Walls across the four hold every land way; ships sail
   under the bridges, so the sea runs
   round the hold but for the Causeway, with Shaper slips in the ocean and on both lagoons and a sea gate of the base's
   (three slips) on each lagoon. The base's installation is the same as The Last

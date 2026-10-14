@@ -117,12 +117,19 @@ type Neck = (&'static [(f64, f64)], f64, f64);
 
 const NECKS: [Neck; 1] = [(&CAUSEWAY, 620.0, 9.0)];
 
-/// A bridge's landing: level at the deck's height for this far inland of the
-/// deck's end, then a ramp down to the ground at this grade (gentler than a
-/// way's), its sides falling away over this many metres.
-const LANDING: f64 = 120.0;
-const RAMP: f64 = 0.08;
+/// Under a bridge's deck the ground's sides meet it over this many metres. A
+/// landing (its projector, `HARDLIGHT_BRIDGE`'s head and ramp, at the bridge's
+/// scale) stands clear of the ground beside it: from its edge the ground drops
+/// this far at once (under anything the model hangs on its walls) and falls away
+/// at [`BANK`] for this far out, then goes back to the ground over
+/// [`LANDING_SIDE`]; lower ground is left as it is. Past the ramp's foot the
+/// ground is level with it for this far, then goes back to the ground over this
+/// many, so nothing rises steeply behind it.
 const LANDING_SIDE: f64 = 140.0;
+const SIDE_DROP: f64 = 6.0;
+const SIDE_KEEP: f64 = 50.0;
+const FOOT_LEVEL: f64 = 60.0;
+const FOOT_BLEND: f64 = 320.0;
 /// Under the deck the ground keeps level for this far past its end (so the
 /// bridge's model, set on the ground at the end, stands at the deck's height),
 /// then falls away at this grade, too gentle for a crag (the terrain's rock relief
@@ -547,14 +554,16 @@ impl Terrain {
         Raw { h, erodes }
     }
 
-    /// The bridges' landings over the ground `h`: at each end a level pad at the
-    /// deck's height inland of it (cut and filled) and a ramp down inland at
-    /// [`RAMP`]; under the deck, past [`LEVEL_UNDER`], a bank falling away at
-    /// [`BANK`] and nothing nearer the glass than [`UNDER_DECK`]; steep sides.
+    /// The bridges' landings over the ground `h`: at each end the projector's
+    /// surface exactly (cut and filled), level at the deck's height and then down
+    /// its ramp, the ground beside it cut away below its edge, and past its foot
+    /// level a while before going back to the ground; under the deck, past
+    /// [`LEVEL_UNDER`], a bank falling away at [`BANK`] and nothing nearer the
+    /// glass than [`UNDER_DECK`]; steep sides.
     fn rh_landings(&self, p: (f64, f64), mut h: f64) -> f64 {
         for b in &BRIDGES {
             let (along, off) = b.frame(p);
-            if off > b.half() + LANDING_SIDE {
+            if off > b.half() + 10.0 + SIDE_KEEP + LANDING_SIDE {
                 continue;
             }
             let side = 1.0 - smoothstep(b.half() + 10.0, b.half() + LANDING_SIDE, off);
@@ -568,12 +577,27 @@ impl Terrain {
             }
             // Inland of the landing, metres: past the hold's end backward, past the far one forward.
             let inland = if along < 0.0 { -along } else { along - len };
-            // The pad is level, cut down where the ground stands higher, so the
-            // bridge's platform lies flush on it; the ramp beyond only builds up.
-            let top = DECK_TOP - RAMP * (inland - LANDING).max(0.0);
-            if top > h || inland <= LANDING {
-                h += (top - h) * side;
-            }
+            let plan = HARDLIGHT_BRIDGE;
+            let (head, run) = (plan.head * b.scale(), plan.run * b.scale());
+            // The projector's surface, and its foot's level past it.
+            let surf = DECK_TOP - plan.grade * (inland - head).clamp(0.0, run);
+            let past = inland - head - run;
+            let d = off - (b.half() + 10.0);
+            let shaped = if d <= 0.0 {
+                surf
+            } else {
+                let bank = surf - SIDE_DROP - BANK * d;
+                // Higher ground is cut to the bank; lower ground is left on the
+                // projector (its walls stand clear) and filled up past its foot.
+                let fall = if h > bank {
+                    bank
+                } else {
+                    h + (bank - h) * smoothstep(0.0, 40.0, past)
+                };
+                fall + (h - fall) * smoothstep(SIDE_KEEP, SIDE_KEEP + LANDING_SIDE, d)
+            };
+            let back = smoothstep(FOOT_LEVEL, FOOT_LEVEL + FOOT_BLEND, past);
+            h = shaped + (h - shaped) * back;
         }
         h
     }
