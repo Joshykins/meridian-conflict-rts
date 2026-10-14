@@ -1259,8 +1259,8 @@ impl World {
         // Neighbouring 2x2s share the overhang cells, and those stay walkable
         // so units can squeeze through without forbidding the next building.
         let path = path_cells_of(footprint, pos);
-        // Nothing is built on a bridge's deck.
-        if self.terrain.decks().covers_any_cell(path.0, path.1) {
+        // Nothing is built on a bridge: its deck or a projector at either end.
+        if self.terrain.decks().holds_any_cell(path.0, path.1) {
             return false;
         }
         let water = self.terrain.water_level();

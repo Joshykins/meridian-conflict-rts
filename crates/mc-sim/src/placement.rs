@@ -31,6 +31,8 @@ pub enum Unfit {
     Shallow,
     /// A city block stands there.
     City,
+    /// On a bridge: its deck or a projector at either end (`mc_map::Deck::holds`).
+    Bridge,
     /// Another structure, standing or planned, has the lot.
     Taken,
     /// A core mine inside another mine's reach (`World::mine_in_the_way`).
@@ -49,6 +51,7 @@ impl Unfit {
             Unfit::Shore => "Needs deep water",
             Unfit::Shallow => "Needs deeper water",
             Unfit::City => "City in the way",
+            Unfit::Bridge => "Can't build on a bridge",
             Unfit::Taken => "Lot taken",
             Unfit::MineReach => "Inside another mine's reach",
             Unfit::OutOfReach => "Out of the station's build range",
@@ -60,6 +63,8 @@ impl Unfit {
 const CITY: u8 = 1 << 7;
 /// Bit on a cell with at least `SEABED_DEPTH` of water over all of it.
 const ABYSS: u8 = 1 << 6;
+/// Bit on a cell a bridge holds (`mc_map::Decks::holds_cell`).
+const BRIDGE: u8 = 1 << 5;
 
 /// Shallowest water a seabed installation (`UnitBlueprint::seabed`) stands in: its
 /// body wholly under the surface, with room over it for a keel to pass.
@@ -103,7 +108,12 @@ impl SiteMap {
                         let at = i * band + j;
                         let (x, y) = ((at % w as usize) as u32, (at / w as usize) as u32);
                         *class = cell_class(ground, water, x, y)
-                            | if abyss(ground, water, x, y) { ABYSS } else { 0 };
+                            | if abyss(ground, water, x, y) { ABYSS } else { 0 }
+                            | if ground.decks().holds_cell(x, y) {
+                                BRIDGE
+                            } else {
+                                0
+                            };
                     }
                 });
             }
@@ -150,6 +160,9 @@ impl SiteMap {
             return Err(Unfit::OffMap);
         }
         let (min, max) = path_cells_of(footprint, pos);
+        if (min.1..=max.1).any(|y| (min.0..=max.0).any(|x| self.cell(x, y) & BRIDGE != 0)) {
+            return Err(Unfit::Bridge);
+        }
         for y in min.1..=max.1 {
             for x in min.0..=max.0 {
                 let class = self.cell(x, y);

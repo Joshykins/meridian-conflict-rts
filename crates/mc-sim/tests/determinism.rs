@@ -279,7 +279,8 @@ fn setup(w: &mut World) {
                 // The Regency gravitic engine: it gathers, its rift runs across the map, and
                 // its well holds over the south across the snapshot, crushing, slowing and
                 // tearing aircraft down (`gravitic.rs`); a store of energy pays for it.
-                add("regency_t5_gravitic_engine", 1, 1200, 1900);
+                // (Clear of the projector past the deck's west end, where nothing stands.)
+                add("regency_t5_gravitic_engine", 1, 1000, 1900);
                 // The Regency gravitic lens: it plants, its front runs out to one of the
                 // south's army and a well holds on it, crushing and slowing (`lens.rs`).
                 add("regency_t3_gravitic_lens", 1, 700, 1250);

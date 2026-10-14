@@ -11,6 +11,7 @@
 //! `a.x, a.y, b.x, b.y, half, top`.
 
 use crate::format::{MapError, Reader};
+use crate::landmark::HARDLIGHT_BRIDGE as PLAN;
 use crate::CELL_SIZE_M;
 use mc_core::{Fx, FxVec2, FxVec3, StateHasher};
 
@@ -21,6 +22,13 @@ pub const MAX_DECKS: usize = 64;
 pub const ON_DECK: Fx = Fx::from_int(60);
 /// Bytes per deck record in the map file.
 pub const DECK_RECORD_LEN: usize = 48;
+/// A deck's bridge holds it and a projector past each end (`HARDLIGHT_BRIDGE`'s
+/// head and ramp, a little wider than the road): how far past each end, and how
+/// wide, in millionths of the deck's length and of its half-width. Worked out
+/// once, at compile time, so every peer has the same integers.
+const PROJECTOR_REACH: i128 = ((PLAN.head + PLAN.run) / PLAN.span * 1e6) as i128;
+const PROJECTOR_WIDTH: i128 = ((PLAN.half + PLAN.edge) / PLAN.half * 1e6) as i128;
+const MILLION: i128 = 1_000_000;
 
 /// One deck.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -49,6 +57,36 @@ impl Deck {
         let across = vx * dy - vy * dx;
         let half = self.half.0 as i128;
         across * across <= half * half * len2
+    }
+
+    /// Whether `p` lies on the deck's bridge: the deck, or a projector past
+    /// either end of it. Nothing is built there.
+    pub fn holds(&self, p: FxVec2) -> bool {
+        let (dx, dy) = (
+            (self.b.x - self.a.x).0 as i128,
+            (self.b.y - self.a.y).0 as i128,
+        );
+        let (vx, vy) = ((p.x - self.a.x).0 as i128, (p.y - self.a.y).0 as i128);
+        let along = (vx * dx + vy * dy) * MILLION;
+        let len2 = dx * dx + dy * dy;
+        let reach = len2 * PROJECTOR_REACH;
+        if along < -reach || along > len2 * MILLION + reach {
+            return false;
+        }
+        let across = vx * dy - vy * dx;
+        let half = self.half.0 as i128 * PROJECTOR_WIDTH / MILLION;
+        across * across <= half * half * len2
+    }
+
+    /// The bounding box of what the deck's bridge holds (`holds`), a little
+    /// generous.
+    fn held_bounds(&self) -> (FxVec2, FxVec2) {
+        let (lo, hi) = self.bounds();
+        let len = (self.b.x - self.a.x).abs() + (self.b.y - self.a.y).abs();
+        let out = Fx((len.0 as i128 * PROJECTOR_REACH / MILLION) as i64)
+            + Fx((self.half.0 as i128 * PROJECTOR_WIDTH / MILLION) as i64);
+        let out = FxVec2::new(out, out);
+        (lo - out, hi + out)
     }
 
     /// The deck's bounding box.
@@ -103,12 +141,19 @@ pub struct Decks {
     decks: Vec<Deck>,
     /// Each deck's bounding box, to rule it out quickly.
     bounds: Vec<(FxVec2, FxVec2)>,
+    /// Each deck's bridge's (`Deck::held_bounds`).
+    held: Vec<(FxVec2, FxVec2)>,
 }
 
 impl Decks {
     pub fn new(decks: Vec<Deck>) -> Decks {
         let bounds = decks.iter().map(Deck::bounds).collect();
-        Decks { decks, bounds }
+        let held = decks.iter().map(Deck::held_bounds).collect();
+        Decks {
+            decks,
+            bounds,
+            held,
+        }
     }
 
     pub fn list(&self) -> &[Deck] {
@@ -136,17 +181,26 @@ impl Decks {
         !self.decks.is_empty() && self.top_at(cell_middle(cx, cy)).is_some()
     }
 
-    /// Whether a deck covers the middle of any cell in `min..=max`.
-    pub fn covers_any_cell(&self, min: (u32, u32), max: (u32, u32)) -> bool {
+    /// Whether a bridge holds the middle of cell `(cx, cy)` (`Deck::holds`): its
+    /// deck or a projector, where nothing is built.
+    pub fn holds_cell(&self, cx: u32, cy: u32) -> bool {
+        let p = cell_middle(cx, cy);
+        self.decks.iter().zip(&self.held).any(|(d, &(lo, hi))| {
+            p.x >= lo.x && p.y >= lo.y && p.x <= hi.x && p.y <= hi.y && d.holds(p)
+        })
+    }
+
+    /// Whether a bridge holds the middle of any cell in `min..=max`.
+    pub fn holds_any_cell(&self, min: (u32, u32), max: (u32, u32)) -> bool {
         if self.decks.is_empty() {
             return false;
         }
         let (lo, hi) = (cell_middle(min.0, min.1), cell_middle(max.0, max.1));
         let near = self
-            .bounds
+            .held
             .iter()
             .any(|&(a, b)| lo.x <= b.x && lo.y <= b.y && hi.x >= a.x && hi.y >= a.y);
-        near && (min.1..=max.1).any(|y| (min.0..=max.0).any(|x| self.covers_cell(x, y)))
+        near && (min.1..=max.1).any(|y| (min.0..=max.0).any(|x| self.holds_cell(x, y)))
     }
 
     /// Where the segment from `from` to `to` passes through a deck's surface,
@@ -242,8 +296,14 @@ mod tests {
         assert_eq!(decks.top_at(FxVec2::from_ints(300, 200)), None);
         assert!(decks.covers_cell(37, 12));
         assert!(!decks.covers_cell(37, 20));
-        assert!(decks.covers_any_cell((30, 15), (40, 25)));
-        assert!(!decks.covers_any_cell((30, 20), (40, 25)));
+        assert!(decks.holds_any_cell((30, 15), (40, 25)));
+        assert!(!decks.holds_any_cell((30, 20), (40, 25)));
+        // Its bridge holds a projector past each end too (51.5 m on a 400 m deck).
+        assert!(!decks.covers_cell(8, 12));
+        assert!(decks.holds_cell(8, 12));
+        assert!(!decks.holds_cell(4, 12));
+        assert!(decks.holds_cell(66, 12));
+        assert!(!decks.holds_cell(70, 12));
         let sky = FxVec3::new(Fx::from_int(300), Fx::from_int(-400), Fx::from_int(400));
         let down = decks.crossing(
             FxVec3::new(Fx::from_int(300), Fx::from_int(100), Fx::from_int(80)),

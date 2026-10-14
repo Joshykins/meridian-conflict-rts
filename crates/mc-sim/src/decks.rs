@@ -7,8 +7,9 @@
 //! it came onto it from the land at its ends (it was already near the deck's
 //! height), so one that sails or drives in under a bridge stays on the water or
 //! the bed. Ships never are, nor aircraft, which fly over anyway. Units on a deck
-//! and units under it pass each other; nothing is built on a deck
-//! (`World::lot_fits`); a shot coming down onto a deck stops there unless it was
+//! and units under it pass each other; nothing is built on a deck or the
+//! projectors at its ends (`World::lot_fits`, `mc_map::Deck::holds`, and the
+//! placement preview's `Unfit::Bridge`); a shot coming down onto a deck stops there unless it was
 //! fired from on it, and one fired from under it stops on its underside
 //! (`impacts.rs`), so a unit under a deck holds its fire at anything it would have
 //! to shoot up through the deck (`line_of_fire.rs`). A ship beside a bridge still

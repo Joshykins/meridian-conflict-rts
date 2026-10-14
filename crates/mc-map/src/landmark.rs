@@ -99,8 +99,9 @@ pub struct PowerLine {
 /// (`crate::deck::Deck`) to it, scaled as the prop is, so the road units walk on is
 /// the one drawn. At each end a projector carries the road onto the land: level
 /// for `head` metres inland of the deck's end, then a ramp down at `grade` for
-/// `run` metres; the map shapes each landing to it, so units walk on the ramp
-/// drawn.
+/// `run` metres, `edge` metres wider than the road either side; the map shapes
+/// each landing to it, so units walk on the ramp drawn. Nothing is built on the
+/// deck or a projector (`crate::deck::Deck::holds`).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BridgePlan {
     pub span: f64,
@@ -108,6 +109,7 @@ pub struct BridgePlan {
     pub head: f64,
     pub run: f64,
     pub grade: f64,
+    pub edge: f64,
 }
 
 pub const HARDLIGHT_BRIDGE: BridgePlan = BridgePlan {
@@ -117,6 +119,7 @@ pub const HARDLIGHT_BRIDGE: BridgePlan = BridgePlan {
     run: 170.0,
     // No steeper than a way's (`bake::sites`), so a way up to a bridge meets it.
     grade: 0.08,
+    edge: 8.0,
 };
 
 /// The dam's lines.

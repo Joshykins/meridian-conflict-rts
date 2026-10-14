@@ -1,6 +1,6 @@
 //! Decks (`decks.rs`): a bridge's road over a strait. Land units cross on top and
 //! stand at the deck's height; ships sail under it and the two pass each other;
-//! nothing is built on it; shells coming down onto it stop there, so a ship under a
+//! nothing is built on it or its projectors; shells coming down onto it stop there, so a ship under a
 //! bridge is out of a land battery's reach while one beside it is not, and a ship
 //! under it cannot shoot up through it while one beside it can.
 
@@ -8,6 +8,7 @@ use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
 use mc_jobs::Pool;
 use mc_map::{Deck, Heightfield};
+use mc_sim::placement::{SiteMap, Unfit};
 use mc_sim::tables::{flag, Controller};
 use mc_sim::world::MapData;
 use mc_sim::{Command, MatchConfig, PlayerCommand, PlayerSetup, UnitId, World};
@@ -25,7 +26,8 @@ fn blueprints() -> Arc<Blueprints> {
     Arc::new(Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap())
 }
 
-fn strait() -> World {
+/// The strait's ground and its deck.
+fn ground() -> Heightfield {
     let mut samples = vec![0u16; 257 * 257];
     for y in 0..257 {
         for x in (0..60).chain(197..257) {
@@ -38,9 +40,12 @@ fn strait() -> World {
         half: Fx::from_int(60),
         top: Fx::from_int(BANK as i32),
     };
-    let terrain =
-        Heightfield::from_samples(256, 256, samples, Fx::ZERO, Fx::ONE, Fx::from_int(WATER))
-            .with_decks(vec![deck]);
+    Heightfield::from_samples(256, 256, samples, Fx::ZERO, Fx::ONE, Fx::from_int(WATER))
+        .with_decks(vec![deck])
+}
+
+fn strait() -> World {
+    let terrain = ground();
     let map = MapData {
         name: "strait".into(),
         content_id: 1,
@@ -164,12 +169,27 @@ fn a_tank_on_the_deck_passes_over_a_frigate_under_it() {
 }
 
 #[test]
-fn nothing_is_built_on_a_deck() {
+fn nothing_is_built_on_a_deck_or_its_projectors() {
     let w = strait();
     let wall = w.blueprints.id_of("aster_t1_point_defense").unwrap();
     let bp = w.blueprints.unit(wall);
-    assert!(!w.can_place(bp, FxVec2::from_ints(1_020, ROAD)));
-    assert!(w.can_place(bp, FxVec2::from_ints(250, 600)));
+    // The deck; a projector on the west bank (150 m past the deck's end on a
+    // 1168 m deck); the bank beside it and far off.
+    let (deck, projector) = (FxVec2::from_ints(1_020, ROAD), FxVec2::from_ints(360, ROAD));
+    let (beside, far) = (
+        FxVec2::from_ints(360, ROAD + 200),
+        FxVec2::from_ints(250, 600),
+    );
+    assert!(!w.can_place(bp, deck));
+    assert!(!w.can_place(bp, projector));
+    assert!(w.can_place(bp, beside));
+    assert!(w.can_place(bp, far));
+    // The placement preview says so before an engineer walks there.
+    let sites = SiteMap::new(&ground(), &[]);
+    let heading = bp.build_heading();
+    assert_eq!(sites.check(bp, deck, heading), Err(Unfit::Bridge));
+    assert_eq!(sites.check(bp, projector, heading), Err(Unfit::Bridge));
+    assert_eq!(sites.check(bp, beside, heading), Ok(()));
 }
 
 /// Shells from a battery on the bank: a frigate under the deck comes through

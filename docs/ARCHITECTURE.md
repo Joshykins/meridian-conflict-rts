@@ -34,7 +34,7 @@ Dependencies point downward only: `mc-sim` never sees the renderer or the networ
   top while ships sail under. A land unit over a deck stands on it; a hover or amphibious one only if it came up onto
   it from a landing (its height was already near the deck's), so one sailing in under it stays on the water; ships
   never (`mc-sim/src/decks.rs`). Units on a deck and under it pass each other (`World::apart`); nothing is built on a
-  deck; a shot coming down onto a deck stops on it unless it was fired from on it, and a deck takes a blast between
+  deck or the projectors at its ends (`Deck::holds`; the placement preview says so, `Unfit::Bridge`); a shot coming down onto a deck stops on it unless it was fired from on it, and a deck takes a blast between
   its two sides (`deck_shields`), so plunging fire cannot reach a ship under a bridge (`tests/decks.rs`).
 - Map tile: 256 cells (2 048 m). A full map is 40 × 40 tiles.
 - Nav sector: 32 cells (256 m).
