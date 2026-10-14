@@ -76,25 +76,32 @@ impl World {
         drop(span);
         // Resolve the same visible engagement as the order controller before
         // applying any moves, so altitude pursuit cannot depend on row order.
-        let attack_altitudes: Vec<_> = (0..rows)
-            .map(|row| {
-                let units = &self.state.units;
-                if !units.slots.is_alive(row)
-                    || !units.is_active(row)
-                    || !units.has_flag(row, flag::AIR_RUN)
-                    || !self.bp(row).has(cat::ANTI_AIR)
-                    || !self
-                        .bp(row)
-                        .motion
-                        .is_some_and(|m| m.layer == MoveLayer::Air && !m.hover)
-                {
-                    return None;
-                }
-                self.air_engage_target(row)
-                    .map(|target| self.air_attack_height(row, target))
-            })
-            .collect();
         let this = &*self;
+        let attack_altitudes: Vec<Option<Fx>> = self
+            .pool
+            .parallel_map_chunks(rows, CHUNK, |_, range| {
+                range
+                    .map(|row| {
+                        let units = &this.state.units;
+                        if !units.slots.is_alive(row)
+                            || !units.is_active(row)
+                            || !units.has_flag(row, flag::AIR_RUN)
+                            || !this.bp(row).has(cat::ANTI_AIR)
+                            || !this
+                                .bp(row)
+                                .motion
+                                .is_some_and(|m| m.layer == MoveLayer::Air && !m.hover)
+                        {
+                            return None;
+                        }
+                        this.air_engage_target(row)
+                            .map(|target| this.air_attack_height(row, target))
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .into_iter()
+            .flatten()
+            .collect();
         let span = mc_core::perf_span!("move.steer");
         let results: Vec<Vec<MoveOut>> = self.pool.parallel_map_chunks(rows, CHUNK, |_, range| {
             let units = &this.state.units;
