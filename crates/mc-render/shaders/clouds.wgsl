@@ -284,9 +284,13 @@ const SHADE_BELOW: f32 = 300.0;
 // Taps through fair-weather cloud, then on up through storm towers.
 const SHADE_STEPS: i32 = 10;
 const SHADE_STORM_STEPS: i32 = 5;
-// A new start offset every frame, folded into what the texel had: the taps
-// are tens of metres apart and a fixed offset would band the shade.
-const SHADE_BLEND: f32 = 0.25;
+// A new start offset each time a texel is taken, folded into what it had: the
+// taps are hundreds of metres apart and a fixed offset would band the shade.
+// Ten taps miss or catch a heap from one offset to the next, so the texel keeps
+// most of what it had: at a quarter of the texels a frame it answers in about
+// forty frames, while a cloud drifts a few metres, a fraction of a texel (tens
+// of metres). At 0.68 a take the shade on the ground shimmered.
+const SHADE_BLEND: f32 = 0.1;
 // Erosion drawn this many times its size: the shade's texels are coarse.
 const SHADE_DETAIL: f32 = 2.0;
 
@@ -317,7 +321,12 @@ fn cs_shade(@builtin(global_invocation_id) invocation: vec3<u32>, @builtin(num_w
     let storm_top = floor + atmos.layer.z + (atmos.layer.z - atmos.layer.x) * TOP_LUMP * 0.5;
     let fair_len = (fair_top - start.z) / d.z;
     let storm_len = max(storm_top - fair_top, 0.0) / d.z;
-    let jitter = fract(hash21(vec2<f32>(id.xy) + 0.5) + atmos.frame.x * 0.618034);
+    // Each time the texel is taken its taps start a golden-ratio step on from the
+    // last, so a few takes cover the whole stride. (Stepped by the frame instead,
+    // a texel taken every fourth frame stepped 2.47 a take: back and forth between
+    // two offsets, and the shade on the ground shimmered.)
+    let takes = select(frame, frame / 4u, stagger);
+    let jitter = fract(hash21(vec2<f32>(id.xy) + 0.5) + f32(takes) * 0.618034);
     var tau = 0.0;
     let dt = fair_len / f32(SHADE_STEPS);
     for (var k = 0; k < SHADE_STEPS; k++) {
@@ -339,9 +348,7 @@ fn cs_shade(@builtin(global_invocation_id) invocation: vec3<u32>, @builtin(num_w
     let texel = vec2<i32>(id.xy);
     let old = textureLoad(cloud_shade_out, texel);
     // Alpha 0: never written (sky.rs clears it so), take this frame whole.
-    // Four frames elapsed between these samples; keep the same response time.
-    let weight = select(SHADE_BLEND, 1.0 - pow(1.0 - SHADE_BLEND, 4.0), stagger);
-    let blend = select(weight, 1.0, old.a < 0.5);
+    let blend = select(SHADE_BLEND, 1.0, old.a < 0.5);
     textureStore(cloud_shade_out, texel, vec4<f32>(mix(old.r, lit, blend), 0.0, 0.0, 1.0));
 }
 
