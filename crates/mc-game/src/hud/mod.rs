@@ -755,19 +755,20 @@ impl Hud {
         let ours = selected
             .iter()
             .any(|u| (u.owner_flags & 0xFF) as u8 == view.local);
-        let units: Vec<&UnitInstance> = if !selected.is_empty() {
-            selected.clone()
+        let none_picked = selected.is_empty();
+        let units: Vec<&UnitInstance> = if !none_picked {
+            selected
         } else if let Some(u) = hovered {
             vec![u]
         } else {
             Vec::new()
         };
-        let mut inspect_only = selected.is_empty() || !ours;
+        let mut inspect_only = none_picked || !ours;
         let mut x = EDGE;
         // The deck slides up and fades in when something is picked, back down when
         // nothing is, and dips briefly when the selection becomes something else.
         // By unit, not loadout: a finished refit is still the same selection.
-        let blueprints = if selected.is_empty() {
+        let blueprints = if none_picked {
             units.iter().map(|u| u.blueprint).collect()
         } else {
             view.picked().kinds().to_vec()
@@ -780,13 +781,13 @@ impl Hud {
         let deck_id = id("hud-deck", 0);
         // The units shown are looked at again only when they may have changed: the same
         // stamp is the same selection found in the same frame.
-        let shown_now = (!selected.is_empty()).then_some(stamp);
+        let shown_now = (!none_picked).then_some(stamp);
         if shown_now.is_none() || self.kept.deck.compared != shown_now {
             self.kept.deck.compared = shown_now;
             // With every selected unit found, those shown are the selection, which is
             // compared without looking at the units.
             let showing: std::borrow::Cow<[u32]> =
-                if units.len() == view.selection.len() && !selected.is_empty() {
+                if units.len() == view.selection.len() && !none_picked {
                     std::borrow::Cow::Borrowed(&view.selection[..])
                 } else {
                     std::borrow::Cow::Owned(units.iter().map(|u| u.unit_id).collect())
@@ -823,7 +824,7 @@ impl Hud {
         // same (`selection/kept.rs`); for the unit under the pointer it is not. Never
         // before the first pull: a deck drawn by hand (tests) changes its frame in place.
         let units_picked = view.picked().units();
-        let mut shown = (!selected.is_empty()).then_some(selection::Shown::Selection {
+        let mut shown = (!none_picked).then_some(selection::Shown::Selection {
             stamp,
             units: units_picked,
         });
@@ -858,8 +859,8 @@ impl Hud {
         // long as the pointer rested on a unit under the deck. Clicks there
         // reach the battlefield, so nothing on it takes them.
         let claimed = self.unclaimed;
-        self.unclaimed |= selected.is_empty();
-        ui.interactive &= !selected.is_empty();
+        self.unclaimed |= none_picked;
+        ui.interactive &= !none_picked;
         if !units.is_empty() {
             let info = Rect::new(x, deck_y, 336.0, DECK_H);
             let strip = !view.observing && !inspect_only;
@@ -962,7 +963,7 @@ impl Hud {
         drop(part);
         let _part = mc_core::perf_span!("ui.hud.after");
         if let Some(u) = hovered {
-            if !view.selection.contains(&u.unit_id) && !selected.is_empty() {
+            if !view.selection.contains(&u.unit_id) && !none_picked {
                 // Not claimed, like the deck shown for a hover (above).
                 let top = deck_y - 40.0 - DECK_H;
                 selection::hover_card(self, ui, s, u, Rect::new(EDGE, top, 336.0, DECK_H));
