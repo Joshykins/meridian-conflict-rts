@@ -17,6 +17,7 @@
 //! Everything here is cosmetic and client-side: nothing feeds back into the sim.
 
 mod blast;
+mod columns;
 mod cut;
 mod regions;
 mod seed;
@@ -62,6 +63,8 @@ const DRAW_SET: &[Binding] = &[
     (4, vk::DescriptorType::SAMPLED_IMAGE),
     (5, vk::DescriptorType::STORAGE_IMAGE),
     (6, vk::DescriptorType::SAMPLED_IMAGE),
+    (7, vk::DescriptorType::STORAGE_IMAGE),
+    (8, vk::DescriptorType::SAMPLED_IMAGE),
 ];
 
 /// The target the march draws this frame's half of its texels into (`Sky::resize`);
@@ -488,6 +491,8 @@ pub struct Sky {
     noise: Image,
     /// The sunlight the drawn clouds let through to the land, over the map.
     shade: Image,
+    /// What the air holds over each spot, baked each frame (`columns.rs`).
+    columns: columns::Columns,
     /// The march this frame, then two histories it is folded into in turn.
     targets: Vec<Image>,
     target_fbs: Vec<vk::Framebuffer>,
@@ -916,6 +921,12 @@ impl Sky {
                 |_| {},
             )?;
 
+        let columns = columns::Columns::new(gpu, draw_module, draw_pipeline_layout)?;
+        for set in draw_sets {
+            write_image(gpu, set, 7, T::STORAGE_IMAGE, columns.view(), general);
+            write_image(gpu, set, 8, T::SAMPLED_IMAGE, columns.view(), general);
+        }
+
         // Bake the cloud noise once.
         // SAFETY: `submit_once` hands a recording command buffer of this device;
         // `noise_pipeline` was made with `sim_pipeline_layout`, every binding of `sim_sets[0]`
@@ -949,6 +960,7 @@ impl Sky {
             flow,
             noise,
             shade,
+            columns,
             targets: Vec::new(),
             target_fbs: Vec::new(),
             march_size: (0, 0),
@@ -1814,7 +1826,14 @@ impl Sky {
 
     /// The cloud march (half its texels a frame), laid out at full size and folded into
     /// the history, between the scene pass and `scene_over`.
-    pub fn record_march(&self, gpu: &Gpu, cmd: vk::CommandBuffer, scene_set: vk::DescriptorSet) {
+    /// `time` opens a timing scope round each pass (`Some(name)`) and closes it (`None`).
+    pub fn record_march(
+        &self,
+        gpu: &Gpu,
+        cmd: vk::CommandBuffer,
+        scene_set: vk::DescriptorSet,
+        mut time: impl FnMut(Option<&'static str>),
+    ) {
         let (w, h) = self.march_size;
         if w == 0 || !self.clouds {
             return;
@@ -1822,21 +1841,30 @@ impl Sky {
         let dev = &gpu.device;
         let k = self.history();
         let set = self.draw_sets[k];
-        for (fb, pass, pipeline, w) in [
+        for (name, fb, pass, pipeline, w) in [
             (
+                "clouds.march",
                 self.target_fbs[MARCH_HALF],
                 self.march_pass,
                 self.march_pipeline,
                 w.div_ceil(2),
             ),
-            (self.target_fbs[0], self.march_pass, self.fill_pipeline, w),
             (
+                "clouds.fill",
+                self.target_fbs[0],
+                self.march_pass,
+                self.fill_pipeline,
+                w,
+            ),
+            (
+                "clouds.resolve",
                 self.target_fbs[1 + k],
                 self.resolve_pass,
                 self.resolve_pipeline,
                 w,
             ),
         ] {
+            time(Some(name));
             // SAFETY: the renderer calls `record_march` with its recording `cmd`, outside any
             // render pass, after `resize` (`w` > 0); each framebuffer was made for the pass it
             // is paired with at the size it is drawn at (`MARCH_HALF` half as wide as
@@ -1891,6 +1919,7 @@ impl Sky {
                 dev.cmd_draw(cmd, 3, 1, 0, 0);
                 dev.cmd_end_render_pass(cmd);
             }
+            time(None);
         }
     }
 
@@ -1965,6 +1994,7 @@ impl Sky {
             ] {
                 dev.destroy_pipeline(p, None);
             }
+            self.columns.destroy(gpu);
             for m in self.modules {
                 dev.destroy_shader_module(m, None);
             }
@@ -2236,6 +2266,8 @@ mod shots {
             // SKY_STIR: a jet flying west to east through the view, a blast at the focus.
             let stir = std::env::var("SKY_STIR").is_ok();
             let mut sums: Vec<f32> = Vec::new();
+            // Each timed scope's sum over the last 20 frames (SKY_SCOPES).
+            let mut scope_sums: Vec<(&str, f32)> = Vec::new();
             let mut previous: Option<Vec<u8>> = None;
             // SKY_PAN: metres a second the camera scrolls east, as a player would.
             let pan: f32 = std::env::var("SKY_PAN")
@@ -2365,6 +2397,12 @@ mod shots {
                     previous = Some(now);
                 }
                 if i + 20 >= frames {
+                    for s in &renderer.stats.gpu_scopes {
+                        match scope_sums.iter_mut().find(|(n, _)| *n == s.name) {
+                            Some((_, sum)) => *sum += s.ms,
+                            None => scope_sums.push((s.name, s.ms)),
+                        }
+                    }
                     for (k, (_, ms)) in renderer.stats.gpu_passes.iter().enumerate() {
                         if sums.len() <= k {
                             sums.push(0.0);
@@ -2395,6 +2433,10 @@ mod shots {
             // when MERIDIAN_GPU_STATS=1 (renderer/gpu_timers.rs).
             if std::env::var("SKY_SCOPES").is_ok() {
                 for s in &renderer.stats.gpu_scopes {
+                    let ms = scope_sums
+                        .iter()
+                        .find(|(n, _)| *n == s.name)
+                        .map_or(s.ms, |(_, sum)| sum / 20.0);
                     let stats = s.stats.as_ref().map_or(String::new(), |d| {
                         format!(
                             " tris {} verts {} frags {}",
@@ -2405,7 +2447,7 @@ mod shots {
                         "{name}:   {}{} {:.2} ms{stats}",
                         "  ".repeat(s.depth as usize),
                         s.name,
-                        s.ms
+                        ms
                     );
                 }
             }

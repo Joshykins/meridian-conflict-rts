@@ -7,7 +7,7 @@
 //! shader (after the numbers the CPU shares with the shaders, generated from
 //! `gpu_consts.rs`), and `bindings.wgsl` with `regions.wgsl` and `lights.wgsl` in
 //! front of those containing the line `//!use bindings` (`regions` alone for a
-//! shader that binds the atmosphere itself and says `//!use regions`); then `shore`, `habitat`, `streets`, `desert`, `rock`, `scars`, `surface`,
+//! shader that binds the atmosphere itself and says `//!use regions`); then `cloud_shape`, `shore`, `habitat`, `streets`, `desert`, `rock`, `scars`, `surface`,
 //! `metal`, `regency`, `scenery`, `warp_hull`, `warp_puffs`, `plasma_puffs` and `gravity_puffs` for their own `//!use` lines, in that order,
 //! then `emp` (an EMP stun's look on a model), `wreck` (how a wreck lies and looks),
 //! `nanite_site` (how a Regency site condenses) and
@@ -15,9 +15,10 @@
 //! `progenitor_glass` (a Progenitor Shaper's dome, after shields.wgsl's own helpers).
 
 /// Files put in front of shaders, never compiled on their own.
-pub(crate) const PRELUDES: [&str; 30] = [
+pub(crate) const PRELUDES: [&str; 31] = [
     "common",
     "bindings",
+    "cloud_shape",
     "regions",
     "shore",
     "sea",
@@ -52,6 +53,7 @@ pub(crate) const PRELUDES: [&str; 30] = [
 pub(crate) struct Preludes {
     common: String,
     bindings: String,
+    cloud_shape: String,
     regions: String,
     shore: String,
     sea: String,
@@ -94,6 +96,7 @@ impl Preludes {
                 read("lights")
             ),
             regions: read("regions"),
+            cloud_shape: read("cloud_shape"),
             shore: read("shore"),
             sea: read("sea"),
             // The texture detail drawn inside a unit's plates rides with the surface.
@@ -135,6 +138,10 @@ impl Preludes {
         } else {
             self.common.clone()
         };
+        // The clouds' shape and their column map (clouds.wgsl; needs bindings).
+        if uses("cloud_shape") {
+            prelude = format!("{prelude}\n{}", self.cloud_shape);
+        }
         // Waves on the shore (needs bindings).
         if uses("shore") {
             prelude = format!("{prelude}\n{}", self.shore);

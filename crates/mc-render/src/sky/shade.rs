@@ -1,7 +1,21 @@
-//! Cloud shadows: compact interleaved dispatch on lower quality presets.
+//! The column map's bake and the cloud shadows (a compact interleaved dispatch on lower
+//! quality presets).
 use super::*;
 
 impl Sky {
+    /// The column map (`columns.rs`): after `record_sim`, before the shade and the march.
+    pub fn record_columns(&self, gpu: &Gpu, cmd: vk::CommandBuffer, scene_set: vk::DescriptorSet) {
+        if !self.clouds {
+            return;
+        }
+        self.columns.record(
+            gpu,
+            cmd,
+            self.draw_pipeline_layout,
+            [scene_set, self.draw_sets[0]],
+        );
+    }
+
     /// The clouds' shade on the land: after `record_sim`, before anything is lit.
     pub fn record_shade(
         &self,

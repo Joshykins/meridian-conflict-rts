@@ -1,4 +1,5 @@
 //!use bindings
+//!use cloud_shape
 // The sky and its clouds (sky.rs).
 //
 //   fs_sky        end of the scene pass: the sky and sun wherever nothing was drawn
@@ -29,30 +30,9 @@
 @group(1) @binding(4) var cloud_now: texture_2d<f32>;
 // This frame's half of the march (`fs_march`), half as wide as `cloud_march`.
 @group(1) @binding(6) var cloud_march_half: texture_2d<u32>;
-
-// Horizontal repeat of the billow texture and of the fine erosion, metres.
-const SHAPE_PERIOD: f32 = 5200.0;
-const DETAIL_PERIOD: f32 = 460.0;
-// The billows' second octave, as a share of their period: no simple ratio, so
-// the two never line up again within the map.
-const OCTAVE_SHARE: f32 = 0.387;
-// How far the billows move a column's top, as a share of its depth, peak to peak.
-const TOP_LUMP: f32 = 0.6;
-// How far the fine erosion moves the upper part of a column's top, likewise.
-const TOP_CAULI: f32 = 0.22;
-// How far round a point the storm is averaged for how tall it grows, metres.
-const STORM_SPREAD: f32 = 420.0;
-// Each lookup of the noise turned to its own angle (cos, sin), so no tile's
-// rows run along the map's axes or along each other's.
-const TURN_SHAPE: vec2<f32> = vec2<f32>(0.9394, 0.3429);
-const TURN_OCTAVE: vec2<f32> = vec2<f32>(0.6118, -0.7910);
-const TURN_DETAIL: vec2<f32> = vec2<f32>(0.2675, 0.9636);
-
-fn turn(p: vec2<f32>, r: vec2<f32>) -> vec2<f32> {
-    return vec2<f32>(p.x * r.x - p.y * r.y, p.x * r.y + p.y * r.x);
-}
-// Extinction of the thickest cloud, per metre.
-const CLOUD_SIGMA: f32 = 0.045;
+// The column map (cloud_shape.wgsl): written by `cs_columns`, read by everything after.
+@group(1) @binding(7) var cloud_columns_out: texture_storage_2d_array<rgba16float, write>;
+@group(1) @binding(8) var cloud_columns: texture_2d_array<f32>;
 
 struct FullOut {
     @builtin(position) clip: vec4<f32>,
@@ -222,268 +202,21 @@ fn clearing(p: vec3<f32>) -> f32 {
     return keep;
 }
 
-struct CloudSample {
-    // Extinction per metre.
-    sigma: f32,
-    // How far up its own column the point is, 0 base to 1 top.
-    height: f32,
-    storm: f32,
-    // 0 a thin, ragged fragment the light goes through, 1 a dense heap.
-    firm: f32,
-    // How much darker than a fresh white cloud it is: old, wet, heavy cloud
-    // is grey all through.
-    grey: f32,
-    // Metres of its own column above the point, for how much sky it hides.
-    above: f32,
-    // 1 in a closed deck or a flat sheet, 0 in a heap.
-    flat: f32,
-}
-
-// The storm round about last looked up (`cloud_column`): where (xy) and the sum
-// of its four taps (z, negative before the first). Rays from the strategic
-// view fall almost straight down and looked up the same four spots at every
-// step, milliseconds of the march over a stormy overcast. `storm_reuse` is how far
-// across the ray may move before they are looked up again: 0 (always) unless
-// `march` sets it, and it sets it to under a march texel.
-var<private> storm_near: vec3<f32> = vec3<f32>(0.0, 0.0, -1.0);
-var<private> storm_reuse: f32 = 0.0;
-
-// What the air holds over one spot (`cloud_column`): the weather, the day's base
-// and how tall the cloud there grows. All of it changes over hundreds of metres
-// or more, so a sample a few metres off (the light's short tap in `march`) takes
-// its shape from the same column: looked up again, it doubled the march's cost.
-struct CloudColumn {
-    // The point, turned with a wheeling storm (`vortex_warp_in`).
-    p: vec3<f32>,
-    // Where the wind has carried the air mass's fields from.
-    air: vec2<f32>,
-    cover: f32,
-    storm: f32,
-    // A Nimbus's seeded cloud, 0 to 1.
-    seeded: f32,
-    churn: f32,
-    // The weather's mass size (`SkyValues::scale`).
-    scale: f32,
-    firm: f32,
-    sheet: f32,
-    deck_closed: f32,
-    base: f32,
-    // How tall the column grows; 0 where there is no cloud.
-    reach: f32,
-}
-
-// The cloud at `p`, given the weather there (`weather_at(p.xy)`); see `cloud_shape`.
-fn cloud_at(at: vec3<f32>, w: vec4<f32>, detail: f32) -> CloudSample {
-    let col = cloud_column(at, w, detail);
-    return cloud_shape(col.p, col, detail, true);
-}
-
-// The column over `at` (`CloudColumn`); `detail` 0 for the light's coarse taps,
-// which skip the storm's four taps round about.
-fn cloud_column(at: vec3<f32>, w: vec4<f32>, detail: f32) -> CloudColumn {
-    var col: CloudColumn;
-    // Round a wheeling storm the billows turn with the weather (`weather_at`).
-    let p = vec3<f32>(vortex_warp_in(atmos.vortex, at.xy), at.z);
-    col.p = p;
-    let cover = w.x;
-    if cover < 0.015 {
-        return col;
+// The column map (cloud_shape.wgsl `bake_column`): the near layers over the map and
+// its margin (z 0), the far ones round it (z 1).
+@compute @workgroup_size(8, 8)
+fn cs_columns(@builtin(global_invocation_id) id: vec3<u32>) {
+    let size = textureDimensions(cloud_columns_out).xy;
+    if any(id.xy >= size) {
+        return;
     }
-    let storm = clamp(w.y, 0.0, 1.0);
-    // A Nimbus's seeded cloud (storm below zero, clouds_sim.wgsl `cs_force`): a firm
-    // heap the bomber flies through the middle of (`atmos.seeded`), wherever the day's
-    // bases hang; as the mark fades it settles back into the layer.
-    let seeded = smoothstep(0.05, 0.5, -w.y);
-    // Height varies from cloud to cloud: bases wander (some hang low enough to
-    // swallow a gunship, some sit over the jets), and where the
-    // air is lifting (a field drifting with the wind) cumulus grows into tall
-    // towers, most of all in towering weather (`shape.x`).
-    let sky = sky_at(p.xy);
-    let tall = sky.towering;
-    let air = p.xy - atmos.wind.xy;
-    let lift = grad_noise2(air + 1711.0, 2600.0 * max(sky.scale, 0.5));
-    // Every cloud its own: a field drifting with the wind decides whether this
-    // one is a thin shred the sun shines through or a dense heap with a grey
-    // belly, and storms and thick cover lean to the heavy kind. With one
-    // density and one brightness everywhere every cloud was the same white
-    // cotton ball.
-    let kind = grad_noise2(air + vec2<f32>(2917.0, -811.0), 1700.0 * max(sky.scale, 0.5));
-    // Under a full deck the thin patches and the sheet's holes close up:
-    // overcast has few breaks.
-    // (The weather's own cover: the map's is never over 1.)
-    let deck_closed = smoothstep(1.5, 1.85, sky.cover);
-    let firm = max(max(smoothstep(0.42, 0.58, kind + storm * 0.5), deck_closed * 0.8), seeded * 0.6);
-    // And in wide stretches of fair weather the heaps give way to a flat,
-    // broken sheet (stratocumulus): shallow, lumpy underneath, full of holes.
-    let sheet = smoothstep(0.5, 0.6, grad_noise2(air + vec2<f32>(-5113.0, 3301.0), 5600.0 * max(sky.scale, 0.5))) * (1.0 - storm) * (1.0 - seeded);
-    let floor = cloud_floor(p.xy);
-    let day_base = floor + atmos.layer.x - storm * 80.0 + (grad_noise2(air - 377.0, 4300.0) - 0.5) * (240.0 + 120.0 * tall);
-    let base = mix(day_base, floor + atmos.seeded.x - DISTURBER_SEED_UNDER, seeded);
-    let deck = atmos.layer.y - atmos.layer.x;
-    let fair_top = floor + atmos.layer.y + deck * 2.6 * pow(lift, 2.2) * tall;
-    // Thin cover makes shallow cloud; the fullest air the tallest.
-    let fill = mix(0.55, 1.0, min(cover, 1.0));
-    // Shreds are shallow as well as thin.
-    let fair_depth = (fair_top - base) * fill * mix(0.7, 1.0, firm) * mix(1.0, 0.3, sheet * (1.0 - deck_closed));
-    let storm_depth = (floor + sky.storm_top - base) * fill;
-    // The billows below decide how tall a storm grows here and lift or drop
-    // every top: tested against the highest it could reach before looking
-    // them up.
-    // How tall a storm grows, from the storm round about: the weather map's
-    // storm has sharp steps (a core's rim), and taken as it is each stood up
-    // as a sheer wall whose sunlit crest ran across the storm like a tube.
-    // Not for the light's taps (`detail` 0): they are coarse, and it would be
-    // sixteen more lookups a sample.
-    var tall_storm = storm;
-    if storm > 0.01 && detail > 0.0 {
-        // The four taps are kept while the ray has moved less than
-        // `storm_reuse` across (see `march`).
-        if storm_near.z < 0.0 || distance(at.xy, storm_near.xy) > storm_reuse {
-            var around = 0.0;
-            for (var k = 0; k < 4; k++) {
-                let a = f32(k) * 1.5708 + 0.4;
-                around += clamp(weather_at(at.xy + vec2<f32>(cos(a), sin(a)) * STORM_SPREAD).y, 0.0, 1.0);
-            }
-            storm_near = vec3<f32>(at.xy, around);
-        }
-        tall_storm = (storm * 2.0 + storm_near.z) / 6.0;
+    let rect = columns_rect(id.z == 1u);
+    let xy = rect.xy + (vec2<f32>(id.xy) + 0.5) / vec2<f32>(size) * rect.zw;
+    let column = bake_column(xy);
+    let first = i32(id.z) * COLUMN_LAYERS;
+    for (var k = 0; k < COLUMN_LAYERS; k++) {
+        textureStore(cloud_columns_out, vec2<i32>(id.xy), first + k, column[k]);
     }
-    col.air = air;
-    col.cover = cover;
-    col.storm = storm;
-    col.seeded = seeded;
-    col.churn = clamp(w.z, 0.0, 1.0);
-    col.scale = sky.scale;
-    col.firm = firm;
-    col.sheet = sheet;
-    col.deck_closed = deck_closed;
-    col.base = base;
-    col.reach = mix(mix(fair_depth, storm_depth, pow(tall_storm, 1.3)), DISTURBER_SEED_DEPTH, seeded);
-    return col;
-}
-
-// The cloud at `p` in column `col`. `detail` 0 skips the fine erosion (light
-// rays); otherwise it is how many times its usual size the erosion is drawn, so
-// seen from far off it stays a few march texels across instead of shimmering or
-// being dropped (which left the whole strategic view soft, rounded blobs).
-// `grey` looks up how grey the cloud is (only the drawn sample needs it). The
-// clearing is applied by the caller, to how opaque the cloud is, never to its shape.
-fn cloud_shape(p: vec3<f32>, col: CloudColumn, detail: f32, grey: bool) -> CloudSample {
-    var out: CloudSample;
-    let base = col.base;
-    let reach = col.reach;
-    if reach <= 0.0 || p.z <= base || p.z >= base + reach * (1.0 + TOP_LUMP * 0.5) {
-        return out;
-    }
-    let cover = col.cover;
-    let storm = col.storm;
-    let seeded = col.seeded;
-    let churn = col.churn;
-    let firm = col.firm;
-    let sheet = col.sheet;
-    let deck_closed = col.deck_closed;
-    out.storm = storm;
-    // The billows drift with the wind; churned air twists them about.
-    let drift = vec3<f32>(atmos.wind.xy, 0.0);
-    // Aircraft wakes: the flow they stirred bends the billows about (the
-    // vortices twist them), and a fresh streak thins the cloud in a narrow
-    // tube at the height the aircraft flew.
-    let stir = flow_at(p.xy);
-    // A bend of some tens of metres at most: past that the billows shear
-    // into ribbons instead of twisting.
-    let bend = stir.xy * 14.0;
-    let q = p - drift - vec3<f32>(bend / (1.0 + length(bend) / 70.0), 0.0);
-    let swirl = vec3<f32>(sin(q.y * 0.004 + atmos.weather.w * 0.3), cos(q.x * 0.004 - atmos.weather.w * 0.25), 0.0) * churn * 140.0;
-    // The tube it thins is tight below the aircraft and rolls up a little above
-    // it, and it is ragged: puffs torn out along it, not a clean cut. Cut
-    // clean and tall (it once reached 650 m up), a flight on patrol sliced the
-    // layer into straight strips with hard edges.
-    let above = p.z - stir.z;
-    var streak = stir.w * exp(-pow(abs(above / select(45.0, 180.0, above > 0.0)), 2.0));
-    if streak > 0.01 {
-        streak *= smoothstep(0.3, 0.75, grad_noise2(q.xy + vec2<f32>(q.z * 0.7, 0.0), 140.0));
-    }
-    // Bigger weather, bigger billows.
-    let period = SHAPE_PERIOD * mix(1.0, max(col.scale, 0.5), 0.6);
-    // Two lookups of the billows at unrelated sizes and angles. One alone
-    // repeated every period across the map, the same lumps over and over, and
-    // where cover was thin (the tops) only its cells' ridges were left: the
-    // same smooth rubbery tubes everywhere.
-    let bq = q.xy + swirl.xy;
-    let n = textureSampleLevel(cloud_noise, repeat_sampler, vec3<f32>(turn(bq, TURN_SHAPE) / period, q.z / (period * 0.25)), 0.0);
-    let op = period * OCTAVE_SHARE;
-    // The second is one flat slice, the same at every height: it also sets
-    // how tall each column grows, and a height taken from noise that changed
-    // with height folded tops over into stacked shelves. The light's coarse
-    // taps (`detail` 0) make do with the first.
-    var m = n;
-    if detail > 0.0 {
-        m = textureSampleLevel(cloud_noise, repeat_sampler, vec3<f32>(turn(bq, TURN_OCTAVE) / op + 0.37, 0.61), 0.0);
-    }
-    let billow = n.x * 0.55 + n.y * 0.15 + m.x * 0.3;
-    // Every top rides up and down with the billows (the flat slice, so a top
-    // never folds over). Taken from the weather map alone, a top was that
-    // map's smooth field drawn in height: smooth rubbery sausages.
-    let h0 = (p.z - base) / (max(reach, 1.0) * (1.0 + (m.x - 0.5) * TOP_LUMP));
-    if h0 >= 1.0 + TOP_CAULI * 0.5 {
-        return out;
-    }
-    // The fine erosion, pushed about by the billows' own lumps so its tile (a
-    // few hundred metres) never shows as the same cauliflower over and over.
-    var fine = 0.5;
-    if detail > 0.0 {
-        let dp = DETAIL_PERIOD * detail;
-        let warp = (vec2<f32>(m.y, n.z) - 0.5) * dp * 0.9;
-        let e = textureSampleLevel(cloud_noise, repeat_sampler,
-            vec3<f32>(turn(q.xy - swirl.xy * 2.0 + warp, TURN_DETAIL) / dp, q.z / (dp * 0.6)) + vec3<f32>(0.0, 0.0, atmos.weather.w * 0.004), 0.0);
-        fine = e.y * 0.625 + e.z * 0.25 + e.w * 0.125;
-    }
-    // Up top it moves the top itself: turrets and cauliflower. Eroding only
-    // the cloud's thin fringe left a storm's top smooth, as a storm is opaque
-    // well inside that fringe, and a low sun drew its gentle swells as tubes.
-    let h = h0 + (0.5 - fine) * TOP_CAULI * smoothstep(0.35, 0.85, h0);
-    if h >= 1.0 {
-        return out;
-    }
-    out.height = h;
-    // Flat, crisp bases; domes that narrow as they climb, so each cell rounds
-    // off on top; a storm towers, then spreads into an anvil.
-    let fair = mix(smoothstep(0.0, 0.08, h) * (1.0 - h * h * 0.85), smoothstep(0.0, 0.2, h) * (1.0 - smoothstep(0.55, 1.0, h)), sheet);
-    let tower = smoothstep(0.0, 0.04, h) * mix(1.0 - h * 0.25, 1.05, smoothstep(0.72, 0.9, h)) * (1.0 - smoothstep(0.88, 1.0, h));
-    // A seeded cloud is a lumpy slab round the bomber's height, not a dome: drawn as a
-    // dome its gathered disc rose to a smooth cone.
-    let slab = smoothstep(0.0, 0.15, h) * (1.0 - smoothstep(0.5, 1.0, h));
-    let profile = mix(mix(fair, tower, storm), slab, seeded);
-    // Full cover still keeps some of the billows' relief, so a deck or a
-    // storm top reads as lumps and not a smooth sheet.
-    // A sheet spreads further than heaps would in the same air.
-    let c = min(cover + sheet * 0.25, 1.0) * profile * mix(0.9, 0.78, storm);
-    var dens = clamp((billow - (1.0 - c)) / max(c, 0.12), 0.0, 1.0);
-    if dens <= 0.0 {
-        return out;
-    }
-    if detail > 0.0 {
-        // Erode the edges: wispy at the base and in churned air, cauliflower on top.
-        let wisp = mix(fine, 1.0 - fine, smoothstep(0.1, 0.5, h));
-        let erode = 0.4 + churn * 0.4 + storm * 0.15 + ((1.0 - firm) * 0.12 + sheet * 0.2) * (1.0 - deck_closed);
-        dens = clamp((dens - wisp * erode) / (1.0 - wisp * erode), 0.0, 1.0);
-    }
-    // A heap is firm inside, so it ends at an edge instead of a wide thin
-    // fringe; a shred stays soft and see-through. Squared (twice as steep at
-    // the edge) the fringe still read as fuzz round every heap.
-    let thin = 1.0 - dens;
-    dens = mix(dens, 1.0 - thin * thin * thin * thin, firm);
-    dens *= 1.0 - 0.55 * streak;
-    out.sigma = dens * CLOUD_SIGMA * (0.65 + 0.8 * storm) * mix(0.12, 1.0, firm);
-    out.firm = firm;
-    out.above = (1.0 - h) * reach;
-    out.flat = max(deck_closed, sheet);
-    if detail > 0.0 && grey {
-        // Older, wetter cloud is greyer: patches of it, more in heavy weather.
-        let age = grad_noise2(col.air - vec2<f32>(1409.0, 2203.0), 1400.0);
-        out.grey = (smoothstep(0.42, 0.62, age) * 0.45 + storm * 0.25 + deck_closed * 0.15 + sheet * 0.2) * (0.4 + 0.6 * firm);
-    }
-    return out;
 }
 
 // The clouds' shade on everything under them (sky.rs `shade`, read by
@@ -537,21 +270,18 @@ fn cs_shade(@builtin(global_invocation_id) invocation: vec3<u32>) {
     let dt = fair_len / f32(SHADE_STEPS);
     for (var k = 0; k < SHADE_STEPS; k++) {
         let p = start + d * (dt * (f32(k) + jitter));
-        let w = weather_at(p.xy);
-        if w.x < 0.015 {
-            continue;
-        }
-        tau += cloud_at(p, w, SHADE_DETAIL).sigma * dt;
+        tau += cloud_at(p, SHADE_DETAIL).sigma * dt;
     }
     // Above the fair tops only a storm's towers reach.
     let ds = storm_len / f32(SHADE_STORM_STEPS);
     for (var k = 0; k < SHADE_STORM_STEPS; k++) {
         let p = start + d * (fair_len + ds * (f32(k) + jitter));
-        let w = weather_at(p.xy);
-        if w.x < 0.015 || w.y < 0.02 {
+        let at = column_at(p.xy);
+        let c0 = column_base(at);
+        if c0.w < 0.02 {
             continue;
         }
-        tau += cloud_at(p, w, SHADE_DETAIL).sigma * ds;
+        tau += cloud_shape(p, at, c0, SHADE_DETAIL, false).sigma * ds;
     }
     let lit = exp(-tau);
     let texel = vec2<i32>(id.xy);
@@ -903,15 +633,7 @@ fn march(in: FullOut) -> vec4<f32> {
     // (`fs_resolve`) it converges on the same picture as a quarter did, and a
     // whole-map view through an overcast deck marched in 10 ms, not 12.
     let fine_dt = clamp(t0 * texel_angle, dt * 0.5, dt);
-    storm_reuse = min(t0 * texel_angle * 0.5, 150.0);
     let light_lod = smoothstep(25.0, 45.0, t0 * texel_angle);
-    // The highest a fair-weather top can reach (`cloud_at`: the lowest base,
-    // the tallest lift, the top's lumps). Above it only a storm has cloud, so
-    // the long climb down from storm height to a deck is open air elsewhere.
-    let deck = atmos.layer.y - atmos.layer.x;
-    let tall = atmos.regions.z;
-    let fair_ceiling = atmos.shape.w + (1.0 + TOP_LUMP * 0.5) * (atmos.layer.y + deck * 2.6 * tall)
-        - TOP_LUMP * 0.5 * (atmos.layer.x - 120.0 - 60.0 * tall) + 50.0;
     let jitter = ign(in.clip.xy);
     var t = t0 + dt * jitter;
     var through = 1.0;
@@ -938,15 +660,15 @@ fn march(in: FullOut) -> vec4<f32> {
         // there at the entry's stride.
         let stride = select(dt, max(fine_dt, min(t * texel_angle, dt)), fine > 0);
         let p = eye + rd * t;
-        let w = weather_at(p.xy);
-        // Open sky: nothing more to look up.
-        if w.x < 0.015 || (w.y <= 0.01 && p.z > fair_ceiling) {
+        let at = column_at(p.xy);
+        let c0 = column_base(at);
+        // Open sky, or over or under the column's cloud: nothing more to look up.
+        if c0.y <= 0.0 || p.z <= c0.x || p.z >= c0.x + c0.y * (1.0 + TOP_LUMP * 0.5) {
             fine = max(fine - 1, 0);
             t += stride;
             continue;
         }
-        let col = cloud_column(p, w, detail);
-        var c = cloud_shape(col.p, col, detail, true);
+        var c = cloud_shape(p, at, c0, detail, true);
         if c.sigma > 0.0 && fine == 0 {
             fine = 8;
             t = max(t - dt * 0.75, t0);
@@ -975,12 +697,12 @@ fn march(in: FullOut) -> vec4<f32> {
                 // Not on a deck's or a sheet's flat top, which it turned into
                 // one even fleece from edge to edge.
                 let short = DETAIL_PERIOD * detail * 0.06;
-                tau = cloud_shape(col.p + sun * short, col, detail, false).sigma * short * 2.0 * (1.0 - 0.8 * c.flat);
+                tau = cloud_shape(p + sun * short, at, c0, detail, false).sigma * short * 2.0 * (1.0 - 0.8 * c.flat);
                 var reach = short * 2.0;
                 for (var k = 0; k < 4; k++) {
                     let seg = 70.0 * exp2(f32(k));
                     let q = p + sun * (reach + seg * 0.5);
-                    tau += cloud_at(q, weather_at(q.xy), 0.0).sigma * seg;
+                    tau += cloud_at(q, 0.0).sigma * seg;
                     reach += seg;
                 }
             }
@@ -990,7 +712,7 @@ fn march(in: FullOut) -> vec4<f32> {
                 for (var k = 0; k < 2; k++) {
                     let seg = 210.0 * exp2(f32(k) * 2.0);
                     let q = p + sun * (reach + seg * 0.5);
-                    coarse += cloud_at(q, weather_at(q.xy), 0.0).sigma * seg;
+                    coarse += cloud_at(q, 0.0).sigma * seg;
                     reach += seg;
                 }
                 tau = mix(tau, coarse, light_lod);

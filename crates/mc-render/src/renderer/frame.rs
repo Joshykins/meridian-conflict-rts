@@ -428,6 +428,11 @@ impl Renderer {
         self.timers.end(&device, cmd);
         self.timers.draws(&device, cmd, "clouds.sim");
         self.sky.record_sim(&self.gpu, cmd);
+        self.timers.end(&device, cmd);
+        self.timers.draws(&device, cmd, "clouds.columns");
+        self.sky.record_columns(&self.gpu, cmd, self.scene_set);
+        self.timers.end(&device, cmd);
+        self.timers.draws(&device, cmd, "clouds.shade");
         self.sky
             .record_shade(&self.gpu, cmd, self.scene_set, self.quality.simple_shading);
         self.timers.end(&device, cmd);
@@ -967,9 +972,12 @@ impl Renderer {
             }
             self.timers.end(&device, cmd);
             // The clouds, at half size, stopped by the scene's depth.
-            self.timers.draws(&device, cmd, "clouds.march");
-            self.sky.record_march(&self.gpu, cmd, self.scene_set);
-            self.timers.end(&device, cmd);
+            // Each of its passes timed on its own (`record_march`).
+            self.sky
+                .record_march(&self.gpu, cmd, self.scene_set, |pass| match pass {
+                    Some(name) => self.timers.draws(&device, cmd, name),
+                    None => self.timers.end(&device, cmd),
+                });
             self.timers.draws(&device, cmd, "shafts.march");
             self.shafts.record_march(&self.gpu, cmd, self.scene_set);
             self.timers.end(&device, cmd);

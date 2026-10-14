@@ -777,6 +777,13 @@ shared! {
         pub const FIELD_SCALE: u32 = 4;
     }
 
+    /// The clouds' column map (mc-render sky/columns.rs, cloud_shape.wgsl): what the air
+    /// holds over each spot, baked once a frame.
+    pub mod cloud_columns as "CLOUD_COLUMNS_" {
+        /// Layers of the map over the map and round it; as many again for the air far out.
+        pub const LAYERS: u32 = 5;
+    }
+
     /// What stirs the weather (sky.rs `Disturber`, clouds_sim.wgsl `cs_force`). The wake
     /// and blast kinds are still spelled out on both sides; new ones are declared here.
     pub mod disturber as "DISTURBER_" {
