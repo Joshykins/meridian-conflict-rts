@@ -1,6 +1,6 @@
 (
     version: 1,
-    next_id: 100,
+    next_id: 114,
     units: [
         (
             id: 1,
@@ -902,6 +902,150 @@
             ),
             heading: (16384),
         ),
+        (
+            id: 100,
+            name: "miners_car_1",
+            group: "miners",
+            blueprint: "vela_evacuation_car",
+            owner: 5,
+            at: (
+                x: (420085760),
+                y: (492830720),
+            ),
+            heading: (32768),
+        ),
+        (
+            id: 101,
+            name: "miners_car_2",
+            group: "miners",
+            blueprint: "vela_evacuation_car",
+            owner: 5,
+            at: (
+                x: (421003264),
+                y: (492830720),
+            ),
+            heading: (32768),
+        ),
+        (
+            id: 102,
+            name: "miners_car_3",
+            group: "miners",
+            blueprint: "vela_evacuation_car",
+            owner: 5,
+            at: (
+                x: (421920768),
+                y: (492830720),
+            ),
+            heading: (32768),
+        ),
+        (
+            id: 103,
+            name: "miners_car_4",
+            group: "miners",
+            blueprint: "vela_evacuation_car",
+            owner: 5,
+            at: (
+                x: (422838272),
+                y: (492830720),
+            ),
+            heading: (32768),
+        ),
+        (
+            id: 104,
+            name: "miners_car_5",
+            group: "miners",
+            blueprint: "vela_evacuation_car",
+            owner: 5,
+            at: (
+                x: (423755776),
+                y: (492830720),
+            ),
+            heading: (32768),
+        ),
+        (
+            id: 105,
+            name: "miners_car_6",
+            group: "miners",
+            blueprint: "vela_evacuation_car",
+            owner: 5,
+            at: (
+                x: (424673280),
+                y: (492830720),
+            ),
+            heading: (32768),
+        ),
+        (
+            id: 106,
+            name: "arc_west_transport",
+            group: "arc_west_ship",
+            blueprint: "aster_t3_lift_ship",
+            owner: 3,
+            at: (
+                x: (458752000),
+                y: (517734400),
+            ),
+            heading: (16384),
+        ),
+        (
+            id: 107,
+            name: "arc_warehouse_transport",
+            group: "arc_warehouse_ship",
+            blueprint: "aster_t3_lift_ship",
+            owner: 3,
+            at: (
+                x: (484311040),
+                y: (566886400),
+            ),
+            heading: (16384),
+        ),
+        (
+            id: 110,
+            name: "spaceport_factory",
+            group: "spaceport",
+            blueprint: "aster_t1_land_factory",
+            owner: 1,
+            at: (
+                x: (597688320),
+                y: (437125120),
+            ),
+            heading: (32768),
+        ),
+        (
+            id: 111,
+            name: "spaceport_power_1",
+            group: "spaceport",
+            blueprint: "aster_t1_power",
+            owner: 1,
+            at: (
+                x: (607518720),
+                y: (428605440),
+            ),
+            heading: (0),
+        ),
+        (
+            id: 112,
+            name: "spaceport_power_2",
+            group: "spaceport",
+            blueprint: "aster_t1_power",
+            owner: 1,
+            at: (
+                x: (610795520),
+                y: (428605440),
+            ),
+            heading: (0),
+        ),
+        (
+            id: 113,
+            name: "spaceport_radar",
+            group: "spaceport",
+            blueprint: "aster_t1_radar",
+            owner: 1,
+            at: (
+                x: (602931200),
+                y: (448921600),
+            ),
+            heading: (0),
+        ),
     ],
     regions: [
         (
@@ -1100,6 +1244,22 @@
             at: (
                 x: (598212608),
                 y: (433061888),
+            ),
+        ),
+        (
+            id: 108,
+            name: "arc_west_drop",
+            at: (
+                x: (470548480),
+                y: (516947968),
+            ),
+        ),
+        (
+            id: 109,
+            name: "arc_warehouse_drop",
+            at: (
+                x: (493355008),
+                y: (552337408),
             ),
         ),
     ],

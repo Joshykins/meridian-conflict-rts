@@ -42,14 +42,8 @@ impl Script {
                 ticks,
             }],
         );
-        self.wait(
-            &format!("{line}.end"),
-            Condition::After {
-                event: line.into(),
-                ticks,
-            },
-        )
-        .await;
+        self.wait(&format!("{line}.end"), Condition::DialogueIdle)
+            .await;
     }
     pub(crate) fn finish(self) -> Vec<Event> {
         self.events.borrow().clone()

@@ -16,6 +16,7 @@ enum Tag {
     HealthBelow,
     All,
     Any,
+    DialogueIdle,
 }
 const TAGS: &[&str] = &[
     "Elapsed",
@@ -27,6 +28,7 @@ const TAGS: &[&str] = &[
     "HealthBelow",
     "All",
     "Any",
+    "DialogueIdle",
 ];
 
 impl<'de> Deserialize<'de> for Condition {
@@ -68,6 +70,10 @@ impl<'de> Visitor<'de> for Seed {
     fn visit_enum<A: EnumAccess<'de>>(self, data: A) -> Result<Condition, A::Error> {
         let (tag, v) = data.variant::<Tag>()?;
         Ok(match tag {
+            Tag::DialogueIdle => {
+                v.unit_variant()?;
+                Condition::DialogueIdle
+            }
             Tag::Elapsed => Condition::Elapsed(v.newtype_variant()?),
             Tag::After => {
                 let a: After = v.struct_variant(&["event", "ticks"], Fields(PhantomData))?;

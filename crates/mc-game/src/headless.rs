@@ -108,6 +108,10 @@ pub fn run_sim(
         world.begin_survival(survival).map_err(|e| e.to_string())?;
     }
     let has_mission = mission.is_some();
+    if opts.mission_pilot && mission.as_ref().is_none_or(|m| m.key != "vela_m1") {
+        return Err("--mission-pilot requires the Vela mission map".into());
+    }
+    let mut mission_pilot = mc_missions::Pilot::default();
     if let Some(mission) = mission {
         world.begin_mission(mission).map_err(|e| e.to_string())?;
     }
@@ -143,10 +147,14 @@ pub fn run_sim(
         if let Some(p) = &mut playback {
             p.step(&mut world, t)?;
         } else {
-            let commands = match t {
-                0 => opening.clone(),
-                1 => setup::scene_orders(opts, map, blueprints, &world),
-                _ => setup::late_orders(opts, &world, t),
+            let commands = if opts.mission_pilot {
+                mission_pilot.commands(&world)
+            } else {
+                match t {
+                    0 => opening.clone(),
+                    1 => setup::scene_orders(opts, map, blueprints, &world),
+                    _ => setup::late_orders(opts, &world, t),
+                }
             };
             world.tick(&commands).map_err(|e| e.to_string())?;
         }

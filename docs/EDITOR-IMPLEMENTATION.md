@@ -40,11 +40,17 @@ playable mission, authored and revised through the editor and its API.
 - Real-order route smoke check reaches victory at tick 5347, without teleports
   or forced triggers; encounter pacing and remaining choreography need work.
 
+- Native Company landing screenshot verifies corrected cinematic HUD.
+- Expanded real-order route wins at tick 6150 with all six checkpoints restored.
+- Added warp emergence, civilian evacuation cars, physical allied transport
+  unloading, base structures, queued dialogue waits, radio cues and camera pans.
+- Protected story actors and mission AI settings survive snapshot restoration.
+
 ## Still required before final delivery
 - Component doodads, general destructible/reclaimable props.
 - Ground cover painting, water/climate controls, remaining brushes and resize.
 - Free camera, catalogue/gizmo improvements and reload UI/API.
-- Native review of Company appearance; miners leaving, propaganda, allied transport arrivals,
-  battle balance, complete real-order playthrough and checkpoint recovery.
+- Propaganda components and encounter balance; native review of evacuation,
+  allied arrivals and later mission beats.
 - Full checks, determinism matrix/cross-platform verification, final native
   screenshots, docs reconciliation, and the pull request to dev.

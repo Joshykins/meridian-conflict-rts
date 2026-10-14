@@ -79,7 +79,17 @@ impl Definition {
                         self.placed.units.iter().any(|u| u.name == *unit)
                             && self.placed.points.iter().any(|p| p.name == *point)
                     }
-                    Action::TakeOff(unit) => self.placed.units.iter().any(|u| u.name == *unit),
+                    Action::Ai { player, config } => {
+                        (*player as usize) < players
+                            && config.is_none_or(|c| {
+                                c.domain_weights.iter().all(|w| *w <= 200)
+                                    && (250..=10_000).contains(&c.income)
+                                    && (250..=10_000).contains(&c.build)
+                            })
+                    }
+                    Action::Arrive(unit) | Action::Protect { unit, .. } | Action::TakeOff(unit) => {
+                        self.placed.units.iter().any(|u| u.name == *unit)
+                    }
                     Action::Move {
                         group: name, point, ..
                     } => group(name) && self.placed.points.iter().any(|p| p.name == *point),
@@ -112,7 +122,7 @@ impl Definition {
         }
         let unit = |name: &str| self.placed.units.iter().any(|u| u.name == name);
         let valid = match c {
-            Condition::Elapsed(_) => true,
+            Condition::Elapsed(_) | Condition::DialogueIdle => true,
             Condition::After { event, .. } => events.contains(event.as_str()),
             Condition::Inside { unit: name, region } => {
                 unit(name) && self.placed.regions.iter().any(|r| r.name == *region)
@@ -151,6 +161,7 @@ impl Mission {
             || self.groups.len() > 16384
             || self.objectives.len() > 4096
             || self.dialogue.len() > 4096
+            || self.protected.len() > 16384
         {
             return Err("mission state exceeds its limits".into());
         }
@@ -160,6 +171,30 @@ impl Mission {
             .any(|name| !self.definition.events.iter().any(|e| e.name == *name))
         {
             return Err("unknown fired mission event".into());
+        }
+        if self
+            .units
+            .keys()
+            .any(|name| !self.definition.placed.units.iter().any(|u| u.name == *name))
+            || self.groups.keys().any(|name| {
+                !self
+                    .definition
+                    .placed
+                    .units
+                    .iter()
+                    .any(|u| u.group == *name)
+            })
+            || self
+                .protected
+                .iter()
+                .any(|id| !self.units.values().any(|known| known == id))
+            || self
+                .groups
+                .values()
+                .flatten()
+                .any(|id| !self.units.values().any(|known| known == id))
+        {
+            return Err("unknown mission runtime identity".into());
         }
         if self
             .dialogue

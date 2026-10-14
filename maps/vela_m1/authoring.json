@@ -342,5 +342,165 @@
       8328
     ],
     "heading": 270
+  },
+  {
+    "action": "unit",
+    "name": "miners_car_1",
+    "group": "miners",
+    "blueprint": "vela_evacuation_car",
+    "owner": 5,
+    "at": [
+      6410,
+      7520
+    ],
+    "heading": 180
+  },
+  {
+    "action": "unit",
+    "name": "miners_car_2",
+    "group": "miners",
+    "blueprint": "vela_evacuation_car",
+    "owner": 5,
+    "at": [
+      6424,
+      7520
+    ],
+    "heading": 180
+  },
+  {
+    "action": "unit",
+    "name": "miners_car_3",
+    "group": "miners",
+    "blueprint": "vela_evacuation_car",
+    "owner": 5,
+    "at": [
+      6438,
+      7520
+    ],
+    "heading": 180
+  },
+  {
+    "action": "unit",
+    "name": "miners_car_4",
+    "group": "miners",
+    "blueprint": "vela_evacuation_car",
+    "owner": 5,
+    "at": [
+      6452,
+      7520
+    ],
+    "heading": 180
+  },
+  {
+    "action": "unit",
+    "name": "miners_car_5",
+    "group": "miners",
+    "blueprint": "vela_evacuation_car",
+    "owner": 5,
+    "at": [
+      6466,
+      7520
+    ],
+    "heading": 180
+  },
+  {
+    "action": "unit",
+    "name": "miners_car_6",
+    "group": "miners",
+    "blueprint": "vela_evacuation_car",
+    "owner": 5,
+    "at": [
+      6480,
+      7520
+    ],
+    "heading": 180
+  },
+  {
+    "action": "unit",
+    "name": "arc_west_transport",
+    "group": "arc_west_ship",
+    "blueprint": "aster_t3_lift_ship",
+    "owner": 3,
+    "at": [
+      7000,
+      7900
+    ],
+    "heading": 90
+  },
+  {
+    "action": "unit",
+    "name": "arc_warehouse_transport",
+    "group": "arc_warehouse_ship",
+    "blueprint": "aster_t3_lift_ship",
+    "owner": 3,
+    "at": [
+      7390,
+      8650
+    ],
+    "heading": 90
+  },
+  {
+    "action": "point",
+    "name": "arc_west_drop",
+    "at": [
+      7180,
+      7888
+    ]
+  },
+  {
+    "action": "point",
+    "name": "arc_warehouse_drop",
+    "at": [
+      7528,
+      8428
+    ]
+  },
+  {
+    "action": "unit",
+    "name": "spaceport_factory",
+    "group": "spaceport",
+    "blueprint": "aster_t1_land_factory",
+    "owner": 1,
+    "at": [
+      9120,
+      6670
+    ],
+    "heading": 180
+  },
+  {
+    "action": "unit",
+    "name": "spaceport_power_1",
+    "group": "spaceport",
+    "blueprint": "aster_t1_power",
+    "owner": 1,
+    "at": [
+      9270,
+      6540
+    ],
+    "heading": 0
+  },
+  {
+    "action": "unit",
+    "name": "spaceport_power_2",
+    "group": "spaceport",
+    "blueprint": "aster_t1_power",
+    "owner": 1,
+    "at": [
+      9320,
+      6540
+    ],
+    "heading": 0
+  },
+  {
+    "action": "unit",
+    "name": "spaceport_radar",
+    "group": "spaceport",
+    "blueprint": "aster_t1_radar",
+    "owner": 1,
+    "at": [
+      9200,
+      6850
+    ],
+    "heading": 0
   }
 ]

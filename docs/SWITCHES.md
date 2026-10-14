@@ -120,3 +120,7 @@ Read by the ignored probe tests in mc-sim, never by the game (docs/AI_COMMANDER.
   Requests are bounded to 256 KiB; each edit batch is one undo step.
 
 --editor-apply FILE applies a JSON action array to the --editor map folder through the editor command layer, saves, and exits unless --screenshot is also given.
+
+- `--mission-pilot`: with `--bench` or `--screenshot` on Vela, execute the
+  authoring smoke route using ordinary Company orders. No teleports or forced
+  triggers; does not control normal interactive play.

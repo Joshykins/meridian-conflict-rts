@@ -109,11 +109,7 @@ async fn cold_open(s: &Script) {
                 group: "company".into(),
                 carrier: "bastion_landing".into(),
             },
-            A::Land {
-                unit: "bastion_landing".into(),
-                point: "beach".into(),
-                unload: true,
-            },
+            A::Arrive("bastion_landing".into()),
             spawn("company_bombers"),
             spawn("roadblock"),
             spawn("checkpoints"),
@@ -125,6 +121,10 @@ async fn cold_open(s: &Script) {
             spawn("harbour_defence"),
             spawn("spaceport"),
             spawn("escape_ship"),
+            A::Protect {
+                unit: "mara_bastion".into(),
+                enabled: true,
+            },
             A::Land {
                 unit: "mara_bastion".into(),
                 point: "escape_pad".into(),
@@ -134,6 +134,15 @@ async fn cold_open(s: &Script) {
             camera("landing", 450),
             go("company_bombers", "beach", true),
         ],
+    );
+    s.event(
+        "bastion_touchdown",
+        after("landing", 40),
+        vec![A::Land {
+            unit: "bastion_landing".into(),
+            point: "beach".into(),
+            unload: true,
+        }],
     );
     for line in [
         "m1.open.01",
@@ -230,7 +239,7 @@ async fn miners(s: &Script) {
     s.then(
         "miners_objective",
         C::Elapsed(0),
-        vec![objective("m1.obj.02", O::Complete)],
+        vec![objective("m1.obj.02", O::Complete), spawn("miners")],
     );
     for line in [
         "m1.mine.03",
@@ -248,6 +257,7 @@ async fn miners(s: &Script) {
         vec![
             objective("m1.obj.01", O::Complete),
             objective("m1.obj.03", O::Active),
+            go("miners", "beach", false),
             go("pdf", "square", false),
         ],
     );
@@ -289,6 +299,7 @@ async fn betrayal(s: &Script) {
 }
 
 async fn arc_push(s: &Script) {
+    arrivals(s);
     s.wait("breakout", inside("breakout")).await;
     s.then(
         "arc_arrival",
@@ -299,9 +310,27 @@ async fn arc_push(s: &Script) {
             spawn("arc_air"),
             spawn("arc_west"),
             spawn("arc_warehouses"),
+            spawn("arc_west_ship"),
+            spawn("arc_warehouse_ship"),
+            A::Load {
+                group: "arc_west".into(),
+                carrier: "arc_west_transport".into(),
+            },
+            A::Load {
+                group: "arc_warehouses".into(),
+                carrier: "arc_warehouse_transport".into(),
+            },
+            A::Land {
+                unit: "arc_west_transport".into(),
+                point: "arc_west_drop".into(),
+                unload: true,
+            },
+            A::Land {
+                unit: "arc_warehouse_transport".into(),
+                point: "arc_warehouse_drop".into(),
+                unload: true,
+            },
             go("arc_air", "square", true),
-            go("arc_west", "harbour", true),
-            go("arc_warehouses", "warehouse", true),
             camera("arc_arrival", 70),
         ],
     );
@@ -409,6 +438,7 @@ async fn spaceport(s: &Script) {
             objective("m1.obj.05", O::Complete),
             objective("m1.obj.06", O::Complete),
             A::Checkpoint(6),
+            A::Controls(false),
             camera("dig_site", 600),
         ],
     );
@@ -427,7 +457,11 @@ async fn spaceport(s: &Script) {
     ] {
         s.say(line, 50).await;
     }
-    s.then("contract_complete", C::Elapsed(0), vec![A::Win]);
+    s.then(
+        "contract_complete",
+        C::Elapsed(0),
+        vec![A::Controls(true), A::Win],
+    );
 }
 
 fn holdouts(s: &Script) {
@@ -467,4 +501,36 @@ fn holdouts(s: &Script) {
         ],
     );
     s.event("boxed_in", after("betrayal", 300), vec![say("m1.turn.11")]);
+}
+
+// Ground allies arrive as actual cargo. Their orders begin once the ramps clear.
+fn arrivals(s: &Script) {
+    for (group, ship, carrier, destination) in [
+        ("arc_west", "arc_west_ship", "arc_west_transport", "harbour"),
+        (
+            "arc_warehouses",
+            "arc_warehouse_ship",
+            "arc_warehouse_transport",
+            "warehouse",
+        ),
+    ] {
+        let out = format!("{group}_unloaded");
+        let clear = format!("{group}_ramps_clear");
+        let departed = format!("{group}_departed");
+        s.event(
+            &out,
+            C::All(vec![after("arc_arrival", 0), C::Unloaded(group.into())]),
+            vec![],
+        );
+        s.event(
+            &clear,
+            after(&out, 80),
+            vec![
+                go(group, destination, true),
+                A::TakeOff(carrier.into()),
+                go(ship, "offshore", false),
+            ],
+        );
+        s.event(&departed, after(&clear, 400), vec![A::Despawn(ship.into())]);
+    }
 }

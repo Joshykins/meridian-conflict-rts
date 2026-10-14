@@ -88,10 +88,12 @@ impl Game {
             self.camera.focus.z = self.camera.focus.z.max(sea);
         }
         self.cine.hand_back_apply(&mut self.camera, dt);
-        self.mission.camera(
+        self.mission.update(
             self.view.status.mission.as_ref(),
             &mut self.camera,
             renderer,
+            audio,
+            dt,
         );
         if fresh {
             self.note_events(audio);

@@ -208,6 +208,7 @@ straight into a match instead.
   --opening              with --loading: the run's opening screen instead of a map's
   --standing-down        with --loading: the screen out of a match, back to the front end
   --cursor X,Y           with --ui: where the pointer is, in pixels
+  --mission-pilot       with --bench/--screenshot on Vela: play the authoring smoke route
   --editor MAP           open a map name or .mcmap path in the map editor
   --editor-apply FILE    apply a JSON command array to the map folder and save; optional screenshot
   --smoke                open the front end, play a default skirmish for a few seconds, return
@@ -455,6 +456,7 @@ fn run() -> Result<(), String> {
             "--follow" => follow = value("--follow")?.parse().map_err(|_| "--follow takes a number of ticks")?,
             "--alpha" => alpha = value("--alpha")?.parse::<f32>().map_err(|_| "--alpha takes a number from 0 to 1")?.clamp(0.0, 1.0),
             "--smoke" => smoke = true,
+            "--mission-pilot" => opts.mission_pilot = true,
             "--editor-apply" => editor_actions = Some(value("--editor-apply")?),
             "--editor" => editor_path = Some(args.next().ok_or("--editor needs a map name or path")?),
             "--dump-sounds" => dump_sounds = Some(value("--dump-sounds")?),

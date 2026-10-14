@@ -13,6 +13,7 @@ use crate::{SimError, World};
 use mc_core::{Angle, Fx, FxVec2, FxVec3, TICKS_PER_SECOND};
 use mc_data::{cat, Trajectory, Weapon, MAX_WEAPONS};
 
+mod damage;
 mod step;
 mod targeting;
 
@@ -1076,21 +1077,6 @@ impl World {
             }
             self.state.projectiles.aim[i] = dir;
             self.state.projectiles.vel[i] = dir * speed;
-        }
-    }
-
-    pub(crate) fn damage_unit(&mut self, row: usize, damage: Fx, by: u8, source: UnitId) {
-        let units = &mut self.state.units;
-        if units.health[row] <= Fx::ZERO || units.has_flag(row, flag::INVULNERABLE) {
-            return;
-        }
-        let applied = damage.min(units.health[row]);
-        units.health[row] -= applied;
-        units.flags[row] |= flag::HURT;
-        let killed = units.health[row] <= Fx::ZERO;
-        self.record_damage(row, source, applied);
-        if killed {
-            self.settle_kill(row, source, by);
         }
     }
 

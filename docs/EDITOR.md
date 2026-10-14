@@ -72,7 +72,8 @@ queues, control state and camera cues are in the simulation snapshot and hash.
 
 Each checkpoint stores the entire world at its tick boundary. A local session
 restores that snapshot before releasing its next tick. Saves bind to the terrain
-content ID and blueprint hash. Incompatible saves produce a menu notice.
+content ID, blueprint hash and authored mission program hash. Separate mission
+keys have separate save folders even when their terrain is identical. Incompatible saves produce a menu notice.
 Completed progress is stored separately from checkpoint snapshots.
 
 Dialogue text is presentation data keyed by stable IDs. Mission actions never
@@ -94,7 +95,10 @@ Run the real-order route check with:
 
 It requires the baked Vela terrain and issues ordinary player movement/attack
 orders, without forcing triggers or changing unit state. The first route completed
-at tick 5347. This is a smoke check; full encounter balance, miners and allied
-transport choreography are still being developed. Component prop editing, the remaining terrain
+at tick 5347 before the next choreography pass. The expanded route includes
+civilian evacuation cars, physical ARC cargo drops, queued comms and checkpoint
+recovery. Add --resume to restore every checkpoint into a fresh world during the
+route. Use --mission-pilot with a headless screenshot to inspect later beats.
+Full encounter balance and visual review remain in progress. Component prop editing, the remaining terrain
 and paint tools, resizing, free camera and reload controls are tracked in
 EDITOR-IMPLEMENTATION.md and are not yet available in this slice.

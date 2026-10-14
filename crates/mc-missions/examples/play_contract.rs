@@ -1,6 +1,5 @@
 //! Real-order smoke playthrough. Requires scripts/vela.sh; never edits world state.
-use mc_core::Fx;
-use mc_sim::{Command, MatchConfig, PlayerCommand, PlayerSetup, World};
+use mc_sim::{MatchConfig, PlayerSetup, World};
 use std::{collections::BTreeSet, path::Path, sync::Arc};
 fn main() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -28,13 +27,28 @@ fn main() {
             })
             .collect(),
     };
-    let mut world = World::new(&map, bp, Arc::new(mc_jobs::Pool::new(0)), &cfg).unwrap();
+    let mut world = World::new(&map, bp.clone(), Arc::new(mc_jobs::Pool::new(0)), &cfg).unwrap();
     world
         .begin_mission(mc_missions::definition(placed))
         .unwrap();
     let mut seen = BTreeSet::new();
-    let mut target = String::new();
+    let mut pilot = mc_missions::Pilot::default();
+    let mut restored_beat = 0;
+    let resume = std::env::args().any(|a| a == "--resume");
     for tick in 0..30000 {
+        let beat = world.mission_status().unwrap().beat;
+        if resume && beat > restored_beat {
+            let hash = world.hash();
+            let mut fresh =
+                World::new(&map, bp.clone(), Arc::new(mc_jobs::Pool::new(0)), &cfg).unwrap();
+            fresh
+                .restore(mc_map::Heightfield::load(&map).unwrap(), &world.snapshot())
+                .unwrap();
+            assert_eq!(hash, fresh.hash());
+            world = fresh;
+            restored_beat = beat;
+            println!("Restored checkpoint {beat} at tick {tick}");
+        }
         let m = world.state.mission.as_ref().unwrap();
         for (event, at) in &m.fired {
             if seen.insert(event.clone()) && !event.starts_with("line_") {
@@ -46,75 +60,13 @@ fn main() {
             assert!(win);
             return;
         }
-        let next = route(m);
-        let mut commands = Vec::new();
-        if m.controls && (next != target || tick % 200 == 0) {
-            target = next.into();
-            let region = m
-                .definition
-                .placed
-                .regions
-                .iter()
-                .find(|r| r.name == next)
-                .unwrap();
-            let mut at = (region.min + region.max) * Fx::HALF;
-            if next == "ridge" && m.fired.contains_key("ridge") {
-                let guns = m
-                    .definition
-                    .placed
-                    .units
-                    .iter()
-                    .filter(|u| u.group == "bridge_guns")
-                    .collect::<Vec<_>>();
-                if let Some(gun) = guns.first() {
-                    at = gun.at;
-                }
-            }
-            let ids = m.groups["company"]
-                .iter()
-                .copied()
-                .filter(|id| world.state.units.row(*id).is_some())
-                .collect();
-            commands.push(PlayerCommand {
-                player: 0,
-                command: Command::AttackMove {
-                    units: ids,
-                    target: at,
-                    queue: false,
-                },
-            });
-            if tick % 1000 == 0 {
-                let row = world.state.units.row(m.units["merrick"]).unwrap();
-                println!(
-                    "tick {tick} -> {next}, Merrick {:?}, health {:?}",
-                    world.state.units.pos[row], world.state.units.health[row]
-                );
-            }
-        }
+        let commands = pilot.commands(&world);
         world.tick(&commands).unwrap();
     }
     let m = world.state.mission.as_ref().unwrap();
     let row = world.state.units.row(m.units["merrick"]).unwrap();
     panic!(
-        "Mission stuck at {target}: {:?}; events {:?}",
+        "Mission stuck at {:?}; events {:?}",
         world.state.units.pos[row], m.fired
     );
-}
-fn route(m: &mc_sim::mission::Mission) -> &'static str {
-    for (event, region) in [
-        ("roadblock_clear", "first_contact"),
-        ("pdf_linkup", "junction"),
-        ("bridge_clear", "ridge"),
-        ("miners_freed", "camp"),
-        ("betrayal", "square"),
-        ("breakout", "breakout"),
-        ("holdouts_rescued", "warehouse"),
-        ("flank", "harbour"),
-        ("base_destroyed", "spaceport"),
-    ] {
-        if !m.fired.contains_key(event) {
-            return region;
-        }
-    }
-    "spaceport"
 }

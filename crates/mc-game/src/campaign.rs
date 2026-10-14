@@ -73,7 +73,16 @@ struct Text {
 pub(crate) struct Presentation {
     strings: BTreeMap<String, Text>,
     camera: Option<u32>,
+    pan: Option<Pan>,
+    line: Option<String>,
     error: Option<String>,
+}
+
+struct Pan {
+    focus: glam::Vec3,
+    distance: f32,
+    yaw: f32,
+    elapsed: f32,
 }
 
 impl Presentation {
@@ -102,21 +111,50 @@ impl Presentation {
         result
     }
 
-    pub(crate) fn camera(
+    pub(crate) fn update(
         &mut self,
         status: Option<&Status>,
         camera: &mut mc_render::Camera,
         renderer: &mc_render::Renderer,
+        audio: &crate::audio::Audio,
+        dt: f32,
     ) {
-        if let Some((target, start, _)) = status.and_then(|s| s.camera.as_ref()) {
-            // A camera cue frames a scene once; the player can immediately take control.
-            if self.camera != Some(*start) {
-                let at = glam::Vec2::from(target.at.to_f32());
-                camera.focus = at.extend(renderer.ground_height(at));
-                camera.distance = target.distance as f32;
-                camera.yaw = target.yaw.to_radians_f32();
-                self.camera = Some(*start);
+        let line = status.and_then(|s| s.line.as_ref());
+        if self.line.as_ref() != line {
+            self.line = line.cloned();
+            if line.is_some() {
+                audio.play(crate::audio::Sfx::Radio);
             }
+        }
+        let Some(status) = status else { return };
+        if let Some((target, start, _)) = &status.camera {
+            if self.camera != Some(*start) {
+                self.camera = Some(*start);
+                self.pan = Some(Pan {
+                    focus: camera.focus,
+                    distance: camera.distance,
+                    yaw: camera.yaw,
+                    elapsed: 0.0,
+                });
+            }
+            if let Some(pan) = &mut self.pan {
+                pan.elapsed += dt;
+                let t = (pan.elapsed / 1.4).clamp(0.0, 1.0);
+                let ease = t * t * (3.0 - 2.0 * t);
+                let at = glam::Vec2::from(target.at.to_f32());
+                camera.focus = pan.focus.lerp(at.extend(renderer.ground_height(at)), ease);
+                camera.distance = pan.distance + (target.distance as f32 - pan.distance) * ease;
+                let yaw = target.yaw.to_radians_f32();
+                let delta = (yaw - pan.yaw + std::f32::consts::PI)
+                    .rem_euclid(std::f32::consts::TAU)
+                    - std::f32::consts::PI;
+                camera.yaw = pan.yaw + delta * ease;
+                if t >= 1.0 {
+                    self.pan = None;
+                }
+            }
+        } else {
+            self.pan = None;
         }
     }
 

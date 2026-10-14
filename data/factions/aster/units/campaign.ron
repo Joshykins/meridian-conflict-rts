@@ -147,4 +147,14 @@
  mission_only: true, skin: Some("company"), mesh: "lift_ship", icon: Transport,
  sounds: (death: "blast_large", moving: "aster_lift_ship"),
 ),
+
+    (
+        key: "vela_evacuation_car", name: "Miners' evacuation car",
+        role: "Freed civilian passengers", tech: 1, categories: ["Land"],
+        health: 200, cost: (materials: 1, energy: 1, time: 1),
+        radius: 2.6, height: 1.6, vision: 180,
+        motion: (layer: Land, size: 0, speed: 24, accel: 18, turn: 150),
+        mission_only: true, mesh: "city_car", icon: Scout,
+        sounds: (moving: "wheels"),
+    ),
 ]

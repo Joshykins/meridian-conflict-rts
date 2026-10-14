@@ -136,6 +136,8 @@ impl Scene {
 
 #[derive(Clone)]
 pub struct Options {
+    /// Headless Vela authoring validation, issuing ordinary player orders.
+    pub mission_pilot: bool,
     pub map: PathBuf,
     pub scene: Scene,
     pub players: usize,
@@ -187,6 +189,7 @@ impl Options {
 impl Default for Options {
     fn default() -> Options {
         Options {
+            mission_pilot: false,
             map: PathBuf::new(),
             scene: Scene::Skirmish,
             players: 2,

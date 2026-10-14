@@ -82,14 +82,56 @@ fn world(threads: usize) -> World {
         fog: true,
         spawn_commanders: false,
     };
-    World::with_terrain(
+    let mut world = World::with_terrain(
         terrain(),
         map,
         Arc::new(blueprints),
         Arc::new(Pool::new(threads)),
         &config,
     )
-    .unwrap()
+    .unwrap();
+    use mc_sim::mission::{Action, Condition, Definition, Event, Objective};
+    world
+        .begin_mission(Definition {
+            key: "determinism_mission".into(),
+            placed: Default::default(),
+            events: vec![
+                Event {
+                    name: "opening".into(),
+                    when: Condition::Elapsed(0),
+                    actions: vec![
+                        Action::Say {
+                            line: "matrix.comms".into(),
+                            ticks: 400,
+                        },
+                        Action::Objective {
+                            line: "matrix.objective".into(),
+                            status: Objective::Active,
+                        },
+                        Action::Checkpoint(1),
+                    ],
+                },
+                Event {
+                    name: "after_snapshot".into(),
+                    when: Condition::All(vec![
+                        Condition::After {
+                            event: "opening".into(),
+                            ticks: 400,
+                        },
+                        Condition::DialogueIdle,
+                    ]),
+                    actions: vec![
+                        Action::Objective {
+                            line: "matrix.objective".into(),
+                            status: Objective::Complete,
+                        },
+                        Action::Checkpoint(2),
+                    ],
+                },
+            ],
+        })
+        .unwrap();
+    world
 }
 
 /// City blocks (`city.rs`): houses round where the warhead lands, which it brings

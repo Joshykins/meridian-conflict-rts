@@ -23,10 +23,12 @@ pub enum Sfx {
     Order,
     Victory,
     Defeat,
+    /// Short band-limited radio squelch at the start of a mission line.
+    Radio,
 }
 
 impl Sfx {
-    pub const ALL: [Sfx; 11] = [
+    pub const ALL: [Sfx; 12] = [
         Sfx::Hover,
         Sfx::Select,
         Sfx::Back,
@@ -38,6 +40,7 @@ impl Sfx {
         Sfx::Order,
         Sfx::Victory,
         Sfx::Defeat,
+        Sfx::Radio,
     ];
 
     pub fn name(self) -> &'static str {
@@ -53,6 +56,7 @@ impl Sfx {
             Sfx::Order => "order",
             Sfx::Victory => "victory",
             Sfx::Defeat => "defeat",
+            Sfx::Radio => "radio",
         }
     }
 }
@@ -61,6 +65,7 @@ impl Sfx {
 /// from filtered noise, and the same short room on everything.
 pub fn interface(sfx: Sfx, rate: u32) -> Vec<[f32; 2]> {
     match sfx {
+        Sfx::Radio => radio(rate),
         Sfx::Hover => {
             // Heard constantly, so it is the quietest sound in the set: a soft,
             // low tap with a slow attack, nothing bright in it and no noise.
@@ -208,4 +213,12 @@ pub fn interface(sfx: Sfx, rate: u32) -> Vec<[f32; 2]> {
             b.finish(0.55)
         }
     }
+}
+
+fn radio(rate: u32) -> Vec<[f32; 2]> {
+    let mut b = Buf::new(rate, 0.24);
+    b.hiss(0.0, 1700.0, 2.0, 0.006, 0.055, 0.45, 0.0, 107);
+    b.hiss(0.07, 1100.0, 2.0, 0.003, 0.025, 0.22, 0.0, 113);
+    b.tone(0.016, 1250.0, 1170.0, 0.022, 0.004, 0.020, 0.08, 0.0);
+    b.finish(0.13)
 }

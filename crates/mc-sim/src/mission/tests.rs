@@ -193,3 +193,90 @@ fn bad_references_do_not_start_a_partial_mission() {
     assert!(w.state.mission.is_none());
     assert_eq!(w.state.units.slots.iter().count(), 0);
 }
+
+#[test]
+fn queued_comms_finish_before_story_continues_after_restore() {
+    let mut w = world(0);
+    let mut d = definition();
+    d.events[0].actions.push(Action::Say {
+        line: "interruption".into(),
+        ticks: 50,
+    });
+    d.events.push(Event {
+        name: "comms_done".into(),
+        when: Condition::All(vec![
+            Condition::After {
+                event: "opening".into(),
+                ticks: 0,
+            },
+            Condition::DialogueIdle,
+        ]),
+        actions: vec![Action::Checkpoint(9)],
+    });
+    w.begin_mission(d).unwrap();
+    for _ in 0..40 {
+        w.tick(&[]).unwrap();
+    }
+    assert_eq!(
+        w.mission_status().unwrap().line.as_deref(),
+        Some("interruption")
+    );
+    let mut restored = world(0);
+    restored.restore(terrain(), &w.snapshot()).unwrap();
+    for _ in 40..80 {
+        assert!(!w
+            .state
+            .mission
+            .as_ref()
+            .unwrap()
+            .fired
+            .contains_key("comms_done"));
+        assert_eq!(w.tick(&[]).unwrap(), restored.tick(&[]).unwrap());
+    }
+    w.tick(&[]).unwrap();
+    restored.tick(&[]).unwrap();
+    assert_eq!(w.hash(), restored.hash());
+    assert!(w
+        .state
+        .mission
+        .as_ref()
+        .unwrap()
+        .fired
+        .contains_key("comms_done"));
+}
+
+#[test]
+fn protected_story_actor_and_ai_settings_survive_a_checkpoint() {
+    let mut w = world(0);
+    let mut d = definition();
+    let ai = crate::AiConfig {
+        difficulty: crate::Difficulty::Easy,
+        ..Default::default()
+    };
+    d.events[0].actions.extend([
+        Action::Protect {
+            unit: "hero".into(),
+            enabled: true,
+        },
+        Action::Ai {
+            player: 1,
+            config: Some(ai),
+        },
+    ]);
+    w.begin_mission(d).unwrap();
+    let id = w.state.mission.as_ref().unwrap().units["hero"];
+    let row = w.state.units.row(id).unwrap();
+    let health = w.state.units.health[row];
+    w.damage_unit(row, Fx::from_int(100_000), 1, UnitId::NONE);
+    assert_eq!(w.state.units.health[row], health);
+    let mut restored = world(0);
+    restored.restore(terrain(), &w.snapshot()).unwrap();
+    assert_eq!(w.hash(), restored.hash());
+    assert_eq!(restored.state.ai[1].config, ai);
+    assert_eq!(restored.state.players[1].controller, Controller::Ai);
+    restored.damage_unit(row, Fx::from_int(100_000), 1, UnitId::NONE);
+    assert_eq!(restored.state.units.health[row], health);
+    restored.state.mission.as_mut().unwrap().protected.clear();
+    restored.damage_unit(row, Fx::from_int(100_000), 1, UnitId::NONE);
+    assert_eq!(restored.state.units.health[row], Fx::ZERO);
+}

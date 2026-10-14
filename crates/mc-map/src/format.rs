@@ -48,7 +48,7 @@
 //! 216  u64      streets offset, 0 when the map has no streets layer
 //! 224  u64      decks offset, 0 when the map has no decks
 //! 232  u32      deck count
-//! 236           reserved, zero
+//! 236           prop tint offset u64 (0 = absent), then reserved zero bytes
 //! ```
 //!
 //! The snow layer came after version 2 was fixed, in bytes that were reserved

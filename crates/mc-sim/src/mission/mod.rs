@@ -1,5 +1,6 @@
 //! Deterministic mission events. Conditions, pending dialogue and fired events
 //! are ordinary snapshot state; presentation never controls a simulation wait.
+mod actions;
 mod decode;
 mod validate;
 use crate::{Command, SimError, UnitId, World};
@@ -25,14 +26,25 @@ pub struct Event {
 #[derive(Clone, Debug, Serialize)]
 pub enum Condition {
     Elapsed(u32),
-    After { event: String, ticks: u32 },
-    Inside { unit: String, region: String },
+    After {
+        event: String,
+        ticks: u32,
+    },
+    Inside {
+        unit: String,
+        region: String,
+    },
     DeadGroup(String),
     Unloaded(String),
     DeadUnit(String),
-    HealthBelow { unit: String, percent: u8 },
+    HealthBelow {
+        unit: String,
+        percent: u8,
+    },
     All(Vec<Condition>),
     Any(Vec<Condition>),
+    /// All queued comms have finished in simulation time.
+    DialogueIdle,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -74,6 +86,15 @@ pub enum Action {
     Checkpoint(u16),
     Win,
     Lose,
+    Arrive(String),
+    Protect {
+        unit: String,
+        enabled: bool,
+    },
+    Ai {
+        player: u8,
+        config: Option<crate::AiConfig>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -104,6 +125,7 @@ pub struct Mission {
     pub checkpoint: u32,
     pub outcome: Option<bool>,
     pub controls: bool,
+    pub protected: std::collections::BTreeSet<UnitId>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -128,6 +150,7 @@ impl Mission {
     fn ready(&self, condition: &Condition, world: &World) -> bool {
         let tick = world.state.tick;
         match condition {
+            Condition::DialogueIdle => self.dialogue.is_empty(),
             Condition::Elapsed(n) => tick.saturating_sub(self.began) >= *n,
             Condition::After { event, ticks } => self
                 .fired
@@ -229,30 +252,30 @@ impl Mission {
     fn act(&mut self, action: &Action, world: &mut World) -> Result<(), SimError> {
         let tick = world.state.tick;
         match action {
-            Action::Spawn(group) => {
-                if self.groups.contains_key(group) {
-                    return Err(SimError::Setup(format!(
-                        "mission group {group} was spawned twice"
-                    )));
+            Action::Arrive(unit) => self.arrive(unit, world)?,
+            Action::Protect { unit, enabled } => {
+                let row = self.live_row(unit, world)?;
+                let id = world.state.units.id(row);
+                if *enabled {
+                    self.protected.insert(id);
+                } else {
+                    self.protected.remove(&id);
                 }
-                let mut ids = vec![];
-                for u in self
-                    .definition
-                    .placed
-                    .units
-                    .iter()
-                    .filter(|u| u.group == *group)
-                {
-                    let bp = world.blueprints.id_of(&u.blueprint).ok_or_else(|| {
-                        SimError::Setup(format!("missing mission blueprint {}", u.blueprint))
-                    })?;
-                    let row = world.spawn_unit(bp, u.owner, u.at, u.heading, true)?;
-                    let id = world.state.units.slots.handle(row);
-                    self.units.insert(u.name.clone(), id);
-                    ids.push(id);
-                }
-                self.groups.insert(group.clone(), ids);
             }
+            Action::Ai { player, config } => {
+                let seat = *player as usize;
+                world.state.players[seat].controller = if config.is_some() {
+                    crate::tables::Controller::Ai
+                } else {
+                    crate::tables::Controller::Human
+                };
+                if let Some(config) = config {
+                    world.state.ai[seat].config = *config;
+                    world.state.players[seat].income_permille = [config.income; 2];
+                    world.state.players[seat].build_permille = config.build;
+                }
+            }
+            Action::Spawn(group) => self.spawn(group, world)?,
             Action::Load { group, carrier } => self.load_cargo(group, carrier, world)?,
             Action::Land {
                 unit,
@@ -300,42 +323,7 @@ impl Mission {
                 group,
                 point,
                 attack,
-            } => {
-                let pos = self
-                    .definition
-                    .placed
-                    .points
-                    .iter()
-                    .find(|p| p.name == *point)
-                    .ok_or_else(|| SimError::Setup(format!("missing mission point {point}")))?
-                    .at;
-                let ids = self.groups.get(group).cloned().unwrap_or_default();
-                let mut by_owner: BTreeMap<u8, Vec<UnitId>> = BTreeMap::new();
-                for id in ids {
-                    if let Some(row) = world.state.units.row(id) {
-                        by_owner
-                            .entry(world.state.units.owner[row])
-                            .or_default()
-                            .push(id);
-                    }
-                }
-                for (owner, units) in by_owner {
-                    let command = if *attack {
-                        Command::AttackMove {
-                            units,
-                            target: pos,
-                            queue: false,
-                        }
-                    } else {
-                        Command::Move {
-                            units,
-                            target: pos,
-                            queue: false,
-                        }
-                    };
-                    world.apply_as(owner, &command)?;
-                }
-            }
+            } => self.move_group(group, point, *attack, world)?,
             Action::Team { player, team } => {
                 world.state.players[*player as usize].team = *team;
                 crate::tables::derive_allies(&mut world.state.players);
@@ -397,6 +385,7 @@ impl World {
             checkpoint: 0,
             outcome: None,
             controls: true,
+            protected: Default::default(),
         });
         self.run_mission()
     }
