@@ -1,5 +1,7 @@
 //! The Contract: a complete route from the beach to the Calder spaceport.
 use crate::script::Script;
+#[path = "vela_propaganda.rs"]
+mod propaganda;
 use mc_map::placed::Placed;
 use mc_sim::mission::{Action as A, Condition as C, Definition, Objective as O};
 use std::future::Future;
@@ -59,7 +61,10 @@ pub fn definition(placed: Placed) -> Definition {
     Definition {
         key: "vela_m1".into(),
         placed,
-        events: script.finish(),
+        events: {
+            propaganda::events(&script);
+            script.finish()
+        },
     }
 }
 

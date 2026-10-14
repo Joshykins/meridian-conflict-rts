@@ -20,6 +20,7 @@ enum Tag {
     DialogueIdle = 9,
     AliveGroup = 10,
     Objective = 11,
+    PropDead = 12,
 }
 const TAGS: &[&str] = &[
     "Elapsed",
@@ -34,6 +35,7 @@ const TAGS: &[&str] = &[
     "DialogueIdle",
     "AliveGroup",
     "Objective",
+    "PropDead",
 ];
 
 impl<'de> Deserialize<'de> for Condition {
@@ -110,6 +112,7 @@ impl<'de> Visitor<'de> for Seed {
             }
             Tag::DeadGroup => Condition::DeadGroup(v.newtype_variant()?),
             Tag::Unloaded => Condition::Unloaded(v.newtype_variant()?),
+            Tag::PropDead => Condition::PropDead(v.newtype_variant()?),
             Tag::DeadUnit => Condition::DeadUnit(v.newtype_variant()?),
             Tag::HealthBelow => {
                 let a: Health = v.struct_variant(&["unit", "percent"], Fields(PhantomData))?;

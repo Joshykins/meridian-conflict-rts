@@ -128,6 +128,11 @@ impl Definition {
                 unit(name) && self.placed.regions.iter().any(|r| r.name == *region)
             }
             Condition::DeadUnit(name) => unit(name),
+            Condition::PropDead(name) => self
+                .placed
+                .doodads
+                .iter()
+                .any(|d| d.name == *name && d.health > 0),
             Condition::HealthBelow {
                 unit: name,
                 percent,

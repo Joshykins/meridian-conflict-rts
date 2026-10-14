@@ -41,7 +41,7 @@ at match start; missions stage their named groups through the mission program.
 ## File layout
 
 A map folder contains terrain.mcmap, map.ron, placed.ron, and optional
-strings.en.ron. The map configuration stores its mission key and player slots. Terrain remains the existing lossless baked
+strings/en.ron. The map configuration stores its mission key and player slots. Terrain remains the existing lossless baked
 format. Placement metadata is versioned, validated and captured when a map opens.
 Loaded maps retain those placements even if the source sidecar is edited later.
 Map identity includes canonical placement values; empty authoring keeps legacy
@@ -246,27 +246,34 @@ read floating-point camera or UI data back into the simulation. A Rust script
 change requires rebuilding and relaunching; reopening the map retains its saved
 authored content.
 
-## Implementation status
+## Verification and iteration
 
-The editor shell, height editing, named placement, undo, atomic save/export,
-playtest return, API/MCP, mission runtime, checkpoint storage and Vela route
-definition are implemented. Optional RGB prop tints survive save/reopen and render
-without changing legacy map hashes. Mission-only Company variants have a separate
-skin and remain outside skirmish production lists.
+The editor supports editable terrain and layers, component doodads, stable object
+IDs, transform handles, slots, map bounds, reloads and repeated Test/Stop.
+The Contract is a complete playable mission with six beat-boundary checkpoints.
 
-Run the real-order route check with:
+Run the ordinary-order route check after baking:
 
-    cargo run --profile gate -p mc-missions --example play_contract
+    scripts/vela.sh
+    cargo run --profile gate -p mc-missions --example play_contract -- --resume
 
-It requires the baked Vela terrain and issues ordinary player movement/attack
-orders, without forcing triggers or changing unit state. The first route completed
-at tick 5347 before the next choreography pass. The expanded route includes
-civilian evacuation cars, physical ARC cargo drops, queued comms and checkpoint
-recovery. Add --resume to restore every checkpoint into a fresh world during the
-route. Use --mission-pilot with a headless screenshot to inspect later beats.
-Full encounter balance and visual review remain in progress. Reclaim collection,
-resizing and remaining gizmos are tracked in
-EDITOR-IMPLEMENTATION.md and are not yet available in this slice.
+The bake stages a fresh base map and applies the complete tracked authoring
+recipe through the same commands as the editor before publishing the folder.
+Use --output artifacts/vela-check for an independent bake. After editor changes,
+update authoring.json and map-local stamps so a clean checkout reproduces them;
+terrain.mcmap is intentionally not tracked.
+
+The route pilot issues ordinary movement and attack orders, without forcing
+triggers or teleporting units. The current route wins in about ten minutes of
+simulation time; this is a fast regression route, not a measured newcomer
+playtime or a substitute for player balance feedback. Native captures cover the
+landing, evacuation, ARC intervention and quarry ending.
+
+Propaganda doodads use named PropDead conditions. Their reactions are optional
+dialogue only, with no objectives, rewards, tallies or campaign consequences.
+Vask's reactions wait for ARC arrival; Mara's wait for the betrayal. Localized
+prop captions use prop.<doodad-name> entries in strings/en.ron, respect fog and
+disappear when destroyed.
 
 Offscreen editors also support {"op":"test"} and {"op":"stop"}. While
 testing, state.playtest reports tick, units, beams, dead/reclaimed props and player

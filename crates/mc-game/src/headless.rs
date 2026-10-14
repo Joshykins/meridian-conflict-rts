@@ -1112,6 +1112,7 @@ pub fn screenshot(
         };
         // The report, like the in-match menu, has the pointer to itself.
         ui.interactive = report.is_none();
+        mission_presentation.signs(&mut ui, &map, &camera, &renderer, &view.frame);
         hud.draw(&mut ui, &scene, 0.016);
         mission_presentation.draw(&mut ui, view.status.mission.as_ref());
         crate::hud::cursor_hint(&mut ui, &view, &world.blueprints, &[]);

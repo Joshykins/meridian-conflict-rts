@@ -1,5 +1,6 @@
 //! Mission assets, startup and presentation. Simulation only sees stable text IDs.
 mod camera;
+mod signs;
 use crate::ui::{palette, rgb, type_scale, Rect, Ui};
 use camera::Pan;
 use mc_sim::{
@@ -58,7 +59,7 @@ pub(crate) struct Presentation {
 impl Presentation {
     pub(crate) fn load(map: &mc_map::MapFile) -> Self {
         let mut result = Self::default();
-        let path = map.path().with_file_name("strings.en.ron");
+        let path = map.path().with_file_name("strings").join("en.ron");
         if !path.exists() {
             return result;
         }

@@ -11,17 +11,24 @@ fn terrain() -> Heightfield {
     Heightfield::from_samples(256, 256, vec![20; 257 * 257], Fx::ZERO, Fx::ONE, Fx::ZERO)
 }
 fn world(workers: usize) -> World {
+    world_props(workers, vec![], vec![])
+}
+fn world_props(
+    workers: usize,
+    props: Vec<mc_map::Prop>,
+    doodads: Vec<mc_map::placed::Doodad>,
+) -> World {
     let bp = mc_data::Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"))
         .unwrap();
     World::with_terrain(
         terrain(),
         MapData {
-            doodads: Default::default(),
+            doodads: doodads.into_iter().map(|d| (d.prop_index, d)).collect(),
             name: "mission test".into(),
             content_id: 1,
             ore: vec![],
             starts: vec![],
-            props: vec![],
+            props,
         },
         Arc::new(bp),
         Arc::new(mc_jobs::Pool::new(workers)),
@@ -283,3 +290,4 @@ fn protected_story_actor_and_ai_settings_survive_a_checkpoint() {
 }
 
 mod outcomes;
+mod propaganda;

@@ -144,7 +144,7 @@ impl Editor {
             frame: Default::default(),
             fresh: true,
             tool: 0,
-            tool_group: 0,
+            tool_group: 2,
             stroke: Default::default(),
             gizmo: Default::default(),
             paint: Default::default(),

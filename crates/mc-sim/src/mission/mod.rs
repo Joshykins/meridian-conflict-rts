@@ -51,6 +51,7 @@ pub enum Condition {
         line: String,
         status: Objective,
     } = 11,
+    PropDead(String) = 12,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -159,6 +160,20 @@ impl Mission {
         let tick = world.state.tick;
         match condition {
             Condition::DialogueIdle => self.dialogue.is_empty(),
+            Condition::PropDead(name) => self
+                .definition
+                .placed
+                .doodads
+                .iter()
+                .find(|d| d.name == *name)
+                .is_some_and(|d| {
+                    let p = d.prop_index as usize;
+                    world
+                        .state
+                        .props_dead
+                        .get(p / 64)
+                        .is_some_and(|bits| bits & (1 << (p % 64)) != 0)
+                }),
             Condition::Objective { line, status } => self.objectives.get(line) == Some(status),
             Condition::AliveGroup(name) => self.groups.get(name).is_some_and(|ids| {
                 ids.iter().any(|id| {

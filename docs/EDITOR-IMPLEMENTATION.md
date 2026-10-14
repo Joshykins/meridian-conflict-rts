@@ -154,7 +154,20 @@ playable mission, authored and revised through the editor and its API.
   preserve components and reject invalid batches atomically. Native handle and
   transformed-object screenshots plus exact Undo/Save baseline verification pass.
 
+- Added 13 destructible propaganda boards with optional, gated dialogue and
+  localized captions; destruction state and one-shot reactions survive snapshots.
+- Authored a fenced, lit quarry excavation through the editor and corrected the
+  ending camera. The complete 176-object recipe includes the original route
+  terrain refinement and excavation stamps. An independent fresh bake matches
+  terrain identity 2e161c07b4a1e672, placements and map settings.
+- The ordinary-order route wins at tick 6182 and restores all six checkpoints.
+  Collateral combat triggers two optional propaganda reactions. Newcomer pacing
+  and encounter balance still need player feedback; this is a regression pilot.
+- Full gate passes in 125 seconds, including 867 simulation integration tests.
+
+- Final Windows/Linux matrix hashes match with prop-death triggers:
+  every-domain 9009efe2c42c3ec2, commander AI b914c756d95136a4.
+
 ## Still required before final delivery
-- Propaganda components and encounter balance; human playtest and cinematic review.
 - Full checks, determinism matrix/cross-platform verification, final native
   screenshots, docs reconciliation, and the pull request to dev.

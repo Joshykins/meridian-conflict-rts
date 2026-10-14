@@ -423,6 +423,8 @@ impl Game {
             camera: &shaken,
             renderer,
         };
+        self.mission
+            .signs(&mut ui, &self.map, &shaken, renderer, &self.view.frame);
         // Marks on the ground grow with the side (every plan's lot, every order's line):
         // half the overlay is kept back for the HUD after them, so a big base cannot
         // crowd the panels off the screen.

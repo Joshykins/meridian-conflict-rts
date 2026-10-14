@@ -8,10 +8,21 @@ fn the_contract_has_resolved_references_and_all_dialogue() {
     let program = crate::definition(placed);
     let bp = mc_data::Blueprints::load(&root.join("data")).unwrap();
     program
-        .validate(&bp, 6, FxVec2::from_ints(12288, 12288), 0)
+        .validate(
+            &bp,
+            6,
+            FxVec2::from_ints(12288, 12288),
+            program
+                .placed
+                .doodads
+                .iter()
+                .map(|d| d.prop_index as usize + 1)
+                .max()
+                .unwrap_or(0),
+        )
         .unwrap();
     let strings: BTreeMap<String, Text> =
-        ron::from_str(include_str!("../../../maps/vela_m1/strings.en.ron")).unwrap();
+        ron::from_str(include_str!("../../../maps/vela_m1/strings/en.ron")).unwrap();
     let mut checkpoints = vec![];
     for event in &program.events {
         for action in &event.actions {

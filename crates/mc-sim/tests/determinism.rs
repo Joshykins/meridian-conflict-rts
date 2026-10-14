@@ -139,7 +139,11 @@ fn world(threads: usize) -> World {
     world
         .begin_mission(Definition {
             key: "determinism_mission".into(),
-            placed: Default::default(),
+            placed: mc_map::placed::Placed {
+                next_id: 3,
+                doodads: world.map.doodads.values().cloned().collect(),
+                ..Default::default()
+            },
             events: vec![
                 Event {
                     name: "opening".into(),
@@ -155,6 +159,14 @@ fn world(threads: usize) -> World {
                         },
                         Action::Checkpoint(1),
                     ],
+                },
+                Event {
+                    name: "prop_destroyed".into(),
+                    when: Condition::PropDead("matrix_billboard".into()),
+                    actions: vec![Action::Say {
+                        line: "matrix.prop".into(),
+                        ticks: 10,
+                    }],
                 },
                 Event {
                     name: "after_snapshot".into(),

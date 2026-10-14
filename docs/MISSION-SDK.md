@@ -1,7 +1,7 @@
 # Mission authoring
 
 Missions live in mc-missions and compile into the game. A map folder contains
-terrain.mcmap, placed.ron, map.ron and strings.en.ron. The map configuration
+terrain.mcmap, placed.ron, map.ron and strings/en.ron. The map configuration
 selects a registered Rust mission and can supply its player slots:
 
     (mission: Some("vela_m1"), players: [
@@ -36,7 +36,7 @@ the next story beat run ahead of the text.
 
 Conditions include elapsed time, time after another event, a named unit inside
 a region, group death or surviving members, unit death or low health, unloaded
-cargo, objective status, dialogue idle,
+cargo, objective status, named destructible-prop death, dialogue idle,
 and bounded All/Any combinations. Times are simulation ticks (10 per second).
 Condition decoding bounds nesting before recursive values are constructed.
 Use an Active objective condition on mutually exclusive success/failure events;
@@ -61,7 +61,7 @@ Wire enum numbers are explicit and new variants are appended.
 - Queue a string ID, change objective status, request a camera, hand controls
   over, create a checkpoint, win or lose.
 
-Text and speakers come from strings.en.ron. Radio squelch and camera pans are
+Text and speakers come from strings/en.ron. Radio squelch and camera pans are
 client presentation; they cannot change a simulation wait or outcome.
 
 ## Checkpoints and compatibility
@@ -95,5 +95,5 @@ For native visual inspection of a later beat:
     scripts/shot.sh -o vela-betrayal run --map vela_m1 --mission-pilot --ticks 3100 --camera 7738,8008,1200,0
 
 The standard determinism matrix includes pending mission dialogue, an objective
-transition and checkpoints across its snapshot. Run scripts/determinism-cross.sh
+transition, named-prop destruction and checkpoints across its snapshot. Run scripts/determinism-cross.sh
 after numeric simulation changes.
