@@ -197,7 +197,7 @@ impl Editor {
                     "dirty":self.doc.dirty,"reloading":self.reloading(),"message":self.message,"destination":self.doc.destination,"placed":self.doc.placed,"camera":{"at":self.camera.focus.to_array(),"zoom":self.camera.distance,"yaw":self.camera.yaw.to_degrees(),"pitch":self.camera.pitch_free.map(f32::to_degrees)}})),
                 Request::Edit {actions} => {
                     if let Some(rect)=self.doc.apply(&actions,&self.blueprints)? {renderer.edit_terrain(&self.doc.map,rect).map_err(|e|e.to_string())?;}
-                    if actions.iter().any(|a|!matches!(a,Command::Terrain{..})){self.refresh_units()?;}
+                    if actions.iter().any(|a|!a.is_terrain()){self.refresh_units()?;}
                 }
                 Request::Undo|Request::Redo => {
                     let rect=if matches!(request,Request::Undo){self.doc.undo()?}else{self.doc.redo()?};

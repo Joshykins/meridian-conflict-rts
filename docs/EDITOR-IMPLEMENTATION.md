@@ -57,10 +57,16 @@ playable mission, authored and revised through the editor and its API.
 - Added free camera, searchable unit catalogue, stable-ID property editing,
   repeated unit stamping and labelled authoring guides behind the panels.
 
+- Full gate passes on 3e809574 (438 s). Native catalogue/free camera screenshots
+  and successful rebuilt-model reload are verified.
+- Added cliff/noise terrain brushes, two-point ramps and bounded heightmap stamp
+  assets, including a crater example. Ramp/stamp atomicity and undo tests pass;
+  native terrain-tool review is next.
+
 ## Still required before final delivery
 - Component doodads, general destructible/reclaimable props.
-- Ground cover painting, water/climate controls, remaining brushes and resize.
-- Remaining gizmo/snapping improvements and free camera/catalogue native review.
+- Ground cover painting, water/climate controls, decorative cliff regeneration and resize.
+- Remaining gizmo/snapping improvements and persistent full camera poses.
 - Propaganda components and encounter balance; native review of evacuation,
   allied arrivals and later mission beats.
 - Full checks, determinism matrix/cross-platform verification, final native

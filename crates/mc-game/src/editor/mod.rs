@@ -48,6 +48,7 @@ pub(crate) struct Editor {
     tool: usize,
     radius: f32,
     strength: f32,
+    stamp_asset: String,
     name: String,
     blueprint: String,
     group: String,
@@ -115,6 +116,7 @@ impl Editor {
             tool: 0,
             radius: 96.0,
             strength: 8.0,
+            stamp_asset: "crater.json".into(),
             name: "company_tank".into(),
             blueprint: "aster_t1_tank".into(),
             group: "company".into(),
@@ -177,7 +179,7 @@ impl Editor {
         command: Command,
         renderer: &mut mc_render::Renderer,
     ) -> Result<(), String> {
-        let objects = !matches!(command, Command::Terrain { .. });
+        let objects = !command.is_terrain();
         if let Some(rect) = self.doc.apply(&[command], &self.blueprints)? {
             renderer
                 .edit_terrain(&self.doc.map, rect)

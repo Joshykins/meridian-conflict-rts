@@ -8,7 +8,10 @@ WASD pans, Q/E orbits, Page Up/Down tilts, and the wheel zooms. Free camera
 keeps the current eye position: WASD flies, Q/E changes height, arrows look,
 Shift boosts movement and the wheel changes speed. Toggle it off to restore
 the previous orbit view. The bottom panel selects a tool.
-Raise, Lower, Flatten and Smooth stamp terrain at the cursor. Unit, Region,
+Raise, Lower, Flatten, Smooth, Cliff and Noise edit terrain at the cursor.
+Ramp connects the existing heights at two clicked endpoints, with the brush
+radius as its half-width. Stamp reads a named JSON heightmap from the map's
+stamps folder (Vela includes crater.json); strength is its height in metres. Unit, Region,
 Point and Camera create named placements. A region uses two opposite corners.
 Select picks an object in the viewport or outliner; Move places that selection
 at the cursor, and the heading button rotates a selected unit. Browse opens a
@@ -56,7 +59,7 @@ Examples:
 
 An edit request has 1–512 actions and is one atomic undo step. Invalid actions
 leave the entire request unapplied. Requests are limited to 256 KiB. Supported
-actions are terrain, unit, region, point, camera, transform, properties and delete; the
+actions are terrain, ramp, stamp, unit, region, point, camera, transform, properties and delete; the
 authoritative schema is editor/document.rs. Coordinates are world metres,
 headings/yaw are degrees, and owner is the zero-based player slot.
 
@@ -77,6 +80,18 @@ It serves the same mailbox and renders at ten frames per second. State, edit,
 undo, save, camera, screenshot and reload work normally. Playtest requires the
 windowed editor. Close with {"op":"close"}; unsaved work refuses to close unless
 {"op":"close","discard":true} is explicitly requested.
+
+A heightmap asset contains width, height and a row-major values array. Each side
+has 2–257 samples, each value is between -1 and 1, and the file is at most 1 MiB.
+Stamp samples it bilinearly as signed height changes; brush radius is its
+horizontal half-width and its original aspect ratio is retained.
+
+    {"op":"edit","actions":[{"action":"ramp","from":[400,400],"to":[800,400],"width":64}]}
+    {"op":"edit","actions":[{"action":"stamp","at":[600,600],"radius":128,"strength":24,"asset":"crater.json"}]}
+
+All terrain tools share sample-level undo and the live tile/overview upload path.
+Cliff edits make a steep plateau in the heightfield; regeneration of decorative
+cliff block props remains a separate pending task.
 
 ## Reload
 

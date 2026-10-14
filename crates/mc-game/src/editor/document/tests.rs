@@ -143,3 +143,52 @@ fn editing_properties_preserves_identity_and_rejects_duplicate_names_atomically(
     assert_eq!(doc.placed.units[0].id, id);
     std::fs::remove_dir_all(folder).unwrap();
 }
+
+#[test]
+fn ramps_and_heightmap_stamps_are_sparse_atomic_and_undoable() {
+    let (folder, mut doc, bp) = fixture();
+    let (w, h) = doc.map.info.size_cells();
+    for y in 0..=h {
+        for x in 0..=w {
+            doc.map.set_sample(x, y, 1000).unwrap();
+        }
+    }
+    doc.map.set_sample(32, 16, 2000).unwrap();
+    let before = doc.map.samples().to_vec();
+    let ramp = Command::Ramp {
+        from: [128.0, 128.0],
+        to: [256.0, 128.0],
+        width: 16.0,
+    };
+    doc.apply(std::slice::from_ref(&ramp), &bp).unwrap();
+    assert_eq!(doc.map.samples()[(16 * (w + 1) + 24) as usize], 1500);
+    assert_eq!(doc.map.samples()[(20 * (w + 1) + 24) as usize], 1000);
+    doc.undo().unwrap();
+    assert_eq!(doc.map.samples(), before);
+    std::fs::create_dir(folder.join("stamps")).unwrap();
+    std::fs::write(
+        folder.join("stamps/bad.json"),
+        r#"{"width":2,"height":2,"values":[2,0,0,0]}"#,
+    )
+    .unwrap();
+    let stamp = |asset: &str| Command::Stamp {
+        at: [512.0, 512.0],
+        radius: 32.0,
+        strength: 8.0,
+        asset: asset.into(),
+    };
+    assert!(doc.apply(&[ramp, stamp("bad.json")], &bp).is_err());
+    assert_eq!(doc.map.samples(), before);
+    std::fs::write(
+        folder.join("stamps/good.json"),
+        r#"{"width":3,"height":3,"values":[0,0,0,0,1,0,0,0,0]}"#,
+    )
+    .unwrap();
+    doc.apply(&[stamp("good.json")], &bp).unwrap();
+    assert!(doc.map.samples()[(64 * (w + 1) + 64) as usize] > 1000);
+    assert_eq!(doc.map.samples()[(64 * (w + 1) + 68) as usize], 1000);
+    doc.undo().unwrap();
+    assert_eq!(doc.map.samples(), before);
+    assert!(doc.apply(&[stamp("../good.json")], &bp).is_err());
+    std::fs::remove_dir_all(folder).unwrap();
+}

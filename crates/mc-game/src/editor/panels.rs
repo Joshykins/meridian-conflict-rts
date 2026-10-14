@@ -84,12 +84,12 @@ impl Editor {
         }
     }
     pub(super) fn tool_rows(width: f32) -> usize {
-        13usize.div_ceil(((width - 68.0) / 112.0).floor().max(1.0) as usize)
+        17usize.div_ceil(((width - 68.0) / 112.0).floor().max(1.0) as usize)
     }
     pub(super) fn tools_panel(&mut self, ui: &mut Ui, bottom: f32) {
         let w = ui.size.x;
-        let columns = (((w - 68.0) / 112.0).floor().max(1.0) as usize).min(13);
         let rows = Self::tool_rows(w);
+        let columns = 17usize.div_ceil(rows);
         let step = (w - 68.0) / columns as f32;
         ui.panel(Rect::new(18.0, bottom, w - 36.0, ui.size.y - bottom - 18.0));
         ui.text(
@@ -113,6 +113,10 @@ impl Editor {
             "Reload data",
             "Reload shaders",
             "Free camera",
+            "Cliff",
+            "Noise",
+            "Ramp",
+            "Stamp",
         ]
         .iter()
         .enumerate()
@@ -134,7 +138,7 @@ impl Editor {
                 kind,
                 true,
             ) {
-                if i < 10 {
+                if !(10..13).contains(&i) {
                     self.tool = i;
                     self.region_start = None;
                     if i == 5 && self.doc.placed.units.iter().any(|u| u.name == self.name) {
@@ -164,7 +168,7 @@ impl Editor {
         if ui.slider(
             id("editor_radius", 0),
             Rect::new(34.0, y, width, 28.0),
-            "Brush radius",
+            &format!("Brush radius: {:.0} m", self.radius),
             &mut radius,
         ) {
             self.radius = 8.0 + radius * 504.0;
@@ -173,7 +177,7 @@ impl Editor {
         if ui.slider(
             id("editor_strength", 0),
             Rect::new(68.0 + width, y, width, 28.0),
-            "Strength",
+            &format!("Strength: {:.0} m", self.strength),
             &mut strength,
         ) {
             self.strength = strength * 64.0;
@@ -200,7 +204,11 @@ impl Editor {
         );
         for (i, (label, value)) in [
             ("Name", &mut self.name),
-            ("Blueprint", &mut self.blueprint),
+            if self.tool == 16 {
+                ("Heightmap file", &mut self.stamp_asset)
+            } else {
+                ("Blueprint", &mut self.blueprint)
+            },
             ("Group", &mut self.group),
             ("Save name", &mut self.save_name),
         ]
@@ -232,7 +240,7 @@ impl Editor {
             Rect::new(card.x + 232.0, card.y + 118.0, 82.0, 34.0),
             "Browse",
             ButtonKind::Secondary,
-            true,
+            self.tool != 16,
         ) {
             self.catalogue = Some(Default::default());
         }
@@ -413,6 +421,36 @@ impl Editor {
                             strength: self.strength,
                             brush: [Brush::Raise, Brush::Lower, Brush::Flatten, Brush::Smooth]
                                 [self.tool - 1],
+                        }),
+                        13 | 14 => Some(Command::Terrain {
+                            at,
+                            radius: self.radius,
+                            strength: self.strength,
+                            brush: if self.tool == 13 {
+                                Brush::Cliff
+                            } else {
+                                Brush::Noise
+                            },
+                        }),
+                        15 => {
+                            match self.region_start.take() {
+                                None => {
+                                    self.region_start = Some(at);
+                                    self.message="Click the other endpoint to connect the two terrain heights.".into();
+                                    None
+                                }
+                                Some(from) => Some(Command::Ramp {
+                                    from,
+                                    to: at,
+                                    width: self.radius,
+                                }),
+                            }
+                        }
+                        16 => Some(Command::Stamp {
+                            at,
+                            radius: self.radius,
+                            strength: self.strength,
+                            asset: self.stamp_asset.clone(),
                         }),
                         5 => Some(Command::Unit {
                             name: self.name.clone(),
