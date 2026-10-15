@@ -443,10 +443,11 @@ fn a_commander_ai_plays_deterministically_and_restores_from_a_snapshot() {
 #[test]
 fn ai_spreads_out_and_guards_materials() {
     let mut w = flat_world(0, true, true);
-    // Twelve minutes: the mines make little until they reach their ore, and short of
+    // Fourteen minutes: the mines make little until they reach their ore, and short of
     // materials (a stall slows everything alike) a side puts up its second factory before
-    // its first point defense.
-    for _ in 0..7200 {
+    // its first point defense. When that comes drifts with any change to the opening (the
+    // commander drawn bigger put it past twelve), and this is about where, not how soon.
+    for _ in 0..8400 {
         w.tick(&[]).unwrap();
     }
     let s = &w.state;
