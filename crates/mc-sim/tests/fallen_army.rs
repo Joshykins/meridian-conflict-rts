@@ -118,9 +118,9 @@ fn kill_commander(w: &mut World, player: u8) -> Vec<SimEvent> {
     };
     let mut events = Vec::new();
     w.tick(&[kill]).unwrap();
-    events.extend(w.events.drain(..));
+    events.append(&mut w.events);
     w.tick(&[]).unwrap();
-    events.extend(w.events.drain(..));
+    events.append(&mut w.events);
     events
 }
 
