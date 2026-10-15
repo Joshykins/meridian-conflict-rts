@@ -14,6 +14,10 @@ fn a_player_out_of_the_match_watches_and_talks_with_the_observers() {
     let relay = relay(3, |_| {});
     let addr = relay.local_addr();
     let mut clients = start_match(addr, 3);
+    // Joining once the clock runs, the observer comes in from a snapshot.
+    pump_until(&mut refs(&mut clients), "30 ticks", |cs| {
+        cs.iter().all(|c| c.ticks() >= 30)
+    });
     let observer = connect_with(addr, "watcher", |c| c.role = Role::Observer);
     clients.push(observer);
     pump_until(&mut refs(&mut clients), "the observer is in", |cs| {
@@ -24,6 +28,11 @@ fn a_player_out_of_the_match_watches_and_talks_with_the_observers() {
     clients[2].session.watching();
     let out_from = clients[2].sent.len() as u32;
     clients[2].session.chat("gg, watching now", 0).unwrap();
+    // Its own line back means the relay has it watching (the observer speaks on another
+    // connection, which could otherwise be heard first).
+    pump_until(&mut refs(&mut clients), "its own line back", |cs| {
+        !cs[2].watchers_chat.is_empty()
+    });
     clients[3].session.chat("welcome", 0b001).unwrap();
     clients[0].session.chat("push mid", 0).unwrap();
     pump_until(&mut refs(&mut clients), "chat", |cs| {
