@@ -1660,6 +1660,30 @@ fn spinners_and_locomotion_are_tagged() {
     }
 }
 
+/// The shader runs links round `TREAD` rubber only on `part::LOCOMOTION`, so a track
+/// left untagged would stand still. Far off a running gear may be one plain face, but a
+/// level that draws rubber at all draws its belt as running gear, and the nearest always does.
+#[test]
+fn tracks_are_running_gear() {
+    for key in crate::all_model_keys() {
+        let model = build_model(key).unwrap();
+        if model.treads.is_none() {
+            continue;
+        }
+        for (lod, mesh) in model.lods.iter().enumerate() {
+            let rubber = |gear: bool| {
+                mesh.vertices
+                    .iter()
+                    .any(|v| v.material == material::TREAD && (!gear || v.part == part::LOCOMOTION))
+            };
+            assert!(
+                rubber(true) || (lod > 0 && !rubber(false)),
+                "{key} lod {lod}: its rubber is not running gear"
+            );
+        }
+    }
+}
+
 #[test]
 fn hover_tank_rides_a_cushion() {
     let model = build_model("hover_tank").unwrap();

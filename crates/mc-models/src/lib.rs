@@ -21,7 +21,8 @@ pub mod material {
     pub const METAL: u32 = 4;
     /// Sensors, canopies.
     pub const GLASS: u32 = 5;
-    /// Treads, tyres, feet.
+    /// Rubber: treads, tyres, feet, and any matte black piece. It is a moving belt only
+    /// on a rolling model's `part::LOCOMOTION`; anywhere else it is just the look.
     pub const TREAD: u32 = 6;
     /// Conventional-weapon emitters (orange). Emissive.
     pub const GLOW_ORANGE: u32 = 7;

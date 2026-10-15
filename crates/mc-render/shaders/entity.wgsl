@@ -280,6 +280,8 @@ fn tread_pitch(reach: f32) -> f32 {
 // Links in one period of a belt's wear bands, which still read as it rolls when the
 // links themselves are a blur.
 const TREAD_WRAP: f32 = 8.0;
+// `VsOut::model_class` bit 9: this rubber is no belt, so it gets no links and does not crawl.
+const CLASS_NO_BELT: u32 = 0x200u;
 
 // Distance along a track belt, increasing in the circulation that drives
 // the hull forward: top run +x, front down, underside -x, rear up. Side
@@ -2568,9 +2570,11 @@ fn vs_main(in: VsIn) -> VsOut {
     out.world = world;
     out.normal = world_n;
     out.warp = vec4<f32>(warp, select(0.0, 1.0, warp_damped) + select(0.0, 2.0, warp_nanite), clamp(0.5 + 0.5 * local.x / warp_reach, 0.0, 1.0));
-    // A walker's rubber is its soles, not a belt: no links, nothing crawls (hover skirts
-    // likewise). `model_class` bit 9 carries the same test to the fragment stage.
-    let belt = (model.icon & 0x20000u) == 0u && model.leg_hip.w <= 0.0;
+    // Rubber is a belt only on the running gear (`part::LOCOMOTION`) of a model that
+    // rolls: a slit, hatch or gun cap painted rubber elsewhere keeps the look and stands
+    // still, and a walker's soles and a hover skirt are running gear but no belt.
+    // `CLASS_NO_BELT` carries the same test to the fragment stage.
+    let belt = in.part == PART_LOCOMOTION && (model.icon & 0x20000u) == 0u && model.leg_hip.w <= 0.0;
     if in.material == MAT_TREAD && belt {
         // The links move by the ground the hull has covered (the sim's gait, metres),
         // wrapped at `TREAD_WRAP` links (the wear bands' period), so a stopped belt stays
@@ -2600,10 +2604,10 @@ fn vs_main(in: VsIn) -> VsOut {
         select(0.0, 1.0, wreck.inner) + select(0.0, 2.0, wreck.sank),
         select(0.0, 1.0 + min(wreck.age, 1000.0), wreck.posed),
     );
-    // Tech in the low byte, then mobile (bit 8) from the icon flags and bit 9 when its
-    // rubber is no belt (a hover skirt or a walker's soles).
+    // Tech in the low byte, then mobile (bit 8) from the icon flags and bit 9 when this
+    // rubber is no belt (`CLASS_NO_BELT`).
     // Naval (icon bit 23) rides in bit 11.
-    out.model_class = ((model.icon >> 8u) & 0xFFu) | ((model.icon >> 8u) & 0x100u) | select(0x200u, 0u, belt) | ((model.icon >> 12u) & 0x800u)
+    out.model_class = ((model.icon >> 8u) & 0xFFu) | ((model.icon >> 8u) & 0x100u) | select(CLASS_NO_BELT, 0u, belt) | ((model.icon >> 12u) & 0x800u)
         | ((finished_pattern(model.skin, in.material, in.surface & 0xFFu) | (in.surface & 0xFF00u)) << 16u)
         | select(0u, 0x1000u, (model.icon & 0x1000000u) != 0u)
         // Bit 13: a capital ship (icon bit 26).
@@ -3637,7 +3641,7 @@ fn shade_entity(in: VsOut) -> vec4<f32> {
         leaf_through *= 1.0 - max(hot, warm);
     }
     var tread = 1.0;
-    if in.material == MAT_TREAD && (in.model_class & 0x200u) == 0u {
+    if in.material == MAT_TREAD && (in.model_class & CLASS_NO_BELT) == 0u {
         // Track links round the belt. The top run crawls forward with the hull; the
         // underside crawls back so it stays on the ground. A hover skirt uses the same
         // rubber but is not a belt. The crawl is already in uv.x (vertex stage, from the
