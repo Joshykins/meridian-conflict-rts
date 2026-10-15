@@ -122,9 +122,15 @@ impl Install {
     }
 
     /// A build carries the launcher it was published with
-    /// (`launcher/MeridianConflict.exe`). When it differs from this one it is
-    /// put beside it as `.new`; true when it was.
+    /// (`launcher/MeridianConflict.exe`). When that build is later than this
+    /// launcher's own and its launcher differs, it is put beside this one as
+    /// `.new`; true when it was. An older build's launcher never replaces a
+    /// newer one: a player who goes from Playtest back to Release keeps the
+    /// newer launcher Playtest brought.
     pub(crate) fn stage_launcher(&self, m: &Manifest) -> std::io::Result<bool> {
+        if !newer_than_this(m.number) {
+            return Ok(false);
+        }
         let Some(name) = self.exe.file_name() else {
             return Ok(false);
         };
@@ -151,6 +157,17 @@ impl Install {
         };
         Some(base?.join("meridian-conflict"))
     }
+}
+
+/// This launcher's build number (build.rs), `None` outside a git checkout.
+fn own_number() -> Option<u32> {
+    env!("MERIDIAN_BUILD_NUMBER").parse().ok()
+}
+
+/// A build numbered `number` is later than this launcher. A launcher without a
+/// number (built outside a checkout) takes any published one.
+fn newer_than_this(number: u32) -> bool {
+    own_number().is_none_or(|own| number > own)
 }
 
 /// `MeridianConflict.exe.new` beside this program is its update: swap it in
@@ -266,5 +283,18 @@ impl Log {
         if let Some(f) = &mut self.0 {
             let _ = writeln!(f, "{text}");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_a_later_build_brings_its_launcher() {
+        let own = own_number().expect("tests run in a git checkout");
+        assert!(newer_than_this(own + 1));
+        assert!(!newer_than_this(own));
+        assert!(!newer_than_this(own - 1));
     }
 }

@@ -150,8 +150,10 @@ it must not need the GPU driver the game needs. The game never updates itself.
   one build); a failed download leaves Play on the installed build with *Try the
   update again*. A channel with nothing installed offers **Install**. A finished
   update becomes its channel's current build; when it brings a different launcher
-  (`launcher/MeridianConflict.exe` in the build), that goes beside the running one as
-  `MeridianConflict.exe.new` and the launcher restarts into it at once.
+  (`launcher/MeridianConflict.exe` in the build) from a later build than the running
+  launcher's own, that goes beside the running one as `MeridianConflict.exe.new` and the
+  launcher restarts into it at once. An older build's launcher never replaces a newer
+  one, so going from Playtest back to Release keeps Playtest's newer launcher.
 - **Starting:** **Play** starts the current build, in the install's folder, with
   `MERIDIAN_LAUNCHER` naming the launcher, and the launcher closes. It keeps the 8
   builds used last, and never one a channel starts.
