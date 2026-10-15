@@ -144,8 +144,9 @@ it must not need the GPU driver the game needs. The game never updates itself.
   by `FRAMING` in `paint/backdrop.rs`) with the latest news on a strip along its foot,
   and under it **Patch Notes** (the channel's history), **News** and **Builds**; the
   news's links along the foot.
-- **Updates:** on opening, the launcher reads each channel's newest build and history
-  and the news. When the picked channel names a build that is not installed, it
+- **Updates:** on opening, and again every 10 minutes while it stays open, the
+  launcher reads each channel's newest build and history and the news (what it shows
+  stays until the new answer is in). When the picked channel names a build that is not installed, it
   downloads it at once and **Play** waits for it (a network match needs everyone on
   one build); a failed download leaves Play on the installed build with *Try the
   update again*. A channel with nothing installed offers **Install**. A finished

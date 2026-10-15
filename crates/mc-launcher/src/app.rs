@@ -8,7 +8,7 @@
 
 use std::net::{TcpStream, ToSocketAddrs};
 use std::path::PathBuf;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use mc_builds::feed::{History, News};
 use mc_builds::versions::Progress;
@@ -35,6 +35,8 @@ pub(crate) struct Remote {
 pub(crate) struct Lane {
     pub(crate) channel: Channel,
     pub(crate) remote: Option<Job<Remote>>,
+    /// A later look at the store, while `remote` still shows the last one.
+    recheck: Option<Job<Remote>>,
     pub(crate) update: Option<Job<Manifest>>,
     /// The channel's server, `host[:port]`, if it has one.
     pub(crate) addr: Option<String>,
@@ -49,6 +51,7 @@ impl Lane {
         Lane {
             channel,
             remote: None,
+            recheck: None,
             update: None,
             addr: install::server(channel).map(str::to_owned),
             server: None,
@@ -120,6 +123,10 @@ pub(crate) struct App {
     pub(crate) page: Page,
     pub(crate) lanes: Vec<Lane>,
     pub(crate) news: Option<Job<News>>,
+    /// A later read of the news, while `news` still shows the last one.
+    news_recheck: Option<Job<News>>,
+    /// When the store was last looked at, for looking again while the window is open.
+    looked: Instant,
     pub(crate) files: Option<Files>,
     /// Installed builds with the bytes only each holds, and the total.
     pub(crate) installed: (Vec<(Manifest, u64)>, u64),
@@ -144,6 +151,8 @@ impl App {
             page: Page::Notes,
             lanes: CHANNELS.iter().map(|c| Lane::new(*c)).collect(),
             news: None,
+            news_recheck: None,
+            looked: Instant::now(),
             files: None,
             installed,
             replay: None,
@@ -193,22 +202,14 @@ impl App {
         let store = self.store.clone();
         if let Some(store) = &store {
             if self.news.is_none() {
-                let s = store.clone();
-                self.news = Some(Job::spawn("news", move |_| {
-                    s.news().map_err(|e| e.to_string())
-                }));
+                self.news = Some(read_news(store));
             }
             for lane in &mut self.lanes {
                 if lane.remote.is_none() {
-                    let (s, channel) = (store.clone(), lane.channel);
-                    lane.remote = Some(Job::spawn("check", move |_| {
-                        let newest = s.newest(channel).map_err(|e| e.to_string())?;
-                        // A store without a history yet still has builds.
-                        let history = s.history(channel).unwrap_or_default();
-                        Ok(Remote { newest, history })
-                    }));
+                    lane.remote = Some(check(store, lane.channel));
                 }
             }
+            self.look_again(store);
         }
         for lane in &mut self.lanes {
             if lane.server.is_none() {
@@ -221,7 +222,11 @@ impl App {
         let channel = self.channel;
         let current = self.current();
         let lane = self.lanes.iter().find(|l| l.channel == channel)?;
-        if let (Some(newest), None, Some(store)) = (lane.newest(), &lane.update, &store) {
+        // A finished update of another build does not stand in the way of this one.
+        let free = lane.update.as_ref().is_none_or(|j| {
+            j.peek(|r| matches!(r, Some(Ok(m)) if Some(&m.build) != lane.newest().as_ref().map(|n| &n.build)))
+        });
+        if let (Some(newest), true, Some(store)) = (lane.newest(), free, &store) {
             let wanted = !self.install.versions.has(&newest.build)
                 && current.as_ref().is_none_or(|c| newest.number > c.number);
             // An update; or a fresh install (the setup just ran), which gets
@@ -233,6 +238,40 @@ impl App {
             }
         }
         self.apply_update(log)
+    }
+
+    /// Looks at the store again every [`LOOK_AGAIN`] while the window is open,
+    /// so a build published meanwhile is fetched without a restart. What the
+    /// window shows stays until the new answer is in; a failed look keeps it.
+    fn look_again(&mut self, store: &Store) {
+        let busy = self.lanes.iter().any(Lane::updating);
+        if !busy && self.looked.elapsed() >= LOOK_AGAIN {
+            self.looked = Instant::now();
+            for lane in &mut self.lanes {
+                lane.recheck = Some(check(store, lane.channel));
+            }
+            self.news_recheck = Some(read_news(store));
+        }
+        for lane in &mut self.lanes {
+            let answer = lane
+                .recheck
+                .as_ref()
+                .and_then(|j| j.peek(|r| r.map(Result::is_ok)));
+            match answer {
+                Some(true) => lane.remote = lane.recheck.take(),
+                Some(false) => lane.recheck = None,
+                None => {}
+            }
+        }
+        let answer = self
+            .news_recheck
+            .as_ref()
+            .and_then(|j| j.peek(|r| r.map(Result::is_ok)));
+        match answer {
+            Some(true) => self.news = self.news_recheck.take(),
+            Some(false) => self.news_recheck = None,
+            None => {}
+        }
     }
 
     /// Installs `m` on its channel's lane.
@@ -512,6 +551,25 @@ impl App {
             ReplayStep::Failed(_) => None,
         }
     }
+}
+
+/// How often an open launcher looks for a newer build.
+const LOOK_AGAIN: Duration = Duration::from_secs(10 * 60);
+
+/// What the store says of `channel`: its newest build and its history.
+fn check(store: &Store, channel: Channel) -> Job<Remote> {
+    let s = store.clone();
+    Job::spawn("check", move |_| {
+        let newest = s.newest(channel).map_err(|e| e.to_string())?;
+        // A store without a history yet still has builds.
+        let history = s.history(channel).unwrap_or_default();
+        Ok(Remote { newest, history })
+    })
+}
+
+fn read_news(store: &Store) -> Job<News> {
+    let s = store.clone();
+    Job::spawn("news", move |_| s.news().map_err(|e| e.to_string()))
 }
 
 /// Seconds a server has to answer.
