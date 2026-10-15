@@ -21,6 +21,7 @@ mod playtest;
 mod raw;
 pub mod refit;
 pub mod regions;
+pub(crate) mod scale;
 pub mod skins;
 pub mod sounds;
 pub mod strategic;
@@ -915,6 +916,9 @@ pub struct UnitBlueprint {
     /// Collision radius on the ground plane.
     pub radius: Fx,
     pub height: Fx,
+    /// How many times its model's authored size it is built (`scale:` in the unit file):
+    /// `radius`, `height` and the points on the model are already multiplied by it.
+    pub scale: f32,
     /// Structure size in build cells. `(0, 0)` for mobile units.
     pub footprint: (u8, u8),
     /// Half-extents, metres, of the ground a structure keeps units off, in its own

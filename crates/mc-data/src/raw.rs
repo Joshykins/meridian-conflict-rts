@@ -373,6 +373,11 @@ pub(crate) struct Unit {
     pub cost: Cost,
     pub radius: f64,
     pub height: f64,
+    /// Built this many times its model's authored size (`crate::scale`): `radius`,
+    /// `height` and every point below placed on the model are given as authored and
+    /// multiplied on load. None: as authored.
+    #[serde(default)]
+    pub scale: Option<f64>,
     #[serde(default)]
     pub footprint: (u8, u8),
     /// Half-extents, metres, of what a structure blocks on the nav grid, in its own
@@ -1702,7 +1707,8 @@ fn mask(names: &[String], ctx: &str) -> Result<u32, DataError> {
 }
 
 impl Unit {
-    pub(crate) fn compile(
+    /// Compiles the unit file as written, at its authored size (`Unit::compile` scales it).
+    pub(crate) fn compile_authored(
         &self,
         id: BlueprintId,
         faction: FactionId,
@@ -2367,6 +2373,7 @@ impl Unit {
             build_time: fx(self.cost.time),
             radius: fx(self.radius),
             height: fx(self.height),
+            scale: 1.0,
             footprint: self.footprint,
             hull: match self.hull {
                 Some((x, y)) => (fx(x), fx(y)),
