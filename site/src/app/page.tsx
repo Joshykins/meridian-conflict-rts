@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { HeroMedia } from "@/components/hero-media";
+import { DownloadLink, PlaytestBadge } from "@/components/download-link";
 import { ArcCrest, RegencyCrest } from "@/components/crests";
 import { UnitTile } from "@/components/unit-tile";
 import { UnitArt } from "@/components/unit-art";
@@ -72,7 +73,9 @@ export default function Home() {
             className="rise flex items-center gap-3 font-display text-base font-semibold text-dim"
             style={{ ["--i" as string]: 0 }}
           >
-            <span className="h-px w-10 bg-accent" />A real-time strategy game · In development
+            <span className="h-px w-10 bg-accent" />A real-time strategy game
+            <span className="text-faint">·</span>
+            <PlaytestBadge className="text-accent" />
           </p>
           <h1 className="mt-4 font-display text-[clamp(4rem,13vw,11.5rem)] leading-[0.82] tracking-[-0.01em]">
             <span className="rise block font-semibold" style={{ ["--i" as string]: 1 }}>
@@ -86,10 +89,11 @@ export default function Home() {
             {site.description}
           </p>
           <div className="rise mt-8 flex flex-wrap items-center gap-3" style={{ ["--i" as string]: 4 }}>
+            <DownloadLink className="group relative inline-flex items-center gap-3 overflow-hidden bg-accent px-6 py-3.5 font-display text-lg font-semibold text-black shadow-[0_0_32px_-6px_rgb(255_90_36/0.8)] transition hover:brightness-110 active:scale-[0.98]" />
             <Link
               href="/units"
               transitionTypes={["nav-forward"]}
-              className="group relative inline-flex items-center gap-3 overflow-hidden bg-accent px-6 py-3.5 font-display text-lg font-semibold text-black transition hover:brightness-110 active:scale-[0.98]"
+              className="glass group inline-flex items-center gap-3 px-6 py-3.5 font-display text-lg font-semibold transition hover:border-white/30"
             >
               Browse the units
               <span className="transition-transform duration-300 group-hover:translate-x-1">→</span>
@@ -98,22 +102,14 @@ export default function Home() {
               href={site.discord}
               target="_blank"
               rel="noreferrer"
-              className="glass inline-flex items-center gap-3 px-6 py-3.5 font-display text-lg font-semibold transition hover:border-white/30"
+              className="inline-flex items-center gap-3 px-3 py-3.5 font-display text-lg font-semibold text-dim transition hover:text-text"
             >
-              Join the Discord
+              Join the Discord ↗
             </a>
-            <span
-              className="inline-flex items-center gap-2.5 px-3 py-3.5 font-display font-semibold text-faint"
-              title="The trailer is being cut"
-            >
-              <span className="grid size-7 place-items-center rounded-full border border-white/20">
-                <svg viewBox="0 0 10 10" className="ml-0.5 size-2.5" aria-hidden>
-                  <path d="M1 0L9 5L1 10Z" fill="currentColor" />
-                </svg>
-              </span>
-              Trailer soon
-            </span>
           </div>
+          <p className="rise mt-4 text-sm text-faint" style={{ ["--i" as string]: 5 }}>
+            Free during the open playtest · {site.download.platform} · The launcher keeps the game up to date
+          </p>
         </div>
 
         {/* Instrument readout, top right. */}
@@ -304,24 +300,31 @@ export default function Home() {
       <section className="relative overflow-hidden border-t border-white/[0.08]">
         <div aria-hidden className="absolute inset-y-0 left-1/2 w-px bg-accent shadow-[0_0_40px_6px_rgb(255_90_36/0.35)]" />
         <div className="relative mx-auto grid max-w-[1480px] gap-10 px-4 py-24 sm:px-8 md:grid-cols-2 md:py-32">
-          <h2 className="reveal font-display text-5xl font-light leading-[1] sm:text-6xl">
-            Help test
-            <br />
-            what comes next
-          </h2>
+          <div className="reveal">
+            <PlaytestBadge className="font-display text-sm font-semibold text-accent" />
+            <h2 className="mt-4 font-display text-5xl font-light leading-[1] sm:text-6xl">
+              The open playtest
+              <br />
+              is live
+            </h2>
+          </div>
           <div className="reveal md:pl-16">
             <p className="text-lg leading-relaxed text-dim">
-              Meridian Conflict is in development. Meet players, share ideas and tell us what breaks. Insiders help test early
-              builds.
+              Meridian Conflict is in open beta: anyone can download the launcher and play, free. Skirmish the AI, fight other
+              players online, and tell us what breaks. The launcher keeps the game up to date as new builds land.
             </p>
-            <a
-              href={site.discord}
-              target="_blank"
-              rel="noreferrer"
-              className="group mt-8 inline-flex items-center gap-3 bg-text px-6 py-3.5 font-display text-lg font-semibold text-black transition hover:bg-white active:scale-[0.98]"
-            >
-              Join the Discord <span className="transition-transform duration-300 group-hover:translate-x-1">↗</span>
-            </a>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <DownloadLink className="group inline-flex items-center gap-3 bg-accent px-6 py-3.5 font-display text-lg font-semibold text-black transition hover:brightness-110 active:scale-[0.98]" />
+              <a
+                href={site.discord}
+                target="_blank"
+                rel="noreferrer"
+                className="group inline-flex items-center gap-3 bg-text px-6 py-3.5 font-display text-lg font-semibold text-black transition hover:bg-white active:scale-[0.98]"
+              >
+                Join the Discord <span className="transition-transform duration-300 group-hover:translate-x-1">↗</span>
+              </a>
+            </div>
+            <p className="mt-4 text-sm text-faint">{site.download.platform}. Unzip anywhere and run MeridianConflict.exe.</p>
           </div>
         </div>
       </section>

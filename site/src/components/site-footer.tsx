@@ -12,7 +12,7 @@ export function SiteFooter() {
             <Wordmark className="text-2xl" />
           </div>
           <p className="mt-4 max-w-sm text-dim">
-            A real-time strategy game about building bases and commanding huge armies. Currently in development.
+            A real-time strategy game about building bases and commanding huge armies. In open playtest now, free on Windows.
           </p>
         </div>
         <FooterCol
@@ -23,10 +23,16 @@ export function SiteFooter() {
             { href: "/factions/regency", label: "The Regency" },
           ]}
         />
-        <FooterCol title="Community" links={[{ href: site.discord, label: "Discord", external: true }]} />
+        <FooterCol
+          title="Play"
+          links={[
+            { href: site.download.href, label: "Download the launcher", external: true },
+            { href: site.discord, label: "Discord", external: true },
+          ]}
+        />
       </div>
       <div className="mx-auto flex max-w-[1480px] flex-wrap items-center justify-between gap-2 border-t border-white/5 px-4 py-5 text-sm text-faint sm:px-8">
-        <span>In development. Everything shown is work in progress.</span>
+        <span>Open playtest. Everything shown is work in progress.</span>
         <span className="num">© {new Date().getFullYear()} Meridian Conflict</span>
       </div>
     </footer>

@@ -1,12 +1,20 @@
 {
   "name": "Meridian Conflict",
   "tagline": "Build your base. Command huge armies.",
-  "description": "A real-time strategy game about building bases and commanding huge armies across land, sea, air and orbit. Currently in development.",
+  "description": "A real-time strategy game about building bases and commanding huge armies across land, sea, air and orbit. The open playtest is live: download the launcher and play.",
   "discord": "https://discord.gg/q7UNPenmmg",
+  "download": {
+    "href": "https://builds.meridianconflict.com/download/MeridianConflict-Playtest.zip",
+    "platform": "Windows 10 and 11",
+    "note": "The playtest channel's newest install, scripts/release.sh uploads it with every playtest build."
+  },
   "heroVideo": {
-    "src": null,
-    "poster": null,
-    "note": "Set src (and poster) to a webm/mp4 in public/ once the trailer is cut. Until then the hero draws the valley and the meridian live."
+    "sources": [
+      { "src": "/hero/battle.webm", "type": "video/webm" },
+      { "src": "/hero/battle.mp4", "type": "video/mp4" }
+    ],
+    "poster": "/hero/battle.jpg",
+    "note": "Cut by scripts/film.sh from the game's own --film shots. It plays muted and looped over the live valley, which stays underneath as its loading state."
   },
   "featured": ["arc/commander", "arc/t1-tank", "arc/t3-assault-bot", "arc/t3-assault-aircraft", "arc/t3-battleship", "arc/t3-frigate", "arc/t4-assault-tank", "arc/t5-titan", "regency/t3-scorpion"]
 }

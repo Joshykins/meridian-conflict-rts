@@ -45,12 +45,15 @@ pnpm typecheck
     (`crates/mc-models/src/thumbnail.rs`), for the directory's tiles, and for
     the unit page until the mesh is in or where there is no WebGL 2.
 - **Site copy and links** live in `content/site.json`: tagline, Discord link,
+  the launcher's download link (the playtest channel's newest install, which
+  `scripts/release.sh` uploads to a fixed address with every playtest build),
   the featured units and the hero video. This is the one content file checked in.
-- **Hero video.** The trailer is still to come. Put a webm/mp4 (and a poster
-  frame) in `public/` and set `heroVideo.src` / `heroVideo.poster` in
-  `content/site.json`; it plays muted and looped over the live canvas valley
-  (`src/components/valley-field.tsx`), which stays underneath as its loading
-  state.
+- **Hero video.** Battle footage the game films itself: `scripts/film.sh --site
+  scripts/film/hero.reel` films each cut of the reel headless, crossfades them
+  and writes `public/hero/battle.{webm,mp4,jpg}` (each under 5 MB, the
+  pre-commit hook's limit). It plays muted and looped over the live canvas
+  valley (`src/components/valley-field.tsx`), which stays underneath as its
+  loading state; with reduced motion only the poster shows.
 
 ## How generation stays cheap
 
