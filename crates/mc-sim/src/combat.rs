@@ -643,9 +643,11 @@ impl World {
             return true;
         }
         let bp = self.bp(shooter);
+        // A broadside hull (`Motion::broadside`) swings where it is to lay a beam on
+        // the mark, at sea or in the sky alike (`combat/step.rs`).
         if bp
             .motion
-            .is_some_and(|m| m.layer == mc_data::MoveLayer::Naval)
+            .is_some_and(|m| m.layer == mc_data::MoveLayer::Naval || m.broadside.0 > 0)
         {
             return true;
         }
