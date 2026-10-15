@@ -7,15 +7,14 @@ use mc_core::Angle;
 
 impl UnitBlueprint {
     /// Which way it faces when raised on its lot unturned. Structures face south. A
-    /// unit built on a lot (a lift ship) lies along the lot's long side, nose east
-    /// when the lot is wider than deep, so its hull and the lot agree.
+    /// unit built on a lot (a lift ship, the Nimbus) faces east: its `footprint` is
+    /// given in its own frame, x along the nose like `hull`, so a long hull and a
+    /// wide wing both fit theirs.
     pub fn build_heading(&self) -> Angle {
-        if !self.is_site_built_unit() {
-            Angle::from_degrees(270)
-        } else if self.footprint.0 >= self.footprint.1 {
+        if self.is_site_built_unit() {
             Angle::ZERO
         } else {
-            Angle::from_degrees(90)
+            Angle::from_degrees(270)
         }
     }
 
@@ -66,8 +65,9 @@ mod tests {
     fn turns_snap_to_the_nearest_quarter() {
         let all = blueprints();
         let bp = (all.units.iter())
-            .find(|b| b.is_site_built_unit() && b.footprint == (8, 19))
-            .expect("a site-built unit on an 8x19 lot");
+            .find(|b| b.is_site_built_unit() && b.footprint.0 != b.footprint.1)
+            .expect("a site-built unit on an oblong lot");
+        let (w, d) = bp.footprint;
         let build = bp.build_heading();
         assert_eq!(bp.lot_turn(build), 0);
         assert_eq!(bp.lot_turn(build + Angle::from_degrees(80)), 1);
@@ -78,8 +78,8 @@ mod tests {
             bp.lot_heading(build + Angle::from_degrees(100)),
             build + Angle::QUARTER_TURN
         );
-        assert_eq!(bp.footprint_at(build + Angle::QUARTER_TURN), (19, 8));
-        assert_eq!(bp.footprint_at(build + Angle::HALF_TURN), (8, 19));
+        assert_eq!(bp.footprint_at(build + Angle::QUARTER_TURN), (d, w));
+        assert_eq!(bp.footprint_at(build + Angle::HALF_TURN), (w, d));
     }
 
     #[test]

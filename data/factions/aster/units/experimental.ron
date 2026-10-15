@@ -156,7 +156,8 @@
         health: 52000,
         cost: (materials: 20000, energy: 240000, time: 120000),
         radius: 110, height: 24,
-        footprint: (8, 19),
+        // Its lot is the airframe: 96 m nose to tail, 216 m tip to tip.
+        footprint: (12, 27),
         vision: 1300,
         // Each gun mount turns about its own pivot, not on the seeder's aim.
         hull_mounts: true,
