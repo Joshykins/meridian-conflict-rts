@@ -180,7 +180,7 @@ them, and publishes those. Write real notes for anything players will read.
 
 ### News
 
-`release/news.json` holds the news and the launcher's links:
+`publish/news.json` holds the news and the launcher's links:
 
 ```json
 {
@@ -260,7 +260,7 @@ scripts/release.sh playtest
 ```
 
 (which `channel.sh promote` and `land` run for you) builds the tip of the channel's branch (`playtest` or `release`) for Windows with the channel, the store's URL and the
-channel's server from `release/config.sh`, stages it (a release leaves out
+channel's server from `publish/config.sh`, stages it (a release leaves out
 playtest-only maps), packs and signs it with its patch notes into the local copy of the store
 (`~/.local/share/meridian-release/store`), uploads what R2 lacks (blobs, then the
 build's manifest, then the channel's history, then the channel's pointer, last), and writes
@@ -275,7 +275,7 @@ Setting up R2, once:
 
 1. In Cloudflare, create an R2 bucket and give it public access (a custom domain, or
    the bucket's `r2.dev` URL). Put that URL in `STORE_URL` and the bucket's name in
-   `R2_BUCKET` in `release/config.sh`, with its S3 endpoint
+   `R2_BUCKET` in `publish/config.sh`, with its S3 endpoint
    (`https://<account id>.r2.cloudflarestorage.com`) in `R2_ENDPOINT`.
 2. Create an R2 API token with write access to the bucket, and give it to the AWS CLI:
    `aws configure --profile meridian-r2` (region `auto`).

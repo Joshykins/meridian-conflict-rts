@@ -99,7 +99,7 @@ See `docs/RELEASES.md`.
 | Switch | Values | Purpose |
 |---|---|---|
 | `MERIDIAN_CHANNEL` (compile time) | `dev` (default), `playtest`, `release` | Who the build is for. Part of the build's name (`0.1.0-playtest+<commit>`; a release is `0.1.0+<commit>`), which replays record and network players must share. A release build has no unit or map marked `playtest: true`. |
-| `MERIDIAN_STORE` (compile time) | an `https://` URL | The build store the launcher updates from and fetches old builds from (`release/config.sh`'s `STORE_URL`, set by `scripts/release.sh`). Unset: no updates, and Match History names the build an old replay needs instead of fetching it. |
+| `MERIDIAN_STORE` (compile time) | an `https://` URL | The build store the launcher updates from and fetches old builds from (`publish/config.sh`'s `STORE_URL`, set by `scripts/release.sh`). Unset: no updates, and Match History names the build an old replay needs instead of fetching it. |
 | `MERIDIAN_LAUNCHER` | the launcher's path | Set by the launcher for the game it starts: Match History's Watch in Its Build asks it to fetch and run an old replay's build. |
 | `MeridianConflict --replay FILE` | a replay | The launcher plays FILE in the build that recorded it (fetching it first), then starts the current build on Match History. |
 | `MeridianConflict --screenshot DIR` | a folder | The launcher draws its window in each of its states into DIR as PNGs (1x and 1.5x) and exits. |

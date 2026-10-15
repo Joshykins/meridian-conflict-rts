@@ -202,10 +202,10 @@ mod tests {
         assert_eq!(h.builds[1].number, HISTORY_LEN as u32 + 4);
     }
 
-    /// release/news.json, which `scripts/release.sh news` publishes, reads.
+    /// publish/news.json, which `scripts/release.sh news` publishes, reads.
     #[test]
     fn the_checked_in_news_reads() {
-        News::parse(include_bytes!("../../../release/news.json")).unwrap();
+        News::parse(include_bytes!("../../../publish/news.json")).unwrap();
     }
 
     #[test]

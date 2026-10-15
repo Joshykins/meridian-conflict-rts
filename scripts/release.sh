@@ -10,7 +10,7 @@
 # 1. Builds meridian.exe and the launcher (MeridianConflict.exe) for Windows in a
 #    worktree of that commit (../mc-package), so uncommitted edits stay out and
 #    the build stamp names a real commit, with MERIDIAN_CHANNEL, the store
-#    URL and the channel's server from release/config.sh. The C runtime is linked
+#    URL and the channel's server from publish/config.sh. The C runtime is linked
 #    statically: a player needs nothing installed but a Vulkan GPU driver.
 # 2. Stages the build: meridian.exe, data/ (tracked files only), maps/ (the baked
 #    maps; a release leaves out maps marked playtest), launcher/MeridianConflict.exe.
@@ -33,7 +33,7 @@
 # upload later by running again. With it, --from REF builds REF instead of the
 # channel's branch (to try the pipeline on a commit of your own).
 #
-# `news` signs FILE (default release/news.json: the launcher's news items and its
+# `news` signs FILE (default publish/news.json: the launcher's news items and its
 # row of links, checked by mc-release) into the store and uploads it.
 set -euo pipefail
 usage="usage: scripts/release.sh playtest|release [--notes FILE] [--no-upload] [--from REF] | news [FILE]"
@@ -47,7 +47,7 @@ esac
 shift
 upload=1
 notes_file=
-news_file=release/news.json
+news_file=publish/news.json
 if [[ $channel == news ]]; then
     news_file=${1:-$news_file}
     (( $# <= 1 )) || { echo "$usage" >&2; exit 2; }
@@ -69,13 +69,13 @@ fi
 
 cd "$(git rev-parse --show-toplevel)"
 repo=$PWD
-# shellcheck source=../release/config.sh
-source release/config.sh
+# shellcheck source=../publish/config.sh
+source publish/config.sh
 key=$HOME/.config/meridian-release/signing.key
 store=${MERIDIAN_RELEASE_STORE:-$HOME/.local/share/meridian-release/store}
 [[ -f $key ]] || { echo "no release key at $key (docs/RELEASES.md)" >&2; exit 1; }
 if (( upload )) && [[ -z $STORE_URL || -z $R2_BUCKET || -z $R2_ENDPOINT ]]; then
-    echo "fill in STORE_URL, R2_BUCKET and R2_ENDPOINT in release/config.sh first, or pass --no-upload" >&2
+    echo "fill in STORE_URL, R2_BUCKET and R2_ENDPOINT in publish/config.sh first, or pass --no-upload" >&2
     exit 1
 fi
 s3() { aws s3 "$@" --endpoint-url "$R2_ENDPOINT" --profile "$R2_PROFILE" --only-show-errors; }
