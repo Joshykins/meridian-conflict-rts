@@ -58,12 +58,17 @@ fn spawn(w: &World, owner: u8, key: &str, x: i32, flags: u16) -> PlayerCommand {
 }
 
 fn group(w: &mut World, key: &str, count: i32) -> Vec<mc_sim::UnitId> {
+    spaced_group(w, key, count, 24)
+}
+
+/// [`group`] on a grid `step` metres apart.
+fn spaced_group(w: &mut World, key: &str, count: i32, step: i32) -> Vec<mc_sim::UnitId> {
     let commands: Vec<_> = (0..count)
         .map(|i| {
             cmd(Command::DebugSpawn {
                 owner: 0,
                 blueprint: w.blueprints.id_of(key).unwrap(),
-                pos: FxVec2::from_ints(350 + (i % 5) * 24, 350 + (i / 5) * 24),
+                pos: FxVec2::from_ints(350 + (i % 5) * step, 350 + (i / 5) * step),
                 heading: Angle::ZERO,
                 count: 1,
                 flags: flag::PASSIVE,
@@ -842,7 +847,8 @@ fn moving_onto_a_parked_commander_finishes_in_a_clear_block() {
 fn disordered_units_start_forward_without_waiting_to_form() {
     for key in ["aster_t1_tank", "aster_t1_interceptor"] {
         let mut w = world();
-        let ids = group(&mut w, key, 25);
+        // Spread wider than any rank spacing, so the group starts out of formation.
+        let ids = spaced_group(&mut w, key, 25, 40);
         let start: Vec<_> = ids
             .iter()
             .map(|&id| w.state.units.pos[w.state.units.row(id).unwrap()])

@@ -7,7 +7,7 @@
         categories: ["Land", "Scout", "DirectFire"],
         health: 35,
         cost: (materials: 12, energy: 80, time: 60),
-        radius: 2.4, height: 1.8, scale: 1.85,
+        radius: 2.4, height: 1.8, scale: 1.6,
         vision: 750, radar: 3000,
         motion: (layer: Land, size: 0, speed: 64, accel: 70, turn: 220),
         weapons: [(
@@ -28,7 +28,7 @@
         categories: ["Land", "DirectFire"],
         health: 75,
         cost: (materials: 35, energy: 150, time: 150),
-        radius: 2.6, height: 5.2, scale: 1.85,
+        radius: 2.6, height: 5.2, scale: 1.6,
         vision: 290,
         motion: (layer: Land, size: 0, speed: 56, accel: 63, turn: 240),
         weapons: [(
@@ -49,7 +49,7 @@
         categories: ["Land", "DirectFire"],
         health: 300,
         cost: (materials: 56, energy: 266, time: 280),
-        radius: 4.6, height: 3.4, scale: 1.85,
+        radius: 4.6, height: 3.4, scale: 1.6,
         vision: 320,
         motion: (layer: Land, size: 1, speed: 43, accel: 39, turn: 110),
         weapons: [(
@@ -70,7 +70,7 @@
         categories: ["Land", "Artillery"],
         health: 140,
         cost: (materials: 54, energy: 270, time: 270),
-        radius: 4.2, height: 3.2, scale: 1.85,
+        radius: 4.2, height: 3.2, scale: 1.6,
         vision: 340,
         motion: (layer: Land, size: 1, speed: 36, accel: 34, turn: 100),
         weapons: [(
@@ -316,7 +316,7 @@
 
 (key: "aster_t1_mobile_aa", name: "Gnat", role: "Mobile AA Gun", title: "Mobile AA", tech: 1,
  categories: ["Land", "AntiAir"], health: 300, cost: (materials: 55, energy: 550, time: 220),
- radius: 4, height: 4.5, scale: 1.85, vision: 360, motion: (layer: Land, size: 1, speed: 46, accel: 42, turn: 100),
+ radius: 4, height: 4.5, scale: 1.6, vision: 360, motion: (layer: Land, size: 1, speed: 46, accel: 42, turn: 100),
  weapons: [(name: "Single Barrel AA Gun", damage: 11, range: 360, reload: 0.35, speed: 800, trajectory: Direct,
  turret_turn: 240, muzzle: (5.5, 0, 3.5), pivot: (0, 0, 3.5), targets: ["Air"], color: Orange, sounds: (fire: "autocannon", impact: "shell_light"), )], mesh: "mobile_aa", icon: AntiAir, sounds: (moving: "tracks")),
 (key: "aster_t2_mobile_aa", name: "Squall", role: "Mobile Flak", title: "Mobile Flak", tech: 2,

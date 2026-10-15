@@ -441,7 +441,7 @@ fn scattered_knolls_do_not_break_the_block() {
             m.bunched_with_room < 0.01,
             "{count} tanks squeezed with room to spare: {m:?}"
         );
-        // 9%: at FAF size and pace (2026-10-14) the 36-block goes 8.1% out of its way
+        // 9%: at FAF size and pace (2026-10-14, T1 x1.85) the 36-block went 8.1% out of its way
         // round the grown knolls, against 8% before; marching is to be gone over again.
         assert!(
             m.detour < 1.09,
