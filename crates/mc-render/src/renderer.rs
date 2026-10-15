@@ -1331,7 +1331,7 @@ impl Renderer {
                 burn_sites.push(burn_sites[base.index()].clone());
                 continue;
             }
-            let (radius, height) = (bp.radius.to_f32(), bp.height.to_f32());
+            let (radius, height) = bp.drawn_size();
             let module_keys: Vec<&str> = bps.refit_set(bp.id).map_or(Vec::new(), |set| {
                 set.slots
                     .iter()

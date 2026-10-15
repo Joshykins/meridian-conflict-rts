@@ -1256,10 +1256,11 @@ pub(crate) fn authored(bp: &mc_data::UnitBlueprint, p: mc_core::FxVec3) -> glam:
 }
 
 /// A length of the unit file `bp`'s model (its radius or height), back at the model's
-/// authored size (tests), as `authored` is for a point.
+/// authored size (tests), as `authored` is for a point: the body is `scale` over the
+/// unit's `visual.draw` times the model's.
 #[cfg(test)]
 pub(crate) fn authored_len(bp: &mc_data::UnitBlueprint, length: mc_core::Fx) -> f32 {
-    length.to_f32() / bp.scale
+    length.to_f32() * bp.visual.draw / bp.scale
 }
 
 /// The most a reduced level of detail may draw, as a share of the full level (plus 20

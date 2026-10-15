@@ -378,6 +378,11 @@ pub(crate) struct Unit {
     /// multiplied on load. None: as authored.
     #[serde(default)]
     pub scale: Option<f64>,
+    /// Drawn this many times its body (`crate::scale`): the model and every point placed
+    /// on it grow by it, `radius` and `height` (what it collides with, what carries it)
+    /// do not. None: drawn at its body's size.
+    #[serde(default)]
+    pub draw_scale: Option<f64>,
     #[serde(default)]
     pub footprint: (u8, u8),
     /// Half-extents, metres, of what a structure blocks on the nav grid, in its own
@@ -2773,6 +2778,7 @@ impl Unit {
                 mesh: self.mesh.clone(),
                 icon: self.icon,
                 lights: self.lights.clone(),
+                draw: 1.0,
             },
             sounds: self.sounds.clone(),
             lore: String::new(),

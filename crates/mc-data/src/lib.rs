@@ -839,6 +839,9 @@ pub struct Visual {
     /// Lamps on the hull. `None`: the renderer's usual set for the kind of unit
     /// (headlights on vehicles, floodlights on structures); `Some([])`: none.
     pub lights: Option<Vec<LightMount>>,
+    /// The model is drawn this many times the blueprint's `radius` and `height`
+    /// (`draw_scale:` in the unit file); the points on it are already multiplied by it.
+    pub draw: f32,
 }
 
 /// How a lamp throws its light.
@@ -916,8 +919,9 @@ pub struct UnitBlueprint {
     /// Collision radius on the ground plane.
     pub radius: Fx,
     pub height: Fx,
-    /// How many times its model's authored size it is built (`scale:` in the unit file):
-    /// `radius`, `height` and the points on the model are already multiplied by it.
+    /// How many times its model's authored size it is drawn (`scale:` times `draw_scale:`
+    /// in the unit file): the points on the model are already multiplied by it, `radius`
+    /// and `height` by it over `visual.draw`.
     pub scale: f32,
     /// Lot size in build cells, x then y: a structure's facing south, a site-built
     /// unit's in its own frame (x along the nose). `(0, 0)` for other mobile units.
@@ -1031,6 +1035,12 @@ pub struct UnitBlueprint {
 }
 
 impl UnitBlueprint {
+    /// The radius and height its model is drawn to: its body's, times `visual.draw`.
+    pub fn drawn_size(&self) -> (f32, f32) {
+        let d = self.visual.draw;
+        (self.radius.to_f32() * d, self.height.to_f32() * d)
+    }
+
     /// Where a point on the turret (`at`, the model's plane) is off the unit's position,
     /// the hull facing `heading` and the turret `facing`: it swings about `turret_at`.
     pub fn turret_point(&self, at: FxVec2, heading: Angle, facing: Angle) -> FxVec2 {
