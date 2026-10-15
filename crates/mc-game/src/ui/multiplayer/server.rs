@@ -53,32 +53,26 @@ impl Problem {
         }
     }
 
-    /// A headline, what it means, and what to try, for `addr`.
+    /// A headline, what it means, and what to try, for `addr`: the build's own
+    /// server, so nothing here asks the player to change it.
     pub fn explain(&self, addr: &str) -> (&'static str, String, Vec<&'static str>) {
         match self {
             Problem::NotFound => (
-                "Address Not Found",
-                format!("No machine goes by \u{201c}{addr}\u{201d}."),
-                vec![
-                    "Check the address for a typing mistake",
-                    "Use the server's IP address instead of a name",
-                ],
+                "Server Not Found",
+                format!("The game's server, {addr}, could not be looked up."),
+                vec!["Check your internet connection, then try again"],
             ),
             Problem::NothingListening => (
-                "Server Not Running",
-                format!("{addr} answered, but no game server is listening there."),
-                vec![
-                    "Start meridian-server on that machine",
-                    "Check the port: servers listen on 7777 unless told otherwise",
-                ],
+                "Server Down",
+                format!("{addr} answered, but the game's server is not running there."),
+                vec!["It may be restarting: it is tried again on its own"],
             ),
             Problem::NoAnswer => (
                 "No Answer",
-                format!("Nothing at {addr} answered in time."),
+                format!("The game's server, {addr}, did not answer in time."),
                 vec![
-                    "Is the server machine on, awake and running meridian-server?",
-                    "Its router must forward TCP port 7777 to it",
-                    "Its firewall must let meridian-server accept connections",
+                    "Check your internet connection",
+                    "A firewall on this computer may block the game",
                 ],
             ),
             Problem::NoNetwork => (
@@ -102,7 +96,7 @@ impl Problem {
 
 /// Where the link to the server stands.
 pub enum Status {
-    /// No server address yet.
+    /// This build has no server of its own.
     NoAddress,
     /// Reaching the server, or signing in.
     Connecting { since: Instant },
@@ -137,8 +131,8 @@ pub enum Answer {
 }
 
 pub struct Server {
-    /// As typed, and as connected to (with the default port added).
-    pub address: String,
+    /// The build's server, and as connected to (with the default port added).
+    address: String,
     target: String,
     pub status: Status,
     client: Option<DirectoryClient>,
@@ -212,9 +206,8 @@ impl Server {
         )
     }
 
-    /// Drops any link and connects afresh to `address` as `name`.
-    pub fn reconnect(&mut self, address: &str, name: &str) {
-        self.address = address.trim().to_owned();
+    /// Drops any link and signs in afresh as `name`.
+    pub fn sign_in_as(&mut self, name: &str) {
         self.name = name.to_owned();
         self.attempts = 0;
         self.connect();

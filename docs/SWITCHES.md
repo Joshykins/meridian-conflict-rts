@@ -125,9 +125,9 @@ See `docs/RELEASES.md`.
 | `--replay-only` | with `--replay` | An old build playing a replay for a newer one: leaving the replay quits, and the settings file is never written. |
 | `--open SCREEN` | `menu`, `skirmish`, `survival`, `multiplayer`, `history`, `settings` | The front end opens on that screen. |
 | `--version` | | Print the build's name, number, channel, commit and simulation fingerprint, one `key: value` a line, and exit. |
-| `MERIDIAN_SERVER_PLAYTEST` (compile time) | `host[:port]` | The server a playtest build plays on until the player types another. Unset: none (the multiplayer screen opens on the local network). |
+| `MERIDIAN_SERVER_PLAYTEST` (compile time) | `host[:port]` | The server a playtest build plays on; players cannot change it. Unset: none (the multiplayer screen opens on the local network). |
 | `MERIDIAN_SERVER_RELEASE` (compile time) | `host[:port]` | The same for a release build. A dev build reads neither and has no server of its own. |
-| `MERIDIAN_MP_SERVER` | `host:port` | With `--ui`: the multiplayer screen connects to that server, whatever the settings say. |
+| `MERIDIAN_MP_SERVER` | `host[:port]` | The game plays on that server instead of the one it was built with (a dev build has none). Also for `--ui` shots of the multiplayer screen. |
 
 ## AI probes and tournaments
 

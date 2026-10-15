@@ -422,17 +422,14 @@ impl Front {
                     }
                     None => {}
                 }
-                // The callsign and server are remembered once they are typed.
+                // The callsign is remembered once it is typed.
                 if let Some(state) = &self.multiplayer {
                     let name = state.name.trim();
                     if ui.mem.editing.is_none()
-                        && (settings.server != state.address.trim()
-                            || (settings.player_name != name && mc_net::check_name(name).is_ok()))
+                        && settings.player_name != name
+                        && mc_net::check_name(name).is_ok()
                     {
-                        settings.server = state.address.trim().to_owned();
-                        if mc_net::check_name(name).is_ok() {
-                            settings.player_name = name.to_owned();
-                        }
+                        settings.player_name = name.to_owned();
                         out.settings_changed = true;
                     }
                 }

@@ -288,10 +288,11 @@ MERIDIAN_LAUNCHER (set by the launcher, MeridianConflict.exe, for the game it st
 is the launcher that keeps it up to date and runs old replays in their own builds.
 
 MERIDIAN_SERVER_PLAYTEST=HOST[:PORT], MERIDIAN_SERVER_RELEASE=HOST[:PORT] at compile time:
-the server a playtest or a release build plays on until another is typed (none: the
-multiplayer screen opens on the local network, as a dev build's always does).
+the server a playtest or a release build plays on; players cannot change it (none:
+the multiplayer screen opens on the local network, as a dev build's always does).
 
-MERIDIAN_MP_SERVER=HOST:PORT with --ui: the multiplayer screen connects to that server.
+MERIDIAN_MP_SERVER=HOST[:PORT]: the game plays on that server instead of its build's
+(also for --ui shots of the multiplayer screen).
 ";
 
 fn main() {

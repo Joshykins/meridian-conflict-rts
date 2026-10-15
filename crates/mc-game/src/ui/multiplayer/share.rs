@@ -42,7 +42,7 @@ pub struct Share {
     server: Option<Server>,
     identity: Option<Identity>,
     title: String,
-    /// On this network rather than the server.
+    /// On this network rather than the server: only ever the player's pick.
     lan: bool,
     private: bool,
     /// Waiting for the server to open the room.
@@ -56,12 +56,11 @@ impl Share {
         self.sheet.is_open()
     }
 
-    /// Opens the sheet, signing in to `address` (the server last used) the first time.
+    /// Opens the sheet, signing in to `address` (the build's server) the first time.
     pub fn open(&mut self, address: &str, name: &str) {
         if self.server.is_none() {
             self.identity = identity();
             self.server = Some(Server::new(address, name, self.identity.clone()));
-            self.lan = address.trim().is_empty();
         }
         if self.title.trim().is_empty() {
             self.title = format!("{}'s Game", name.trim());
@@ -119,19 +118,17 @@ impl Share {
                 }
             }
         }
-        if !self.online() {
-            // The link went while the server was opening the room: no answer is coming.
-            if self.busy {
-                log::warn!("the server link dropped while it opened a game");
-                self.say(
-                    "The server went away before the game opened. Try again once it is back."
-                        .to_owned(),
-                );
-            }
-            self.lan = true;
+        // The link went while the server was opening the room: no answer is coming.
+        if !self.online() && self.busy {
+            log::warn!("the server link dropped while it opened a game");
+            self.say(
+                "The server went away before the game opened. Try again once it is back."
+                    .to_owned(),
+            );
         }
         let name_ok = mc_net::check_name(callsign);
         let ready = !self.busy
+            && (self.lan || self.online())
             && name_ok.is_ok()
             && !self.title.trim().is_empty()
             && lineup.problem(catalog).is_none()
@@ -208,9 +205,7 @@ impl Share {
                 format!("Friends anywhere join through {target}")
             }
             Some((Status::Connecting { .. }, target)) => format!("Reaching {target}\u{2026}"),
-            Some((Status::NoAddress, _)) | None => {
-                "No server yet: set one in Multiplayer".to_owned()
-            }
+            Some((Status::NoAddress, _)) | None => "This build has no server of its own".to_owned(),
             Some((Status::NeedsName, _)) => {
                 "Choose a callsign in Multiplayer to go online".to_owned()
             }
@@ -290,6 +285,12 @@ impl Share {
             (
                 format!("Your callsign will not do on a server: {e}. Change it in Match Settings."),
                 palette::WARN,
+            )
+        } else if !self.lan && !online {
+            (
+                "Over the Internet opens once the server is in reach; On This Network needs none."
+                    .to_owned(),
+                palette::DIM,
             )
         } else {
             // Your seat aside, the seats a person may take.

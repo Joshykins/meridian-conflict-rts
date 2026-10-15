@@ -49,7 +49,9 @@ Pass any server options straight through, for example:
 ```
 
 Relative paths are resolved from the checkout, even when you launch the script
-from another directory. In the game on this Mac, connect to `127.0.0.1:7777`.
+from another directory. To play on it from this Mac, start the game with
+`MERIDIAN_MP_SERVER=127.0.0.1:7777` (a build otherwise plays on the server it was
+built with, section 6).
 
 The first time, macOS asks whether `meridian-server` may **accept incoming
 network connections**: choose **Allow**. (If you missed it: System Settings ->
@@ -69,7 +71,7 @@ your *public* address, and your router must pass that on to the Mac:
    Server" or "NAT"). Forward **TCP port 7777** to the Mac's address, port 7777.
 3. Find your public address: `curl -4 ifconfig.me` in Terminal.
 
-**Who types what in the game:**
+**Which address each starts the game with** (`MERIDIAN_MP_SERVER=...`):
 
 - Your friend, elsewhere on the internet: your **public** address, e.g. `203.0.113.7`.
 - You, at home on the same network as the Mac: the Mac's **home network**
@@ -86,7 +88,7 @@ Both of you are then on the same server and see the same games.
   differs from what `ifconfig.me` says, your provider shares one address among
   many homes ("CGNAT") and port forwarding cannot work. Then either rent a
   server (below), or use [Tailscale](https://tailscale.com): both of you install
-  it and join the same network, and your friend types the Mac's Tailscale
+  it and join the same network, and your friend uses the Mac's Tailscale
   address (`100.x.y.z`) instead. No port forwarding is needed with Tailscale.
 
 The rest of this guide (sections 1-5) is for a rented Linux server; sections 6,
@@ -195,15 +197,18 @@ any desync, and where the replay went), refusals, and limits being hit.
 
 Stopping (or restarting) ends the games in progress; their replays are kept.
 
-## 6. Tell players where it is
+## 6. Point the game at it
 
-Players open **Multiplayer** in the game, type the server's address in the
-**Server** box and press **Connect**: your IP, e.g. `203.0.113.7` (the port can
-be left off when it is 7777). The panel under the box says whether it got in,
-and if not, why (nothing at that address, nothing listening, no answer) and what
-to check. If you own a domain, add an **A record**
-(e.g. `play.example.com` pointing at the IP) and give out `play.example.com:7777`
-instead; it keeps working if the IP ever changes.
+Players never type a server: a build plays on the one it was built with
+(`MERIDIAN_SERVER_PLAYTEST`/`MERIDIAN_SERVER_RELEASE`, see *A second server for
+playtest builds*), and its
+**Multiplayer** screen signs in on its own once the player has a callsign. When
+it cannot get in, the game list says why (not found, not running, no answer).
+To try a server from a dev build, start the game with
+`MERIDIAN_MP_SERVER=203.0.113.7` (the port can be left off when it is 7777).
+If you own a domain, add an **A record** (e.g. `play.example.com` pointing at
+the IP) and build with `play.example.com:7777` instead; it keeps working if the
+IP ever changes.
 
 Everyone must run the same build of the game as each other to play together;
 the server refuses a mismatched player with a message saying so.
@@ -325,8 +330,7 @@ MERIDIAN_SERVER_PLAYTEST=play.example.com:7778 MERIDIAN_SERVER_RELEASE=play.exam
     MERIDIAN_CHANNEL=playtest cargo build --release -p mc-game
 ```
 
-A player who types another address keeps it: each channel's builds remember
-their own.
+A player cannot change it: a build plays on the server it was built with.
 
 ## 10. Updating
 

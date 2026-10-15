@@ -1452,10 +1452,6 @@ pub fn ui_screenshot(
     if let Ok(stem) = std::env::var("MERIDIAN_SKIRMISH_MAP") {
         settings.skirmish_map = stem;
     }
-    // `MERIDIAN_MP_SERVER=host:port`: the multiplayer screen connects to that server.
-    if let Ok(addr) = std::env::var("MERIDIAN_MP_SERVER") {
-        settings.server = addr;
-    }
     let mut front = Front::new(
         Director::new(&map, true),
         blueprints,

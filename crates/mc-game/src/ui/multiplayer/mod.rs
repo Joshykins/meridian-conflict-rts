@@ -54,9 +54,10 @@ pub struct MultiplayerState {
     scanner: Option<LanScanner>,
     lan: Vec<LanGame>,
     identity: Option<Identity>,
-    /// As typed in the fields.
+    /// As typed in the field.
     pub name: String,
-    pub address: String,
+    /// A callsign has been chosen: until then the screen asks for nothing else.
+    named: bool,
     code: String,
     direct: String,
     tab: Tab,
@@ -123,8 +124,8 @@ impl MultiplayerState {
             scanner,
             lan: Vec::new(),
             identity,
+            named: mc_net::check_name(&name).is_ok(),
             name,
-            address: settings.server.clone(),
             code: String::new(),
             direct: String::new(),
             tab: if settings.server.is_empty() {
@@ -158,7 +159,7 @@ impl MultiplayerState {
             lan: Vec::new(),
             identity,
             name: settings.player_name.clone(),
-            address: settings.server.clone(),
+            named: true,
             code: String::new(),
             direct: String::new(),
             tab: if settings.server.is_empty() {

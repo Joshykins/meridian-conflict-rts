@@ -1,8 +1,8 @@
-//! The browser: who you are, which server, and the games to join, on the server
-//! and on this network. When the server cannot be reached the list says why and
-//! what to try, and games on this network still work.
+//! The browser: who you are, and the games to join, on the server the game
+//! ships with and on this network. When the server cannot be reached the list
+//! says why, and games on this network still work.
 
-use super::server::{Problem, Status};
+use super::server::Status;
 use super::{MultiplayerAction, MultiplayerState, Tab};
 use crate::audio::Sfx;
 use crate::ui::{id, ink, palette, rgb, type_scale, ButtonKind, Key, Rect, Ui};
@@ -53,9 +53,34 @@ pub(super) fn draw(
     state: &mut MultiplayerState,
     enter: f32,
 ) -> Option<MultiplayerAction> {
+    if !state.named {
+        return callsign_first(ui, state, enter);
+    }
     let (w, h) = (ui.size.x, ui.size.y);
+    // Signed in: who as, how busy the server is, and its message of the day.
     let signed = match &state.server.status {
-        Status::Online { name, .. } => format!("Signed in as {name}"),
+        Status::Online {
+            name,
+            online,
+            rooms,
+            motd,
+        } => {
+            let plural =
+                |n: u32, one: &str, many: &str| format!("{n} {}", if n == 1 { one } else { many });
+            let ms = state
+                .server
+                .latency()
+                .map_or(String::new(), |d| format!("  \u{b7}  {} ms", d.as_millis()));
+            let mut line = format!(
+                "Signed in as {name}  \u{b7}  {} online  \u{b7}  {}{ms}",
+                plural(*online, "commander", "commanders"),
+                plural(*rooms, "game", "games")
+            );
+            if !motd.is_empty() {
+                line = format!("{line}  \u{b7}  {motd}");
+            }
+            line
+        }
         _ => "Play with friends over the internet or on your network".to_owned(),
     };
     header(ui, "Multiplayer", &signed, enter);
@@ -80,8 +105,7 @@ pub(super) fn draw(
         games.w + 44.0,
         games.h + 40.0,
     ));
-    let mut y = commander(ui, state, side);
-    y = server_panel(ui, state, Rect::new(side.x, y, side.w, side.bottom() - y));
+    let y = commander(ui, state, side);
     join_panel(ui, state, Rect::new(side.x, y, side.w, side.bottom() - y));
     game_list(ui, state, games);
 
@@ -129,6 +153,88 @@ pub(super) fn draw(
     } else if host {
         ui.audio.play(Sfx::Select);
         action = Some(MultiplayerAction::Host);
+    }
+    ui.fade = 1.0;
+    ui.shift.y = 0.0;
+    action
+}
+
+/// The screen before the browser while there is no callsign: every game,
+/// online or on this network, is played under one, so it is asked for first.
+fn callsign_first(
+    ui: &mut Ui,
+    state: &mut MultiplayerState,
+    enter: f32,
+) -> Option<MultiplayerAction> {
+    let (w, h) = (ui.size.x, ui.size.y);
+    header(ui, "Multiplayer", "Choose your callsign", enter);
+    let card = Rect::new((w - 560.0) * 0.5, h * 0.5 - 150.0, 560.0, 250.0);
+    ui.panel(Rect::new(
+        card.x - 22.0,
+        card.y - 20.0,
+        card.w + 44.0,
+        card.h + 40.0,
+    ));
+    ui.section(card.x, card.y + 6.0, card.w, "Your Callsign");
+    ui.text_fit_left(
+        card.x,
+        card.y + 40.0,
+        card.w,
+        type_scale::BODY,
+        rgb(palette::DIM, 1.0),
+        "The name other commanders see, on the server and on this network.",
+    );
+    let field = Rect::new(card.x, card.y + 70.0, card.w, 44.0);
+    let name_id = id("mp-name", 0);
+    let editing = ui.mem.editing == Some(name_id);
+    ui.text_field(name_id, field, &mut state.name, mc_net::MAX_PLAYER_NAME);
+    let valid = mc_net::check_name(&state.name);
+    if state.name.is_empty() && !editing {
+        ui.text(
+            field.x + 12.0,
+            field.mid_y(),
+            type_scale::BODY,
+            rgb(palette::FAINT, 1.0),
+            "type a callsign",
+        );
+        let pulse = 0.35 + 0.65 * (ui.time * 3.0).sin().abs();
+        ui.frame(field, rgb(palette::ACCENT, pulse));
+    }
+    let (text, tone) = match &valid {
+        Err(_) if state.name.is_empty() => (
+            "Letters, digits, spaces, _ - and . up to 24 characters".to_owned(),
+            palette::FAINT,
+        ),
+        Err(why) => (format!("That name will not do: {why}"), palette::WARN),
+        Ok(()) => (
+            "A server keeps a callsign for the computer that first used it".to_owned(),
+            palette::FAINT,
+        ),
+    };
+    caption(ui, card.x, field.bottom() + 16.0, card.w, &text, tone);
+    let go = ui.button(
+        id("mp-callsign-go", 0),
+        Rect::new(card.right() - 220.0, card.bottom() - 52.0, 220.0, 52.0),
+        "Continue",
+        ButtonKind::Primary,
+        valid.is_ok(),
+    );
+    let back = ui.button(
+        id("mp-back", 0),
+        Rect::new(card.x, card.bottom() - 52.0, 160.0, 52.0),
+        "Back",
+        ButtonKind::Secondary,
+        true,
+    );
+    let mut action = None;
+    if (go || (editing && ui.input.key(Key::Enter))) && valid.is_ok() {
+        ui.audio.play(Sfx::Select);
+        state.named = true;
+        let name = state.name.clone();
+        state.server.sign_in_as(&name);
+    } else if back || (ui.input.key(Key::Escape) && !editing && ui.interactive) {
+        ui.audio.play(Sfx::Back);
+        action = Some(MultiplayerAction::Back);
     }
     ui.fade = 1.0;
     ui.shift.y = 0.0;
@@ -196,196 +302,17 @@ fn commander(ui: &mut Ui, state: &mut MultiplayerState, r: Rect) -> f32 {
     // the callsign was what stopped the link.
     let entered = editing && ui.input.key(Key::Enter);
     let left = !editing && state.server.name_problem() && state.name != state.server.name();
-    if (entered || left) && valid.is_ok() && !state.address.trim().is_empty() {
+    if (entered || left) && valid.is_ok() {
         if entered {
             ui.audio.play(Sfx::Select);
         }
-        let (address, name) = (state.address.clone(), state.name.clone());
-        state.server.reconnect(&address, &name);
-        state.tab = Tab::Online;
+        let name = state.name.clone();
+        state.server.sign_in_as(&name);
+        if !matches!(state.server.status, Status::NoAddress) {
+            state.tab = Tab::Online;
+        }
     }
     r.y + 108.0
-}
-
-/// The server's address, and how the link to it stands. Returns the y under it.
-fn server_panel(ui: &mut Ui, state: &mut MultiplayerState, r: Rect) -> f32 {
-    ui.section(r.x, r.y + 6.0, r.w, "Server");
-    let button_w = 118.0;
-    let field = Rect::new(r.x, r.y + 30.0, r.w - button_w - 10.0, 40.0);
-    let editing = ui.mem.editing == Some(id("mp-server", 0));
-    ui.text_field(id("mp-server", 0), field, &mut state.address, 64);
-    if state.address.is_empty() && !editing {
-        ui.text(
-            field.x + 12.0,
-            field.mid_y(),
-            type_scale::BODY,
-            rgb(palette::FAINT, 1.0),
-            "address, e.g. 203.0.113.7",
-        );
-    }
-    let changed = state.address.trim() != state.server.address || state.name != state_name(state);
-    let label = if changed || !state.server.online() {
-        "Connect"
-    } else {
-        "Reconnect"
-    };
-    let go = ui.button(
-        id("mp-connect", 0),
-        Rect::new(field.right() + 10.0, field.y, button_w, field.h),
-        label,
-        ButtonKind::Secondary,
-        !state.address.trim().is_empty(),
-    );
-    let enter = editing && ui.input.key(Key::Enter);
-    if go || enter {
-        ui.audio.play(Sfx::Select);
-        let (address, name) = (state.address.clone(), state.name.clone());
-        state.server.reconnect(&address, &name);
-        state.tab = Tab::Online;
-    }
-
-    // The link: a mark that says how it stands at a glance, then the words.
-    let y = r.y + 88.0;
-    let mark = Vec2::new(r.x + 12.0, y + 9.0);
-    let t = ui.time;
-    let (tone, headline, detail) = match &state.server.status {
-        Status::NoAddress => (
-            palette::FAINT,
-            "Not Connected".to_owned(),
-            "Enter the address of a Meridian server to find games on it.".to_owned(),
-        ),
-        Status::Connecting { since } => (
-            palette::TEXT,
-            "Connecting".to_owned(),
-            format!(
-                "Reaching {}  \u{b7}  {:.0} s",
-                state.server.target(),
-                since.elapsed().as_secs_f32()
-            ),
-        ),
-        Status::Online {
-            online,
-            rooms,
-            motd,
-            ..
-        } => {
-            let ms = state
-                .server
-                .latency()
-                .map_or(String::new(), |d| format!("  \u{b7}  {} ms", d.as_millis()));
-            let plural =
-                |n: u32, one: &str, many: &str| format!("{n} {}", if n == 1 { one } else { many });
-            let mut line = format!(
-                "{}  \u{b7}  {}{ms}",
-                plural(*online, "commander", "commanders"),
-                plural(*rooms, "game", "games")
-            );
-            if !motd.is_empty() {
-                line = format!("{line}\n{motd}");
-            }
-            (palette::TEXT, "Online".to_owned(), line)
-        }
-        Status::Offline { problem, .. } => {
-            let (title, body, _) = problem.explain(state.server.target());
-            (palette::WARN, title.to_owned(), body)
-        }
-        Status::NeedsName => (
-            palette::ACCENT,
-            "Choose a Callsign".to_owned(),
-            "Type the name other players will see under Your Callsign, then press Enter to connect."
-                .to_owned(),
-        ),
-        Status::Refused {
-            reason: mc_net::DirRefuseReason::NameTaken,
-            ..
-        } => (
-            palette::WARN,
-            "Callsign Taken".to_owned(),
-            format!(
-                "Another player owns \u{201c}{}\u{201d} on this server. Choose another callsign above and press Enter.",
-                state.server.name()
-            ),
-        ),
-        Status::Refused { reason, detail } => (
-            palette::BAD,
-            "Turned Away".to_owned(),
-            if detail.is_empty() {
-                capitalise(reason.describe())
-            } else {
-                format!("{}: {detail}", capitalise(reason.describe()))
-            },
-        ),
-    };
-    // A ring: turning while connecting, whole when online, broken when not.
-    match &state.server.status {
-        Status::Connecting { .. } => {
-            ui.arc(mark, 7.0, t * 5.0, t * 5.0 + 3.8, 2.0, rgb(tone, 1.0));
-        }
-        Status::Online { .. } => {
-            ui.arc(mark, 7.0, 0.0, std::f32::consts::TAU, 2.0, rgb(tone, 1.0));
-            ui.disc(
-                mark,
-                3.0,
-                rgb(palette::ACCENT, 0.6 + 0.4 * (t * 2.0).sin().abs()),
-            );
-        }
-        _ => {
-            ui.arc(mark, 7.0, 0.6, 2.6, 2.0, rgb(tone, 1.0));
-            ui.arc(mark, 7.0, 3.7, 5.7, 2.0, rgb(tone, 1.0));
-        }
-    }
-    ui.text(
-        r.x + 30.0,
-        y + 9.0,
-        type_scale::VALUE,
-        rgb(tone, 1.0),
-        &headline,
-    );
-    let mut ly = y + 32.0;
-    for para in detail.lines() {
-        for line in ui.wrap(type_scale::BODY, para, r.w - 30.0) {
-            ui.text(
-                r.x + 30.0,
-                ly,
-                type_scale::BODY,
-                rgb(palette::DIM, 1.0),
-                &line,
-            );
-            ly += 20.0;
-        }
-    }
-    if let Status::Offline {
-        retry_at, attempts, ..
-    } = state.server.status
-    {
-        let left = retry_at
-            .saturating_duration_since(std::time::Instant::now())
-            .as_secs_f32()
-            .ceil();
-        let r2 = Rect::new(r.x + 30.0, ly + 4.0, 130.0, 34.0);
-        if ui.button(
-            id("mp-retry", 0),
-            r2,
-            "Try Now",
-            ButtonKind::Secondary,
-            true,
-        ) {
-            ui.audio.play(Sfx::Select);
-            state.server.retry();
-        }
-        ui.text(
-            r2.right() + 14.0,
-            r2.mid_y(),
-            type_scale::MICRO,
-            rgb(palette::FAINT, 1.0),
-            &format!(
-                "Trying again in {left:.0} s  \u{b7}  attempt {}",
-                attempts + 1
-            ),
-        );
-        ly += 46.0;
-    }
-    ly + 12.0
 }
 
 fn capitalise(s: &str) -> String {
@@ -393,14 +320,6 @@ fn capitalise(s: &str) -> String {
     c.next().map_or_else(String::new, |f| {
         f.to_uppercase().collect::<String>() + c.as_str()
     })
-}
-
-/// The name the server link was made with (to tell when it has changed).
-fn state_name(state: &MultiplayerState) -> String {
-    match &state.server.status {
-        Status::Online { name, .. } => name.clone(),
-        _ => state.name.clone(),
-    }
 }
 
 /// Join by code, and by address. Returns nothing: it is the last of the column.
@@ -574,7 +493,7 @@ fn status_card(status: &Status, target: &str, name: &str) -> (String, String, Ve
     match status {
         Status::NeedsName => (
             "Choose a Callsign".into(),
-            "Games on a server are played under a callsign of your own. Type one under Your Callsign at the top left and press Enter: it connects straight away.".into(),
+            "Games on a server are played under a callsign of your own. Type one under Your Callsign at the top left and press Enter: it signs in straight away.".into(),
             vec![
                 "Letters, digits, spaces, _ - and . up to 24 characters".into(),
                 "A server keeps a callsign for the computer that first used it".into(),
@@ -592,24 +511,22 @@ fn status_card(status: &Status, target: &str, name: &str) -> (String, String, Ve
             ],
         ),
         Status::NoAddress => (
-            "Connect to a Server".into(),
-            "Games over the internet go through a Meridian server. Whoever runs one gives you its address; enter it on the left.".into(),
-            vec![
-                "Anyone can run one: meridian-server, see docs/SERVER.md".into(),
-                "Friends on your own network need no server: see This Network".into(),
-            ],
+            "No Server".into(),
+            "This build of the game has no server of its own, so there are no games over the internet.".into(),
+            vec!["Friends on your own network need no server: see This Network".into()],
         ),
-        Status::Connecting { .. } => (
+        Status::Connecting { since } => (
             "Connecting".into(),
-            format!("Reaching {target}\u{2026}"),
+            format!(
+                "Reaching the game's server\u{2026}  \u{b7}  {:.0} s",
+                since.elapsed().as_secs_f32()
+            ),
             Vec::new(),
         ),
         Status::Offline { problem, .. } => {
             let (title, body, hints) = problem.explain(target);
             let mut hints: Vec<String> = hints.into_iter().map(String::from).collect();
-            if matches!(problem, Problem::NoAnswer | Problem::NothingListening) {
-                hints.push("Games on your own network still work: see This Network".into());
-            }
+            hints.push("Games on your own network still work: see This Network".into());
             (title.to_owned(), body, hints)
         }
         Status::Refused { reason, detail } => (
@@ -723,6 +640,25 @@ fn offline_card(
     ) {
         ui.audio.play(Sfx::Tick);
         state.tab = Tab::Network;
+    }
+    if let Status::Offline {
+        retry_at, attempts, ..
+    } = state.server.status
+    {
+        let left = retry_at
+            .saturating_duration_since(std::time::Instant::now())
+            .as_secs_f32()
+            .ceil();
+        ui.text_centred(
+            c.x,
+            y + 68.0,
+            type_scale::MICRO,
+            rgb(palette::FAINT, 1.0),
+            &format!(
+                "Trying again in {left:.0} s  \u{b7}  attempt {}",
+                attempts + 1
+            ),
+        );
     }
 }
 
