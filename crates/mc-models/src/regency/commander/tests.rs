@@ -25,7 +25,8 @@ fn data() -> Data {
     let blueprints = mc_data::Blueprints::load(&dir).unwrap();
     let id = blueprints.id_of("regency_commander").unwrap();
     let bp = blueprints.unit(id);
-    let v = |p: mc_core::FxVec3| Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
+    // The unit file draws the model bigger than it is authored: back to its size.
+    let v = |p| crate::authored(bp, p);
     let arm = bp.builder.as_ref().unwrap().arm.as_ref().unwrap();
     let set = blueprints.refit_set(id).unwrap();
     Data {
@@ -250,7 +251,6 @@ fn loadout(keys: &[&str]) -> mc_data::UnitBlueprint {
 
 #[test]
 fn each_rebuilt_cannon_ends_at_its_muzzle() {
-    let v = |p: mc_core::FxVec3| Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
     let model =
         build_model_fitted("regency_commander", 10.4, HEIGHT, 1, &["pinched", "fusion"]).unwrap();
     let tag = |key: &str| {
@@ -270,7 +270,7 @@ fn each_rebuilt_cannon_ends_at_its_muzzle() {
             1,
             "{module}: the new gun replaces the Repeater"
         );
-        let muzzle = v(bp.weapons[0].muzzle);
+        let muzzle = crate::authored(&bp, bp.weapons[0].muzzle);
         assert!(
             muzzle.distance(MUZZLE.with_x(tip)) < 1e-3,
             "{module}: the unit file's muzzle {muzzle}"
@@ -298,9 +298,9 @@ fn each_rebuilt_cannon_ends_at_its_muzzle() {
 
 #[test]
 fn the_auxiliary_arm_is_the_unit_files() {
-    let v = |p: mc_core::FxVec3| Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
     let bp = loadout(&["aux_eng"]);
     let builder = bp.builder.as_ref().unwrap();
+    let v = |p| crate::authored(&bp, p);
     assert_eq!(builder.emitters.len(), 1);
     assert!(v(builder.emitters[0]).distance(shoulder::AUX_EMITTER) < 1e-3);
     assert!(v(builder.hinge.unwrap()).distance(shoulder::AUX_WRIST) < 1e-3);
