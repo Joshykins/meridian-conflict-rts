@@ -56,6 +56,13 @@ fn sea() -> World {
     World::with_terrain(terrain, map, blueprints, Arc::new(Pool::new(1)), &config).unwrap()
 }
 
+/// The hull is wholly under the water, deck and all.
+fn under(w: &World, id: UnitId) -> bool {
+    let r = w.state.units.row(id).unwrap();
+    w.state.units.z[r] + w.blueprints.unit(w.state.units.blueprint[r]).height
+        < w.terrain.water_level()
+}
+
 fn spawn(w: &mut World, key: &str, owner: u8, x: i32, y: i32, flags: u16) -> UnitId {
     let bp = w.blueprints.id_of(key).unwrap();
     let at = snap_to_build_grid(w.blueprints.unit(bp), FxVec2::from_ints(x, y));
@@ -155,7 +162,10 @@ fn its_deck_rails_fire_only_with_the_boat_surfaced() {
     let mut dived = 0;
     for _ in 0..150 {
         w.tick(&[]).unwrap();
-        dived += rails(&w);
+        // Shots while it is going down count only once its deck is under.
+        if under(&w, boat) {
+            dived += rails(&w);
+        }
     }
     assert_eq!(dived, 0, "a rail fired with the boat under");
     order(
@@ -243,8 +253,13 @@ fn its_warheads_leave_by_the_silo_hatches_in_turn() {
     for f in &from {
         let off = f.xy() - at;
         let back = off.dot(aft);
+        // 45 to 58 m aft at the model's size, times the boat's scale.
+        let k = w
+            .blueprints
+            .unit(w.blueprints.id_of(MEGALODON).unwrap())
+            .scale;
         assert!(
-            (Fx::from_int(45)..Fx::from_int(58)).contains(&back),
+            (45.0 * k..58.0 * k).contains(&back.to_f32()),
             "{back} m aft of the boat's middle"
         );
         assert!(
@@ -255,8 +270,13 @@ fn its_warheads_leave_by_the_silo_hatches_in_turn() {
         );
     }
     let apart = from[0].xy().distance(from[1].xy());
+    // 7 to 10 m at the model's size, times the boat's scale.
+    let k = w
+        .blueprints
+        .unit(w.blueprints.id_of(MEGALODON).unwrap())
+        .scale;
     assert!(
-        (Fx::from_int(7)..Fx::from_int(10)).contains(&apart),
+        (7.0 * k..10.0 * k).contains(&apart.to_f32()),
         "the two hatches stand {apart} m apart"
     );
 }

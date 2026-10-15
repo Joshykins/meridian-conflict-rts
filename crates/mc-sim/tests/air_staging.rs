@@ -317,7 +317,8 @@ fn a_carrier_under_way_is_caught_up_and_landed_on() {
             &mut w,
             Command::Move {
                 units: vec![id],
-                target: FxVec2::from_ints(3800, 3200),
+                // Far enough that it is still under way when the aircraft lands.
+                target: FxVec2::from_ints(4000, 3900),
                 queue: false,
             },
         );

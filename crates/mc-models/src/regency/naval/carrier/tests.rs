@@ -149,7 +149,7 @@ fn the_unit_files_numbers_are_the_models() {
     let bp = blueprints.unit(blueprints.id_of("regency_t3_carrier").unwrap());
     assert_eq!(bp.visual.mesh, "regency_carrier");
     let l = &LAYOUT;
-    let v = |p: mc_core::FxVec3| Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
+    let v = |p| crate::authored(bp, p);
     let cells = muzzles(l);
     let seekers = &bp.weapons[0];
     assert_eq!(seekers.muzzles.len(), cells.len());

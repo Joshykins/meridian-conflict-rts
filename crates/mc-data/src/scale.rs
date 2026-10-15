@@ -2,7 +2,8 @@
 //! radius, height and every point the file places on the model (muzzles, pivots, mounts,
 //! build and reclaim arms, lamps, drone sockets) are multiplied on load, so the numbers in
 //! the file stay the model's own and the renderer, fitting the mesh to the radius and
-//! height, draws it to match. Ranges, speeds and everything else that is play, not the
+//! height, draws it to match. A carrier's landing and launch points and a hull
+//! launcher's tubes count among those points. Ranges, speeds and everything else that is play, not the
 //! model, are left as written.
 
 use crate::raw::{RawBuilder, RawReclaimer, RawWeapon, Unit};
@@ -35,9 +36,7 @@ impl Unit {
         let unscaled = [
             ("refits", !self.refits.is_empty()),
             ("transport", self.transport.is_some()),
-            ("staging", self.staging.is_some()),
             ("gravitic", self.gravitic.is_some()),
-            ("strategic", self.strategic.is_some()),
             ("stomp", self.stomp.is_some()),
             ("edict", self.edict.is_some()),
         ];
@@ -80,6 +79,17 @@ impl Unit {
         }
         if let Some(r) = &mut u.reclaimer {
             scale_reclaimer(r, k);
+        }
+        // A carrier's deck: where its aircraft come down and leave from.
+        if let Some(s) = &mut u.staging {
+            p3(&mut s.land);
+            for l in &mut s.launch {
+                *l = (l.0 * k, l.1 * k, l.2 * k, l.3);
+            }
+        }
+        // A launcher on a hull: its tubes' mouths.
+        if let Some(s) = &mut u.strategic {
+            s.tubes.iter_mut().for_each(p3);
         }
         u
     }

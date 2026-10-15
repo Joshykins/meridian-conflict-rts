@@ -164,7 +164,7 @@ fn the_unit_files_weapons_are_the_models() {
     let blueprints = mc_data::Blueprints::load(&dir).unwrap();
     let bp = blueprints.unit(blueprints.id_of("regency_t3_battleship").unwrap());
     assert_eq!(bp.visual.mesh, "regency_battleship");
-    let v = |p: mc_core::FxVec3| Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
+    let v = |p| crate::authored(bp, p);
     let close = |a: Vec3, b: Vec3| a.distance(b) < 0.02;
     let w = &bp.weapons;
     for i in 0..3 {

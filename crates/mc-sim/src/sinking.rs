@@ -24,12 +24,12 @@ const SETTLED_SHARE: Fx = Fx::ratio(3, 5);
 /// as it lands, its bow (or stern) left dug into the silt. The wreck lies so.
 const BOTTOM_TRIM: Fx = Fx::ratio(2, 5);
 /// A hull taller than this (metres) is a big ship: it trims less, and sinks faster.
-const BIG_HULL: i32 = 12;
+const BIG_HULL: i32 = 24;
 /// Most a big ship goes down by the head or the stern: six degrees.
 const BIG_TRIM: u16 = Angle::from_degrees(6).0;
 /// The frigate's height, metres: sinking paces are for it, and a taller hull's are
 /// scaled up by its height over this, never down.
-const PACE_HEIGHT: i32 = 10;
+const PACE_HEIGHT: i32 = 22;
 
 fn default_pace() -> Fx {
     Fx::ONE

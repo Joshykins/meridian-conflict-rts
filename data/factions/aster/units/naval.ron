@@ -11,9 +11,9 @@
         categories: ["Naval", "DirectFire"],
         health: 380,
         cost: (materials: 60, energy: 330, time: 300),
-        radius: 6, height: 4,
+        radius: 6, height: 4, scale: 1.6,
         vision: 350,
-        motion: (layer: Naval, size: 0, speed: 60, accel: 38, turn: 120),
+        motion: (layer: Naval, size: 1, speed: 81, accel: 51, turn: 168),
         // A three-barrel rotary gun on a ring at the bow. It spins up briefly before the
         // stream starts; the casings leave its port just behind the barrels.
         weapons: [(
@@ -34,9 +34,9 @@
         categories: ["Naval", "DirectFire", "AntiAir"],
         health: 2600,
         cost: (materials: 230, energy: 1500, time: 1150),
-        radius: 15, height: 10,
+        radius: 15, height: 10, scale: 2.2,
         vision: 650, radar: 1400,
-        motion: (layer: Naval, size: 2, speed: 38, accel: 14, turn: 36),
+        motion: (layer: Naval, size: 4, speed: 76, accel: 28, turn: 50),
         weapons: [
             // The deck gun, forward: a long-range naval rifle in a turret. It cannot
             // bear straight aft; the ship turns to bring it round.
@@ -72,10 +72,10 @@
         cost: (materials: 150, energy: 1000, time: 750),
         // Surfaced, the sail stands `height` over the water; dived, `dive.depth`
         // metres of water close over it.
-        radius: 10, height: 3.6,
+        radius: 10, height: 3.6, scale: 1.3,
         vision: 450, sonar: 700,
         dive: (depth: 2, time: 3),
-        motion: (layer: Naval, size: 1, speed: 40, accel: 19, turn: 60),
+        motion: (layer: Naval, size: 1, speed: 70, accel: 33, turn: 84),
         // Four bow tubes, fired in pairs. They are the only thing that reaches a dived hull.
         weapons: [(
             name: "Torpedo Tubes",
@@ -274,9 +274,9 @@
         categories: ["Naval", "DirectFire", "AntiAir"],
         health: 12000,
         cost: (materials: 920, energy: 6440, time: 5520),
-        radius: 26.4, height: 14.4,
+        radius: 26.4, height: 14.4, scale: 1.4,
         vision: 800, radar: 1500, sonar: 900,
-        motion: (layer: Naval, size: 3, speed: 40, accel: 14, turn: 34),
+        motion: (layer: Naval, size: 4, speed: 68, accel: 24, turn: 48),
         weapons: [
             // The bolt rifle forward, in a house of its own: the Paladin's gun a size down
             // (7.4 m of it). It lobs a little (`loft`), so it reaches over a headland or a
@@ -330,7 +330,7 @@
         categories: ["Naval", "AntiAir", "Intel"],
         health: 8500,
         cost: (materials: 900, energy: 6300, time: 5400),
-        radius: 26.4, height: 16.8,
+        radius: 26.4, height: 16.8, scale: 1.55,
         vision: 1000, radar: 2800,
         // Two interceptor lasers, one off the tower's front and one on the quarterdeck,
         // each burning a missile of its own inside this radius: wide enough to screen the
@@ -338,7 +338,7 @@
         anti_missile: 600, anti_missile_lasers: 2,
         anti_missile_mounts: [(-8.64, 0, 15.12), (-21.96, 0, 6)],
         economy: (energy_upkeep: 60),
-        motion: (layer: Naval, size: 3, speed: 38, accel: 14, turn: 34),
+        motion: (layer: Naval, size: 5, speed: 65, accel: 24, turn: 48),
         weapons: [
             // A vertical array forward of the bridge: sixteen cells rippled off in one
             // volley, each missile straight up and arcing over onto its mark. Its reach sits
@@ -373,9 +373,9 @@
         categories: ["Naval", "Artillery"],
         health: 6000,
         cost: (materials: 880, energy: 6160, time: 5280),
-        radius: 20, height: 10,
+        radius: 20, height: 10, scale: 1.4,
         vision: 400, radar: 1200,
-        motion: (layer: Naval, size: 3, speed: 34, accel: 12, turn: 30),
+        motion: (layer: Naval, size: 3, speed: 58, accel: 20, turn: 42),
         // Eight cells on the deck canted forward, each holding a rack of unguided rockets.
         // The cells are fixed, so the hull turns its bow onto the mark; a salvo ripples
         // thirty-two rockets out on a high lob along the cells (`fixed_rack`, `rake`: 75
@@ -402,10 +402,10 @@
         categories: ["Naval", "DirectFire"],
         health: 5200,
         cost: (materials: 600, energy: 4200, time: 3600),
-        radius: 14, height: 4.2,
+        radius: 14, height: 4.2, scale: 1.4,
         vision: 550, sonar: 1300,
         dive: (depth: 3, time: 2.5),
-        motion: (layer: Naval, size: 2, speed: 48, accel: 22, turn: 60),
+        motion: (layer: Naval, size: 2, speed: 79, accel: 36, turn: 84),
         weapons: [
             // Six bow tubes in two banks.
             (
@@ -445,9 +445,9 @@
         categories: ["Naval", "Shield"],
         health: 3500,
         cost: (materials: 700, energy: 4900, time: 4200),
-        radius: 16, height: 12,
+        radius: 16, height: 12, scale: 1.4,
         vision: 380,
-        motion: (layer: Naval, size: 2, speed: 38, accel: 14, turn: 40),
+        motion: (layer: Naval, size: 2, speed: 65, accel: 24, turn: 56),
         // A dome over the ships around it. Shells and missiles break on it; torpedoes run
         // under its skirt. It draws energy like every shield.
         economy: (energy_upkeep: 180),
@@ -464,11 +464,11 @@
         categories: ["Naval", "DirectFire"],
         health: 60000,
         cost: (materials: 4200, energy: 37800, time: 25200),
-        radius: 72, height: 38,
+        radius: 72, height: 38, scale: 1.3,
         vision: 1440,
         // Engaged and stopped, it lays its beam to the mark, a little forward of square, so
         // every battery bears.
-        motion: (layer: Naval, size: 5, speed: 32, accel: 7, turn: 18, broadside: 75),
+        motion: (layer: Naval, size: 5, speed: 40, accel: 9, turn: 23, broadside: 75),
         // Three triple turrets, each a house of its own: two forward, one astern, each
         // carrying three Arc Cannons (the Trebuchet's Arc Howitzer made a naval gun, laid
         // flatter): a long charge, then great rounds of blue plasma on a shallow arc that
@@ -568,14 +568,14 @@
         categories: ["Naval", "AntiAir", "Intel"],
         health: 32000,
         cost: (materials: 3400, energy: 30600, time: 20400),
-        radius: 60, height: 24,
+        radius: 60, height: 24, scale: 1.65,
         vision: 900, radar: 4000,
         // Four interceptor lasers: the citadel's, the plateau's aft corners, and the port
         // ramp aft.
         anti_missile: 350,
         anti_missile_mounts: [(-45.6, 0.0, 19.5), (-36.0, -14.4, 11.7), (-36.0, 14.4, 11.7), (40.0, -13.6, 11.5)],
         economy: (energy_upkeep: 120),
-        motion: (layer: Naval, size: 5, speed: 33, accel: 7, turn: 18),
+        motion: (layer: Naval, size: 5, speed: 41, accel: 9, turn: 23),
         // The fleet's long arm against air: a Skyguard's reach afloat (a little short of the
         // fixed site's), no gun of any kind. Twelve hatched cells in two blocks flush in the
         // deck either side of the flight tunnel, port block first; a salvo spreads over the
@@ -638,7 +638,7 @@
         radius: 30, height: 5,
         vision: 650, sonar: 2000,
         dive: (depth: 4, time: 4),
-        motion: (layer: Naval, size: 3, speed: 38, accel: 15, turn: 40),
+        motion: (layer: Naval, size: 3, speed: 46, accel: 18, turn: 52),
         weapons: [
             // Eight bow tubes.
             (
@@ -681,12 +681,12 @@
         categories: ["Naval", "DirectFire", "Artillery", "Experimental"],
         health: 48000,
         cost: (materials: 18000, energy: 193000, time: 62000),
-        radius: 74.25, height: 9.45, footprint: (14, 5), hull: (74.25, 13.5),
+        radius: 74.25, height: 9.45, scale: 1.3, footprint: (14, 5), hull: (74.25, 13.5),
         vision: 800, sonar: 2600, water_build: true,
         dive: (depth: 6, time: 6),
         shield: (kind: Hull, health: 24000, regen: 160),
         economy: (energy_upkeep: 400),
-        motion: (layer: Naval, size: 5, speed: 32, accel: 7, turn: 16),
+        motion: (layer: Naval, size: 5, speed: 40, accel: 9, turn: 21),
         strategic: (
             kind: Nuke,
             // A warhead assembled aboard at the silo's pace (so engineers assisting speed it
@@ -766,9 +766,9 @@
         categories: ["Naval", "AntiAir"],
         health: 40000,
         cost: (materials: 3800, energy: 34200, time: 22800),
-        radius: 84, height: 34,
+        radius: 84, height: 34, scale: 1.2,
         vision: 1200,
-        motion: (layer: Naval, size: 5, speed: 34, accel: 7, turn: 20),
+        motion: (layer: Naval, size: 5, speed: 42, accel: 9, turn: 26),
         weapons: [
             (
                 name: "Zenith Rail Cannon",

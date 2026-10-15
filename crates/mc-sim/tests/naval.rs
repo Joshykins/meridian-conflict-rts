@@ -115,8 +115,15 @@ fn a_new_submarine_dives_by_itself_and_surfaces_on_order() {
         "it is on its way down"
     );
     run(&mut w, 40);
-    // Height 3.6 and two metres of water over it.
-    assert!(near(z(&w, sub), Fx::from_int(WATER) - Fx::ratio(56, 10)));
+    // Its height and two metres of water over it.
+    let height = w
+        .blueprints
+        .unit(w.state.units.blueprint[row(&w, sub)])
+        .height;
+    assert!(near(
+        z(&w, sub),
+        Fx::from_int(WATER) - height - Fx::from_int(2)
+    ));
     assert!(under(&w, sub));
     let unit = frame(&w, Some(0))
         .units
@@ -416,10 +423,16 @@ fn a_frigate_sinks_slowly_and_leaves_a_wreck_on_the_seabed() {
         "20 m of water should take 8 to 20 seconds, took {ticks} ticks"
     );
     assert!(w.state.sinking.is_empty());
-    // It rests three tenths of its 10 m height over the bed.
-    assert!(near(settled.z, Fx::from_int(3)));
+    // It rests three tenths of its height over the bed.
+    let rest = w
+        .blueprints
+        .unit(w.blueprints.id_of("aster_t1_frigate").unwrap())
+        .height
+        * 3
+        / 10;
+    assert!(near(settled.z, rest));
     let wreck = w.state.wrecks.slots.iter().next().expect("a wreck");
-    assert!(near(w.state.wrecks.z[wreck], Fx::from_int(3)));
+    assert!(near(w.state.wrecks.z[wreck], rest));
     let bank = w.state.wrecks.bank[wreck];
     assert!(
         bank.unsigned_abs() >= Angle::from_degrees(15).0,
@@ -618,9 +631,11 @@ fn a_fast_boat_s_rounds_leave_from_the_gun_as_drawn() {
             let at: [f32; 3] =
                 std::array::from_fn(|a| hull.prev_pos[a] + (hull.pos[a] - hull.prev_pos[a]) * t);
             let off = ((out[0] - at[0]).powi(2) + (out[1] - at[1]).powi(2)).sqrt();
-            // The muzzle is 4.6 m forward of the hull's origin, on a turret 3.3 m forward.
+            // The muzzle is 4.6 m forward of the hull's origin, on a turret 3.3 m forward,
+            // at the model's size: times the boat's scale.
+            let k = w.blueprints.unit(w.state.units.blueprint[r]).scale;
             assert!(
-                off < 5.2,
+                off < 5.2 * k,
                 "a round left {off:.1} m from the hull at {travel:.1} m a tick"
             );
             checked += 1;

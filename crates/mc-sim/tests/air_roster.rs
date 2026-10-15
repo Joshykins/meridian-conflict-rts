@@ -831,13 +831,15 @@ fn manta_ripples_all_sixteen_cells_and_curves_while_accelerating() {
         }
     }
     assert_eq!(mouths.len(), 16);
+    // The cells at the model's size, times the hull's scale.
+    let k = w.blueprints.unit(bp).scale;
     for (i, (x, y)) in mouths.iter().enumerate() {
         assert!(
-            (*x - (8.7 - 1.8 * (i / 4) as f32)).abs() < 0.02,
+            (*x - k * (8.7 - 1.8 * (i / 4) as f32)).abs() < 0.02,
             "{mouths:?}"
         );
         assert!(
-            (*y - (-2.7 + 1.8 * (i % 4) as f32)).abs() < 0.02,
+            (*y - k * (-2.7 + 1.8 * (i % 4) as f32)).abs() < 0.02,
             "{mouths:?}"
         );
     }

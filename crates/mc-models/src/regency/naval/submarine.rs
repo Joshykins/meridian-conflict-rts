@@ -471,10 +471,10 @@ mod tests {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
         let blueprints = mc_data::Blueprints::load(&dir).unwrap();
         let bp = blueprints.unit(blueprints.id_of("regency_t1_submarine").unwrap());
-        let v = |p: mc_core::FxVec3| Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
+        let v = |p| crate::authored(bp, p);
         assert_eq!(bp.visual.mesh, "regency_submarine");
-        assert!((bp.radius.to_f32() - RADIUS).abs() < 1e-3);
-        assert!((bp.height.to_f32() - HEIGHT).abs() < 1e-3);
+        assert!((crate::authored_len(bp, bp.radius) - RADIUS).abs() < 1e-3);
+        assert!((crate::authored_len(bp, bp.height) - HEIGHT).abs() < 1e-3);
         let weapon = &bp.weapons[0];
         let drawn: Vec<Vec3> = weapon.muzzles.iter().map(|&p| v(p)).collect();
         assert_eq!(drawn.len(), 2);

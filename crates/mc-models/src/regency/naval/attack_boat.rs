@@ -540,11 +540,11 @@ mod tests {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
         let blueprints = mc_data::Blueprints::load(&dir).unwrap();
         let bp = blueprints.unit(blueprints.id_of("regency_t1_attack_boat").unwrap());
-        let v = |p: mc_core::FxVec3| Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
+        let v = |p| crate::authored(bp, p);
         assert_eq!(bp.visual.mesh, "regency_attack_boat");
         assert!(
-            (bp.radius.to_f32() - RADIUS).abs() < 1e-3
-                && (bp.height.to_f32() - HEIGHT).abs() < 1e-3
+            (crate::authored_len(bp, bp.radius) - RADIUS).abs() < 1e-3
+                && (crate::authored_len(bp, bp.height) - HEIGHT).abs() < 1e-3
         );
         let w = &bp.weapons[0];
         assert!(w.mount, "the repeater turns on a gun house");

@@ -821,7 +821,7 @@ mod tests {
         let blueprints = mc_data::Blueprints::load(&dir).unwrap();
         let bp = blueprints.unit(blueprints.id_of("regency_t2_cruiser").unwrap());
         assert_eq!(bp.visual.mesh, "regency_cruiser");
-        let v = |p: mc_core::FxVec3| Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
+        let v = |p| crate::authored(bp, p);
         let cells: Vec<Vec3> = blocks().iter().flat_map(muzzles).collect();
         let seekers = &bp.weapons[0];
         assert_eq!(seekers.muzzles.len(), cells.len());

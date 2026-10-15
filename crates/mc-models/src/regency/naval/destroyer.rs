@@ -872,7 +872,7 @@ mod tests {
         let blueprints = mc_data::Blueprints::load(&dir).unwrap();
         let bp = blueprints.unit(blueprints.id_of("regency_t2_destroyer").unwrap());
         assert_eq!(bp.visual.mesh, "regency_destroyer");
-        let v = |p: mc_core::FxVec3| Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
+        let v = |p| crate::authored(bp, p);
         let w = &bp.weapons;
         let close = |a: Vec3, b: Vec3| a.distance(b) < 0.02;
         assert!(close(v(w[0].pivot.unwrap()), GUN) && close(v(w[0].muzzle), CHARGE));

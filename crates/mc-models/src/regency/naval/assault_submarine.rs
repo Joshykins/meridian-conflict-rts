@@ -902,9 +902,9 @@ mod tests {
         let blueprints = mc_data::Blueprints::load(&dir).unwrap();
         let bp = blueprints.unit(blueprints.id_of("regency_t3_submarine").unwrap());
         assert_eq!(bp.visual.mesh, "regency_assault_submarine");
-        assert!((bp.radius.to_f32() - RADIUS).abs() < 1e-3);
-        assert!((bp.height.to_f32() - HEIGHT).abs() < 1e-3);
-        let v = |p: mc_core::FxVec3| Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
+        assert!((crate::authored_len(bp, bp.radius) - RADIUS).abs() < 1e-3);
+        assert!((crate::authored_len(bp, bp.height) - HEIGHT).abs() < 1e-3);
+        let v = |p| crate::authored(bp, p);
         let close = |a: Vec3, b: Vec3| a.distance(b) < 0.02;
         let w = &bp.weapons;
         let all = |i: usize, want: &[Vec3]| {

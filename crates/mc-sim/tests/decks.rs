@@ -193,14 +193,15 @@ fn nothing_is_built_on_a_deck_or_its_projectors() {
     assert_eq!(sites.check(bp, beside, heading), Ok(()));
 }
 
-/// Shells from a battery on the bank: a frigate under the deck comes through
-/// unharmed, one just past its side does not.
+/// Shells from a battery on the bank: a boat under the deck comes through
+/// unharmed, one just past its side does not. (A frigate, 66 m long, sticks out
+/// past the deck's sides.)
 #[test]
 fn shells_stop_on_the_deck_over_a_ship() {
     let hurt = |y: i32| {
         let mut w = strait();
         let gun = spawn(&mut w, "aster_t1_artillery", 0, 1_750, y, 0);
-        let ship = spawn(&mut w, "aster_t1_frigate", 1, 1_400, y, flag::PASSIVE);
+        let ship = spawn(&mut w, "aster_t1_attack_boat", 1, 1_400, y, flag::PASSIVE);
         let full = w.state.units.health[row(&w, ship)];
         order(
             &mut w,

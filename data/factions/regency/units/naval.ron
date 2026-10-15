@@ -21,9 +21,9 @@
         categories: ["Naval", "DirectFire"],
         health: 330,
         cost: (materials: 70, energy: 390, time: 350),
-        radius: 6.5, height: 3.2,
+        radius: 6.5, height: 3.2, scale: 1.6,
         vision: 360,
-        motion: (layer: Naval, size: 0, speed: 58, accel: 36, turn: 120),
+        motion: (layer: Naval, size: 1, speed: 78, accel: 49, turn: 168),
         weapons: [(
             name: "Twin Plasmeric Repeater",
             damage: 15, splash: 1, range: 320, reload: 0.45, speed: 480, trajectory: Direct,
@@ -47,10 +47,10 @@
         categories: ["Naval", "DirectFire"],
         health: 850,
         cost: (materials: 160, energy: 1070, time: 800),
-        radius: 10.5, height: 3.4,
+        radius: 10.5, height: 3.4, scale: 1.3,
         vision: 450, sonar: 700,
         dive: (depth: 2, time: 2.5),
-        motion: (layer: Naval, size: 1, speed: 42, accel: 20, turn: 60),
+        motion: (layer: Naval, size: 1, speed: 74, accel: 35, turn: 84),
         weapons: [(
             name: "Gravitic Torpedo Tubes",
             damage: 130, splash: 3, range: 560, reload: 5, speed: 54, trajectory: Direct,
@@ -74,9 +74,9 @@
         categories: ["Naval", "DirectFire", "AntiAir"],
         health: 2500,
         cost: (materials: 240, energy: 1560, time: 1200),
-        radius: 15.5, height: 9,
+        radius: 15.5, height: 9, scale: 2.2,
         vision: 650, radar: 1300,
-        motion: (layer: Naval, size: 2, speed: 38, accel: 14, turn: 36),
+        motion: (layer: Naval, size: 4, speed: 76, accel: 28, turn: 50),
         weapons: [
             // Forward: a heavy repeater in a turret. It cannot bear straight aft; the
             // hull turns to bring it round.
@@ -118,11 +118,11 @@
         categories: ["Naval", "DirectFire", "AntiAir"],
         health: 12500,
         cost: (materials: 1050, energy: 7350, time: 6300),
-        radius: 27, height: 11,
+        radius: 27, height: 11, scale: 1.4,
         vision: 800, radar: 1400, sonar: 900,
         shield: (kind: Hull, health: 5000, regen: 50),
         economy: (energy_upkeep: 80),
-        motion: (layer: Naval, size: 3, speed: 40, accel: 14, turn: 34),
+        motion: (layer: Naval, size: 5, speed: 68, accel: 24, turn: 48),
         weapons: [
             // Forward, in a house of its own: plasma gathered and squeezed in front of the
             // bore for a second, then pinched out as one jet (as the Halberd's, a size up).
@@ -190,12 +190,12 @@
         categories: ["Naval", "AntiAir", "Artillery", "Intel"],
         health: 9000,
         cost: (materials: 980, energy: 6860, time: 5880),
-        radius: 27, height: 15,
+        radius: 27, height: 15, scale: 1.55,
         vision: 1000, radar: 2600,
         anti_missile: 600, anti_missile_lasers: 2,
         anti_missile_mounts: [(-1.2, 0, 9.9), (-12.0, 0, 6.6)],
         economy: (energy_upkeep: 60),
-        motion: (layer: Naval, size: 3, speed: 38, accel: 14, turn: 34),
+        motion: (layer: Naval, size: 5, speed: 65, accel: 24, turn: 48),
         weapons: [
             // Twelve hatched cells in two blocks of six in line on the spine (the model's
             // `CellBlock`s, fore block first): a ripple of gravitic seekers spread over the
@@ -255,11 +255,11 @@
         categories: ["Naval", "DirectFire"],
         health: 54000,
         cost: (materials: 4600, energy: 41400, time: 27600),
-        radius: 64, height: 20,
+        radius: 64, height: 20, scale: 1.3,
         vision: 1400,
         anti_missile: 300,
         anti_missile_mounts: [(-1.0, 5.0, 13.0), (-1.0, -5.0, 13.0), (-20.0, 5.0, 10.5), (-20.0, -5.0, 10.5)],
-        motion: (layer: Naval, size: 5, speed: 32, accel: 6, turn: 18, broadside: 75),
+        motion: (layer: Naval, size: 5, speed: 40, accel: 8, turn: 23, broadside: 75),
         weapons: [
             (
                 name: "Fore Pinch-fusion Cannon",
@@ -385,12 +385,12 @@
         categories: ["Naval", "AntiAir", "Intel"],
         health: 30000,
         cost: (materials: 3500, energy: 31500, time: 21000),
-        radius: 60, height: 22,
+        radius: 60, height: 22, scale: 1.65,
         vision: 900, radar: 3800,
         anti_missile: 350,
         anti_missile_mounts: [(38.0, 10.5, 10.6), (38.0, -10.5, 10.6), (-53.0, 14.0, 10.4), (-53.0, -14.0, 10.4)],
         economy: (energy_upkeep: 120),
-        motion: (layer: Naval, size: 5, speed: 33, accel: 7, turn: 18),
+        motion: (layer: Naval, size: 5, speed: 41, accel: 9, turn: 23),
         weapons: [
             (
                 name: "Heavy Gravitic Seeker Battery",
@@ -469,10 +469,10 @@
         categories: ["Naval", "DirectFire", "AntiAir"],
         health: 16000,
         cost: (materials: 2000, energy: 18000, time: 12000),
-        radius: 26, height: 5,
+        radius: 26, height: 5, scale: 1.1,
         vision: 700, sonar: 1600,
         dive: (depth: 3, time: 2),
-        motion: (layer: Naval, size: 3, speed: 58, accel: 22, turn: 50),
+        motion: (layer: Naval, size: 3, speed: 84, accel: 32, turn: 65),
         weapons: [
             (
                 name: "Gravitic Torpedo Launcher",
