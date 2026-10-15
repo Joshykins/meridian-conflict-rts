@@ -1365,14 +1365,21 @@ impl World {
         Ok(())
     }
 
-    /// Assassination rules: lose the commander, lose everything.
+    /// Lose the commander, lose everything: to a living ally under
+    /// `FallenArmy::ToAlly` (`succession.rs`), otherwise destroyed.
     pub(crate) fn defeat_player(&mut self, player: u8) {
-        let p = &mut self.state.players[player as usize];
-        if p.defeated {
+        if self.state.players[player as usize].defeated {
             return;
         }
-        p.defeated = true;
-        self.events.push(SimEvent::PlayerDefeated { player });
+        let heir = self.heir(player);
+        self.state.players[player as usize].defeated = true;
+        self.events.push(SimEvent::PlayerDefeated { player, heir });
+        if let Some(heir) = heir {
+            // Before the reap's next pass, which takes every unit a defeated
+            // side still owns.
+            self.hand_over(player, heir);
+            return;
+        }
         let units = &mut self.state.units;
         for row in 0..units.slots.rows() {
             if units.slots.is_alive(row) && units.owner[row] == player {

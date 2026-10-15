@@ -7,7 +7,7 @@
 
 use mc_data::weather::SkyChoice;
 use mc_sim::tables::Controller;
-use mc_sim::{MatchConfig, SurvivalConfig};
+use mc_sim::{FallenArmy, MatchConfig, SurvivalConfig};
 use serde::{Deserialize, Serialize};
 
 /// The most a start message's options may take to decode: they come from another
@@ -31,6 +31,8 @@ pub struct MatchOptions {
     /// shows the match under it. Presentation only: the sim never reads it.
     pub sky: SkyChoice,
     pub mission: Option<mc_sim::mission::Definition>,
+    /// What becomes of a defeated side's forces.
+    pub fallen_army: FallenArmy,
 }
 
 /// One person's own choices for their seat, sent as their lobby setup.
@@ -65,7 +67,7 @@ impl SeatChoice {
 
 impl MatchOptions {
     pub fn encode(&self) -> Result<Vec<u8>, String> {
-        let mut bytes = b"MCOPT2\0".to_vec();
+        let mut bytes = b"MCOPT3\0".to_vec();
         bytes.extend(bincode::serialize(self).map_err(|e| e.to_string())?);
         if bytes.len() as u64 > MAX_OPTIONS_BYTES {
             return Err("Match options exceed 1 MiB".into());
@@ -74,9 +76,22 @@ impl MatchOptions {
     }
 
     pub fn decode(bytes: &[u8]) -> Result<MatchOptions, String> {
-        if let Some(body) = bytes.strip_prefix(b"MCOPT2\0") {
-            mc_sim::decode_untrusted(body, MAX_OPTIONS_BYTES)
-                .map_err(|e| format!("the host sent unreadable match options: {e}"))
+        let unreadable = |e| format!("the host sent unreadable match options: {e}");
+        if let Some(body) = bytes.strip_prefix(b"MCOPT3\0") {
+            mc_sim::decode_untrusted(body, MAX_OPTIONS_BYTES).map_err(unreadable)
+        } else if let Some(body) = bytes.strip_prefix(b"MCOPT2\0") {
+            let old: OptionsV2 =
+                mc_sim::decode_untrusted(body, MAX_OPTIONS_BYTES).map_err(unreadable)?;
+            Ok(Self {
+                config: old.config,
+                survival: old.survival,
+                colors: old.colors,
+                map: old.map,
+                map_id: old.map_id,
+                sky: old.sky,
+                mission: old.mission,
+                fallen_army: FallenArmy::default(),
+            })
         } else {
             let old: LegacyOptions = mc_sim::decode_untrusted(bytes, MAX_OPTIONS_BYTES)
                 .map_err(|e| format!("unreadable legacy match options: {e}"))?;
@@ -88,6 +103,7 @@ impl MatchOptions {
                 map_id: old.map_id,
                 sky: old.sky,
                 mission: None,
+                fallen_army: FallenArmy::default(),
             })
         }
     }
@@ -161,8 +177,32 @@ mod tests {
         assert_eq!(decoded.map_id, 7);
         assert!(decoded.mission.is_none());
         let versioned = decoded.encode().unwrap();
-        assert!(versioned.starts_with(b"MCOPT2\0"));
+        assert!(versioned.starts_with(b"MCOPT3\0"));
         assert_eq!(MatchOptions::decode(&versioned).unwrap().map, "old-map");
+    }
+
+    #[test]
+    fn options_from_before_the_fallen_army_rule_lose_the_army() {
+        let v2 = OptionsV2 {
+            config: MatchConfig {
+                seed: 1,
+                players: vec![seat("old", Controller::Human)],
+                cheats: false,
+                fog: true,
+                spawn_commanders: true,
+            },
+            survival: None,
+            colors: crate::setup::TEAM_COLORS,
+            map: "old-map".into(),
+            map_id: 7,
+            sky: Default::default(),
+            mission: None,
+        };
+        let mut bytes = b"MCOPT2\0".to_vec();
+        bytes.extend(bincode::serialize(&v2).unwrap());
+        let decoded = MatchOptions::decode(&bytes).unwrap();
+        assert_eq!(decoded.map, "old-map");
+        assert_eq!(decoded.fallen_army, FallenArmy::Destroyed);
     }
 
     #[test]
@@ -181,6 +221,7 @@ mod tests {
             map_id: 9,
             sky: SkyChoice::default(),
             mission: None,
+            fallen_army: FallenArmy::ToAlly,
         };
         let start = mc_net::MatchStart {
             content: Default::default(),
@@ -210,6 +251,7 @@ mod tests {
             ("friend", Controller::Human, "Regency")
         );
         assert_eq!(built.map_id, 9);
+        assert_eq!(built.fallen_army, FallenArmy::ToAlly);
         // Garbage from another machine is an error, never a panic.
         assert!(MatchOptions::decode(&[0xFF; 40]).is_err());
     }
@@ -224,4 +266,16 @@ struct LegacyOptions {
     map: String,
     map_id: u64,
     sky: SkyChoice,
+}
+
+// Options before the fallen army rule ("MCOPT2").
+#[derive(Serialize, Deserialize)]
+struct OptionsV2 {
+    config: MatchConfig,
+    survival: Option<SurvivalConfig>,
+    colors: crate::setup::Palette,
+    map: String,
+    map_id: u64,
+    sky: SkyChoice,
+    mission: Option<mc_sim::mission::Definition>,
 }

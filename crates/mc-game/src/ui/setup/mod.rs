@@ -31,6 +31,8 @@ pub struct MatchRequest {
     pub survival: Option<mc_sim::SurvivalConfig>,
     /// The weather and time of day the match is shown under.
     pub sky: SkyChoice,
+    /// What becomes of a defeated side's forces.
+    pub fallen_army: mc_sim::FallenArmy,
 }
 
 pub enum SetupAction {
@@ -237,6 +239,7 @@ impl SetupState {
             colors: options.colors,
             survival: options.survival,
             sky: options.sky,
+            fallen_army: options.fallen_army,
         }
     }
 
@@ -362,6 +365,7 @@ fn screen(ui: &mut Ui, state: &mut SetupState, enter: f32) -> Option<SetupAction
     let (left, centre, right) = lineup::columns(ui);
     let chips = [
         lineup::settings::fog_chip(state.lineup.fog),
+        lineup::settings::fallen_army_chip(state.lineup.fallen_army),
         lineup::settings::seed_chip(state.lineup.seed),
         super::sky::summary(&state.sky(), &state.map_config()),
     ];

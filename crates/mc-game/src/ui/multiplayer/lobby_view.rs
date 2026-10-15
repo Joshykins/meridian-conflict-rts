@@ -118,6 +118,7 @@ fn screen(
     let (left, centre, right) = lineup::columns(ui);
     let chips = [
         lineup::settings::fog_chip(plan.fog),
+        lineup::settings::fallen_army_chip(plan.fallen_army),
         crate::ui::sky::summary(&plan.sky, &map_config(plan, state)),
     ];
     let below = lineup::match_card(ui, plan, &mut state.catalog, table.host, &chips, left);

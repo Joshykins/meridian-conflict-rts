@@ -237,6 +237,7 @@ pub(crate) fn start(
         colors: crate::setup::TEAM_COLORS,
         survival: None,
         sky: Default::default(),
+        fallen_army: Default::default(),
     };
     crate::app::local_checkpoint_start(request, blueprints, false, Some(mission), checkpoint)
 }

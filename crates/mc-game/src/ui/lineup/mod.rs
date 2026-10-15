@@ -35,7 +35,7 @@ use glam::Vec2;
 use mc_data::survival::Domain;
 use mc_data::weather::{MapConfig, SkyChoice};
 use mc_sim::tables::Controller;
-use mc_sim::{MatchConfig, PlayerSetup, SurvivalRules};
+use mc_sim::{FallenArmy, MatchConfig, PlayerSetup, SurvivalRules};
 use roster::{Control, Roster, Seat};
 use std::sync::mpsc::{channel, Receiver, TryRecvError};
 
@@ -302,6 +302,8 @@ pub struct Lineup {
     pub map: usize,
     pub roster: Roster,
     pub fog: bool,
+    /// What becomes of a defeated side's forces.
+    pub fallen_army: FallenArmy,
     /// The weather and time of day the match is shown under; left alone, the map's own.
     pub sky: SkyChoice,
     pub seed: u64,
@@ -346,6 +348,7 @@ impl Lineup {
             map,
             roster: Roster::default(),
             fog: true,
+            fallen_army: FallenArmy::default(),
             sky: SkyChoice::default(),
             seed: fresh_seed(),
             rules: SurvivalRules::default(),
@@ -427,6 +430,7 @@ impl Lineup {
             map: self.map,
             roster: self.roster.clone(),
             fog: self.fog,
+            fallen_army: self.fallen_army,
             sky: self.sky,
             seed: self.seed,
             rules: self.rules,
@@ -655,6 +659,7 @@ impl Lineup {
             map_id: card.map.content_id(),
             sky: self.sky,
             mission: None,
+            fallen_army: self.fallen_army,
         })
     }
 
@@ -669,6 +674,7 @@ impl Lineup {
         self.map = map;
         self.last_map[mode.index()] = map;
         self.fog = options.config.fog;
+        self.fallen_army = options.fallen_army;
         self.sky = options.sky;
         self.seed = options.config.seed;
         let engine = options.survival.as_ref().map(|s| s.engine_player as usize);
@@ -757,7 +763,8 @@ pub fn sheet(
         .card(catalog)
         .map(|m| m.config.clone())
         .unwrap_or_default();
-    let taller = (super::sky::row_count(&map) as f32 - 2.0) * RULE_PITCH;
+    // The sky's rows past two, and the fallen army's row.
+    let taller = (super::sky::row_count(&map) as f32 - 1.0) * RULE_PITCH;
     let size = settings::SHEET + Vec2::new(0.0, taller);
     sheet.draw(ui, "Match Settings", size, live, |ui, body| {
         let (left, right) = settings::sheet_columns(body);
@@ -929,7 +936,8 @@ pub fn rule_label(ui: &mut Ui, r: Rect, label: &str) {
     );
 }
 
-/// The rules every set-up shares, from `y`: the mode, fog, and the
+/// The rules every set-up shares, from `y`: the mode, fog, what becomes of a
+/// fallen commander's army, and the
 /// seed (one machine's; a network match's seed is the relay's). Only the host
 /// changes them. Returns the y under the last row.
 fn rules(
@@ -947,36 +955,21 @@ fn rules(
         let r = row(y);
         rule_label(ui, r, "Mode");
         let modes = [Mode::Skirmish, Mode::Survival];
-        let tw = 118.0;
-        for (k, mode) in modes.into_iter().enumerate() {
-            let t = Rect::new(
-                r.right() - (2 - k) as f32 * (tw + 4.0) + 4.0,
-                r.mid_y() - 16.0,
-                tw,
-                32.0,
-            );
-            let on = lineup.mode == mode;
-            let res = ui.tile(id("rule-mode", k), t, on, table.host || on);
-            ui.text_centred(
-                t.x + t.w * 0.5,
-                t.mid_y(),
-                type_scale::BUTTON,
-                rgb(
-                    if on { 0xFFFFFF } else { palette::DIM },
-                    0.85 + 0.15 * res.glow,
-                ),
-                match mode {
-                    Mode::Skirmish => "Skirmish",
-                    Mode::Survival => "Survival",
-                },
-            );
-            if res.clicked && !on && table.host {
-                match lineup.set_mode(catalog, mode, |i| table.occupied(i)) {
-                    Ok(()) => ui.audio.play(Sfx::Select),
-                    Err(e) => {
-                        ui.audio.play(Sfx::Deny);
-                        ask = Some(Ask::Say(e));
-                    }
+        let on = modes.iter().position(|m| *m == lineup.mode);
+        let picked = choice_tiles(
+            ui,
+            "rule-mode",
+            r,
+            &["Skirmish", "Survival"],
+            on,
+            table.host,
+        );
+        if let Some(mode) = picked.map(|k| modes[k]) {
+            match lineup.set_mode(catalog, mode, |i| table.occupied(i)) {
+                Ok(()) => ui.audio.play(Sfx::Select),
+                Err(e) => {
+                    ui.audio.play(Sfx::Deny);
+                    ask = Some(Ask::Say(e));
                 }
             }
         }
@@ -988,6 +981,18 @@ fn rules(
     ui.toggle(id("rule-fog", 0), r, "Fog of War", "", &mut lineup.fog);
     ui.interactive = live;
     y += RULE_PITCH;
+    {
+        let r = row(y);
+        rule_label(ui, r, "Fallen Commander's Army");
+        let rules = [FallenArmy::Destroyed, FallenArmy::ToAlly];
+        let labels = rules.map(settings::fallen_army_choice);
+        let on = rules.iter().position(|a| *a == lineup.fallen_army);
+        if let Some(k) = choice_tiles(ui, "rule-fallen", r, &labels, on, table.host) {
+            lineup.fallen_army = rules[k];
+            ui.audio.play(Sfx::Select);
+        }
+        y += RULE_PITCH;
+    }
     if !table.lobby {
         // Seed: shown as two groups of hex digits, with a re-roll.
         let r = row(y);
@@ -1017,6 +1022,45 @@ fn rules(
         y += RULE_PITCH;
     }
     (y, ask)
+}
+
+/// A rule's choices as tiles along the right of its row, `on` lit. Returns the
+/// one clicked, when it was not already the choice and `host` may change it.
+fn choice_tiles(
+    ui: &mut Ui,
+    key: &str,
+    r: Rect,
+    labels: &[&str],
+    on: Option<usize>,
+    host: bool,
+) -> Option<usize> {
+    let tw = 118.0;
+    let n = labels.len();
+    let mut picked = None;
+    for (k, label) in labels.iter().enumerate() {
+        let t = Rect::new(
+            r.right() - (n - k) as f32 * (tw + 4.0) + 4.0,
+            r.mid_y() - 16.0,
+            tw,
+            32.0,
+        );
+        let lit = on == Some(k);
+        let res = ui.tile(id(key, k), t, lit, host || lit);
+        ui.text_centred(
+            t.x + t.w * 0.5,
+            t.mid_y(),
+            type_scale::BUTTON,
+            rgb(
+                if lit { 0xFFFFFF } else { palette::DIM },
+                0.85 + 0.15 * res.glow,
+            ),
+            label,
+        );
+        if res.clicked && !lit && host {
+            picked = Some(k);
+        }
+    }
+    picked
 }
 
 /// The race picker and the map browser over the screen, when open. `slot` is the

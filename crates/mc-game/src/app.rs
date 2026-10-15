@@ -337,6 +337,7 @@ pub fn range_start(
         colors: setup::TEAM_COLORS,
         survival: None,
         sky: Default::default(),
+        fallen_army: Default::default(),
     };
     let mut start = local_start(request, blueprints, false)?;
     start.scene = Some(scene_scripts(&opts, map, blueprints));
@@ -401,6 +402,7 @@ impl FrontStage {
             colors: setup::TEAM_COLORS,
             survival: None,
             sky: Default::default(),
+            fallen_army: Default::default(),
         };
         let start = local_start(request, &args.blueprints, false)?;
         let scene = Some(scene_scripts(&opts, map, &args.blueprints));

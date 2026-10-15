@@ -47,6 +47,7 @@ mod factions;
 mod factory;
 mod factory_batch;
 mod factory_orders;
+mod fallen_army;
 mod fed_reload;
 mod fog;
 mod formation_terrain;

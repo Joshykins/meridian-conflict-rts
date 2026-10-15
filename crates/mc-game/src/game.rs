@@ -4118,15 +4118,21 @@ impl Game {
                     audio.play(Sfx::Deny);
                     self.hud.toast(reason.message(), palette::BAD);
                 }
-                mc_sim::SimEvent::PlayerDefeated { player } => {
-                    let name = self
-                        .view
-                        .status
-                        .players
+                mc_sim::SimEvent::PlayerDefeated { player, heir } => {
+                    let players = &self.view.status.players;
+                    let name = players
                         .get(*player as usize)
                         .map_or("A Commander", |p| p.name.as_str());
+                    let yours = !self.view.observing && *heir == Some(self.view.local);
+                    let text = match heir.and_then(|h| players.get(h as usize)) {
+                        Some(_) if yours => {
+                            format!("{name} Has Been Defeated: Their Army Is Yours")
+                        }
+                        Some(h) => format!("{name} Has Been Defeated: Their Army Joins {}", h.name),
+                        None => format!("{name} Has Been Defeated"),
+                    };
                     self.hud.toast(
-                        format!("{name} Has Been Defeated"),
+                        text,
                         if !self.view.observing && *player == self.view.local {
                             palette::BAD
                         } else {

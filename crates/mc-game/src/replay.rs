@@ -18,6 +18,7 @@ pub struct Playback {
     pub mission: Option<mc_sim::mission::Definition>,
     /// The weather and time of day the match was played under.
     pub sky: mc_data::weather::SkyChoice,
+    pub fallen_army: mc_sim::FallenArmy,
     /// `replay.held` carried out so far.
     held: usize,
 }
@@ -38,6 +39,7 @@ impl Playback {
             survival: options.survival,
             mission: options.mission,
             sky: options.sky,
+            fallen_army: options.fallen_army,
             replay,
             path: path.to_owned(),
             held: 0,
@@ -99,6 +101,7 @@ pub fn chronicle_of(
     let mut playback = Playback::open(path)?;
     let mut world = World::new(map, blueprints.clone(), pool.clone(), &playback.config)
         .map_err(|e| e.to_string())?;
+    world.set_fallen_army(playback.fallen_army);
     if let Some(survival) = playback.survival.clone() {
         world.begin_survival(survival).map_err(|e| e.to_string())?;
     }

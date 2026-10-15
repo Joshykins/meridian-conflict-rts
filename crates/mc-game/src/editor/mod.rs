@@ -350,6 +350,7 @@ impl Editor {
             colors: crate::setup::TEAM_COLORS,
             survival: None,
             sky: Default::default(),
+            fallen_army: Default::default(),
         };
         let mission = crate::campaign::definition(&map)?;
         crate::app::local_editor_start(

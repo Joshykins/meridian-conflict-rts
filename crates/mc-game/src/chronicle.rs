@@ -270,7 +270,7 @@ impl Chronicle {
                         upgrade,
                     });
                 }
-                SimEvent::PlayerDefeated { player } => self.defeats.push((tick, player)),
+                SimEvent::PlayerDefeated { player, .. } => self.defeats.push((tick, player)),
                 SimEvent::NuclearDetonation {
                     pos,
                     owner,

@@ -50,6 +50,7 @@ fn start_local(
         colors,
         survival,
         sky,
+        fallen_army,
     } = request;
     if mission.is_some() && editor_slot.is_none() {
         config = crate::campaign::config();
@@ -99,6 +100,7 @@ fn start_local(
             map: map.name().to_owned(),
             map_id: map.content_id(),
             sky,
+            fallen_army,
         }
         .encode()?,
     };

@@ -158,6 +158,9 @@ pub struct State {
     /// Finished units' lots waiting to be laid again on Repeat (`site_repeat.rs`).
     #[serde(default)]
     pub site_repeats: crate::site_repeat::SiteRepeats,
+    /// What becomes of a defeated side's forces (`succession.rs`).
+    #[serde(default)]
+    pub fallen_army: crate::succession::FallenArmy,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -492,6 +495,7 @@ impl World {
             levels: Default::default(),
             lances: Default::default(),
             site_repeats: Default::default(),
+            fallen_army: Default::default(),
         };
         let water = terrain.water_level();
         let ore = crate::mines::OreGrid::new(&map.ore, size, |p| terrain.height_at(p) > water);

@@ -325,6 +325,9 @@ pub enum SimEvent {
     },
     PlayerDefeated {
         player: u8,
+        /// The ally who took over the fallen side's army (`succession.rs`), if
+        /// anyone did; otherwise the army was destroyed.
+        heir: Option<u8>,
     },
     MatchOver {
         winner_team: u8,

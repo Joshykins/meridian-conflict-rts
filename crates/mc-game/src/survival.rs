@@ -364,7 +364,7 @@ pub fn log_tick(world: &mc_sim::World, tick: u32) {
             SimEvent::SurvivalWon { rounds } => {
                 println!("[{min:5.1} min] defenders won after {rounds} rounds")
             }
-            SimEvent::PlayerDefeated { player } => {
+            SimEvent::PlayerDefeated { player, .. } => {
                 println!("[{min:5.1} min] player {player} defeated")
             }
             _ => {}

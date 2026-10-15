@@ -298,6 +298,23 @@ pub fn fog_chip(fog: bool) -> String {
     if fog { "Fog of War" } else { "No Fog" }.to_owned()
 }
 
+/// A fallen army rule as its tile on the settings sheet names it.
+pub fn fallen_army_choice(rule: mc_sim::FallenArmy) -> &'static str {
+    match rule {
+        mc_sim::FallenArmy::Destroyed => "Destroyed",
+        mc_sim::FallenArmy::ToAlly => "To an Ally",
+    }
+}
+
+/// The card's chip for the fallen army rule.
+pub fn fallen_army_chip(rule: mc_sim::FallenArmy) -> String {
+    match rule {
+        mc_sim::FallenArmy::Destroyed => "Fallen Armies Destroyed",
+        mc_sim::FallenArmy::ToAlly => "Fallen Armies to Allies",
+    }
+    .to_owned()
+}
+
 /// The card's chip for a seed.
 pub fn seed_chip(seed: u64) -> String {
     format!("Seed {:04X}-{:04X}", seed >> 16 & 0xFFFF, seed & 0xFFFF)

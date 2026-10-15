@@ -773,6 +773,7 @@ fn run() -> Result<(), String> {
             map_id: map.content_id(),
             sky: Default::default(),
             mission: None,
+            fallen_army: Default::default(),
         }
         .encode()
     };
@@ -858,6 +859,7 @@ fn run() -> Result<(), String> {
                 colors,
                 survival,
                 sky: Default::default(),
+                fallen_army: Default::default(),
             };
             let mut start = app::local_start(request, &blueprints, skirmish)?;
             // Test scenes script their armies locally; that only works on one machine.

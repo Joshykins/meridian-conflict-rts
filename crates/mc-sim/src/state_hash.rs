@@ -61,6 +61,7 @@ impl World {
                 h.write_u64(s.winner.map_or(u64::MAX, |w| w as u64));
             },
             &|h| {
+                h.write_u64(s.fallen_army as u64);
                 for p in &s.players {
                     p.hash(h);
                 }

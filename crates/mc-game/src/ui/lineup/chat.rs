@@ -128,6 +128,7 @@ pub struct Facts {
     mode: Mode,
     map: String,
     fog: bool,
+    fallen_army: mc_sim::FallenArmy,
     seed: u64,
     rules: Option<SurvivalRules>,
     /// On one machine: every commander is an AI and you watch.
@@ -197,6 +198,7 @@ impl Facts {
                 .card(catalog)
                 .map_or_else(String::new, |c| c.name.clone()),
             fog: lineup.fog,
+            fallen_army: lineup.fallen_army,
             seed: lineup.seed,
             rules: (lineup.mode == Mode::Survival).then_some(lineup.rules),
             observe: table.observe,
@@ -238,6 +240,13 @@ fn changes(was: &Facts, now: &Facts) -> Vec<Change> {
             "Fog of war off"
         };
         say("fog", None, text.to_owned());
+    }
+    if was.fallen_army != now.fallen_army {
+        let text = match now.fallen_army {
+            mc_sim::FallenArmy::Destroyed => "A fallen commander's army is destroyed",
+            mc_sim::FallenArmy::ToAlly => "A fallen commander's army passes to an ally",
+        };
+        say("fallen", None, text.to_owned());
     }
     if was.seed != now.seed {
         say(
@@ -524,6 +533,7 @@ mod tests {
             mode: Mode::Skirmish,
             map: "Serac Divide".to_owned(),
             fog: true,
+            fallen_army: mc_sim::FallenArmy::Destroyed,
             seed: 7,
             rules: None,
             observe: false,
@@ -550,6 +560,7 @@ mod tests {
         chat.watch(plan());
         let mut now = plan();
         now.fog = false;
+        now.fallen_army = mc_sim::FallenArmy::ToAlly;
         now.seats[1].team = 0;
         now.seats[1].control = "AI \u{b7} Hard";
         now.seats.push(seat(2, "ARC AI 2"));
@@ -558,6 +569,7 @@ mod tests {
             texts(&chat),
             [
                 "Fog of war off",
+                "A fallen commander's army passes to an ally",
                 "ARC AI 1 set to AI \u{b7} Hard",
                 "ARC AI 1 joins Team 1",
                 "ARC AI 2 joins  \u{b7}  AI \u{b7} Normal",

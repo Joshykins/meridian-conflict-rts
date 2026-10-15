@@ -91,6 +91,7 @@ pub fn run(
                     let config = options.config;
                     let mut w = World::new(&map, blueprints.clone(), pool.clone(), &config)
                         .map_err(|e| e.to_string())?;
+                    w.set_fallen_army(options.fallen_army);
                     if let Some(survival) = options.survival {
                         w.begin_survival(survival).map_err(|e| e.to_string())?;
                     }

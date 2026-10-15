@@ -125,6 +125,7 @@ fn playtest_uses_chosen_slot_and_authored_roster() {
         colors: crate::setup::TEAM_COLORS,
         survival: None,
         sky: Default::default(),
+        fallen_army: Default::default(),
     };
     let start = crate::app::local_editor_start(request, &bp, None, 1).unwrap();
     assert_eq!(start.local, 1);

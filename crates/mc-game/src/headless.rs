@@ -101,6 +101,9 @@ pub fn run_sim(
     };
     let mut world =
         World::new(map, blueprints.clone(), pool.clone(), &config).map_err(|e| e.to_string())?;
+    if let Some(p) = &playback {
+        world.set_fallen_army(p.fallen_army);
+    }
     let survival = match &playback {
         Some(p) => p.survival.clone(),
         None if opts.scene == setup::Scene::Survival => {
