@@ -6,7 +6,7 @@
 STORE_URL="https://builds.meridianconflict.com"
 # The R2 bucket and its S3 endpoint (https://<account id>.r2.cloudflarestorage.com).
 R2_BUCKET="meridian-builds"
-R2_ENDPOINT=""
+R2_ENDPOINT="https://674c2382543440ce4fd497aafd05db48.r2.cloudflarestorage.com"
 # The AWS CLI profile holding the bucket's R2 access key (aws configure --profile ...).
 R2_PROFILE="meridian-r2"
 
