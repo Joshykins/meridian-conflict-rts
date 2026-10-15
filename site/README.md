@@ -80,12 +80,14 @@ generates again when either changes; reload the page to see it.
 
 The site runs on Railway as a service of its own, built with
 `deploy/site.Dockerfile` (Node and the pinned Rust toolchain, then `pnpm build`,
-then Next's standalone server) from the `release` branch. Only
-`scripts/channel.sh promote release` (or a release hotfix) moves that branch, after
-the build is published, so the site always shows the game players have
-(docs/RELEASES.md). The service's settings: source this repository, branch
-`release`, variable `RAILWAY_DOCKERFILE_PATH=deploy/site.Dockerfile`, and the custom
-domains `meridianconflict.com` and `www.meridianconflict.com`.
+then Next's standalone server) from the `playtest` branch while the game is in open
+playtest. Only `scripts/channel.sh promote playtest` (or a playtest hotfix) moves that
+branch, after the build and its setup are published, so the site shows the game
+players have and its Download button never points at a file not yet there
+(docs/RELEASES.md). When the release channel opens, the service moves to `release`.
+The service's settings: source this repository, branch `playtest`, variables
+`RAILWAY_DOCKERFILE_PATH=deploy/site.Dockerfile` and `PORT=3000`, and the custom
+domains `meridianconflict.com` and `www.meridianconflict.com` on port 3000.
 
 To try the image here: `docker build -f deploy/site.Dockerfile -t meridian-site .`
 from the repository root, then `docker run -p 3000:3000 meridian-site`.
