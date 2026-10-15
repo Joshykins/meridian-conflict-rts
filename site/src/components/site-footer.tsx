@@ -26,7 +26,7 @@ export function SiteFooter() {
         <FooterCol
           title="Play"
           links={[
-            { href: site.download.href, label: "Download the launcher", external: true },
+            { href: "/play", label: "Download the launcher" },
             { href: site.discord, label: "Discord", external: true },
           ]}
         />

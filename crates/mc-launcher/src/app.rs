@@ -224,8 +224,11 @@ impl App {
         if let (Some(newest), None, Some(store)) = (lane.newest(), &lane.update, &store) {
             let wanted = !self.install.versions.has(&newest.build)
                 && current.as_ref().is_none_or(|c| newest.number > c.number);
-            if wanted && current.is_some() {
-                log.line(&format!("updating to {}", newest.build));
+            // An update; or a fresh install (the setup just ran), which gets
+            // its picked channel's build straight away.
+            let fresh = self.installed.0.is_empty();
+            if wanted && (current.is_some() || fresh) {
+                log.line(&format!("installing {}", newest.build));
                 self.start_install(store.clone(), newest);
             }
         }

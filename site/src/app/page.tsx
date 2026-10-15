@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { HeroMedia } from "@/components/hero-media";
-import { DownloadLink, PlaytestBadge } from "@/components/download-link";
+import { PlayLink, PlaytestBadge } from "@/components/download-link";
 import { ArcCrest, RegencyCrest } from "@/components/crests";
 import { UnitTile } from "@/components/unit-tile";
 import { UnitArt } from "@/components/unit-art";
@@ -89,7 +89,7 @@ export default function Home() {
             {site.description}
           </p>
           <div className="rise mt-8 flex flex-wrap items-center gap-3" style={{ ["--i" as string]: 4 }}>
-            <DownloadLink className="group relative inline-flex items-center gap-3 overflow-hidden bg-accent px-6 py-3.5 font-display text-lg font-semibold text-black shadow-[0_0_32px_-6px_rgb(255_90_36/0.8)] transition hover:brightness-110 active:scale-[0.98]" />
+            <PlayLink className="group relative inline-flex items-center gap-3 overflow-hidden bg-accent px-6 py-3.5 font-display text-lg font-semibold text-black shadow-[0_0_32px_-6px_rgb(255_90_36/0.8)] transition hover:brightness-110 active:scale-[0.98]" />
             <Link
               href="/units"
               transitionTypes={["nav-forward"]}
@@ -314,7 +314,7 @@ export default function Home() {
               players online, and tell us what breaks. The launcher keeps the game up to date as new builds land.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <DownloadLink className="group inline-flex items-center gap-3 bg-accent px-6 py-3.5 font-display text-lg font-semibold text-black transition hover:brightness-110 active:scale-[0.98]" />
+              <PlayLink className="group inline-flex items-center gap-3 bg-accent px-6 py-3.5 font-display text-lg font-semibold text-black transition hover:brightness-110 active:scale-[0.98]" />
               <a
                 href={site.discord}
                 target="_blank"
@@ -324,7 +324,7 @@ export default function Home() {
                 Join the Discord <span className="transition-transform duration-300 group-hover:translate-x-1">↗</span>
               </a>
             </div>
-            <p className="mt-4 text-sm text-faint">{site.download.platform}. Unzip anywhere and run MeridianConflict.exe.</p>
+            <p className="mt-4 text-sm text-faint">{site.download.platform}. A small setup; the launcher then downloads the game.</p>
           </div>
         </div>
       </section>

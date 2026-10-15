@@ -110,7 +110,17 @@ are signed like manifests, so the links the launcher opens are ours.
 
 ## An install and the launcher
 
-What a player unzips and runs:
+A new player gets the setup from the website's Play page
+(`meridianconflict.com/play`): `MeridianConflictSetup-<Channel>.exe`, which is the
+launcher itself under that name (`crates/mc-launcher/src/setup.rs`). Run, it installs
+itself for that user, with no admin prompt, to `%LOCALAPPDATA%\Programs\Meridian
+Conflict`, puts shortcuts in the Start menu and on the desktop, lists the game in
+Settings > Apps, and starts the installed launcher, which finds nothing installed and
+downloads its channel's newest build at once. Settings > Apps > Uninstall runs
+`MeridianConflict --uninstall`: shortcuts, the Apps entry, the builds and the launcher
+go; the replays stay. The zip from `release.sh` is the same install for hand delivery.
+
+What an install holds:
 
 ```text
 MeridianConflict.exe      the launcher (crates/mc-launcher)
@@ -265,9 +275,9 @@ playtest-only maps), packs and signs it with its patch notes into the local copy
 (`~/.local/share/meridian-release/store`), uploads what R2 lacks (blobs, then the
 build's manifest, then the channel's history, then the channel's pointer, last), and writes
 `target/dist/MeridianConflict-Playtest-Build<N>.zip`: the launcher with this build
-installed, to hand to a new player, and uploads it as well to the fixed link
-`https://builds.meridianconflict.com/download/MeridianConflict-<Channel>.zip`, which
-always gives the channel's newest. Players who have an install get it as an update.
+installed, to hand to a new player. It uploads the launcher alone as the setup, at the
+fixed link `https://builds.meridianconflict.com/download/MeridianConflictSetup-<Channel>.exe`
+(always the channel's newest), which the website's Play page serves. Players who have an install get it as an update.
 `--no-upload` is a trial: it stops before uploading and leaves the channel's pointer
 and history alone, so the zip works but no player is told of the build.
 `mc-release unlist --store DIR --key KEY --channel CHANNEL BUILD` takes a build listed

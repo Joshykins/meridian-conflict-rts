@@ -1,15 +1,34 @@
+import Link from "next/link";
 import site from "../../content/site.json";
 
-/** The launcher's install zip: the playtest channel's newest build. */
-export function DownloadLink({ className = "", children }: { className?: string; children?: React.ReactNode }) {
+const arrow = (
+  <svg viewBox="0 0 16 16" className="size-4" aria-hidden>
+    <path d="M8 1v9M4 6.5L8 10.5L12 6.5M2 14h12" fill="none" stroke="currentColor" strokeWidth="1.8" />
+  </svg>
+);
+
+/** Every Play and Download button: to the Play page, which has the download and how to install. */
+export function PlayLink({ className = "", children }: { className?: string; children?: React.ReactNode }) {
+  return (
+    <Link href="/play" transitionTypes={["nav-forward"]} className={className}>
+      {children ?? (
+        <>
+          {arrow}
+          Download the launcher
+        </>
+      )}
+    </Link>
+  );
+}
+
+/** The setup itself: the playtest channel's launcher, which installs itself (the Play page only). */
+export function SetupDownload({ className = "", children }: { className?: string; children?: React.ReactNode }) {
   return (
     <a href={site.download.href} download className={className}>
       {children ?? (
         <>
-          <svg viewBox="0 0 16 16" className="size-4" aria-hidden>
-            <path d="M8 1v9M4 6.5L8 10.5L12 6.5M2 14h12" fill="none" stroke="currentColor" strokeWidth="1.8" />
-          </svg>
-          Download the launcher
+          {arrow}
+          Download for Windows
         </>
       )}
     </a>

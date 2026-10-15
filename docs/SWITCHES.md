@@ -118,6 +118,8 @@ See `docs/RELEASES.md`.
 | `MERIDIAN_STORE` (compile time) | an `https://` URL | The build store the launcher updates from and fetches old builds from (`publish/config.sh`'s `STORE_URL`, set by `scripts/release.sh`). Unset: no updates, and Match History names the build an old replay needs instead of fetching it. |
 | `MERIDIAN_LAUNCHER` | the launcher's path | Set by the launcher for the game it starts: Match History's Watch in Its Build asks it to fetch and run an old replay's build. |
 | `MeridianConflict --replay FILE` | a replay | The launcher plays FILE in the build that recorded it (fetching it first), then starts the current build on Match History. |
+| `MeridianConflict --uninstall` | | Removes the install: the shortcuts, the Settings > Apps entry, the builds and the launcher; the replays stay. Settings > Apps runs it. |
+| `MeridianConflictSetup*.exe` | the launcher under that name | Installs itself to `%LOCALAPPDATA%\Programs\Meridian Conflict` with shortcuts and an Apps entry, then starts the installed launcher (the website's download). |
 | `MeridianConflict --screenshot DIR` | a folder | The launcher draws its window in each of its states into DIR as PNGs (1x and 1.5x) and exits. |
 | `MERIDIAN_TEST_JOBS` | a number (default 6) | How many test binaries `scripts/check.sh` runs at once. |
 | `MERIDIAN_TEST_LIMIT` | seconds (default 300) | How long `scripts/check.sh` lets one test binary run before it fails the check as hung. |

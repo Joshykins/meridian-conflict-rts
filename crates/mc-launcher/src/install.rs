@@ -207,7 +207,7 @@ pub(crate) fn open(target: &str) {
 /// The game is a console program and the launcher has no console to lend it,
 /// so Windows would open one beside the game (CREATE_NO_WINDOW). Its log goes
 /// to meridian.log anyway.
-fn no_console(c: &mut Command) {
+pub(crate) fn no_console(c: &mut Command) {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -234,6 +234,24 @@ pub(crate) fn tell(message: &str) {
     } else {
         eprintln!("{message}");
     }
+}
+
+/// Asks a yes-or-no question in a system dialog; true for yes.
+pub(crate) fn ask(question: &str) -> bool {
+    if !cfg!(windows) {
+        eprintln!("{question} (answering no: there is no dialog here)");
+        return false;
+    }
+    let mut c = Command::new("powershell.exe");
+    c.args([
+        "-NoProfile",
+        "-Command",
+        "Add-Type -AssemblyName PresentationFramework; [System.Windows.MessageBox]::Show($env:MC_QUESTION, 'Meridian Conflict', 'YesNo', 'Question')",
+    ])
+    .env("MC_QUESTION", question);
+    no_console(&mut c);
+    c.output()
+        .is_ok_and(|o| String::from_utf8_lossy(&o.stdout).trim() == "Yes")
 }
 
 /// `launcher.log`: what this run did, for a report.

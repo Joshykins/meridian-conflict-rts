@@ -4,9 +4,9 @@
   "description": "A real-time strategy game about building bases and commanding huge armies across land, sea, air and orbit. The open playtest is live: download the launcher and play.",
   "discord": "https://discord.gg/q7UNPenmmg",
   "download": {
-    "href": "https://builds.meridianconflict.com/download/MeridianConflict-Playtest.zip",
+    "href": "https://builds.meridianconflict.com/download/MeridianConflictSetup-Playtest.exe",
     "platform": "Windows 10 and 11",
-    "note": "The playtest channel's newest install, scripts/release.sh uploads it with every playtest build."
+    "note": "The playtest channel's setup (the launcher, which installs itself), uploaded by scripts/release.sh with every playtest build. Every Play and Download button leads to /play, which serves it."
   },
   "heroVideo": {
     "sources": [

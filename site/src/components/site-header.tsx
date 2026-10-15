@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { DownloadLink } from "./download-link";
+import { PlayLink } from "./download-link";
 import { Emblem, Wordmark } from "./emblem";
 import site from "../../content/site.json";
 
@@ -72,9 +72,9 @@ export function SiteHeader() {
             <span className="size-1.5 animate-[blink_2s_ease-in-out_infinite] rounded-full bg-accent" />
             Discord
           </a>
-          <DownloadLink className="ml-2 hidden items-center gap-2 bg-accent px-3.5 py-1.5 font-display font-semibold text-black transition hover:brightness-110 sm:inline-flex">
+          <PlayLink className="ml-2 hidden items-center gap-2 bg-accent px-3.5 py-1.5 font-display font-semibold text-black transition hover:brightness-110 sm:inline-flex">
             Play free
-          </DownloadLink>
+          </PlayLink>
         </nav>
       </div>
     </header>

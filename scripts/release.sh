@@ -22,9 +22,10 @@
 # 4. Uploads what the published store lacks to R2: blobs, then the build's
 #    manifest, then the channel's history, then the channel's pointer last.
 # 5. Writes the install zip, target/dist/MeridianConflict-<Channel>-Build<N>.zip:
-#    the launcher and this build, ready to unzip and run, uploaded too to the fixed
-#    link $STORE_URL/download/MeridianConflict-<Channel>.zip that the website and
-#    any message to a new player can point at. Its symbols go to the
+#    the launcher and this build, ready to unzip and run, for hand delivery. The
+#    launcher alone goes up as the setup, at the fixed link
+#    $STORE_URL/download/MeridianConflictSetup-<Channel>.exe that the website's
+#    Play page serves: it installs itself and downloads the game. Its symbols go to the
 #    main checkout's target/dist (<name>-<commit>.pdb): a crash report names code
 #    as meridian.exe+0x..., which scripts/symbolize.sh turns into names with it,
 #    and a minidump opens in Visual Studio or WinDbg only with it.
@@ -223,9 +224,12 @@ rm -rf "$stage"
 (cd "$out" && 7z a -tzip -mx=7 -bso0 -bsp0 "$out.zip" MeridianConflict)
 echo "built $out.zip ($(du -h "$out.zip" | cut -f1))"
 if (( upload )); then
-    # The same name every time, never cached for long: the link always gives the newest.
-    download=download/MeridianConflict-$Channel.zip
-    s3 cp "$out.zip" "s3://$R2_BUCKET/$download" \
-        --content-type application/zip --cache-control "public, max-age=300"
-    echo "new players download it from $STORE_URL/$download"
+    # The launcher is its own setup (mc-launcher setup.rs): under this name it installs
+    # itself. The same name every time, never cached for long: the link always gives
+    # the newest.
+    download=download/MeridianConflictSetup-$Channel.exe
+    s3 cp "$install/MeridianConflict.exe" "s3://$R2_BUCKET/$download" \
+        --content-type application/vnd.microsoft.portable-executable \
+        --cache-control "public, max-age=300"
+    echo "new players install it with $STORE_URL/$download"
 fi

@@ -13,6 +13,9 @@
 //!   then starts the current build again on Match History.
 //! - `MeridianConflict --screenshot DIR` draws the window in each of its
 //!   states into DIR as PNGs, and exits.
+//! - Run as `MeridianConflictSetup*.exe` (the website's download), it installs
+//!   itself and starts the installed copy; `--uninstall` takes it away again
+//!   (`setup.rs`).
 //!
 //! An update to this program comes with the build it was published with; it
 //! goes beside it as `MeridianConflict.exe.new` and is swapped in by
@@ -25,6 +28,7 @@ mod install;
 mod notes;
 mod paint;
 mod screens;
+mod setup;
 mod shots;
 mod ui;
 mod window;
@@ -44,6 +48,11 @@ MeridianConflict: keeps Meridian Conflict up to date and starts it.
                                    first if need be), then the current build again
   MeridianConflict --screenshot DIR  draw the launcher in each of its states into DIR
                                    (one PNG each, at 1x and 1.5x) and exit
+  MeridianConflict --uninstall     remove the install (shortcuts, the Apps entry, the
+                                   builds), keeping the replays; Settings > Apps runs it
+  MeridianConflictSetup*.exe       the same program under the website's name: installs
+                                   itself to %LOCALAPPDATA%\\Programs\\Meridian Conflict,
+                                   with shortcuts, and starts the installed launcher
   MeridianConflict --help          this
 
 Built in at compile time (scripts/release.sh): MERIDIAN_CHANNEL (the channel it opens
@@ -78,7 +87,29 @@ fn main() -> ExitCode {
         }
         _ => {}
     }
+    if setup::is_setup(&exe) && args.is_empty() {
+        let mut log = Log::open(&std::env::temp_dir().join("meridian-setup.log"));
+        return match setup::run(&exe, &mut log) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(e) => {
+                log.line(&format!("setup failed: {e}"));
+                install::tell(&format!("Meridian Conflict could not be installed.\n\n{e}"));
+                ExitCode::FAILURE
+            }
+        };
+    }
     let mut log = Log::open(&root.join("launcher.log"));
+    if let [flag] = args.as_slice() {
+        if flag == "--uninstall" {
+            return match setup::uninstall(&exe, &root, &mut log) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(e) => {
+                    install::tell(&format!("The uninstall did not finish.\n\n{e}"));
+                    ExitCode::FAILURE
+                }
+            };
+        }
+    }
     if install::swap_in_update(&exe, &args, &mut log) {
         return ExitCode::SUCCESS;
     }
