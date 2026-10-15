@@ -157,7 +157,7 @@ fn build(order: Order, shared: &Mutex<Shared>) -> Result<Ready, String> {
         MapSource::Loaded(map) => map,
         MapSource::Backdrop => {
             set("Reading the map", 0.0);
-            let path = crate::setup::backdrop_map().ok_or("no maps found. Bake one with: cargo run --release -p mc-map --bin mc-bake -- --layout islands --size-km 10 --seed 46 --name \"Twin Shoals\" -o maps/twin_shoals.mcmap")?;
+            let path = crate::setup::backdrop_map().ok_or("no maps found. Bake one with: cargo run --release -p mc-map --bin mc-bake -- --layout islands --size-km 8 --seed 46 --name \"Twin Shoals\" -o maps/twin_shoals.mcmap")?;
             Arc::new(MapFile::open(&path).map_err(|e| format!("{}: {e}", path.display()))?)
         }
     };

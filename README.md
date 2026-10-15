@@ -319,8 +319,8 @@ ground for whatever is selected or being placed (weapons by kind with their dead
 synthesised interface sound set. Skirmish control can be OBSERVE: the AIs fight, the map opens
 from orbit, pause and game speed still work, and a click on the roster jumps to that commander.
 Three maps: the 80 km Meridian Basin, Crosswater, a 16 km four-player free-for-all
-(a lake with an island and four fords in the middle, a sea round the map and into a bay between every two neighbours), and Twin Shoals, a 10 km 1v1 island map (both commanders on the main island around a
-central lake, a ridge in each passage, two town islands reachable by amphibious units and hovers). Local matches are recorded to `replays/<id>.mcreplay` (the relay records with `--replay-dir`);
+(a lake with an island and four fords in the middle, a sea round the map and into a bay between every two neighbours), and Twin Shoals, an 8 km 1v1 island map (both commanders on the main island around a
+central lake, a causeway either side of it, two town islands reachable by amphibious units and hovers). Local matches are recorded to `replays/<id>.mcreplay` (the relay records with `--replay-dir`);
 the main menu's **Match History** opens each one's battle report or watches it with a timeline to scrub, and F1's **Mark Issue** flags a
 moment with a note, the timings and a screenshot for later: see `docs/REPLAYS.md`.
 

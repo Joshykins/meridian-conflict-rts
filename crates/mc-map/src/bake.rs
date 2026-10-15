@@ -20,11 +20,10 @@
 //!   every town, with mountains and lakes kept away from them.
 //!
 //! That is the default [`Layout::Basin`]. [`Layout::Islands`] is a designed
-//! two-player sea map built from the same parts: one long main island with
-//! both starts on it, narrowing to a waist round a lake in its middle, so the
-//! passage either side of the lake is a neck (Finn's Revenge's), a ridge in
-//! each passage (so each is a lake-shore lane and a coastal lane), and
-//! a secondary island with a town across a deep channel on either flank.
+//! two-player sea map built from the same parts (`islands.rs`): one main island
+//! with both starts on it, narrowing to a waist round a lake in its middle, so
+//! the land either side of the lake is a causeway, and a secondary island with
+//! a town across a deep channel on either flank.
 
 use crate::format::{
     encode_tile, EncodedTile, MapError, MapInfo, MapWriter, OreRegion, Prop, PropKind, SNOW_STRIDE,
@@ -57,9 +56,6 @@ const MAX_TREES: usize = 450_000;
 const CITY_LOT_M: f64 = 48.0;
 /// Corners on one ore field's outline.
 const ORE_CORNERS: usize = 28;
-/// How much narrower the islands layout's main island is at its waist, round the
-/// lake, than across its lobes: what makes the passages either side of the lake necks.
-const ISLAND_WAIST: f64 = 0.40;
 
 mod alpine;
 mod antarctic;
@@ -70,6 +66,7 @@ mod crosswater;
 mod facility;
 mod frostline;
 mod harvest;
+mod islands;
 mod machine;
 mod params;
 mod planned_wrecks;
@@ -495,7 +492,7 @@ impl Terrain {
             size,
             wedge,
             base,
-            start_r: if islands { 0.30 } else { 0.36 } * size,
+            start_r: if islands { islands::START_R } else { 0.36 } * size,
             start_outer: 2.0 * start_core,
             town: (town_r * (wedge / 2.0).cos(), town_r * (wedge / 2.0).sin()),
             town_outer: 1.6 * town_core,
@@ -551,19 +548,7 @@ impl Terrain {
         };
 
         if islands {
-            // A few stacks per quadrant, strung along the main island's
-            // outline a little way out to sea, clear of the town channels.
-            let mut rng = mc_core::Rng::new(seed ^ 0x6973_6C65);
-            for at in [0.20, 0.58, 0.95] {
-                let angle: f64 = at + 0.24 * (rng.unit().to_f64() - 0.5);
-                let out = 1.24 + 0.10 * rng.unit().to_f64();
-                let radius = (0.008 + 0.014 * rng.unit().to_f64().powi(2)) * size;
-                t.islets.push((
-                    0.40 * size * out * angle.cos(),
-                    0.24 * size * out * angle.sin(),
-                    radius,
-                ));
-            }
+            t.lay_islets();
         }
 
         if params.layout == Layout::Archipelago {
@@ -888,194 +873,6 @@ impl Terrain {
         }
 
         h + (1.0 + 5.0 * m) * 1.4 * self.detail.fbm(px / 350.0, py / 350.0, 3, 0.45)
-    }
-
-    /// Folded position for sampling noise in the islands layout. A field
-    /// sampled at the plain folded position is creased along the fold axes,
-    /// which shows wherever a coast or a ridge crosses one; this fold is
-    /// rounded (zero gradient on the axis), so fields stay smooth across it.
-    fn soft_fold(&self, px: f64, py: f64) -> (f64, f64) {
-        let e = 0.02 * self.size;
-        ((px * px + e * e).sqrt(), (py * py + e * e).sqrt())
-    }
-
-    /// How far inside the central lake's shoreline a folded position is, in
-    /// metres (roughly; negative on land). The lake is longer along the start
-    /// axis, which keeps the passages either side of it open, and its shore is
-    /// pushed about by noise on the scale of the lake itself.
-    fn lake_inside(&self, px: f64, py: f64) -> f64 {
-        let s = self.size;
-        let (sx, sy) = self.soft_fold(px, py);
-        let e = ((px / (0.080 * s)).powi(2) + (py / (0.055 * s)).powi(2)).sqrt();
-        0.065
-            * s
-            * (1.0 - e
-                + 0.42
-                    * self
-                        .lake_shore
-                        .fbm(sx / (0.05 * s), sy / (0.05 * s), 3, 0.55))
-    }
-
-    /// The islands layout. Everything designed is an even function of the
-    /// folded coordinates, so it is smooth across the fold axes too.
-    fn natural_islands(&self, x: f64, y: f64) -> f64 {
-        let s = self.size;
-        // Lengths given in metres (beaches, shore shelves) are for the 10 km
-        // map and follow the size only so far: a beach can be neither a cliff
-        // nor a plain.
-        let k = (s / 10_240.0).clamp(0.8, 1.25);
-        let (px, py, _) = self.fold(x, y);
-        let (sx, sy) = self.soft_fold(px, py);
-        let d_start = ((px - self.start_r).powi(2) + py * py).sqrt();
-        let d_town = ((px - self.town.0).powi(2) + (py - self.town.1).powi(2)).sqrt();
-        let so = self.start_outer;
-
-        // Distance inland from the main island's coast: an ellipse along the
-        // start axis, pushed in and out by a slow warp (so the outline is not
-        // an ellipse) and a faster wobble (bays and headlands). The coast keeps
-        // still around the starts, and keeps clear of the town islands so the
-        // channel between them stays wide and deep. The island has a waist
-        // where the lake is: either side of the lake the passage from its shore
-        // to the coast is a neck (Finn's Revenge's, a few hundred metres), so
-        // the armies meet there, and the coast barely wobbles across it.
-        let waist = 1.0 - smoothstep(0.06 * s, 0.17 * s, px.abs());
-        let (a, b) = (0.40 * s, 0.24 * s * (1.0 - ISLAND_WAIST * waist));
-        let e = ((px / a).powi(2) + (py / b).powi(2)).sqrt();
-        let g = ((px / (a * a)).powi(2) + (py / (b * b)).powi(2)).sqrt();
-        let wobble = 0.06 * s * self.coast.fbm(sx / (0.11 * s), sy / (0.11 * s), 4, 0.55)
-            + 0.06 * s * self.coast_warp.get(sx / (0.28 * s), sy / (0.28 * s));
-        let d_main = (1.0 - e) * if g > 1e-12 { e / g } else { b }
-            + wobble * (0.4 + 0.6 * smoothstep(so, 4.0 * so, d_start)) * (1.0 - 0.85 * waist);
-        // (A smooth minimum with the distance to a circle around the town island.)
-        let d_clear = d_town - 0.20 * s;
-        let d_main =
-            0.5 * (d_main + d_clear - ((d_main - d_clear).powi(2) + (100.0 * k).powi(2)).sqrt());
-        // The town islands: rough ovals lying along the channel.
-        let e_sec = ((px / (0.125 * s)).powi(2) + ((py - self.town.1) / (0.10 * s)).powi(2)).sqrt();
-        let d_sec = 0.11
-            * s
-            * (1.0 - e_sec
-                + 0.40
-                    * self
-                        .coast
-                        .fbm(sx / (0.08 * s) + 40.0, sy / (0.08 * s), 3, 0.55)
-                + 0.2 * self.coast_warp.get(sx / (0.15 * s) + 40.0, sy / (0.15 * s)));
-        let inland_m = d_main.max(d_sec);
-
-        // Interior relief is the basin's terrace field, but only in the two
-        // lobes around the starts: the lake shore, the passages either side of
-        // it and the town islands are lowland, and so is a coastal strip all
-        // the way round (the field is capped by the distance inland), which is
-        // what guarantees a ground route from each start to every lane. The
-        // pulls are wide and soft so the terrace edges they leave behind
-        // are still the noise's, not arcs around the start and the lake.
-        let lake_in = self.lake_inside(px, py);
-        let wf = 1.0 / (0.6 * self.l_cont);
-        let wx = self.warp_x.get(sx * wf, sy * wf) * 0.15 * self.l_cont;
-        let wy = self.warp_y.get(sx * wf, sy * wf) * 0.15 * self.l_cont;
-        let mut c = 0.42
-            + 1.0
-                * self
-                    .cont
-                    .fbm((sx + wx) / self.l_cont, (sy + wy) / self.l_cont, 4, 0.5);
-        let rough = 1.0 + 0.3 * self.detail.get(sx / (1.5 * so), sy / (1.5 * so));
-        c += (0.15 - c) * bump(d_start * rough / (3.0 * so));
-        c += (0.15 - c) * bump(-lake_in.min(0.0) / (0.10 * s));
-        c += (0.15 - c) * (1.0 - smoothstep(0.09 * s, 0.17 * s, px));
-        let u = (inland_m / (1500.0 * k)).min(c.max(0.12));
-        // 0 around the starts, the lake and in the passages; 1 out in the lobes.
-        let lobes = smoothstep(so, 2.5 * so, d_start)
-            * smoothstep(0.12 * s, 0.17 * s, px)
-            * smoothstep(0.03 * s, 0.07 * s, -lake_in);
-
-        // Same shore and terrace profile as the basin, on a wider beach.
-        let ramp = self
-            .ramp
-            .get(sx / (0.35 * self.l_cont), sy / (0.35 * self.l_cont));
-        let half = 0.006 + 0.10 * smoothstep(0.15, 0.55, ramp);
-        let mut h = -8.0 + (TERRACES[0] + 8.0) * smoothstep(-0.08, 0.08, u);
-        h -= 40.0 * smoothstep(0.08, 0.45, -u);
-        h += (TERRACES[1] - TERRACES[0]) * smoothstep(0.40 - half, 0.40 + half, u);
-        h += (TERRACES[2] - TERRACES[1]) * smoothstep(0.80 - half, 0.80 + half, u);
-        let land = smoothstep(0.0, 0.1, u);
-        h += 2.5 * land * self.tilt.get(sx / 1800.0, sy / 1800.0);
-
-        // Noise-driven ranges and ponds as in the basin, in the lobes only.
-        let mut m = 0.0;
-        let inland = smoothstep(300.0 * k, 520.0 * k, inland_m) * lobes;
-        if inland > 0.0 {
-            let mask = smoothstep(
-                -0.25,
-                0.05,
-                self.mtn_mask
-                    .get(sx / (2.4 * self.l_mtn), sy / (2.4 * self.l_mtn)),
-            );
-            let (mx, my) = ((sx + 0.5 * wx) / self.l_mtn, (sy + 0.5 * wy) / self.l_mtn);
-            let line = smoothstep(0.88, 0.985, 1.0 - self.mtn.get(mx, my).abs());
-            let gap = smoothstep(
-                -0.35,
-                -0.05,
-                self.mtn_gap
-                    .get(sx / (0.7 * self.l_mtn), sy / (0.7 * self.l_mtn)),
-            );
-            m = line * mask * gap * inland;
-        }
-        let crag = self.crag.ridged(sx / 700.0, sy / 700.0, 4, 0.5);
-        if m > 0.0 {
-            let tall = 250.0
-                + 70.0
-                    * self
-                        .mtn_height
-                        .get(sx / (1.3 * self.l_mtn), sy / (1.3 * self.l_mtn));
-            h += self.mtn_scale * m * (tall + 120.0 * (crag - 0.4));
-        }
-        let lowland = land
-            * (1.0 - smoothstep(0.30, 0.38, u))
-            * lobes
-            * smoothstep(300.0 * k, 500.0 * k, inland_m);
-        if lowland > 0.0 {
-            let pond = smoothstep(0.45, 0.7, self.lake.get(sx / self.l_lake, sy / self.l_lake));
-            h += (-7.0 - h) * pond * lowland;
-        }
-
-        // The designed ridge in each passage. It is laid out in the passage's
-        // own coordinate (0 at the lake shore, 1 at the coast) so that wherever
-        // the shores wander, the lanes either side of it share the room. The
-        // crest wanders and its height comes and goes in peaks and
-        // saddles, none low enough to cross.
-        let (d_lake, d_coast) = (-lake_in, d_main);
-        let mut ridge = 0.0;
-        if d_lake > 0.0 && d_coast > 0.0 && px < 0.13 * s {
-            let wander = 0.10 * self.ridge.fbm(sx / (0.06 * s), 0.5, 2, 0.6);
-            let across = d_lake / (d_lake + d_coast) - 0.55 - wander;
-            let width = 0.13 + 0.035 * self.ridge.get(sx / (0.03 * s), 4.5);
-            let end = 0.085 * s + 0.02 * s * self.ridge.get(sy / (0.02 * s), 14.5);
-            ridge = bump(across.abs() / width)
-                * (1.0 - smoothstep(end - 0.035 * s, end + 0.015 * s, px));
-            let tall = 150.0 + 30.0 * self.ridge.get(sx / (0.035 * s), 9.5);
-            h += ridge * (tall + 110.0 * (crag - 0.45));
-        }
-
-        // A rocky knoll on the seaward side of each town island.
-        let d_knoll = (px * px + (py - self.town.1 - 0.05 * s).powi(2)).sqrt();
-        h += (22.0 + 40.0 * crag) * bump(d_knoll / (0.04 * s)) * smoothstep(0.0, 300.0 * k, d_sec);
-
-        // The lake: deep enough in the middle that land units go around.
-        let lake = smoothstep(-200.0 * k, 200.0 * k, lake_in);
-        h += (-9.0 - 9.0 * smoothstep(0.0, 0.05 * s, lake_in) - h) * lake;
-
-        h += (1.0 + 5.0 * m + 3.0 * ridge) * 1.4 * self.detail.fbm(sx / 350.0, sy / 350.0, 3, 0.45);
-
-        // Sea stacks off the main island's coast.
-        for &(ix, iy, radius) in &self.islets {
-            let d = ((px - ix).powi(2) + (py - iy).powi(2)).sqrt();
-            if d < radius {
-                h += (24.0 + 36.0 * crag - h) * smoothstep(0.1, 0.7, bump(d / radius));
-            }
-        }
-        // Open sea all the way round, whatever the noise did.
-        let edge = x.min(y).min(self.size_x - x).min(self.size_y - y);
-        h + (-48.0 - h) * (1.0 - smoothstep(0.015 * s, 0.04 * s, edge))
     }
 
     fn height_with(&self, pads: &[Pad], x: f64, y: f64) -> f64 {

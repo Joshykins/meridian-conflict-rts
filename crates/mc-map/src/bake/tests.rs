@@ -270,13 +270,13 @@ fn islands_have_level_starts_a_lake_towns_and_open_sea() {
     let (water, size) = (hf.water_level(), 4 * TILE_SIZE_M);
     let centre = FxVec2::from_ints(size / 2, size / 2);
 
-    // Both starts on the main island: level, dry, mirrored, about 0.6 of the map apart.
+    // Both starts on the main island: level, dry, mirrored, about half the map apart.
     let starts = map.start_positions();
     assert_eq!(starts.len(), 2);
     assert!((starts[0] + starts[1] - centre - centre).length() <= Fx::from_int(BUILD_CELL_M));
     let apart = starts[0].distance(starts[1]).to_f64() / size as f64;
     assert!(
-        (0.55..0.65).contains(&apart),
+        (0.45..0.55).contains(&apart),
         "starts are {apart} of the map apart"
     );
     for &s in starts {
