@@ -218,7 +218,7 @@ impl SetupState {
     fn request(&self) -> MatchRequest {
         let name = self.name.clone();
         let observe = self.observe;
-        let options = self
+        let mut options = self
             .lineup
             .options(&self.catalog, |_| {
                 if observe {
@@ -228,6 +228,9 @@ impl SetupState {
                 }
             })
             .expect("a request needs a map");
+        options
+            .deal_zones()
+            .expect("the roster leaves a free zone for every random seat");
         let map = self
             .lineup
             .card(&self.catalog)

@@ -28,7 +28,11 @@ pub struct Seat {
     pub control: Control,
     pub team: u8,
     /// Skirmish: the map's start position. Survival: an index into the theatre's spawns.
+    /// A random seat still holds one, so zones stay unique, but the chart hides it.
     pub start: u8,
+    /// The zone is dealt at the start, from the match seed, out of every zone
+    /// no chosen seat holds (`MatchOptions::deal_zones`).
+    pub random_zone: bool,
     pub color: u8,
     pub race: Pick,
     pub ai: AiConfig,
@@ -66,6 +70,7 @@ impl Roster {
                     },
                     team: if allied { 0 } else { i as u8 },
                     start: i as u8,
+                    random_zone: false,
                     color: i as u8,
                     race: Pick::default(),
                     ai: AiConfig::default(),
@@ -179,7 +184,7 @@ impl Roster {
         }
     }
 
-    /// Seat `i` deploys at zone `n`; whoever held it takes seat `i`'s.
+    /// Seat `i` deploys at zone `n` (no longer random); whoever held it takes seat `i`'s.
     pub fn take_zone(&mut self, i: usize, n: u8) {
         let mine = self.seats[i].start;
         if let Some(j) = (0..self.seats.len())
@@ -188,6 +193,28 @@ impl Roster {
             self.seats[j].start = mine;
         }
         self.seats[i].start = n;
+        self.seats[i].random_zone = false;
+    }
+
+    /// The seat in play that shows on the chart at zone `n`: random seats hold
+    /// a zone but do not show there.
+    pub fn shown_at(&self, n: u8) -> Option<usize> {
+        self.seats
+            .iter()
+            .position(|s| s.open() && !s.random_zone && s.start == n)
+    }
+
+    /// Every seat in play lands at random, or (when they all do already) none
+    /// does: each lands at the zone it holds.
+    pub fn toggle_all_random(&mut self) {
+        let all = self
+            .seats
+            .iter()
+            .filter(|s| s.open())
+            .all(|s| s.random_zone);
+        for s in self.seats.iter_mut().filter(|s| s.open()) {
+            s.random_zone = !all;
+        }
     }
 
     /// Seat `i` wears colour `n`; whoever wore it takes seat `i`'s.
@@ -274,6 +301,7 @@ impl Roster {
                 control: Control::Closed,
                 team: key,
                 start: key,
+                random_zone: false,
                 color: key,
                 race: Pick::default(),
                 ai: AiConfig::default(),
@@ -350,6 +378,24 @@ mod tests {
         assert_eq!((r.seats[0].start, r.seats[2].start), (2, 0));
         r.take_color(1, 0);
         assert_eq!((r.seats[1].color, r.seats[0].color), (0, 1));
+    }
+
+    #[test]
+    fn a_random_seat_hides_from_the_chart_until_placed() {
+        let mut r = Roster::new(4, 1, 2, false);
+        r.toggle_all_random();
+        assert!(r.seats[..3].iter().all(|s| s.random_zone));
+        assert!(!r.seats[3].random_zone, "a closed seat is left alone");
+        assert_eq!(r.shown_at(1), None, "seat 1 holds zone 1 but does not show");
+        // Placing seat 0 on zone 1 fixes it there; seat 1 keeps zone 0, still random.
+        r.take_zone(0, 1);
+        assert_eq!(r.shown_at(1), Some(0));
+        assert_eq!((r.seats[1].start, r.seats[1].random_zone), (0, true));
+        // Not all random now: the toggle makes them all random again, then none.
+        r.toggle_all_random();
+        assert!(r.seats[..3].iter().all(|s| s.random_zone));
+        r.toggle_all_random();
+        assert!(r.seats.iter().all(|s| !s.random_zone));
     }
 
     #[test]

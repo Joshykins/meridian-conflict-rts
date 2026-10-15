@@ -119,7 +119,11 @@ Games hosted from the client (LAN, direct IP) do not check names.
    screen (`ui/lineup/chat.rs`). The host starts once everyone is ready; a short
    countdown runs on every screen. The mode is skirmish (teams, any skirmish
    map) or co-op survival (every seat a defender on its own landing zone,
-   against the Progenitor on a survival map). Seats in play come first and
+   against the Progenitor on a survival map). A seat may land at random
+   (Land at Random while moving it on the chart, or Random Zones for all): the
+   plan carries those seats and the zones no chosen seat holds, and every
+   machine deals them from the match's start seed (`MatchOptions::deal_zones`),
+   so nobody sees where they land before the match. Seats in play come first and
    match the relay's seats, so the host's changes never move a seated player.
    The sky (weather and time of day) is the host's too: everyone plays under it,
    and a replay shows it. It is presentation only; the sim never reads it.

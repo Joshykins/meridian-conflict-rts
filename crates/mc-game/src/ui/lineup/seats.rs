@@ -892,7 +892,7 @@ fn name_cell(
 }
 
 /// A seat's landing zone as a cell: its marker, in the seat's colour, with
-/// the zone's number. A click picks the commander up to move on the chart
+/// the zone's number, or "?" while it lands at random. A click picks the commander up to move on the chart
 /// (and puts them down again); true when clicked.
 fn zone_cell(ui: &mut Ui, key: usize, f: Rect, seat: &Seat, placing: bool, enabled: bool) -> bool {
     let res = ui.interact(id("slot-zone", key), f, enabled);
@@ -932,7 +932,11 @@ fn zone_cell(ui: &mut Ui, key: usize, f: Rect, seat: &Seat, placing: bool, enabl
         p.y,
         type_scale::MICRO,
         rgb(palette::TEXT, if enabled || placing { 1.0 } else { 0.7 }),
-        &format!("{}", seat.start + 1),
+        &if seat.random_zone {
+            "?".to_owned()
+        } else {
+            format!("{}", seat.start + 1)
+        },
     );
     res.clicked
 }
@@ -1104,8 +1108,8 @@ fn difficulty_at(d: Difficulty) -> usize {
 }
 
 /// Quick team layouts under the rows: sides drawn from where the landing zones
-/// lie, so allies start next to each other whatever the seat order. Then the
-/// matchup as it stands.
+/// lie, so allies start next to each other whatever the seat order; Random
+/// Zones for everyone. Then the matchup as it stands.
 fn layouts(ui: &mut Ui, lineup: &mut Lineup, catalog: &Catalog, table: &Table, area: Rect, y: f32) {
     if y + 34.0 >= area.bottom() {
         return;
@@ -1141,6 +1145,29 @@ fn layouts(ui: &mut Ui, lineup: &mut Lineup, catalog: &Catalog, table: &Table, a
         }
     }
     let seated = lineup.roster.seated_teams();
+    // Everyone lands at random (or back to the zones they hold), when the row has
+    // room for it beside the matchup.
+    let random = Rect::new(area.x + 64.0 + 4.0 * 110.0 + 16.0, y, 124.0, 32.0);
+    let matchup_w = ui.text_width(type_scale::ITEM, &teams::matchup(&seated)) + 24.0;
+    if random.right() < area.right() - matchup_w {
+        let all = lineup
+            .roster
+            .seats
+            .iter()
+            .filter(|s| s.open())
+            .all(|s| s.random_zone);
+        if ui.button(
+            id("random-zones", 0),
+            random,
+            if all { "Chosen Zones" } else { "Random Zones" },
+            ButtonKind::Secondary,
+            table.host,
+        ) {
+            lineup.roster.toggle_all_random();
+            lineup.placing = None;
+            ui.audio.play(Sfx::Tick);
+        }
+    }
     if seated.len() >= 2 {
         let right = area.right();
         let uneven = teams::uneven(&seated) && !teams::free_for_all(&seated);

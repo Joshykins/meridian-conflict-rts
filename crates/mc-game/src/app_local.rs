@@ -101,6 +101,8 @@ fn start_local(
             map_id: map.content_id(),
             sky,
             fallen_army,
+            // The set-up dealt them already (`ui::setup`).
+            random_zones: Default::default(),
         }
         .encode()?,
     };

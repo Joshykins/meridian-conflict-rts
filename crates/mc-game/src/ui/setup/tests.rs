@@ -479,3 +479,53 @@ fn a_zone_cell_picks_a_commander_up_and_the_chart_puts_them_down() {
         Some(SetupAction::Back)
     ));
 }
+
+#[test]
+fn random_zones_deal_at_launch_and_travel_in_a_lobbys_plan() {
+    let mut state = state();
+    let Some(big) = state.catalog.maps.iter().position(|m| m.starts >= 4) else {
+        return;
+    };
+    state
+        .lineup
+        .set_map(&state.catalog, big, |_| false)
+        .unwrap();
+    // You pick zone 2; both AIs land at random.
+    let me = 0;
+    state.lineup.roster.take_zone(me, 2);
+    for s in &mut state.lineup.roster.seats[1..3] {
+        s.control = Control::Ai;
+        s.random_zone = true;
+    }
+    let catalog = &state.catalog;
+    let zones = state.lineup.zones(catalog);
+    let starts = |seed: u64| -> Vec<u8> {
+        let mut lineup = state.lineup.plan();
+        lineup.seed = seed;
+        let mut o = lineup
+            .options(catalog, |_| ("Tester".into(), Controller::Human))
+            .unwrap();
+        assert_eq!(o.random_zones.seats, 0b110);
+        assert_eq!(o.random_zones.pool.len(), zones - 1, "every zone but yours");
+        o.deal_zones().unwrap();
+        o.config.players.iter().map(|p| p.start).collect()
+    };
+    let dealt = starts(7);
+    assert_eq!(dealt, starts(7), "one seed, one deal");
+    assert_eq!(dealt[me], 2, "your pick stands");
+    assert!(dealt[1] != dealt[2] && !dealt[1..3].contains(&2));
+    assert!((0..32).any(|s| starts(s) != dealt), "the seed moves them");
+
+    // A guest's line-up, rebuilt from the host's plan, still shows them as random.
+    let plan = state
+        .lineup
+        .options(catalog, |_| (lineup::OPEN_NAME.into(), Controller::Ai))
+        .unwrap();
+    let mut guest = Lineup::new(catalog, Mode::Skirmish, 0, 0, 0);
+    assert!(guest.sync(catalog, &plan));
+    let random: Vec<bool> = guest.roster.seats[..3]
+        .iter()
+        .map(|s| s.random_zone)
+        .collect();
+    assert_eq!(random, vec![false, true, true]);
+}

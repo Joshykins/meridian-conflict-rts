@@ -176,9 +176,13 @@ impl Facts {
                 },
                 control: seats::control_label(s),
                 team: s.team,
-                zone: spawns
-                    .and_then(|sp| sp.get(s.start as usize))
-                    .map_or_else(|| format!("zone {}", s.start + 1), |z| z.name.clone()),
+                zone: if s.random_zone {
+                    "a random zone".to_owned()
+                } else {
+                    spawns
+                        .and_then(|sp| sp.get(s.start as usize))
+                        .map_or_else(|| format!("zone {}", s.start + 1), |z| z.name.clone())
+                },
                 color: s.color,
                 race: match s.race.race() {
                     Some(r) => format!("the {}", r.name),

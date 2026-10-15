@@ -15,6 +15,8 @@ use serde::{Deserialize, Serialize};
 pub const MAX_OPTIONS_BYTES: u64 = 1 << 20;
 /// The most a seat's choices may take.
 const MAX_SEAT_BYTES: u64 = 1 << 10;
+/// Parts the zone deal's draws from the races' (`Pick::resolve`) on one seed.
+const ZONE_SALT: u64 = 0x2F0E_5A11_D0C4_7E3B;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MatchOptions {
@@ -33,6 +35,17 @@ pub struct MatchOptions {
     pub mission: Option<mc_sim::mission::Definition>,
     /// What becomes of a defeated side's forces.
     pub fallen_army: FallenArmy,
+    /// Seats whose landing zone is dealt at the start (`deal_zones`).
+    pub random_zones: RandomZones,
+}
+
+/// Seats that land at random, and the zones they are dealt from.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RandomZones {
+    /// One bit per player (`mc_core::player_bit`).
+    pub seats: mc_core::PlayerMask,
+    /// The map start positions no chosen seat holds.
+    pub pool: Vec<u8>,
 }
 
 /// One person's own choices for their seat, sent as their lobby setup.
@@ -67,7 +80,7 @@ impl SeatChoice {
 
 impl MatchOptions {
     pub fn encode(&self) -> Result<Vec<u8>, String> {
-        let mut bytes = b"MCOPT3\0".to_vec();
+        let mut bytes = b"MCOPT4\0".to_vec();
         bytes.extend(bincode::serialize(self).map_err(|e| e.to_string())?);
         if bytes.len() as u64 > MAX_OPTIONS_BYTES {
             return Err("Match options exceed 1 MiB".into());
@@ -77,8 +90,22 @@ impl MatchOptions {
 
     pub fn decode(bytes: &[u8]) -> Result<MatchOptions, String> {
         let unreadable = |e| format!("the host sent unreadable match options: {e}");
-        if let Some(body) = bytes.strip_prefix(b"MCOPT3\0") {
+        if let Some(body) = bytes.strip_prefix(b"MCOPT4\0") {
             mc_sim::decode_untrusted(body, MAX_OPTIONS_BYTES).map_err(unreadable)
+        } else if let Some(body) = bytes.strip_prefix(b"MCOPT3\0") {
+            let old: OptionsV3 =
+                mc_sim::decode_untrusted(body, MAX_OPTIONS_BYTES).map_err(unreadable)?;
+            Ok(Self {
+                config: old.config,
+                survival: old.survival,
+                colors: old.colors,
+                map: old.map,
+                map_id: old.map_id,
+                sky: old.sky,
+                mission: old.mission,
+                fallen_army: old.fallen_army,
+                random_zones: RandomZones::default(),
+            })
         } else if let Some(body) = bytes.strip_prefix(b"MCOPT2\0") {
             let old: OptionsV2 =
                 mc_sim::decode_untrusted(body, MAX_OPTIONS_BYTES).map_err(unreadable)?;
@@ -91,6 +118,7 @@ impl MatchOptions {
                 sky: old.sky,
                 mission: old.mission,
                 fallen_army: FallenArmy::default(),
+                random_zones: RandomZones::default(),
             })
         } else {
             let old: LegacyOptions = mc_sim::decode_untrusted(bytes, MAX_OPTIONS_BYTES)
@@ -104,8 +132,30 @@ impl MatchOptions {
                 sky: old.sky,
                 mission: None,
                 fallen_army: FallenArmy::default(),
+                random_zones: RandomZones::default(),
             })
         }
+    }
+
+    /// Deals each random seat a zone from the pool, shuffled by the match seed, so
+    /// every machine (and a replay) lands them in the same places. Nothing is
+    /// random afterwards. Fails when the host sent fewer zones than random seats.
+    pub fn deal_zones(&mut self) -> Result<(), String> {
+        let RandomZones { seats, mut pool } = std::mem::take(&mut self.random_zones);
+        for i in (1..pool.len()).rev() {
+            let j = (crate::ui::faction::mix(self.config.seed ^ ZONE_SALT, i) % (i as u64 + 1))
+                as usize;
+            pool.swap(i, j);
+        }
+        let mut dealt = pool.into_iter();
+        for (i, p) in self.config.players.iter_mut().enumerate() {
+            if i < mc_core::MAX_PLAYERS && seats & mc_core::player_bit(i as u8) != 0 {
+                p.start = dealt
+                    .next()
+                    .ok_or("the host sent more random landing zones than zones to deal")?;
+            }
+        }
+        Ok(())
     }
 
     /// The match every machine builds from a session's start message. Seats a person
@@ -113,6 +163,7 @@ impl MatchOptions {
     pub fn from_start(start: &mc_net::MatchStart) -> Result<MatchOptions, String> {
         let mut options = MatchOptions::decode(&start.options)?;
         options.config.seed = start.seed;
+        options.deal_zones()?;
         let seats = options.config.players.len();
         for p in &start.players {
             let seat = options
@@ -177,8 +228,119 @@ mod tests {
         assert_eq!(decoded.map_id, 7);
         assert!(decoded.mission.is_none());
         let versioned = decoded.encode().unwrap();
-        assert!(versioned.starts_with(b"MCOPT3\0"));
+        assert!(versioned.starts_with(b"MCOPT4\0"));
         assert_eq!(MatchOptions::decode(&versioned).unwrap().map, "old-map");
+    }
+
+    #[test]
+    fn mcopt3_options_decode_with_nobody_random() {
+        let v3 = OptionsV3 {
+            config: options(1, 1).config,
+            survival: None,
+            colors: crate::setup::TEAM_COLORS,
+            map: "v3-map".into(),
+            map_id: 8,
+            sky: Default::default(),
+            mission: None,
+            fallen_army: FallenArmy::ToAlly,
+        };
+        let mut bytes = b"MCOPT3\0".to_vec();
+        bytes.extend(bincode::serialize(&v3).unwrap());
+        let decoded = MatchOptions::decode(&bytes).unwrap();
+        assert_eq!(
+            (decoded.map_id, decoded.fallen_army, decoded.random_zones),
+            (8, FallenArmy::ToAlly, RandomZones::default())
+        );
+    }
+
+    fn options(seed: u64, seats: usize) -> MatchOptions {
+        MatchOptions {
+            config: MatchConfig {
+                seed,
+                players: (0..seats).map(|_| seat("AI", Controller::Ai)).collect(),
+                cheats: false,
+                fog: true,
+                spawn_commanders: true,
+            },
+            survival: None,
+            colors: crate::setup::TEAM_COLORS,
+            map: "m".into(),
+            map_id: 1,
+            sky: SkyChoice::default(),
+            mission: None,
+            fallen_army: FallenArmy::default(),
+            random_zones: RandomZones::default(),
+        }
+    }
+
+    fn dealt(seed: u64) -> Vec<u8> {
+        // Seat 0 chose zone 3; seats 1, 2 and 4 land at random among the rest.
+        let mut o = options(seed, 5);
+        o.config.players[0].start = 3;
+        o.config.players[3].start = 6;
+        o.random_zones = RandomZones {
+            seats: 0b10110,
+            pool: vec![0, 1, 2, 4, 5],
+        };
+        o.deal_zones().unwrap();
+        assert_eq!(
+            o.random_zones,
+            RandomZones::default(),
+            "nothing random after"
+        );
+        o.config.players.iter().map(|p| p.start).collect()
+    }
+
+    #[test]
+    fn random_seats_are_dealt_distinct_free_zones_from_the_seed() {
+        let a = dealt(42);
+        assert_eq!(a, dealt(42), "one seed, one deal");
+        assert_eq!((a[0], a[3]), (3, 6), "chosen zones stay");
+        let mut random = vec![a[1], a[2], a[4]];
+        random.sort_unstable();
+        random.dedup();
+        assert_eq!(random.len(), 3);
+        assert!(random.iter().all(|z| [0, 1, 2, 4, 5].contains(z)));
+        // Over many seeds every free zone comes up, and seats do not keep one order.
+        let deals: Vec<Vec<u8>> = (0..64).map(dealt).collect();
+        for z in [0, 1, 2, 4, 5] {
+            assert!(
+                deals.iter().any(|d| d[1] == z),
+                "zone {z} never dealt to seat 1"
+            );
+        }
+    }
+
+    #[test]
+    fn a_host_short_of_zones_is_an_error_not_a_panic() {
+        let mut o = options(1, 3);
+        o.random_zones = RandomZones {
+            seats: u32::MAX,
+            pool: vec![0],
+        };
+        assert!(o.deal_zones().is_err());
+    }
+
+    #[test]
+    fn a_network_start_deals_random_zones_from_the_relays_seed() {
+        let mut o = options(0, 2);
+        o.random_zones = RandomZones {
+            seats: 0b11,
+            pool: (0..8).collect(),
+        };
+        let start = |seed| mc_net::MatchStart {
+            content: Default::default(),
+            seed,
+            input_delay: 2,
+            players: Vec::new(),
+            options: o.encode().unwrap(),
+        };
+        let zones = |seed| -> Vec<u8> {
+            let built = MatchOptions::from_start(&start(seed)).unwrap();
+            built.config.players.iter().map(|p| p.start).collect()
+        };
+        assert_eq!(zones(5), zones(5));
+        assert!((0..16).any(|s| zones(s) != zones(5)), "the seed moves them");
     }
 
     #[test]
@@ -222,6 +384,7 @@ mod tests {
             sky: SkyChoice::default(),
             mission: None,
             fallen_army: FallenArmy::ToAlly,
+            random_zones: RandomZones::default(),
         };
         let start = mc_net::MatchStart {
             content: Default::default(),
@@ -278,4 +441,17 @@ struct OptionsV2 {
     map_id: u64,
     sky: SkyChoice,
     mission: Option<mc_sim::mission::Definition>,
+}
+
+// Options before random landing zones ("MCOPT3").
+#[derive(Serialize, Deserialize)]
+struct OptionsV3 {
+    config: MatchConfig,
+    survival: Option<SurvivalConfig>,
+    colors: crate::setup::Palette,
+    map: String,
+    map_id: u64,
+    sky: SkyChoice,
+    mission: Option<mc_sim::mission::Definition>,
+    fallen_army: FallenArmy,
 }

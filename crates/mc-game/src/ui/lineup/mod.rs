@@ -29,7 +29,7 @@ use super::survival::Theatre;
 use super::teams;
 use super::{id, ink, palette, rgb, type_scale, ButtonKind, Rect, Ui};
 use crate::audio::Sfx;
-use crate::match_options::MatchOptions;
+use crate::match_options::{MatchOptions, RandomZones};
 use crate::setup::TEAM_COLORS;
 use glam::Vec2;
 use mc_data::survival::Domain;
@@ -385,13 +385,9 @@ impl Lineup {
     /// Landing zone `n` was clicked by whoever may plan: the commander being
     /// moved goes there (whoever held it takes theirs). With nobody being
     /// moved, a held zone picks up its commander to move, and a free one
-    /// takes yours.
+    /// takes yours. A random commander's zone shows as free.
     fn place(&mut self, table: &Table, n: u8) -> Sfx {
-        let holder = self
-            .roster
-            .seats
-            .iter()
-            .position(|s| s.open() && s.start == n);
+        let holder = self.roster.shown_at(n);
         let moving = self.placing.and_then(|k| self.roster.index_of(k));
         match (moving, holder) {
             (Some(p), h) => {
@@ -413,6 +409,17 @@ impl Lineup {
                 }
                 None => Sfx::Deny,
             },
+        }
+    }
+
+    /// The commander being moved lands at random instead of at a zone picked.
+    fn place_random(&mut self) -> Sfx {
+        match self.placing.take().and_then(|k| self.roster.index_of(k)) {
+            Some(i) => {
+                self.roster.seats[i].random_zone = true;
+                Sfx::Tick
+            }
+            None => Sfx::Deny,
         }
     }
 
@@ -593,7 +600,9 @@ impl Lineup {
 
     /// The match this plan makes. `person(i)` names seat i's person and says who
     /// controls it (on one machine, you; in a lobby, `OPEN_NAME` for an AI to hold
-    /// until someone joins). Random races are dealt from the seed.
+    /// until someone joins). Random races are dealt from the seed; random zones
+    /// are left to deal when the match starts (`MatchOptions::deal_zones`), so a
+    /// lobby's seed decides them and its plan does not give them away.
     pub fn options(
         &self,
         catalog: &Catalog,
@@ -602,6 +611,13 @@ impl Lineup {
         let card = self.card(catalog)?;
         let mut colors = TEAM_COLORS;
         let mut players = Vec::new();
+        let mut random_zones = RandomZones {
+            seats: 0,
+            pool: (0..self.zones(catalog) as u8)
+                .filter(|&z| self.roster.shown_at(z).is_none())
+                .map(|z| self.zone_start(catalog, z))
+                .collect(),
+        };
         let mut ai = 0;
         for (i, s) in self
             .roster
@@ -621,6 +637,9 @@ impl Lineup {
             } else {
                 person(i)
             };
+            if s.random_zone {
+                random_zones.seats |= mc_core::player_bit(players.len() as u8);
+            }
             players.push(PlayerSetup {
                 name,
                 faction: faction::race_key(race),
@@ -660,6 +679,11 @@ impl Lineup {
             sky: self.sky,
             mission: None,
             fallen_army: self.fallen_army,
+            random_zones: if random_zones.seats == 0 {
+                RandomZones::default()
+            } else {
+                random_zones
+            },
         })
     }
 
@@ -704,6 +728,8 @@ impl Lineup {
                 },
                 team: p.team,
                 start,
+                random_zone: i < mc_core::MAX_PLAYERS
+                    && options.random_zones.seats & mc_core::player_bit(i as u8) != 0,
                 color: TEAM_COLORS
                     .iter()
                     .position(|c| *c == options.colors[i])
@@ -1119,6 +1145,9 @@ pub fn summary(lineup: &Lineup, catalog: &Catalog) -> String {
                 .theatre(catalog)
                 .and_then(|t| {
                     let first = lineup.roster.seats.first()?;
+                    if first.random_zone {
+                        return Some("a random zone".to_owned());
+                    }
                     Some(t.layout.spawns.get(first.start as usize)?.name.clone())
                 })
                 .unwrap_or_default();

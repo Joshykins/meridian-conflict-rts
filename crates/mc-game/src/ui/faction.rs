@@ -145,12 +145,7 @@ impl Pick {
     pub fn resolve(self, seed: u64, seat: usize) -> u8 {
         match self {
             Pick::Race(r) => r,
-            Pick::Random => {
-                let mut z = seed ^ (seat as u64 + 1).wrapping_mul(0x9E37_79B9_7F4A_7C15);
-                z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-                z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-                ((z ^ (z >> 31)) % races().len().max(1) as u64) as u8
-            }
+            Pick::Random => (mix(seed, seat) % races().len().max(1) as u64) as u8,
         }
     }
 
@@ -166,6 +161,15 @@ impl Pick {
     pub fn label(self) -> &'static str {
         self.race().map_or("Random", |r| r.abbreviation.as_str())
     }
+}
+
+/// A well-mixed draw from a match seed and an index (splitmix64): what the
+/// set-up deals random races and landing zones from.
+pub(crate) fn mix(seed: u64, n: usize) -> u64 {
+    let mut z = seed ^ (n as u64 + 1).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^ (z >> 31)
 }
 
 /// Draws the faction's sigil (its badge), `r` points in radius, at `alpha`,

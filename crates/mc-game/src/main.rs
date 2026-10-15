@@ -774,6 +774,7 @@ fn run() -> Result<(), String> {
             sky: Default::default(),
             mission: None,
             fallen_army: Default::default(),
+            random_zones: Default::default(),
         }
         .encode()
     };

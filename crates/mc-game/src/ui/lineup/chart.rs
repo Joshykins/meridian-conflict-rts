@@ -5,7 +5,9 @@
 //! Whoever may plan moves commanders here: click a commander's zone (or the
 //! Zone cell in their row) to pick them up, then the zone they go to; whoever
 //! held it takes theirs. A free zone clicked with nobody picked up takes your
-//! own commander. Escape or a right click puts a picked-up commander down.
+//! own commander. Escape or a right click puts a picked-up commander down;
+//! Land at Random sends them to a zone dealt at the start, and the chart hides
+//! them until then.
 
 use super::roster::Seat;
 use super::{Catalog, Lineup, Mode, Table};
@@ -124,17 +126,23 @@ pub fn chart(
     }
     if let Some(i) = lineup.placing.and_then(|k| lineup.roster.index_of(k)) {
         let name = super::seats::who(lineup, table, i, &lineup.roster.seats[i]);
-        moving_banner(ui, &name, colour(&lineup.roster.seats[i]), area);
+        if moving_banner(ui, &name, colour(&lineup.roster.seats[i]), area) {
+            let sfx = lineup.place_random();
+            ui.audio.play(sfx);
+        }
     }
 }
 
-/// Over the top of the chart while a commander is picked up: who, and what to do.
-fn moving_banner(ui: &mut Ui, name: &str, c: [f32; 3], area: Rect) {
+/// Over the top of the chart while a commander is picked up: who, and what to
+/// do, with a button to land them at random instead. True when it is clicked.
+fn moving_banner(ui: &mut Ui, name: &str, c: [f32; 3], area: Rect) -> bool {
     let text = format!("Moving {name}: click a landing zone");
     let hint = "Esc or Right Click to Cancel";
+    let random = "Land at Random";
     let tw = ui.text_width(type_scale::CAPTION, &text);
     let hw = ui.text_width(type_scale::MICRO, hint);
-    let w = (tw + hw + 70.0).min(area.w);
+    let bw = ui.text_width(type_scale::BUTTON, random) + 28.0;
+    let w = (tw + hw + bw + 80.0).min(area.w);
     let r = Rect::new(area.x + (area.w - w) * 0.5, area.y + 12.0, w, 34.0);
     let pulse = 0.5 + 0.5 * (ui.time * 4.0).sin();
     ui.fill(r, ink(0.88));
@@ -147,14 +155,22 @@ fn moving_banner(ui: &mut Ui, name: &str, c: [f32; 3], area: Rect) {
         rgb(palette::TEXT, 1.0),
         &text,
     );
+    let button = Rect::new(r.right() - bw - 5.0, r.y + 4.0, bw, r.h - 8.0);
     ui.text_fit_left(
         end + 16.0,
         r.mid_y() + 0.5,
-        r.right() - end - 26.0,
+        button.x - end - 26.0,
         type_scale::MICRO,
         rgb(palette::DIM, 1.0),
         hint,
     );
+    ui.button(
+        id("land-at-random", 0),
+        button,
+        random,
+        crate::ui::ButtonKind::Secondary,
+        true,
+    )
 }
 
 fn colour(s: &Seat) -> [f32; 3] {
@@ -179,7 +195,7 @@ fn siege_chart(
         .seats
         .iter()
         .enumerate()
-        .filter(|(_, s)| s.open())
+        .filter(|(_, s)| s.open() && !s.random_zone)
         .map(|(i, s)| Holder {
             spawn: s.start as usize,
             color: colour(s),
@@ -262,7 +278,11 @@ fn zones(
         Vec2::new(frame.x, frame.y) + preview::locate(&map, p, side)
     };
     if allied {
-        let seated: Vec<&Seat> = seats.iter().filter(|s| s.open()).collect();
+        // A random commander has no zone to join up yet.
+        let seated: Vec<&Seat> = seats
+            .iter()
+            .filter(|s| s.open() && !s.random_zone)
+            .collect();
         let at: Vec<Vec2> = seated.iter().map(|s| at_zone(s.start as usize)).collect();
         let team_of: Vec<u8> = seated.iter().map(|s| s.team).collect();
         for (a, b) in teams::links(&at, &team_of) {
@@ -293,7 +313,7 @@ fn zones(
     for n in 0..zones {
         let p = at_zone(n);
         lineup.markers.push(p + ui.shift);
-        let holder = seats.iter().position(|s| s.open() && s.start as usize == n);
+        let holder = lineup.roster.shown_at(n as u8);
         let res = ui.interact(
             id("start-marker", n),
             Rect::new(p.x - 17.0, p.y - 17.0, 34.0, 34.0),
