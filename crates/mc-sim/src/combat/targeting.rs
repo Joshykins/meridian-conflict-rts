@@ -71,6 +71,16 @@ impl World {
                 });
                 let ground = this.ground_mark(row).is_some();
                 let strike = this.striking(row);
+                // An aircraft sent at a mark: what could strike the mark waits for it
+                // (`held_for_mark`, below).
+                let attack_run = bp
+                    .motion
+                    .is_some_and(|m| m.layer == mc_data::MoveLayer::Air)
+                    && this
+                        .state
+                        .orders
+                        .front(units, row)
+                        .is_some_and(|o| o.kind == OrderKind::Attack);
                 let mut targets = units.weapon_target[row];
                 for (w, weapon) in bp.weapons.iter().enumerate() {
                     // A group's guns choose for themselves (`mount_picks`, below).
@@ -87,6 +97,15 @@ impl World {
                         ordered.filter(|t| !spreading && this.is_valid_target(row, *t, weapon))
                     {
                         targets[w] = units.id(t);
+                        continue;
+                    }
+                    // Held for the mark: on the run in, a weapon that could strike the mark
+                    // but cannot yet does not go at what it passes over, so a bomber's bay
+                    // opens on the mark the pilot flies at, not on a tank under the run.
+                    let held_for_mark = ordered
+                        .filter(|&t| attack_run && !spreading && this.weapon_reaches(t, weapon));
+                    if held_for_mark.is_some() {
+                        targets[w] = Handle::NONE;
                         continue;
                     }
                     // Ordered onto the ground: the weapons phase aims these at it.

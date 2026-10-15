@@ -1248,6 +1248,20 @@ pub(crate) fn wears_team(model: &Model, mesh: &MeshLod, upward: bool) -> bool {
             .any(|v| v.material == material::TEAM && (!upward || v.normal[2] > 0.5))
 }
 
+/// A point the unit file `bp` places on its model, back at the model's authored size
+/// (tests): the loader multiplies every such point by the unit's `scale`.
+#[cfg(test)]
+pub(crate) fn authored(bp: &mc_data::UnitBlueprint, p: mc_core::FxVec3) -> glam::Vec3 {
+    glam::Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32()) / bp.scale
+}
+
+/// A length of the unit file `bp`'s model (its radius or height), back at the model's
+/// authored size (tests), as `authored` is for a point.
+#[cfg(test)]
+pub(crate) fn authored_len(bp: &mc_data::UnitBlueprint, length: mc_core::Fx) -> f32 {
+    length.to_f32() / bp.scale
+}
+
 /// The most a reduced level of detail may draw, as a share of the full level (plus 20
 /// triangles), in the tests that hold models to their budgets.
 #[cfg(test)]

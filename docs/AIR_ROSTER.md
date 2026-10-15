@@ -10,7 +10,7 @@ All units are available through the existing tiered factories and engineer/comma
 | 2 | Kestrel | Four-engine tilt-jet gunship with a chin autocannon and volley rocket pods |
 | 2 | Hellkite | Four-engine flying fortress; 24 scattered incendiaries and three independent AA guns |
 | 2 | Peregrine | Fast guided-missile interceptor |
-| 2 | Courier | Fast unarmed transport; eight cargo slots; built on site |
+| 2 | Courier | Fast unarmed transport; sixteen cargo slots; built on site |
 | 3 | Bastion | Capital assault transport; carries the T1-T3 land roster; built on site |
 | 3 | Raptor | Fast, highly maneuverable air-superiority fighter |
 | 3 | Eclipse | Fast strategic bomber; one AEB bomb that bursts as the electric bore's blast |
@@ -235,7 +235,7 @@ it there (4200 materials, 63000 energy, 25200 build time). A finished ship stays
   just that unit out (`Command::Unload`; the ship sets down where it is first), Shift-click
   for every unit of that kind, Ctrl-click to pick it alongside the ship and give it orders
   for when it is off.
-- **Hold.** Room 96, 40 m wide and 34 m clear height; a commander takes eight slots; other land units take their size class plus one.
+- **Hold.** Room 192, 40 m wide and 34 m clear height; a commander takes sixteen slots; other land units take their size class plus one.
   Units walk round the hull (never in under it from the side) to a point on the centre
   line behind the stern, wait there in file while the ramp is up, then walk straight up
   the centre line over the lip and are stowed at the far end of the hold (they keep their
@@ -295,7 +295,7 @@ it themselves, but other traffic still walks under it); the AI neither builds no
 ## Courier light transport
 
 The T2 Courier (`aster_t2_lift_ship`) is built on a 10 x 6 lot by the Mason II and III or the commander's Engineering Suite II and III. It carries
-8 weighted cargo slots (one commander or eight T1 light tanks), cruises at 150 m/s at 140 m altitude,
+16 weighted cargo slots (one commander or eight T1 light tanks, two slots each), cruises at 150 m/s at 140 m altitude,
 accelerates at 42 m/s squared, and climbs/descends at 60 m/s. It has 400 health,
 no weapons, no shield, and costs 280 materials / 4200 energy / 1400 build time.
 
@@ -497,7 +497,7 @@ rotors, no jet plumes. Each is anchored on ARC's unit of the same job.
 | Flechette (`regency_t1_air_scout`) | Air scout, unarmed | Swift | The fastest thing in the air (270 m/s), a wider turn, thinner skin |
 | Quarrel (`regency_t1_fighter`) | Fighter: Twin Plasmeric Repeater, aircraft only | Shrike | About the same damage a second in heavier bolts, a little less reach; crescent wing |
 | Petard (`regency_t1_bomber`) | Light bomber: a stick of three Plasmeric Bombs | Petrel | 330 a pass in three lighter bombs strung along the run; a cleaver of a flying wing |
-| Coffer (`regency_t2_transport`, tech 2) | Light transport, eight slots, raised on a 7x5 lot by the Artificer II and III and the Exarch's Engineering Suites | Courier | No warp drive, a little quicker; an open-sterned box hold between two sponsons on six lift bells |
+| Coffer (`regency_t2_transport`, tech 2) | Light transport, sixteen slots, raised on a 7x5 lot by the Artificer II and III and the Exarch's Engineering Suites | Courier | No warp drive, a little quicker; an open-sterned box hold between two sponsons on six lift bells |
 
 The Skyforge (all three tiers) makes the Quarrel, Petard and Flechette, and the Regency
 Reclaimer up to its tier; there is no tech 1 gunship. The Commander AI fields them by role like any other unit

@@ -277,7 +277,7 @@ mod tests {
         let blueprints = mc_data::Blueprints::load(&dir).unwrap();
         let bp = blueprints.unit(blueprints.id_of("regency_t1_mobile_aa").unwrap());
         assert_eq!(bp.visual.mesh, "regency_mobile_aa");
-        let v = |p: mc_core::FxVec3| Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
+        let v = |p| crate::authored(bp, p);
         let w = &bp.weapons[0];
         assert!(v(w.muzzle).distance(LINE.muzzle) < 1e-3);
         assert!(v(w.pivot.unwrap()).distance(LINE.pivot) < 1e-3);

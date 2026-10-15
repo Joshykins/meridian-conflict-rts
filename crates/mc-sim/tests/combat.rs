@@ -1892,8 +1892,11 @@ fn flak_barrel_tracks_close_overhead_and_crossing_aircraft_before_firing() {
                         let shot_pitch = FxVec2::new(vel.xy().length(), vel.z).angle();
                         // The shot's lead is solved again from the barrel tip; a slow flak
                         // shell leads an aircraft overhead far enough that the two differ by
-                        // a few degrees more than a fast round's would.
-                        assert!(pitch.delta_to(shot_pitch).unsigned_abs() <= Angle::from_degrees(6).0,
+                        // a few degrees more than a fast round's would, and the further the
+                        // tip stands from the trunnion (the gun's scale) the more.
+                        let scale = w.blueprints.unit(gun_bp).scale;
+                        let tolerance = Angle::from_degrees((6.0 * scale).ceil() as i32);
+                        assert!(pitch.delta_to(shot_pitch).unsigned_abs() <= tolerance.0,
                             "{gun} offset {offset}: barrel pitch {pitch:?}, shot pitch {shot_pitch:?}");
                         shots += 1;
                     }

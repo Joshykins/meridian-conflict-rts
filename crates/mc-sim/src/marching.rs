@@ -321,7 +321,7 @@ impl World {
                 // off it. Only worth asking when the cap holds it back.
                 let look = route
                     * (pace * 3)
-                        .clamp(Fx::from_int(24), Fx::from_int(64))
+                        .clamp(Fx::from_int(24), Fx::from_int(90))
                         .min(delta.length());
                 let hemmed = || {
                     rows.iter().any(|&row| {
@@ -431,7 +431,7 @@ impl World {
         let reopened = || {
             let look = route
                 * (pace * 3)
-                    .clamp(Fx::from_int(24), Fx::from_int(64))
+                    .clamp(Fx::from_int(24), Fx::from_int(90))
                     .min(delta.length());
             let ahead = rows
                 .iter()
@@ -488,7 +488,7 @@ impl World {
             // slowest member's own speed.
             let warn = route
                 * (pace * 12)
-                    .clamp(Fx::from_int(96), Fx::from_int(256))
+                    .clamp(Fx::from_int(96), Fx::from_int(358))
                     .min(delta.length());
             let ground_ahead = || {
                 self.count_rows(&rows, |row| {
@@ -559,7 +559,7 @@ impl World {
             // Ground past the goal is none of the block's business.
             let look = route
                 * (pace * 3)
-                    .clamp(Fx::from_int(24), Fx::from_int(64))
+                    .clamp(Fx::from_int(24), Fx::from_int(90))
                     .min(delta.length());
             let mut lean = 0i32;
             let mut facing_ground = false;
@@ -579,7 +579,7 @@ impl World {
             let mut dodge = false;
             let far = route
                 * (pace * 8)
-                    .clamp(Fx::from_int(48), Fx::from_int(128))
+                    .clamp(Fx::from_int(48), Fx::from_int(179))
                     .min(delta.length());
             if lean == 0 && !facing_ground {
                 // Look further down the road for ground square across the front.

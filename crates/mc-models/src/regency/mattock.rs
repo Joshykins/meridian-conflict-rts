@@ -382,8 +382,11 @@ mod tests {
         let blueprints = mc_data::Blueprints::load(&dir).unwrap();
         let bp = blueprints.unit(blueprints.id_of("regency_t1_artillery").unwrap());
         assert_eq!(bp.visual.mesh, "regency_mattock");
-        assert!((bp.radius.to_f32() - 4.2).abs() < 1e-3 && (bp.height.to_f32() - 3.2).abs() < 1e-3);
-        let v = |p: mc_core::FxVec3| Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
+        assert!(
+            (crate::authored_len(bp, bp.radius) - 4.2).abs() < 1e-3
+                && (crate::authored_len(bp, bp.height) - 3.2).abs() < 1e-3
+        );
+        let v = |p| crate::authored(bp, p);
         let w = &bp.weapons[0];
         assert!(v(w.muzzle).distance(MUZZLE) < 1e-3);
         assert!(v(w.pivot.expect("it pitches")).distance(PIVOT) < 1e-3);

@@ -263,7 +263,7 @@ mod tests {
         let blueprints = mc_data::Blueprints::load(&dir).unwrap();
         let bp = blueprints.unit(blueprints.id_of("regency_t1_raider").unwrap());
         assert_eq!(bp.visual.mesh, "regency_raider");
-        let v = |p: mc_core::FxVec3| Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
+        let v = |p| crate::authored(bp, p);
         let mouths: Vec<Vec3> = bp.weapons[0].muzzles.iter().map(|&m| v(m)).collect();
         for m in muzzles() {
             assert!(

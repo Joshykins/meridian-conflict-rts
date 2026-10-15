@@ -149,7 +149,7 @@ fn coffer_boards_flies_and_unloads_a_commander_as_its_full_load() {
     })])
     .unwrap();
     assert!(until(&mut w, 2000, |w| w.state.units.hangar[commander] == sid));
-    assert_eq!(w.cargo_used(ship), 8);
+    assert_eq!(w.cargo_used(ship), 16);
     let tank = add(&mut w, "regency_t1_tank", 0, 850, 1020);
     let tid = w.state.units.id(tank);
     w.tick(&[cmd(Command::Board {

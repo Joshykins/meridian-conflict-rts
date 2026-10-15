@@ -363,9 +363,12 @@ mod tests {
         let blueprints = mc_data::Blueprints::load(&dir).unwrap();
         let bp = blueprints.unit(blueprints.id_of("regency_t1_mobile_reclaimer").unwrap());
         assert_eq!(bp.visual.mesh, "regency_reclaimer");
-        assert!((bp.radius.to_f32() - 4.6).abs() < 1e-3 && (bp.height.to_f32() - 3.4).abs() < 1e-3);
+        assert!(
+            (crate::authored_len(bp, bp.radius) - 4.6).abs() < 1e-3
+                && (crate::authored_len(bp, bp.height) - 3.4).abs() < 1e-3
+        );
         assert_eq!(bp.motion.map(|m| m.layer), Some(mc_data::MoveLayer::Hover));
-        let v = |p: mc_core::FxVec3| Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
+        let v = |p| crate::authored(bp, p);
         let reclaimer = bp.reclaimer.expect("it reclaims");
         assert!(reclaimer.mobile, "it works what it passes");
         let head = &reclaimer.heads()[0];

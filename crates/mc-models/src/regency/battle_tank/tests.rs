@@ -13,9 +13,12 @@ fn the_unit_files_gun_is_the_models() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
     let blueprints = mc_data::Blueprints::load(&dir).unwrap();
     let bp = blueprints.unit(blueprints.id_of("regency_t2_tank").unwrap());
-    let v = |p: mc_core::FxVec3| Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
+    let v = |p| crate::authored(bp, p);
     assert_eq!(bp.visual.mesh, KEY);
-    assert!((bp.radius.to_f32() - 6.2).abs() < 1e-3 && (bp.height.to_f32() - 4.4).abs() < 1e-3);
+    assert!(
+        (crate::authored_len(bp, bp.radius) - 6.2).abs() < 1e-3
+            && (crate::authored_len(bp, bp.height) - 4.4).abs() < 1e-3
+    );
     let w = &bp.weapons[0];
     assert!(v(w.muzzle).distance(MUZZLE) < 1e-3);
     assert!(v(w.pivot.unwrap()).distance(PIVOT) < 1e-3);

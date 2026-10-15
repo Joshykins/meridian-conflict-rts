@@ -12,9 +12,9 @@
         categories: ["Land", "Scout", "DirectFire"],
         health: 40,
         cost: (materials: 14, energy: 90, time: 70),
-        radius: 3.8, height: 4.0,
+        radius: 3.8, height: 4.0, scale: 1.85,
         vision: 750, radar: 3000,
-        motion: (layer: Land, size: 0, speed: 42, accel: 48, turn: 220),
+        motion: (layer: Land, size: 1, speed: 59, accel: 67, turn: 220),
         weapons: [(
             name: "Light Plasmeric Repeater",
             // A scout's gun: single light slugs, enough to finish a scout or harry an engineer.
@@ -40,9 +40,9 @@
         categories: ["Land", "DirectFire"],
         health: 80,
         cost: (materials: 36, energy: 160, time: 150),
-        radius: 2.6, height: 4.0,
+        radius: 2.6, height: 4.0, scale: 1.85,
         vision: 290,
-        motion: (layer: Land, size: 0, speed: 42, accel: 46, turn: 240),
+        motion: (layer: Land, size: 0, speed: 59, accel: 64, turn: 240),
         weapons: [(
             name: "Twin Plasmeric Repeater",
             // 7 a bolt, four a second: 28 a second, to the Lancer's 22.5.
@@ -73,9 +73,9 @@
         categories: ["Land", "DirectFire"],
         health: 270,
         cost: (materials: 60, energy: 290, time: 300),
-        radius: 4.6, height: 3.4,
+        radius: 4.6, height: 3.4, scale: 1.85,
         vision: 320,
-        motion: (layer: Hover, size: 0, speed: 32, accel: 28, turn: 115),
+        motion: (layer: Hover, size: 1, speed: 45, accel: 39, turn: 115),
         weapons: [(
             name: "Plasmeric Repeater",
             // 10 a bolt, two and a half a second: 25 a second, to the Warden's 20.
@@ -105,9 +105,9 @@
         categories: ["Land", "AntiAir"],
         health: 290,
         cost: (materials: 56, energy: 550, time: 225),
-        radius: 4.0, height: 4.0,
+        radius: 4.0, height: 4.0, scale: 1.85,
         vision: 360,
-        motion: (layer: Land, size: 0, speed: 33, accel: 30, turn: 110),
+        motion: (layer: Land, size: 1, speed: 46, accel: 42, turn: 110),
         weapons: [(
             name: "Plasmeric Repeater",
             // 3 bolts of 14 every 0.7 s: 60 a second on one plane, to the Gnat's 46.
@@ -139,9 +139,9 @@
         categories: ["Land", "Artillery"],
         health: 150,
         cost: (materials: 56, energy: 280, time: 270),
-        radius: 4.2, height: 3.2,
+        radius: 4.2, height: 3.2, scale: 1.85,
         vision: 340,
-        motion: (layer: Land, size: 0, speed: 25, accel: 24, turn: 100),
+        motion: (layer: Land, size: 1, speed: 35, accel: 34, turn: 100),
         weapons: [(
             name: "Plasmeric Mortar",
             damage: 150, splash: 7, range_min: 60, range: 400, reload: 5.0, speed: 125,

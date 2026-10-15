@@ -404,7 +404,7 @@ fn bastion_carries_the_complete_t3_land_roster_with_physical_clearance() {
         .unit(w.state.units.blueprint[ship])
         .transport
         .unwrap();
-    assert_eq!(t.capacity, 96);
+    assert_eq!(t.capacity, 192);
     let keys: Vec<_> = w
         .blueprints
         .units
@@ -538,13 +538,13 @@ fn capital_ship_accelerates_climbs_with_pitch_and_levels_for_touchdown() {
 }
 
 #[test]
-fn courier_is_an_unarmed_t2_site_built_transport_with_eight_slots() {
+fn courier_is_an_unarmed_t2_site_built_transport_with_sixteen_slots() {
     let w = world();
     let id = w.blueprints.id_of("aster_t2_lift_ship").unwrap();
     let bp = w.blueprints.unit(id);
     let t = bp.transport.unwrap();
     assert_eq!(bp.tech, 2);
-    assert_eq!(t.capacity, 8);
+    assert_eq!(t.capacity, 16);
     assert!(bp.weapons.is_empty());
     assert!(bp.shield.is_none());
     assert!(bp.is_site_built_unit());
@@ -579,11 +579,11 @@ fn courier_is_an_unarmed_t2_site_built_transport_with_eight_slots() {
 }
 
 #[test]
-fn courier_loads_exactly_eight_slots_flies_fast_and_unloads_without_a_ramp() {
+fn courier_loads_exactly_sixteen_slots_flies_fast_and_unloads_without_a_ramp() {
     let mut w = world();
     let ship = add(&mut w, "aster_t2_lift_ship", 0, 1600, 1600);
     let id = w.state.units.id(ship);
-    // Eight light tanks fill eight slots; the ninth must stay behind.
+    // Eight light tanks, two slots each, fill its sixteen; the ninth must stay behind.
     let cargo: Vec<_> = (0..9)
         .map(|i| add(&mut w, "aster_t1_tank", 0, 1450 - i * 30, 1600))
         .collect();
@@ -591,7 +591,7 @@ fn courier_loads_exactly_eight_slots_flies_fast_and_unloads_without_a_ramp() {
         w.blueprints
             .unit(w.state.units.blueprint[cargo[0]])
             .cargo_room(),
-        Some(1)
+        Some(2)
     );
     let ids = cargo.iter().map(|&r| w.state.units.id(r)).collect();
     w.tick(&[cmd(Command::Board {
@@ -601,15 +601,15 @@ fn courier_loads_exactly_eight_slots_flies_fast_and_unloads_without_a_ramp() {
     })])
     .unwrap();
     assert!(
-        run_until(&mut w, 2500, |w| w.cargo_used(ship) == 8).is_some(),
-        "failed to fill eight slots: {:?}",
+        run_until(&mut w, 2500, |w| w.cargo_used(ship) == 16).is_some(),
+        "failed to fill sixteen slots: {:?}",
         cargo
             .iter()
             .map(|&r| (w.state.units.pos[r], w.state.units.hangar[r]))
             .collect::<Vec<_>>()
     );
     run(&mut w, 150);
-    assert_eq!(w.cargo_used(ship), 8);
+    assert_eq!(w.cargo_used(ship), 16);
     let aboard: Vec<_> = cargo
         .iter()
         .copied()
@@ -650,7 +650,7 @@ fn courier_loads_exactly_eight_slots_flies_fast_and_unloads_without_a_ramp() {
         w.tick(&[]).unwrap();
         fastest = fastest.max(w.state.units.speed[ship]);
         airborne |= height(&w, ship) > 100;
-        assert!(w.cargo_used(ship) <= 8);
+        assert!(w.cargo_used(ship) <= 16);
         for &r in &aboard {
             if w.state.units.hangar[r] == Handle::NONE {
                 let local = (w.state.units.pos[r] - w.state.units.pos[ship])
@@ -685,7 +685,7 @@ fn courier_loads_exactly_eight_slots_flies_fast_and_unloads_without_a_ramp() {
 }
 
 #[test]
-fn courier_carries_a_commander_as_its_full_eight_slot_load() {
+fn courier_carries_a_commander_as_its_full_sixteen_slot_load() {
     let mut w = world();
     let ship = add(&mut w, "aster_t2_lift_ship", 0, 1600, 1600);
     let id = w.state.units.id(ship);
@@ -697,7 +697,7 @@ fn courier_carries_a_commander_as_its_full_eight_slot_load() {
         .unit(w.state.units.blueprint[ship])
         .transport
         .unwrap();
-    assert_eq!(cbp.cargo_room(), Some(8));
+    assert_eq!(cbp.cargo_room(), Some(16));
     assert!(cbp.radius * 2 <= t.width && cbp.height <= t.clearance);
     w.tick(&[cmd(Command::Board {
         units: vec![cid],
@@ -706,7 +706,7 @@ fn courier_carries_a_commander_as_its_full_eight_slot_load() {
     })])
     .unwrap();
     assert!(run_until(&mut w, 2000, |w| w.state.units.hangar[commander] == id).is_some());
-    assert_eq!(w.cargo_used(ship), 8);
+    assert_eq!(w.cargo_used(ship), 16);
     let tank = add(&mut w, "aster_t1_tank", 0, 1540, 1600);
     let tid = w.state.units.id(tank);
     w.tick(&[cmd(Command::Board {

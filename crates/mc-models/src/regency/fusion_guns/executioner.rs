@@ -183,8 +183,8 @@ mod tests {
         assert!(factory.builder.as_ref().unwrap().builds.contains(&id));
         assert_eq!(unit.visual.mesh, "regency_executioner");
         let gun = &unit.weapons[0];
-        assert_eq!(gun.muzzle.x.to_f32(), LINE.muzzle().x);
-        assert!((gun.muzzle.z.to_f32() - LINE.muzzle().z).abs() < 0.001);
+        assert_eq!(crate::authored(unit, gun.muzzle).x, LINE.muzzle().x);
+        assert!((crate::authored(unit, gun.muzzle).z - LINE.muzzle().z).abs() < 0.001);
         for key in ["regency_executioner"] {
             let model = crate::build_model(key).unwrap();
             for mesh in &model.lods {
@@ -206,7 +206,7 @@ mod tests {
                     w.muzzles.clone()
                 }
             }) {
-                let at = v3(muzzle.x.to_f32(), muzzle.y.to_f32(), muzzle.z.to_f32());
+                let at = crate::authored(unit, muzzle);
                 let near = mesh
                     .vertices
                     .iter()

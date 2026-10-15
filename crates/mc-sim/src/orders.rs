@@ -36,7 +36,7 @@ const WORK_AIM_TOLERANCE: u16 = 728;
 const DT: i32 = TICKS_PER_SECOND as i32;
 /// How far a followed guard's centre may have moved on from where a `RelocateOrder`
 /// found it and still be the one meant, metres: a fast unit's travel over the command delay.
-pub(crate) const GUARD_FOLLOW_SLACK: Fx = Fx::from_int(64);
+pub(crate) const GUARD_FOLLOW_SLACK: Fx = Fx::from_int(90);
 /// A member of an arrived block has this long to find its exact slot before
 /// it settles for near it (movement counts the ticks it spends jostling).
 const SLOT_GRACE_TICKS: u16 = 2 * TICKS_PER_SECOND as u16;

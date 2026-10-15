@@ -8,7 +8,7 @@
         motion: (layer: Air, size: 0, speed: 92, accel: 22, turn: 32, altitude: 440, hover: true, deploy: 1.4),
         // Warp: the Regency's drives take the hull apart into a nanite swarm (`style: Nanite`).
         warp: (per_km: 8000, spool: 4, cooldown: 60, speed: 3500, style: Nanite),
-        transport: (capacity: 96, descent: 85, hold: (40, 0), ramp: (-10, -86), width: 44, floor: 38, clearance: 36, unload: 0.4),
+        transport: (capacity: 192, descent: 85, hold: (40, 0), ramp: (-10, -86), width: 44, floor: 38, clearance: 36, unload: 0.4),
         weapons: [], mesh: "regency_ark", icon: Transport,
         shield: (kind: Hull, health: 4000, regen: 45), economy: (energy_upkeep: 80),
         sounds: (death: "blast_large", moving: "aster_hover"),

@@ -99,7 +99,7 @@
         health: 1400, cost: (materials: 280, energy: 4200, time: 1400),
         radius: 44, height: 36, footprint: (8, 7), hull: (44, 40), vision: 500,
         motion: (layer: Air, size: 0, speed: 165, accel: 42, turn: 70, altitude: 320, hover: true, deploy: 0.6),
-        transport: (capacity: 8, descent: 120, hold: (-2, 0), ramp: (-28, -40), width: 26, floor: 1, clearance: 28, unload: 0.25),
+        transport: (capacity: 16, descent: 120, hold: (-2, 0), ramp: (-28, -40), width: 26, floor: 1, clearance: 28, unload: 0.25),
         weapons: [], mesh: "regency_coffer", icon: Transport,
         sounds: (death: "blast", moving: "aster_hover"),
     ),

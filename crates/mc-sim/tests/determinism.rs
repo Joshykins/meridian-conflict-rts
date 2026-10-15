@@ -38,7 +38,7 @@ const SHORE_CELL: usize = 200;
 /// Long enough for the fleets to close and meet torpedoes with interceptors, which they do
 /// late: the Regent overhead draws their guns first.
 const TICKS: u32 = 700;
-const SNAPSHOT_AT: u32 = 250;
+const SNAPSHOT_AT: u32 = 240;
 
 fn terrain() -> Heightfield {
     let side = CELLS as usize + 1;

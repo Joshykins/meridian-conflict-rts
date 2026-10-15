@@ -307,11 +307,14 @@ fn with_nowhere_to_go_a_batch_marches_clear_as_one_group() {
     let place = goal(&w, first);
     let second = next_product(&mut w, "aster_t1_tank", &[first]);
     let factory = w.state.units.pos[w.state.units.row(fid).unwrap()];
+    // Out along the factory's facing: the muster block spreads across it.
+    let ahead = FxVec2::from_angle(w.state.units.heading[w.state.units.row(fid).unwrap()]);
+    let out = |p: FxVec2| (p - factory).dot(ahead);
     let formation = |t: usize| w.state.orders.front(&w.state.units, t).unwrap().formation;
     assert!(formation(first) != 0 && formation(first) == formation(second));
     for t in [first, second] {
         assert!(
-            goal(&w, t).distance(factory) > place.distance(factory) + Fx::from_int(20),
+            out(goal(&w, t)) > out(place) + Fx::from_int(20),
             "they march out past where the next batch forms up"
         );
     }

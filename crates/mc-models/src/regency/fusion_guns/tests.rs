@@ -1,5 +1,3 @@
-use glam::Vec3;
-
 use super::{howitzer, skyspear};
 use crate::build_model;
 
@@ -51,15 +49,21 @@ fn the_unit_files_guns_are_the_models() {
         let bp = blueprints.unit(blueprints.id_of(key).unwrap());
         assert_eq!(bp.visual.mesh, mesh);
         assert_eq!(bp.tech, 3);
-        assert!((bp.radius.to_f32() - radius).abs() < 1e-3, "{key} radius");
-        assert!((bp.height.to_f32() - height).abs() < 1e-3, "{key} height");
+        assert!(
+            (crate::authored_len(bp, bp.radius) - radius).abs() < 1e-3,
+            "{key} radius"
+        );
+        assert!(
+            (crate::authored_len(bp, bp.height) - height).abs() < 1e-3,
+            "{key} height"
+        );
         assert!(
             bp.turret_at.is_none(),
             "{key}: the turret turns about the middle"
         );
         let w = &bp.weapons[0];
         assert_eq!(w.plasma_grade, Some(mc_data::PlasmaGrade::PinchFusion));
-        let v = |p: mc_core::FxVec3| Vec3::from(p.to_f32());
+        let v = |p| crate::authored(bp, p);
         assert!(v(w.muzzle).distance(line.muzzle()) < 0.02, "{key} muzzle");
         assert!(
             v(w.pivot.unwrap()).distance(line.pivot) < 0.02,

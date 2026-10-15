@@ -6,8 +6,8 @@ dimensions; weapon mounts and cargo apertures use the same metre coordinates.
 
 | Unit | Tier | Built by | Role |
 | --- | --- | --- | --- |
-| Coffer | 2 | Artificer II/III; Exarch Engineering Suite II/III | Unarmed light transport; eight slots, enough for one commander |
-| Ark | 3 | Artificer III; Exarch Engineering Suite III | Heavy transport; 96 slots, 44 m bay width and 36 m clearance |
+| Coffer | 2 | Artificer II/III; Exarch Engineering Suite II/III | Unarmed light transport; sixteen slots, enough for one commander |
+| Ark | 3 | Artificer III; Exarch Engineering Suite III | Heavy transport; 192 slots, 44 m bay width and 36 m clearance |
 | Vassal | 3 | Artificer III; Exarch Engineering Suite III | Escort frigate, the Valiant's peer: a Pinch-plasma Lance under the keel and three Twin Escort Plasma Repeaters |
 | Suzerain | 3 | Artificer III; Exarch Engineering Suite III | Monitor with two anti-ship guns and six area suppression batteries |
 | Scourge | 4 | Artificer III; Exarch Engineering Suite III | Capital destroyer, the Dominion's peer: a Heavy Pinch-fusion Lance from the energy core through its middle, six Pinch-plasma Batteries, sixteen hatched seeker cells |
@@ -18,7 +18,7 @@ filter in the testing ground also exposes all five.
 
 Coffer preserves the existing `regency_t2_transport` unit ID and `regency_coffer`
 mesh key while replacing the old model completely. Its 26 m wide, 28 m high bay
-clears the Exarch; commanders use all eight slots. Ark clears the complete Regency
+clears the Exarch; commanders use all sixteen slots. Ark clears the complete Regency
 land roster through tech 3.
 
 The Ark is the Bastion's counterpart at the Bastion's size (300 m): a broad arrowhead

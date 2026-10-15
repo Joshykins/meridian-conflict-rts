@@ -292,7 +292,7 @@ fn share(mine: Fx, theirs: Fx) -> Fx {
         return Fx::HALF;
     }
     let share = theirs / (mine + theirs).max(Fx::EPSILON);
-    if share < Fx::ratio(1, 8) {
+    if share < Fx::ratio(1, 5) {
         Fx::ZERO
     } else {
         share

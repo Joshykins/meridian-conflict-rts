@@ -1117,7 +1117,8 @@ impl UnitBlueprint {
         self.has(cat::SPACE) || self.transport.is_some()
     }
 
-    /// Room in a transport: a commander takes eight slots; other land units take their size class plus one.
+    /// Room in a transport: a commander takes sixteen slots, a courier's whole hold; other
+    /// land units take their size class plus one.
     /// `None` for what cannot ride in one: anything that is not a land unit.
     pub fn cargo_room(&self) -> Option<u16> {
         let m = self.motion?;
@@ -1126,7 +1127,7 @@ impl UnitBlueprint {
             MoveLayer::Land | MoveLayer::Amphibious | MoveLayer::Hover
         ) && self.transport.is_none())
         .then_some(if self.has(cat::COMMANDER) {
-            8
+            16
         } else {
             m.size_class as u16 + 1
         })

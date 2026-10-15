@@ -90,7 +90,7 @@ mod tests {
         let mounts: Vec<Vec3> = unit
             .anti_missile_mounts
             .iter()
-            .map(|m| Vec3::new(m.x.to_f32(), m.y.to_f32(), m.z.to_f32()))
+            .map(|&m| crate::authored(unit, m))
             .collect();
         assert_eq!(mounts.len(), HEADS.len());
         for (m, h) in mounts.iter().zip(&HEADS) {

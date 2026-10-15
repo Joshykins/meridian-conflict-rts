@@ -177,7 +177,7 @@ fn tanks_sent_through_a_parked_fulgur_flow_round_it() {
     let tanks = spawn_at(
         &mut w,
         "aster_t1_tank",
-        &grid(420, 440, 6, 36, 14),
+        &grid(420, 440, 6, 36, 24),
         Angle::ZERO,
     );
     move_to(&mut w, &tanks, 700, 512);
@@ -418,7 +418,7 @@ fn a_mixed_block_marching_about_reaches_every_rank() {
     let tanks = spawn_at(
         &mut w,
         "aster_t1_tank",
-        &grid(400, 400, 8, 40, 16),
+        &grid(400, 400, 8, 40, 24),
         Angle::ZERO,
     );
     let heavy = spawn_at(
@@ -430,7 +430,7 @@ fn a_mixed_block_marching_about_reaches_every_rank() {
     let bulwarks = spawn_at(
         &mut w,
         "aster_t2_tank",
-        &grid(300, 560, 4, 8, 20),
+        &grid(300, 560, 4, 8, 26),
         Angle::ZERO,
     );
     let all: Vec<_> = tanks

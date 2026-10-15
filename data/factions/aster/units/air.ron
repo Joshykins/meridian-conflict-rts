@@ -6,7 +6,7 @@
         health: 1400, cost: (materials: 280, energy: 4200, time: 1400),
         radius: 58, height: 38, footprint: (10, 6), hull: (59, 36), vision: 320,
         motion: (layer: Air, size: 0, speed: 150, accel: 42, turn: 90, altitude: 280, hover: true, deploy: 0.9),
-        transport: (capacity: 8, descent: 120, hold: (-16, 0), ramp: (-36, -42), width: 28, floor: 0, clearance: 26, unload: 0.25),
+        transport: (capacity: 16, descent: 120, hold: (-16, 0), ramp: (-36, -42), width: 28, floor: 0, clearance: 26, unload: 0.25),
         // Warp: a light drive, quick to charge and quick to recharge. A jump costs
         // `per_km` energy for each kilometre it reaches (at least one), drained off the
         // grid over `spool * (10 + km) / 10` seconds; slower in a stall.
@@ -235,7 +235,7 @@ trail: true, wake: 1.2, sounds: (fire: "bomb_release", impact: "aster_bore_heavy
  health: 16000, cost: (materials: 4200, energy: 63000, time: 25200),
  radius: 160, height: 95, footprint: (28, 13), hull: (166, 76), vision: 520,
  motion: (layer: Air, size: 0, speed: 78, accel: 14, turn: 16, altitude: 560, hover: true, deploy: 2.2),
- transport: (capacity: 96, descent: 80, hold: (20, 0), ramp: (-16, -84), width: 40, floor: 34, clearance: 34, unload: 0.4),
+ transport: (capacity: 192, descent: 80, hold: (20, 0), ramp: (-16, -84), width: 40, floor: 34, clearance: 34, unload: 0.4),
  warp: (per_km: 8000, spool: 4, cooldown: 60, speed: 3500),
  hull_mounts: true,
  weapons: [
