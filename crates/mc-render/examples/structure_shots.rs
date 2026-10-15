@@ -2,7 +2,7 @@
 //! each shot places some blueprints on the map and films them from the RTS camera.
 //!
 //!   cargo run --release -p mc-render --example structure_shots -- maps/twin_shoals.mcmap OUT_DIR \
-//!       forge:aster_t1_land_factory@7000,7000,0:120,0.2,0.6
+//!       forge:aster_t1_land_factory@land,0,0:120,0.2,0.6
 //!
 //! A shot is `name:KEY@x,y,heading[,altitude[,ramp]][+KEY@x,y,heading...]:distance,tilt[,yaw[,dx,dy]]`; the
 //! camera looks at the first structure, or `dx, dy` metres off it. `x` of `water` puts the structure on the first open water

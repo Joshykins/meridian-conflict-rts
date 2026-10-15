@@ -2,7 +2,7 @@
 //!
 //! ```text
 //! mc-bake --size-km 80 --seed 7 --name "Meridian Basin" -o maps/meridian_basin.mcmap
-//! mc-bake --layout islands --size-km 10 --seed 46 --name "Twin Shoals" -o maps/twin_shoals.mcmap
+//! mc-bake --layout islands --size-km 8 --seed 46 --name "Twin Shoals" -o maps/twin_shoals.mcmap
 //! mc-bake --layout alpine --size-km 8 --seed 3 --name "Serac Divide" -o maps/serac_divide.mcmap
 //! mc-bake --layout alpine-teams --size-km 12 --seed 5 --name "Serac Sound" -o maps/serac_sound.mcmap
 //! mc-bake --layout archipelago --size-km 20 --seed 23 --name "The Axis" -o maps/the_axis.mcmap

@@ -241,11 +241,11 @@ cargo test -p mc-models --lib tests::
 ```
 
 `--scene naval` puts the whole roster to sea either side of the open water it prints
-(`naval scene: fleets either side of X,Y`; Twin Shoals: 7109,8663), both sides funded so
+(`naval scene: fleets either side of X,Y`), both sides funded so
 shields, sonar and lasers run; `naval-still` holds fire. Player 0's fleet lies to the west:
 the Leviathan 420 m out on the line, the Atoll at (-540, -120), the Kraken at (-380, +90),
 the Swordfish at (-340, -80). The Leviathan's first salvo lands
-at tick 36 (`--ticks 36 --follow 8 --alpha 0.5 --camera 6689,8663,170,140`).
+at tick 36 (`--ticks 36 --follow 8 --alpha 0.5 --camera X-420,Y,170,140`, from the X,Y it printed).
 
 Software previews of every hull: `MODEL_DUMP_DIR=DIR cargo test -p mc-models --lib -- --ignored dump_models`.
 

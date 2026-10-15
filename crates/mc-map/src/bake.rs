@@ -21,8 +21,9 @@
 //!
 //! That is the default [`Layout::Basin`]. [`Layout::Islands`] is a designed
 //! two-player sea map built from the same parts: one long main island with
-//! both starts on it, a lake in its middle, a ridge in the passage either side
-//! of the lake (so each passage is a lake-shore lane and a coastal lane), and
+//! both starts on it, narrowing to a waist round a lake in its middle, so the
+//! passage either side of the lake is a neck (Finn's Revenge's), a ridge in
+//! each passage (so each is a lake-shore lane and a coastal lane), and
 //! a secondary island with a town across a deep channel on either flank.
 
 use crate::format::{
@@ -56,6 +57,9 @@ const MAX_TREES: usize = 450_000;
 const CITY_LOT_M: f64 = 48.0;
 /// Corners on one ore field's outline.
 const ORE_CORNERS: usize = 28;
+/// How much narrower the islands layout's main island is at its waist, round the
+/// lake, than across its lobes: what makes the passages either side of the lake necks.
+const ISLAND_WAIST: f64 = 0.40;
 
 mod alpine;
 mod antarctic;
@@ -930,14 +934,18 @@ impl Terrain {
         // start axis, pushed in and out by a slow warp (so the outline is not
         // an ellipse) and a faster wobble (bays and headlands). The coast keeps
         // still around the starts, and keeps clear of the town islands so the
-        // channel between them stays wide and deep.
-        let (a, b) = (0.40 * s, 0.24 * s);
+        // channel between them stays wide and deep. The island has a waist
+        // where the lake is: either side of the lake the passage from its shore
+        // to the coast is a neck (Finn's Revenge's, a few hundred metres), so
+        // the armies meet there, and the coast barely wobbles across it.
+        let waist = 1.0 - smoothstep(0.06 * s, 0.17 * s, px.abs());
+        let (a, b) = (0.40 * s, 0.24 * s * (1.0 - ISLAND_WAIST * waist));
         let e = ((px / a).powi(2) + (py / b).powi(2)).sqrt();
         let g = ((px / (a * a)).powi(2) + (py / (b * b)).powi(2)).sqrt();
         let wobble = 0.06 * s * self.coast.fbm(sx / (0.11 * s), sy / (0.11 * s), 4, 0.55)
             + 0.06 * s * self.coast_warp.get(sx / (0.28 * s), sy / (0.28 * s));
         let d_main = (1.0 - e) * if g > 1e-12 { e / g } else { b }
-            + wobble * (0.4 + 0.6 * smoothstep(so, 4.0 * so, d_start));
+            + wobble * (0.4 + 0.6 * smoothstep(so, 4.0 * so, d_start)) * (1.0 - 0.85 * waist);
         // (A smooth minimum with the distance to a circle around the town island.)
         let d_clear = d_town - 0.20 * s;
         let d_main =
