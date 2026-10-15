@@ -1,7 +1,7 @@
 // Warp drives and warp dampeners (mc-sim `warp.rs`), played by `audio/warp.rs`: a
 // capital ship charging its drive, tearing out of the world, the rift where it will come
 // out, and the thunderclap as it does; the same jump snagged by an enemy Undertow
-// (`aster_t2_warp_damper`), dragged, torn and thrown out stunned; the stunned hull
+// (`aster_t3_warp_damper`), dragged, torn and thrown out stunned; the stunned hull
 // arcing and its systems coming back; the dampener's field humming and surging.
 //
 // A ship may name its own `<moving>_<name>` (e.g. `aster_courier_warp_jump`); these are

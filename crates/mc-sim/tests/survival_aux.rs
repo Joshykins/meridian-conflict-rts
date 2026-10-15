@@ -21,7 +21,7 @@ const ARTILLERY: (i32, i32) = (5300, 3800);
 const NUKE: (i32, i32) = (3700, 5300);
 const FLEET: (i32, i32) = (5400, 2400);
 const HOME: (i32, i32) = (1000, 1000);
-const DAMPER: &str = "aster_t2_warp_damper";
+const DAMPER: &str = "aster_t3_warp_damper";
 
 fn site(kind: SiteKind) -> NodeSite {
     let (x, y) = match kind {

@@ -366,7 +366,7 @@ fn setup(w: &mut World) {
                 add("aster_t4_artillery", 1, 300, 250);
                 add("aster_t3_power", 1, 700, 150);
                 add("aster_t2_radar", 1, 150, 150);
-                add("aster_t2_warp_damper", 1, 1300, 300);
+                add("aster_t3_warp_damper", 1, 1300, 300);
                 // An Exarch with its Nanite Repair Field by the north's AA, which start
                 // half dead, mending them (`repair_field.rs`).
                 add("regency_commander+nano_field", 1, 800, 540);

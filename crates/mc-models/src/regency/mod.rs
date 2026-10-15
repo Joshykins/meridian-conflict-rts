@@ -48,6 +48,7 @@ pub(crate) mod naval;
 mod palisade;
 mod parts;
 mod plating;
+mod portcullis;
 mod raider;
 mod reclaimer;
 mod saker;
@@ -277,6 +278,8 @@ pub(super) const MODELS: &[ModelDef] = &[
         [(13.9, 26.0), (13.9, 26.0), (13.9, 32.0)],
         ward::ward,
     ),
+    // The warp dampener: four talons closed round a lens (`portcullis`), tech 3.
+    ModelDef::new("regency_portcullis", 18.0, 46.0, portcullis::portcullis),
     // The reclaim tower (`crucible`): tech 1 to 3 in place, as tall at every tier.
     ModelDef::tiered(
         "regency_crucible",
@@ -454,6 +457,9 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_missile_defense" => 4000,
         // Its tech 3 kit waiting on it.
         "regency_ward" => 6000,
+        // A 4 x 4 field mast: four talons of lapped plates, knuckles and arms, a plated
+        // core, two turning rings and the crown.
+        "regency_portcullis" => 9000,
         // A skirted tracked body, a turret, the gun and its caged core.
         "regency_skyspear" | "regency_fusion_howitzer" => 8000,
         // Four plated shard legs, their thighs, a body and its well.

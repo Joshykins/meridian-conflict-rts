@@ -488,7 +488,7 @@
     "aster_t3_shield": (
         lore: "The same tower refitted with a far larger reactor and a wider dome.",
     ),
-    "aster_t2_warp_damper": (
+    "aster_t3_warp_damper": (
         lore: "A field mast that knots space for a mile and more around it. A ship that drops out of warp inside it comes out slow, torn and blind, and the guns below are waiting.",
     ),
     "aster_wall": (

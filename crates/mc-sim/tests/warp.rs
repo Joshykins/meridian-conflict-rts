@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 const COURIER: &str = "aster_t2_lift_ship";
 const FRIGATE: &str = "aster_t4_frigate";
-const DAMPER: &str = "aster_t2_warp_damper";
+const DAMPER: &str = "aster_t3_warp_damper";
 
 fn world() -> World {
     let blueprints = Arc::new(

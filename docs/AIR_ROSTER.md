@@ -397,7 +397,8 @@ draws the stretch through all of `Emerge`, not just its first tick). A dampened 
 the same unmaking in violet, shuddering, with red lightning at the well. Range scenarios
 `warp` and `warp-dampened` take `--unit regency_t3_space_cruiser`.
 
-**Undertow** (`aster_t2_warp_damper`, T2, 300 E/s upkeep, `warp_damper:`): an enemy
+**Undertow** (`aster_t3_warp_damper`, T3, 300 E/s upkeep, `warp_damper:`), and the Regency's
+match, the **Portcullis** (`regency_t3_warp_damper`, the same numbers): an enemy
 jump that ends within 1 600 m of a finished, powered Undertow is snagged. The transit
 drags on 3x longer (a field raised mid-jump snags what is left of it), and if the
 Undertow still stands and has power when the ship comes out, the ship loses a quarter

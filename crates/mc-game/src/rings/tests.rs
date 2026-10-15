@@ -78,7 +78,7 @@ fn rings_follow_the_data() {
     );
     // The Undertow's field, where an enemy jump is snagged.
     assert_eq!(
-        of(&b, "aster_t2_warp_damper"),
+        of(&b, "aster_t3_warp_damper"),
         vec![(Reach::Damper, 0, 0.0, 1600.0)]
     );
     // The Exarch's Nanite Repair Field, where its side's units mend.

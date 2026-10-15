@@ -421,6 +421,10 @@
         lore: "The mast refitted with a third floating ring and clamped feet; it reaches farther still.",
         weapons: {},
     ),
+    "regency_t3_warp_damper": (
+        lore: "A mast that bars the sky like a gate: a ship that drops out of warp within a mile of it is caught in the bars and comes out slow, torn and blind under the guns.",
+        weapons: {},
+    ),
     "regency_t1_sonar": (
         lore: "A plated bell hung in a tripod over a raft, listening to the sea; a sounding weight hangs beneath the raft on no line, held in the water by gravity alone.",
         weapons: {},

@@ -1,4 +1,4 @@
-//! Undertow (`aster_t2_warp_damper`, mesh "warp_damper"): the tech 2 warp dampener,
+//! Undertow (`aster_t3_warp_damper`, mesh "warp_damper"): the tech 3 warp dampener,
 //! authored at blueprint scale (metres, 4x4 lot, radius 18, height 46).
 //!
 //! A heavy anchored machine that grips space: it throws a 1600 m field that

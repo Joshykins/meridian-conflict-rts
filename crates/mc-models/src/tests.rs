@@ -335,7 +335,7 @@ const BLUEPRINTS: &[Blueprint] = &[
     structure("eng_station", 11.3, 20.0, 3, 2, &[]),
     structure("shield", 13.9, 40.0, 2, 3, &[]),
     structure("shield", 13.9, 52.0, 3, 3, &[]),
-    structure("warp_damper", 18.0, 46.0, 2, 4, &[]),
+    structure("warp_damper", 18.0, 46.0, 3, 4, &[]),
     structure("wall", 6.0, 4.5, 1, 1, &[]),
     // Strategic weapons (strategic.ron).
     structure("nuke_silo", 42.5, 26.0, 4, 8, &[]),
@@ -978,7 +978,7 @@ fn lods_reduce_and_respect_budgets() {
             // its own sonar, and a spire to the surface.
             3600
         } else if base_key(&model.key) == "warp_damper" {
-            // The tech 2 Undertow: a 4x4 lot, a 46 m anchor frame round spinning gear.
+            // The tech 3 Undertow: a 4x4 lot, a 46 m anchor frame round spinning gear.
             4200
         } else if model.key == "assault_bot" {
             // The tech 3 Paladin: two rigged legs with shin tubes, and a bolt rifle carried

@@ -131,10 +131,10 @@ fn the_card_tells_a_jump_a_stun_and_the_drives_recharge() {
 #[test]
 fn a_dampeners_card_says_whether_its_field_is_up() {
     let stats = FrameStats::default();
-    let mut rig = Rig::new("aster_t2_warp_damper");
+    let mut rig = Rig::new("aster_t3_warp_damper");
     let bp = rig
         .blueprints
-        .unit(rig.blueprints.id_of("aster_t2_warp_damper").unwrap());
+        .unit(rig.blueprints.id_of("aster_t3_warp_damper").unwrap());
     let field = |live| DamperView {
         unit_id: 7,
         owner: 0,
