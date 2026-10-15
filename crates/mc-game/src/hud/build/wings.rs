@@ -132,7 +132,7 @@ pub(super) fn draw(
         unit_face(hud, ui, aircraft, tr, t.glow);
         let what = format!("{} \u{d7} {}", wing.count, aircraft.name);
         let price = aircraft.cost_materials.to_f32() * wing.count as f32;
-        tile_caption(ui, &wing.name, Some(&what), tr, t.glow, price);
+        tile_caption(ui, &wing.name, Some(&what), tr, t.glow, price, 0.0);
         if let Some(&key) = ITEM_KEYS.get(i) {
             key_cap(ui, tr.right() - 19.0, tr.y + 4.0, key, live);
         }

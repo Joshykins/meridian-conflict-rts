@@ -120,6 +120,11 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
         }
     }
     let is_factory = bp.has(cat::FACTORY);
+    let saving = if is_factory {
+        super::adjacency::build_saving(s, units)
+    } else {
+        [0.0; 2]
+    };
 
     // A refit changes the unit's blueprint to another loadout of the same unit: the panel stays put.
     let family = s.blueprints.base_of(BlueprintId(unit.blueprint as u16)).0 as u32;
@@ -391,6 +396,7 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
                         .map(|(i, b)| (i, s.blueprints.upgrade_needs(b)))
                         .find(|&(_, needs)| needs > tech)
                 }),
+            saving,
         };
         // The strip runs the full width: it has no scroll bar at the side.
         hovered = tiles(
@@ -477,7 +483,10 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
         Some(Hover::Unit(item, tile, locked)) => {
             let pace = match bp.elevator {
                 Some(e) => Pace::Platform(e.payload.to_f32()),
-                None => Pace::Build(bp.builder.as_ref().map_or(0.0, |b| b.power.to_f32())),
+                None => Pace::Build {
+                    power: bp.builder.as_ref().map_or(0.0, |b| b.power.to_f32()),
+                    saving,
+                },
             };
             let hint = match locked {
                 Some(up) => format!("Queue the {} Upgrade First", up.name),
@@ -586,6 +595,9 @@ struct Offer<'a> {
     /// The first tier up `line` the side has not reached the tech for, and that tech
     /// (`Blueprints::upgrade_needs`): it and the tiers after it cannot be queued yet.
     locked: Option<(usize, u8)>,
+    /// What the factory's neighbours save it on each build, `[materials, energy]`
+    /// (`adjacency::build_saving`): its tiles show the price it pays.
+    saving: [f32; 2],
 }
 
 /// The tile under the cursor.
@@ -855,7 +867,14 @@ fn tiles<'a>(
             true,
         );
         unit_face(hud, ui, item, tr, t.glow);
-        caption(ui, item, tr, t.glow, item.cost_materials.to_f32());
+        caption(
+            ui,
+            item,
+            tr,
+            t.glow,
+            item.cost_materials.to_f32(),
+            offer.saving[0],
+        );
         if slot.n < ITEM_KEYS.len() && slot.shelf == current {
             key_cap(ui, tr.right() - 19.0, tr.y + 4.0, ITEM_KEYS[slot.n], live);
         }
@@ -1100,7 +1119,7 @@ fn climb_tile(
         tone,
     );
     ui.text_right(end, tr.y + 11.5, type_scale::MICRO, tone, &label);
-    caption(ui, item, tr, t.glow, price.to_f32());
+    caption(ui, item, tr, t.glow, price.to_f32(), 0.0);
     if let Some((_, progress)) = offer.under_way.filter(|(b, _)| *b == item.id) {
         // Under way: its progress in the construction amber, along the foot of the picture.
         let track = Rect::new(tr.x + 6.0, tr.bottom() - 45.0, tr.w - 12.0, 3.0);
@@ -1397,18 +1416,28 @@ fn upgrade_card(
 }
 
 /// A construction tile's foot: what it is (`title`, "Land Factory") over its name
-/// ("Forge"), then its price in materials. A unit without a title shows its name alone,
-/// in the title's place.
-fn caption(ui: &mut Ui, item: &UnitBlueprint, tr: Rect, glow: f32, price: f32) {
+/// ("Forge"), then its price in materials, less the share `saved` of it. A unit without a
+/// title shows its name alone, in the title's place.
+fn caption(ui: &mut Ui, item: &UnitBlueprint, tr: Rect, glow: f32, price: f32, saved: f32) {
     let (title, name) = match &item.title {
         Some(title) => (title.as_str(), Some(item.name.as_str())),
         None => (item.name.as_str(), None),
     };
-    tile_caption(ui, title, name, tr, glow, price);
+    tile_caption(ui, title, name, tr, glow, price, saved);
 }
 
-/// A tile's foot: `title` big, `name` under it, then `price` in materials.
-fn tile_caption(ui: &mut Ui, title: &str, name: Option<&str>, tr: Rect, glow: f32, price: f32) {
+/// A tile's foot: `title` big, `name` under it, then `price` in materials. When
+/// adjacency saves the share `saved` of it, the full price is struck through ahead of
+/// what is paid.
+fn tile_caption(
+    ui: &mut Ui,
+    title: &str,
+    name: Option<&str>,
+    tr: Rect,
+    glow: f32,
+    price: f32,
+    saved: f32,
+) {
     let x = tr.x + tr.w * 0.5;
     // Big, in the names' semi-condensed bold; a long one closes up and comes down to
     // fit the tile before it is ever cut.
@@ -1424,12 +1453,32 @@ fn tile_caption(ui: &mut Ui, title: &str, name: Option<&str>, tr: Rect, glow: f3
         let (st, name) = ui.fitted(type_scale::MICRO, name, tr.w - 8.0);
         ui.text_centred(x, tr.bottom() - 20.0, st, rgb(palette::DIM, 0.95), &name);
     }
-    ui.text_centred(
-        x,
-        tr.bottom() - 8.5,
+    let y = tr.bottom() - 8.5;
+    let paid = whole(price * (1.0 - saved));
+    let full = whole(price);
+    if saved <= 0.0 || paid == full {
+        ui.text_centred(x, y, type_scale::MICRO, rgb(MATERIALS, 0.95), &full);
+        return;
+    }
+    struck_price(ui, x, y, &full, &paid, MATERIALS);
+}
+
+/// `paid` in `tone` after the full price `full`, struck through, the pair centred on `x`.
+pub(super) fn struck_price(ui: &mut Ui, x: f32, y: f32, full: &str, paid: &str, tone: u32) {
+    let w_full = ui.text_width(type_scale::MICRO, full);
+    let w_paid = ui.text_width(type_scale::MICRO, paid);
+    let left = x - (w_full + 5.0 + w_paid) * 0.5;
+    ui.text(left, y, type_scale::MICRO, rgb(palette::DIM, 1.0), full);
+    ui.fill(
+        Rect::new(left - 1.0, y - 0.5, w_full + 2.0, 1.0),
+        rgb(palette::FAINT, 0.9),
+    );
+    ui.text(
+        left + w_full + 5.0,
+        y,
         type_scale::MICRO,
-        rgb(MATERIALS, 0.95),
-        &whole(price),
+        rgb(tone, 1.0),
+        paid,
     );
 }
 

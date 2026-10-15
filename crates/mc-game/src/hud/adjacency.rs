@@ -197,6 +197,22 @@ pub fn totals(ties: &[Tie]) -> [f32; 2] {
     t
 }
 
+/// What every factory among `units` is saved on each build in its bay this tick:
+/// `[materials, energy]`, the least any of them gets (an order may go to any), and
+/// nothing when none of them is a factory (`mc_sim::World::builder_pays`).
+pub fn build_saving(s: &Scene, units: &[&UnitInstance]) -> [f32; 2] {
+    let mut least: Option<[f32; 2]> = None;
+    for u in units {
+        let bp = s.bp(u);
+        if !bp.has(mc_data::cat::FACTORY) || !adjacency::uses(bp, Resource::Materials) {
+            continue;
+        }
+        let t = totals(&ties_of(&s.view.frame.links, u.unit_id)).map(|v| v.clamp(0.0, 1.0));
+        least = Some(least.map_or(t, |l| [l[0].min(t[0]), l[1].min(t[1])]));
+    }
+    least.unwrap_or_default()
+}
+
 /// How much of the perimeter of a building of `bp` its providers cover, zero to one:
 /// its savings grow until this is one.
 pub fn ringed(bp: &UnitBlueprint, ties: &[Tie]) -> f32 {

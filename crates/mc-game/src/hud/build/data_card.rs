@@ -6,14 +6,15 @@
 use crate::hud::style::Domain;
 use crate::hud::{whole, Hud, Scene, ENERGY, MATERIALS};
 use crate::ui::{palette, rgb, type_scale, Rect, Ui};
-use mc_core::TICKS_PER_SECOND;
+use mc_core::{Fx, TICKS_PER_SECOND};
 use mc_data::UnitBlueprint;
 
 /// How the builder whose card it is turns out what it offers.
 #[derive(Clone, Copy)]
 pub(in crate::hud) enum Pace<'a> {
-    /// Builds it at this build power.
-    Build(f32),
+    /// Builds it at this build power, saved this share of its `[materials, energy]` by
+    /// adjacency (`hud::adjacency::build_saving`).
+    Build { power: f32, saving: [f32; 2] },
     /// A space elevator: its platform brings it down free, out of a payload this big.
     Platform(f32),
     /// A carrier: builds `count` of it at once as the wing `name`, at this build power.
@@ -215,57 +216,91 @@ pub(in crate::hud) fn data_card(
     );
     crate::hud::volatile::chip(ui, item, end + 8.0, r.y + 48.0);
 
-    // The price: materials, energy, and how long this builder takes over it. An elevator's
-    // platform brings it down free, taking its materials out of the payload.
-    let built = |power: f32, n: f32| {
+    // The price: materials, energy, and how long this builder takes over it, the first two
+    // less what adjacency saves this factory (the full price struck through after them).
+    // An elevator's platform brings it down free, taking its materials out of the payload.
+    let built = |power: f32, n: f32, saving: [f32; 2]| {
+        let paid = |cost: Fx, share: f32| {
+            let (full, value) = (
+                whole(cost.to_f32() * n),
+                whole(cost.to_f32() * n * (1.0 - share)),
+            );
+            Price {
+                saved: (share > 0.0 && value != full).then_some((full, share)),
+                value,
+            }
+        };
         [
-            (
-                "Materials",
-                whole(item.cost_materials.to_f32() * n),
-                MATERIALS,
-            ),
-            ("Energy", whole(item.cost_energy.to_f32() * n), ENERGY),
+            ("Materials", paid(item.cost_materials, saving[0]), MATERIALS),
+            ("Energy", paid(item.cost_energy, saving[1]), ENERGY),
             (
                 "Time",
-                crate::hud::clock(item.build_time.to_f32() * n / power.max(0.1)),
+                Price::plain(crate::hud::clock(
+                    item.build_time.to_f32() * n / power.max(0.1),
+                )),
                 palette::TEXT,
             ),
         ]
     };
     let costs = match pace {
         // The side's build dial speeds every builder alike (`Player::build_permille`).
-        Pace::Build(power) => built(power * s.build_dial(s.view.local), 1.0),
-        Pace::Wing { power, count, .. } => built(power, count as f32),
+        Pace::Build { power, saving } => built(power * s.build_dial(s.view.local), 1.0, saving),
+        Pace::Wing { power, count, .. } => built(power, count as f32, [0.0; 2]),
         Pace::Platform(payload) => [
             (
                 "Of Payload",
-                format!(
+                Price::plain(format!(
                     "{:.0}%",
                     100.0 * item.cost_materials.to_f32() / payload.max(1.0)
-                ),
+                )),
                 crate::hud::elevator::CABLE,
             ),
-            ("Price", "Free".to_owned(), palette::TEXT),
-            ("Arrives", "By platform".to_owned(), palette::TEXT),
+            ("Price", Price::plain("Free".to_owned()), palette::TEXT),
+            (
+                "Arrives",
+                Price::plain("By platform".to_owned()),
+                palette::TEXT,
+            ),
         ],
     };
-    for (i, (label, value, tone)) in costs.iter().enumerate() {
+    for (i, (label, price, tone)) in costs.iter().enumerate() {
         let cx = x + i as f32 * (cw - 70.0) / 3.0;
         ui.fill(Rect::new(cx, r.y + 66.0, 2.0, 28.0), rgb(*tone, 0.9));
-        ui.text(
+        let label_end = ui.text(
             cx + 10.0,
             r.y + 72.0,
             type_scale::MICRO,
             rgb(palette::FAINT, 1.0),
             label,
         );
-        ui.text(
+        let end = ui.text(
             cx + 10.0,
             r.y + 88.0,
             type_scale::VALUE,
             rgb(*tone, 1.0),
-            value,
+            &price.value,
         );
+        if let Some((full, share)) = &price.saved {
+            ui.text(
+                label_end + 5.0,
+                r.y + 72.0,
+                type_scale::MICRO,
+                rgb(*tone, 1.0),
+                &crate::hud::adjacency::percent(*share),
+            );
+            let w = ui.text_width(type_scale::MICRO, full);
+            ui.text(
+                end + 6.0,
+                r.y + 89.0,
+                type_scale::MICRO,
+                rgb(palette::DIM, 1.0),
+                full,
+            );
+            ui.fill(
+                Rect::new(end + 5.0, r.y + 88.5, w + 2.0, 1.0),
+                rgb(palette::FAINT, 0.9),
+            );
+        }
     }
     ui.hline(x, r.y + 104.0, cw, rgb(palette::LINE, 0.16));
     let mut y = r.y + 120.0;
@@ -310,4 +345,17 @@ pub(in crate::hud) fn data_card(
         rgb(palette::FAINT, 1.0),
         hint,
     );
+}
+
+/// One figure of the card's price, and when adjacency saves some of it, the full figure
+/// (struck through beside it) and the share saved.
+struct Price {
+    value: String,
+    saved: Option<(String, f32)>,
+}
+
+impl Price {
+    fn plain(value: String) -> Self {
+        Price { value, saved: None }
+    }
 }
