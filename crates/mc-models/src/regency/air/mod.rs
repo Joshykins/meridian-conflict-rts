@@ -223,9 +223,9 @@ mod tests {
         (blueprints, id)
     }
 
-    /// A point of the unit file, in metres.
-    pub(super) fn v(p: mc_core::FxVec3) -> Vec3 {
-        Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32())
+    /// A point of the unit file `bp`, in metres at the model's authored size.
+    pub(super) fn v(bp: &mc_data::UnitBlueprint, p: mc_core::FxVec3) -> Vec3 {
+        crate::authored(bp, p)
     }
 
     /// What every Regency jet keeps to: no ARC light anywhere, red heat in its exhausts and

@@ -19,7 +19,7 @@
         categories: ["Air", "AntiAir"],
         health: 3200,
         cost: (materials: 620, energy: 23500, time: 3800),
-        radius: 9.8, height: 3.0,
+        radius: 9.8, height: 3.0, scale: 1.2,
         vision: 1000,
         motion: (layer: Air, size: 0, speed: 255, accel: 114, turn: 100, altitude: 300, hover: false),
         // Kilometres of flight at full speed: over a big map and back.
@@ -52,7 +52,7 @@
         categories: ["Air"],
         health: 6000,
         cost: (materials: 1150, energy: 45000, time: 7200),
-        radius: 16, height: 3.6,
+        radius: 16, height: 3.6, scale: 1.2,
         vision: 1000,
         motion: (layer: Air, size: 0, speed: 210, accel: 95, turn: 62, altitude: 300, hover: false),
         fuel: (range: 60),
@@ -80,7 +80,7 @@
         categories: ["Air", "Scout", "Intel"],
         health: 2000,
         cost: (materials: 700, energy: 24000, time: 4000),
-        radius: 12, height: 2.8,
+        radius: 12, height: 2.8, scale: 1.2,
         vision: 2400,
         // Above the weather (`above_weather`): a gun reaches it only along the line of sight,
         // so a fighter cruising at 300 m and flak are short of it; SAMs and heavy flak

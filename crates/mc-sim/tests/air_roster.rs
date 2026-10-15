@@ -895,10 +895,13 @@ fn twin_flak_fires_both_barrels_at_once_and_the_shells_drift_apart() {
     w.state.units.flags[target] |= flag::PASSIVE | flag::INVULNERABLE;
     let bp = w.state.units.blueprint[aa];
     assert!(w.blueprints.unit(bp).weapons[0].flak);
-    let mut volley = Vec::new();
-    for _ in 0..200 {
+    // Each shell takes its own scatter (`spread`), so one volley's two may by chance
+    // leave nearly together: over a few volleys they drift apart.
+    let mut widest = Fx::ZERO;
+    let mut volleys = 0;
+    for _ in 0..600 {
         w.tick(&[]).unwrap();
-        volley = w
+        let volley: Vec<_> = w
             .events
             .iter()
             .filter_map(|e| match e {
@@ -911,21 +914,25 @@ fn twin_flak_fires_both_barrels_at_once_and_the_shells_drift_apart() {
                 _ => None,
             })
             .collect();
-        if !volley.is_empty() {
+        if volley.is_empty() {
+            continue;
+        }
+        assert_eq!(volley.len(), 2, "both barrels fire on the same tick");
+        let [(p0, v0), (p1, v1)] = [volley[0], volley[1]];
+        assert!(
+            (p0 - p1).length() > Fx::ONE,
+            "one shell from each barrel: {p0:?} {p1:?}"
+        );
+        // Ten ticks out, metres apart.
+        let spread = ((p0 + v0 * Fx::from_int(10)) - (p1 + v1 * Fx::from_int(10))).length();
+        widest = widest.max(spread);
+        volleys += 1;
+        if volleys == 5 {
             break;
         }
     }
-    assert_eq!(volley.len(), 2, "both barrels fire on the same tick");
-    let [(p0, v0), (p1, v1)] = [volley[0], volley[1]];
-    assert!(
-        (p0 - p1).length() > Fx::ONE,
-        "one shell from each barrel: {p0:?} {p1:?}"
-    );
-    // The two leave a few degrees apart, so ten ticks out they are metres apart.
-    let (d0, d1) = (v0.normalize(), v1.normalize());
-    assert!(d0.dot(d1) < Fx::ratio(9999, 10000), "{v0:?} {v1:?}");
-    let spread = ((p0 + v0 * Fx::from_int(10)) - (p1 + v1 * Fx::from_int(10))).length();
-    assert!(spread > Fx::from_int(3), "{spread:?}");
+    assert_eq!(volleys, 5, "the battery kept firing");
+    assert!(widest > Fx::from_int(3), "{widest:?}");
 }
 
 #[test]

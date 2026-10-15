@@ -156,8 +156,8 @@ mod tests {
         let bp = b.unit(id);
         assert_eq!(bp.visual.mesh, "regency_flechette");
         assert!(
-            (bp.radius.to_f32() - RADIUS).abs() < 1e-3
-                && (bp.height.to_f32() - HEIGHT).abs() < 1e-3
+            (crate::authored_len(bp, bp.radius) - RADIUS).abs() < 1e-3
+                && (crate::authored_len(bp, bp.height) - HEIGHT).abs() < 1e-3
         );
         assert!(bp.weapons.is_empty(), "it is unarmed");
         assert_eq!(

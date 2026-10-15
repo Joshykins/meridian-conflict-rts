@@ -22,7 +22,7 @@
         categories: ["Air", "AntiAir", "DirectFire"],
         health: 250,
         cost: (materials: 45, energy: 770, time: 360),
-        radius: 3.6, height: 1.8,
+        radius: 3.6, height: 1.8, scale: 1.6,
         vision: 480,
         motion: (layer: Air, size: 0, speed: 120, accel: 32, turn: 72, altitude: 200),
         // Kilometres of flight at full speed: over a big map and back.
@@ -46,7 +46,7 @@
         categories: ["Air"],
         health: 250,
         cost: (materials: 60, energy: 980, time: 420),
-        radius: 5.6, height: 2.6,
+        radius: 5.6, height: 2.6, scale: 1.6,
         vision: 520,
         motion: (layer: Air, size: 0, speed: 84, accel: 22, turn: 42, altitude: 200),
         fuel: (range: 50),
@@ -68,7 +68,7 @@
 (
  key: "aster_t1_air_scout", name: "Swift", role: "Air Scout", title: "Air Scout", tech: 1, categories: ["Air", "Scout", "Intel"],
  health: 55, cost: (materials: 20, energy: 350, time: 120),
- radius: 3.5, height: 1.7, vision: 1100,
+ radius: 3.5, height: 1.7, scale: 1.6, vision: 1100,
  motion: (layer: Air, size: 0, speed: 115, accel: 50, turn: 110, altitude: 240, hover: false),
  fuel: (range: 70),
  weapons: [], mesh: "air_scout", icon: Scout,
@@ -77,7 +77,7 @@
 (
  key: "aster_t1_rotor_gunship", name: "Wasp", role: "Rotor Gunship", title: "Gunship", tech: 1, categories: ["Air"],
  health: 160, cost: (materials: 45, energy: 750, time: 260),
- radius: 5.5, height: 3.2, vision: 460,
+ radius: 5.5, height: 3.2, scale: 1.6, vision: 460,
  motion: (layer: Air, size: 0, speed: 70, accel: 22, turn: 150, altitude: 38, hover: true),
  fuel: (range: 40),
  weapons: [(name: "Light Machine Gun", damage: 5, range: 155, reload: 0.2, speed: 480, trajectory: Direct,
@@ -88,7 +88,7 @@
 (
  key: "aster_t3_support", name: "Argus", role: "Radar / Anti-Missile Support", tech: 3, categories: ["Air", "Intel"],
  health: 2400, cost: (materials: 1200, energy: 36000, time: 6000),
- radius: 9.2, height: 4.0, vision: 2000,
+ radius: 9.2, height: 4.0, scale: 1.2, vision: 2000,
  motion: (layer: Air, size: 0, speed: 165, accel: 70, turn: 64, altitude: 450, hover: false),
  fuel: (range: 90),
  weapons: [], mesh: "support_air", icon: Intel,
@@ -108,7 +108,7 @@
  // Cheap: built on the commander's drone port pad under the side's materials
  // priority, like any other build.
  health: 150, cost: (materials: 3, energy: 30, time: 30),
- radius: 1.8, height: 1.2, vision: 360,
+ radius: 1.8, height: 1.2, scale: 1.6, vision: 360,
  motion: (layer: Air, size: 0, speed: 100, accel: 45, turn: 240, altitude: 22, hover: true),
  weapons: [], mesh: "reclaim_drone", icon: SalvageDrone,
  sounds: (death: "blast_small", moving: "aster_hover"), reclaimer: (power: 5, range: 35, heads: [(emitter: (1.15, 0, 0.35))]), wreck_fraction: 0,
@@ -116,7 +116,7 @@
 (
  key: "aster_t2_gunship", name: "Kestrel", role: "Heavy Gunship", title: "Heavy Gunship", tech: 2, categories: ["Air"],
  health: 1300, cost: (materials: 220, energy: 7600, time: 1360),
- radius: 7.5, height: 3.5, vision: 560,
+ radius: 7.5, height: 3.5, scale: 1.4, vision: 560,
  motion: (layer: Air, size: 0, speed: 85, accel: 31, turn: 130, altitude: 65, hover: true),
  fuel: (range: 45),
  // One long autocannon in a ball turret under the chin (the model's `GUN_PIVOT`,
@@ -140,7 +140,7 @@
 (
  key: "aster_t2_fire_bomber", name: "Hellkite", role: "Flying Fortress Fire Bomber", title: "Fire Bomber", tech: 2, categories: ["Air"],
  health: 3687, cost: (materials: 250, energy: 8750, time: 1560),
- radius: 13, height: 5, vision: 640,
+ radius: 13, height: 5, scale: 1.4, vision: 640,
  motion: (layer: Air, size: 0, speed: 130, accel: 45, turn: 55, altitude: 280, hover: false),
  fuel: (range: 50),
  // Big incendiaries: each leaves a patch ~29 m across that burns 20 s at 75 damage a second.
@@ -156,7 +156,7 @@ burn: 20, burn_dps: 75, flash: 0.2, impact: 3, trail: true, wake: 1.2, sounds: (
 (
  key: "aster_t2_torpedo_bomber", name: "Gannet", role: "Torpedo Bomber", title: "Torpedo Bomber", tech: 2, categories: ["Air"],
  health: 1050, cost: (materials: 180, energy: 6100, time: 1150),
- radius: 7.2, height: 3, vision: 600, sonar: 900,
+ radius: 7.2, height: 3, scale: 1.4, vision: 600, sonar: 900,
  motion: (layer: Air, size: 0, speed: 86, accel: 36, turn: 48, altitude: 120, hover: false),
  fuel: (range: 55),
  // A torpedo under each inner wing, let go low over the water on the run in (`movement.rs`
@@ -172,7 +172,7 @@ burn: 20, burn_dps: 75, flash: 0.2, impact: 3, trail: true, wake: 1.2, sounds: (
 (
  key: "aster_t2_interceptor", name: "Peregrine", role: "Interceptor", title: "Interceptor", tech: 2, categories: ["Air", "AntiAir"],
  health: 1000, cost: (materials: 170, energy: 5800, time: 1040),
- radius: 5, height: 2.4, vision: 700,
+ radius: 5, height: 2.4, scale: 1.4, vision: 700,
  motion: (layer: Air, size: 0, speed: 160, accel: 72, turn: 122, altitude: 260, hover: false),
  fuel: (range: 45),
  weapons: [(name: "Interceptor Missiles", damage: 130, range: 310, reload: 1.3, speed: 420, trajectory: Direct,
@@ -185,7 +185,7 @@ burn: 20, burn_dps: 75, flash: 0.2, impact: 3, trail: true, wake: 1.2, sounds: (
  // The model is authored at radius 7 and drawn 1.4x (radius 9.8); muzzles are 1.4x the
  // model's `LANCE`. Two bolt rifles fire in turn: a fast blue bolt that bursts in
  // lightning round what it hits (`discharge`).
- radius: 9.8, height: 4.48, vision: 1000,
+ radius: 9.8, height: 4.48, scale: 1.2, vision: 1000,
  motion: (layer: Air, size: 0, speed: 255, accel: 114, turn: 100, altitude: 300, hover: false),
  fuel: (range: 50),
  weapons: [(name: "Bolt Rifle", damage: 330, splash: 5, range: 350, reload: 0.5, speed: 700, trajectory: Direct,
@@ -197,7 +197,7 @@ burn: 20, burn_dps: 75, flash: 0.2, impact: 3, trail: true, wake: 1.2, sounds: (
 (
  key: "aster_t3_strategic_bomber", name: "Eclipse", role: "Strategic Bomber", title: "Strategic Bomber", tech: 3, categories: ["Air"],
  health: 6000, cost: (materials: 1150, energy: 45000, time: 7200),
- radius: 16, height: 4.5, vision: 1000,
+ radius: 16, height: 4.5, scale: 1.2, vision: 1000,
  motion: (layer: Air, size: 0, speed: 210, accel: 95, turn: 62, altitude: 300, hover: false),
  fuel: (range: 60),
  // An AEB bomb: it goes off as the electric bore's blast (`ion_blast`), the charge
@@ -210,7 +210,7 @@ trail: true, wake: 1.2, sounds: (fire: "bomb_release", impact: "aster_bore_heavy
 (
  key: "aster_t3_assault_aircraft", name: "Thunderhead", role: "Assault Aircraft", title: "Assault Aircraft", tech: 3, categories: ["Air"],
  health: 7641, cost: (materials: 1350, energy: 52000, time: 8400),
- radius: 15.6, height: 7.15, vision: 1000,
+ radius: 15.6, height: 7.15, scale: 1.2, vision: 1000,
  motion: (layer: Air, size: 0, speed: 188, accel: 83, turn: 104, altitude: 95, hover: false),
  fuel: (range: 50),
  weapons: [(name: "Avenger Rotary Cannon", damage: 45, range: 960, reload: 0.1, speed: 1000, trajectory: Direct,

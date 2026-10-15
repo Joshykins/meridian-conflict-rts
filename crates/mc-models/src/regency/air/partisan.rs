@@ -301,11 +301,11 @@ mod tests {
         let bp = blueprints.unit(blueprints.id_of("regency_t3_air_superiority").unwrap());
         assert_eq!(bp.visual.mesh, "regency_partisan");
         assert!(
-            (bp.radius.to_f32() - RADIUS).abs() < 1e-3
-                && (bp.height.to_f32() - HEIGHT).abs() < 1e-3
+            (crate::authored_len(bp, bp.radius) - RADIUS).abs() < 1e-3
+                && (crate::authored_len(bp, bp.height) - HEIGHT).abs() < 1e-3
         );
         let m = bp.weapons[0].muzzle;
-        let m = Vec3::new(m.x.to_f32(), m.y.to_f32(), m.z.to_f32());
+        let m = crate::authored(bp, m);
         assert!(m.distance(MUZZLE) < 1e-3, "muzzle {m}");
         let model = crate::build_model("regency_partisan").unwrap();
         let near = model.lods[0]

@@ -176,10 +176,10 @@ mod tests {
         let bp = b.unit(id);
         assert_eq!(bp.visual.mesh, "regency_petard");
         assert!(
-            (bp.radius.to_f32() - RADIUS).abs() < 1e-3
-                && (bp.height.to_f32() - HEIGHT).abs() < 1e-3
+            (crate::authored_len(bp, bp.radius) - RADIUS).abs() < 1e-3
+                && (crate::authored_len(bp, bp.height) - HEIGHT).abs() < 1e-3
         );
-        assert!(v(bp.weapons[0].muzzle).distance(BAY) < 1e-3);
+        assert!(v(bp, bp.weapons[0].muzzle).distance(BAY) < 1e-3);
         assert_eq!(build_model("regency_petard").unwrap().exhausts.len(), 2);
     }
 }

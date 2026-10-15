@@ -297,7 +297,7 @@ pub(super) mod check {
 
     use crate::material::{GLOW, GLOW_ORANGE, PLATING_DARK, TEAM};
 
-    /// Unit `key` from the data, checked to draw `mesh` at the model's own size.
+    /// Unit `key` from the data, checked to draw `mesh` at its authored size.
     pub(crate) fn blueprint(
         key: &str,
         mesh: &str,
@@ -308,17 +308,23 @@ pub(super) mod check {
         let blueprints = mc_data::Blueprints::load(&dir).unwrap();
         let bp = blueprints.unit(blueprints.id_of(key).unwrap()).clone();
         assert_eq!(bp.visual.mesh, mesh);
-        assert!((bp.radius.to_f32() - radius).abs() < 1e-3, "{key}: radius");
-        assert!((bp.height.to_f32() - height).abs() < 1e-3, "{key}: height");
+        assert!(
+            (crate::authored_len(&bp, bp.radius) - radius).abs() < 1e-3,
+            "{key}: radius"
+        );
+        assert!(
+            (crate::authored_len(&bp, bp.height) - height).abs() < 1e-3,
+            "{key}: height"
+        );
         bp
     }
 
-    /// The muzzles of a unit's first weapon, in model metres.
+    /// The muzzles of a unit's first weapon, in metres at the model's authored size.
     pub(crate) fn muzzles(bp: &mc_data::UnitBlueprint) -> Vec<Vec3> {
         bp.weapons[0]
             .muzzles
             .iter()
-            .map(|p| Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32()))
+            .map(|&p| crate::authored(bp, p))
             .collect()
     }
 
