@@ -100,6 +100,8 @@ pub enum NetNotice {
         name: String,
         /// Sent to a few, not to everyone.
         private: bool,
+        /// Said among those watching the match (observers, and players already out).
+        watchers: bool,
         text: String,
     },
     Dropped(u8),
@@ -132,6 +134,8 @@ pub enum NetRequest {
     Speed(u32),
     /// Give up the match (so this side is defeated, not left standing idle), then leave.
     Surrender,
+    /// This side is out of the match and watches the rest (`Session::watching`).
+    Watch,
 }
 
 /// The interface's side: read the link, take the notices, send requests.
@@ -223,6 +227,7 @@ impl NetDriver {
                 NetRequest::Speed(percent) => {
                     session.set_speed(percent);
                 }
+                NetRequest::Watch => session.watching(),
                 NetRequest::Surrender => {
                     let resign = mc_sim::Command::Resign.encode();
                     if let Err(e) = session.submit(vec![resign]) {
@@ -282,11 +287,13 @@ impl NetDriver {
                 from,
                 name,
                 to,
+                watchers,
                 text,
             } => s.notices.push(NetNotice::Chat {
                 from: from.map(|p| p.0),
                 name: name.clone(),
                 private: *to != 0,
+                watchers: *watchers,
                 text: text.clone(),
             }),
             SessionEvent::PlayerDropped(p) => s.notices.push(NetNotice::Dropped(p.0)),

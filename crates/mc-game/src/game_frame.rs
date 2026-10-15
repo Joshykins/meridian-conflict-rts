@@ -119,6 +119,7 @@ impl Game {
 
         self.answer_selection(audio, now);
 
+        self.watch_once_out();
         self.result_frame(dt);
 
         // Selection and hover marks.
@@ -153,6 +154,7 @@ impl Game {
             || self.watched.perspective != self.view.perspective
             || self.watched.zones != self.mind_map_on()
             || self.watched.reveal != self.editor_tools.as_ref().is_some_and(|t| t.reveal)
+            || self.watched.out != self.view.out.is_some()
         {
             self.watched = Watch {
                 units: watch.collect(),
@@ -161,6 +163,7 @@ impl Game {
                 perspective: self.view.perspective,
                 zones: self.mind_map_on(),
                 reveal: self.editor_tools.as_ref().is_some_and(|t| t.reveal),
+                out: self.view.out.is_some(),
             };
             self.sim.watch.lock().unwrap().clone_from(&self.watched);
         }

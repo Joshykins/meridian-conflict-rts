@@ -4,6 +4,9 @@
 //! Enter opens the line (Shift+Enter to your allies), Tab switches between
 //! everyone and allies, Enter sends, Escape puts it away. Lines fade after a
 //! while and come back while the line is open.
+//!
+//! Those watching (observers, and players whose side is out) talk among
+//! themselves: the relay keeps what they say from the players still fighting.
 
 use super::notices::Glyph;
 use super::{Hud, HudAction, Scene, EDGE};
@@ -29,6 +32,8 @@ struct Line {
     from: Option<u8>,
     name: String,
     private: bool,
+    /// Said among the watchers.
+    watchers: bool,
     text: String,
     age: f32,
 }
@@ -99,6 +104,7 @@ impl Hud {
                     from,
                     name,
                     private,
+                    watchers,
                     text,
                 } => {
                     ui.audio.play(Sfx::Tick);
@@ -106,6 +112,7 @@ impl Hud {
                         from: *from,
                         name: name.clone(),
                         private: *private,
+                        watchers: *watchers,
                         text: text.clone(),
                         age: 0.0,
                     });
@@ -287,11 +294,19 @@ impl Hud {
                 Rect::new(EDGE, bottom - input_h, WIDTH, input_h),
                 k,
                 allies,
+                s.view.observing,
             );
         }
     }
 
-    fn chat_input(&mut self, ui: &mut Ui, r: Rect, k: f32, allies: mc_core::PlayerMask) {
+    fn chat_input(
+        &mut self,
+        ui: &mut Ui,
+        r: Rect,
+        k: f32,
+        allies: mc_core::PlayerMask,
+        watching: bool,
+    ) {
         let Some(draft) = &mut self.net.draft else {
             return;
         };
@@ -299,9 +314,15 @@ impl Hud {
         ui.fade *= k;
         ui.fill(r, ink(0.5));
         ui.frame(r, rgb(palette::ACCENT, 0.6));
-        // Who it goes to: a pill that Tab, or a click, switches.
-        let label = if draft.allies { "To Allies" } else { "To All" };
-        let pill = Rect::new(r.x + 8.0, r.y + 7.0, 92.0, r.h - 14.0);
+        // Who it goes to: a pill that Tab, or a click, switches. A watcher's words
+        // go to the other watchers whatever it asks (the relay sees to that).
+        let label = match (watching, draft.allies) {
+            (true, _) => "To Observers",
+            (false, true) => "To Allies",
+            (false, false) => "To All",
+        };
+        let pill_w = if watching { 112.0 } else { 92.0 };
+        let pill = Rect::new(r.x + 8.0, r.y + 7.0, pill_w, r.h - 14.0);
         let res = ui.interact(id("chat-scope", 0), pill, allies != 0);
         if allies != 0 && (res.clicked || ui.input.key(Key::Tab)) {
             ui.audio.play(Sfx::Tick);
@@ -360,7 +381,15 @@ fn chat_line(ui: &mut Ui, s: &Scene, line: &Line, x: f32, y: f32, fade: f32) {
         ui.text(x, y, type_scale::BODY, rgb(palette::WARN, fade), &line.text);
         return;
     }
-    if line.private {
+    if line.watchers {
+        x = ui.text(
+            x,
+            y,
+            type_scale::MICRO,
+            rgb(palette::DIM, fade),
+            "Observers",
+        ) + 8.0;
+    } else if line.private {
         x = ui.text(x, y, type_scale::MICRO, rgb(palette::DIM, fade), "Allies") + 8.0;
     }
     let tone = match line.from {
@@ -373,6 +402,8 @@ fn chat_line(ui: &mut Ui, s: &Scene, line: &Line, x: f32, y: f32, fade: f32) {
     };
     let who = match line.from {
         Some(_) => format!("{}:", line.name),
+        // Among the watchers, the tag says as much already.
+        None if line.watchers => format!("{}:", line.name),
         None => format!("{} (watching):", line.name),
     };
     x = ui.text(x, y, type_scale::VALUE, tone, &who) + 8.0;

@@ -55,6 +55,10 @@ pub enum Message {
         map: String,
         mode: String,
     },
+    /// This player's side is out of the match; from now on it watches. The relay
+    /// takes no more orders or clock changes from it, and its chat goes to the
+    /// watchers (observers and players already out) alone.
+    Watching,
     // relay -> client
     Welcome(Welcome),
     /// Layout is frozen across protocol versions so a mismatched peer can read it.
@@ -106,12 +110,15 @@ pub enum Message {
     },
     Ping(u32),
     Pong(u32),
-    /// Filled in by the relay: `from` (`None` is an observer) and `name`. `to` is
-    /// a mask of the slots it is for, the sender included; 0 is everyone.
+    /// Filled in by the relay: `from` (`None` is an observer), `name`, and
+    /// `watchers`, set when it was said among the watchers (observers and players
+    /// already out), who alone hear it. `to` is a mask of the slots it is for, the
+    /// sender included; 0 is everyone.
     Chat {
         from: Option<PlayerId>,
         name: String,
         to: PlayerMask,
+        watchers: bool,
         text: String,
     },
 }
@@ -153,6 +160,7 @@ pub(super) mod tag {
     pub(in crate::protocol) const LISTING: u8 = 33;
     pub(in crate::protocol) const SET_CONTENT: u8 = 34;
     pub(in crate::protocol) const SPEED: u8 = 35;
+    pub(in crate::protocol) const WATCHING: u8 = 36;
 }
 
 fn encode_opt_slot(e: &mut Enc, slot: Option<PlayerId>) {
@@ -330,15 +338,18 @@ impl Message {
                 from,
                 name,
                 to,
+                watchers,
                 text,
             } => {
                 e.u8(tag::CHAT);
                 encode_opt_slot(e, *from);
                 e.str(name);
                 e.u32(*to);
+                e.bool(*watchers);
                 e.str(text);
             }
             Message::Leave => e.u8(tag::LEAVE),
+            Message::Watching => e.u8(tag::WATCHING),
             Message::MatchEnd => e.u8(tag::MATCH_END),
             Message::Loaded => e.u8(tag::LOADED),
             Message::DesyncReport { tick, sections } => {
@@ -534,9 +545,11 @@ impl Message {
                 from: decode_opt_slot(d)?,
                 name: d.str(MAX_NAME_LEN)?,
                 to: d.u32()?,
+                watchers: d.bool()?,
                 text: d.str(MAX_CHAT_LEN)?,
             },
             tag::LEAVE => Message::Leave,
+            tag::WATCHING => Message::Watching,
             tag::MATCH_END => Message::MatchEnd,
             tag::LOADED => Message::Loaded,
             tag::DESYNC_REPORT => Message::DesyncReport {

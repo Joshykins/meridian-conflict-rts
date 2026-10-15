@@ -133,15 +133,18 @@ fn samples() -> Vec<Message> {
             from: None,
             name: "watcher".into(),
             to: 0,
+            watchers: true,
             text: "gl hf".into(),
         },
         Message::Chat {
             from: Some(PlayerId(1)),
             name: "grace".into(),
             to: 0b101,
+            watchers: false,
             text: "".into(),
         },
         Message::Leave,
+        Message::Watching,
         Message::MatchEnd,
         Message::Loaded,
         Message::DesyncReport {

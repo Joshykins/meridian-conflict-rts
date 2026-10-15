@@ -375,6 +375,7 @@ impl Hub {
 
         for s in self.slots.iter_mut().filter(|s| s.occupied) {
             s.synced = true;
+            s.watching = false;
         }
         for c in self.conns.values_mut().filter(|c| c.kind != Kind::Pending) {
             c.live = true;

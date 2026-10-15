@@ -19,6 +19,7 @@ use crate::*;
 mod clock;
 mod lobby;
 mod local_seek;
+mod watching;
 
 const DEADLINE: Duration = Duration::from_secs(30);
 
@@ -81,6 +82,8 @@ struct Client<S: Session> {
     dropped: Vec<PlayerId>,
     rejoined: Vec<PlayerId>,
     chat: Vec<(Option<PlayerId>, String)>,
+    /// What was said among the watchers (`SessionEvent::Chat::watchers`).
+    watchers_chat: Vec<(Option<PlayerId>, String)>,
     /// The last `Clock`: paused, by whom, input delay.
     clock: Option<(bool, Option<PlayerId>, u32)>,
     /// The last `Clock`'s speed.
@@ -116,6 +119,7 @@ impl<S: Session> Client<S> {
             dropped: Vec::new(),
             rejoined: Vec::new(),
             chat: Vec::new(),
+            watchers_chat: Vec::new(),
             clock: None,
             speed: None,
             loading: None,
@@ -214,7 +218,18 @@ impl<S: Session> Client<S> {
                 SessionEvent::ReplayDiverged { .. } => self.diverged = true,
                 SessionEvent::PlayerDropped(p) => self.dropped.push(p),
                 SessionEvent::PlayerRejoined(p) => self.rejoined.push(p),
-                SessionEvent::Chat { from, text, .. } => self.chat.push((from, text)),
+                SessionEvent::Chat {
+                    from,
+                    text,
+                    watchers,
+                    ..
+                } => {
+                    if watchers {
+                        self.watchers_chat.push((from, text));
+                    } else {
+                        self.chat.push((from, text));
+                    }
+                }
                 SessionEvent::Clock {
                     paused,
                     speed,

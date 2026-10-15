@@ -257,8 +257,11 @@ pub struct View {
     pub nuke_sent: Vec<crate::hud::silo::SentLaunch>,
     /// Tier-5 titans: strikes charging and storms raging, sightings (`titan_marks.rs`).
     pub titans: crate::titan_marks::Titans,
-    /// This machine has no slot: the commanders fight, and we watch.
+    /// This machine has no slot, or its side is out: the commanders fight, and we watch.
     pub observing: bool,
+    /// This machine's side, once out of a match that goes on: it watches from then on
+    /// (`observing`), while `local` follows the side it looks through.
+    pub out: Option<u8>,
     /// Observing: whose eyes the battlefield is seen through; `None` sees it all.
     pub perspective: Option<u8>,
     /// Where the map lets structures stand, for the placement preview. Filled
@@ -299,6 +302,7 @@ impl View {
             nuke_sent: Vec::new(),
             titans: Default::default(),
             observing: false,
+            out: None,
             perspective: None,
             sites: Default::default(),
             sky_shown: None,
@@ -2461,15 +2465,6 @@ impl Game {
             }
             HudAction::LineUp(units) => self.range_line_up(&units, audio),
         }
-    }
-
-    /// This machine's commander has fallen (or it has surrendered).
-    fn defeated(&self) -> bool {
-        self.view
-            .status
-            .players
-            .get(self.view.local as usize)
-            .is_some_and(|p| p.defeated)
     }
 
     fn toggle_pause(&mut self) {

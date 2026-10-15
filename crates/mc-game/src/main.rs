@@ -160,7 +160,8 @@ straight into a match instead.
   --range-maps           range screenshot: show the map browser
   --paused               match screenshot: show the match paused
   --net-shot STATE       match screenshot: stage a network match's moment: play | chat |
-                         paused | waiting | rejoin | desync
+                         watching | paused | waiting | rejoin | desync (watching: this side is
+                         out and watches, its chat line open among the observers)
   --report PAGE[@M:SS]   match screenshot: the battle report over the match, open on PAGE
                          (overview, economy, military, battlefield, timeline); the
                          battlefield replay stands at M:SS, or at the end. With --observe

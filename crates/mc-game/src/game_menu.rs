@@ -65,11 +65,52 @@ impl Game {
         self.end_orbit();
     }
 
+    /// This machine's commander has fallen (or it has surrendered).
+    pub(super) fn defeated(&self) -> bool {
+        self.view.out.is_some()
+            || self
+                .view
+                .status
+                .players
+                .get(self.view.local as usize)
+                .is_some_and(|p| p.defeated)
+    }
+
+    /// The side this machine played, if it played: its result is the report's.
+    fn played(&self) -> Option<u8> {
+        if self.view.observing {
+            self.view.out
+        } else {
+            Some(self.view.local)
+        }
+    }
+
+    /// Once this machine's side has fallen in a match that goes on without it, it
+    /// watches the rest as an observer does: every side in view, the observer panel,
+    /// no orders, and its chat among the watchers (`hud/netplay.rs`).
+    pub(super) fn watch_once_out(&mut self) {
+        if self.view.observing || self.view.status.winner.is_some() || !self.defeated() {
+            return;
+        }
+        // Surrendered to leave: the match is left as soon as that is carried out.
+        if let Some(net) = &self.sim.net {
+            if net.link().surrendering.is_some() {
+                return;
+            }
+            net.request(crate::netplay::NetRequest::Watch);
+        }
+        self.view.out = Some(self.view.local);
+        self.view.observing = true;
+        self.view.perspective = None;
+        self.view.mode = super::Mode::Normal;
+        self.view.selection = Default::default();
+        self.release_held();
+    }
+
     /// The report on the match so far, from the sim thread's record of it.
     fn report(&self) -> Box<Report> {
         let chronicle = self.sim.chronicle.lock().unwrap();
-        let local = (!self.view.observing).then_some(self.view.local);
-        Box::new(Report::new(&chronicle, &self.blueprints, local))
+        Box::new(Report::new(&chronicle, &self.blueprints, self.played()))
     }
 
     /// The report can be read once the match is decided, and at any time by an
@@ -128,7 +169,7 @@ impl Game {
         let ctx_map = self.map.clone();
         let blueprints = self.blueprints.clone();
         let colors = self.view.colors;
-        let local = (!self.view.observing).then_some(self.view.local);
+        let local = self.played();
         let owns_clock = self.view.status.owns_clock;
         let wanted_report = {
             let menu = self.menu.as_mut()?;

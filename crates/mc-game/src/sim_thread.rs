@@ -163,13 +163,15 @@ pub struct Watch {
     /// The queues of everything on that side are wanted as well (shift is held).
     pub everyone: bool,
     /// An observer looking through one side's eyes: its fog and what it can see.
-    /// `None` sees everything. Ignored on a machine that plays.
+    /// `None` sees everything. Ignored on a machine that plays (until its side is `out`).
     pub perspective: Option<u8>,
     /// An observer is drawing an AI's map of the zones: the zones and their truth are
     /// published (`SimStatus::zone_map`).
     pub zones: bool,
     /// Local authoring playtests can inspect the whole battlefield.
     pub reveal: bool,
+    /// This machine's side is out of the match: it watches as an observer does.
+    pub out: bool,
 }
 
 pub struct SimHandle {
@@ -383,6 +385,8 @@ pub fn queue_of(queues: &[UnitOrders], id: u32) -> Option<&UnitOrders> {
 }
 
 fn write_watched(world: &World, local: Option<u8>, watch: &Watch, status: &mut SimStatus) {
+    // A side out of the match watches as an observer does.
+    let local = local.filter(|_| !watch.out);
     let viewer = if world.state.cheats { None } else { local };
     let side = if world.state.cheats {
         Some(watch.side)
@@ -452,10 +456,11 @@ fn write_ally_mine_plans(world: &World, side: Option<u8>, out: &mut Vec<(u8, Pla
 }
 
 /// Whose eyes the render frame is drawn through: the player's own, or, for an
-/// observer in a fogged match, whichever side it chose (`None`: all of them).
+/// observer in a fogged match (or a player whose side is out), whichever side it chose
+/// (`None`: all of them).
 fn eyes(fog: bool, local: Option<u8>, watch: &Watch) -> Option<u8> {
     if fog && !watch.reveal {
-        local.or(watch.perspective)
+        local.filter(|_| !watch.out).or(watch.perspective)
     } else {
         None
     }

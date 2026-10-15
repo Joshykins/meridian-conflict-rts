@@ -133,7 +133,14 @@ Games hosted from the client (LAN, direct IP) do not check names.
    (0.1x to 12x, everyone sees who); the relay closes ticks that much faster,
    raises the input delay to cover the same round trips in shorter ticks, and
    the slowest machine still sets the pace.
+   In the match, Enter opens chat to everyone and Shift+Enter to your allies.
+   Observers talk among themselves: the relay never passes what they say to a
+   player still fighting, since they see every side.
 6. **End.** The match ends for a player when it is defeated, resigns or leaves.
+   A player defeated while the match goes on watches the rest as an observer
+   does (every side in view, the observer panel, observer chat); its client
+   tells the relay `Watching`, after which the relay drops its orders and
+   clock changes and routes its chat to the observers.
    The replay is kept on every client and on the server.
 
 ## Latency

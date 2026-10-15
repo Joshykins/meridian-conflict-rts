@@ -110,6 +110,9 @@ pub(super) struct Slot {
     pub(super) hash_from: u32,
     /// Has built the match from `Start` (or joined after the clock started).
     pub(super) loaded: bool,
+    /// Its side is out of the match and it watches (`Message::Watching`): its turns
+    /// still close ticks, but carry no orders, and it talks among the watchers.
+    pub(super) watching: bool,
 }
 
 pub(super) struct SnapshotJob {
@@ -555,6 +558,8 @@ impl Hub {
         }
         let in_lobby = self.game.is_none();
         let is_host = player.is_some_and(|p| self.host == Some(p.index()));
+        // A player out of the match has no more say in it than an observer.
+        let playing = player.filter(|p| !self.slots[p.index()].watching);
         match msg {
             Message::Hello(hello) => self.on_hello(id, hello),
             Message::Ping(n) => self.send(id, &Message::Pong(n)),
@@ -625,11 +630,20 @@ impl Hub {
                 }
             }
 
-            Message::Commands { tick, commands } => {
+            Message::Commands { tick, mut commands } => {
                 let Some(slot) = player else {
                     return Err(NetError::Malformed("Commands from an observer"));
                 };
+                // A watching player's turn still closes its ticks; what it orders is dropped.
+                if playing.is_none() {
+                    commands.clear();
+                }
                 self.on_commands(slot, tick, commands)?;
+            }
+            Message::Watching => {
+                if let (false, Some(slot)) = (in_lobby, player) {
+                    self.slots[slot.index()].watching = true;
+                }
             }
             Message::Hash { tick, hash } => self.on_hash(player, tick, hash)?,
             Message::Loaded => {
@@ -638,12 +652,12 @@ impl Hub {
                 }
             }
             Message::Pause(paused) => {
-                if let Some(slot) = player {
+                if let Some(slot) = playing {
                     self.set_paused(paused, Some(slot));
                 }
             }
             Message::Speed(percent) => {
-                if let Some(slot) = player {
+                if let Some(slot) = playing {
                     self.set_speed(percent, slot);
                 }
             }
@@ -701,27 +715,42 @@ impl Hub {
                 from: None,
                 name: String::new(),
                 to: 0,
+                watchers: false,
                 text: "Slow down: chat allows about one message a second.".into(),
             };
             return self.send(id, &notice);
         }
         conn.chat_tokens -= 1;
+        // Once the match is on, those watching it (observers, and players already
+        // out) see every side: what they say stays among themselves.
+        let watcher = |slots: &[Slot], kind: Kind| match kind {
+            Kind::Player(s) => slots[s.index()].watching,
+            Kind::Observer => true,
+            Kind::Pending => false,
+        };
+        let watchers = self.game.is_some() && watcher(&self.slots, conn.kind);
         let msg = Message::Chat {
             from,
             name: conn.name.clone(),
-            to,
+            to: if watchers { 0 } else { to },
+            watchers,
             text,
         };
-        if to == 0 || from.is_none() {
+        if !watchers && (to == 0 || from.is_none()) {
             return self.broadcast(&msg);
         }
         let Some(f) = frame(&msg) else { return };
         let ids: Vec<ConnId> = self
             .conns
             .iter()
-            .filter(|(cid, c)| match c.kind {
-                Kind::Player(s) => **cid == id || to & mc_core::player_bit(s.0) != 0,
-                _ => false,
+            .filter(|(cid, c)| {
+                if watchers {
+                    return watcher(&self.slots, c.kind);
+                }
+                match c.kind {
+                    Kind::Player(s) => **cid == id || to & mc_core::player_bit(s.0) != 0,
+                    _ => false,
+                }
             })
             .map(|(cid, _)| *cid)
             .collect();

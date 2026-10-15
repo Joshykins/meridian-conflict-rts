@@ -388,6 +388,12 @@ impl Session for NetSession {
         }
     }
 
+    fn watching(&mut self) {
+        if self.role == Role::Player {
+            let _ = self.send(&Message::Watching);
+        }
+    }
+
     /// `to`: the slots it is for, one bit each (the relay adds the sender); 0 is everyone.
     fn chat(&mut self, text: &str, to: mc_core::PlayerMask) -> Result<(), NetError> {
         if text.len() > MAX_CHAT_LEN {
@@ -397,6 +403,7 @@ impl Session for NetSession {
             from: None,
             name: String::new(),
             to,
+            watchers: false,
             text: text.to_owned(),
         })
     }
@@ -543,11 +550,13 @@ impl Reader {
                 from,
                 name,
                 to,
+                watchers,
                 text,
             } => self.emit(SessionEvent::Chat {
                 from,
                 name,
                 to,
+                watchers,
                 text,
             }),
             Message::Loading { loaded } => self.emit(SessionEvent::Loading { loaded }),
@@ -592,7 +601,8 @@ impl Reader {
             | Message::TakeSeat(_)
             | Message::Kick(_)
             | Message::Listing { .. }
-            | Message::SetContent(_) => {
+            | Message::SetContent(_)
+            | Message::Watching => {
                 return Err(NetError::Malformed("client-only message from the relay"))
             }
         }

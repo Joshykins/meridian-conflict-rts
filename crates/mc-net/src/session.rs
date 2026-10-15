@@ -69,11 +69,13 @@ pub enum SessionEvent {
     PlayerDropped(PlayerId),
     PlayerRejoined(PlayerId),
     /// `from` is `None` for an observer, or for the relay itself when `name` is empty.
-    /// `to` is the mask of slots it was sent to; 0 is everyone.
+    /// `to` is the mask of slots it was sent to; 0 is everyone. `watchers`: said among
+    /// those watching the match (observers, and players already out), who alone hear it.
     Chat {
         from: Option<PlayerId>,
         name: String,
         to: mc_core::PlayerMask,
+        watchers: bool,
         text: String,
     },
     /// After `Started`: which slots have loaded (one bit each). The clock starts
@@ -149,6 +151,10 @@ pub trait Session {
 
     /// The match has been built from `Started`; a network match's clock waits for this.
     fn loaded(&mut self) {}
+
+    /// This machine's side is out of the match and it now watches: a network match's
+    /// relay takes no more orders from it, and its chat goes to the watchers alone.
+    fn watching(&mut self) {}
 
     /// Answers `Desync { tick }` with this machine's state hash sections at `tick`.
     fn report_desync(&mut self, _tick: u32, _sections: &[u64]) {}
