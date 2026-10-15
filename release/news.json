@@ -1,6 +1,11 @@
 {
   "items": [
     {
+      "date": "2026-10-15",
+      "title": "The playtest is open",
+      "body": "Welcome to the first playtest build of Meridian Conflict. Play it, break it, and tell us what you find on Discord.\n\n- Multiplayer finds the playtest server by itself: open Multiplayer and host or join.\n- If something goes wrong, the game writes a report; Builds, then Logs and Crash Reports, has it, ready to send us."
+    },
+    {
       "date": "2026-10-14",
       "title": "The launcher",
       "body": "Meridian Conflict now opens on its launcher. It keeps the game up to date before you play, shows what changed in each build, and can check and repair the installed files.\n\n- Pick Playtest under Channel for builds ahead of release, on their own server.\n- Builds lists what is installed and what each takes on disk."
@@ -13,7 +18,7 @@
     },
     {
       "label": "Discord",
-      "url": "https://discord.com/channels/1553517008631505097/1553517009185276016"
+      "url": "https://discord.gg/q7UNPenmmg"
     }
   ]
 }
