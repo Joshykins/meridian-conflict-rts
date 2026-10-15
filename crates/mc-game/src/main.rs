@@ -13,6 +13,7 @@ mod adjacency_marks;
 mod ambience;
 mod app;
 mod audio;
+mod bug_report;
 mod build_info;
 mod builds;
 mod campaign;
@@ -285,6 +286,9 @@ dev). It is part of the build's name, which replays record and network players m
 share (docs/RELEASES.md). A release build has no unit or map marked `playtest: true`.
 
 MERIDIAN_STORE=URL at compile time: the build store a published build's install has.
+
+MERIDIAN_REPORTS=URL at compile time: where Report a Bug and the crash screen's Send
+report post to (docs/REPORTS.md). Unset (a dev build): nothing is sent.
 MERIDIAN_LAUNCHER (set by the launcher, MeridianConflict.exe, for the game it starts)
 is the launcher that keeps it up to date and runs old replays in their own builds.
 

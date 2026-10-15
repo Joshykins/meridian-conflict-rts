@@ -51,6 +51,8 @@ pub enum FrontEvent {
     Campaign(bool),
     /// Watch a replay, jumping to the tick if one is given.
     Replay(std::path::PathBuf, Option<u32>),
+    /// Open Report a Bug over the menu (`bug_report.rs`).
+    ReportBug,
     Quit,
 }
 
@@ -291,6 +293,7 @@ impl Front {
         ui: &mut Ui,
         settings: &mut Settings,
         telemetry: &Telemetry,
+        covered: bool,
     ) -> FrontOutcome {
         let mut out = FrontOutcome::default();
         if let (true, Some(preview)) = (std::mem::take(&mut self.preview_due), &self.preview) {
@@ -323,7 +326,8 @@ impl Front {
         } else if !leaving && self.open(settings, false) {
             self.enter = (self.enter + ui.dt / ARRIVE).min(1.0);
         }
-        ui.interactive = !leaving && self.enter > 0.6;
+        // `covered`: Report a Bug is open over the front end.
+        ui.interactive = !leaving && self.enter > 0.6 && !covered;
         let enter = smooth(self.enter);
 
         match self.screen {
@@ -344,6 +348,7 @@ impl Front {
                     Some(MenuAction::Range) => self.launching = Some((Launching::Range, 0.0)),
                     Some(MenuAction::History) => self.go(Screen::History, settings),
                     Some(MenuAction::Options) => self.go(Screen::Options, settings),
+                    Some(MenuAction::ReportBug) => out.event = Some(FrontEvent::ReportBug),
                     Some(MenuAction::Quit) => self.quitting = Some(0.0),
                     None => {}
                 }

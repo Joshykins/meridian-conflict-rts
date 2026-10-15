@@ -14,6 +14,7 @@ impl Game {
             dt,
             time,
             cover,
+            mut bug_report,
         } = ctx;
         if !self.chart_ready {
             overlay.set_image(
@@ -554,8 +555,14 @@ impl Game {
             (settings_changed, display_changed),
             surrender,
             dt,
+            bug_report.as_deref_mut(),
         ) {
             event = Some(e);
+        }
+        // Report a Bug, over the menu that opened it.
+        if let Some(report) = bug_report.as_deref_mut() {
+            ui.interactive = true;
+            report.draw(&mut ui, &settings.player_name);
         }
         // A surrender goes out with the next turn; the match is left once it has been
         // carried out, so every machine sees this side fall rather than stand idle.
@@ -652,6 +659,9 @@ impl Game {
             icons: !clean,
         };
         self.hud.issues.pump_capture(renderer);
+        if let Some(report) = bug_report {
+            report.pump_capture(renderer, self.hud.issues.capturing());
+        }
         renderer
             .render(&frame)
             .map_err(|e| format!("rendering failed: {e}"))?;

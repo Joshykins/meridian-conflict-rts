@@ -13,9 +13,15 @@
 //!   is kept as `meridian-previous.log`, `session.rs`), so a run that was killed
 //!   from outside, which nothing can catch, still leaves its trace.
 //!
-//! The window (`dialog.rs`) says what happened in a sentence, and has Copy
-//! details (the whole report onto the clipboard, to paste into a message) and
-//! Open folder (the file, selected in Explorer).
+//! The crash screen (`screen.rs`) says what happened and has Send report (the
+//! report, the player's note and a native fault's minidump, to us:
+//! `bug_report::spawn`), Copy details (the whole report onto the clipboard) and
+//! Open folder (the file, selected in Explorer). Nothing is sent until the
+//! player presses Send report. When the screen cannot come up, the system's task
+//! dialog (`dialog.rs`) stands in with Copy details and Open folder.
+//!
+//! A player's bug report (Report a Bug, `bug_report.rs`) carries the same
+//! sections after the player's note (`snapshot`).
 //!
 //! Every report is meant to be enough to find the cause without asking the
 //! player anything (CLAUDE.md section 7). After what happened, it carries:
@@ -282,6 +288,24 @@ pub fn report_error(message: &str) {
         report: &report,
         path: path.as_deref(),
     });
+}
+
+/// A player's bug report (`bug_report.rs`): nothing failed, so after the
+/// player's note it is what every crash report carries, the machine, the state,
+/// the settings and the log.
+pub(crate) fn snapshot(note: &str) -> String {
+    format!(
+        "Meridian Conflict {} bug report\n{}\n\nnote:\n{}\n\n{}{}",
+        env!("MERIDIAN_BUILD"),
+        system_line(),
+        if note.trim().is_empty() {
+            "-"
+        } else {
+            note.trim()
+        },
+        details(),
+        session::kept_lines()
+    )
 }
 
 fn panic_report(info: &std::panic::PanicHookInfo<'_>) -> Panicked {

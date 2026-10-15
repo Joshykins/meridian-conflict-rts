@@ -1,8 +1,10 @@
 //! The crash screen: the game's own interface, telling a player what happened
 //! and getting the report to us in one press. The brand panel where the menu
 //! has it; on the left what happened and the report itself (scrolls); on the
-//! right what to do, as the menu's tiles: Copy details, Open folder, Restart,
-//! Quit. No keys: four buttons, pressed with the pointer. Drawn by the reporter
+//! right what to do, as the menu's tiles: Send report (to us, with the note
+//! under the tiles: `bug_report::spawn`), Copy details, Open folder, Restart,
+//! Quit. Nothing is sent until the player presses Send report. No keys but the
+//! note's: five buttons, pressed with the pointer. Drawn by the reporter
 //! process (`reporter.rs`) on the splash presenter, which has no glass: panels
 //! stand on black.
 //! Presentation only: every float here ends on the screen.
@@ -10,6 +12,7 @@
 use crate::audio::Sfx;
 use crate::ui::{self, id, ink, palette, rgb, type_scale, Rect, Style, Ui};
 use glam::Vec2;
+use mc_builds::report::MAX_NOTE;
 use mc_render::Face;
 use std::path::PathBuf;
 
@@ -26,13 +29,28 @@ pub(crate) struct Summary {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Action {
+    Send,
     Copy,
     OpenFolder,
     Restart,
     Quit,
 }
 
-const ACTIONS: [(Action, &str, &str); 4] = [
+/// Where Send report is.
+pub(crate) enum Sending {
+    Idle,
+    Busy,
+    /// Sent; the reference it was given.
+    Sent(String),
+    Failed(String),
+}
+
+const ACTIONS: [(Action, &str, &str); 5] = [
+    (
+        Action::Send,
+        "Send report",
+        "Straight to the developers, with your note",
+    ),
     (
         Action::Copy,
         "Copy details",
@@ -56,13 +74,18 @@ pub(crate) struct Screen {
     scroll_to: f32,
     /// When the report was last copied, on the screen's clock, and whether it worked.
     copied: Option<(f32, bool)>,
+    /// What the player wrote to go with the report.
+    note: String,
+    sending: Sending,
+    /// This build has somewhere to send reports (a dev build has not).
+    can_send: bool,
 }
 
 const MARGIN: f32 = 24.0;
 const GAP: f32 = 14.0;
 const SIDE_W: f32 = 330.0;
 const BRAND_H: f32 = 84.0;
-const TILE_H: f32 = 62.0;
+const TILE_H: f32 = 56.0;
 const TILE_GAP: f32 = 8.0;
 const LINE_H: f32 = 17.0;
 
@@ -88,11 +111,28 @@ impl Screen {
             scroll: 0.0,
             scroll_to: 0.0,
             copied: None,
+            note: String::new(),
+            sending: Sending::Idle,
+            can_send: crate::bug_report::available(),
         }
     }
 
     pub(crate) fn path(&self) -> &std::path::Path {
         &self.summary.path
+    }
+
+    pub(crate) fn note(&self) -> &str {
+        &self.note
+    }
+
+    /// Send report was pressed and is under way, or has come back.
+    pub(crate) fn set_sending(&mut self, sending: Sending) {
+        self.sending = sending;
+    }
+
+    /// Send report can be pressed: not while it goes, nor once it has gone.
+    fn send_ready(&self) -> bool {
+        self.can_send && matches!(self.sending, Sending::Idle | Sending::Failed(_))
     }
 
     /// The report was put on the clipboard (or could not be).
@@ -122,14 +162,18 @@ impl Screen {
                 ),
             )
         });
-        let action = self.with_arrival(ui, t, 0.12, 1.0, |s, ui| {
+        let (action, side_bottom) = self.with_arrival(ui, t, 0.12, 1.0, |s, ui| {
             s.actions(
                 ui,
                 Rect::new(side_x, MARGIN, SIDE_W, h - 2.0 * MARGIN - 22.0),
             )
         });
         self.with_arrival(ui, t, 0.22, 1.0, |s, ui| {
-            s.readouts(ui, Rect::new(side_x, 0.0, SIDE_W, h - MARGIN - 22.0))
+            s.readouts(
+                ui,
+                Rect::new(side_x, 0.0, SIDE_W, h - MARGIN - 22.0),
+                side_bottom + GAP,
+            )
         });
         self.footer(ui);
         ui.fade = 1.0;
@@ -228,7 +272,8 @@ impl Screen {
         );
         y += 38.0;
         let lead = "Sorry about this. A report was saved; sending it to us is the quickest \
-                    way to get it fixed. Press Copy details, then paste it into a message.";
+                    way to get it fixed. Press Send report, with a line about what you were \
+                    doing if you can.";
         for line in ui.wrap(LEAD, lead, w.min(640.0)) {
             ui.text(x, y, LEAD, rgb(palette::DIM, 1.0), &line);
             y += 22.0;
@@ -360,9 +405,9 @@ impl Screen {
         }
     }
 
-    /// What the player can do, as the menu's tiles; and once the report is
-    /// copied, what to do with it.
-    fn actions(&mut self, ui: &mut Ui, panel: Rect) -> Option<Action> {
+    /// What the player can do, as the menu's tiles, and under them the note that
+    /// goes with Send report. Returns the choice and the bottom of what it drew.
+    fn actions(&mut self, ui: &mut Ui, panel: Rect) -> (Option<Action>, f32) {
         let n = ACTIONS.len() as f32;
         let tiles_h = 40.0 + n * (TILE_H + TILE_GAP) - TILE_GAP + 14.0;
         let r = Rect::new(panel.x, panel.y, panel.w, tiles_h);
@@ -381,14 +426,22 @@ impl Screen {
                 r.w - 24.0,
                 TILE_H,
             );
-            // Copy details is the one to press: it stands lit.
-            let res = ui.tile(id("crash-action", i), tr, action == Action::Copy, true);
-            if res.clicked {
+            let enabled = action != Action::Send || self.send_ready();
+            // Send report is the one to press, Copy details where there is nowhere
+            // to send: it stands lit.
+            let lit = action
+                == if self.can_send {
+                    Action::Send
+                } else {
+                    Action::Copy
+                };
+            let res = ui.tile(id("crash-action", i), tr, lit, enabled);
+            if res.clicked && enabled {
                 chosen = Some(action);
             }
             let g = res.glow;
             let tone = match action {
-                Action::Copy => palette::ACCENT,
+                Action::Send => palette::ACCENT,
                 Action::Quit => palette::TEXT,
                 _ => palette::DIM,
             };
@@ -403,14 +456,31 @@ impl Screen {
             );
             let c = Vec2::new(tr.x + 26.0, tr.mid_y());
             let glyph_tone = rgb(if g > 0.5 { 0xFFFFFF } else { tone }, 0.8 + 0.2 * g);
-            let done = action == Action::Copy && copied_k > 0.0;
+            let done = match action {
+                Action::Copy => copied_k > 0.0,
+                Action::Send => matches!(self.sending, Sending::Sent(_)),
+                _ => false,
+            };
             glyph(ui, action, done, c, glyph_tone);
             let x = tr.x + 50.0;
-            let (name, line) = match (action, self.copied) {
-                (Action::Copy, Some((_, true))) if done => {
+            let said;
+            let (name, line) = match (action, &self.sending, self.copied) {
+                (Action::Send, _, _) if !self.can_send => {
+                    (label, "This build has nowhere to send reports")
+                }
+                (Action::Send, Sending::Busy, _) => ("Sending…", "Hold on a moment"),
+                (Action::Send, Sending::Sent(reference), _) => {
+                    said = format!("Thank you. It is report {reference}");
+                    ("Sent", said.as_str())
+                }
+                (Action::Send, Sending::Failed(e), _) => {
+                    said = format!("Press to try again. {e}");
+                    ("Could not send", said.as_str())
+                }
+                (Action::Copy, _, Some((_, true))) if done => {
                     ("Copied", "Now paste it into a message to us")
                 }
-                (Action::Copy, Some((_, false))) if done => {
+                (Action::Copy, _, Some((_, false))) if done => {
                     ("Could not copy", "Open folder has the file instead")
                 }
                 _ => (label, blurb),
@@ -431,41 +501,6 @@ impl Screen {
                 line,
             );
         }
-
-        // Where to send it: under the tiles, while the copy is fresh.
-        if copied_k > 0.0 && self.copied.is_some_and(|(_, ok)| ok) {
-            let fade = ui.fade;
-            ui.fade *= copied_k;
-            let y = r.bottom() + GAP;
-            let note = Rect::new(r.x, y, r.w, 84.0);
-            ui.panel(note);
-            ui.text(
-                note.x + 18.0,
-                note.y + 24.0,
-                type_scale::CAPTION,
-                rgb(palette::ACCENT, 1.0),
-                "On the clipboard",
-            );
-            for (k, line) in ui
-                .wrap(
-                    BLURB,
-                    "Paste it (Ctrl+V) into a message to the developers, with a line \
-                     about what you were doing.",
-                    note.w - 36.0,
-                )
-                .iter()
-                .enumerate()
-            {
-                ui.text(
-                    note.x + 18.0,
-                    note.y + 46.0 + k as f32 * 17.0,
-                    BLURB,
-                    rgb(palette::TEXT, 0.85),
-                    line,
-                );
-            }
-            ui.fade = fade;
-        }
         if chosen.is_some() {
             ui.audio.play(if chosen == Some(Action::Quit) {
                 Sfx::Back
@@ -473,12 +508,43 @@ impl Screen {
                 Sfx::Select
             });
         }
-        chosen
+        if !self.can_send {
+            return (chosen, r.bottom());
+        }
+
+        // The note: what the player was doing, sent with the report.
+        let inner = r.w - 36.0;
+        let field_h = ui.text_area_height(inner, &self.note, 2, 4);
+        let note = Rect::new(r.x, r.bottom() + GAP, r.w, 40.0 + field_h + 14.0);
+        ui.panel(note);
+        ui.section(note.x + 12.0, note.y + 20.0, note.w - 24.0, "Your note");
+        let field = Rect::new(note.x + 18.0, note.y + 36.0, inner, field_h);
+        let note_id = id("crash-note", 0);
+        if self.send_ready() {
+            ui.text_area(note_id, field, &mut self.note, MAX_NOTE);
+        } else {
+            // Going or gone: what is shown is what was sent.
+            let mut shown = self.note.clone();
+            let interactive = std::mem::replace(&mut ui.interactive, false);
+            ui.text_area(note_id, field, &mut shown, MAX_NOTE);
+            ui.interactive = interactive;
+        }
+        if self.note.is_empty() && ui.mem.editing != Some(note_id) {
+            ui.text(
+                field.x + 12.0,
+                field.y + 17.5,
+                type_scale::VALUE,
+                rgb(palette::FAINT, 1.0),
+                "What were you doing? (optional)",
+            );
+        }
+        (chosen, note.bottom())
     }
 
     /// The report's particulars, at the foot of the right-hand column: what to
-    /// quote when asked which crash it was.
-    fn readouts(&mut self, ui: &mut Ui, column: Rect) {
+    /// quote when asked which crash it was. Left out when the column is too
+    /// short to have them below `above`.
+    fn readouts(&mut self, ui: &mut Ui, column: Rect, above: f32) {
         let file = self
             .summary
             .path
@@ -508,6 +574,9 @@ impl Screen {
         let row_h = 26.0;
         let h = 40.0 + rows.len() as f32 * row_h + 6.0;
         let r = Rect::new(column.x, column.bottom() - h, column.w, h);
+        if r.y < above {
+            return;
+        }
         ui.panel(r);
         ui.section(r.x + 12.0, r.y + 20.0, r.w - 24.0, "Particulars");
         for (i, (label, value)) in rows.iter().enumerate() {
@@ -598,6 +667,13 @@ fn glyph(ui: &mut Ui, action: Action, done: bool, c: Vec2, color: ui::Color) {
         return;
     }
     match action {
+        // An arrow going out, up and away.
+        Action::Send => {
+            let (from, to) = (c + Vec2::new(-6.0, 6.0), c + Vec2::new(7.0, -7.0));
+            ui.stroke(from, to, line, color);
+            ui.stroke(to, to + Vec2::new(-8.0, 0.0), line, color);
+            ui.stroke(to, to + Vec2::new(0.0, 8.0), line, color);
+        }
         // Two sheets, one over the other.
         Action::Copy => {
             ui.frame(Rect::new(c.x - 7.0, c.y - 4.0, 10.0, 12.0), color);

@@ -18,6 +18,7 @@ pub enum MenuAction {
     Campaign,
     ContinueCampaign,
     History,
+    ReportBug,
     Options,
     Quit,
 }
@@ -48,7 +49,7 @@ struct Entry {
     action: Option<MenuAction>,
 }
 
-const ENTRIES: [Entry; 10] = [
+const ENTRIES: [Entry; 11] = [
     Entry {
         label: "The Contract",
         blurb: "Vela • begin Merrick's first mission",
@@ -88,6 +89,11 @@ const ENTRIES: [Entry; 10] = [
         label: "Match History",
         blurb: "Battle reports and replays of your matches",
         action: Some(MenuAction::History),
+    },
+    Entry {
+        label: "Report a Bug",
+        blurb: "Tell the developers what went wrong",
+        action: Some(MenuAction::ReportBug),
     },
     Entry {
         label: "Settings",
@@ -217,10 +223,12 @@ fn entries(ui: &mut Ui, state: &mut MenuState, enter: f32) -> Option<MenuAction>
     // Keyboard: up and down move the highlight, enter activates it, and each
     // entry's number picks it directly.
     let before = state.selected;
-    if ui.input.key(Key::Down) {
+    // Not while something over the menu has the keyboard (Report a Bug's note).
+    let keys = ui.interactive;
+    if keys && ui.input.key(Key::Down) {
         state.selected = (state.selected + 1) % shown.len();
     }
-    if ui.input.key(Key::Up) {
+    if keys && ui.input.key(Key::Up) {
         state.selected = (state.selected + shown.len() - 1) % shown.len();
     }
     let digit = ui
@@ -229,7 +237,7 @@ fn entries(ui: &mut Ui, state: &mut MenuState, enter: f32) -> Option<MenuAction>
         .chars()
         .filter_map(|c| c.to_digit(10))
         .map(|d| d as usize)
-        .find(|d| (1..=shown.len()).contains(d));
+        .find(|d| keys && (1..=shown.len()).contains(d));
     if let Some(d) = digit {
         state.selected = d - 1;
     }
@@ -375,6 +383,22 @@ fn glyph(ui: &mut Ui, action: Option<MenuAction>, c: Vec2, r: f32, color: super:
                 c + Vec2::new(-r * 0.3, r * 0.45),
                 color,
             );
+        }
+        Some(MenuAction::ReportBug) => {
+            // A warning sign.
+            let corners = [
+                c + Vec2::new(0.0, -r * 0.9),
+                c + Vec2::new(r * 0.95, r * 0.75),
+                c + Vec2::new(-r * 0.95, r * 0.75),
+            ];
+            ui.polyline(&corners, t, color, true);
+            ui.stroke(
+                c + Vec2::new(0.0, -r * 0.35),
+                c + Vec2::new(0.0, r * 0.2),
+                t,
+                color,
+            );
+            ui.disc(c + Vec2::new(0.0, r * 0.47), t * 0.8, color);
         }
         Some(MenuAction::Options) => {
             // Three sliders.

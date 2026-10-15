@@ -342,6 +342,8 @@ pub struct FrameCtx<'a> {
     pub time: f32,
     /// The loading screen, still over the match while it settles.
     pub cover: Option<&'a mut crate::loading::Curtain>,
+    /// The Report a Bug panel, which the in-match menu opens (none in the editor).
+    pub bug_report: Option<&'a mut crate::bug_report::BugReport>,
 }
 
 /// What each blueprint sounds like, as ids into the sound library in use.

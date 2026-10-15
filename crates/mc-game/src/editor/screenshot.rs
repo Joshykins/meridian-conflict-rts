@@ -57,6 +57,7 @@ pub(crate) fn screenshot(
             dt: 1.0 / 30.0,
             time: i as f32 / 30.0,
             cover: None,
+            bug_report: None,
         })?;
     }
     let rgba = renderer

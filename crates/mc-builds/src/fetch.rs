@@ -222,7 +222,7 @@ fn quote(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
-fn curl() -> Command {
+pub(crate) fn curl() -> Command {
     let mut c = Command::new("curl");
     c.args([
         "--fail",
@@ -243,7 +243,7 @@ fn curl() -> Command {
     c
 }
 
-fn no_curl(e: std::io::Error) -> Error {
+pub(crate) fn no_curl(e: std::io::Error) -> Error {
     Error::Fetch(format!("could not run curl: {e}"))
 }
 

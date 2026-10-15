@@ -118,6 +118,7 @@ powershell.exe -NoProfile -Command "
 \$env:RUSTFLAGS = '-C target-feature=+crt-static'
 \$env:MERIDIAN_CHANNEL = '$channel'
 \$env:MERIDIAN_STORE = '$(q "$STORE_URL")'
+\$env:MERIDIAN_REPORTS = '$(q "$REPORTS_URL")'
 \$env:MERIDIAN_SERVER_PLAYTEST = '$(q "$SERVER_PLAYTEST")'
 \$env:MERIDIAN_SERVER_RELEASE = '$(q "$SERVER_RELEASE")'
 Set-Location '$win_wt'

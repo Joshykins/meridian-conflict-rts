@@ -63,6 +63,7 @@ pub(crate) fn serve(
             dt: 0.1,
             time: started.elapsed().as_secs_f32(),
             cover: None,
+            bug_report: None,
         };
         if let Some(current) = &mut game {
             let leaving = matches!(current.frame(ctx)?, Some(crate::game::GameEvent::Leave));

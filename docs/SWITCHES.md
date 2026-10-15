@@ -90,10 +90,11 @@ for Visual Studio or WinDbg with the build's `.pdb`), an error to `error-<secs>.
 player's run (no arguments, or one that opens the window) also shows the crash screen, and
 writes its whole log to `meridian.log` (the run before it: `meridian-previous.log`). The crash
 screen is the game's own interface in a process of its own (the game started again with
-`--crash-screen`; `crates/mc-game/src/crash/screen.rs`): what happened, the report, and Copy
-details, Open folder, Restart and Quit. When it cannot come up, a system task dialog with Copy
-details and Open folder stands in. Tool runs (headless shots, the shot server, bots) write the
-reports and never wait on a window.
+`--crash-screen`; `crates/mc-game/src/crash/screen.rs`): what happened, the report, a note
+field, and Send report (to us, `docs/REPORTS.md`), Copy details, Open folder, Restart and Quit.
+When it cannot come up, a system task dialog with Copy details and Open folder stands in. Tool
+runs (headless shots, the shot server, bots) write the reports and never wait on a window.
+Report a Bug, in the main menu and the in-match menu, sends a player's own report the same way.
 
 | Switch | Values | Purpose |
 |---|---|---|
@@ -116,6 +117,7 @@ See `docs/RELEASES.md`.
 |---|---|---|
 | `MERIDIAN_CHANNEL` (compile time) | `dev` (default), `playtest`, `release` | Who the build is for. Part of the build's name (`0.1.0-playtest+<commit>`; a release is `0.1.0+<commit>`), which replays record and network players must share. A release build has no unit or map marked `playtest: true`. |
 | `MERIDIAN_STORE` (compile time) | an `https://` URL | The build store the launcher updates from and fetches old builds from (`publish/config.sh`'s `STORE_URL`, set by `scripts/release.sh`). Unset: no updates, and Match History names the build an old replay needs instead of fetching it. |
+| `MERIDIAN_REPORTS` (compile time) | an `https://` URL | Where Report a Bug and the crash screen's Send report post (`publish/config.sh`'s `REPORTS_URL`, set by `scripts/release.sh`; the Worker in `deploy/reports`, `docs/REPORTS.md`). Unset (a dev build): nothing is sent, and the panel says so. |
 | `MERIDIAN_LAUNCHER` | the launcher's path | Set by the launcher for the game it starts: Match History's Watch in Its Build asks it to fetch and run an old replay's build. |
 | `MeridianConflict --replay FILE` | a replay | The launcher plays FILE in the build that recorded it (fetching it first), then starts the current build on Match History. |
 | `MeridianConflict --uninstall` | | Removes the install: the shortcuts, the Settings > Apps entry, the builds and the launcher; the replays stay. Settings > Apps runs it. |

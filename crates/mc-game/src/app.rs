@@ -144,6 +144,8 @@ struct App {
     /// the pointer was when it was taken, to give it back there.
     cursor_mode: crate::game::CursorMode,
     grabbed_at: Option<Vec2>,
+    /// Report a Bug, over the main menu or a match's menu.
+    bug_report: crate::bug_report::BugReport,
 }
 
 pub fn run(mut args: AppArgs) -> Result<(), String> {
@@ -203,6 +205,7 @@ pub fn run(mut args: AppArgs) -> Result<(), String> {
         cursors: Default::default(),
         cursor_mode: Default::default(),
         grabbed_at: None,
+        bug_report: Default::default(),
         editor_return: None,
         stage: Stage::Loading {
             pending: Some(first),

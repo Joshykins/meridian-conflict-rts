@@ -1473,6 +1473,8 @@ pub fn ui_screenshot(
     front.show(screen, &settings);
     let audio = crate::audio::Audio::silent();
     let (mut overlay, mut memory) = (Overlay::default(), ui::Memory::default());
+    // Report a Bug, as the main menu opens it (a click on its entry, `MERIDIAN_CLICKS`).
+    let mut bug_report = crate::bug_report::BugReport::default();
     let still = ui::Input {
         cursor: cursor.map_or(glam::Vec2::splat(-100.0), glam::Vec2::from),
         ..Default::default()
@@ -1533,7 +1535,12 @@ pub fn ui_screenshot(
             altitude: camera.eye().z - camera.focus.z,
             preview: true,
         };
-        let outcome = front.frame(&mut ui, &mut settings, &telemetry);
+        let outcome = front.frame(&mut ui, &mut settings, &telemetry, bug_report.is_open());
+        if let Some(ui::front::FrontEvent::ReportBug) = outcome.event {
+            bug_report.open(false);
+        }
+        ui.interactive = true;
+        bug_report.draw(&mut ui, &settings.player_name);
         if outcome.display_changed {
             settings
                 .apply_graphics(&mut renderer)

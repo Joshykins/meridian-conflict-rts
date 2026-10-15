@@ -186,7 +186,14 @@ impl App {
                     altitude: camera.eye().z - camera.focus.z,
                     preview: true,
                 };
-                let out = front.frame(&mut ui, &mut self.settings, &telemetry);
+                let out = front.frame(
+                    &mut ui,
+                    &mut self.settings,
+                    &telemetry,
+                    self.bug_report.is_open(),
+                );
+                ui.interactive = true;
+                self.bug_report.draw(&mut ui, &self.settings.player_name);
                 ui.fill(
                     ui::Rect::new(0.0, 0.0, ui.size.x, ui.size.y),
                     ui::rgb(0x000000, veil),
@@ -308,6 +315,8 @@ impl App {
                             detail,
                         ));
                     }
+                    // No screenshot: the menu it was opened from is all it would show.
+                    Some(FrontEvent::ReportBug) => self.bug_report.open(false),
                     Some(FrontEvent::Quit) => quit = true,
                     None => {}
                 }
@@ -344,6 +353,7 @@ impl App {
                     dt,
                     time,
                     cover: self.curtain.as_mut(),
+                    bug_report: None,
                 };
                 match editor.frame(ctx)? {
                     Some(crate::editor::Event::Open(editor)) => {
@@ -381,6 +391,7 @@ impl App {
                     dt,
                     time,
                     cover: self.curtain.as_mut(),
+                    bug_report: Some(&mut self.bug_report),
                 };
                 let game_event = game.frame(ctx)?;
                 let stop_test = self

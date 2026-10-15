@@ -1,0 +1,19 @@
+# The reports endpoint (worker.js; docs/REPORTS.md). Deploy from this folder:
+#   npx wrangler deploy
+# Its Discord channel's webhook is a secret, set once:
+#   npx wrangler secret put DISCORD_WEBHOOK
+name = "meridian-reports"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+routes = [{ pattern = "report.meridianconflict.com", custom_domain = true }]
+
+# Every report, kept whole: reports/<date>/<id>/{meta.json,report.txt,screenshot.png,crash.dmp}.
+[[r2_buckets]]
+binding = "REPORTS"
+bucket_name = "meridian-reports"
+
+# Six reports a minute from one address.
+[[ratelimits]]
+name = "LIMITER"
+namespace_id = "1001"
+simple = { limit = 6, period = 60 }

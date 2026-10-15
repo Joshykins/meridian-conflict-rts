@@ -6,13 +6,16 @@
 //! data), so it comes up even when the game's data is what broke. When it
 //! cannot come up, the crashed run shows the system's task dialog instead.
 
-use super::screen::{Action, Screen, Summary};
+use super::screen::{Action, Screen, Sending, Summary};
 use crate::audio::Audio;
+use crate::bug_report::Outcome;
 use crate::ui::{self, Ui};
 use glam::Vec2;
+use mc_builds::report::{Attachment, Kind, Report};
 use mc_render::{Overlay, Splash, Target};
 use std::io::{BufRead, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::mpsc::{Receiver, TryRecvError};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use winit::application::ApplicationHandler;
@@ -110,6 +113,7 @@ pub(crate) fn run(summary: Summary) -> Result<(), String> {
         started: now,
         last: now,
         failed: None,
+        sending: None,
     };
     event_loop.run_app(&mut app).map_err(|e| e.to_string())?;
     log::info!("crash screen: closed ({:?})", app.failed);
@@ -128,6 +132,8 @@ struct Reporter {
     started: Instant,
     last: Instant,
     failed: Option<String>,
+    /// Send report, while it goes.
+    sending: Option<Receiver<Outcome>>,
 }
 
 impl Reporter {
@@ -190,7 +196,40 @@ impl Reporter {
         );
         self.input.end_frame();
         splash.render(&self.overlay).map_err(|e| e.to_string())?;
+        if let Some(rx) = &self.sending {
+            let came = match rx.try_recv() {
+                Ok(Ok(reference)) => Some(Sending::Sent(reference)),
+                Ok(Err(e)) => Some(Sending::Failed(e)),
+                Err(TryRecvError::Disconnected) => {
+                    Some(Sending::Failed("the report could not be sent".into()))
+                }
+                Err(TryRecvError::Empty) => None,
+            };
+            if let Some(came) = came {
+                self.screen.set_sending(came);
+                self.sending = None;
+            }
+        }
         match action {
+            Some(Action::Send) => {
+                let report = Report {
+                    kind: Kind::Crash,
+                    build: env!("MERIDIAN_BUILD").to_owned(),
+                    player: crate::settings::Settings::load().player_name,
+                    note: self.screen.note().to_owned(),
+                    text: self.report.clone(),
+                    attachments: dump_of(&self.report)
+                        .map(|path| Attachment {
+                            field: "dump",
+                            path,
+                            mime: "application/octet-stream",
+                        })
+                        .into_iter()
+                        .collect(),
+                };
+                self.sending = Some(crate::bug_report::spawn(report, None));
+                self.screen.set_sending(Sending::Busy);
+            }
             Some(Action::Copy) => {
                 let ok = crate::clipboard::copy(&self.report).is_ok();
                 self.screen.copied(time, ok);
@@ -207,6 +246,15 @@ impl Reporter {
         }
         Ok(())
     }
+}
+
+/// The minidump a native fault's report names (`native.rs`), while it is there.
+fn dump_of(report: &str) -> Option<PathBuf> {
+    report
+        .lines()
+        .find_map(|l| l.strip_prefix("minidump: "))
+        .map(PathBuf::from)
+        .filter(|p| p.is_file())
 }
 
 /// One frame of the screen into `overlay`, one point to a logical pixel.
@@ -265,7 +313,7 @@ impl ApplicationHandler for Reporter {
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
-        self.input.feed(&event, false);
+        self.input.feed(&event, self.memory.editing.is_some());
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::Destroyed => log::info!("crash screen: window destroyed"),
@@ -355,4 +403,36 @@ pub(crate) fn screenshot(
         out.file_stem().and_then(|s| s.to_str()).unwrap_or("crash")
     ));
     crate::loading::shoot(&mut renderer, &camera, 2.5, &overlay, shot, &copied)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn a_native_report_names_its_dump() {
+        let dir = std::env::temp_dir().join(format!("mc-dump-of-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let dump = dir.join("crash-1.dmp");
+        std::fs::write(&dump, b"MDMP").unwrap();
+        let report = format!(
+            "crashed
+stack:
+  x
+
+minidump: {}
+
+system:
+",
+            dump.display()
+        );
+        assert_eq!(super::dump_of(&report), Some(dump.clone()));
+        assert_eq!(
+            super::dump_of(
+                "panicked
+system:
+"
+            ),
+            None
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 }

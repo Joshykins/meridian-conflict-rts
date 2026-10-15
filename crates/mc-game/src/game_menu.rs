@@ -1,9 +1,11 @@
 //! What stands over the match: the in-match menu (`ui/pause.rs`), the settings
-//! screen over it, and the battle report (`ui/report`), which the match's end
-//! opens by itself a moment after the last commander falls.
+//! screen and Report a Bug (`bug_report.rs`) over it, and the battle report
+//! (`ui/report`), which the match's end opens by itself a moment after the last
+//! commander falls.
 
 use super::{Game, GameEvent};
 use crate::audio::{Audio, Sfx};
+use crate::bug_report::BugReport;
 use crate::settings::Settings;
 use crate::ui::pause::{self, PauseAction};
 use crate::ui::report::{Ctx, Place, Report, ReportAction};
@@ -158,7 +160,12 @@ impl Game {
         changed: (&mut bool, &mut bool),
         surrender: bool,
         dt: f32,
+        mut bug_report: Option<&mut BugReport>,
     ) -> Option<GameEvent> {
+        // Report a Bug's screenshot is the battle, not the menu over it; and the menu
+        // under the panel takes no clicks.
+        let shooting = bug_report.as_ref().is_some_and(|r| r.hides_menu());
+        let reporting = bug_report.as_ref().is_some_and(|r| r.is_open());
         let (settings_changed, display_changed) = changed;
         let mut event = None;
         // Leaving a network match this side is still in gives it up first: the side is
@@ -207,14 +214,26 @@ impl Game {
                 }
             } else {
                 let in_settings = menu.settings.is_some();
-                ui.interactive = !menu.closing && !in_settings && !fresh;
+                ui.interactive = !menu.closing && !in_settings && !fresh && !reporting;
                 let eased = 1.0 - (1.0 - menu.enter).powi(3);
-                let out = pause::draw(ui, owns_clock, surrender, readable, settings, eased);
+                let out = if shooting {
+                    pause::PauseOutcome {
+                        action: None,
+                        settings_changed: false,
+                    }
+                } else {
+                    pause::draw(ui, owns_clock, surrender, readable, settings, eased)
+                };
                 *settings_changed |= out.settings_changed;
                 match out.action {
                     Some(PauseAction::Resume) => menu.closing = true,
                     Some(PauseAction::Settings) => menu.settings = Some((0.0, false)),
                     Some(PauseAction::Report) => wanted = true,
+                    Some(PauseAction::BugReport) => {
+                        if let Some(r) = &mut bug_report {
+                            r.open(true);
+                        }
+                    }
                     Some(PauseAction::Leave) if surrender => {
                         give_up = true;
                         menu.closing = true;

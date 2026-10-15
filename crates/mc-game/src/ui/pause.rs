@@ -1,6 +1,6 @@
-//! The in-match menu: resume, settings, leave, quit. A single-player match
-//! holds its clock while this is open; a lockstep match cannot, so there it is
-//! a panel over a battle that carries on. Once the match is decided (or for an
+//! The in-match menu: resume, settings, report a bug, leave, quit. A
+//! single-player match holds its clock while this is open; a lockstep match
+//! cannot, so there it is a panel over a battle that carries on. Once the match is decided (or for an
 //! observer, at any time) it opens the battle report (`report`).
 
 use super::{id, ink, palette, rgb, type_scale, ButtonKind, Key, Rect, Ui};
@@ -12,6 +12,8 @@ pub enum PauseAction {
     Resume,
     Settings,
     Report,
+    /// Report a Bug (`bug_report.rs`).
+    BugReport,
     Leave,
     Quit,
 }
@@ -40,7 +42,7 @@ pub fn draw(
     ui.fade = enter;
     ui.shift.y = 18.0 * (1.0 - enter);
 
-    let tall = 532.0 + if report { 62.0 } else { 0.0 };
+    let tall = 594.0 + if report { 62.0 } else { 0.0 };
     let panel = Rect::new((w - 460.0) * 0.5, (h - tall) * 0.5, 460.0, tall);
     ui.panel(panel);
     let (x, cw) = (panel.x + 30.0, panel.w - 60.0);
@@ -109,6 +111,17 @@ pub fn draw(
             ui.audio.play(Sfx::Select);
             out.action = Some(PauseAction::Report);
         }
+    }
+    y += 62.0;
+    if ui.button(
+        id("pause-bug", 0),
+        Rect::new(x, y, cw, 50.0),
+        "Report a Bug",
+        ButtonKind::Secondary,
+        true,
+    ) {
+        ui.audio.play(Sfx::Select);
+        out.action = Some(PauseAction::BugReport);
     }
     y += 74.0;
     // Narrower than the settings screen's rows, so the slider is laid out by hand there; here just volume.

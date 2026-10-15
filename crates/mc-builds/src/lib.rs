@@ -20,11 +20,13 @@
 //! - [`fetch`]: reading a store (through `curl`, on every supported system).
 //! - [`versions`]: the builds installed side by side under an install's `versions/`.
 //! - [`pack`]: writing a build into a store (the publishing side, `mc-release`).
+//! - [`report`]: sending a bug or crash report to us (the same `curl`, posting).
 
 pub mod feed;
 pub mod fetch;
 pub mod manifest;
 pub mod pack;
+pub mod report;
 pub mod versions;
 
 use std::fmt;
@@ -82,6 +84,8 @@ pub enum Error {
     Hash(String),
     /// This build was made without a store to read from.
     NoStore,
+    /// This build was made without anywhere to send reports.
+    NoReports,
     Cancelled,
 }
 
@@ -96,6 +100,7 @@ impl fmt::Display for Error {
             Error::Malformed(e) => write!(f, "malformed: {e}"),
             Error::Hash(path) => write!(f, "{path} did not match its manifest"),
             Error::NoStore => f.write_str("this build has no build store to download from"),
+            Error::NoReports => f.write_str("this build has nowhere to send reports"),
             Error::Cancelled => f.write_str("cancelled"),
         }
     }

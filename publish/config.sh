@@ -10,6 +10,10 @@ R2_ENDPOINT="https://674c2382543440ce4fd497aafd05db48.r2.cloudflarestorage.com"
 # The AWS CLI profile holding the bucket's R2 access key (aws configure --profile ...).
 R2_PROFILE="meridian-r2"
 
+# Where a published build sends bug and crash reports: the Worker in deploy/reports
+# (docs/REPORTS.md).
+REPORTS_URL="https://report.meridianconflict.com"
+
 # Each channel's multiplayer server, host[:port] (docs/SERVER.md).
 # playtest.meridianconflict.com is a DNS-only CNAME to the Railway relay's TCP proxy
 # (shortline.proxy.rlwy.net, internal port 7777): moving the relay is a DNS change,

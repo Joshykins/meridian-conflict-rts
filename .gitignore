@@ -20,3 +20,7 @@ __pycache__/
 /meridian-data/
 
 maps/**/*.mcmap
+
+# The reports Worker (deploy/reports): wrangler's local state and secrets
+/deploy/reports/.wrangler/
+/deploy/reports/.dev.vars
