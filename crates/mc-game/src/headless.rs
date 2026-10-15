@@ -68,6 +68,8 @@ pub struct Shot {
     pub build_grid: bool,
     /// Draw at this graphics preset instead of the renderer's default.
     pub quality: Option<crate::settings::Quality>,
+    /// Film a camera move into numbered frames instead (`film.rs`).
+    pub film: Option<crate::film::Film>,
 }
 
 /// Builds the world for `opts` and runs it for `ticks`; `chronicle` keeps the
@@ -1202,6 +1204,20 @@ pub fn screenshot(
         };
         renderer.render(&input).map_err(|e| e.to_string())?;
         std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    if let Some(film) = &shot.film {
+        let stage = crate::film::Stage {
+            world: &mut world,
+            frame: &mut frame,
+            renderer: &mut renderer,
+            camera: &mut camera,
+            eyes: shot_eyes(opts),
+            fixed: shot.camera.map(|c| glam::Vec2::new(c[0], c[1])),
+            water: map.info().water_level.to_f32(),
+            width: shot.width,
+            height: shot.height,
+        };
+        return crate::film::roll(film, stage, Path::new(&shot.path));
     }
     // The followed ticks, at the pace of a live match: two frames a tick.
     let mut time = 10.0 + warmup_frames as f32 * 0.016;

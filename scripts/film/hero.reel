@@ -1,0 +1,32 @@
+# The website's background (site/public/hero/battle.*): scripts/film.sh --site scripts/film/hero.reel
+# One cut a line: a name, then the game's arguments (meridian --help: --film-*).
+# Rigs are YAW,PITCH,DIST,FOV,LIFT,SIDE: the bearing looked along, degrees below the
+# horizon, metres to the aim point, lens degrees, aim point height and sideways offset.
+
+# A long lens trucks along the Regency's heavy line as the Scorpions push in.
+scorpion --map crosswater --no-fog --ticks 300 \
+    --blue aster_t2_tank:60 --blue aster_t3_assault_bot:20 \
+    --red regency_t4_scorpion:2 --red regency_t3_assault_tank:24 \
+    --film-secs 5 --film-speed 0.7 --film-from 90,7,420,22,6,-160 --film-to 90,7,420,22,6,160
+
+# The titan walks into a Regency armour column, seen from low down, looking up.
+titan --map crosswater --no-fog --ticks 350 \
+    --blue aster_t5_titan:1 --blue aster_t2_tank:24 \
+    --red regency_t1_tank:120 --red regency_t2_tank:40 \
+    --film-on t5_titan --film-secs 6 --film-speed 0.6 --film-from 110,6,520,45,55 --film-to 150,1,420,45,70
+
+# Two armoured fronts meet on open grass; a slow orbit round the line of fire.
+clash --map crosswater --no-fog --ticks 320 \
+    --blue aster_t1_tank:90 --blue aster_t2_tank:30 --blue aster_t3_assault_bot:12 --blue aster_t1_artillery:24 \
+    --red regency_t1_tank:90 --red regency_t2_tank:30 --red regency_t3_assault_tank:12 --red regency_t1_artillery:24 \
+    --film-secs 6 --film-speed 0.8 --film-from 200,17,380,34,6 --film-to 240,12,300,34,6
+
+# Tech 4 machines on both sides, from above, the camera wheeling round.
+giants --map crosswater --no-fog --ticks 320 \
+    --blue aster_t4_assault_tank:3 --blue aster_t3_artillery:8 --blue aster_t2_tank:40 \
+    --red regency_t4_colossus:2 --red regency_t4_strider:3 --red regency_t2_tank:40 \
+    --film-secs 5 --film-speed 0.7 --film-from 300,30,620,34,8 --film-to 345,20,440,34,8
+
+# Fleets trade broadsides at sea; a crane down from high toward the water.
+fleet --scene naval --map crosswater --no-fog --ticks 200 \
+    --film-secs 6 --film-speed 0.8 --film-from 20,35,700,34,4 --film-to 60,13,420,34,4

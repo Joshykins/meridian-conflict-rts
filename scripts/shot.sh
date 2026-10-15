@@ -25,6 +25,8 @@
 # Options before the subcommand:
 #   -o NAME      output file name (default: KEY or "shot", plus the time)
 #   --no-build   use the last build as it is
+#   --timeout S  stop a run-mode shot after S seconds (default 180; a film
+#                runs longer, scripts/film.sh)
 #
 # Examples:
 #   scripts/shot.sh unit aster_t1_tank
@@ -65,10 +67,12 @@ repo=$(git rev-parse --show-toplevel)
 checkout=$(basename "$repo")
 out_name=""
 build=1
+run_timeout=180
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -o) out_name="$2"; shift 2 ;;
         --no-build) build=0; shift ;;
+        --timeout) run_timeout="$2"; shift 2 ;;
         -h|--help) sed -n '2,/^set -euo/p' "$0" | grep '^#' | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) break ;;
     esac
@@ -517,15 +521,15 @@ else
     for a in "${game_args[@]}" --screenshot "$out_win"; do
         ps_args+=" '${a//\'/\'\'}'"
     done
-    # A run-mode shot takes 15-60 s; at 3 minutes it is stuck. Killing the
+    # A run-mode shot takes 15-60 s; at 3 minutes (--timeout) it is stuck. Killing the
     # PowerShell side alone would leave the game running, so it goes by path.
     set +e
-    timeout 180 powershell.exe -NoProfile -Command "${ps_env}Set-Location '$repo_win'; & '$(wslpath -w "$exe")'$ps_args 2>&1 | ForEach-Object { \"\$_\" } | Where-Object { \$_ -notmatch '^\s+\S+\s+[0-9.]+ ms/tick' }; exit \$LASTEXITCODE" | tr -d '\r'
+    timeout "$run_timeout" powershell.exe -NoProfile -Command "${ps_env}Set-Location '$repo_win'; & '$(wslpath -w "$exe")'$ps_args 2>&1 | ForEach-Object { \"\$_\" } | Where-Object { \$_ -notmatch '^\s+\S+\s+[0-9.]+ ms/tick' }; exit \$LASTEXITCODE" | tr -d '\r'
     status=${PIPESTATUS[0]}
     set -e
     if (( status == 124 )); then
         powershell.exe -NoProfile -Command "Get-Process | Where-Object { \$_.Path -eq '$(wslpath -w "$exe")' } | Stop-Process -Force" > /dev/null 2>&1
-        echo "shot.sh: the shot did not finish in 3 minutes (stopped)" >&2
+        echo "shot.sh: the shot did not finish in $run_timeout s (stopped)" >&2
         exit 1
     elif (( status != 0 )); then
         exit "$status"

@@ -27,6 +27,7 @@ mod destruct_marks;
 mod edict_marks;
 mod editor;
 mod fast_hash;
+mod film;
 mod formation_drag;
 mod game;
 mod gravitic_marks;
@@ -179,6 +180,20 @@ straight into a match instead.
   --follow N             match screenshot: play N more ticks through the renderer first,
                          so smoke, dust, track marks and shells in flight are in the picture
   --alpha A              with --follow: how far into the last tick the kept frame is (0..1)
+  --film DIR             match screenshot: film a camera move after --ticks into DIR as
+                         numbered PNGs (00000.png, ...), no interface; --screenshot gets the
+                         last frame. The camera aims at the middle of the mobile units,
+                         followed smoothly, or at --camera X,Y. scripts/film.sh cuts the clips
+  --film-secs S          with --film: the clip's length (default 8)
+  --film-fps N           with --film: frames a second (default 30)
+  --film-speed X         with --film: match seconds a second of film, 0.5 slow motion (default 1)
+  --film-from RIG        with --film: where the camera starts, YAW,PITCH,DIST[,FOV[,LIFT[,SIDE]]]:
+                         the bearing it looks along and degrees below the horizon, metres
+                         from the aim point, lens in degrees (default 34), the aim point's
+                         metres above the ground (default 4) and to the camera's right (0)
+  --film-to RIG          with --film: where it ends, eased there from --film-from (an orbit
+                         turns YAW, a crane PITCH, a push in DIST, a truck past the fight SIDE)
+  --film-on KEY          with --film: aim at the units whose blueprint key contains KEY
   --unit-shot KEY        with --screenshot: that unit alone on the range, no HUD, from several
                          angles in one run, three to a row (--size is one view; default 800x600);
                          or a map prop by its model key (city_office), its front its street
@@ -340,6 +355,11 @@ fn run() -> Result<(), String> {
     let mut build_grid = false;
     let mut quality = None;
     let (mut follow, mut alpha) = (0u32, 1.0f32);
+    let (mut film, mut film_dir, mut film_opts) = (
+        film::Film::new(Default::default()),
+        None::<std::path::PathBuf>,
+        false,
+    );
     let mut bot: Option<net_bot::Bot> = None;
     let mut drop_at: Option<u32> = None;
     let mut sized = false;
@@ -434,7 +454,7 @@ fn run() -> Result<(), String> {
             "--bench" => bench = Some(value("--bench")?.parse().map_err(|_| "--bench takes a tick count")?),
             "--ticks" => ticks = value("--ticks")?.parse().map_err(|_| "--ticks takes a number")?,
             "--at" => at = Some(value("--at")?),
-            "--screenshot" => shot = Some(headless::Shot { path: value("--screenshot")?, camera: None, focus_z: None, width: 0, height: 0, select: None, cursor: None, paused: false, net: None, unit_picker: false, range_maps: false, refit_tab: false, details: false, report: None, range_tab: None, place: None, turn: Default::default(), prefabs: None, save_prefab: false, plans: false, drag: None, follow: 0, alpha: 1.0, build_grid: false, quality: None }),
+            "--screenshot" => shot = Some(headless::Shot { path: value("--screenshot")?, camera: None, focus_z: None, width: 0, height: 0, select: None, cursor: None, paused: false, net: None, unit_picker: false, range_maps: false, refit_tab: false, details: false, report: None, range_tab: None, place: None, turn: Default::default(), prefabs: None, save_prefab: false, plans: false, drag: None, follow: 0, alpha: 1.0, build_grid: false, quality: None, film: None }),
             "--camera" => {
                 let v: Vec<f32> = value("--camera")?.split(',').filter_map(|p| p.trim().parse().ok()).collect();
                 if v.len() < 3 {
@@ -479,6 +499,21 @@ fn run() -> Result<(), String> {
             }
             "--follow" => follow = value("--follow")?.parse().map_err(|_| "--follow takes a number of ticks")?,
             "--alpha" => alpha = value("--alpha")?.parse::<f32>().map_err(|_| "--alpha takes a number from 0 to 1")?.clamp(0.0, 1.0),
+            "--film" => film_dir = Some(value("--film")?.into()),
+            "--film-secs" | "--film-fps" | "--film-speed" | "--film-from" | "--film-to" | "--film-on" => {
+                let text = value(&arg)?;
+                let f = &mut film;
+                film_opts = true;
+                let number = |what: &str| text.parse::<f32>().ok().filter(|v| *v > 0.0).ok_or(format!("{arg} takes {what}"));
+                match arg.as_str() {
+                    "--film-secs" => f.secs = number("seconds")?,
+                    "--film-fps" => f.fps = number("frames a second")?.round() as u32,
+                    "--film-speed" => f.speed = number("a speed, 1 the match's own")?,
+                    "--film-on" => f.on = Some(text),
+                    "--film-from" => f.from = film::Rig::parse(&text).ok_or("--film-from takes YAW,PITCH,DIST[,FOV[,LIFT[,SIDE]]]")?,
+                    _ => f.to = film::Rig::parse(&text).ok_or("--film-to takes YAW,PITCH,DIST[,FOV[,LIFT[,SIDE]]]")?,
+                }
+            }
             "--smoke" => smoke = true,
             "--mission-pilot" => opts.mission_pilot = true,
             "--editor-headless" => editor_headless=true,
@@ -693,6 +728,12 @@ fn run() -> Result<(), String> {
         }
         return unit_shot::run(&opts, map, blueprints, pool, ticks, &unit_shot);
     }
+    if film_opts && film_dir.is_none() {
+        return Err("--film-secs, --film-fps, --film-speed, --film-from, --film-to and --film-on go with --film DIR".into());
+    }
+    if film_dir.is_some() && shot.is_none() {
+        return Err("--film draws headless: give it --screenshot FILE.png (its last frame)".into());
+    }
     if let Some(mut shot) = shot {
         shot.camera = camera;
         shot.focus_z = focus_z;
@@ -711,6 +752,7 @@ fn run() -> Result<(), String> {
         (shot.plans, shot.drag) = (plans, drag);
         shot.build_grid = build_grid;
         shot.quality = quality;
+        shot.film = film_dir.map(|dir| film::Film { dir, ..film });
         return headless::screenshot(&opts, map, blueprints, pool, ticks, &shot);
     }
 

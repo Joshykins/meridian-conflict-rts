@@ -65,6 +65,22 @@ match that long is run with the built exe directly.
 | `--place-turn Q[m]` | `0`..`3`, then `m` to mirror | With `--place`: what is in hand turned Q quarter turns anticlockwise (as R turns it, clockwise, in the game), and with `m` (a prefab) mirrored first, as F does. |
 | `--save-prefab` | | The Save Prefab box open on the selection: its structures, and with `--plans` the commander's planned ones. |
 
+## Films
+
+Headless camera moves over a match, for trailers and the website's background
+(`crates/mc-game/src/film.rs`). `scripts/film.sh REEL` films each cut of a reel
+(`scripts/film/hero.reel`) and cuts them into one WebM, MP4 and poster frame;
+`scripts/film.sh --help`.
+
+| Switch | Values | Purpose |
+|---|---|---|
+| `--film DIR` | a folder | With `--screenshot`: after `--ticks`, film a camera move into DIR as numbered PNGs, no interface; the screenshot is the last frame. The camera aims at the middle of the mobile units, followed smoothly, or at `--camera X,Y`. |
+| `--film-secs S` | seconds (default 8) | The clip's length. |
+| `--film-fps N` | frames a second (default 30) | |
+| `--film-speed X` | match seconds per film second (default 1) | 0.5 is half-speed slow motion. |
+| `--film-from RIG`, `--film-to RIG` | `YAW,PITCH,DIST[,FOV[,LIFT[,SIDE]]]` | Where the camera starts and ends, eased between: the bearing it looks along and degrees below the horizon, metres from the aim point, lens degrees (default 34), the aim point's height above the ground (default 4) and offset to the camera's right (0). |
+| `--film-on KEY` | part of a blueprint key | Aim at the units whose key contains KEY (`t5_titan`) instead of them all. |
+
 ## Crash reports
 
 Whatever ends the game badly is written beside the settings file (`%APPDATA%\meridian-conflict`
