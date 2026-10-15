@@ -4,10 +4,10 @@
 //! its front and two slim barrels through it that fire together and kick back together.
 //! Behind the shield each breech stands open with a clip of rounds in its guide.
 //! Conventional guns: nothing is lit. The shoulder howitzer stands on the same trunnion
-//! and ring (`mechs.rs`): the model has one mount.
+//! and ring (`refits.rs`): the model has one mount.
 use glam::{Affine3A, Vec2, Vec3};
 
-use super::parts::*;
+use crate::aster::parts::*;
 use crate::builder::MeshBuilder;
 use crate::material::*;
 

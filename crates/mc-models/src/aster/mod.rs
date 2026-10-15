@@ -13,8 +13,8 @@ mod bolt_rifle;
 mod bore_tank;
 pub(super) mod breacher;
 mod citadel;
-mod commander_flak;
-mod commander_head;
+mod commander;
+pub(crate) use commander::RAIL as COMMANDER_RAIL;
 mod culverin;
 mod drone_port;
 mod elevator;
@@ -24,7 +24,6 @@ pub(crate) use citadel::RAIL as CITADEL_RAIL;
 mod factories;
 mod limbs;
 mod mechs;
-pub(crate) use mechs::RAIL as COMMANDER_RAIL;
 mod mine;
 mod missile_carrier;
 mod missile_defense;
@@ -60,7 +59,7 @@ const ENG_STATION: [(f32, f32); 3] = [(eng_station::RADIUS, eng_station::HEIGHT)
 
 pub(super) const MODELS: &[ModelDef] = &[
     // Command and construction.
-    ModelDef::new("commander", 6.5, 15.0, mechs::commander),
+    ModelDef::new("commander", 6.5, 15.0, commander::commander),
     ModelDef::new("engineer", 3.6, 3.4, vehicles::engineer),
     // Land units.
     ModelDef::new("scout", 2.4, 1.8, vehicles::scout),

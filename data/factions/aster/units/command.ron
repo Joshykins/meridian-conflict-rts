@@ -3,7 +3,7 @@
     // one module; a module with `after` is the next tier of that one and replaces it, the
     // others in a slot are alternatives. `cost` is the price of the refit. Every loadout is
     // compiled to a blueprint of its own; the model tags each module's pieces with its key
-    // (`mechs::commander`), so a new module wants pieces there too.
+    // (`models::aster::commander`), so a new module wants pieces there too.
     (
         key: "aster_commander",
         name: "ARC Commander",

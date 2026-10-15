@@ -808,6 +808,9 @@ const SUBMARINE_TITAN_TRIANGLES: usize = 8000;
 /// sprockets, return rollers seen through the side) and carries two bolt rifles and the
 /// capacitor-fed AEB-2, and finned heat sinks.
 const ASSAULT_TANK_TRIANGLES: usize = 9200;
+/// The ARC Commander, one a player and the faction's hero: armour plated over its
+/// machinery, and every refit's pieces on it at once.
+const COMMANDER_TRIANGLES: usize = 6000;
 
 /// Models already over the rules below when they were last checked (2026-09-28),
 /// held where they are so they cannot grow further: its coarse level's triangles,
@@ -981,6 +984,8 @@ fn lods_reduce_and_respect_budgets() {
             // The tech 3 Paladin: two rigged legs with shin tubes, and a bolt rifle carried
             // in each hooded shoulder, its plasma cell down the flank.
             3400
+        } else if base_key(&model.key) == "commander" {
+            COMMANDER_TRIANGLES
         } else if model.key == "assault_tank" {
             ASSAULT_TANK_TRIANGLES
         } else if model.key.starts_with("reclaim_tower") {

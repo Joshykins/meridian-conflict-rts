@@ -458,7 +458,16 @@ fn find_subject(world: &World, frame: &RenderFrame, key: &str) -> Result<UnitIns
         .iter()
         .find(|u| u.owner_flags & (KIND_WRECK | KIND_GHOST) == 0 && is_key(u))
     {
-        return Ok(*u);
+        // Framed by the model as drawn, not its body (`draw_scale:`).
+        let draw = world
+            .blueprints
+            .unit(mc_data::BlueprintId(u.blueprint as u16))
+            .visual
+            .draw;
+        return Ok(UnitInstance {
+            radius: u.radius * draw,
+            ..*u
+        });
     }
     let settled = |u: &&UnitInstance| {
         u.owner_flags & KIND_WRECK != 0 && u.packed == 0 && u.refit_modules & WRECK_INNER == 0
