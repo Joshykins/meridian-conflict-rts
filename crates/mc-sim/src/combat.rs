@@ -672,10 +672,11 @@ impl World {
     }
 
     /// Whether `row` may leave its spot, or its route, to go after a target no order
-    /// names: only an aircraft at fire at will. Land and naval units hold where the
-    /// player put them and shoot what comes in range.
+    /// names: only an aircraft at fire at will. Land and naval units, and capital
+    /// ships (`is_capital_ship`), hold where the player put them and shoot what
+    /// comes in range.
     pub(crate) fn chases(&self, row: usize) -> bool {
-        self.fires_at_will(row) && self.is_air(row)
+        self.fires_at_will(row) && self.is_air(row) && !self.bp(row).is_capital_ship()
     }
 
     /// The point (and scatter) `row`'s orders tell its ground weapons to shell, if any.

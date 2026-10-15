@@ -42,7 +42,7 @@ pub const NO_FIELD: u32 = u32::MAX;
 ///
 /// Land and naval units never leave their spot, or their route, to go after a
 /// target no order names: they shoot what comes in range. Only armed aircraft
-/// go after what they see (`World::chases`).
+/// (not capital ships) go after what they see (`World::chases`).
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum FireState {

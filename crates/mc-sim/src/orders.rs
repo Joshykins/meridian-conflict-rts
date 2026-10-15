@@ -1351,6 +1351,12 @@ impl World {
             if let Some(t) = self.air_engage_target_specced(row) {
                 return self.air_fight(row, t);
             }
+            // A capital ship does not go after what it sees (`World::chases`): as a
+            // land unit does, it stops while its guns have something to fire at.
+            if self.bp(row).is_capital_ship() && self.has_clear_target(row) {
+                self.stop_moving(row);
+                return Ok(());
+            }
         }
         let goal = self.clamp_to_map(o.pos + o.offset);
         let motion = self.bp(row).motion.expect("air");

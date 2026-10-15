@@ -197,7 +197,9 @@ enemies it can strike that come within `radius` of `pos`. The chase is an
 `Attack` pushed in front of the guard, leashed to the area plus a gun's reach.
 After it the unit walks back; on hold fire it stays put. A guard area is the one place
 a land or naval unit goes after an enemy no order names: elsewhere it holds where it is
-put and shoots what comes in range, and only aircraft go after what they see.
+put and shoots what comes in range, and only aircraft go after what they see. A capital
+ship (any `Space` hull or lift ship) holds like a land unit: it never chases on its own, and
+on attack-move it stops while its guns have something to fire at.
 Aircraft fight what is in the area, then circle it at half its radius
 (`orbit.rs`); a group flies the circle as a V and re-forms with the formation
 settings. Pressed on a friendly unit, the area goes with that unit (`target`),

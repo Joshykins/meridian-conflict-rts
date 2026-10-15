@@ -120,3 +120,18 @@ fn the_rotary_cannon_shoots_down_aircraft_round_the_ship() {
         health(&w, gunship)
     );
 }
+
+#[test]
+fn an_idle_ship_holds_where_it_was_put_rather_than_chasing() {
+    let mut w = world();
+    let ship = corvette(&mut w);
+    let at = w.state.units.pos[w.state.units.row(ship).unwrap()];
+    // In sight, but past the rotary cannon's reach, and nothing the rail takes.
+    let _gunship = add(&mut w, "aster_t2_gunship", 1, 3000 + 1100, 3000, 0);
+    for _ in 0..seconds(15) {
+        w.tick(&[]).unwrap();
+    }
+    let row = w.state.units.row(ship).unwrap();
+    let moved = w.state.units.pos[row].distance(at).to_f32();
+    assert!(moved < 30.0, "the ship went after the gunship: {moved} m");
+}
