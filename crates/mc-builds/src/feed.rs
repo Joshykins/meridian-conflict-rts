@@ -66,6 +66,12 @@ impl History {
         self
     }
 
+    /// The history without the build named `build` (`mc-release unlist`).
+    pub fn without(mut self, build: &str) -> History {
+        self.builds.retain(|r| r.build != build);
+        self
+    }
+
     pub fn parse(bytes: &[u8]) -> Result<History> {
         let h: History = parse_json(bytes)?;
         if h.builds.len() > HISTORY_LEN
@@ -200,6 +206,10 @@ mod tests {
         assert_eq!(h.builds.len(), HISTORY_LEN);
         assert_eq!(h.builds[0].number, HISTORY_LEN as u32 + 5);
         assert_eq!(h.builds[1].number, HISTORY_LEN as u32 + 4);
+        let gone = h.builds[1].build.clone();
+        let h = h.without(&gone);
+        assert_eq!(h.builds.len(), HISTORY_LEN - 1);
+        assert!(h.builds.iter().all(|r| r.build != gone));
     }
 
     /// publish/news.json, which `scripts/release.sh news` publishes, reads.

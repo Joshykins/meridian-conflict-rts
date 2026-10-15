@@ -4,6 +4,9 @@
 //!   mc-release keygen KEYFILE PUBFILE      a new release key (once, ever)
 //!   mc-release pack --stage DIR --store DIR --key KEYFILE --version-of EXE [--notes FILE] [--newest]
 //!   mc-release news --store DIR --key KEYFILE NEWS.json   checks the news and signs it into the store
+//!   mc-release unlist --store DIR --key KEYFILE --channel CHANNEL BUILD
+//!                                           takes BUILD out of the channel's history (one
+//!                                           listed by mistake) and signs the history again
 //!   mc-release origin REPLAY                who recorded a replay, one `key: value` a line
 
 use std::path::{Path, PathBuf};
@@ -35,6 +38,7 @@ fn run(args: &[String]) -> Result<(), String> {
         }
         Some("pack") => pack_cmd(&args[1..]),
         Some("news") => news_cmd(&args[1..]),
+        Some("unlist") => unlist_cmd(&args[1..]),
         Some("origin") => {
             let [_, file] = args else {
                 return Err("usage: mc-release origin REPLAY".into());
@@ -120,6 +124,33 @@ fn news_cmd(args: &[String]) -> Result<(), String> {
         "news: {} items, {} links signed into {store}",
         news.items.len(),
         news.links.len()
+    );
+    Ok(())
+}
+
+fn unlist_cmd(args: &[String]) -> Result<(), String> {
+    let usage = "usage: mc-release unlist --store DIR --key KEYFILE --channel CHANNEL BUILD";
+    let [f_store, store, f_key, key, f_channel, channel, build] = args else {
+        return Err(usage.into());
+    };
+    if f_store != "--store" || f_key != "--key" || f_channel != "--channel" {
+        return Err(usage.into());
+    }
+    let key = pack::load_key(Path::new(key)).map_err(|e| e.to_string())?;
+    let channel: mc_core::Channel = channel.parse().map_err(|e| format!("{e}"))?;
+    // The store holds Windows builds: scripts/release.sh publishes no other.
+    let at = mc_builds::feed::History::path(channel, "windows-x64");
+    let file = Path::new(store).join(&at);
+    let bytes = std::fs::read(&file).map_err(|e| format!("{}: {e}", file.display()))?;
+    let history = mc_builds::feed::History::parse(&bytes).map_err(|e| e.to_string())?;
+    if !history.builds.iter().any(|r| &r.build == build) {
+        return Err(format!("{build} is not in the {channel} history"));
+    }
+    let history = history.without(build);
+    mc_builds::feed::sign_into(Path::new(store), &at, &history, &key).map_err(|e| e.to_string())?;
+    println!(
+        "{build} taken out of {at}; it lists {} builds now",
+        history.builds.len()
     );
     Ok(())
 }

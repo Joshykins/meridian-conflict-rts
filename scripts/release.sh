@@ -29,9 +29,10 @@
 #    as meridian.exe+0x..., which scripts/symbolize.sh turns into names with it,
 #    and a minidump opens in Visual Studio or WinDbg only with it.
 #
-# --no-upload does 1-3 and 5 only: a zip for hand delivery, and a store copy to
-# upload later by running again. With it, --from REF builds REF instead of the
-# channel's branch (to try the pipeline on a commit of your own).
+# --no-upload does 1-3 and 5 only, a trial: a zip for hand delivery, with the
+# build packed into the local store but not named the channel's newest there.
+# With it, --from REF builds REF instead of the channel's branch (to try the
+# pipeline on a commit of your own).
 #
 # `news` signs FILE (default publish/news.json: the launcher's news items and its
 # row of links, checked by mc-release) into the store and uploads it.
@@ -170,9 +171,13 @@ else
     echo "patch notes for $build (drafted from ${range}; pass --notes FILE to write them):"
     sed 's/^/    /' "$notes"
 fi
+# A trial (--no-upload) packs the build but leaves the channel's pointer and
+# history as they are, so a build that was never published is never listed.
+newest=()
+(( upload )) && newest=(--newest)
 cargo run --quiet --profile gate -p mc-builds --bin mc-release -- pack \
     --stage "$stage" --store "$store" --key "$key" --version-of "$out/version.txt" \
-    --notes "$notes" --newest
+    --notes "$notes" "${newest[@]}"
 
 if (( upload )); then
     # Blobs are named by their bytes: one already there is the same.

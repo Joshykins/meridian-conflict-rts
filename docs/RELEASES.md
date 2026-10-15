@@ -268,7 +268,10 @@ build's manifest, then the channel's history, then the channel's pointer, last),
 installed, to hand to a new player, and uploads it as well to the fixed link
 `https://builds.meridianconflict.com/download/MeridianConflict-<Channel>.zip`, which
 always gives the channel's newest. Players who have an install get it as an update.
-`--no-upload` stops before uploading: the zip still works, and a later run uploads.
+`--no-upload` is a trial: it stops before uploading and leaves the channel's pointer
+and history alone, so the zip works but no player is told of the build.
+`mc-release unlist --store DIR --key KEY --channel CHANNEL BUILD` takes a build listed
+by mistake out of a channel's history (upload the history again after it).
 The build's `.pdb` goes to the main checkout's `target/dist` (`MeridianConflict-<Channel>-Build<N>-<commit>.pdb`), where `scripts/symbolize.sh` finds it for a crash report from that build: keep (and back up) every published build's.
 
 Setting up R2, once:
