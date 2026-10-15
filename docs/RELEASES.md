@@ -265,7 +265,9 @@ playtest-only maps), packs and signs it with its patch notes into the local copy
 (`~/.local/share/meridian-release/store`), uploads what R2 lacks (blobs, then the
 build's manifest, then the channel's history, then the channel's pointer, last), and writes
 `target/dist/MeridianConflict-Playtest-Build<N>.zip`: the launcher with this build
-installed, to hand to a new player. Players who have an install get it as an update.
+installed, to hand to a new player, and uploads it as well to the fixed link
+`https://builds.meridianconflict.com/download/MeridianConflict-<Channel>.zip`, which
+always gives the channel's newest. Players who have an install get it as an update.
 `--no-upload` stops before uploading: the zip still works, and a later run uploads.
 The build's `.pdb` goes to the main checkout's `target/dist` (`MeridianConflict-<Channel>-Build<N>-<commit>.pdb`), where `scripts/symbolize.sh` finds it for a crash report from that build: keep (and back up) every published build's.
 
