@@ -71,14 +71,16 @@ from the lower lens of the energy core, a drum through the middle of the hull; n
 turns. The core charges for 3 s (`spin_up`): light runs in along the hull's seams from
 bow and stern to the core (regency.wgsl `reg_edict`), the Edict's star kindles under the
 lens, lightning crawling in to it off the hull, and `regency_edict_lance_charge` keeps
-time with it, ending on the Edict's release as the beam lights: a flash, a lens flare, a
-pressure ring and a hard ring of pinched plasma round the lens
-(`renderer/edict_lance_fx.rs`). The beam is the Edict's column, 108 m across: a white-hot
-core in a roiling pink and red sheath (`fade_beam::HELD_EDICT`), its roar the loop
+time with it. The beam lights on its first shot, which may come after the charge once
+the hull bears on the mark: a red flash, a lens flare, a pressure ring and a hard ring of
+pinched plasma round the lens (`renderer/edict_lance_fx.rs`), heard as
+`regency_edict_lance_release`. The beam is the Edict's column, 108 m across: a red-hot
+core in a roiling scarlet and crimson sheath (`fade_beam::HELD_EDICT`), its roar the loop
 `regency_edict_lance_hold`. It is fired down its line (`sweep`): locked on, it stays on
 the mark; when the mark dies the beam stays lit while it slowly slews (12°/s) onto the
 next, and the stretch between lands on the ground and melts it to glass; unlike an
-excavation lance it digs no crater. With nothing left to shoot it goes out
+excavation lance it digs no crater. What it melts is as wide as what it burns: its
+`splash` (20 m), the trees it sets alight, not its column's width. With nothing left to shoot it goes out
 (`regency_edict_lance_vent`), leaving a red filament along its line that cools and
 breaks up, the star collapsing and the seams' red dying out of the hull. It reaches
 2.2 km.

@@ -1542,7 +1542,9 @@ pub struct WeaponSounds {
     /// A loop heard from each shot while it flies: a cruise missile's motor, a gravitic
     /// lens's front.
     pub flight: Option<String>,
-    /// A gravitic lens's well let go (`LensReleased`), heard where it collapses.
+    /// A gravitic lens's well let go (`LensReleased`), heard where it collapses; a held
+    /// beam that runs up (`beam` with `spin_up`, the Edict Lance) lighting, heard on the
+    /// tick it first fires after its `spin` charge.
     pub release: Option<String>,
     /// A cluster shot (`cluster`) breaking into its sub-shots, heard where it splits.
     pub split: Option<String>,

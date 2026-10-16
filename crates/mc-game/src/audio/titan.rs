@@ -5,7 +5,9 @@
 //!   the ordinary `step` plays (game.rs footfalls); further out this low boom takes over,
 //!   cross-faded by how much of the near one is still heard.
 //! - A weapon's `far` sound: the same for its hits (the AEB-3's strike).
-//! - A rotary gun's `spin`: heard as its barrels start to turn (`Weapon::spin_up`).
+//! - A rotary gun's `spin`: heard as its barrels start to turn (`Weapon::spin_up`); a
+//!   held beam that runs up (the Edict Lance) has its charge there, and its `release`
+//!   heard on the tick it lights.
 //! - A giant rail gun's spent sabot bursting where it lands (`SimEvent::SabotLanded`).
 //! - The trees a giant or a settling capital ship knocks over (`trees.rs`).
 //! - A gravitic engine's rift gathering, tearing out and striking, felt as the ground
@@ -42,6 +44,10 @@ struct Ids {
     spin: Option<SoundId>,
     whir: Option<SoundId>,
     spindown: Option<SoundId>,
+    /// When that gun is a held beam that runs up (the Edict Lance): its release, heard on
+    /// the tick it lights. The charge (`spin`) is heard from the start of the run-up, and
+    /// the beam may light well after the run-up is done, once the hull bears.
+    release: Option<SoundId>,
     /// Per weapon, its far hit.
     far: [Option<SoundId>; mc_data::MAX_WEAPONS],
     /// Per weapon, a spent casing (`sabot`) landing: its `casing` sound, or failing
@@ -53,6 +59,8 @@ struct Ids {
 pub struct GiantSounds {
     /// Units whose rotary barrels were turning last tick.
     spinning: HashSet<u32>,
+    /// Units whose run-up beam was lit last tick (`Ids::release`).
+    lit: HashSet<u32>,
     /// A rotary gun's turn last tick (radians a tick), and whether its run-down was heard.
     spin_speed: HashMap<u32, (f32, bool)>,
     /// This tick's barrel whir loops (sound, gain, pan, pitch), for the game's loop mix.
@@ -108,6 +116,9 @@ impl GiantSounds {
                     spin: rotary.and_then(|w| id(&w.sounds.spin)),
                     whir: rotary.and_then(|w| id(&w.sounds.whir)),
                     spindown: rotary.and_then(|w| id(&w.sounds.spindown)),
+                    release: rotary
+                        .filter(|w| w.beam)
+                        .and_then(|w| id(&w.sounds.release)),
                     far,
                     casing,
                 }
@@ -123,6 +134,7 @@ impl GiantSounds {
 
         let mut jolts = Vec::new();
         let mut spinning = HashSet::new();
+        let mut lit = HashSet::new();
         for u in units {
             if u.owner_flags & KIND_WRECK != 0 {
                 continue;
@@ -168,6 +180,14 @@ impl GiantSounds {
                     speeds.insert(u.unit_id, (speed.max(last * 0.999), ran_down));
                 }
             }
+            // A run-up beam's brace reads one only on a tick it fired (`mirror::beam_brace`).
+            if let Some(release) = found.release.filter(|_| u.recoil >= 1.0) {
+                lit.insert(u.unit_id);
+                if !self.lit.contains(&u.unit_id) {
+                    let (gain, pan) = hear(at);
+                    audio.play_world(release, gain, pan, 1.0);
+                }
+            }
             let Some(sound) = found.step_far else {
                 continue;
             };
@@ -197,6 +217,7 @@ impl GiantSounds {
             jolts.push((at, 0.4, 0.7, STOMP_REACH));
         }
         self.spinning = spinning;
+        self.lit = lit;
         self.spin_speed = speeds;
 
         for event in events {

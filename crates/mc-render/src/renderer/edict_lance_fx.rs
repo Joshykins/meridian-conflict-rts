@@ -2,9 +2,10 @@
 //! brought down to a held beam, laid from the core in the hull (`Model::beam_core`, its
 //! lower lens). What drives it is how far the beam's projector has run up
 //! (`UnitInstance::recoil`, last tick's in `prev_recoil`: 0 cold to 1 lit;
-//! `mirror::beam_brace`), so it keeps time with the sim's charge and with the charge sound
-//! (`regency_edict_lance_charge`). Pinch fusion: white-hot with the prism's pastel rim, the
-//! Regency's red behind it; hard-edged, no mist.
+//! `mirror::beam_brace`: one only on a tick the beam fired), so it keeps time with the
+//! sim's charge, with the charge sound (`regency_edict_lance_charge`) and with the release
+//! heard as the beam lights (`regency_edict_lance_release`). Pinch fusion in the Regency's
+//! red: red-hot, crimson round it; hard-edged, no mist.
 //!
 //! - **The gather** (regency.wgsl `reg_edict`, fed each ship's charge through
 //!   `UnitInstance::mount` as `gpu_consts::edict` lays out): light runs in along the plate
@@ -12,11 +13,11 @@
 //!   the seams behind them and pulses running on toward it. While the beam burns the charge
 //!   is held there, a white-hot pool round the core; let go before it lit it gutters out;
 //!   when the beam goes out the pool cools to red and the seams' last red dies.
-//! - **The star** at the lens: from a spark to a blinding white-hot point as it charges, its
-//!   rim the prism, a red corona round it, lightning crawling in to it off the hull and red
+//! - **The star** at the lens: from a spark to a blinding red-hot point as it charges, a
+//!   crimson corona round it, lightning crawling in to it off the hull and red
 //!   streamers licking off it; drawn in hard at the end, held beating while the beam
 //!   burns, collapsing when it goes out.
-//! - **Ignition** (the tick it is full): a blinding flash at the lens, its light over the
+//! - **Ignition** (the tick the beam first fires): a blinding flash at the lens, its light over the
 //!   country, a lens flare, a pressure ring and a hard ring of pinched plasma thrown out
 //!   round the lens (`plasma_fx.rs` draws the column itself and the filament it leaves).
 //!
@@ -28,7 +29,7 @@ use glam::{Vec2, Vec3};
 use mc_sim::mirror::{UnitInstance, KIND_GHOST, KIND_WRECK, STATE_RADAR};
 
 use super::lens_flare::Flare;
-use super::star_core_fx::{ARC, STAR, WHITE};
+use super::star_core_fx::{ARC, STAR};
 use super::stun_fx::Flash;
 use super::Renderer;
 use crate::camera::Camera;
@@ -37,10 +38,14 @@ use crate::gpu_consts::{edict, puff};
 /// A streamer licking off the corona, and a knot of the ignition's ring.
 const LICK: f32 = puff::WARP_STREAK as f32;
 const KNOT: f32 = puff::PINCH_KNOT as f32;
-/// The star's light: white, a breath of the prism's rose; and its lens flare at a glare of
-/// one, white going to the Regency's rose.
-const LIGHT: Vec3 = Vec3::new(1.0, 0.86, 0.9);
-const FLARE: Vec3 = Vec3::new(1.0, 0.62, 0.66);
+/// The star's light: the Regency's red; and its lens flare at a glare of one, red going to
+/// rose. Nothing of it white: it is all the ground under the ship sees.
+const LIGHT: Vec3 = Vec3::new(1.0, 0.12, 0.07);
+const FLARE: Vec3 = Vec3::new(1.0, 0.3, 0.26);
+/// The star's face, against its glare: red-hot.
+const FACE: Vec3 = Vec3::new(1.0, 0.36, 0.3);
+/// The ignition's flash and its light thrown over the country.
+const IGNITION: Vec3 = Vec3::new(1.0, 0.22, 0.14);
 /// The star's face against the lens's radius as a spark and at its fullest.
 const SPARK: f32 = 0.15;
 const FULL: f32 = 1.8;
@@ -50,9 +55,10 @@ const DRAWN: f32 = 0.45;
 /// Its brightness (`appearance.rgb`) as a spark and at its fullest.
 const GLARE_SPARK: f32 = 2.0;
 const GLARE_FULL: f32 = 26.0;
-/// Its light at its fullest, per metre of lens, and how far it reaches in lens radii.
-const POWER: f32 = 8.0e4;
-const LIGHT_REACH: f32 = 110.0;
+/// Its light at its fullest, per metre of lens, and how far it reaches in lens radii: down
+/// to the ground under a ship at its height, a red glow there and not a floodlight.
+const POWER: f32 = 2.5e4;
+const LIGHT_REACH: f32 = 70.0;
 /// The ignition's ring: its knots, how long it runs out, how far it gets and how thick it
 /// is, in lens radii.
 const RING_KNOTS: usize = 48;
@@ -250,7 +256,9 @@ impl Renderer {
                 Some(k) => fx.ships[k] = ship,
                 None => fx.ships.push(ship),
             }
-            if stage == Stage::Burning && before < 1.0 {
+            // The charge reads one only on a tick the beam fired (`mirror::beam_brace`), so
+            // it lights with the column even when the hull was still swinging onto its mark.
+            if stage == Stage::Burning && was.is_none_or(|s| s.stage != Stage::Burning) {
                 self.edict_lance_ignites(&ship, time);
             }
         }
@@ -315,7 +323,7 @@ impl Renderer {
             time,
             life,
             (across, across),
-            Vec3::splat(glare * beat),
+            FACE * glare * beat,
             s.seed,
         );
         let power = POWER * s.r * s.r * share.powi(3) * beat;
@@ -373,7 +381,7 @@ impl Renderer {
     }
 
     /// Crimson streamers licking off the star's corona, more and longer as it fills: the
-    /// Regency's red round the white.
+    /// Regency's red round the red-hot face.
     fn edict_lance_licks(&mut self, at: Vec3, r: f32, share: f32, time: f32) {
         if share < 0.3 {
             return;
@@ -400,7 +408,8 @@ impl Renderer {
         }
     }
 
-    /// The tick the lance lights: a blinding flash at the lens, its light thrown over the
+    /// The tick the lance lights (its first shot, not the tick its charge fills: the hull
+    /// may still be swinging onto its mark): a blinding flash at the lens, its light thrown over the
     /// country, a lens flare, a pressure ring and the hard ring of pinched plasma.
     fn edict_lance_ignites(&mut self, s: &Ship, time: f32) {
         let at = s.lens - Vec3::Z * s.r;
@@ -411,15 +420,15 @@ impl Renderer {
             time,
             0.3,
             (s.r * 9.0, s.r * 9.0),
-            Vec3::splat(40.0),
+            IGNITION * 40.0,
             1.7,
         );
         self.emp_fx.flashes.push(Flash {
             pos: at - Vec3::Z * s.r * 2.0,
             start: time,
             life: 0.3,
-            color: WHITE * 2.0e6 * s.r,
-            range: s.r * 150.0,
+            color: IGNITION * 1.2e6 * s.r,
+            range: s.r * 100.0,
             flicker: 0.0,
         });
         self.lens_flares.flash(
@@ -440,7 +449,8 @@ impl Renderer {
     }
 
     /// The hard ring thrown out round the lens as it lights: a band of pinched plasma knots
-    /// edge-on round the beam's line (down), white going to rose as it runs out and thins.
+    /// edge-on round the beam's line (down), scarlet going to crimson as it runs out and
+    /// thins.
     fn edict_lance_ring(&mut self, ring: &Ring, time: f32) {
         let age = time - ring.start;
         let k = age / RING_RUN;
@@ -450,7 +460,7 @@ impl Renderer {
         let reach = ring.r * (1.0 + RING_REACH * (1.0 - (-age * 3.2).exp()));
         let half = reach * TAU / RING_KNOTS as f32 * 0.75;
         let glow = 2.2 * (1.0 - k).powf(2.5);
-        let rgb = Vec3::new(1.0, 0.95, 0.97).lerp(Vec3::new(1.0, 0.45, 0.62), k) * glow;
+        let rgb = Vec3::new(1.0, 0.3, 0.2).lerp(Vec3::new(0.8, 0.03, 0.04), k) * glow;
         let life = self.tick_seconds.clamp(0.03, 0.25) * 2.0;
         for i in 0..RING_KNOTS {
             // Torn as it runs out: knots drop out of it, more the further it has gone.

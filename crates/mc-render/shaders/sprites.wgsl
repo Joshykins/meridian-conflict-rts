@@ -1261,14 +1261,14 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
         if in.shape.y > 6.4 {
             // An Edict Lance's column (`Weapon::edict_beam`, renderer/plasma_fx.rs): the
             // Regency's pinch fusion held as one column, swelling from the lens to its full
-            // width at the ground. A white-hot core, widening where it meets the ground, in a
-            // roiling sheath of plasma: the prism's pink next to the core going to the
-            // Regency's red at its torn, flickering edge, pulses of light running down it
-            // from the hull.
+            // width at the ground. A red-hot core, widening where it meets the ground, in a
+            // roiling sheath of plasma: scarlet next to the core going to the Regency's
+            // crimson at its torn, flickering edge, pulses of light running down it from
+            // the hull. Red throughout: nothing white.
             let run = (in.uv.x * 0.5 + 0.5) * -in.shape.x;
             let u = in.uv.x * 0.5 + 0.5;
             let t = globals.camera.w;
-            // Out of the lens it swells from a white-hot thread over a couple of its widths,
+            // Out of the lens it swells from a red-hot thread over a couple of its widths,
             // so it starts at a point, not along a flat edge; wider still toward the ground.
             let swell = smoothstep(0.0, 2.0, run / max(in.color.g, 1.0));
             let prof = mix(0.2, 1.0, swell) * mix(0.75, 1.0, smoothstep(0.0, 0.8, u));
@@ -1284,17 +1284,16 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
             let core_w = mix(0.18, 0.32, smoothstep(0.75, 1.0, u)) * (0.95 + 0.1 * lick);
             let core = 1.0 - smoothstep(core_w * 0.75, core_w, y);
             let pulse = exp(-pow(fract(run * 0.005 - t * 2.6) - 0.5, 2.0) * 30.0);
-            let hue = prism(run * 0.012 + churn * 0.6 - t * PRISM_RATE * 4.0);
-            let pink = mix(vec3<f32>(1.0, 0.3, 0.5), hue, 0.35);
-            let crimson = vec3<f32>(1.0, 0.04, 0.03);
-            // Out through the sheath: pink, then red, cells of it brighter and darker.
+            let scarlet = vec3<f32>(1.0, 0.1, 0.05);
+            let crimson = vec3<f32>(0.75, 0.01, 0.02);
+            // Out through the sheath: scarlet, then crimson, cells of it brighter and darker.
             let out_t = smoothstep(core_w, 1.0, y);
             let cells = 0.3 + 1.4 * churn * (0.6 + 0.4 * lick);
             let flicker = 0.85 + 0.15 * sin(t * 37.0 + run * 0.03);
-            let sheath = mix(pink * 14.0, crimson * 10.0, smoothstep(0.0, 0.45, out_t))
+            let sheath = mix(scarlet * 12.0, crimson * 9.0, smoothstep(0.0, 0.45, out_t))
                 * cells * flicker * (1.0 - smoothstep(0.85, 1.0, y) * 0.5);
-            let white = vec3<f32>(1.0, 0.97, 0.98) * (24.0 + 20.0 * pulse);
-            let rgb = mix(sheath, white, core);
+            let hot = vec3<f32>(1.0, 0.2, 0.1) * (14.0 + 12.0 * pulse);
+            let rgb = mix(sheath, hot, core);
             return vec4<f32>(rgb * in.color.r, 1.0);
         }
         if in.shape.y > 6.1 {

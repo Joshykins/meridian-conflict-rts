@@ -1025,13 +1025,21 @@ fn salvo_kick(cooldown: u16, reload: u16, gap: u8, salvo_left: u8) -> (f32, f32)
 /// its projector has run up (`Weapon::spin_ticks`, `Units::spin`), zero to one, so the gun
 /// and whatever carries it settle onto the shot and ease off after it. A beam that does not
 /// run up is braced while it fires.
+///
+/// It reads one only on a tick it fired (`cooldown` set): run up but still swinging onto
+/// its mark it holds just short, so what is drawn lighting at one (the Edict Lance's
+/// ignition, `edict_lance_fx.rs`) lights with the beam, not before it. Last tick's is never
+/// one, as whether it fired then is not kept.
 fn beam_brace(weapon: &mc_data::Weapon, spin: [u16; 4], cooldown: u16) -> (f32, f32) {
     if weapon.spin_ticks == 0 {
         let on = if cooldown > 0 { 1.0 } else { 0.0 };
         return (on, on);
     }
+    const HELD: f32 = 0.999;
     let level = |n: u16| n.min(weapon.spin_ticks) as f32 / weapon.spin_ticks as f32;
-    (level(spin[0]), level(spin[3]))
+    let now = level(spin[0]);
+    let now = if cooldown > 0 { now } else { now.min(HELD) };
+    (now, level(spin[3]).min(HELD))
 }
 
 /// `owner_flags` bit: the record is a wreck. `health` holds the share of materials left.

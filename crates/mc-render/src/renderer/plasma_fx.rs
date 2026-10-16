@@ -34,14 +34,22 @@ pub(super) const HELD_BEAM: u32 = 7;
 const CHARGE: u32 = 8;
 /// Seconds a beam that stops being fed takes to go out.
 const CUT: f32 = 0.12;
-/// Metres apart the pools a beam glasses the ground with are laid.
+/// Metres apart the pools a beam glasses the ground with are laid, at the least, and as a
+/// share of a pool's radius: a wide pool every couple of metres heats the same ground
+/// many times over for nothing.
 const GLASS_STEP: f32 = 2.4;
+const GLASS_STEP_SHARE: f32 = 0.2;
+/// Radius of the pools a beam glasses the ground with, in beam widths.
+const GLASS_RADIUS: f32 = 2.8;
 /// Furthest a beam's strike may have moved since it last glassed the ground for the
 /// stretch between to be seared too: past it the beam jumped to a new mark.
 const RAKE_GAP: f32 = 40.0;
-/// Radius, in beam widths, of the plasma spreading over the ground where an Edict Lance
-/// strikes.
-const SPILL_RADIUS: f32 = 9.0;
+/// Radius, in its pools' radii, of the plasma spreading over the ground where an Edict
+/// Lance strikes.
+const SPILL_RADIUS: f32 = 2.2;
+/// How hot an Edict Lance runs the ground (`GroundMelt::melt`'s `peak`): molten red-orange,
+/// not white-hot, under its red column.
+const EDICT_MELT_PEAK: f32 = 0.65;
 /// Seconds a glassed pool takes to crust over and cool.
 const GLASS_COOL: f32 = 9.0;
 /// The red filament an Edict Lance leaves along its line when it goes out: its width
@@ -70,6 +78,10 @@ struct Held {
     dir: Vec3,
     range: f32,
     width: f32,
+    /// The radius of the pools it glasses the ground with. An Edict Lance's is its
+    /// `splash`, the ground whose trees it burns, not its column's width: the column is
+    /// drawn far wider than what it burns.
+    melt: f32,
     fusion: bool,
     /// Drawn as an Edict Lance's column, and melts the ground without digging
     /// (`Weapon::edict_beam`).
@@ -196,6 +208,11 @@ impl Renderer {
             (0.5 + w.damage.to_f32().max(1.0).sqrt() * 0.08) * w.flash.max(1.0) * w.tracer.max(0.1);
         let fusion = w.plasma_grade == Some(PlasmaGrade::PinchFusion);
         let edict = fusion && w.edict_beam;
+        let melt = if edict {
+            w.splash.to_f32().max(1.0)
+        } else {
+            width * GLASS_RADIUS
+        };
         let start = muzzle - travel;
         let reach = travel.length() + 6.0;
         let fx = &mut self.plasma_fx;
@@ -235,6 +252,7 @@ impl Renderer {
                 dir,
                 range,
                 width,
+                melt,
                 fusion,
                 edict,
                 last: time,
@@ -285,6 +303,7 @@ impl Renderer {
         }
         h.struck = true;
         let width = h.width;
+        let melt = h.melt;
         let fusion = h.fusion;
         let edict = h.edict;
         // It glasses the ground where it lands, a pool at a time as the strike walks. A
@@ -294,10 +313,12 @@ impl Renderer {
         h.boiling = sea.is_some();
         if h.boiling {
             h.glassed = None;
-            self.beam_boils(at, width, edict, time);
+            // An Edict Lance boils what it would melt on land, not its column's width.
+            self.beam_boils(at, if edict { melt } else { width }, edict, time);
             return;
         }
-        let glass = !on_unit && last.is_none_or(|g| g.distance(at.truncate()) > GLASS_STEP);
+        let step = GLASS_STEP.max(melt * GLASS_STEP_SHARE);
+        let glass = !on_unit && last.is_none_or(|g| g.distance(at.truncate()) > step);
         if glass {
             h.glassed = Some(at.truncate());
         }
@@ -309,26 +330,25 @@ impl Renderer {
             self.plasma_left_burning(from, at, width, burn, time);
         }
         if glass {
-            // An Edict Lance runs the ground white-hot; any other glows it red at first,
-            // and melts it as it drags on over ground it has already heated. One that
-            // leaves it burning only sears it: the burning plasma is its mark.
+            // An Edict Lance runs the ground molten at once; any other glows it red at
+            // first, and melts it as it drags on over ground it has already heated. One
+            // that leaves it burning only sears it: the burning plasma is its mark.
             let peak = if edict {
-                1.0
+                EDICT_MELT_PEAK
             } else if burn > 0.0 {
                 (0.12 + 0.08 * width).min(0.5)
             } else {
                 (0.25 + 0.12 * width).min(0.9)
             };
             if let Some(g) = from {
-                let steps = (g.distance(at.truncate()) / GLASS_STEP).floor() as usize;
+                let steps = (g.distance(at.truncate()) / step).floor() as usize;
                 for k in 1..steps {
                     let p = g.lerp(at.truncate(), k as f32 / steps as f32);
-                    self.ground_melt
-                        .melt(p, width * 2.8, peak, time, GLASS_COOL);
+                    self.ground_melt.melt(p, melt, peak, time, GLASS_COOL);
                 }
             }
             self.ground_melt
-                .melt(at.truncate(), width * 2.8, peak, time, GLASS_COOL);
+                .melt(at.truncate(), melt, peak, time, GLASS_COOL);
             // The excavation lance digs as it glasses; the Edict Lance only melts.
             if fusion && !edict {
                 self.impact_craters.dig(at.truncate(), width * 2.2, time);
@@ -339,11 +359,11 @@ impl Renderer {
                 Vec3::Z * 2.5,
                 time,
                 2.2,
-                (width * 1.2, width * 3.5),
+                (melt * 0.43, melt * 1.25),
             );
         }
         if edict {
-            self.edict_outflow(at, width, on_unit, time);
+            self.edict_outflow(at, melt, on_unit, time);
         }
         // A fusion lance biting into a hull (`regency_guns_fx/lance.rs`).
         if bite {
@@ -409,6 +429,12 @@ impl Renderer {
     /// tick the beam holds.
     fn beam_boils(&mut self, at: Vec3, width: f32, edict: bool, time: f32) {
         let s = if edict { 1.6 } else { 1.0 };
+        // An Edict Lance's strike is red-hot, as on the ground (`edict_outflow`).
+        let hot = if edict {
+            Vec3::new(1.0, 0.32, 0.18)
+        } else {
+            Vec3::new(1.0, 0.92, 0.85)
+        };
         self.push_lit(
             puff::WARP_GLOW as f32,
             at + Vec3::Z * width * 0.3,
@@ -416,7 +442,7 @@ impl Renderer {
             time,
             0.12,
             (width * 1.1 * s, width * 1.5 * s),
-            Vec3::new(1.0, 0.92, 0.85) * 5.0,
+            hot * 5.0,
             0.0,
         );
         for _ in 0..2 {
@@ -437,27 +463,27 @@ impl Renderer {
         }
     }
 
-    /// Where an Edict Lance strikes: a tight white-hot spot with a red bloom under it, and a
-    /// crown of molten droplets thrown up and out in arcs that fall back and cool. Nothing
-    /// hazy. Every tick the beam holds.
-    fn edict_outflow(&mut self, at: Vec3, width: f32, on_unit: bool, time: f32) {
+    /// Where an Edict Lance strikes: a tight red-hot spot with a deeper red bloom under it,
+    /// and a crown of molten droplets thrown up and out in arcs that fall back and cool.
+    /// Nothing hazy. Every tick the beam holds. `melt` is the radius it glasses.
+    fn edict_outflow(&mut self, at: Vec3, melt: f32, on_unit: bool, time: f32) {
         self.push_lit(
             puff::WARP_GLOW as f32,
-            at + Vec3::Z * width * 0.3,
+            at + Vec3::Z * melt * 0.3,
             Vec3::ZERO,
             time,
             0.12,
-            (width * 1.1, width * 1.5),
-            Vec3::new(1.0, 0.92, 0.85) * 7.0,
+            (melt * 1.1, melt * 1.5),
+            Vec3::new(1.0, 0.32, 0.18) * 5.0,
             0.0,
         );
         self.push_lit(
             puff::WARP_GLOW as f32,
-            at + Vec3::Z * width * 0.2,
+            at + Vec3::Z * melt * 0.2,
             Vec3::ZERO,
             time,
             0.2,
-            (width * 2.2, width * 2.6),
+            (melt * 2.2, melt * 2.6),
             Vec3::new(1.0, 0.14, 0.08) * 2.5,
             0.0,
         );
@@ -635,7 +661,7 @@ impl Renderer {
                 let fade = 1.0 - ((time - h.last - tick * 1.5) / CUT).clamp(0.0, 1.0);
                 fx.spills.push(StainInstance {
                     pos: h.to[1].truncate().to_array(),
-                    radius: h.width * SPILL_RADIUS,
+                    radius: h.melt * SPILL_RADIUS,
                     strength_seed: (fade * 255.0) as u32 | stain::SPILL,
                 });
             }

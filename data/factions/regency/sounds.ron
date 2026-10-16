@@ -1178,14 +1178,15 @@
         ),
         // ---- the Scourge's Edict Lance ----
         // The Regent's Edict brought down to a held beam: the gather run in along the hull in
-        // three seconds, heard once as the charge begins, the lance lighting at its end. A
-        // contactor drops the hull onto the core; a sub swell climbs; rough growls start wide
-        // at bow and stern and run in to the middle, a deep pulse quickening under them, the
-        // plates ticking; the air is drawn in over the last half second, a held breath, then
-        // the Edict's release at 3 s: the pinch, a crack and a chest-deep slam, the column's
-        // buzzing roar falling away into the hold. Low and tonal; nothing beeps or whines.
+        // three seconds, heard once as the charge begins. A contactor drops the hull onto the
+        // core; a sub swell climbs; rough growls start wide at bow and stern and run in to the
+        // middle, a deep pulse quickening under them, the plates ticking; the air is drawn in
+        // over the last half second, a held breath, the pinch drawing in. The release is a
+        // sound of its own (`regency_edict_lance_release`), heard when the beam lights: that
+        // may be after the gather, once the hull bears, and in one sound its slam set the
+        // level, leaving the gather near silent. Low and tonal; nothing beeps or whines.
         "regency_edict_lance_charge": (
-            length: 6.0, peak: 0.85, room: 0.5,
+            length: 4.0, peak: 0.75, room: 0.5,
             layers: [
                 // The contactor.
                 Burst(low: 35, high: 380, attack: 0.001, decay: 0.06, gain: 4, seed: 47201),
@@ -1223,20 +1224,29 @@
                 // The last half second: the air drawn in toward the point, then a held breath.
                 Roll(at: 2.3, from: 150, to: 520, glide: 0.6, attack: 0.55, decay: 0.03, gain: 0.9, swell: 7, depth: 0.5, seed: 47211),
                 Sweep(at: 2.4, from: 900, to: 280, glide: 0.5, q: 0.7, attack: 0.48, decay: 0.03, gain: 0.45, seed: 47212),
-                Drive(1.4),
-                // The release at 3 s: the pinch, the crack, a slam and the sub shove.
+                // The pinch drawing in at the end of the gather.
                 Sweep(at: 2.92, from: 800, to: 260, glide: 0.08, q: 0.6, attack: 0.078, decay: 0.008, gain: 1.1, seed: 47213),
                 Tone(at: 2.92, from: 34, to: 30, glide: 0.08, attack: 0.075, decay: 0.012, gain: 0.5),
-                Burst(at: 3.0, low: 250, high: 2400, attack: 0.0003, decay: 0.012, gain: 8, seed: 47214),
-                Burst(at: 3.0, low: 100, high: 1100, attack: 0.0005, decay: 0.035, gain: 6, seed: 47215),
-                Burst(at: 3.001, low: 35, high: 400, attack: 0.002, decay: 0.22, gain: 12, seed: 47216),
-                Burst(at: 3.003, low: 28, high: 190, attack: 0.006, decay: 0.6, gain: 9, seed: 47217),
-                Tone(at: 3.0, from: 140, to: 48, glide: 0.2, attack: 0.002, decay: 0.4, gain: 2),
-                Tone(at: 3.0, from: 76, to: 32, glide: 0.8, attack: 0.004, decay: 0.8, gain: 2),
+                Drive(1.4),
+            ],
+        ),
+        // The Edict Lance lighting, heard on the tick its beam first fires: the crack, a
+        // chest-deep slam and the sub shove, the column's buzzing roar falling away into the
+        // hold.
+        "regency_edict_lance_release": (
+            length: 3.0, peak: 0.85, room: 0.5,
+            layers: [
+                Burst(low: 250, high: 2400, attack: 0.0003, decay: 0.012, gain: 8, seed: 47214),
+                Burst(low: 100, high: 1100, attack: 0.0005, decay: 0.035, gain: 6, seed: 47215),
+                Burst(at: 0.001, low: 35, high: 400, attack: 0.002, decay: 0.22, gain: 12, seed: 47216),
+                Burst(at: 0.003, low: 28, high: 190, attack: 0.006, decay: 0.6, gain: 9, seed: 47217),
+                Tone(from: 140, to: 48, glide: 0.2, attack: 0.002, decay: 0.4, gain: 2),
+                Tone(from: 76, to: 32, glide: 0.8, attack: 0.004, decay: 0.8, gain: 2),
                 // The column lighting: its buzzing roar falling away into the hold.
-                Stack(at: 3.005, from: 92, to: 58, glide: 1.2, attack: 0.03, decay: 0.5, gain: 0.45, detune: 1.012, width: 0.5, partials: [(1, 1), (2, 0.7), (3, 0.5), (4, 0.35), (5, 0.25), (6, 0.18), (8, 0.1)]),
-                Fm(at: 3.005, from: 112, to: 60, glide: 1, ratio: 0.5, index: 2.4, fade: 2, attack: 0.01, decay: 0.5, gain: 0.7),
-                Roll(at: 3.01, from: 420, to: 160, glide: 1.2, attack: 0.03, decay: 0.45, gain: 0.7, swell: 14, depth: 0.6, seed: 47218),
+                Stack(at: 0.005, from: 92, to: 58, glide: 1.2, attack: 0.03, decay: 0.5, gain: 0.45, detune: 1.012, width: 0.5, partials: [(1, 1), (2, 0.7), (3, 0.5), (4, 0.35), (5, 0.25), (6, 0.18), (8, 0.1)]),
+                Fm(at: 0.005, from: 112, to: 60, glide: 1, ratio: 0.5, index: 2.4, fade: 2, attack: 0.01, decay: 0.5, gain: 0.7),
+                Roll(at: 0.01, from: 420, to: 160, glide: 1.2, attack: 0.03, decay: 0.45, gain: 0.7, swell: 14, depth: 0.6, seed: 47218),
+                Drive(1.4),
             ],
         ),
         // The Edict Lance held, heard as this loop while it burns: the Edict's column held at a
