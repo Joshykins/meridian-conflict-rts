@@ -1,9 +1,10 @@
 //! The lance's energy core: an armoured drum through the hull at the ship's middle,
 //! clamped where it passes through the plating. Its upper end is a round aperture (an
 //! armoured rim, a bright ring, overlapping iris plates stepped in to a collar and the
-//! white-hot pinch-fusion lens), what is seen from above. Under the hull hangs the emitter
-//! the Edict Lance is laid from (`emitter`): a ribbed lens dome inside rings of machinery
-//! that turn with the charge.
+//! white-hot pinch-fusion lens), what is seen from above. Its lower end is at the keel,
+//! where the emitter the Edict Lance is laid from (`emitter`) is set into the belly: a
+//! ribbed lens dome inside rings of machinery that turn with the charge, in a well whose
+//! seat is faired up into the hull all round.
 
 use std::f32::consts::TAU;
 
@@ -21,9 +22,12 @@ use super::super::body::Body;
 const DRUM: f32 = 34.0;
 const RIM: f32 = 31.0;
 const LENS_OUT: f32 = 4.8;
-/// The emitter under the drum: its flange's outer radius, the lens dome's radius at its
-/// foot and at its face, and how far the face hangs under the drum.
-const FLANGE: f32 = 56.0;
+/// The emitter's seat in the belly: the flat face round its well, and how far out the
+/// fairing runs up into the hull; the crown's ring inside the well; the lens dome's radius
+/// at its foot and at its face, and how far the face hangs under the drum.
+const SEAT: f32 = 54.0;
+const FAIRING: f32 = 78.0;
+const CROWN: f32 = 47.0;
 const DOME: f32 = 22.0;
 const FACE: f32 = 7.0;
 const DROP: f32 = 12.0;
@@ -68,7 +72,7 @@ pub(super) fn core(b: &mut MeshBuilder, body: &Body, at: Core) {
         }
     }
     aperture(b, v3(at.x, 0.0, at.high));
-    let lens = emitter(b, v3(at.x, 0.0, at.low));
+    let lens = emitter(b, body, v3(at.x, 0.0, at.low));
     b.set_beam_core(lens, RIM * 0.39);
 }
 
@@ -111,26 +115,14 @@ fn aperture(b: &mut MeshBuilder, c: Vec3) {
     b.cylinder_between(c, c + Vec3::Z * LENS_OUT, r * 0.41, r * 0.39, sides);
 }
 
-/// The emitter hung under the drum's lower face at `c`: a broad armoured flange, the lens
-/// dome hanging from it, ribbed, and round the dome the rings that turn as the lance
+/// The emitter set into the belly at the drum's lower face `c`: its seat faired into the
+/// hull (`fairing`), the lens dome hanging from it, ribbed, and round the dome the rings that turn as the lance
 /// charges (orbit pieces, driven by the charge: `Model::beam_core`). Returns the lens's
 /// face.
-fn emitter(b: &mut MeshBuilder, c: Vec3) -> Vec3 {
+fn emitter(b: &mut MeshBuilder, body: &Body, c: Vec3) -> Vec3 {
     let sides = b.sides(36);
     let down = -Vec3::Z;
-    // The flange, a dark recess under it the rings turn in, and its rim.
-    dark_plate(b);
-    hoop(
-        b,
-        c + down,
-        (FLANGE + DRUM) * 0.5,
-        FLANGE - DRUM,
-        2.0,
-        sides,
-    );
-    seam(b);
-    b.prism(c + down * 2.2, sides, FLANGE - 3.0, FLANGE - 3.0, 0.4);
-    hoop(b, c + down * 1.4, FLANGE + 0.4, 1.4, 2.6, sides);
+    fairing(b, body, c);
     let pivot = c + down * PIVOT_DROP;
     b.set_spinner_pivot(pivot);
     b.with_orbit(Vec3::Z, CROWN_RATE, |b| crown(b, c));
@@ -184,10 +176,56 @@ fn emitter(b: &mut MeshBuilder, c: Vec3) -> Vec3 {
     c + down * DROP
 }
 
+/// The emitter's seat in the belly, its face at `c` a little under the keel: a flat ring
+/// of plate round the dark well the rings turn in, faired out and up into the hull's
+/// underside all round, its outer edge laid along the keel flat and up the bilge, so the
+/// emitter is set into the hull, not hung under it.
+fn fairing(b: &mut MeshBuilder, body: &Body, c: Vec3) {
+    let sides = b.sides(36);
+    // The hull's underside over a point, and a little into it, so the edge is buried.
+    let under = |p: Vec2| {
+        let u = body.u_down(p.x, p.y.abs());
+        body.point(p.x, u).z + 1.0
+    };
+    let ring = |r: f32, z: Option<f32>| -> Vec<Vec3> {
+        (0..sides)
+            .map(|i| {
+                let a = TAU * (i as f32 + 0.5) / sides as f32;
+                let p = c.truncate() + Vec2::from_angle(a) * r;
+                p.extend(z.unwrap_or_else(|| under(p)))
+            })
+            .collect()
+    };
+    let face = c.z - 1.0;
+    // The face, then the fairing rising out and up, steepest at first, into the hull.
+    let rise = |k: f32| {
+        let r = SEAT + (FAIRING - SEAT) * k;
+        let lift = 1.0 - (1.0 - k) * (1.0 - k);
+        ring(r, None)
+            .into_iter()
+            .map(|p| p.truncate().extend(face + (p.z - face) * lift))
+            .collect::<Vec<_>>()
+    };
+    dark_plate(b);
+    let steps = if b.coarse() { 1 } else { 4 };
+    let mut rings = vec![ring(SEAT, Some(face))];
+    rings.extend((1..=steps).map(|k| rise(k as f32 / steps as f32)));
+    b.with_facets(|b| b.loft(&rings, false, false));
+    // The flat face of the seat round the well, and the dark well the rings turn in.
+    b.prism(c - Vec3::Z * 1.4, sides, SEAT, SEAT, 0.4);
+    seam(b);
+    b.prism(c - Vec3::Z * 1.6, sides, SEAT - 4.0, SEAT - 4.0, 0.4);
+    if !b.coarse() {
+        // A lip round the well, and a seam where the fairing leaves the face.
+        hoop(b, c - Vec3::Z * 1.9, SEAT - 4.0, 1.6, 1.2, sides);
+        hoop(b, c - Vec3::Z * 1.2, SEAT + 0.6, 1.2, 0.8, sides);
+    }
+}
+
 /// The outer crown: a ring with teeth hanging from it, long and short by turns.
 fn crown(b: &mut MeshBuilder, c: Vec3) {
     let sides = b.sides(36);
-    let r = FLANGE - 9.0;
+    let r = CROWN;
     let top = c - Vec3::Z * 3.0;
     dark_plate(b);
     hoop(b, top - Vec3::Z * 1.5, r, 6.0, 3.0, sides);

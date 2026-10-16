@@ -91,7 +91,7 @@ static HULL: LazyLock<Body> = LazyLock::new(hull);
 /// way it is laid.
 const CORE: Core = Core {
     x: 0.0,
-    low: 20.0,
+    low: 34.0,
     high: 118.0,
 };
 

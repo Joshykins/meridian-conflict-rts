@@ -155,7 +155,7 @@
             (
                 name: "Edict Lance", damage: 160, splash: 20, range: 2200, reload: 0.1,
                 hitscan: true, beam: true, edict_beam: true, trajectory: Direct, spin_up: 3.0,
-                turret_turn: 12, lays_at_once: true, muzzle: (0, 0, 8), sweep: 10,
+                turret_turn: 12, lays_at_once: true, muzzle: (0, 0, 22), sweep: 10,
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
                 plasma_grade: Some(PinchFusion), flash: 0.4, impact: 3.2, tracer: 36.0,
                 sounds: (
