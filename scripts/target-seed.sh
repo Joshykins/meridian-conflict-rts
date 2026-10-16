@@ -16,10 +16,13 @@
 # Taking makes the seed's outputs count as fresh only where they are: every
 # checked-in file the seed's commit has unchanged is dated 2000 (and so is
 # every directory with no change below it), so cargo sees the outputs as newer;
-# a file that differs keeps its own date and what it feeds is rebuilt. A unit
-# that compiled in its checkout's path (`env!("CARGO_MANIFEST_DIR")`, the
-# tests' temp dir) is always rebuilt, so no binary here reads another
-# checkout's files.
+# a file that differs keeps its own date and what it feeds is rebuilt. Cargo
+# records a source outside a unit's own crate (the workspace Cargo.toml, a
+# `#[path]` module or an `include_bytes!` from data/) by its absolute path, so
+# those paths are rewritten from the seed's checkout to this one; otherwise
+# cargo would judge them by the other checkout's copies. A unit that compiled
+# in its checkout's path (`env!` of CARGO_MANIFEST_DIR, the tests' temp dir) is
+# always rebuilt, so no binary here reads another checkout's files.
 #
 # Libraries (deps/*.rlib, .rmeta, .so) are hard links, so they cost no disk and
 # taking is quick: rustc replaces one by renaming a new file over it, so a
@@ -58,6 +61,40 @@ copy() {
     return 0
 }
 
+# Points the absolute paths under FROM recorded in DIR's fingerprints at this
+# checkout instead, keeping each file's date (cargo compares sources against
+# it). Prints the units whose records it cannot read, to be rebuilt.
+relocate() {
+    python3 -I - "$1/" "$root/" "$2/.fingerprint" << 'EOF'
+import os, struct, sys
+old, new, top = sys.argv[1].encode(), sys.argv[2].encode(), sys.argv[3]
+for unit in sorted(os.listdir(top)):
+    for name in os.listdir(os.path.join(top, unit)):
+        path = os.path.join(top, unit, name)
+        if not name.startswith("dep-"):
+            continue
+        data = open(path, "rb").read()
+        out, at, ok = bytearray(), 0, True
+        while (p := data.find(old, at)) >= 0:
+            # Each path is a little-endian u32 length and then its bytes.
+            n = struct.unpack_from("<I", data, p - 4)[0] if p >= 4 else 0
+            if n < len(old) or p + n > len(data) or b"\0" in data[p:p + n]:
+                ok = False
+                break
+            out += data[at:p - 4] + struct.pack("<I", n - len(old) + len(new)) + new
+            at = p + len(old)
+        if not ok:
+            print(unit)
+            break
+        if at:
+            out += data[at:]
+            st = os.stat(path)
+            with open(path, "wb") as f:
+                f.write(out)
+            os.utime(path, ns=(st.st_atime_ns, st.st_mtime_ns))
+EOF
+}
+
 # Dates every checked-in file and directory that BASE has unchanged to 2000.
 age_sources() {
     local base=$1 changed
@@ -85,8 +122,12 @@ case "${1:-}" in
             [ -d "$dir/deps" ] && continue
             mkdir -p "$dir"
             copy "$seed/current/$p" "$dir"
-            # Units built in the seed's own path rebuild here (see above).
+            # Sources recorded by the seed's path are judged by this checkout's
+            # copies, and units built in the seed's own path rebuild here.
             if [ -n "$from" ]; then
+                relocate "$from" "$dir" | while read -r unit; do
+                    rm -rf "$dir/.fingerprint/$unit"
+                done
                 grep -laE "^# env-dep:(CARGO_MANIFEST_DIR|CARGO_TARGET_TMPDIR)=$from/" "$dir"/deps/*.d "$dir"/examples/*.d 2> /dev/null \
                     | while read -r d; do
                         hash=$(basename "$d" .d)
