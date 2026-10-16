@@ -222,9 +222,9 @@ fn speed_pick(i: usize) -> Vec2 {
 fn pause_button() -> Vec2 {
     Vec2::new(top_bar() + 196.0 + SPEED_W + 10.0 + 20.0, EDGE + 22.0)
 }
-/// Middle of the minimap's chart: under the top bar and the two-player roster.
+/// Middle of the minimap's chart, under the top bar.
 fn chart() -> Vec2 {
-    let top = EDGE + 44.0 + GAP + 2.0 * 22.0 + 12.0 + GAP;
+    let top = EDGE + 44.0 + GAP + GAP;
     Vec2::new(1920.0 - EDGE - MINIMAP * 0.5, top + 11.0 + MINIMAP * 0.5)
 }
 /// What the first tile of tier `tech` offers: the tier's builds on shelves by purpose.

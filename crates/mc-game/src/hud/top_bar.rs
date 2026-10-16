@@ -1,5 +1,5 @@
-//! The top bar (mission time, a network match's link, game speed, pause, menu) and
-//! the roster of commanders under it, with the speed list that drops from it.
+//! The top bar (mission time, a network match's link, game speed, pause, menu), with
+//! the speed list that drops from it.
 
 use super::{
     clock, icons, speed_label, Hud, HudAction, Scene, EDGE, GAP, LINK_W, SPEEDS, SPEED_W, TOP_BAR_W,
@@ -9,10 +9,9 @@ use crate::netplay::NetLink;
 use crate::ui::{id, ink, palette, rgb, type_scale, ButtonKind, Rect, Response, Ui};
 use glam::Vec2;
 use icons::Glyph;
-use mc_net::Link;
 
 impl Hud {
-    /// Clock, game speed, pause and menu; the commanders under them. Returns the y below it all.
+    /// Clock, game speed, pause and menu. Returns the y below them.
     pub(super) fn top_bar(&mut self, ui: &mut Ui, s: &Scene) -> f32 {
         let _t = mc_core::perf_span!("ui.top_bar");
         let view = s.view;
@@ -98,108 +97,7 @@ impl Hud {
             self.actions.push(HudAction::Menu);
         }
 
-        // The commanders in this match.
-        let players = &view.status.players;
-        let mut y = r.bottom() + GAP;
-        // An observer has them all down the left instead.
-        if players.len() > 1 && !view.observing {
-            // Past ten commanders (up to 32) they go in columns of eight, a colour and
-            // a name each; a defeated one is dimmed rather than labelled.
-            let columns = if players.len() > 10 {
-                players.len().div_ceil(8)
-            } else {
-                1
-            };
-            let per_column = players.len().div_ceil(columns);
-            let compact = columns > 1;
-            let (column_w, row_h) = if compact {
-                (150.0, 20.0)
-            } else {
-                (250.0, 22.0)
-            };
-            let wide = column_w * columns as f32;
-            let list = Rect::new(r.right() - wide, y, wide, per_column as f32 * row_h + 12.0);
-            self.claim(ui, list);
-            ui.fill(list, ink(0.6));
-            ui.frame(list, rgb(palette::LINE, 0.12));
-            for (i, p) in players.iter().enumerate() {
-                let (column, line) = (i / per_column, i % per_column);
-                let row = Rect::new(
-                    list.x + column as f32 * column_w,
-                    list.y + 6.0 + line as f32 * row_h,
-                    column_w,
-                    row_h,
-                );
-                let res = ui.interact(id("hud-player", i), row, !p.defeated);
-                if res.clicked {
-                    ui.audio.play(Sfx::Select);
-                    self.actions.push(HudAction::FocusPlayer(i as u8));
-                }
-                if res.glow > 0.02 {
-                    ui.fill(row, rgb(palette::TEXT, 0.10 * res.glow));
-                }
-                let ry = row.mid_y();
-                let alive = if p.defeated { 0.35 } else { 1.0 };
-                let mut c = s.team_color(i as u8);
-                c[3] = alive;
-                ui.fill(Rect::new(row.x + 12.0, ry - 4.0, 8.0, 8.0), c);
-                if i == view.local as usize {
-                    ui.frame(
-                        Rect::new(row.x + 9.0, ry - 7.0, 14.0, 14.0),
-                        rgb(palette::TEXT, 0.8),
-                    );
-                }
-                if compact {
-                    ui.text_fit_left(
-                        row.x + 28.0,
-                        ry,
-                        row.w - 36.0,
-                        type_scale::CAPTION,
-                        rgb(palette::TEXT, 0.9 * alive),
-                        &p.name,
-                    );
-                    continue;
-                }
-                ui.text(
-                    row.x + 32.0,
-                    ry,
-                    type_scale::CAPTION,
-                    rgb(palette::TEXT, 0.9 * alive),
-                    &p.name,
-                );
-                // In a network match a person's seat also says how its link stands.
-                let stat = s.net.and_then(|l| l.stat(i as u8));
-                let (tag, tone) = match (p.defeated, stat.map(|st| st.link)) {
-                    (true, _) => ("Defeated".to_owned(), palette::BAD),
-                    (false, Some(Link::Dropped)) => ("Disconnected".to_owned(), palette::WARN),
-                    (false, Some(Link::Lagging)) => ("Lagging".to_owned(), palette::WARN),
-                    (false, Some(Link::Loading)) => ("Loading".to_owned(), palette::DIM),
-                    _ => (format!("Team {}", p.team + 1), palette::FAINT),
-                };
-                ui.text_right(
-                    list.right() - 12.0,
-                    ry,
-                    type_scale::MICRO,
-                    rgb(tone, 1.0),
-                    &tag,
-                );
-                if let Some(st) = stat.filter(|st| st.link == Link::Connected && st.rtt_ms > 0) {
-                    let tag_w = ui.text_width(type_scale::MICRO, &tag);
-                    let right = list.right() - 12.0 - tag_w - 12.0;
-                    let (bars, bar_tone) = signal(Some(st.rtt_ms as u32));
-                    signal_bars(ui, right - 14.0, ry + 4.0, 0.6, bars, bar_tone);
-                    ui.text_right(
-                        right - 20.0,
-                        ry,
-                        type_scale::MICRO,
-                        rgb(palette::DIM, 1.0),
-                        &format!("{} ms", st.rtt_ms),
-                    );
-                }
-            }
-            y = list.bottom();
-        }
-        y
+        r.bottom() + GAP
     }
 
     /// Where the rows of the speed list are, as far as it has unrolled.
