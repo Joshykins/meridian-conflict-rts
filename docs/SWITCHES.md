@@ -124,7 +124,8 @@ See `docs/RELEASES.md`.
 | `MeridianConflict --uninstall` | | Removes the install: the shortcuts, the Settings > Apps entry, the builds and the launcher; the replays stay. Settings > Apps runs it. |
 | `MeridianConflictSetup*.exe` | the launcher under that name | Installs itself to `%LOCALAPPDATA%\Programs\Meridian Conflict` with shortcuts and an Apps entry, then starts the installed launcher (the website's download). |
 | `MeridianConflict --screenshot DIR` | a folder | The launcher draws its window in each of its states into DIR as PNGs (1x and 1.5x) and exits. |
-| `MERIDIAN_TEST_JOBS` | a number (default 6) | How many test binaries `scripts/check.sh` runs at once. |
+| `MERIDIAN_CHECK_SLOTS` | a number (default: one per 8 cores) | How many `scripts/check.sh` runs this machine takes at once; another waits for a free slot. Each sizes its cargo jobs and test threads to its share of the cores. |
+| `MERIDIAN_TEST_JOBS` | a number (default: half a check slot's cores) | How many test binaries `scripts/check.sh` runs at once. |
 | `MERIDIAN_TEST_LIMIT` | seconds (default 300) | How long `scripts/check.sh` lets one test binary run before it fails the check as hung. |
 | `MERIDIAN_RELEASE_STORE` | a folder | Where `scripts/release.sh` keeps its copy of the build store (default `~/.local/share/meridian-release/store`). |
 | `--replay-only` | with `--replay` | An old build playing a replay for a newer one: leaving the replay quits, and the settings file is never written. |

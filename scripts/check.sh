@@ -17,8 +17,17 @@
 # crates come ready-built from scripts/target-seed.sh. The Linux build has no
 # audio device, so sound is left out (`--features alsa` is opt-in).
 #
+# Many sessions check at once on one machine, so a check first takes one of
+# MERIDIAN_CHECK_SLOTS machine-wide slots (default: one per 8 cores) and waits,
+# naming the holders, while all are taken. It runs at low priority, with its
+# cargo jobs and test threads sized to its slot's share of the cores, so checks
+# side by side neither starve each other nor the sessions' own builds and shots.
+# If perf_budgets fails while other checks are running, it runs once more with
+# the machine to itself.
+#
 # A test binary still running after MERIDIAN_TEST_LIMIT seconds (default 300)
-# fails the check as hung; MERIDIAN_TEST_JOBS (default 6) binaries run at once.
+# fails the check as hung; MERIDIAN_TEST_JOBS (default: half the slot's cores)
+# binaries run at once.
 set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
 
@@ -49,6 +58,64 @@ fi
 
 cd "$root"
 start=$SECONDS
+renice -n 10 -p $$ > /dev/null 2>&1 || true
+
+# Machine-wide slots are lock files in /tmp, held until the check exits (or is
+# killed). Each one's .who file names its holder, so a wait says whom it is for.
+cpus=$(nproc)
+slots=${MERIDIAN_CHECK_SLOTS:-$((cpus >= 16 ? cpus / 8 : 1))}
+share=$((cpus / slots > 1 ? cpus / slots : 1))
+half=$((share / 2 > 2 ? share / 2 : 2))
+me="$(basename "$root") (pid $$)"
+declare -A held=()
+lock_slot() { # SLOT WAIT(-n or empty)
+    local fd
+    exec {fd}> "/tmp/meridian-check-slot-$1"
+    if flock $2 "$fd"; then
+        held[$1]=$fd
+        echo "$me" > "/tmp/meridian-check-slot-$1.who"
+    else
+        exec {fd}>&-
+        return 1
+    fi
+}
+take_slot() {
+    local i waited=0
+    while :; do
+        for ((i = 0; i < slots; i++)); do
+            lock_slot "$i" -n && return
+        done
+        [ $((waited % 60)) != 0 ] || echo "== waiting for a check slot, held by: $(cat /tmp/meridian-check-slot-*.who 2> /dev/null | paste -sd, - | sed 's/,/, /g')"
+        sleep 5
+        waited=$((waited + 5))
+    done
+}
+# Every slot, for a run that needs a quiet machine. A check gives its own slot
+# back first and only one gathers at a time, so two never deadlock.
+take_machine() {
+    local i fd quiet
+    for i in "${!held[@]}"; do
+        fd=${held[$i]}
+        exec {fd}>&-
+    done
+    held=()
+    exec {quiet}> /tmp/meridian-check-quiet
+    flock "$quiet"
+    for ((i = 0; i < slots; i++)); do lock_slot "$i" ""; done
+}
+others_running() {
+    local i
+    for ((i = 0; i < slots; i++)); do
+        [ -z "${held[$i]:-}" ] || continue
+        flock -n "/tmp/meridian-check-slot-$i" true || return 0
+    done
+    return 1
+}
+take_slot
+echo "== check slot taken ($slots on this machine, $share cores each)"
+export CARGO_BUILD_JOBS=$share
+export RUST_TEST_THREADS=${RUST_TEST_THREADS:-$half}
+
 "$root/scripts/target-seed.sh" take
 echo "== rustfmt"
 cargo fmt --all --check
@@ -63,7 +130,8 @@ if [ "$mode" = quick ]; then
 fi
 
 echo "== clippy and the test build"
-cargo clippy --workspace --all-targets --quiet --color always -- -D warnings \
+# Clippy only checks, so it gets half the slot's jobs beside the test build.
+CARGO_BUILD_JOBS=$half cargo clippy --workspace --all-targets --quiet --color always -- -D warnings \
     > "$logs/clippy" 2>&1 &
 clippy=$!
 build=0
@@ -131,9 +199,18 @@ echo "== tests"
 doc=0
 cargo test --workspace --profile gate --doc --quiet > "$logs/doc.log" 2>&1 &
 docs=$!
-grep -v -P '\tperf_budgets$' "$logs/binaries" | order | run_all "${MERIDIAN_TEST_JOBS:-6}"
+grep -v -P '\tperf_budgets$' "$logs/binaries" | order | run_all "${MERIDIAN_TEST_JOBS:-$half}"
 wait "$docs" || doc=$?
 grep -P '\tperf_budgets$' "$logs/binaries" | run_all 1
+# perf_budgets times its scenes, so other checks running beside it can push it
+# over budget: then it runs again once every slot is this check's.
+perf=$(compgen -G "$logs/perf_budgets-*.log.failed" || true)
+if [ -n "$perf" ] && others_running; then
+    echo "   perf_budgets failed beside other checks (load $(cut -d' ' -f1 /proc/loadavg)); waiting for them to finish to run it again"
+    rm -f $perf
+    take_machine
+    grep -P '\tperf_budgets$' "$logs/binaries" | RUST_TEST_THREADS=$cpus run_all 1
+fi
 
 [ -s "$logs/times" ] && cp "$logs/times" "$times"
 
