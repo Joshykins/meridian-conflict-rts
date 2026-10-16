@@ -419,6 +419,20 @@ impl World {
         army_out: Option<FxVec2>,
         out: &mut Vec<Command>,
     ) -> u32 {
+        // Each kind's cost shows on its own in the profiler: a side's scouts once took
+        // seconds of a think, hidden in the commander's total.
+        let _span = match op.kind {
+            OpKind::Army | OpKind::Defend | OpKind::Raid | OpKind::Siege | OpKind::Guard => {
+                mc_core::perf_span!("ai.op.land")
+            }
+            OpKind::Landing => mc_core::perf_span!("ai.op.landing"),
+            OpKind::Strike => mc_core::perf_span!("ai.op.strike"),
+            OpKind::AirGuard => mc_core::perf_span!("ai.op.air_guard"),
+            OpKind::Fleet | OpKind::Wolfpack => mc_core::perf_span!("ai.op.fleet"),
+            OpKind::Warships => mc_core::perf_span!("ai.op.warships"),
+            OpKind::Scout => mc_core::perf_span!("ai.op.scout"),
+            OpKind::Titan => mc_core::perf_span!("ai.op.titan"),
+        };
         match op.kind {
             OpKind::Army | OpKind::Defend | OpKind::Raid | OpKind::Siege | OpKind::Guard => {
                 self.run_land_op(ctx, op, army_out, out)

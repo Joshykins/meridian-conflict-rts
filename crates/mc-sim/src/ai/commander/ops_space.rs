@@ -136,13 +136,22 @@ impl World {
         let rows = self.op_rows(op);
         let mut orders = 0;
         let mut taken: Vec<FxVec2> = Vec::new();
+        // The places worth a look, ranked once for all of this think's scouts: ranked
+        // afresh for each, a side with dozens idle spent seconds on one think.
+        let (mut by_air, mut on_foot) = (None, None);
         for &r in &rows {
             if self.state.units.order_head[r] != NO_ORDER {
                 continue;
             }
             let p = ctx.profiles.get(self.state.units.blueprint[r]);
             let walks = p.domain == Some(Domain::Land);
-            let Some(spot) = self.stalest(ctx, &taken, walks) else {
+            let ranked = if walks { &mut on_foot } else { &mut by_air };
+            let ranked = ranked.get_or_insert_with(|| self.stalest(ctx, walks));
+            let Some(spot) = ranked
+                .iter()
+                .copied()
+                .find(|c| !taken.iter().any(|t| t.distance(*c) < Fx::from_int(1500)))
+            else {
                 continue;
             };
             taken.push(spot);
@@ -175,18 +184,20 @@ impl World {
         orders
     }
 
-    /// The place most worth a look: least recently seen, weighted toward enemy
-    /// starts and their side of the map, kept off anti-air and away from `taken`.
-    /// For a unit that `walks`, the walkable spot nearest that place, and only
-    /// places that have one: a cell's centre on a mountain is no goal at all, and
-    /// a Serac Divide side's scouts were sent to one every think for 19 minutes
-    /// and never left home.
-    fn stalest(&self, ctx: &Ctx, taken: &[FxVec2], walks: bool) -> Option<FxVec2> {
+    /// The places worth a look, most worth it first: least recently seen, weighted
+    /// toward enemy starts and their side of the map, kept off anti-air, and only
+    /// those stale enough to be worth it. For a unit that `walks`, the walkable spot
+    /// nearest each place, and only places that have one: a cell's centre on a
+    /// mountain is no goal at all, and a Serac Divide side's scouts were sent to one
+    /// every think for 19 minutes and never left home.
+    fn stalest(&self, ctx: &Ctx, walks: bool) -> Vec<FxVec2> {
         let tick = self.state.tick;
         let seen = &self.state.ai[ctx.player as usize].commander.seen;
-        let enemy = ctx.enemy_start?;
+        let Some(enemy) = ctx.enemy_start else {
+            return Vec::new();
+        };
         let span = enemy.distance(ctx.start).max(Fx::ONE);
-        (0..seen.len())
+        let mut ranked: Vec<(i64, FxVec2)> = (0..seen.len())
             .filter_map(|i| {
                 let c = ctx.wm.centre(i);
                 if walks {
@@ -195,7 +206,6 @@ impl World {
                     Some((i, c))
                 }
             })
-            .filter(|(_, c)| !taken.iter().any(|t| t.distance(*c) < Fx::from_int(1500)))
             // Never where anti-air is known to be: three Vigils were lost over bases.
             .filter(|(_, c)| ctx.wm.threat_at(*c, Target::Air) == Fx::ZERO)
             .map(|(i, c)| {
@@ -211,9 +221,11 @@ impl World {
                     as i64;
                 (age * (1 + theirs + 2 * home + ore), c)
             })
-            .max_by_key(|&(w, c)| (w, std::cmp::Reverse((c.x, c.y))))
             .filter(|&(w, _)| w > 900)
-            .map(|(_, c)| c)
+            .collect();
+        // Most worth a look first; on a tie, the least x, then the least y.
+        ranked.sort_by_key(|&(w, c)| (std::cmp::Reverse(w), c.x, c.y));
+        ranked.into_iter().map(|(_, c)| c).collect()
     }
 
     /// A landing: its lift ship takes cargo from the army gathering at staging,

@@ -133,9 +133,37 @@ impl Claims {
     }
 }
 
+/// Metres from each zone's centre to each of its neighbours' (`Zone::adj`), at
+/// least 1: found once a think for every `reach`, which runs per enemy and ground.
+fn steps(zones: &Zones) -> Vec<Vec<i64>> {
+    zones
+        .zones
+        .iter()
+        .map(|z| {
+            z.adj
+                .iter()
+                .map(|&a| {
+                    i64::from(
+                        z.centre
+                            .distance(zones.zones[a as usize].centre)
+                            .floor_int(),
+                    )
+                    .max(1)
+                })
+                .collect()
+        })
+        .collect()
+}
+
 /// Walk distance from the nearest claim of at least `CLAIM_MIN` to every zone on
 /// `ground`, a claim starting ahead by its strength; `i64::MAX` where none reaches.
-fn reach(zones: &Zones, ground: Ground, claim: &[i32], army: &[i32]) -> Vec<i64> {
+fn reach(
+    zones: &Zones,
+    steps: &[Vec<i64>],
+    ground: Ground,
+    claim: &[i32],
+    army: &[i32],
+) -> Vec<i64> {
     let n = zones.zones.len();
     let mut d = vec![i64::MAX; n];
     let mut heap = BinaryHeap::new();
@@ -163,10 +191,8 @@ fn reach(zones: &Zones, ground: Ground, claim: &[i32], army: &[i32]) -> Vec<i64>
         if dz > d[z as usize] {
             continue;
         }
-        let here = zones.zones[z as usize].centre;
-        for &a in &zones.zones[z as usize].adj {
-            let step = i64::from(here.distance(zones.zones[a as usize].centre).floor_int());
-            let next = dz + step.max(1);
+        for (&a, &step) in zones.zones[z as usize].adj.iter().zip(&steps[z as usize]) {
+            let next = dz + step;
             if next < d[a as usize] {
                 d[a as usize] = next;
                 heap.push(Reverse((next, a)));
@@ -212,13 +238,22 @@ pub(in crate::ai) fn find(
 ) -> (Vec<Front>, Vec<FrontRecord>, u32) {
     let n = zones.zones.len();
     let mut found: Vec<Front> = Vec::new();
+    let steps = steps(zones);
+    // Our reach is the same against every enemy.
+    let mut ours_reach: [Option<Vec<i64>>; 2] = [None, None];
     for (p, theirs) in claims.theirs.iter().enumerate() {
         if theirs.iter().all(|c| *c == 0) {
             continue;
         }
         for ground in [Ground::Land, Ground::Water] {
-            let du = reach(zones, ground, &claims.ours, &claims.our_army);
-            let dt = reach(zones, ground, theirs, &claims.their_army[p]);
+            let span = mc_core::perf_span!("fronts.reach");
+            let du = ours_reach[ground as usize].get_or_insert_with(|| {
+                reach(zones, &steps, ground, &claims.ours, &claims.our_army)
+            });
+            let du = &*du;
+            let dt = reach(zones, &steps, ground, theirs, &claims.their_army[p]);
+            drop(span);
+            let span = mc_core::perf_span!("fronts.border");
             let reached = |z: usize| du[z] != i64::MAX && dt[z] != i64::MAX;
             let ours_side: Vec<bool> = (0..n).map(|z| reached(z) && du[z] <= dt[z]).collect();
             let their_side: Vec<bool> = (0..n).map(|z| reached(z) && dt[z] < du[z]).collect();
@@ -232,6 +267,8 @@ pub(in crate::ai) fn find(
                             }))
                 })
                 .collect();
+            let to_goal = hops_to_goal(zones, &their_side, theirs);
+            drop(span);
             let mut taken = vec![false; n];
             for start in 0..n {
                 if !border[start] || taken[start] {
@@ -250,7 +287,11 @@ pub(in crate::ai) fn find(
                         }
                     }
                 }
-                for mut run in sectors(zones, run) {
+                let span = mc_core::perf_span!("fronts.sectors");
+                let cut = sectors(zones, run);
+                drop(span);
+                for mut run in cut {
+                    let _span = mc_core::perf_span!("fronts.read");
                     run.sort_unstable();
                     let entries: Vec<u16> = {
                         let mut e: Vec<u16> = run
@@ -284,7 +325,13 @@ pub(in crate::ai) fn find(
                     if run.len() <= SCRAP_ZONES && stake_us.max(stake_them) < SCRAP_STAKE {
                         continue;
                     }
-                    let depth = depth_to(zones, &run, &their_side, theirs);
+                    let depth = to_goal.as_ref().map_or(0, |d| {
+                        run.iter()
+                            .map(|&z| d[z as usize])
+                            .min()
+                            .filter(|&h| h != u16::MAX)
+                            .unwrap_or(0)
+                    });
                     let rear = near_us
                         .iter()
                         .copied()
@@ -307,6 +354,7 @@ pub(in crate::ai) fn find(
             }
         }
     }
+    let _span = mc_core::perf_span!("fronts.ids");
     // The fronts with most at stake are kept when there are too many.
     found.sort_by_key(|f| {
         (
@@ -364,14 +412,21 @@ fn sectors(zones: &Zones, run: Vec<u16>) -> Vec<Vec<u16>> {
     if run.len() <= SECTOR as usize {
         return vec![run];
     }
+    let mut in_run = vec![false; zones.zones.len()];
+    for &z in &run {
+        in_run[z as usize] = true;
+    }
     let hops = |from: u16| -> Vec<(u16, u32)> {
+        let mut seen = vec![false; zones.zones.len()];
+        seen[from as usize] = true;
         let mut out = vec![(from, 0)];
         let mut k = 0;
         while k < out.len() {
             let (z, d) = out[k];
             k += 1;
             for &a in &zones.zones[z as usize].adj {
-                if run.contains(&a) && !out.iter().any(|&(o, _)| o == a) {
+                if in_run[a as usize] && !seen[a as usize] {
+                    seen[a as usize] = true;
                     out.push((a, d + 1));
                 }
             }
@@ -411,38 +466,34 @@ fn shared(a: &[u16], b: &[u16]) -> usize {
     n
 }
 
-/// Hops from `run` across their side to their most valuable zone; 0 when none.
-fn depth_to(zones: &Zones, run: &[u16], side: &[bool], theirs: &[i32]) -> u16 {
-    let Some(goal) = (0..zones.zones.len())
+/// Hops from every zone to their most valuable zone on their side (`u16::MAX` where
+/// none leads), one search for every front against them: a front's depth, how far a
+/// push gets, is its nearest zone's. `None` when they hold no zone of value.
+fn hops_to_goal(zones: &Zones, side: &[bool], theirs: &[i32]) -> Option<Vec<u16>> {
+    let goal = (0..zones.zones.len())
         .filter(|&z| side[z])
         .max_by_key(|&z| (theirs[z], Reverse(z)))
-        .filter(|&z| theirs[z] > 0)
-    else {
-        return 0;
-    };
-    let mut seen = vec![false; zones.zones.len()];
-    let mut ring: Vec<u16> = run.to_vec();
-    for &z in run {
-        seen[z as usize] = true;
-    }
+        .filter(|&z| theirs[z] > 0)?;
+    // Crossings go both ways (`Zones::build` adds each to both zones), so the hops
+    // from the goal are the hops to it.
+    let mut d = vec![u16::MAX; zones.zones.len()];
+    d[goal] = 0;
+    let mut ring = vec![goal as u16];
     let mut hops = 0;
-    while !ring.is_empty() && hops < u16::MAX {
-        if ring.contains(&(goal as u16)) {
-            return hops;
-        }
+    while !ring.is_empty() && hops < u16::MAX - 1 {
         hops += 1;
         let mut next = Vec::new();
         for &z in &ring {
             for &a in &zones.zones[z as usize].adj {
-                if !seen[a as usize] {
-                    seen[a as usize] = true;
+                if d[a as usize] == u16::MAX {
+                    d[a as usize] = hops;
                     next.push(a);
                 }
             }
         }
         ring = next;
     }
-    0
+    Some(d)
 }
 
 impl crate::World {
@@ -475,7 +526,9 @@ impl crate::World {
             .collect();
         let tick = self.state.tick;
         let c = &self.state.ai[player as usize].commander;
+        let span = mc_core::perf_span!("fronts.claims");
         let claims = Claims::read(zones, &c.knowledge, &enemies, ours, our_army, tick);
+        drop(span);
         let (fronts, records, next) = find(zones, &claims, &c.fronts, c.next_front, tick);
         let c = &mut self.state.ai[player as usize].commander;
         c.fronts = records;
