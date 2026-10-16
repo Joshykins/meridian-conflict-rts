@@ -106,22 +106,3 @@ fn the_unit_files_guns_are_the_models() {
     assert_eq!(have, lenses, "anti-missile mounts");
     assert_eq!(unit.anti_missile_lasers as usize, lenses.len());
 }
-
-#[test]
-fn zz_print_mounts() {
-    let (port, rondels) = mounts(&A, &HULL);
-    for g in guns(&port) {
-        let o: Vec<String> = g.kind.muzzles().iter().map(|&m| show(m)).collect();
-        println!(
-            "{:?} pivot {} yaw {} muzzles {}",
-            g.kind,
-            show(g.house()),
-            g.yaw.to_degrees(),
-            o.join(" ")
-        );
-    }
-    for r in rondels {
-        println!("rondel {}", show(r + Vec3::Z * RONDEL_LENS));
-    }
-    println!("lens {}", show(CORE.lens()));
-}
