@@ -191,8 +191,12 @@ impl Renderer {
             dust_color: Some(WASH_DUST),
             ..saved.1
         };
+        // Its own hull field holds the drives: what they throw out is not cut by it
+        // (the plumes stopped dead at the field's edge).
+        let outbound = std::mem::replace(&mut self.effect_outbound, true);
         self.drives(u, &kit, time, focus);
         (self.effect_origin, self.effect_settings) = saved;
+        self.effect_outbound = outbound;
     }
 
     fn drives(&mut self, u: &UnitInstance, kit: &Kit, time: f32, focus: Vec2) {
@@ -654,6 +658,20 @@ impl Renderer {
         }
     }
 
+    /// The origin a drive puff at `pos` carries for the shield clip (puffs.wgsl
+    /// `fs_puff_lit`), as `push_puff` gives it; `None` when a shield stands between.
+    fn drive_origin(&self, pos: Vec3) -> Option<Vec3> {
+        if self.effect_outbound {
+            return Some(Vec3::new(pos.x, pos.y, super::PUFF_UNCLIPPED_Z));
+        }
+        let origin = self.effect_origin.unwrap_or(pos);
+        let blocked = self
+            .live_effect_barriers
+            .iter()
+            .any(|b| b.crosses(origin, pos));
+        (!blocked).then_some(origin)
+    }
+
     /// One point of a drive plume's tube: at `pos`, `step` to its neighbours; `params` as
     /// the shader takes them: its radius, how far down the plume it is (0 the mouth, 1 the
     /// tip), its kind (`PUFF_PLUME`, or `PUFF_PLASMA_PLUME` for a plasma drive) and how
@@ -668,7 +686,9 @@ impl Renderer {
         motion: Vec3,
         heat: f32,
     ) {
-        let origin = self.effect_origin.unwrap_or(pos);
+        let Some(origin) = self.drive_origin(pos) else {
+            return;
+        };
         let p = Puff {
             appearance: [motion.x, motion.y, motion.z, heat],
             origin: origin.to_array(),
@@ -698,14 +718,9 @@ impl Renderer {
         motion: Vec3,
         heat: f32,
     ) {
-        let origin = self.effect_origin.unwrap_or(pos);
-        if self
-            .live_effect_barriers
-            .iter()
-            .any(|b| b.crosses(origin, pos))
-        {
+        let Some(origin) = self.drive_origin(pos) else {
             return;
-        }
+        };
         let p = Puff {
             appearance: [motion.x, motion.y, motion.z, heat],
             origin: origin.to_array(),
