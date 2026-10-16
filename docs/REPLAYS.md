@@ -32,8 +32,10 @@ F1 opens the profiler with a Report card above it: the match id (Copy puts it on
 clipboard), a note field and **Mark Issue** (Enter in the note also marks). A mark:
 
 - appends a block to `replays/issues.log`: match id, mark number, tick and match time,
-  note, map, camera, FPS, CPU and GPU time with every GPU scope, sim phases, counts, and
-  a `repro:` command line;
+  note, map, camera, FPS, CPU and GPU time and the game speed, the window thread's CPU
+  spans (mean of the last second), every GPU scope, sim phases, counts, and a `repro:`
+  command line. The CPU spans are the one part a headless `repro:` cannot show: it does
+  not run the sim beside the renderer as play does;
 - saves what the window showed, HUD included, as `replays/<id>-mark<N>.png`.
 
 Marks made while watching a replay go on that replay's match.

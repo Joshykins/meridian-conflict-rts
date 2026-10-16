@@ -19,6 +19,7 @@ mod economy_panel;
 mod edict;
 mod elevator;
 mod focus;
+mod frame_spans;
 pub mod free_camera;
 mod gravitic;
 mod groups;

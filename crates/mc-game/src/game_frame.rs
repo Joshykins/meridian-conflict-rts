@@ -16,6 +16,7 @@ impl Game {
             cover,
             mut bug_report,
         } = ctx;
+        self.hud.issues.spans.begin();
         if !self.chart_ready {
             overlay.set_image(
                 hud::MINIMAP_SLOT,
@@ -666,6 +667,7 @@ impl Game {
         renderer
             .render(&frame)
             .map_err(|e| format!("rendering failed: {e}"))?;
+        self.hud.issues.spans.end(Instant::now());
         self.view.cpu_ms = self.view.cpu_ms * 0.9 + now.elapsed().as_secs_f32() * 100.0;
         Ok(event.or(self.event.take()))
     }

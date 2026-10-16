@@ -33,6 +33,8 @@ pub struct IssueMark {
     /// What this card and the profiler under it covered last frame: they draw
     /// over the rest of the HUD, and keep the pointer there (`Hud::debug_column`).
     pub column: Rect,
+    /// The window thread's CPU spans of the last second, written with a mark.
+    pub spans: super::frame_spans::FrameSpans,
 }
 
 impl IssueMark {
@@ -285,9 +287,16 @@ impl IssueMark {
         let gpu_total: f32 = s.gpu.gpu_passes.iter().map(|p| p.1).sum();
         let _ = writeln!(
             e,
-            "frame: {:.0} FPS  CPU {:.2} ms  GPU {gpu_total:.2} ms",
-            s.view.fps, s.view.cpu_ms
+            "frame: {:.0} FPS  CPU {:.2} ms  GPU {gpu_total:.2} ms  speed {}%{}",
+            s.view.fps,
+            s.view.cpu_ms,
+            s.view.speed,
+            if s.view.paused { " (paused)" } else { "" }
         );
+        // The window thread's own time, mean of the last second's frames.
+        for (name, ms) in self.spans.means().iter().filter(|(_, ms)| *ms >= 0.05) {
+            let _ = writeln!(e, "  cpu {name:<26} {ms:>7.2} ms");
+        }
         for scope in &s.gpu.gpu_scopes {
             let _ = write!(
                 e,
