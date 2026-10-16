@@ -1280,8 +1280,8 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
             if y >= 1.0 {
                 discard;
             }
-            // The core: a third of the width, half where it meets the ground.
-            let core_w = mix(0.24, 0.45, smoothstep(0.75, 1.0, u)) * (0.95 + 0.1 * lick);
+            // The core: a fifth of the width, a third where it meets the ground.
+            let core_w = mix(0.18, 0.32, smoothstep(0.75, 1.0, u)) * (0.95 + 0.1 * lick);
             let core = 1.0 - smoothstep(core_w * 0.75, core_w, y);
             let pulse = exp(-pow(fract(run * 0.005 - t * 2.6) - 0.5, 2.0) * 30.0);
             let hue = prism(run * 0.012 + churn * 0.6 - t * PRISM_RATE * 4.0);
@@ -1291,9 +1291,9 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
             let out_t = smoothstep(core_w, 1.0, y);
             let cells = 0.3 + 1.4 * churn * (0.6 + 0.4 * lick);
             let flicker = 0.85 + 0.15 * sin(t * 37.0 + run * 0.03);
-            let sheath = mix(pink * 4.0, crimson * 3.2, smoothstep(0.0, 0.3, out_t))
+            let sheath = mix(pink * 14.0, crimson * 10.0, smoothstep(0.0, 0.45, out_t))
                 * cells * flicker * (1.0 - smoothstep(0.85, 1.0, y) * 0.5);
-            let white = vec3<f32>(1.0, 0.97, 0.98) * (30.0 + 24.0 * pulse);
+            let white = vec3<f32>(1.0, 0.97, 0.98) * (24.0 + 20.0 * pulse);
             let rgb = mix(sheath, white, core);
             return vec4<f32>(rgb * in.color.r, 1.0);
         }

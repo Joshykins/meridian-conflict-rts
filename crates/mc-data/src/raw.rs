@@ -1202,7 +1202,8 @@ pub struct RawWeapon {
     /// On a cone, how many times its usual height its wall stands (at least 1).
     #[serde(default)]
     pub shockwave: f64,
-    /// Multiplies the projectile tracer. 1 is the size the damage implies.
+    /// Multiplies the projectile tracer. 1 is the size the damage implies; at most 40 (a
+    /// held beam's column, the Edict Lance's).
     #[serde(default = "one_f64")]
     pub tracer: f64,
     /// A projectile wake: blue energy for Blue shots, white smoke for Orange shots.
@@ -2228,7 +2229,7 @@ impl Unit {
                     w.flash.clamp(0.2, 4.0) as f32
                 },
                 shockwave: w.shockwave.clamp(0.0, 4.0) as f32,
-                tracer: w.tracer.clamp(0.2, 8.0) as f32,
+                tracer: w.tracer.clamp(0.2, 40.0) as f32,
                 trail: w.trail,
                 wake: w
                     .wake

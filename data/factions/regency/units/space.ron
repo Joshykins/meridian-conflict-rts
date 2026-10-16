@@ -156,7 +156,7 @@
                 hitscan: true, beam: true, edict_beam: true, trajectory: Direct, spin_up: 3.0,
                 turret_turn: 12, muzzle: (0, 0, 15.2), sweep: 10,
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
-                plasma_grade: Some(PinchFusion), flash: 0.4, impact: 3.2, tracer: 26.0,
+                plasma_grade: Some(PinchFusion), flash: 0.4, impact: 3.2, tracer: 36.0,
                 sounds: (spin: "regency_edict_lance_charge", hold: "regency_edict_lance_hold", spindown: "regency_edict_lance_vent"),
             ),
             // Six Pinch-plasma Batteries, three a side, fore to aft, port first: twin forks
