@@ -63,6 +63,8 @@ const TUBE_LIFE: f32 = 16.0;
 const COLLAR_STEP: f32 = 150.0;
 /// Most strokes kept (arcs and channel pieces of every gun firing).
 const MAX_STROKES: usize = 3000;
+/// Seconds fired rails glow as they cool.
+const RAIL_HEAT: f32 = 4.0;
 /// The least `heavy_rail` whose firing, path and hit are drawn as a capital gun's. A
 /// lighter gun's slug is too small to be told from an ordinary rail's (`heavy_shot_of`):
 /// it charges like a capital gun and its rails glow after, but it fires as a plain rail.
@@ -102,16 +104,19 @@ struct Charge {
     scale: f32,
 }
 
-/// A gun that has just fired: its rails glow and cool, the breech vents (laid on the next
-/// tick, when the hull can be found).
+/// A gun that has just fired: its rails glow and cool, laid each tick on the barrel as it
+/// is then, so the heat goes where the gun goes; the breech vents once (on the next tick,
+/// when the hull can be found).
 struct Fired {
     blueprint: u16,
     weapon: u8,
+    /// Where the hull was last found, and the unit once it has been.
     near: Vec3,
-    /// The unit, when its charge was seen.
     unit: Option<u32>,
     time: f32,
-    /// Rails, for their light while they cool.
+    /// The breech has vented (or the hull was never found).
+    vented: bool,
+    /// Rails as last laid, for their light while they cool; none once the hull is gone.
     rails: Option<(Vec3, Vec3)>,
 }
 
@@ -140,6 +145,8 @@ pub(super) struct HeavyRailFx {
     fired: Vec<Fired>,
     shots: Vec<Shot>,
     strokes: Vec<Stroke>,
+    /// This tick's strokes of the fired rails' heat, laid afresh every tick.
+    heat: Vec<Stroke>,
     last: f32,
     /// This tick's gun-house poses (`RenderFrame::houses`), for guns on houses of their own.
     houses: Vec<HousePose>,
@@ -278,6 +285,7 @@ impl Renderer {
                     near,
                     unit,
                     time,
+                    vented: false,
                     rails: None,
                 });
                 if scale < FIRES_HEAVY {
@@ -411,7 +419,7 @@ impl Renderer {
         self.heavy_rail.houses.clear();
         self.heavy_rail.houses.extend_from_slice(houses);
         self.heavy_charges(units, time);
-        self.heavy_fired(units, time);
+        self.heavy_fired(units);
         for p in projectiles {
             if let Some(i) = self.heavy_shot_of(p) {
                 self.heavy_path(i, p, time);
@@ -425,14 +433,14 @@ impl Renderer {
             }
         }
         self.heavy_rail.shots.retain(|s| time < s.fired + TUBE_LIFE);
-        self.heavy_rail.fired.retain(|f| time < f.time + 6.0);
+        self.heavy_rail.fired.retain(|f| time < f.time + RAIL_HEAT);
         self.heavy_rail.strokes.retain(|s| time < s.start + s.life);
         if self.heavy_rail.strokes.len() > MAX_STROKES {
             let extra = self.heavy_rail.strokes.len() - MAX_STROKES;
             self.heavy_rail.strokes.drain(..extra);
         }
         let size = size_of::<ProjectileInstance>();
-        for s in &self.heavy_rail.strokes {
+        for s in self.heavy_rail.strokes.iter().chain(&self.heavy_rail.heat) {
             let i = self.projectile_count as usize;
             if i >= super::MAX_PROJECTILES {
                 break;
@@ -536,10 +544,10 @@ impl Renderer {
         for f in &self.heavy_rail.fired {
             let Some((a, b)) = f.rails else { continue };
             let age = time - f.time;
-            if !(0.0..4.0).contains(&age) {
+            if !(0.0..RAIL_HEAT).contains(&age) {
                 continue;
             }
-            let heat = 1.0 - age / 4.0;
+            let heat = 1.0 - age / RAIL_HEAT;
             // Rails shorter than the Resolute's turret's light less, and less far: the
             // commander's arm gun would otherwise light the whole commander white.
             let k = (a.distance(b) / 36.0).min(1.0);
@@ -1140,29 +1148,35 @@ impl Renderer {
         self.sky.blast(at + dir * 60.0 * s, 200.0 * s, 1.2, time);
     }
 
-    /// The rails of guns that fired last tick: white-hot, cooling to orange, venting.
-    fn heavy_fired(&mut self, units: &[UnitInstance], time: f32) {
+    /// The rails of guns that fired: white-hot, cooling to orange, laid on the barrel where
+    /// it is this tick; and once, on the tick after the shot, the breech venting.
+    fn heavy_fired(&mut self, units: &[UnitInstance]) {
+        self.heavy_rail.heat.clear();
         for i in 0..self.heavy_rail.fired.len() {
-            if self.heavy_rail.fired[i].rails.is_some() {
+            let (blueprint, weapon, near, unit, fired, vented) = {
+                let f = &self.heavy_rail.fired[i];
+                (f.blueprint, f.weapon, f.near, f.unit, f.time, f.vented)
+            };
+            if vented && self.heavy_rail.fired[i].rails.is_none() {
                 continue;
             }
-            let (blueprint, weapon, near, unit, fired) = {
-                let f = &self.heavy_rail.fired[i];
-                (f.blueprint, f.weapon, f.near, f.unit, f.time)
-            };
-            let Some(row) = self.heavy_find(units, blueprint, near, unit) else {
-                // Gone (or not seen): nothing to glow; don't look again.
-                self.heavy_rail.fired[i].rails = Some((near, near));
+            let found = self
+                .heavy_find(units, blueprint, near, unit)
+                .and_then(|row| {
+                    let u = units[row];
+                    Some((u, self.heavy_barrel(&u, weapon, 0.5)?))
+                });
+            let Some((u, b)) = found else {
+                // Gone (or never seen): nothing to glow; don't look again.
+                let f = &mut self.heavy_rail.fired[i];
+                (f.vented, f.rails) = (true, None);
                 continue;
             };
-            let Some(b) = self.heavy_barrel(&units[row], weapon, 0.5) else {
-                continue;
-            };
-            self.heavy_rail.fired[i].rails = Some((b.breech, b.muzzle));
-            let s = self
-                .heavy_weapon(BlueprintId(blueprint), weapon)
-                .unwrap_or(1.0);
-            let outbound = std::mem::replace(&mut self.effect_outbound, true);
+            {
+                let f = &mut self.heavy_rail.fired[i];
+                (f.unit, f.near, f.vented) = (Some(u.unit_id), Vec3::from(u.pos), true);
+                f.rails = Some((b.breech, b.muzzle));
+            }
             // The open rails glow white-hot and cool to orange (where they are in the open:
             // from the first stretch as high as the last to the muzzle).
             let lift = b.heat_lift;
@@ -1173,19 +1187,22 @@ impl Renderer {
                 .find(|sp| (sp.2 - lift).abs() < 0.01)
                 .unwrap_or(b.spots[0]);
             for rail in [-1.0, 1.0] {
-                let (a, z) = (
-                    b.on_rail(t0 - half0, rail, lift),
-                    b.on_rail(1.0, rail, lift),
-                );
-                self.heavy_rail.strokes.push(Stroke {
-                    from: a,
-                    to: z,
+                self.heavy_rail.heat.push(Stroke {
+                    from: b.on_rail(t0 - half0, rail, lift),
+                    to: b.on_rail(1.0, rail, lift),
                     start: fired,
-                    life: 4.0,
+                    life: RAIL_HEAT,
                     width: b.gap * 0.8,
                     color: CHANNEL,
                 });
             }
+            if vented {
+                continue;
+            }
+            let s = self
+                .heavy_weapon(BlueprintId(blueprint), weapon)
+                .unwrap_or(1.0);
+            let outbound = std::mem::replace(&mut self.effect_outbound, true);
             // The breech vents behind.
             let (side, up) = (b.side, b.up);
             for i in 0..10 {
@@ -1221,7 +1238,6 @@ impl Renderer {
                 );
             }
             self.effect_outbound = outbound;
-            let _ = time;
         }
     }
 

@@ -203,9 +203,33 @@
         // The Bulwark's pair of rails: the commander's rail cannon, a little lighter,
         // still loud: nothing in its class hits this fast.
         "aster_rail_tank": (like: "aster_rail_cannon", size: 0.85, peak: 0.86),
-        // Its charge: the commander's, smaller, heard just before each pair; its tail
-        // rings on under the shot.
-        "aster_rail_tank_charge": (like: "citadel_rail_charge", size: 0.55, length: 1.4, peak: 0.2),
+        // Its charge, 0.5 s before each pair: the Resolute's turret charge (below) at about
+        // half its length and a little higher, let go by the shot so the pair's crack lands
+        // on silence. Its own layers, not `like` that charge: a resized sound keeps its
+        // layers' `attack`, so the swell would still top out at 0.86 s, long after the shot.
+        "aster_rail_tank_charge": (
+            length: 0.85, peak: 0.2, room: 0.3,
+            layers: [
+                // The bank closing: a firm clack and a knock under it.
+                Burst(low: 500, high: 2600, attack: 0.0004, decay: 0.005, gain: 1.6, seed: 61),
+                Tone(from: 210, to: 120, glide: 0.03, attack: 0.001, decay: 0.035, gain: 0.3),
+                // The hum swelling and lifting a fifth as the bank fills, cut at the shot.
+                Fm(at: 0.01, from: 150, to: 225, glide: 0.46, ratio: 0.5, index: 1.5, fade: 3.3, attack: 0.46, decay: 0.02, gain: 0.55),
+                Fm(at: 0.01, from: 75, to: 112, glide: 0.46, ratio: 0.5, index: 1.2, fade: 3.3, attack: 0.46, decay: 0.02, gain: 0.35),
+                Drive(1.4),
+                // The air along the rails hissing up with it, a sizzle thickening at the top.
+                Sweep(at: 0.055, from: 1100, to: 2800, glide: 0.415, q: 1.4, attack: 0.415, decay: 0.02, gain: 0.5, seed: 62),
+                Roll(at: 0.25, from: 1200, to: 2600, glide: 0.22, attack: 0.22, decay: 0.02, gain: 0.32, swell: 80, depth: 0.9, pan: 0.15, seed: 63),
+                // A few sparks, closer together towards the top.
+                Burst(at: 0.2, low: 1000, high: 2900, attack: 0.0002, decay: 0.002, gain: 0.7, pan: -0.3, seed: 64),
+                Burst(at: 0.31, low: 1000, high: 2900, attack: 0.0002, decay: 0.002, gain: 0.9, pan: 0.3, seed: 65),
+                Burst(at: 0.38, low: 1000, high: 2900, attack: 0.0002, decay: 0.002, gain: 1.1, pan: -0.15, seed: 66),
+                Burst(at: 0.43, low: 1000, high: 2900, attack: 0.0002, decay: 0.002, gain: 1.3, pan: 0.2, seed: 67),
+                // Topped out: one arc across the slot.
+                Burst(at: 0.468, low: 400, high: 2400, attack: 0.0004, decay: 0.007, gain: 1.9, seed: 68),
+                Roll(at: 0.468, from: 2600, to: 700, glide: 0.033, attack: 0.001, decay: 0.025, gain: 0.45, swell: 110, depth: 1.0, seed: 69),
+            ],
+        ),
         // The Resolute's rail turrets.
         "aster_rail_heavy": (like: "aster_rail_cannon", size: 1.2, peak: 0.94),
         // A rail slug arriving: harder and sharper than a shell, a hit you feel.
