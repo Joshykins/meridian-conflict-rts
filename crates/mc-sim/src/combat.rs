@@ -358,6 +358,16 @@ struct Mark {
 /// Angle steps a rotary gun's barrels turn in a tick at full spin: a turn and a half a second.
 pub(crate) const SPIN_TOP: u16 = 9830;
 
+/// A beam that runs up (`Weapon::beam` with `spin_ticks`, the Edict Lance) with its shot
+/// laid this tick: on its mark, in reach, nothing in the way. Its run-up gains a tick on
+/// where it stood last tick (`step_gun` ran it down a tick at the start of this one, as it
+/// does every tick it is not laid), so the charge is only ever heard and seen filling
+/// while the beam can light the moment it is full.
+fn run_up_beam(units: &mut Units, row: usize, weapon: &Weapon) {
+    let spin = &mut units.spin[row][weapon.rotary as usize];
+    spin[0] = (spin[3] + 1).min(weapon.spin_ticks);
+}
+
 /// Signed angle steps from `turn` back to the nearest turn with one of `barrels` barrels
 /// at the top of its cluster. The model sets its barrels half a spacing off the top at
 /// rest, so the tops fall on odd multiples of half the spacing.

@@ -106,11 +106,13 @@ impl World {
             || self.drowned_on_seabed(row, weapon);
         let units = &mut self.state.units;
         let held = drowned || (units.has_flag(row, flag::WORKING) && !weapon.mount);
-        // A rotary gun spins up while it has something to shoot, and down again after.
+        // A rotary gun spins up while it has something to shoot, and down again after. A
+        // beam that runs up (the Edict Lance) runs down here too, and up again only once
+        // its shot is laid (`run_up_beam`), so it lights as it fills, not long after.
         if weapon.spin_ticks > 0 {
             let spin = &mut units.spin[row][weapon.rotary as usize];
             spin[3] = spin[0];
-            spin[0] = if mark.is_some() && !held {
+            spin[0] = if mark.is_some() && !held && !weapon.beam {
                 (spin[0] + 1).min(weapon.spin_ticks)
             } else {
                 spin[0].saturating_sub(1)
@@ -829,6 +831,12 @@ impl World {
         let units = &mut self.state.units;
         if !(aligned && pitched_on && !hidden) || units.weapon_cooldown[row][w] > 0 {
             return Ok(());
+        }
+        if weapon.beam && weapon.spin_ticks > 0 {
+            if !in_reach || slant_out {
+                return Ok(());
+            }
+            run_up_beam(units, row, weapon);
         }
         let spun = if weapon.spin_ramp > 0 {
             weapon.spin_ticks.div_ceil(3)
