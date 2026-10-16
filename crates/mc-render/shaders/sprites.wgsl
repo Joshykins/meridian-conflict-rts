@@ -1,4 +1,5 @@
 //!use bindings
+//!use shells
 // Additive sprites: projectile tracers and short-lived flashes/explosions.
 // Both animate entirely on the GPU from data uploaded once (per tick for
 // projectiles, per event for effects).
@@ -157,8 +158,12 @@ fn knotted_shell(p: Projectile) -> bool {
     return plasma_look(p) == PLASMA_LOOK_KNOTTED_SHELL;
 }
 
-// A cased seeker's charge and line work, as the strategic warhead's (nova.wgsl `NOVA_VIOLET`).
-const SEEKER_RED: vec3<f32> = vec3<f32>(1.0, 0.035, 0.012);
+// A gravitic shock shell (`PLASMA_LOOK_GRAVITIC_SHELL`, the Exarch's mortar): a shard of
+// violet crystal drawn by `vs_missile` (`gravitic_shard`), turning about its length; its
+// twisting tail by `vs_projectile`, and from afar a violet marker by `vs_shot`.
+fn gravitic_shell(p: Projectile) -> bool {
+    return plasma_look(p) == PLASMA_LOOK_GRAVITIC_SHELL;
+}
 
 struct SpritePush {
     // SPRITE_LAYER_*: which side of the clouds this draw of the shots is.
@@ -726,18 +731,24 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     if (at.w < 0.0 && !beam && !fade_beam) || center.w < SHOT_NEAR {
         center = vec4<f32>(0.0, 0.0, 0.0, -1.0);
     }
-    if plasma_look(p) == PLASMA_LOOK_GRAVITIC_SHELL && !beam && !fade_beam {
-        // A gravitic shock shell's knot (`fs_shot_lit`): a few pixels across at least, so it
-        // reads violet at any height; from orbit a violet marker, never the shells' yellow.
+    if gravitic_shell(p) && !beam && !fade_beam {
+        // A gravitic shock shell from afar (`fs_shot_lit`): a violet point a few pixels
+        // across, so it reads violet at any height, and from orbit a violet marker, never
+        // the shells' yellow. Close enough to see its shard (`vs_missile`), it goes.
         let strategic = strategic_view(center.w);
-        let px = max(size * 1.1 * globals.lod.x / max(center.w, 1.0), mix(6.0, 3.5, strategic));
+        let scale = globals.lod.x / max(center.w, 1.0);
+        let px = max(size * 1.1 * scale, mix(6.0, 3.5, strategic));
+        let shard_px = gravitic_shard_half(p.size) * 2.0 * scale;
         let ndc = center.xy / center.w + corner * px * globals.viewport.zw;
         var knot: SpriteOut;
         knot.clip = vec4<f32>(ndc * center.w, center.z, center.w);
         knot.uv = corner;
         knot.color = vec3<f32>(strategic);
         knot.shape = vec2<f32>(-3.0, px);
-        knot.share = layer_share(strategic, true);
+        knot.share = layer_share(strategic, true) * (1.0 - smoothstep(6.0, 16.0, shard_px));
+        if knot.share <= 0.0 {
+            knot.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
+        }
         return knot;
     }
     if (p.color & BOMB) != 0u {
@@ -888,29 +899,19 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
 
 fn fs_shot_lit(in: SpriteOut) -> vec4<f32> {
     if in.shape.x < -2.5 {
-        // A gravitic shock shell's knot (`vs_shot`): a lilac-white heart in a deep violet
-        // body that churns as the gravity holding it winds round, a thin bright rim of bent
-        // light, and outside it a dark ring where the light is pulled away. `color.r` how
-        // far it is a marker (from orbit: a plain violet dot).
+        // A gravitic shock shell seen from too far to make out its shard (`vs_shot`): a
+        // lilac-white point in a soft violet glow. `color.r` how far it is a marker (from
+        // orbit: a plain violet dot).
         let d = length(in.uv);
-        let now = globals.camera.w;
-        let angle = atan2(in.uv.y, in.uv.x);
-        let wind = 0.5 + 0.5 * sin(angle * 3.0 - now * 18.0 + d * 9.0);
-        let body_r = 0.5;
-        let body = 1.0 - smoothstep(body_r - 0.06, body_r, d);
-        let heart = pow(max(1.0 - d / (body_r * 0.45), 0.0), 2.0);
-        let rim = exp(-pow((d - body_r) / 0.05, 2.0));
-        let dark = smoothstep(body_r - 0.02, body_r + 0.08, d) * (1.0 - smoothstep(0.72, 1.0, d));
-        let deep = vec3<f32>(0.2, 0.025, 0.6);
+        let heart = pow(max(1.0 - d / 0.3, 0.0), 2.0);
+        let glow = pow(max(1.0 - d, 0.0), 2.2);
         let violet = vec3<f32>(0.55, 0.12, 1.0);
         let lilac = vec3<f32>(0.85, 0.66, 1.0);
-        let near = mix(deep, violet, 0.4 + 0.6 * wind) * body * 1.8
-            + mix(lilac, vec3<f32>(1.0, 0.95, 1.0), heart) * heart * 4.5
-            + mix(violet, lilac, 0.5) * rim * 1.6;
+        let near = violet * glow * 1.6 + mix(lilac, vec3<f32>(1.0, 0.95, 1.0), heart) * heart * 4.0;
         let marker = smoothstep(0.3, 0.9, in.color.r);
         let dot = 1.0 - smoothstep(0.6, 1.0, d);
         let rgb = mix(near, violet * 2.5, marker);
-        let alpha = mix(max(body, dark * 0.7), dot, marker) * in.share;
+        let alpha = mix(max(glow, heart), dot, marker) * in.share;
         if alpha <= 0.01 {
             discard;
         }
@@ -1500,7 +1501,8 @@ fn vs_missile(@builtin(vertex_index) vertex: u32, @builtin(instance_index) insta
     var out: MissileOut;
     let at = shot_head(p);
     let knotted = knotted_shell(p);
-    let shell = surge_shell(p) || knotted;
+    let gravitic = gravitic_shell(p);
+    let shell = surge_shell(p) || knotted || gravitic;
     // A shell has no fins or wings.
     if ((p.color & 0x100u) == 0u && !shell) || at.w < 0.0 || (shell && vertex >= 96u) {
         out.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
@@ -1527,7 +1529,12 @@ fn vs_missile(@builtin(vertex_index) vertex: u32, @builtin(instance_index) insta
     var normal = vec3<f32>(0.0);
     var surface = vec3<f32>(0.0);
     let quad = array<u32, 6>(0u, 1u, 2u, 0u, 2u, 3u);
-    if vertex < 48u {
+    if gravitic {
+        let v = gravitic_shard(vertex, gravitic_shard_half(p.size), f32(instance));
+        local = v.local;
+        normal = v.normal;
+        surface = v.surface;
+    } else if vertex < 48u {
         let segment = vertex / 6u;
         let corner = quad[vertex % 6u];
         let side = f32(segment) + select(0.0, 1.0, corner == 1u || corner == 2u);
@@ -1596,11 +1603,12 @@ fn vs_missile(@builtin(vertex_index) vertex: u32, @builtin(instance_index) insta
     out.clip = globals.view_proj * vec4<f32>(at.xyz + axis * local.x + side * local.y + up * local.z, 1.0);
     out.normal = axis * normal.x + side * normal.y + up * normal.z;
     out.surface = surface;
-    out.cased = select(select(select(0u, 1u, cased), 2u, shell), 3u, knotted);
+    out.cased = select(select(select(select(0u, 1u, cased), 2u, shell), 3u, knotted), 4u, gravitic);
     return out;
 }
 fn fs_missile_lit(in: MissileOut) -> vec4<f32> {
-    let light = 0.45 + 0.55 * abs(dot(normalize(in.normal), normalize(vec3<f32>(0.4, -0.5, 0.8))));
+    let facing = abs(dot(normalize(in.normal), normalize(vec3<f32>(0.4, -0.5, 0.8))));
+    let light = 0.45 + 0.55 * facing;
     if in.cased == 0u {
         return vec4<f32>(vec3<f32>(0.024, 0.028, 0.033) * light, 1.0);
     }
@@ -1611,104 +1619,12 @@ fn fs_missile_lit(in: MissileOut) -> vec4<f32> {
     if in.cased == 3u {
         look = knotted_shell_color(in.surface);
     }
+    if in.cased == 4u {
+        // A crystal's facets glint as it turns.
+        look = gravitic_shard_color(in.surface);
+        return vec4<f32>(look[0] * light + look[1] + vec3<f32>(0.9, 0.8, 1.0) * pow(facing, 24.0) * 3.0, 1.0);
+    }
     return vec4<f32>(look[0] * light + look[1], 1.0);
-}
-
-// A cased seeker's surface at `s` (`MissileOut::surface`): its base colour and the red
-// light of its line work and charge (added unlit). Graphite in steel courses, as the
-// strategic warhead (nova.wgsl `nova_missile_color`): chevrons cut into the prow's facets,
-// a ring at its foot, seams down every other edge, and the charge seen through the tail.
-fn cased_seeker_color(s: vec3<f32>) -> array<vec3<f32>, 2> {
-    let graphite = vec3<f32>(0.03, 0.03, 0.034);
-    let steel = vec3<f32>(0.2, 0.205, 0.225);
-    let pulse = 0.85 + 0.15 * sin(globals.camera.w * 4.0 + s.x * 6.0);
-    let piece = u32(s.z + 0.5);
-    if piece == 2u {
-        // The tail: the charge, held, seen through it.
-        return array<vec3<f32>, 2>(graphite, SEEKER_RED * 6.0 * pulse);
-    }
-    if piece == 3u {
-        // A fin: plate, its tip edge steel.
-        return array<vec3<f32>, 2>(select(graphite * 1.3, steel * 0.8, s.y > 0.85), vec3<f32>(0.0));
-    }
-    var base = graphite;
-    if s.x < -0.94 || (s.x > -0.36 && s.x < -0.3) || (s.x > 0.2 && s.x < 0.25) {
-        base = steel;
-    }
-    // Across one facet, 0 at its middle, 0.5 at its edges.
-    let d = abs(fract(s.y * 8.0 + 1e-3) - 0.5);
-    let w = 0.025;
-    var line = 0.0;
-    if piece == 1u {
-        // Along the prow, 0 at its foot to 1 at its point.
-        let t = (s.x - 0.4) / 0.6;
-        // A chevron on every facet, its point forward, and a smaller one ahead of it.
-        line = max(line, 1.0 - step(w * 1.6, abs(t - (0.42 - 0.5 * d))));
-        line = max(line, (1.0 - step(w * 1.6, abs(t - (0.7 - 0.3 * d)))) * step(d, 0.3));
-    } else {
-        // A ring at the prow's foot, and seams down every other edge running back from it.
-        line = max(line, 1.0 - step(w, abs(s.x - 0.34)));
-        let edge = (u32(floor(s.y * 8.0 + 0.5)) & 1u) == 0u;
-        line = max(line, step(0.46, d) * step(0.05, s.x) * step(s.x, 0.34) * select(0.0, 1.0, edge));
-    }
-    return array<vec3<f32>, 2>(base, SEEKER_RED * line * 4.0 * pulse);
-}
-
-// A surge shell's surface at `s` (`MissileOut::surface`), its base colour and light: graphite
-// in steel courses, a crimson driving band near its base and a ring at the prow's foot, seams
-// of crimson down every other edge between them, and its base burning with the charge it
-// carries. The light beats with the pressure pulses running back down its plume.
-fn surge_shell_color(s: vec3<f32>) -> array<vec3<f32>, 2> {
-    let graphite = vec3<f32>(0.03, 0.03, 0.034);
-    let steel = vec3<f32>(0.2, 0.205, 0.225);
-    let crimson = vec3<f32>(1.0, 0.03, 0.04);
-    let beat = 0.75 + 0.25 * sin(globals.camera.w * 31.4);
-    let piece = u32(s.z + 0.5);
-    if piece == 2u {
-        return array<vec3<f32>, 2>(graphite, crimson * 7.0 * beat);
-    }
-    var base = graphite;
-    if piece == 1u && s.x > 0.85 {
-        // Its point, bright steel.
-        base = steel;
-    }
-    if s.x < -0.92 || (s.x > 0.15 && s.x < 0.22) {
-        base = steel;
-    }
-    let d = abs(fract(s.y * 8.0 + 1e-3) - 0.5);
-    var line = 0.0;
-    if piece == 0u {
-        line = max(line, 1.0 - step(0.05, abs(s.x + 0.66)));
-        line = max(line, 1.0 - step(0.025, abs(s.x - 0.24)));
-        let edge = (u32(floor(s.y * 8.0 + 0.5)) & 1u) == 0u;
-        line = max(line, step(0.46, d) * step(-0.6, s.x) * step(s.x, 0.22) * select(0.0, 1.0, edge));
-    }
-    return array<vec3<f32>, 2>(base, crimson * line * 5.0 * beat);
-}
-
-// A knotted shell's surface at `s` (`MissileOut::surface`), its base colour and light:
-// graphite, a steel point and driving band, three red seams down it a third of a turn
-// apart (the three knots it was gathered from), and its base burning red with the plasma
-// it carries, beating fast.
-fn knotted_shell_color(s: vec3<f32>) -> array<vec3<f32>, 2> {
-    let graphite = vec3<f32>(0.028, 0.028, 0.034);
-    let steel = vec3<f32>(0.22, 0.22, 0.25);
-    let red = vec3<f32>(1.0, 0.06, 0.03);
-    let beat = 0.8 + 0.2 * sin(globals.camera.w * 40.0);
-    let piece = u32(s.z + 0.5);
-    if piece == 2u {
-        return array<vec3<f32>, 2>(graphite, mix(red, vec3<f32>(1.0, 0.6, 0.5), 0.25) * 8.0 * beat);
-    }
-    var base = graphite;
-    if (piece == 1u && s.x > 0.8) || s.x < -0.93 || (s.x > -0.62 && s.x < -0.55) {
-        base = steel;
-    }
-    var line = 0.0;
-    if piece == 0u {
-        let d = abs(fract(s.y * 3.0 + 0.04) - 0.5);
-        line = step(0.47, d) * step(-0.9, s.x);
-    }
-    return array<vec3<f32>, 2>(base, red * line * 5.0 * beat);
 }
 
 // How much of a shot or effect shows past the clouds (bindings.wgsl `past_clouds_at`):

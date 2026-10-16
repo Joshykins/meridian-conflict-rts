@@ -1469,9 +1469,100 @@
         // A sub-seeker coming down: the bomb's hit a size down, so a volley's twelve land
         // as a ripple of heavy whumps rather than one blast.
         "regency_seeker_hit": (like: "regency_gravitic_hit", size: 0.8, peak: 0.6),
-        // The Exarch's shoulder mortar: the Saker's shot a size down, a short gun's
-        // compressive whump.
-        "regency_gravitic_mortar_fire": (like: "regency_surge_fire", size: 0.6, peak: 0.55),
+        // The Exarch's shoulder mortar charging, 1.6 s before its shot: the breech locking,
+        // the crystal struck and winding up between the tines. A rising glassy hum, its
+        // vanes whumping past faster and faster (in time with the model: two turns,
+        // quickening, three vanes), the pressure swelling deep under it, air drawn in down
+        // the bore, violet crackle walking up the tines, and a last short suck as the knot
+        // pinches. It stops dead for the shot (`regency_gravitic_mortar_fire`).
+        "regency_gravitic_mortar_charge": (
+            length: 1.65, peak: 0.5, room: 0.3,
+            layers: [
+                // The breech locking: a deep clunk and a metal clank.
+                Burst(low: 50, high: 450, attack: 0.001, decay: 0.035, gain: 3.5, seed: 14101),
+                Fm(from: 330, to: 260, glide: 0.07, ratio: 3.5, index: 1.3, fade: 0.04, attack: 0.001, decay: 0.06, gain: 0.3),
+                // The crystal struck: a glassy ping, ringing on.
+                Fm(at: 0.02, from: 1180, to: 1170, glide: 0.5, ratio: 2.76, index: 0.7, fade: 0.3, attack: 0.001, decay: 0.45, gain: 0.08, pan: 0.1),
+                // Winding up: a hum of glass and metal rising, louder as it goes.
+                Stack(at: 0.05, from: 70, to: 230, glide: 1.55, attack: 1.45, decay: 0.04, gain: 0.5, detune: 1.007, width: 0.35, partials: [(1, 1), (2, 0.5), (3, 0.3), (5.2, 0.12)]),
+                Fm(at: 0.3, from: 520, to: 1500, glide: 1.3, ratio: 2.76, index: 0.5, fade: 2.0, attack: 1.2, decay: 0.04, gain: 0.05),
+                // The pressure swelling deep under it.
+                Tone(at: 0.1, from: 40, to: 31, glide: 1.5, attack: 1.4, decay: 0.05, gain: 0.6),
+                Fm(at: 0.4, from: 64, to: 54, glide: 1.2, ratio: 0.5, index: 2.0, fade: 3.0, attack: 1.1, decay: 0.05, gain: 0.4),
+                // The vanes whumping past, quickening: each a short low push of air.
+                Tone(at: 0.65, from: 82, to: 46, glide: 0.06, attack: 0.008, decay: 0.08, gain: 0.5),
+                Tone(at: 0.92, from: 86, to: 47, glide: 0.06, attack: 0.007, decay: 0.07, gain: 0.6),
+                Tone(at: 1.13, from: 90, to: 48, glide: 0.05, attack: 0.006, decay: 0.06, gain: 0.7),
+                Tone(at: 1.31, from: 95, to: 50, glide: 0.05, attack: 0.005, decay: 0.05, gain: 0.8),
+                Tone(at: 1.46, from: 100, to: 52, glide: 0.04, attack: 0.004, decay: 0.045, gain: 0.9),
+                Drive(1.4),
+                Roll(at: 0.62, from: 260, to: 260, glide: 1, attack: 0.01, decay: 0.07, gain: 0.35, swell: 8, depth: 0.5, seed: 14102),
+                Roll(at: 0.9, from: 300, to: 300, glide: 1, attack: 0.01, decay: 0.06, gain: 0.4, swell: 8, depth: 0.5, pan: -0.2, seed: 14103),
+                Roll(at: 1.11, from: 340, to: 340, glide: 1, attack: 0.008, decay: 0.05, gain: 0.45, swell: 8, depth: 0.5, pan: 0.2, seed: 14104),
+                Roll(at: 1.29, from: 380, to: 380, glide: 1, attack: 0.006, decay: 0.045, gain: 0.5, swell: 8, depth: 0.5, pan: -0.15, seed: 14105),
+                Roll(at: 1.44, from: 420, to: 420, glide: 1, attack: 0.005, decay: 0.04, gain: 0.55, swell: 8, depth: 0.5, pan: 0.15, seed: 14106),
+                // Air drawn in down the bore, its band falling as it swells.
+                Sweep(at: 0.2, from: 2600, to: 520, glide: 1.4, q: 0.9, attack: 1.3, decay: 0.05, gain: 0.3, seed: 14107),
+                // Violet crackle walking up the tines.
+                Roll(at: 0.8, from: 1500, to: 2300, glide: 0.75, attack: 0.7, decay: 0.04, gain: 0.25, swell: 90, depth: 1.0, pan: -0.25, seed: 14108),
+                Roll(at: 0.85, from: 1400, to: 2200, glide: 0.7, attack: 0.65, decay: 0.04, gain: 0.25, swell: 100, depth: 1.0, pan: 0.25, seed: 14109),
+                // The knot pinching: a short deep suck rising into the shot.
+                Roll(at: 1.45, from: 110, to: 380, glide: 0.15, attack: 0.145, decay: 0.01, gain: 1.0, swell: 6, depth: 0.4, seed: 14110),
+            ],
+        ),
+        // The Exarch's shoulder mortar letting its knot go: a glassy snap as the crystal
+        // lets go and a deep gravitic thoom that holds in the floor; the knot tearing away
+        // up its arc, its buzz falling off; the gun slamming back in its yoke and the
+        // crystal flung whirring round between the tines, slowing; air shoved out round
+        // the shoulder; then the recuperator hissing as the gun runs out, and the clunk of
+        // it home in battery at a second and a half (the unit file's `run_out`).
+        "regency_gravitic_mortar_fire": (
+            length: 3, peak: 0.7, room: 0.5,
+            layers: [
+                // The crystal letting go: a hard snap and a glassy crack.
+                Burst(low: 900, high: 4500, attack: 0.0001, decay: 0.004, gain: 9, seed: 14111),
+                Fm(from: 2300, to: 2200, glide: 0.05, ratio: 2.76, index: 1.0, fade: 0.03, attack: 0.0005, decay: 0.05, gain: 0.12),
+                // The thoom: bursts reaching down into the sub, a thump falling into it and a
+                // low one that holds.
+                Burst(at: 0.002, low: 30, high: 500, attack: 0.0005, decay: 0.12, gain: 18, seed: 14112),
+                Burst(at: 0.003, low: 22, high: 160, attack: 0.002, decay: 0.45, gain: 14, seed: 14113),
+                Tone(at: 0.002, from: 120, to: 36, glide: 0.12, attack: 0.001, decay: 0.38, gain: 2.4),
+                Tone(at: 0.004, from: 55, to: 26, glide: 0.9, attack: 0.004, decay: 0.85, gain: 1.2),
+                // The gravity let go: a rough growl sinking.
+                Fm(at: 0.003, from: 110, to: 52, glide: 0.5, ratio: 0.5, index: 2.2, fade: 0.4, attack: 0.002, decay: 0.5, gain: 0.7),
+                // The gun slamming back in its yoke: a heavy clank.
+                Burst(at: 0.006, low: 80, high: 900, attack: 0.0005, decay: 0.03, gain: 3, seed: 14114),
+                Fm(at: 0.006, from: 260, to: 195, glide: 0.08, ratio: 3.5, index: 1.5, fade: 0.05, attack: 0.0005, decay: 0.09, gain: 0.3),
+                Drive(1.7),
+                // The knot tearing away up its arc, its buzz falling off.
+                Stack(at: 0.006, from: 320, to: 110, glide: 0.55, attack: 0.004, decay: 0.3, gain: 0.25, detune: 1.01, width: 0.3, partials: [(1, 1), (2, 0.5), (3, 0.3)]),
+                Sweep(at: 0.01, from: 1800, to: 300, glide: 0.7, q: 1.0, attack: 0.02, decay: 0.35, gain: 0.32, seed: 14115),
+                // The crystal flung round: a glassy whir falling, beating with its vanes.
+                Fm(at: 0.01, from: 900, to: 480, glide: 1.8, ratio: 2.76, index: 0.6, fade: 1.0, attack: 0.01, decay: 1.0, gain: 0.07, pan: 0.1),
+                Roll(at: 0.02, from: 900, to: 380, glide: 2.0, attack: 0.02, decay: 1.0, gain: 0.3, swell: 7, depth: 0.8, pan: 0.1, seed: 14116),
+                // Air shoved out round the shoulder, to either side.
+                Roll(at: 0.01, from: 650, to: 130, glide: 1.1, attack: 0.02, decay: 0.55, gain: 0.6, swell: 10, depth: 0.6, pan: -0.45, seed: 14117),
+                Roll(at: 0.03, from: 620, to: 120, glide: 1.1, attack: 0.02, decay: 0.55, gain: 0.6, swell: 10, depth: 0.6, pan: 0.45, seed: 14118),
+                // The recuperator: a hiss and a low servo as the gun runs out.
+                Hiss(at: 0.15, freq: 3200, q: 1.5, attack: 0.35, decay: 0.5, gain: 0.22, seed: 14119),
+                Fm(at: 0.2, from: 150, to: 205, glide: 1.2, ratio: 1, index: 0.8, fade: 2.0, attack: 0.3, decay: 0.45, gain: 0.07),
+                // Home in battery.
+                Burst(at: 1.5, low: 50, high: 600, attack: 0.002, decay: 0.045, gain: 1.8, seed: 14120),
+                Fm(at: 1.5, from: 300, to: 250, glide: 0.06, ratio: 3.5, index: 1.2, fade: 0.04, attack: 0.001, decay: 0.06, gain: 0.14),
+            ],
+        ),
+        // Its knot in flight, heard from each one: a low gravitic thrum that wobbles as the
+        // knot turns, and a faint glassy shimmer over it.
+        "regency_gravitic_mortar_flight": (
+            length: 2, peak: 0.3, room: 0.2, looped: true,
+            layers: [
+                Fm(from: 46, to: 46, glide: 1, ratio: 0.5, index: 1.4, fade: 1000, attack: 0.01, decay: 100000, gain: 0.22),
+                Rumble(freq: 170, q: 0.9, gain: 3, wobble: 7, depth: 0.5, seed: 14121),
+                Drone(freq: 640, gain: 0.025, wobble: 3, depth: 0.6),
+                Drive(1.2),
+                Roll(from: 900, to: 900, glide: 1, attack: 0.01, decay: 100000, gain: 0.3, swell: 7, depth: 0.6, seed: 14122),
+            ],
+        ),
         // Its knot landing: the gravitic engine's rift strike cut down to a shell's, at the
         // strike's own pitch so the boom stays in the floor (shrinking it with `size`
         // pitches every layer up with it): a short pull in, the snaps, a sub slam that

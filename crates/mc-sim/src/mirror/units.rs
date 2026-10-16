@@ -196,7 +196,18 @@ impl World {
         let twin = twin_arm_gun(&bp.weapons, main);
         let mounted = bp.weapons.iter().position(|w| w.mount);
         let (mount_kick, prev_mount_kick) = mounted.map_or((0.0, 0.0), |w| {
-            barrel_recoil_pair(s.units.weapon_cooldown[row][w], bp.weapons[w].reload_ticks)
+            let gun = &bp.weapons[w];
+            let cooldown = s.units.weapon_cooldown[row][w];
+            if gun.run_out_ticks > 0 {
+                run_out_pair(
+                    cooldown,
+                    gun.reload_ticks,
+                    gun.run_out_ticks,
+                    gun.charge_ticks,
+                )
+            } else {
+                barrel_recoil_pair(cooldown, gun.reload_ticks)
+            }
         });
         let house = self.house_pose(row, mounted.or(twin.map(|t| t.0)), houses);
         // Each rotary gun's barrels, by its slot (`Weapon::rotary`): turned last tick and this.
@@ -208,7 +219,7 @@ impl World {
                         s.tick,
                         s.units.id(row).0,
                         s.units.weapon_cooldown[row][w],
-                        bp.weapons[w].reload_ticks,
+                        (bp.weapons[w].reload_ticks, bp.weapons[w].charge_ticks),
                         bp.weapons[w].fling,
                     ),
                     _ => [0.0; 2],
@@ -553,25 +564,92 @@ fn dash_pose(dash: &mc_data::dash::Dash, s: &crate::dash::DashState) -> [f32; 2]
 /// Ticks a shoulder gun's flung gear takes to drift round once at rest.
 const FLING_DRIFT_TICKS: u32 = 320;
 
+/// Whole turns a shoulder gun's flung gear is wound through over its charge
+/// (`Weapon::charge_ticks`), turning faster and faster into the shot.
+const WIND_TURNS: f32 = 2.0;
+
 /// How far a shoulder gun's flung gear (`Weapon::fling`, the Exarch mortar's crystal) has
 /// turned, last tick and this, in radians: a slow drift at rest (one turn every
-/// `FLING_DRIFT_TICKS`, each unit from its own start), and each shot flinging it through
-/// `turns` whole turns, fast at the shot and easing to rest as the reload runs out. Both
-/// parts end on whole turns, so the next shot takes up from where this one left it.
-fn flung_pair(tick: u32, unit: u32, cooldown: u16, reload: u16, turns: u8) -> [f32; 2] {
+/// `FLING_DRIFT_TICKS`, each unit from its own start); wound through `WIND_TURNS` over the
+/// countdown's last `charge` ticks, faster and faster into the shot; and each shot flinging
+/// it through `turns` whole turns, fast at the shot and easing to rest as the reload runs
+/// out. Every part ends on whole turns, so nothing jumps at the shot or the next one.
+fn flung_pair(
+    tick: u32,
+    unit: u32,
+    cooldown: u16,
+    (reload, charge): (u16, u16),
+    turns: u8,
+) -> [f32; 2] {
     use std::f32::consts::TAU;
     let reload = reload.max(1);
     let turns = turns as f32;
     let flung = |c: u16| TAU * turns * (1.0 - (c.min(reload) as f32 / reload as f32).powi(3));
+    // From nothing at the charge's first tick to whole turns at its last (a countdown of 1).
+    let wound = |c: u16| {
+        if charge < 2 || c == 0 || c > charge {
+            return 0.0;
+        }
+        let f = (charge - c) as f32 / (charge - 1) as f32;
+        TAU * WIND_TURNS * f * f
+    };
     let drift = TAU / FLING_DRIFT_TICKS as f32;
     let now_drift = (tick.wrapping_add(unit.wrapping_mul(97)) % FLING_DRIFT_TICKS) as f32 * drift;
     // The tick it fires it starts from where the last shot left it: a whole number of turns.
+    // At rest it was at rest last tick too, whole turns on from its wind (a charge that
+    // never fired).
     let was = if cooldown == reload {
         0.0
+    } else if cooldown == 0 {
+        flung(1)
     } else {
-        flung(cooldown.saturating_add(1))
+        flung(cooldown + 1) + wound(cooldown + 1)
     };
-    [now_drift - drift + was, now_drift + flung(cooldown)]
+    [
+        now_drift - drift + was,
+        now_drift + flung(cooldown) + wound(cooldown),
+    ]
+}
+
+/// Ticks a heavy shoulder gun holds at full kick before it starts to run out.
+const KICK_HOLD: u16 = 2;
+/// How far back a charging heavy shoulder gun has drawn by its shot, a share of its kick.
+const DRAW_BACK: f32 = 0.18;
+
+/// A heavy shoulder gun's kick (`Weapon::run_out_ticks`) this tick and last, a share of the
+/// model's: drawn back a little over the countdown's last `charge` ticks, slammed all the
+/// way back at the shot, held there `KICK_HOLD` ticks, then run out over `run_out` ticks,
+/// easing off at both ends as a recuperator does.
+fn run_out_pair(cooldown: u16, reload: u16, run_out: u16, charge: u16) -> (f32, f32) {
+    let kick = |c: u16| -> f32 {
+        if c == 0 || reload == 0 {
+            return 0.0;
+        }
+        let since = reload.saturating_sub(c);
+        if c <= charge && since > KICK_HOLD + run_out {
+            let f = (charge - c) as f32 / charge as f32;
+            return DRAW_BACK * f * f;
+        }
+        if since < KICK_HOLD {
+            return 1.0;
+        }
+        let x = (since - KICK_HOLD) as f32 / run_out.max(1) as f32;
+        if x >= 1.0 {
+            return 0.0;
+        }
+        (1.0 - x) * (1.0 - x) * (1.0 + 2.0 * x)
+    };
+    // At rest it was at rest last tick too (a charge that never fired lets go at once).
+    if cooldown == 0 {
+        return (0.0, 0.0);
+    }
+    // The shot slams it back from where its charge drew it.
+    let prev = if cooldown == reload {
+        kick(1)
+    } else {
+        kick(cooldown.saturating_add(1))
+    };
+    (kick(cooldown), prev)
 }
 
 #[cfg(test)]
@@ -583,7 +661,7 @@ mod tests {
     #[test]
     fn a_flung_gear_turns_whole_turns_fastest_at_the_shot() {
         let off = |a: f32| (a / TAU - (a / TAU).round()).abs();
-        let at = |c: u16| super::flung_pair(1000, 7, c, 160, 3);
+        let at = |c: u16| super::flung_pair(1000, 7, c, (160, 0), 3);
         let [was, now] = at(160);
         assert!(off(now - was) < 0.01, "the shot: {was} -> {now}");
         let first = at(159);
@@ -592,5 +670,38 @@ mod tests {
         let [_, ready] = at(0);
         assert!(off(ready - at(160)[1]) < 0.01);
         assert!((ready - at(160)[1] - 3.0 * TAU).abs() < 0.01);
+    }
+
+    /// Over the charge the crystal winds up faster and faster, and reaches the shot on whole
+    /// turns, so the shot's fling takes up from it without a jump.
+    #[test]
+    fn a_flung_gear_winds_up_into_the_shot() {
+        let off = |a: f32| (a / TAU - (a / TAU).round()).abs();
+        let at = |c: u16| super::flung_pair(1000, 7, c, (160, 32), 3);
+        let (early, late) = (at(30), at(2));
+        assert!(late[1] - late[0] > 5.0 * (early[1] - early[0]));
+        let (last, fired) = (at(1)[1], at(160)[0]);
+        assert!(off(last - fired) < 0.01, "{last} -> {fired}");
+        let [was, now] = at(0);
+        assert!((now - was).abs() < 0.1, "at rest: {was} -> {now}");
+    }
+
+    /// A heavy gun draws back over its charge, slams all the way back at the shot, holds, and
+    /// runs out smoothly, home long before its next charge.
+    #[test]
+    fn a_heavy_gun_kicks_holds_and_runs_out() {
+        let at = |c: u16| super::run_out_pair(c, 160, 28, 32);
+        assert_eq!(at(0), (0.0, 0.0));
+        let (drawn, _) = at(1);
+        assert!(drawn > 0.1 && drawn < 0.3, "{drawn}");
+        assert_eq!(at(160), (1.0, drawn));
+        assert_eq!(at(159).0, 1.0);
+        let mut last = 1.0;
+        for c in (100..159).rev() {
+            let (now, was) = at(c);
+            assert!(now <= was && now <= last, "{c}");
+            last = now;
+        }
+        assert_eq!(at(100).0, 0.0);
     }
 }

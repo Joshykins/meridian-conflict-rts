@@ -270,6 +270,9 @@ pub struct Weapon {
     /// Whole turns a shoulder gun's spinning gear is flung through by each shot
     /// (`RawWeapon::fling`). Cosmetic: not in the content hash.
     pub fling: u8,
+    /// Ticks a shoulder gun takes to run back out after its kick (`RawWeapon::run_out`);
+    /// zero for the ordinary quick kick. Cosmetic: not in the content hash.
+    pub run_out_ticks: u16,
     /// A strafing beam (`RawWeapon::strafe`): fixed in the hull, it rakes a line over the
     /// ground through its mark as the aircraft flies its run (`strafe.rs`).
     pub strafe: Option<Strafe>,

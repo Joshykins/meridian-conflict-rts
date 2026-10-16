@@ -12,10 +12,11 @@
 //! then `emp` (an EMP stun's look on a model), `wreck` (how a wreck lies and looks),
 //! `nanite_site` (how a Regency site condenses) and
 //! `flight` (a winged flier's rig) and `crawl` (a many-legged walker's legs), and
-//! `progenitor_glass` (a Progenitor Shaper's dome, after shields.wgsl's own helpers).
+//! `progenitor_glass` (a Progenitor Shaper's dome, after shields.wgsl's own helpers) and
+//! `shells` (a solid shot's body, sprites.wgsl).
 
 /// Files put in front of shaders, never compiled on their own.
-pub(crate) const PRELUDES: [&str; 31] = [
+pub(crate) const PRELUDES: [&str; 32] = [
     "common",
     "bindings",
     "cloud_shape",
@@ -47,6 +48,7 @@ pub(crate) const PRELUDES: [&str; 31] = [
     "crawl",
     "props",
     "progenitor_glass",
+    "shells",
 ];
 
 /// The prelude files' text.
@@ -80,6 +82,7 @@ pub(crate) struct Preludes {
     crawl: String,
     props: String,
     progenitor_glass: String,
+    shells: String,
 }
 
 impl Preludes {
@@ -123,6 +126,7 @@ impl Preludes {
             crawl: read("crawl"),
             props: read("props"),
             progenitor_glass: read("progenitor_glass"),
+            shells: read("shells"),
         }
     }
 
@@ -242,6 +246,10 @@ impl Preludes {
         // A Progenitor Shaper's dome (shields.wgsl; uses its shield helpers).
         if uses("progenitor_glass") {
             prelude = format!("{prelude}\n{}", self.progenitor_glass);
+        }
+        // A solid shot's body (sprites.wgsl; needs bindings).
+        if uses("shells") {
+            prelude = format!("{prelude}\n{}", self.shells);
         }
         let lines = prelude.lines().count() + 1;
         (format!("{prelude}\n{body}"), lines)

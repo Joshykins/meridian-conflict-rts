@@ -1468,6 +1468,11 @@ pub struct RawWeapon {
     /// default): none. Cosmetic.
     #[serde(default)]
     pub fling: u8,
+    /// Seconds a shoulder gun (`mount`) takes to run back out after a shot's kick: it
+    /// slams back, holds a moment, then eases home over this (the Exarch mortar's). Zero
+    /// (the default): the ordinary quick kick. Cosmetic.
+    #[serde(default)]
+    pub run_out: f64,
     /// A strafing beam (`RawStrafe`).
     #[serde(default)]
     pub strafe: Option<RawStrafe>,
@@ -2133,6 +2138,11 @@ impl Unit {
                     "{ctx}: fling is up to 12 turns, on a shoulder gun (mount)"
                 )));
             }
+            if w.run_out != 0.0 && (!w.mount || !(0.2..=6.0).contains(&w.run_out)) {
+                return Err(DataError::Invalid(format!(
+                    "{ctx}: run_out is 0.2 to 6 s, on a shoulder gun (mount)"
+                )));
+            }
             if w.dash_only && w.cone.is_none() {
                 return Err(DataError::Invalid(format!(
                     "{ctx}: a dash_only weapon is a cone, let go at the unit's feet as it lands"
@@ -2324,6 +2334,7 @@ impl Unit {
                 rails: w.rails,
                 shatter: w.shatter as f32,
                 fling: w.fling,
+                run_out_ticks: ticks(w.run_out).clamp(0, 120) as u16,
                 surge: match &w.surge {
                     Some(s) => Some(s.compile(key, fx, TICKS_PER_SECOND)?),
                     None => None,

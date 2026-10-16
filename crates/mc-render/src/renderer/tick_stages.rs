@@ -237,6 +237,10 @@ impl Renderer {
                     self.regency_guns_tick(units, &frame.houses, time);
                 }
                 {
+                    let _t = mc_core::perf_span!("wfx.gravitic_mortar_tick");
+                    self.gravitic_mortar_tick(units, &frame.houses, time);
+                }
+                {
                     let _t = mc_core::perf_span!("wfx.regency_trails");
                     self.regency_trails(projectiles, time);
                 }

@@ -45,6 +45,7 @@ mod capital_crash_fx;
 mod capital_fx;
 mod capture;
 mod casing_fx;
+mod charge_events;
 mod damper_fx;
 mod dash_fx;
 mod dive_fx;
@@ -4831,41 +4832,7 @@ impl Renderer {
                 self.shell_discharge(Vec3::from(from.to_f32()), to, splash, after.to_f32(), time);
                 self.shell_melt(to, splash * melt, after.to_f32(), time);
             }
-            SimEvent::WeaponCharging {
-                unit,
-                pos,
-                owner,
-                blueprint,
-                weapon,
-                gun,
-            } => {
-                // A squeezed plasma gun gathers its charge in front of the bore
-                // (`regency_guns_fx`), not as an ordinary gun's glow nor as a thrown
-                // charge held at its unpitched muzzle (the Springald lobs, but its
-                // charge rides its barrel).
-                if !self.regency_charging(
-                    unit.0,
-                    (*blueprint, *weapon, *gun),
-                    Vec3::from(pos.to_f32()),
-                    time,
-                ) {
-                    self.plasma_charging(
-                        unit.0,
-                        *owner,
-                        *blueprint,
-                        *weapon,
-                        Vec3::from(pos.to_f32()),
-                        time,
-                    );
-                    self.weapon_charging(Vec3::from(pos.to_f32()), *blueprint, *weapon, time);
-                }
-                let w = &self.blueprints.unit(*blueprint).weapons[*weapon as usize];
-                let seconds = w.charge_ticks as f32 * self.tick_seconds.max(0.02);
-                if w.bore.is_some() && seconds >= titan_fx::GIANT_CHARGE {
-                    let (at, id) = (Vec3::from(pos.to_f32()), blueprint.0 as u32);
-                    self.bore_charge(at, id, seconds, time);
-                }
-            }
+            SimEvent::WeaponCharging { .. } => self.weapon_charging_event(event, time),
             SimEvent::MissileLased {
                 from,
                 to,

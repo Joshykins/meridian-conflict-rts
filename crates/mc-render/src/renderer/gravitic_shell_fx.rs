@@ -4,14 +4,22 @@
 //! from the bore to the ground: no powder flash or smoke, no orange blast, no crater, no
 //! red plasma.
 //!
-//! - **The shot** (`SimEvent::ShotFired`): the knot pinched out of the bore, a ring of bent
-//!   light tightening on it at the mouth; a white-violet flash, a violet pressure ring
-//!   punched out along the bore, motes and a few arcs of violet thrown after it.
-//! - **In flight** (sprites.wgsl `plasma_look::GRAVITIC_SHELL`): a knot of held gravity, a
-//!   lilac-white heart in a deep violet body ringed dark where it bends the light, a short
-//!   twisting violet tail, and behind it a filament trail (`PLASMA_TRAIL_GRAVITIC`) that
-//!   deepens to violet and goes out to indigo. It bends the view round it as it flies
-//!   (a lens for the tone map) and lights what it passes violet (`lights.rs`).
+//! - **The charge** (`SimEvent::WeaponCharging`, `charge`): the crystal winding up and
+//!   lighting, motes drawn in, light running up the tines, arcs across the gap, a ring of
+//!   bent light closing on the mouth.
+//! - **The shot** (`SimEvent::ShotFired`): the crystal lets go in a white-violet flash
+//!   thrown up the bore, the knot pinched out between the points, a ring of bent light
+//!   tightening on it at the mouth and the view bent out round it; violet pressure rings
+//!   punched out one after another along the line of fire, lightning snapping off the
+//!   points, motes and arcs thrown after it; lilac vapour blown out of the breech to either
+//!   side as the gun slams back (the mirror's `run_out_pair`), and the air shoved down
+//!   round the gun's feet.
+//! - **In flight** (sprites.wgsl `plasma_look::GRAVITIC_SHELL`): a shard of violet crystal
+//!   (`gravitic_shard`), a long point forward, turning about its length, lit from within
+//!   and its points going white; a short twisting violet tail, and behind it a filament
+//!   trail (`PLASMA_TRAIL_GRAVITIC`) that deepens to violet and goes out to indigo. It
+//!   bends the view round it as it flies (a lens for the tone map) and lights what it
+//!   passes violet (`lights.rs`). From afar it is a violet point, from orbit a marker.
 //! - **The strike** (`SimEvent::Impact`): a pull first, a ring of bent light and motes
 //!   drawn in to the point and the view bent in toward it; then the ground shatters
 //!   (`rift::SHELL`, scars.wgsl): plates broken over `Weapon::shatter` metres, struck
@@ -39,9 +47,16 @@ use super::stun_fx::Flash;
 use super::{Renderer, PUFF_CLOD, PUFF_DUST};
 use crate::gpu_consts::{effect, fade_beam, haze, plasma_look, puff};
 
+mod charge;
+
 const MOTE: f32 = puff::WARP_MOTE as f32;
 const ARC: f32 = puff::WARP_ARC as f32;
 const LENS: f32 = puff::CRUSH_LENS as f32;
+const GLOW: f32 = puff::WARP_GLOW as f32;
+const STREAK: f32 = puff::WARP_STREAK as f32;
+/// The pressure rings a shot punches out along its line of fire: metres out from the
+/// mouth, metres across, each a little after the last.
+const RINGS: [(f32, f32); 3] = [(3.0, 4.5), (6.5, 6.0), (10.5, 7.5)];
 const GRAVITIC: f32 = effect::GRAVITIC as f32;
 /// The motes' drag (warp_puffs.wgsl): one thrown at `v` goes `v * (1 - e^(-DRAG t)) / DRAG`.
 const DRAG: f32 = 1.8;
@@ -98,6 +113,7 @@ pub(super) struct GraviticShellFx {
     /// Shells in flight this tick: where each was and is, and its size.
     flying: Vec<(Vec3, Vec3, f32)>,
     pulls: Vec<Pull>,
+    charges: Vec<charge::Charge>,
     /// This frame's lenses for the tone map (heat_haze.rs).
     pub(super) lenses: Vec<GpuHeatPlume>,
 }
@@ -148,10 +164,12 @@ impl Renderer {
                     return false;
                 };
                 let (flash, shock) = (w.flash.clamp(0.5, 3.0), w.shockwave);
+                let pivot = w.pivot.map_or(Vec3::ZERO, |p| Vec3::from(p.to_f32()));
+                let bore = Vec3::from(w.muzzle.to_f32()).distance(pivot);
                 let at = Vec3::from(pos.to_f32()) - Vec3::from(travel.to_f32());
                 let dir = Vec3::from(vel.to_f32()).normalize_or(Vec3::X);
                 let outbound = std::mem::replace(&mut self.effect_outbound, true);
-                self.gravitic_shell_fired(at, dir, flash, shock, time);
+                self.gravitic_shell_fired(at, dir, (flash, shock, bore), time);
                 self.effect_outbound = outbound;
                 true
             }
@@ -180,9 +198,18 @@ impl Renderer {
         }
     }
 
-    /// The knot leaves the bore at `at` along `dir`.
-    fn gravitic_shell_fired(&mut self, at: Vec3, dir: Vec3, s: f32, shock: f32, time: f32) {
+    /// The knot leaves the bore at `at` along `dir`; `s` the weapon's flash, `shock` its
+    /// shockwave and `bore` metres from its trunnions out to its mouth.
+    fn gravitic_shell_fired(
+        &mut self,
+        at: Vec3,
+        dir: Vec3,
+        (s, shock, bore): (f32, f32, f32),
+        time: f32,
+    ) {
         let mouth = at + dir * 0.6 * s;
+        self.gravitic_shell_let_go(at, dir, s, bore, time);
+        self.gravitic_shell_kick(at, dir, s, bore, time);
         // The knot pinched out: a ring of bent light tightening on it at the mouth.
         self.push_lit(
             LENS,
@@ -218,8 +245,28 @@ impl Renderer {
                 0.0,
                 dir,
             );
+            // Tight rings punched out one after another down the line of fire.
+            for (k, &(out, across)) in RINGS.iter().enumerate() {
+                self.push_shockwave(
+                    (mouth + dir * out * s).to_array(),
+                    time + 0.025 * k as f32,
+                    across * s,
+                    0.3 + 0.05 * k as f32,
+                    (0.8 * shock).min(1.0),
+                    0.0,
+                    dir,
+                );
+            }
             self.effect_settings.shockwave_color = tint;
         }
+        // The view bent out round the mouth for a moment as the knot leaves.
+        self.plasma_fx.shells.pulls.push(Pull {
+            at: mouth + dir * 2.0,
+            radius: 5.0 * s,
+            start: time,
+            life: 0.4,
+            peak: 0.12,
+        });
         // Motes of violet thrown out after it in a loose cone, and arcs snapping forward.
         let side = dir.cross(Vec3::Z).normalize_or(Vec3::Y);
         let up = side.cross(dir);
@@ -265,6 +312,118 @@ impl Renderer {
             start: time,
             life: 0.35,
         });
+    }
+
+    /// The crystal letting the knot go, the mouth at `at`: a white-violet flash where it
+    /// hangs between the tines (`charge::CRYSTAL` of the `bore` back), its light thrown up
+    /// the bore, and lightning snapping off the tines' points after the knot.
+    fn gravitic_shell_let_go(&mut self, at: Vec3, dir: Vec3, s: f32, bore: f32, time: f32) {
+        let side = dir.cross(Vec3::Z).normalize_or(Vec3::Y);
+        let up = side.cross(dir);
+        let crystal = at - dir * bore * (1.0 - charge::CRYSTAL);
+        self.push_lit(
+            GLOW,
+            crystal,
+            Vec3::ZERO,
+            time,
+            0.22,
+            (2.2 * s, 2.2 * s),
+            WHITE.lerp(LILAC, 0.4) * 5.0,
+            0.0,
+        );
+        self.push_lit(
+            STREAK,
+            crystal,
+            dir * (at.distance(crystal) + 4.0 * s),
+            time,
+            0.16,
+            (0.5 * s, 0.2 * s),
+            LILAC * 6.0,
+            0.0,
+        );
+        for tip in [up * 0.3, -up * 0.3] {
+            let ahead = at + dir * s * (3.5 + 2.5 * self.scatter.unit());
+            self.emp_kinks(
+                at + tip,
+                ahead,
+                0.35 * s,
+                side,
+                up * 0.1,
+                time,
+                0.12,
+                0.35,
+                5,
+                fade_beam::RIFT_BOLT,
+            );
+        }
+    }
+
+    /// The gun slamming back in its yoke, the mouth at `at` and the breech `bore` metres
+    /// back: lilac vapour blown out of the breech to either side and back, and the air
+    /// shoved down round the gun's feet.
+    fn gravitic_shell_kick(&mut self, at: Vec3, dir: Vec3, s: f32, bore: f32, time: f32) {
+        let side = dir.cross(Vec3::Z).normalize_or(Vec3::Y);
+        let up = side.cross(dir);
+        let breech = at - dir * (bore + 1.2);
+        for sign in [1.0f32, -1.0] {
+            let vent = breech + side * sign * 0.8;
+            for k in 0..3 {
+                let out = (side * sign - dir * 0.5 + up * 0.25 * self.scatter.signed())
+                    .normalize_or(side);
+                let reach = s * (3.0 + 2.0 * self.scatter.unit());
+                self.push_lit(
+                    STREAK,
+                    vent,
+                    out * reach,
+                    time + 0.012 * k as f32,
+                    0.25,
+                    (0.25 * s, 0.1 * s),
+                    LILAC * 3.0,
+                    0.0,
+                );
+            }
+            for _ in 0..6 {
+                let out = (side * sign - dir * 0.4
+                    + Vec3::new(
+                        self.scatter.signed(),
+                        self.scatter.signed(),
+                        self.scatter.signed(),
+                    ) * 0.35)
+                    .normalize_or(side);
+                let roll = self.scatter.unit();
+                self.push_lit(
+                    MOTE,
+                    vent,
+                    out * mote_speed(4.0 * s * (0.6 + 0.6 * roll), 0.6),
+                    time + roll * 0.04,
+                    0.5 + 0.3 * roll,
+                    (0.25 * s, 0.1 * s),
+                    VIOLET.lerp(LILAC, 0.5 + 0.5 * roll) * 3.0,
+                    0.0,
+                );
+            }
+        }
+        // The air shoved down round the feet: a low skirt of dust rolling out.
+        let foot = breech.truncate();
+        let floor = self.ground_height(foot);
+        if at.z - floor > 60.0 || self.under_sea(foot.extend(floor + 0.1)) {
+            return;
+        }
+        for i in 0..12 {
+            let a = TAU * (i as f32 + self.scatter.unit() * 0.6) / 12.0;
+            let way = Vec2::new(a.cos(), a.sin());
+            let p = foot + way * (3.0 + 5.0 * self.scatter.unit());
+            let speed = 9.0 + 7.0 * self.scatter.unit();
+            let life = 1.4 + 0.6 * self.scatter.unit();
+            self.push_puff(
+                PUFF_DUST,
+                p.extend(self.ground_height(p)),
+                way.extend(0.1) * speed,
+                time + 0.05,
+                life,
+                (1.0, 3.2),
+            );
+        }
     }
 
     /// The shell lands at `at` at `start`: a pull, then the ground shattered `radius` round.
