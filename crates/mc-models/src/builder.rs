@@ -1148,7 +1148,7 @@ impl MeshBuilder {
 
     /// Marks this hull as a hovercraft: the shader bobs it, the renderer
     /// raises downwash, and the skirt is left sitting off the ground.
-    /// Tread crawl and the running-gear shudder do not apply.
+    /// Tread crawl does not apply.
     pub fn set_hover(&mut self) {
         self.hover = true;
     }

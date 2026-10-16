@@ -2205,19 +2205,6 @@ fn vs_main(in: VsIn) -> VsOut {
             n = posed[1];
             // The legs lean with the body's shift, the feet staying where they stand.
             p.y += stance.body.y * clamp(p.z / model.leg_hip.z, 0.0, 1.0);
-        } else if in.part == PART_LOCOMOTION && !walks && (model.icon & 0x20000u) == 0u
-            && (e.owner_flags & KIND_WRECK) == 0u
-            && (in.rig & RIG_DEPLOY) == 0u
-            && terrain_height(e.pos.xy) >= globals.map.z - 0.25 {
-            // Running gear without a rig: a small shudder. Quiet while floating.
-            // Hover skirts are not tracks: they do not crawl or bounce with the belt.
-            // It follows the ground covered, not the clock, and fades in with speed, so a
-            // hull nudged a hair by the crowd (one tick of MOVING) does not twitch.
-            let gt = globals.sun.w;
-            let step = mix(e.gait.z, e.gait.y, gt);
-            let rolled = e.gait.x - e.gait.y * (1.0 - gt);
-            let phase = fract(rolled * 0.25) * 6.2831853 + p.x * 0.8 + sign(p.y) * 1.57;
-            p.z += max(sin(phase), 0.0) * 0.12 * model.height * 0.1 * smoothstep(0.1, 0.8, step);
         }
     }
     // Factory deck: up while a hull is printing, down to release it. A refit
