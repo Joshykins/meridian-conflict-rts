@@ -378,7 +378,7 @@ fn destroyers_core_charges_before_the_lance_lights() {
     w.state.units.health[tank] = Fx::from_int(500000);
     let blueprint = w.state.units.blueprint[ship];
     let spin_ticks = w.blueprints.unit(blueprint).weapons[0].spin_ticks as usize;
-    assert_eq!(spin_ticks, 30, "a 3 s charge");
+    assert_eq!(spin_ticks, 50, "a 5 s charge");
     let (id, tank_id) = (w.state.units.id(ship), w.state.units.id(tank));
     w.tick(&[cmd(Command::Attack {
         units: vec![id],
