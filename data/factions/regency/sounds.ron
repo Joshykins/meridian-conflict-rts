@@ -1185,7 +1185,7 @@
         // the Edict's release at 3 s: the pinch, a crack and a chest-deep slam, the column's
         // buzzing roar falling away into the hold. Low and tonal; nothing beeps or whines.
         "regency_edict_lance_charge": (
-            length: 4.2, peak: 0.85, room: 0.5,
+            length: 6.0, peak: 0.85, room: 0.5,
             layers: [
                 // The contactor.
                 Burst(low: 35, high: 380, attack: 0.001, decay: 0.06, gain: 4, seed: 47201),
