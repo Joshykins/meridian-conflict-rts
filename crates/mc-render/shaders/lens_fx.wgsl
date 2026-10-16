@@ -1,9 +1,9 @@
 //!use bindings
 // A gravitic lens at work, the Lodestone's (renderer/lens_fx.rs, lens_fx/pass.rs): one
 // record a lens, drawn by three meshes over the scene after the water. Each bends the scene
-// behind it, read from the copy the water sees through (set 2), and darkens it; the light
-// is the Fallen's violet energy wound round that dark, at moderate gains. (Its trail in the
-// ground is the terrain's, scars.wgsl `RIFT_TRAIL`.)
+// behind it, read from the copy the water sees through (set 2); the light is the Fallen's
+// violet energy, burning lilac-white at the heart of the charge and the front. (Its trail
+// in the ground is the terrain's, scars.wgsl `RIFT_TRAIL`.)
 //
 // - **The well** (`vs_lens_well`): where the front strikes, a disc laid over the ground
 //   round the target. The strike's violet ring closes over it; for a moment it is
@@ -13,11 +13,11 @@
 //   is left fading.
 // - **The air** (`vs_lens_ribbon`): a corridor of rippled air behind a running front with
 //   a frayed violet wake in it.
-// - **The charge, the front, the strike** (`vs_lens_ball`): turned to the eye, a black
-//   heart with the scene behind it bent round it as round a heavy mass, a thin rim where
-//   the light bends hardest, violet filaments swirling round it (`lens_energy`); drawn
-//   larger far off. Rings of bent air close on the charge, and a violet one on the target
-//   as the front strikes; then the dark flash throws off a ragged violet ring.
+// - **The charge, the front, the strike** (`vs_lens_ball`): turned to the eye, a burning
+//   heart in a violet halo, the scene behind it bent round it as round a heavy mass, a
+//   thin rim where the light bends hardest, violet filaments swirling round it
+//   (`lens_energy`); drawn larger far off. Rings of bent air close on the charge, and a violet one on the target
+//   as the front strikes; then the flash throws off a ragged violet ring.
 //
 // Premultiplied, depth-tested, writing no depth; no `discard` (AMD).
 
@@ -54,9 +54,11 @@ struct LensWork {
 const L_RED: vec3<f32> = vec3<f32>(1.0, 0.07, 0.04);
 const L_VIOLET: vec3<f32> = vec3<f32>(0.55, 0.16, 1.0);
 const L_RIM: vec3<f32> = vec3<f32>(0.78, 0.11, 0.52);
-// The Fallen's energy round a dark heart: violet, and lilac where it runs hottest. Kept
+// The Fallen's energy round the heart: violet, and lilac where it runs hottest. Kept
 // to moderate gains: a bright violet line blooms to white.
 const L_LILAC: vec3<f32> = vec3<f32>(0.82, 0.6, 1.0);
+// The burning heart of the charge and the front: lilac run nearly to white.
+const L_CORE: vec3<f32> = vec3<f32>(0.95, 0.85, 1.0);
 
 fn hidden_clip() -> vec4<f32> {
     return vec4<f32>(0.0, 0.0, 0.0, -1.0);
@@ -67,7 +69,7 @@ fn since(when: f32) -> f32 {
     return select(-1.0e6, globals.camera.w - when, when >= 0.0);
 }
 
-// When the well collapses: at once after the strike's dark flash (below zero: no strike).
+// When the well collapses: at once after the strike's flash (below zero: no strike).
 fn collapse_at(s: LensWork) -> f32 {
     return select(-1.0, s.strike + LENS_FX_IMPLODE + LENS_FX_FLASH, s.strike >= 0.0);
 }
@@ -421,7 +423,7 @@ fn fs_lens_ribbon(in: RibbonOut) -> @location(0) vec4<f32> {
 // The violet energy wound round a heart (`BallOut::energy`), at `r` metres from its middle:
 // filaments of it swirling round, hottest close in, a faint violet haze between them out to
 // its outer radius; and the violet on a ring of bent air closing in (`shape.w`). Light only,
-// round the dark heart, never a ball of its own.
+// round the burning heart.
 fn lens_energy(in: BallOut, r: f32, px: f32) -> vec3<f32> {
     let strength = in.energy.x;
     let inner = in.energy.y;
@@ -466,10 +468,10 @@ struct BallOut {
     @location(2) @interpolate(flat) middle: vec3<f32>,
     @location(3) @interpolate(flat) right: vec3<f32>,
     @location(4) @interpolate(flat) up: vec3<f32>,
-    // The black heart's radius, how hard the light bends (the radius it is seen at),
+    // The burning heart's radius, how hard the light bends (the radius it is seen at),
     // the reach of the bend, and a ring of bent air's radius (below zero: none).
     @location(5) @interpolate(flat) shape: vec4<f32>,
-    // The ring's strength, the rim's, how black the heart is, the billboard's half size.
+    // The ring's strength, the rim's, how bright the heart burns, the billboard's half size.
     @location(6) @interpolate(flat) look: vec4<f32>,
     // The violet energy wound round the heart: how strong, its inner and outer radius,
     // and the ring's violet (the strike's closing ring).
@@ -483,13 +485,13 @@ fn vs_lens_ball(@builtin(vertex_index) v: u32, @builtin(instance_index) instance
     var out: BallOut;
     let ball = v / 6u;
     var middle = s.front;
-    // Heart, bend, reach, ring; ring strength, rim, black, half size.
+    // Heart, bend, reach, ring; ring strength, rim, heart, half size.
     var shape = vec4<f32>(0.0, 0.0, 0.0, -1.0);
     var look = vec4<f32>(0.0, 0.35, 1.0, 0.0);
     var energy = vec4<f32>(0.0);
     var show = false;
     // Far off, the charge and the front are drawn larger, so they read at a game's zoom
-    // as a knot of violet round a dark heart, not a speck.
+    // as a knot of violet round a burning heart, not a speck.
     let far = clamp(distance(globals.camera.xyz, s.front) / 220.0, 1.0, 4.0);
     if ball == 0u {
         let c = since(s.charge);
@@ -534,7 +536,7 @@ fn vs_lens_ball(@builtin(vertex_index) v: u32, @builtin(instance_index) instance
                 look = vec4<f32>(2.2, 0.5, 1.0, max(s.radius * 0.7 + 4.0, 10.5));
                 energy = vec4<f32>(1.0, 1.3, 4.5, 1.0 - 0.5 * f);
             } else {
-                // The dark flash: the heart thrown open and gone.
+                // The flash: the heart thrown open and gone.
                 let f = (a - LENS_FX_IMPLODE) / LENS_FX_FLASH;
                 let heart = mix(1.3, 7.5, sqrt(f));
                 shape = vec4<f32>(heart, heart * 1.3 * (1.0 - f), heart * 2.4, -1.0);
@@ -611,15 +613,15 @@ fn fs_lens_ball(in: BallOut) -> @location(0) vec4<f32> {
     let seen = bent_scene(p, distance(globals.camera.xyz, in.middle));
     let half = in.look.w;
     let w = clamp(length(src - in.q) / 0.05, 0.0, 1.0) * (1.0 - smoothstep(0.85, 1.0, r / half));
-    // The black heart, soft by a pixel, and the thin rim where the light bends hardest.
-    let black = (1.0 - smoothstep(heart - px, heart + px, r)) * in.look.z;
-    // A shadow round the heart, deepest at its edge: the light that passed close is lost.
-    let shade = exp(-max(r - heart, 0.0) / max(0.9 * heart, 0.3)) * 0.55 * in.look.z;
+    // The burning heart, soft by a pixel, white-lilac, in a violet halo falling off round
+    // it, and the thin rim where the light bends hardest.
+    let core = (1.0 - smoothstep(heart * 0.55 - px, heart + px, r)) * in.look.z;
+    let halo = exp(-max(r - heart * 0.55, 0.0) / max(0.7 * heart, 0.3)) * in.look.z
+        * select(0.0, 1.0, heart > 0.0);
     let rim = exp(-pow((r - heart * 1.06) / (0.04 * heart + px), 2.0)) * in.look.y;
-    var light = L_RIM * rim * 0.05 + lens_energy(in, r, px) * (1.0 - black);
+    let light = L_RIM * rim * 0.05 + L_CORE * core * 2.2 + L_VIOLET * halo * 0.7
+        + lens_energy(in, r, px) * (1.0 - 0.6 * core);
     // Soft where it meets the ground or a hull behind it.
     let soft = clamp(gap / 2.0, 0.0, 1.0);
-    // The bend softens where it meets what is behind it; the heart stays whole.
-    let heart_dark = max(black, shade * select(0.0, 1.0, heart > 0.0) * soft);
-    return under_sea_seen(lay(seen, w * soft, heart_dark, light), in.clip);
+    return under_sea_seen(lay(seen, w * soft, 0.0, light), in.clip);
 }

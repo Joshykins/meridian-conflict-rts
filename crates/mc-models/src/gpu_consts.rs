@@ -1788,7 +1788,7 @@ shared! {
         /// Billboards a lens draws (its charge or its front, the strike's core, and the
         /// snap of bent air as it lets go).
         pub const BALLS: u32 = 3;
-        /// Seconds: the strike's ring closing in, the dark flash after it (the well
+        /// Seconds: the strike's ring closing in, the flash after it (the well
         /// collapses as it ends), the collapse's pulse running out, and its pressed ring
         /// left fading on the ground.
         pub const IMPLODE: f32 = 0.22;

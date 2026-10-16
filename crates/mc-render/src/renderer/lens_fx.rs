@@ -1,16 +1,16 @@
 //! A gravitic lens at work, as it is drawn (`Weapon::lens`, the Lodestone; `mc_sim::lens`):
 //! of a piece with the Regency's gravity engines, a small, quick cousin of the Fallen's.
-//! Its heart is dark: it bends the scene behind it (the copy the water sees through,
-//! lens_fx.wgsl) and darkens it. Round that heart runs the Fallen's violet energy (its
-//! colours, and its lightning made small, `fade_beam::LENS_ARC`), wound round the dark,
-//! never a ball of light; the gains stay moderate, as a bright violet blooms to white.
+//! Its heart burns lilac-white in a violet halo, and it bends the scene behind it (the copy
+//! the water sees through, lens_fx.wgsl). Round that heart runs the Fallen's violet energy
+//! (its colours, and its lightning made small, `fade_beam::LENS_ARC`), wound round it; the
+//! gains stay moderate, as a bright violet blooms to white.
 //!
-//! - **Charge** (`WeaponCharging`): a black pinpoint swells over the emitter with violet
+//! - **Charge** (`WeaponCharging`): a burning pinpoint swells over the emitter with violet
 //!   filaments winding round it, rings of bent air close in on it one after another, and
 //!   grit and dust are drawn in to it.
 //! - **Launch** (`LensLaunched`): a deep pressure snap at the emitter; the pinpoint is let
 //!   go as the front.
-//! - **Front**: a dark lens running out to its target, black at its heart and bending what
+//! - **Front**: a lens running out to its target, burning at its heart and bending what
 //!   lies behind it round that heart, wrapped in swirling violet filaments with a frayed
 //!   violet wake; small arcs crackle off it, back along its way and down to the ground,
 //!   and its light falls on what it passes. Far off it is drawn larger, so it reads at a
@@ -20,10 +20,10 @@
 //!   `gravitic_engine_fx::ground`): a jagged crack, the ground either side broken into
 //!   tipped plates, cracks branching off it at a slant. Violet light down in the crack
 //!   burns behind the head and cools in about a second to embers. Once the front strikes
-//!   (or is lost), the light dies and the cracks fade out over some seconds. Trails keep
+//!   (or is lost), the light dies and the cracks fade out over three seconds. Trails keep
 //!   to their own share of the records (`rift::TRAILS`), the oldest going first.
 //! - **Strike** (`LensStruck`): a violet ring of bent air snaps inward onto the target,
-//!   arcs run in from round the well's edge, a dark flash throws off a ragged violet ring
+//!   arcs run in from round the well's edge, a flash throws off a ragged violet ring
 //!   and a violet light, then dust is pushed out across the well and the trees bowed.
 //! - **Collapse**, at once after the flash (`collapse`): for a moment the ground under the
 //!   well is darkened and rippling in, thin violet arms spiralling in and violet energy
@@ -75,7 +75,7 @@ const DUST_HEIGHT: f32 = 30.0;
 /// How much of a blast's dust a lens's puffs carry.
 const DUST_THIN: f32 = 0.4;
 
-/// When a well that opened at `strike` collapses: at once after the dark flash.
+/// When a well that opened at `strike` collapses: at once after the flash.
 fn collapse(strike: f32) -> f32 {
     strike + IMPLODE + FLASH
 }
@@ -591,11 +591,11 @@ impl Renderer {
     }
 
     /// The front strikes on `foot`: a ring of bent air closes on the target (lens_fx.wgsl),
-    /// a dark flash, then dust pushed out across the well and the trees bowed.
+    /// a flash, then dust pushed out across the well and the trees bowed.
     fn lens_strike(&mut self, foot: Vec3, radius: f32, time: f32) {
         let push = time + IMPLODE + 0.06;
         // As the ring closes: arcs from out round the well's edge in onto the target, and
-        // a violet flash with the dark one.
+        // a violet light with the flash.
         for k in 0..7 {
             let angle = (k as f32 + self.scatter.unit()) / 7.0 * TAU;
             let rim = foot.truncate()

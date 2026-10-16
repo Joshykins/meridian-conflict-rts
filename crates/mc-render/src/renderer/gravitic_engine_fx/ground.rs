@@ -44,8 +44,9 @@ const LIGHT_DIES: f32 = 2.5;
 const PLATES_SETTLE: f32 = 6.0;
 /// How quickly a fed break's light follows what it is fed (1/s).
 const FOLLOW: f32 = 6.0;
-/// Seconds a lens's trail takes to fade out once it is let go.
-const TRAIL_SCAR: f32 = 14.0;
+/// Seconds a lens's trail takes to fade out once it is let go: gone well before its lens
+/// fires again.
+const TRAIL_SCAR: f32 = 3.0;
 /// Seconds a shell's break holds its light after it lands, the light then takes to die,
 /// and its scar takes to fade away from the landing.
 const SHELL_HOLD: f32 = 0.5;
@@ -374,9 +375,9 @@ impl RiftGround {
                         r.now[k] = r.now[k].min(r.fed[k] * light * light);
                     }
                     if r.kind == rift::TRAIL {
-                        // A trail's scar fades away entirely.
+                        // A trail's scar fades away entirely, from the moment it is let go.
                         let scar = (1.0 - gone / TRAIL_SCAR).clamp(0.0, 1.0);
-                        r.now[4] = r.now[4].min(r.fed[4] * scar.sqrt());
+                        r.now[4] = r.now[4].min(r.fed[4] * scar * scar);
                     } else {
                         // Settled plates still show a little: the ground stays broken.
                         r.now[4] = r.now[4].min(r.fed[4] * (0.25 + 0.75 * settle * settle));
