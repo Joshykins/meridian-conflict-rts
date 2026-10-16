@@ -345,12 +345,15 @@ impl World {
             if !weapon.is_group() {
                 continue;
             }
+            // `picks` holds the groups' guns alone, each by its gun slot: an ordinary weapon
+            // ahead of a group (a held beam) has a slot but no pick.
             let first = bp.gun_slot(w);
-            let guns = &picks[first..first + weapon.mounts.len()];
-            let lead = guns
-                .iter()
-                .find(|p| p.1 != Handle::NONE)
-                .unwrap_or(&guns[0]);
+            let slots = first..first + weapon.mounts.len();
+            let mut guns = picks.iter().filter(|p| slots.contains(&(p.0 as usize)));
+            let Some(&head) = guns.clone().next() else {
+                continue;
+            };
+            let lead = guns.find(|p| p.1 != Handle::NONE).unwrap_or(&head);
             targets[w] = lead.1;
             *blocked = *blocked & !(1 << w) | (lead.2 as u16) << w;
         }

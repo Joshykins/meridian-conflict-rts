@@ -549,11 +549,11 @@
         },
     ),
     "regency_t4_space_destroyer": (
-        lore: "The Regency's capital warship, cut from hard-chined armour, with an energy core set through its heart. The core gathers itself for long seconds before the lance lights; then it holds its mark under a white-hot star of a beam, and when the mark is gone the beam does not go out: it drags slowly across the ground to the next, and leaves a line of molten glass behind. Six batteries along its hull answer anything the lance is not on.",
+        lore: "The Regency's capital warship, cut from hard-chined armour under a carapace of feathered plates, two great arms swept back from its flanks into claws. An energy core is set through its heart; when the lance is called the light runs in along the seams of the hull to it, and the core lets go a column of white-hot fusion that holds its mark, and when the mark is gone it does not go out: it drags slowly across the ground to the next, and leaves a line of molten glass behind. Six batteries along its hull answer anything the lance is not on.",
         weapons: {
-            "Heavy Pinch-fusion Lance": "A held pinch-fusion beam laid from the lower lens of the core through the ship's middle: it burns what it is on and melts the ground it crosses on the way to the next.",
+            "Edict Lance": "The Regent's Edict made a held beam: the hull gathers it along its seams into the core, and the core lets it go from its lower lens as a column of pinch fusion that burns what it is on and melts the ground it crosses on the way to the next.",
             "Pinch-plasma Battery": "Twin forks in a gun house, each gathering plasma ahead of its blades and pinching it out as one jet; three a side, each bearing round its own beam.",
-            "Gravitic Seeker Battery": "Two blocks of eight hatched cells, a salvo of gravitic seekers spread over the aircraft in reach: a seeker silo's worth twice over.",
+            "Twin AA Repeater": "Twin ringed barrels raised on a pedestal, one on each arm and one each side of the after deck, laid up at the sky.",
         },
     ),
     "regency_t1_eng_station": (

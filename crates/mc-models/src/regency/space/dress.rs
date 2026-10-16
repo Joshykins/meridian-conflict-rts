@@ -1,5 +1,5 @@
 //! The dressing every faceted Regency warship hull shares: plate courses, the pale
-//! second plate, blades out of the chine, stern drives, belly lifts and the owner's mark.
+//! second plate, stern drives, belly lifts and the owner's mark.
 
 use glam::Vec3;
 
@@ -9,7 +9,7 @@ use crate::pattern;
 
 use super::super::kit::{dark_plate, metal, seam, v3};
 use super::super::machine::hoop_on;
-use super::body::{feather, Body, CHINE};
+use super::body::{feather, Body};
 
 /// The second plate: a paler steel under the same film (regency.wgsl `REG_FILM_PALE`),
 /// laid in bands against the charcoal for a two-tone hull.
@@ -41,38 +41,6 @@ pub(super) fn course(
             0.42,
         );
     }
-}
-
-/// A blade out of the hull's chine from `head` back to `tail`, reaching `span(t)` out
-/// beyond the chine and drooping `droop` by its tail: a hard, flat-faceted lozenge.
-pub(super) fn strake(
-    b: &mut MeshBuilder,
-    body: &Body,
-    (head, tail): (f32, f32),
-    span: impl Fn(f32) -> f32,
-    thick: (f32, f32),
-    droop: f32,
-) {
-    let along = if b.fine() { 12 } else { 4 };
-    let rings: Vec<Vec<Vec3>> = (0..=along)
-        .map(|i| {
-            let t = i as f32 / along as f32;
-            let x = head + (tail - head) * t;
-            let p = body.point(x.max(body.span().0 + 1.0), CHINE);
-            let inner = p - Vec3::Y * 4.0;
-            let outer = v3(x, p.y + span(t), p.z - droop * t);
-            let th = thick.0 + (thick.1 - thick.0) * t;
-            let mid = inner.lerp(outer, 0.4);
-            vec![
-                inner + Vec3::Z * th,
-                mid + Vec3::Z * (th * 0.8),
-                outer,
-                mid - Vec3::Z * (th * 0.5),
-                inner - Vec3::Z * th,
-            ]
-        })
-        .collect();
-    b.with_facets(|b| b.loft(&rings, true, true));
 }
 
 /// The stern's drives: each `(mouth's middle, radius)` a violet throat deep in a

@@ -376,11 +376,11 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         // The Resolute's peer, plated in the Ark's courses with blistered battery
         // pockets and gun wells.
         "regency_space_cruiser" => 11000,
-        // The tech 4 hero hull, the Dominion's peer: plate courses laid over the whole
-        // of it, the blades, the core's drum with an aperture each end, six ball
-        // mounts in pockets pressed into the chines (each pocket's stations add a
-        // ring to every plate course) and sixteen hatched cells.
-        "regency_space_destroyer" => 24000,
+        // The tech 4 hero hull, the Dominion's peer: plate courses and the carapace laid
+        // over the whole of it, the two arms, the core's drum with an aperture each end,
+        // six ball mounts in pockets pressed into the chines (each pocket's stations add a
+        // ring to every plate course), four AA pedestals and four Rondels.
+        "regency_space_destroyer" => 27000,
         // The tech 5 super destroyer, three kilometres of it, one or two a match: several
         // plated sub-hulls, the machinery between them, eighty-two guns (about twenty
         // thousand triangles of them) and two seeker spines.

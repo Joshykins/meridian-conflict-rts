@@ -25,28 +25,12 @@ pub(super) const BALL_R: f32 = BALL * SIZE;
 /// How far forward the forks stand of where they were authored round a flat house.
 const FORK_X: f32 = 3.0;
 
-/// Where a battery at `pivot` gathers its plasma: the port fork's gap, then starboard's.
-#[cfg(test)]
-pub(super) fn muzzles(pivot: Vec3) -> [Vec3; 2] {
-    gaps(SIZE).map(|g| pivot + g)
-}
-
 /// Where the ball (`house`) built at `scale` gathers its plasma off its pivot: the port
 /// fork's gap, then starboard's.
 #[cfg(test)]
 pub(in crate::regency::space) fn gaps(scale: f32) -> [Vec3; 2] {
     let g = GAP * scale;
     [g, v3(g.x, -g.y, g.z)]
-}
-
-/// A battery bound to `weapon`, its ball turning and pitching about `pivot`.
-pub(super) fn battery(b: &mut MeshBuilder, weapon: usize, pivot: Vec3) {
-    b.with_house(weapon, pivot, 0.8 * SIZE, |b| {
-        b.with(
-            glam::Affine3A::from_translation(pivot) * glam::Affine3A::from_scale(Vec3::splat(SIZE)),
-            house,
-        );
-    });
 }
 
 /// The ball, authored about its pivot at the origin, facing +x: all of it pitches. The

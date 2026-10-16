@@ -125,9 +125,12 @@
         shield: (kind: Hull, health: 7000, regen: 70), economy: (energy_upkeep: 180),
         sounds: (death: "blast_large", moving: "aster_hover"),
     ),
-    // The Scourge: the Regency's capital warship, the Dominion's peer. It fights from the
-    // Dominion's height with the lance held from its core under it, six batteries in
-    // ball mounts in pockets in its chines and a T3 seeker silo's worth of cells twice over.
+    // The Scourge: the Regency's capital warship, the Dominion's peer, the Regent brought
+    // down to tech 4 (docs/REGENCY_SPACE_FLEET.md). It fights from the Dominion's height with
+    // the lance held from its core under it, six batteries in ball mounts in pockets in its
+    // chines, four AA repeaters on the arms and the after deck and four Rondels. Its guns
+    // are weapon groups after the lance (`models::regency::space::destroyer`, `guns.rs`):
+    // each mount a house of its own, muzzles about its pivot as the house faces the nose.
     (
         key: "regency_t4_space_destroyer", name: "Scourge", role: "Destroyer", title: "Destroyer",
         tech: 4, categories: ["Air", "Space", "Experimental"], health: 170000,
@@ -138,122 +141,66 @@
         motion: (layer: Air, size: 0, speed: 40, accel: 4, turn: 6, altitude: 700, hover: true, hangs: true),
         warp: (per_km: 45000, spool: 7, cooldown: 110, speed: 4000, style: Nanite),
         hull_mounts: true,
+        // Four Rondel crush lenses on the deck edges, two a side.
+        anti_missile: 800, anti_missile_lasers: 4,
+        anti_missile_mounts: [(270, 22.75, 88.5), (-110, 61, 110.5), (270, -22.75, 88.5), (-110, -61, 110.5)],
         weapons: [
             // One held beam laid from the lower lens of the energy core in the drum through
-            // the ship's middle (nothing turns: the beam is aimed from the lens). The core charges for 2.5 s
-            // (`spin_up`) before the beam lights, and winds down when it has nothing left.
-            // It fires down its line (`sweep`): locked on, it holds on the mark; when the
-            // mark dies it stays lit as it slowly drags across the ground onto the next,
-            // melting a line of glass between them. Drawn as the power generator's star
-            // (`star_beam`): it melts the ground, it digs no crater.
+            // the ship's middle (nothing turns: the beam is aimed from the lens). The core
+            // charges (`spin_up`) before the beam lights, and winds down when it has nothing
+            // left. It fires down its line (`sweep`): locked on, it holds on the mark; when
+            // the mark dies it stays lit as it slowly drags across the ground onto the next,
+            // melting a line of glass between them; it digs no crater.
             (
-                name: "Heavy Pinch-fusion Lance", damage: 160, splash: 20, range: 1800, reload: 0.1,
-                hitscan: true, beam: true, star_beam: true, trajectory: Direct, spin_up: 2.5,
+                name: "Edict Lance", damage: 160, splash: 20, range: 2200, reload: 0.1,
+                hitscan: true, beam: true, star_beam: true, trajectory: Direct, spin_up: 3.0,
                 turret_turn: 12, muzzle: (0, 0, 15.2), sweep: 10,
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
                 plasma_grade: Some(PinchFusion), flash: 0.4, impact: 3.2, tracer: 26.0,
-                sounds: (spin: "regency_lance_charge", hold: "regency_lance_hold", spindown: "regency_lance_vent"),
+                sounds: (spin: "regency_edict_lance_charge", hold: "regency_edict_lance_hold", spindown: "regency_edict_lance_vent"),
             ),
-            // Six Pinch-plasma Batteries, three a side (port of each pair first, fore to
-            // aft): twin forks out of a ball mount seated in a pocket pressed into the chine,
-            // clear of the hull below, each fork gathering plasma in the gap ahead of its blades
-            // and pinching it out as one jet. Each bears from a little past
-            // the nose round its own side to a little past the stern.
+            // Six Pinch-plasma Batteries, three a side, fore to aft, port first: twin forks
+            // out of a ball mount seated in a pocket pressed into the chine, clear of the hull
+            // below, each fork gathering plasma in the gap ahead of its blades and pinching it
+            // out as one jet. Each bears from a little past the nose round its own side to a
+            // little past the stern.
             (
                 name: "Pinch-plasma Battery",
-                damage: 1400, splash: 18, range: 2400, reload: 8, salvo: 2, salvo_delay: 0.35, speed: 900, trajectory: Direct,
+                damage: 1400, splash: 18, range: 2600, reload: 8, salvo: 2, salvo_delay: 0.35, speed: 900, trajectory: Direct,
                 rounds: 8, round_span: 0.3,
-                turret_turn: 40, arc: 220, facing: 90, mount: true, pivot: (230, 45.64, 64.39), muzzle: (262.4, 50.5, 64.39),
-                muzzles: [(262.4, 50.5, 64.39), (262.4, 40.78, 64.39)],
+                turret_turn: 40, arc: 220,
+                muzzle: (32.4, 4.86, 0), muzzles: [(32.4, 4.86, 0), (32.4, -4.86, 0)],
                 targets: ["Land", "Naval", "Structure", "Space"], color: Orange, red: 1.0,
                 plasma_grade: Some(Pinched), flash: 1.8, impact: 2.6, tracer: 2.0,
                 sounds: (
                     fire: "regency_halberd_fire", charge: "regency_halberd_charge", charge_time: 1.0,
                     impact: "regency_halberd_hit", ground: "regency_halberd_hit",
                 ),
-            ),
-            (
-                name: "Pinch-plasma Battery",
-                damage: 1400, splash: 18, range: 2400, reload: 8, salvo: 2, salvo_delay: 0.35, speed: 900, trajectory: Direct,
-                rounds: 8, round_span: 0.3,
-                turret_turn: 40, arc: 220, facing: -90, mount: true, pivot: (230, -45.64, 64.39), muzzle: (262.4, -40.78, 64.39),
-                muzzles: [(262.4, -40.78, 64.39), (262.4, -50.5, 64.39)],
-                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, red: 1.0,
-                plasma_grade: Some(Pinched), flash: 1.8, impact: 2.6, tracer: 2.0,
-                sounds: (
-                    fire: "regency_halberd_fire", charge: "regency_halberd_charge", charge_time: 1.0,
-                    impact: "regency_halberd_hit", ground: "regency_halberd_hit",
-                ),
-            ),
-            (
-                name: "Pinch-plasma Battery",
-                damage: 1400, splash: 18, range: 2400, reload: 8, salvo: 2, salvo_delay: 0.35, speed: 900, trajectory: Direct,
-                rounds: 8, round_span: 0.3,
-                turret_turn: 40, arc: 220, facing: 90, mount: true, pivot: (130, 66.9, 62.91), muzzle: (162.4, 71.76, 62.91),
-                muzzles: [(162.4, 71.76, 62.91), (162.4, 62.04, 62.91)],
-                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, red: 1.0,
-                plasma_grade: Some(Pinched), flash: 1.8, impact: 2.6, tracer: 2.0,
-                sounds: (
-                    fire: "regency_halberd_fire", charge: "regency_halberd_charge", charge_time: 1.0,
-                    impact: "regency_halberd_hit", ground: "regency_halberd_hit",
-                ),
-            ),
-            (
-                name: "Pinch-plasma Battery",
-                damage: 1400, splash: 18, range: 2400, reload: 8, salvo: 2, salvo_delay: 0.35, speed: 900, trajectory: Direct,
-                rounds: 8, round_span: 0.3,
-                turret_turn: 40, arc: 220, facing: -90, mount: true, pivot: (130, -66.9, 62.91), muzzle: (162.4, -62.04, 62.91),
-                muzzles: [(162.4, -62.04, 62.91), (162.4, -71.76, 62.91)],
-                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, red: 1.0,
-                plasma_grade: Some(Pinched), flash: 1.8, impact: 2.6, tracer: 2.0,
-                sounds: (
-                    fire: "regency_halberd_fire", charge: "regency_halberd_charge", charge_time: 1.0,
-                    impact: "regency_halberd_hit", ground: "regency_halberd_hit",
-                ),
-            ),
-            (
-                name: "Pinch-plasma Battery",
-                damage: 1400, splash: 18, range: 2400, reload: 8, salvo: 2, salvo_delay: 0.35, speed: 900, trajectory: Direct,
-                rounds: 8, round_span: 0.3,
-                turret_turn: 40, arc: 220, facing: 90, mount: true, pivot: (30, 85.25, 62.08), muzzle: (62.4, 90.11, 62.08),
-                muzzles: [(62.4, 90.11, 62.08), (62.4, 80.39, 62.08)],
-                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, red: 1.0,
-                plasma_grade: Some(Pinched), flash: 1.8, impact: 2.6, tracer: 2.0,
-                sounds: (
-                    fire: "regency_halberd_fire", charge: "regency_halberd_charge", charge_time: 1.0,
-                    impact: "regency_halberd_hit", ground: "regency_halberd_hit",
-                ),
-            ),
-            (
-                name: "Pinch-plasma Battery",
-                damage: 1400, splash: 18, range: 2400, reload: 8, salvo: 2, salvo_delay: 0.35, speed: 900, trajectory: Direct,
-                rounds: 8, round_span: 0.3,
-                turret_turn: 40, arc: 220, facing: -90, mount: true, pivot: (30, -85.25, 62.08), muzzle: (62.4, -80.39, 62.08),
-                muzzles: [(62.4, -80.39, 62.08), (62.4, -90.11, 62.08)],
-                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, red: 1.0,
-                plasma_grade: Some(Pinched), flash: 1.8, impact: 2.6, tracer: 2.0,
-                sounds: (
-                    fire: "regency_halberd_fire", charge: "regency_halberd_charge", charge_time: 1.0,
-                    impact: "regency_halberd_hit", ground: "regency_halberd_hit",
-                ),
-            ),
-            // Two blocks of eight hatched cells either side of the spine, port block first,
-            // as one launcher: a Belfry's seekers twice over, a salvo spread over the
-            // aircraft in reach.
-            (
-                name: "Gravitic Seeker Battery",
-                damage: 800, splash: 24, proximity: 10, range: 2900, reload: 11, speed: 480,
-                trajectory: Direct,
-                turret_turn: 0, arc: 360, muzzle: (-290.5, 18.5, 112.86),
-                muzzles: [
-                    (-290.5, 18.5, 112.86), (-276.5, 25.5, 112.86), (-283.5, 18.5, 112.86), (-269.5, 25.5, 112.86), (-290.5, 25.5, 112.86), (-276.5, 18.5, 112.86), (-283.5, 25.5, 112.86), (-269.5, 18.5, 112.86),
-                    (-290.5, -25.5, 112.86), (-276.5, -18.5, 112.86), (-283.5, -25.5, 112.86), (-269.5, -18.5, 112.86), (-290.5, -18.5, 112.86), (-276.5, -25.5, 112.86), (-283.5, -18.5, 112.86), (-269.5, -25.5, 112.86),
+                mounts: [
+                    (pivot: (250, 40.75, 64.75), facing: 90),
+                    (pivot: (170, 59, 63.5), facing: 90),
+                    (pivot: (90, 75, 62.5), facing: 90),
+                    (pivot: (250, -40.75, 64.75), facing: -90),
+                    (pivot: (170, -59, 63.5), facing: -90),
+                    (pivot: (90, -75, 62.5), facing: -90),
                 ],
-                salvo: 16, salvo_delay: 0.2, split: true, hatch: 0.5, caliber: 0.8,
-                targets: ["Air"], color: Orange, red: 1.0, missile: true, guided: true, vertical_launch: true,
-                intercept: 80, impact: 1.6, shockwave: 0.8,
-                plasma_grade: Some(Gravitic),
-                sounds: (fire: "regency_gravitic_throw", impact: "regency_gravitic_hit"),
+            ),
+            // Four Twin AA Repeaters raised on pedestals, one on each arm's corner and one each
+            // side of the after deck, resting laid up at the sky they guard.
+            (
+                name: "Twin AA Repeater", damage: 45, splash: 3, range: 1500, reload: 0.4,
+                salvo: 2, salvo_delay: 0.15, speed: 1300, trajectory: Direct,
+                turret_turn: 180, arc: 300, rest_pitch: 45,
+                muzzle: (15.75, 1.44, 0), muzzles: [(15.75, 1.44, 0), (15.75, -1.44, 0)],
+                targets: ["Air"], color: Orange, red: 1.0,
+                plasma_grade: Some(Plasmeric), flash: 1.0, impact: 1.0, tracer: 0.9,
+                sounds: (fire: "regency_canopy_fire", impact: "regency_repeater_hit", ground: "regency_repeater_hit"),
+                mounts: [
+                    (pivot: (-190, 150, 73.25), facing: 90),
+                    (pivot: (-262, 57.5, 102.5), facing: 90),
+                    (pivot: (-190, -150, 73.25), facing: -90),
+                    (pivot: (-262, -57.5, 102.5), facing: -90),
+                ],
             ),
         ], mesh: "regency_space_destroyer", icon: Warship,
         shield: (kind: Hull, health: 64000, regen: 420), economy: (energy_upkeep: 850),
