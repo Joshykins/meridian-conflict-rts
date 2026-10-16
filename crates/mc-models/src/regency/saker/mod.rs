@@ -12,9 +12,9 @@
 //! middle of that charge. Its fusion is housed in the plated hump on the turret's back;
 //! the light is in the plates (`pattern::EMBER_SLOT`), never a lit piece.
 //!
-//! Authored planted, at the unit file's size (`regency_t4_surge_artillery`,
-//! `data/factions/regency/units/experimental.ron`), the pivot and muzzle its gun's
-//! [`gun::Line`].
+//! Authored planted, [`SCALE`] times smaller than the unit file builds it
+//! (`regency_t4_surge_artillery`, `data/factions/regency/units/experimental.ron`): its
+//! size, pivot and muzzle are this file's, its gun's [`gun::Line`], times `SCALE` (tests).
 
 mod feet;
 mod gun;
@@ -27,9 +27,12 @@ mod turret;
 use crate::builder::MeshBuilder;
 use crate::part;
 
-/// The unit file's size, planted.
+/// Authored size, planted (the unit file's is `SCALE` times it).
 pub(super) const RADIUS: f32 = 26.0;
 pub(super) const HEIGHT: f32 = 14.5;
+/// How much bigger the unit file builds it.
+#[cfg(test)]
+const SCALE: f32 = 1.3;
 
 /// The hull's top, where the turret's race sits, planted.
 const DECK: f32 = 6.6;

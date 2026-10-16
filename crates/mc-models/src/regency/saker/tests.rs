@@ -1,6 +1,6 @@
 use glam::Vec3;
 
-use super::{gun, legs, HEIGHT, RADIUS};
+use super::{gun, legs, HEIGHT, RADIUS, SCALE};
 use crate::{build_model_scaled, part, rig};
 
 const KEY: &str = "regency_saker";
@@ -55,19 +55,23 @@ fn walks_on_four_legs_and_braces() {
     assert!(feet > RADIUS * 0.9, "feet at {feet}");
 }
 
-/// The unit file's size, pivot and muzzle are the model's.
+/// The unit file builds the model `SCALE` times its authored size: its size, pivot and
+/// muzzle are the model's times `SCALE`.
 #[test]
 fn the_unit_files_gun_is_the_models() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
     let blueprints = mc_data::Blueprints::load(&dir).unwrap();
     let bp = blueprints.unit(blueprints.id_of("regency_t4_surge_artillery").unwrap());
     assert_eq!(bp.visual.mesh, KEY);
-    assert!((bp.radius.to_f32() - RADIUS).abs() < 1e-3, "radius");
-    assert!((bp.height.to_f32() - HEIGHT).abs() < 1e-3, "height");
+    assert!((bp.radius.to_f32() - RADIUS * SCALE).abs() < 1e-3, "radius");
+    assert!((bp.height.to_f32() - HEIGHT * SCALE).abs() < 1e-3, "height");
     assert!(bp.turret_at.is_none(), "the turret turns about the middle");
     let w = &bp.weapons[0];
     let v = |p: mc_core::FxVec3| Vec3::from(p.to_f32());
     let line = gun::BORE.line;
-    assert!(v(w.muzzle).distance(line.muzzle()) < 0.02, "muzzle");
-    assert!(v(w.pivot.unwrap()).distance(line.pivot) < 0.02, "pivot");
+    assert!(v(w.muzzle).distance(line.muzzle() * SCALE) < 0.02, "muzzle");
+    assert!(
+        v(w.pivot.unwrap()).distance(line.pivot * SCALE) < 0.02,
+        "pivot"
+    );
 }

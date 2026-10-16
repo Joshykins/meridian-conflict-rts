@@ -255,7 +255,8 @@
     // 7000 at 2600 m every 14 s, and the wake on top; far short of a map gun's reach. Not a
     // brawler: less than half a Strider's armour, and it must plant.
     //
-    // Model: `regency_saker` (`models::regency::saker`), authored at this size.
+    // Model: `regency_saker` (`models::regency::saker`), authored at 1/1.3 this size and
+    // built 1.3 times authored size: the muzzle and pivot follow it.
     (
         key: "regency_t4_surge_artillery",
         name: "Saker",
@@ -264,8 +265,8 @@
         categories: ["Land", "Artillery", "Experimental"],
         health: 26000,
         cost: (materials: 16000, energy: 160000, time: 94000),
-        radius: 26.0, height: 14.5,
-        footprint: (5, 5),
+        radius: 33.8, height: 18.85,
+        footprint: (7, 7),
         vision: 600,
         motion: (layer: Land, size: 4, speed: 20, accel: 10, turn: 30, deploy: 6.0, deploy_idle: true),
         weapons: [(
@@ -273,7 +274,7 @@
             damage: 7000, splash: 32, range_min: 250, range: 2600, reload: 14.0, speed: 520,
             trajectory: Ballistic, loft: 3, spread: 2.0,
             surge: (radius: 180, speed: 60, damage: 40, linger: 6),
-            turret_turn: 20, muzzle: (30.427, 0, 11.093), pivot: (0.5, 0, 9.0),
+            turret_turn: 20, muzzle: (39.555, 0, 14.421), pivot: (0.65, 0, 11.7),
             targets: ["Structure", "Land", "Naval"], color: Orange, red: 1.0,
             plasma_grade: Some(PinchFusion),
             flash: 1.6, impact: 2.0, tracer: 2.4,
