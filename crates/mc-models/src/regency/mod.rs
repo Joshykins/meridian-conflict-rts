@@ -368,10 +368,11 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         // pockets and gun wells.
         "regency_space_cruiser" => 11000,
         // The tech 4 hero hull, the Dominion's peer: plate courses and the carapace laid
-        // over the whole of it, the two arms, the core's drum with an aperture each end,
-        // six ball mounts in pockets pressed into the chines (each pocket's stations add a
-        // ring to every plate course), four AA pedestals and four Rondels.
-        "regency_space_destroyer" => 27000,
+        // over the whole of it, the two arms, the core's drum with an aperture above and
+        // the lance's emitter under it (crown, race, gimbals and ribbed dome), six ball
+        // mounts in pockets pressed into the chines (each pocket's stations add a ring to
+        // every plate course), four AA pedestals and four Rondels.
+        "regency_space_destroyer" => 28000,
         "regency_submarine" => 2800,
         "regency_frigate" => 4500,
         "regency_destroyer" | "regency_cruiser" => 7000,
