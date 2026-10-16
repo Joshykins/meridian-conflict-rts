@@ -67,7 +67,6 @@ impl World {
             .iter_mut()
             .for_each(|r| take(&mut r.owner));
         s.wells.iter_mut().for_each(|w| take(&mut w.owner));
-        s.edicts.iter_mut().for_each(|c| take(&mut c.owner));
         s.lenses.iter_mut().for_each(|t| take(&mut t.owner));
         // The heir's storage grows by what it took over; the economy holds the
         // store to it from the next tick.

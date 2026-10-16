@@ -105,13 +105,11 @@ impl Renderer {
                 let pre = mc_core::perf_span!("ev.pre");
                 self.construction(frame, time, camera);
                 self.nanite_site_glints(frame, time, camera.eye());
-                // A blast (or an Edict's strike) is known before the trees it kills are looked at
-                // (`nuke_fx::tree_fate`).
+                // A blast is known before the trees it kills are looked at (`nuke_fx::tree_fate`).
                 // (The Progenitor's unmaking is not a blast of fire: `progenitor_event` draws it.)
                 for event in &frame.events {
                     if matches!(event, SimEvent::NuclearDetonation { look, .. }
                         if *look != mc_data::strategic::StrategicLook::Progenitor)
-                        || matches!(event, SimEvent::EdictFired { .. })
                     {
                         self.nuke_event(event, time);
                     }
@@ -310,10 +308,6 @@ impl Renderer {
                 {
                     let _t = mc_core::perf_span!("wfx.write_regency_trails");
                     self.write_regency_trails(time);
-                }
-                {
-                    let _t = mc_core::perf_span!("wfx.edict_tick");
-                    self.edict_tick(frame, time, camera);
                 }
                 {
                     let _t = mc_core::perf_span!("wfx.lens_tick");

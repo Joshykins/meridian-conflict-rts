@@ -101,7 +101,6 @@ impl World {
                 crate::gravitic::hash_wells(&s.wells, h);
                 crate::lens::hash_tethers(&s.lenses, h);
                 crate::surge::hash_surges(s, h);
-                crate::edict::hash_edicts(&s.edicts, h);
             },
             &|h| {
                 s.strategic.hash(h);

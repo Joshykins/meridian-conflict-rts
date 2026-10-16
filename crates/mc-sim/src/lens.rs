@@ -27,7 +27,7 @@ use mc_data::Lens;
 use serde::{Deserialize, Serialize};
 
 use crate::tables::UnitId;
-use crate::well_area::{Aircraft, Sides, WellArea};
+use crate::well_area::{Aircraft, WellArea};
 use crate::{SimEvent, World};
 
 const DT: i32 = TICKS_PER_SECOND as i32;
@@ -120,7 +120,7 @@ impl World {
         units.is_active(row)
             && units.is_active(target)
             && planted
-            && !self.weapons_silent(row)
+            && !self.stunned(row)
             && !self.powered_down(row)
             && units.weapon_target[row].get(t.weapon as usize) == Some(&t.target)
             && units.pos[row].distance(units.pos[target]) <= reach
@@ -145,8 +145,6 @@ impl World {
             source: t.source,
             per_tick: weapon.damage / DT,
             aircraft: Aircraft::Spared,
-            edge: Fx::ONE,
-            sides: Sides::Enemies,
         })
     }
 

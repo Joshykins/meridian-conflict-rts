@@ -1,15 +1,9 @@
 //! Construction as the presentation sees it: the beams from builders and factories to
 //! the work they raise, the nanite streams and swarms of a faction that builds with
-//! nanites, and the great beam a yard casts up to a hull it raises aloft
-//! (`sky_yard.rs`).
+//! nanites.
 
 use super::*;
-use crate::reclaim::{BeamInstance, BEAM_SKY_LIFT};
-
-/// How wide the great beam a yard casts up to its hull is drawn, metres round its axis.
-const SKY_LIFT_RADIUS: f32 = 22.0;
-/// The size a helper's stream into a yard's intake is drawn for.
-const INTAKE_SIZE: f32 = 6.0;
+use crate::reclaim::BeamInstance;
 
 impl World {
     /// This tick's construction beams and build sounds into `frame`, for `viewer`.
@@ -22,16 +16,6 @@ impl World {
         let mut nanite_beams: Vec<(u32, BeamInstance)> = Vec::new();
         // The Regency sites those streams feed, by unit id.
         let mut nanite_sites: Vec<u32> = Vec::new();
-        // The hulls yards are raising aloft, and their yards: work on them pours into the
-        // yard's intakes, not up under the hull.
-        let aloft: Vec<(UnitId, usize)> = s
-            .units
-            .slots
-            .iter()
-            .filter(|&r| self.builds_aloft(r))
-            .map(|r| (s.units.build_target[r], r))
-            .filter(|&(t, _)| s.units.row(t).is_some())
-            .collect();
         for row in s.units.slots.iter() {
             let flags = s.units.flags[row];
             if flags & flag::BUILDING == 0
@@ -57,19 +41,12 @@ impl World {
                 continue;
             };
             let from = self.builder_emitter(row);
-            // A hull going up aloft is fed through one of its yard's intakes.
-            let intake = aloft
-                .iter()
-                .find(|&&(hull, _)| hull == s.units.id(t))
-                .map(|&(_, yard)| self.yard_intake(yard, s.units.id(row).0));
-            let to = intake.unwrap_or_else(|| self.weld_on(t, from.to_f32()).0);
-            let size = intake.map_or(self.bp(t).radius.to_f32(), |_| INTAKE_SIZE);
+            let to = self.weld_on(t, from.to_f32()).0;
+            let size = self.bp(t).radius.to_f32();
             frame.build_sources.push(self.build_source(row, to));
             if self.uses_nanites(row) {
                 // A Regency site is fed by one nanite stream from the builder's emitter.
-                if intake.is_none() {
-                    nanite_sites.push(s.units.id(t).0);
-                }
+                nanite_sites.push(s.units.id(t).0);
                 nanite_beams.push((
                     s.units.id(row).0,
                     BeamInstance {
@@ -87,7 +64,7 @@ impl World {
                 frame.projectiles.push(ProjectileInstance {
                     prev_pos: from.to_f32(),
                     color: COLOR_BUILD | PROJECTILE_BEAM,
-                    pos: intake.unwrap_or_else(|| self.weld_on(t, from.to_f32()).0),
+                    pos: self.weld_on(t, from.to_f32()).0,
                     size,
                     wake: 0.0,
                     plasma: 0.0,
@@ -113,23 +90,6 @@ impl World {
             };
             if !s.units.has_flag(t, flag::UNDER_CONSTRUCTION) || s.units.has_flag(t, flag::UPGRADE)
             {
-                continue;
-            }
-            if self.builds_aloft(row) {
-                // A yard casts one great beam up from its emitter to the hull it raises.
-                let (from, to) = self.sky_lift(row, t);
-                frame.build_sources.push(self.build_source(row, from));
-                nanite_beams.push((
-                    s.units.id(row).0,
-                    BeamInstance {
-                        from,
-                        kind: BEAM_SKY_LIFT,
-                        to_prev: to,
-                        radius: SKY_LIFT_RADIUS,
-                        to,
-                        height: 0.0,
-                    },
-                ));
                 continue;
             }
             let heads = self.factory_print_heads(row);
@@ -259,39 +219,5 @@ impl World {
                 height,
             });
         }
-    }
-
-    /// Where a yard's great beam leaves (its first emitter) and where it meets the hull
-    /// going up over it: the hull's belly over its middle.
-    fn sky_lift(&self, yard: usize, hull: usize) -> ([f32; 3], [f32; 3]) {
-        let s = &self.state;
-        let from = self.yard_emitter(yard, 0);
-        let h = self.bp(hull).height.to_f32();
-        let p = s.units.pos[hull].to_f32();
-        (from, [p[0], p[1], s.units.z[hull].to_f32() + h * 0.06])
-    }
-
-    /// The intake of a yard a helper's stream pours into: one of its emitters after the
-    /// first, by the helper's id, so a crowd of helpers spreads over them.
-    fn yard_intake(&self, yard: usize, helper: u32) -> [f32; 3] {
-        let n = self
-            .bp(yard)
-            .builder
-            .as_ref()
-            .map_or(1, |b| b.emitters.len().max(2));
-        self.yard_emitter(yard, 1 + helper as usize % (n - 1))
-    }
-
-    /// A yard's `k`-th emitter in the world (`Builder::emitters`, turned with the yard).
-    fn yard_emitter(&self, yard: usize, k: usize) -> [f32; 3] {
-        let s = &self.state;
-        let e = self
-            .bp(yard)
-            .builder
-            .as_ref()
-            .and_then(|b| b.emitters.get(k).copied())
-            .unwrap_or(FxVec3::new(Fx::ZERO, Fx::ZERO, self.bp(yard).height));
-        let at = s.units.pos[yard] + mc_core::FxVec2::new(e.x, e.y).rotate(s.units.heading[yard]);
-        at.extend(s.units.z[yard] + e.z).to_f32()
     }
 }

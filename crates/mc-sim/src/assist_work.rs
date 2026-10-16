@@ -29,8 +29,7 @@ impl World {
     pub(crate) fn assist_work(&self, t: usize) -> Option<AssistWork> {
         let units = &self.state.units;
         if units.has_flag(t, flag::UNDER_CONSTRUCTION) {
-            // A hull aloft whose yard is gone: nothing else can build it.
-            (!self.stranded_aloft(t)).then_some(AssistWork::Raise)
+            Some(AssistWork::Raise)
         } else if let Some(p) = units
             .row(units.build_target[t])
             .filter(|&p| units.has_flag(p, flag::UNDER_CONSTRUCTION))

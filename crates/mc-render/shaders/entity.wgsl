@@ -119,8 +119,8 @@ const WORK_BREATHE: u32 = 3u;
 const LIMB_MOUNT: u32 = 8u;
 
 // How big a model's plates are drawn, from its reach: they grow with the model up to
-// 6 m, and past a kilometre of reach (the Regent's three) on again, slowly, so a hull
-// that size is not a grid of small squares.
+// 6 m, and past a kilometre of reach on again, slowly, so a hull that size is not a grid
+// of small squares.
 fn plate_scale(reach: f32) -> f32 {
     return clamp(0.55 * pow(reach, 0.6), 0.7, 6.0 + max(reach - 1000.0, 0.0) * 0.006);
 }
@@ -252,9 +252,7 @@ struct VsOut {
     // y how full its warp drive's charge is while it spools (warp_hull.wgsl), 0 to 1.
     // A wreck instead: x the share reclaim has taken (past 1, the last of it going:
     // `wreck_going`), y seconds since it last worked it (`wreck_reclaim`).
-    // z, w: its Edict gathering in the hull (`edict_state`) and where it fires from, metres
-    // along model x (`EDICT_*`, regency.wgsl `reg_edict`); zero on anything without one.
-    @location(16) @interpolate(flat) crackle: vec4<f32>,
+    @location(16) @interpolate(flat) crackle: vec2<f32>,
     // A settled wreck's section (wreck.wgsl): the stretch of the hull it keeps along model
     // x (metres), 1 when it draws the hull's inside, 1 when it is posed at all.
     @location(17) @interpolate(flat) wreck: vec4<f32>,
@@ -413,27 +411,6 @@ fn pipe_offset(part: u32, beat: f32, model: ModelInfo) -> vec3<f32> {
 const PAT_COIL: u32 = 19u;
 const PAT_COIL_TURN: u32 = 27u;
 const CHARGE_RECORD: f32 = -1000.0;
-
-// A ship's Edict from its record in `mount` (`EDICT_*`, renderer/edict_fx): the share of the
-// gather (0 to 1) under power, minus it while stalled or let go (falling to nothing over
-// `EDICT_FADE`), or 2 plus the seconds since the shot; 0 on anything without one.
-fn edict_state(m: vec4<f32>, time: f32) -> f32 {
-    if m.w <= EDICT_GATHERING && m.w > EDICT_GATHERING - 1.0 {
-        let rate = EDICT_GATHERING - m.w;
-        return clamp(m.x + clamp(time - m.y, 0.0, EDICT_TICK_REACH) * rate, 0.001, 1.0);
-    }
-    if m.w == EDICT_STALLED {
-        return -clamp(m.x, 0.001, 1.0);
-    }
-    if m.w == EDICT_FIRED {
-        return 2.0 + max(time - m.x, 0.0);
-    }
-    if m.w == EDICT_CANCELLED {
-        let left = 1.0 - (time - m.y) / EDICT_FADE;
-        return select(0.0, -clamp(m.x, 0.001, 1.0) * left, left > 0.0);
-    }
-    return 0.0;
-}
 
 // The charge a vertex's gear and coils move with, as `mount` carries it (x start, y due,
 // z last shot, w CHARGE_RECORD): its own gun's for a piece of a gun house of its own whose
@@ -2617,9 +2594,7 @@ fn vs_main(in: VsIn) -> VsOut {
         // Bit 10: printed by a replicator (`mirror::UNIT_REPLICATING` in `status[1]`).
         | select(0u, 0x400u, (e.status[1] & 1u) != 0u)
         // Bit 14: built by nanites, not printed (`mirror::UNIT_NANITE`).
-        | select(0u, CLASS_NANITE, (e.status[1] & UNIT_NANITE) != 0u)
-        // Bit 15: it condenses along its keel, raised aloft (`ModelInfo::nanite_order`).
-        | select(0u, CLASS_KEEL, model.nanite_order == NANITE_ORDER_KEEL);
+        | select(0u, CLASS_NANITE, (e.status[1] & UNIT_NANITE) != 0u);
     out.face = in.face;
     out.unit_id = e.unit_id;
     out.skin = model.skin;
@@ -2694,9 +2669,9 @@ fn vs_main(in: VsIn) -> VsOut {
     }
     out.dust = select(0.62, model.surface.y / max(model.height, 0.1), model.surface.y > 0.0);
     let crackles = (e.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST)) == 0u;
-    out.crackle = select(vec4<f32>(0.0), vec4<f32>(mix(e.fx.z, e.fx.w, t), warp_charge(e.fx, t), edict_state(e.mount, time), e.mount.z), crackles);
+    out.crackle = select(vec2<f32>(0.0), vec2<f32>(mix(e.fx.z, e.fx.w, t), warp_charge(e.fx, t)), crackles);
     if (e.owner_flags & KIND_WRECK) != 0u {
-        out.crackle = vec4<f32>(e.fx.zw, 0.0, 0.0);
+        out.crackle = e.fx.zw;
     }
     // Pieces go up one after another over the first four fifths of the refit, each taking a fifth.
     // What is coming off turns to a hologram at the start.
@@ -2986,10 +2961,6 @@ fn fs_prepass(in: VsOut) {
             || wreck_going(in.local, in.state.z, in.weld.z, in.crackle.x, in.state.w) < 0.0) {
         discard;
     }
-    // A hull that fell half built is there only as far as it had formed.
-    if (flags & KIND_WRECK) != 0u && keel_unformed(in.local, in.weld, in.model_class, in.state.x, in.state.w) {
-        discard;
-    }
     if in.material == MAT_FOLIAGE && foliage_missing(in, foliage_sample(in)) { discard; }
     if (in.material == MAT_FOLIAGE || in.material == MAT_BARK) && (flags & KIND_PROP) != 0u && vapor_edge(in) > 0.0 {
         discard;
@@ -3006,13 +2977,12 @@ fn fs_shadow(in: VsOut) {
     if in.wreck.w > 0.5 && !wreck_keeps(in.local, in.wreck.x, in.wreck.y, in.weld.z) { discard; }
     // The last of a reclaimed wreck, burning away (`wreck_going`).
     if (in.owner_flags & KIND_WRECK) != 0u && wreck_going(in.local, in.state.z, in.weld.z, in.crackle.x, in.state.w) < 0.0 { discard; }
-    if (in.owner_flags & KIND_WRECK) != 0u && keel_unformed(in.local, in.weld, in.model_class, in.state.x, in.state.w) { discard; }
     if vapor_edge(in) > 0.0 { discard; }
     // Unbuilt parts of a construction site cast no shadow: neither what is still to be
     // printed nor a Regency site's swarm.
     if (in.owner_flags & FLAG_UNDER_CONSTRUCTION) != 0u {
         if (in.model_class & CLASS_NANITE) != 0u {
-            if site_order(in.local, in.weld, in.model_class, in.state.w).order > nanite_grow(in.state.x) {
+            if nanite_order(in.local, in.weld.w, in.state.w) > nanite_grow(in.state.x) {
                 discard;
             }
         } else {
@@ -3431,7 +3401,6 @@ fn shade_entity(in: VsOut) -> vec4<f32> {
         ri.unit = in.state.w;
         ri.working = select(0.0, 1.0, (flags & FLAG_BUILDING) != 0u && in.refit.z <= 0.0
             && (flags & (FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) == 0u);
-        ri.edict = vec3<f32>(in.crackle.zw, in.weld.z);
         regency = regency_look(ri, works);
         // A flier's feathers burn with what it does (`flight_glow`), whiter the harder.
         if in.drive_at.w == FLIGHT_DRIVE_TAG {
@@ -4111,8 +4080,7 @@ fn shade_entity(in: VsOut) -> vec4<f32> {
         m.emissive += rc.glow;
         if wreck_worn(in.local, in.state.z, in.state.y, in.weld.z)
             || (in.wreck.w > 0.5 && !wreck_keeps(in.local, in.wreck.x, in.wreck.y, in.weld.z))
-            || wreck_going(in.local, in.state.z, in.weld.z, in.crackle.x, in.state.w) < 0.0
-            || keel_unformed(in.local, in.weld, in.model_class, in.state.x, in.state.w) {
+            || wreck_going(in.local, in.state.z, in.weld.z, in.crackle.x, in.state.w) < 0.0 {
             discard;
         }
     }
@@ -4179,8 +4147,7 @@ fn shade_entity(in: VsOut) -> vec4<f32> {
 
     if (flags & FLAG_UNDER_CONSTRUCTION) != 0u && (in.model_class & CLASS_NANITE) != 0u {
         // Built by nanites, not printed: a swarm condensing into it (`nanite_site`).
-        let at = site_order(in.local, in.weld, in.model_class, in.state.w);
-        let site = nanite_site(color, in.local, in.state.x, at, in.state.w, time);
+        let site = nanite_site(color, in.local, in.state.x, in.weld.w, in.state.w, time);
         if site.w < 0.5 {
             discard;
         }

@@ -20,8 +20,8 @@ const _: () = assert!(
 );
 
 /// Metres toward the sun past a cascade's sphere that still cast into it: tall terrain,
-/// aircraft under the cloud layer, and a capital ship hanging high over the ground (the
-/// Regent's hull is 2.3 km up: 3.2 km along a sun 45 degrees up). The map is 32-bit
+/// aircraft under the cloud layer, and a capital ship hanging high over the ground (a
+/// hull 2.3 km up is 3.2 km along a sun 45 degrees up). The map is 32-bit
 /// depth, so the longer span costs no acne.
 const CASTER_REACH: f32 = 3200.0;
 

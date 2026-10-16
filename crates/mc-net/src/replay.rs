@@ -28,7 +28,7 @@ use crate::origin::{read_block, Origin};
 use crate::protocol::{MatchStart, TickBundle, MAX_FRAME_LEN};
 use crate::wire::{Dec, Enc, NetError};
 
-pub const REPLAY_FORMAT_VERSION: u32 = 35;
+pub const REPLAY_FORMAT_VERSION: u32 = 36;
 pub const REPLAY_EXTENSION: &str = "mcreplay";
 
 pub(crate) const MAGIC: [u8; 4] = *b"MCRP";

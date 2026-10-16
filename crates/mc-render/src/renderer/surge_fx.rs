@@ -17,23 +17,17 @@
 //! Its ground effects are laid a tick at a time as the front gets there (`surge_tick`);
 //! the front and the burn are drawn where the front stands each frame (`SurgeFx::upload`).
 //! Presentation only; the renderer's own clock.
-//!
-//! The Edict's strike (`nuke_fx/edict.rs`) is drawn with the same machinery at its own
-//! scale and in its own look (`Surge::look`, `gpu_consts::surge_fx`): its molten wave, its
-//! shock and the lens of plasma over its mark; what each lays on the ground as it goes is
-//! in `edict`.
 
-mod edict;
 pub(crate) mod pass;
 
 use super::regency_guns_fx::{HOT, MOTE, RED, WHITE};
 use super::{Renderer, PUFF_DUST};
 use crate::gpu::{Gpu, GpuError};
-use crate::gpu_consts::surge_fx::{EDICT_SHOCK, EDICT_WAVE, FADE, MAX_EDICT, MAX_SURGES, SAKER};
+use crate::gpu_consts::surge_fx::{FADE, MAX_SURGES};
 use crate::pipelines::{Layouts, Passes};
 use glam::{Vec2, Vec3};
 use mc_sim::mirror::SimEvent;
-use pass::{Counts, GpuSurge, SurgePass};
+use pass::{GpuSurge, SurgePass};
 use std::f32::consts::TAU;
 
 /// Metres between the rings of the front's foot laid at once.
@@ -45,56 +39,28 @@ const VIOLET: Vec3 = Vec3::new(0.55, 0.16, 1.0);
 /// Embers let rise off a burning disc each tick, before the burn dies down.
 const EMBERS: usize = 6;
 
-/// A surge's wake, from the shell landing to its embers dying down; or one of the
-/// Edict's records (`look`).
+/// A surge's wake, from the shell landing to its embers dying down.
 #[derive(Clone, Copy)]
-pub(super) struct Surge {
-    pub(super) at: Vec3,
-    pub(super) start: f32,
-    pub(super) radius: f32,
-    pub(super) speed: f32,
-    pub(super) linger: f32,
-    pub(super) power: f32,
-    pub(super) seed: f32,
-    /// `gpu_consts::surge_fx::SAKER`, `EDICT_WAVE`, ...
-    pub(super) look: u32,
+struct Surge {
+    at: Vec3,
+    start: f32,
+    radius: f32,
+    speed: f32,
+    linger: f32,
+    power: f32,
+    seed: f32,
     /// Rings of its foot laid so far.
     laid: usize,
 }
 
 impl Surge {
     /// Seconds until its front reaches its radius.
-    pub(super) fn roll(&self) -> f32 {
+    fn roll(&self) -> f32 {
         self.radius / self.speed
     }
 
-    pub(super) fn end(&self) -> f32 {
+    fn end(&self) -> f32 {
         self.start + self.roll() + self.linger
-    }
-
-    /// Metres out its front stands at `time` (surge_fx.wgsl `front_of`, before it thins):
-    /// the Edict's shock runs out on the blast's square-root law, fast at first, the rest
-    /// at their pace.
-    pub(super) fn front(&self, time: f32) -> f32 {
-        let age = (time - self.start).max(0.0);
-        if self.look == EDICT_SHOCK {
-            let t = (age / self.roll()).min(1.0);
-            return self.radius * (1.0 / 12.0 + 11.0 / 12.0 * t.sqrt());
-        }
-        (age * self.speed).min(self.radius)
-    }
-
-    /// Metres between the rings of its foot laid at once.
-    fn ring(&self) -> f32 {
-        match self.look {
-            SAKER => RING,
-            _ => edict::RING,
-        }
-    }
-
-    /// Records drawn on the Edict's meshes.
-    fn edict(&self) -> bool {
-        self.look != SAKER
     }
 }
 
@@ -116,43 +82,25 @@ impl SurgeFx {
         self.pass.destroy(gpu);
     }
 
-    /// Hands the GPU this frame's surges: the Saker's, the Edict's waves, then its other
-    /// records (`pass::Counts`).
+    /// Hands the GPU this frame's surges.
     pub(super) fn upload(&mut self) {
-        let rank = |s: &Surge| match s.look {
-            SAKER => 0,
-            EDICT_WAVE => 1,
-            _ => 2,
-        };
-        let mut counts = Counts::default();
-        let mut surges: Vec<(u8, GpuSurge)> = Vec::with_capacity(self.surges.len());
-        for s in &self.surges {
-            let k = rank(s);
-            match k {
-                0 => counts.saker += 1,
-                1 => counts.waves += 1,
-                _ => counts.fronts += 1,
-            }
-            surges.push((
-                k,
-                GpuSurge {
-                    centre: s.at.to_array(),
-                    start: s.start,
-                    radius: s.radius,
-                    speed: s.speed,
-                    linger: s.linger,
-                    seed: s.seed,
-                    power: s.power,
-                    look: s.look,
-                    _pad1: 0.0,
-                    _pad2: 0.0,
-                },
-            ));
-        }
-        // Stable: within a kind, oldest first.
-        surges.sort_by_key(|(k, _)| *k);
-        let surges: Vec<GpuSurge> = surges.into_iter().map(|(_, g)| g).collect();
-        self.pass.upload(&surges, counts);
+        let surges: Vec<GpuSurge> = self
+            .surges
+            .iter()
+            .map(|s| GpuSurge {
+                centre: s.at.to_array(),
+                start: s.start,
+                radius: s.radius,
+                speed: s.speed,
+                linger: s.linger,
+                seed: s.seed,
+                power: s.power,
+                _pad0: 0.0,
+                _pad1: 0.0,
+                _pad2: 0.0,
+            })
+            .collect();
+        self.pass.upload(&surges);
     }
 
     /// Inside `scene_over` (see `SurgePass::draw`).
@@ -213,34 +161,11 @@ impl Renderer {
         linger: f32,
         power: f32,
     ) {
-        self.add_surge(at, start, radius, speed, linger, power, SAKER);
-    }
-
-    /// A record of `look` (`gpu_consts::surge_fx`) from `start`, as `push_surge`'s.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "a record's own fields, as push_surge's"
-    )]
-    pub(super) fn add_surge(
-        &mut self,
-        at: Vec3,
-        start: f32,
-        radius: f32,
-        speed: f32,
-        linger: f32,
-        power: f32,
-        look: u32,
-    ) {
         let seed = self.scatter.unit() * 61.0;
         let surges = &mut self.surge_fx.surges;
-        // A deliberate cosmetic cap, as many of each mesh as are drawn: the oldest of its
-        // kind goes first, so a battle's Saker shells never put out an Edict's.
-        let edict = look != SAKER;
-        let most = if edict { MAX_EDICT } else { MAX_SURGES } as usize;
-        if surges.iter().filter(|s| s.edict() == edict).count() >= most {
-            if let Some(i) = surges.iter().position(|s| s.edict() == edict) {
-                surges.remove(i);
-            }
+        // A deliberate cosmetic cap, as many as are drawn: the oldest goes first.
+        if surges.len() >= MAX_SURGES as usize {
+            surges.remove(0);
         }
         surges.push(Surge {
             at,
@@ -250,7 +175,6 @@ impl Renderer {
             linger,
             power,
             seed,
-            look,
             laid: 0,
         });
     }
@@ -266,21 +190,13 @@ impl Renderer {
                 self.surge_fx.surges.remove(i);
                 continue;
             }
-            let front = surge.front(until);
-            while ring_at(surge.laid, surge.ring()) <= front {
-                if surge.edict() {
-                    self.lay_edict_ring(&surge, surge.laid);
-                } else {
-                    self.lay_surge_ring(&surge, surge.laid);
-                }
+            let front = ((until - surge.start) * surge.speed).min(surge.radius);
+            while ring_at(surge.laid) <= front {
+                self.lay_surge_ring(&surge, surge.laid);
                 surge.laid += 1;
             }
-            if front > surge.ring() && time < surge.end() - FADE {
-                match surge.look {
-                    SAKER => self.surge_embers(&surge, front, time),
-                    EDICT_WAVE => self.edict_embers(&surge, front, time),
-                    _ => {}
-                }
+            if front > RING && time < surge.end() - FADE {
+                self.surge_embers(&surge, front, time);
             }
             self.surge_fx.surges[i] = surge;
             i += 1;
@@ -289,7 +205,7 @@ impl Renderer {
 
     /// A point on the ground `r` out from the crater, `turn` of the way round it, and
     /// which way out it faces.
-    pub(super) fn surge_foot(&self, surge: &Surge, r: f32, turn: f32) -> (Vec3, Vec2) {
+    fn surge_foot(&self, surge: &Surge, r: f32, turn: f32) -> (Vec3, Vec2) {
         let water = self.map_info.water_level.to_f32();
         let out = Vec2::from_angle(turn * TAU);
         let xy = surge.at.truncate() + out * r;
@@ -299,7 +215,7 @@ impl Renderer {
     /// Ring `k` of a surge's foot, as the front reaches it: a low ring of dust and a few
     /// sparks thrown outward, its light, the trees swaying away.
     fn lay_surge_ring(&mut self, surge: &Surge, k: usize) {
-        let r = ring_at(k, RING);
+        let r = ring_at(k);
         let when = surge.start + r / surge.speed;
         let water = self.map_info.water_level.to_f32();
         // Thrown off all round, fewer close in. A deliberate cosmetic cap per ring.
@@ -391,7 +307,7 @@ impl Renderer {
     }
 }
 
-/// How far out ring `k` of a surge's foot is laid, metres, `step` apart.
-fn ring_at(k: usize, step: f32) -> f32 {
-    6.0 + k as f32 * step
+/// How far out ring `k` of a surge's foot is laid, metres.
+fn ring_at(k: usize) -> f32 {
+    6.0 + k as f32 * RING
 }

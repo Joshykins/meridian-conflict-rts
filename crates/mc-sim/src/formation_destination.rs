@@ -1,8 +1,8 @@
 //! Where a formation ordered onto occupied ground stands instead: the whole
 //! layout shifted off parked hulls and structures, the slots kept together.
 //! A long hull (`UnitBlueprint::body`) takes up its capsule, laid along the way
-//! it will face there, and a parked one along its heading: two Regents may stand
-//! abreast a beam apart, where their 1.9 km radii kept them 3.8 km apart.
+//! it will face there, and a parked one along its heading: two long hulls may
+//! stand abreast a beam apart, where their radii kept them twice as far apart.
 
 use crate::body::{self, spines_gap};
 use crate::spatial::kind;

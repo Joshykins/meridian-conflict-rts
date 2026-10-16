@@ -8,7 +8,6 @@
 //! match starts.
 
 pub mod dash;
-pub mod edict;
 pub mod elevator;
 pub mod gravitic;
 pub mod growth;
@@ -465,11 +464,6 @@ pub struct Builder {
     pub unfold_ticks: u16,
     /// Where that gear pitches (by the build arm's pitch) to point at the work. `None`: fixed.
     pub hinge: Option<FxVec3>,
-    /// Builds its products in the sky over itself, at their cruise height, under its
-    /// heading: a yard for a hull too big to stand on any lot (the Regent). They are not
-    /// in a bay while they go up, but out where they can be seen and shot at; builders
-    /// helping come to the yard, and its `emitters` cast the work up to them.
-    pub aloft: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -965,8 +959,6 @@ pub struct UnitBlueprint {
     pub dash: Option<dash::Dash>,
     /// Tears a rift to any point and holds a gravity well there.
     pub gravitic: Option<gravitic::Gravitic>,
-    /// The Edict: a main gun with no barrel, fired from the hull nearest its mark.
-    pub edict: Option<edict::Edict>,
     pub motion: Option<Motion>,
     pub economy: Economy,
     /// A core mine: makes materials out of the ground around it.
@@ -986,10 +978,6 @@ pub struct UnitBlueprint {
     /// What grows with the unit's level (survival's Shapers).
     pub growth: Option<growth::Growth>,
     pub builder: Option<Builder>,
-    /// Built only by builders that build aloft (`Builder::aloft`), in the sky over them:
-    /// worked on from the yard under it, and it comes down, not away, if it dies half
-    /// built. Worked out from the builders at load.
-    pub built_aloft: bool,
     pub reclaimer: Option<Reclaimer>,
     /// A lift ship: carries land units in its hold.
     pub transport: Option<Transport>,
@@ -1446,51 +1434,6 @@ impl Blueprints {
                 }
             }
         }
-        // A yard that builds aloft is a factory standing on the ground, and what it builds
-        // flies at a height of its own and stands on no lot. Nothing else builds that.
-        let aloft: Vec<BlueprintId> = units
-            .iter()
-            .filter(|u| u.builder.as_ref().is_some_and(|b| b.aloft))
-            .flat_map(|u| u.builder.as_ref().unwrap().builds.clone())
-            .collect();
-        for u in &units {
-            let Some(b) = u.builder.as_ref().filter(|b| b.aloft) else {
-                continue;
-            };
-            if !u.is_structure() || !u.has(cat::FACTORY) || b.emitters.is_empty() {
-                return Err(DataError::Invalid(format!(
-                    "{}: a builder that builds aloft is a Factory structure with emitters",
-                    u.key
-                )));
-            }
-            for &id in &b.builds {
-                let made = &units[id.index()];
-                let flies = made
-                    .motion
-                    .is_some_and(|m| m.layer == MoveLayer::Air && m.altitude > Fx::ZERO);
-                if !flies || made.footprint != (0, 0) {
-                    return Err(DataError::Invalid(format!(
-                        "{}: builds {} aloft, which does not fly or stands on a lot",
-                        u.key, made.key
-                    )));
-                }
-            }
-        }
-        for u in &units {
-            let Some(b) = u.builder.as_ref().filter(|b| !b.aloft) else {
-                continue;
-            };
-            if let Some(&id) = b.builds.iter().find(|id| aloft.contains(id)) {
-                return Err(DataError::Invalid(format!(
-                    "{}: builds {}, which is built aloft by its yard alone",
-                    u.key,
-                    units[id.index()].key
-                )));
-            }
-        }
-        for id in aloft {
-            units[id.index()].built_aloft = true;
-        }
         // An elevator brings down mobile land and air units, each light enough to ride one
         // platform; it builds nothing, so its build power is nil.
         for u in &units {
@@ -1692,10 +1635,6 @@ impl Blueprints {
                 Some(g) => g.hash(&mut h),
                 None => h.write_u64(u64::MAX),
             }
-            // Hashed only where there is one, so no other blueprint's hash moves.
-            if let Some(e) = &u.edict {
-                e.hash(&mut h);
-            }
             h.write_u64(u.water_build as u64);
             h.write_u64(u.seabed as u64);
             h.write_u64(u.drone_sockets.len() as u64);
@@ -1761,11 +1700,7 @@ impl Blueprints {
                     {
                         h.write_i64(v.0);
                     }
-                    h.write_u64(
-                        b.emitters.len() as u64
-                            | (b.unfold_ticks as u64) << 32
-                            | (b.aloft as u64) << 48,
-                    );
+                    h.write_u64(b.emitters.len() as u64 | (b.unfold_ticks as u64) << 32);
                     for v in b.hinge.map_or([Fx::MAX; 3], |p| [p.x, p.y, p.z]) {
                         h.write_i64(v.0);
                     }
@@ -2148,13 +2083,12 @@ mod tests {
         assert!(builds.len() >= 8);
         assert!(builds.iter().all(|&b| bp.unit(b).faction == regency.id
             && (bp.unit(b).is_structure() || bp.unit(b).is_site_built_unit())));
-        // Their factories make their own engineer and, for now, the stand-in's fighters;
-        // all but the yard the Regent is raised over, which makes nothing else.
-        for factory in bp.units.iter().filter(|u| {
-            u.faction == regency.id
-                && u.has(cat::FACTORY)
-                && !u.builder.as_ref().is_some_and(|b| b.aloft)
-        }) {
+        // Their factories make their own engineer and, for now, the stand-in's fighters.
+        for factory in bp
+            .units
+            .iter()
+            .filter(|u| u.faction == regency.id && u.has(cat::FACTORY))
+        {
             let made = &factory.builder.as_ref().unwrap().builds;
             assert!(
                 made.iter()
@@ -2350,26 +2284,6 @@ mod tests {
                 u.key
             );
         }
-    }
-
-    /// The Regent is raised in the sky over its yard, and by nothing else (`Builder::aloft`).
-    #[test]
-    fn the_regent_is_raised_by_its_yard_alone() {
-        let bp = Blueprints::load(&data_dir()).unwrap();
-        let regent = bp.unit_by_key("regency_t5_super_destroyer").unwrap();
-        assert!(regent.built_aloft);
-        let builders: Vec<&str> = bp
-            .units
-            .iter()
-            .filter(|u| {
-                u.builder
-                    .as_ref()
-                    .is_some_and(|b| b.builds.contains(&regent.id))
-            })
-            .map(|u| u.key.as_str())
-            .collect();
-        assert_eq!(builders, ["regency_t5_sky_yard"]);
-        assert!(bp.units.iter().filter(|u| u.built_aloft).count() == 1);
     }
 
     #[test]

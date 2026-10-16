@@ -252,36 +252,6 @@ fn cs_force(@builtin(global_invocation_id) id: vec3<u32>) {
             }
             continue;
         }
-        if kind == DISTURBER_CUT {
-            // The Edict's cut (sky/cut.rs): the one thing that clears the deck rather than
-            // stirring it (approved 2026-10-13). A lane along the shot's line (`c.z` 1) or a
-            // ring round its mark (radius `b.y`): inside it the cover and any storm are gone
-            // within a second while it holds (`b.x`) and the air churns, its edge torn, the
-            // cloud either side thrown back off it. Let go, it heals as any other cloud.
-            var off = rel;
-            if d.c.z > 0.0 {
-                let span = d.c.xy - d.a.xy;
-                off = rel - span * clamp(dot(rel, span) / max(dot(span, span), 1.0), 0.0, 1.0);
-            }
-            var q = length(off);
-            var away = off / max(q, 1.0);
-            if d.b.y > 0.0 {
-                q = abs(q - d.b.y);
-                away *= select(-1.0, 1.0, length(rel) > d.b.y);
-            }
-            if q > r * 4.0 { continue; }
-            let hold = d.b.x;
-            let torn = grad_noise2(xy + d.a.xy * 0.07, r * 0.7);
-            let edge = r * (0.75 + 0.5 * torn);
-            let inside = 1.0 - smoothstep(edge * 0.7, edge, q);
-            let clear = clamp(inside * hold * dt * 9.0, 0.0, 1.0);
-            state.x *= 1.0 - clear;
-            state.y *= 1.0 - clear;
-            state.z = max(state.z, max(inside, exp(-pow(q / (r * 2.2), 2.0))) * hold);
-            let shove = exp(-pow((q - edge) / (r * 0.9), 2.0));
-            flow = vec4<f32>(flow.xy + away * shove * hold * 70.0 * dt, flow.zw);
-            continue;
-        }
         if kind == KIND_BLAST && dot(rel, rel) > r * r * 36.0 {
             // Outside six radii both Gaussian influences are below 1e-8.
             // Avoid evaluating blast noise over the entire million-texel field.

@@ -24,7 +24,6 @@
 pub(crate) mod beams;
 pub mod capital;
 mod duck;
-mod edict;
 pub(crate) mod elevator;
 pub(crate) mod flight;
 pub(crate) mod gravitic;
@@ -694,21 +693,14 @@ impl Audio {
         }
     }
 
-    /// Asks, for this tick, that every world sound and loop be held down by `depth` (0:
-    /// not at all, 1: silent) but those in `spared`, falling fast and coming back slowly
-    /// (`duck.rs`): one moment the whole battle steps back for. Every asker of the tick
-    /// is merged; `settle_duck` ends the tick.
+    /// Holds every world sound and loop down by `depth` (0: not at all, 1: silent) but
+    /// those in `spared`, falling fast and coming back slowly (`duck.rs`): one moment the
+    /// whole battle steps back for. Call it again with 0 to let go.
     pub fn duck_world(&self, depth: f32, spared: &[SoundId]) {
         self.shared
             .mixer()
             .duck
-            .request(depth, spared.iter().map(|&s| sound_key(s)));
-    }
-
-    /// Takes up what this tick's `duck_world` askers want; with none, the battle comes
-    /// back. Call it once a tick, after every sound of the tick.
-    pub fn settle_duck(&self) {
-        self.shared.mixer().duck.settle();
+            .set(depth, spared.iter().map(|&s| sound_key(s)));
     }
 
     pub fn set_volumes(&self, volumes: Volumes) {

@@ -51,14 +51,10 @@ pub const BEAM_NANITE: u32 = 1;
 /// is the site's foot, `to` (and `to_prev`) the middle of its build front, `radius` and
 /// `height` the hull's. The renderer draws the swarm and the rings round it.
 pub const BEAM_NANITE_SITE: u32 = 6;
-/// The great beam a yard casts straight up to the hull it raises aloft (`sky_yard.rs`):
-/// `from` its emitter, `to` (and `to_prev`) the hull's belly, `radius` the column's.
-/// Drawn where it stands: a column of nanite strands turning about it, its swarm
-/// climbing it, a knot of light at each end.
-pub const BEAM_SKY_LIFT: u32 = 9;
 /// Salvage riding from a drone into the underside of its carrier: particles, no ribbon.
 pub const BEAM_RELAY: u32 = 3;
 // retired: 7 (a scavenger tower's dim sweep beam)
+// retired: 9 (a yard's great beam up to a hull it raised aloft)
 /// A reclaim beam of a faction that builds with nanites (`mc_data::Construction::Nanite`):
 /// drawn as their nanite stream, its strands reaching out to the target and the matter
 /// riding home down them. Laid out as `BEAM_RECLAIM`.

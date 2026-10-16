@@ -16,8 +16,7 @@
 //! Like the giants' far sounds (`titan.rs`), the big moments carry across the map at once,
 //! without the real lag of sound: the launch and, loudest, the strike.
 //!
-//! The gravitic lens, The Fallen's small cousin, is heard alongside (`lens.rs`), and so is
-//! the Regent's Edict (`edict.rs`), whose held gather shares the engine's held voices.
+//! The gravitic lens, The Fallen's small cousin, is heard alongside (`lens.rs`).
 
 use super::held::Held;
 use super::Audio;
@@ -115,8 +114,6 @@ pub(crate) struct GraviticSounds {
     tick: u64,
     /// Gravitic lenses' fronts, strikes and wells.
     lens: super::lens::LensSounds,
-    /// The Regent's Edicts gathering and firing.
-    edict: super::edict::EdictSounds,
 }
 
 impl GraviticSounds {
@@ -133,8 +130,7 @@ impl GraviticSounds {
     ) -> Vec<LoopRow> {
         self.tick += 1;
         let (library, generation) = audio.library();
-        let fresh = self.generation != Some(generation);
-        if fresh {
+        if self.generation != Some(generation) {
             self.generation = Some(generation);
             self.ids.clear();
         }
@@ -187,13 +183,9 @@ impl GraviticSounds {
             audio.play_world(sound, gain.min(1.0), pan, 1.0);
         }
 
-        let (mut held, mut loops) = wanted(&frame.wells, &mut ids, |at, reach| {
+        let (held, mut loops) = wanted(&frame.wells, &mut ids, |at, reach| {
             far(at, reach.unwrap_or(Far(0.0, 1.0)), 1.0)
         });
-        held.extend(
-            self.edict
-                .tick(frame, blueprints, (&library, fresh), audio, focus, &hear),
-        );
         audio.set_held(&held);
         loops.extend(
             self.lens

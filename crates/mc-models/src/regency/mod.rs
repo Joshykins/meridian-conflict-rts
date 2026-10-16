@@ -58,7 +58,6 @@ mod seeker_hover;
 mod seraph;
 mod shard;
 mod shield_hover;
-mod sky_yard;
 mod sonar;
 pub(crate) mod space;
 mod strategic;
@@ -203,14 +202,6 @@ pub(super) const MODELS: &[ModelDef] = &[
         gravitic_engine::RADIUS,
         gravitic_engine::HEIGHT,
         gravitic_engine::crown,
-    ),
-    // The Regent Yard: the Regent is raised in the sky over it on one great beam from its
-    // emitter (`sky_yard`).
-    ModelDef::new(
-        "regency_sky_yard",
-        sky_yard::RADIUS,
-        sky_yard::HEIGHT,
-        sky_yard::bore,
     ),
     // Factories: the land press works (`brood`), the air launch frame (`hatchery`), the
     // shell crouched on its legs behind the berth (`tidebrood`). All three upgrade in place
@@ -438,7 +429,6 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_gravitic_engine" => 34000,
         // A 24 x 24 tech 5 yard: the apron, four intakes, the walled bore, eight flaring
         // shards and the mast of rotor drums to the emitter.
-        "regency_sky_yard" => 34000,
         "regency_wake_tank" => 5000,
         // Three armoured belts, layered crown, segmented lance and six rocket cells.
         "regency_executioner" => 7000,
@@ -778,6 +768,5 @@ mod tests {
         assert_eq!(beam::NANITE, mc_sim::reclaim::BEAM_NANITE);
         assert_eq!(beam::NANITE_SITE, mc_sim::reclaim::BEAM_NANITE_SITE);
         assert_eq!(beam::NANITE_RECLAIM, mc_sim::reclaim::BEAM_NANITE_RECLAIM);
-        assert_eq!(beam::SKY_LIFT, mc_sim::reclaim::BEAM_SKY_LIFT);
     }
 }

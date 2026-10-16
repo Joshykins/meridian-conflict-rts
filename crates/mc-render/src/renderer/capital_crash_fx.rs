@@ -89,11 +89,10 @@ impl Renderer {
         let hull = self.hull(u.blueprint);
         let tick = self.tick_seconds.max(0.02);
         let s = hull.fire;
-        let span = formed(u);
         // One fire per 60 m or so of hull, fixed on it for the whole fall.
         let fires = ((hull.reach / 30.0).ceil() as u32).clamp(3, 9);
         for k in 0..fires {
-            let along = (hash(u.unit_id, 101 + k) * 1.7 - 0.85) * span;
+            let along = hash(u.unit_id, 101 + k) * 1.7 - 0.85;
             let across = (hash(u.unit_id, 211 + k) - 0.5) * 0.18;
             let local = self.plating(u.blueprint, hull.reach, along, across);
             let t = self.scatter.unit();
@@ -141,7 +140,7 @@ impl Renderer {
         }
         // Now and then something inside goes up.
         if self.scatter.unit() < 0.06 {
-            let along = self.scatter.signed() * 0.85 * span;
+            let along = self.scatter.signed() * 0.85;
             let across = self.scatter.signed() * 0.08;
             let local = self.plating(u.blueprint, hull.reach, along, across);
             let at = HullFrame::of(u, 1.0, true).at(local);
@@ -216,7 +215,6 @@ impl Renderer {
             })
             .filter(|(_, _, d)| *d < hull.reach * 2.0)
             .min_by(|a, b| a.2.total_cmp(&b.2).then(a.0.cmp(&b.0)));
-        let span = seen.map_or(1.0, |(_, u, _)| formed(&u));
         let frame = seen.map(|(id, u, _)| {
             self.hull_crash_fx.falling.remove(&id);
             (u.unit_id, HullFrame::of(&u, 1.0, true))
@@ -239,9 +237,8 @@ impl Renderer {
         let blasts = ((hull.reach / 18.0).ceil() as u32).clamp(6, 26);
         let mut points: Vec<Vec3> = (0..blasts)
             .map(|i| {
-                let along = ((i as f32 + 0.5) / blasts as f32 * 1.8 - 0.9
-                    + self.scatter.signed() * 0.4 / blasts as f32)
-                    * span;
+                let along = (i as f32 + 0.5) / blasts as f32 * 1.8 - 0.9
+                    + self.scatter.signed() * 0.4 / blasts as f32;
                 let across = self.scatter.signed() * 0.1;
                 let local = self.plating(blueprint, hull.reach, along, across);
                 match &frame {
@@ -332,13 +329,6 @@ impl Renderer {
             }
         }
     }
-}
-
-/// How much of a falling hull's length there is either side of its middle: all of it, but
-/// for one that fell half built, raised aloft along its keel from the middle out
-/// (nanite_site.wgsl `keel_order`, `nanite_grow`).
-fn formed(u: &UnitInstance) -> f32 {
-    (u.build / 0.8).clamp(0.05, 1.0)
 }
 
 /// The radius of one fire or blast on a capital hull `reach` metres from middle to bow,

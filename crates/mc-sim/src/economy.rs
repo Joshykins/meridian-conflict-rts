@@ -520,11 +520,7 @@ impl World {
                 && !job.shield
                 && units.build_progress[job.target] >= self.bp(job.target).build_time
             {
-                if self.bp(job.target).built_aloft {
-                    self.complete_unit_aloft(job.target)?;
-                } else {
-                    self.complete_unit(job.target)?;
-                }
+                self.complete_unit(job.target)?;
             }
         }
         for job in &drones {
@@ -572,7 +568,7 @@ impl World {
     }
 
     /// `complete_unit` for a unit built in the air, never on a lot (a survival
-    /// Gatewright's warships, a yard's hull): nothing to give back under it.
+    /// Gatewright's warships): nothing to give back under it.
     pub(crate) fn complete_unit_aloft(&mut self, row: usize) -> Result<(), SimError> {
         self.finish_unit(row, false)
     }

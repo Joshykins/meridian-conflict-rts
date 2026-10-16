@@ -111,10 +111,6 @@
         lore: "A crown of black shards around a well of held gravity. Given a point anywhere in the world, it tears the ground open toward it; where the rift ends the ground breaks apart, aircraft are dragged out of the sky, and everything caught there is crushed slowly until the engine looks elsewhere.",
         weapons: {},
     ),
-    "regency_t5_sky_yard": (
-        lore: "No ground is long enough to lay the Regent on, so it is raised in the sky. The yard casts one great column of nanites straight up, and the hull condenses along it at the height it will fly, from its keel outward, while every builder near pours its work into the yard.",
-        weapons: {},
-    ),
     "regency_t1_engineer": (
         lore: "A construction craft that rides a gravity lift over land and sea alike and builds with the nanite emitter on its arm.",
         weapons: {},

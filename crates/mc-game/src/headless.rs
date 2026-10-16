@@ -785,7 +785,6 @@ pub fn screenshot(
             "warp" => crate::game::Targeting::Warp,
             "dash" => crate::game::Targeting::Dash,
             "fracture" => crate::game::Targeting::Fracture,
-            "edict" => crate::game::Targeting::Edict,
             _ => crate::game::Targeting::Nuke,
         });
     }
@@ -1086,7 +1085,6 @@ pub fn screenshot(
         crate::titan_marks::draw(&mut ui, &field, 1.0, pointer);
         crate::dash_marks::draw(&mut ui, &field, 1.0, pointer);
         crate::gravitic_marks::draw(&mut ui, &field, pointer);
-        crate::edict_marks::draw(&mut ui, &field, pointer);
         crate::warp_marks::draw(&mut ui, &field, 1.0, pointer);
         crate::destruct_marks::draw(&mut ui, &field, 1.0);
         crate::pings::draw(&mut ui, &field, &hud.pings);

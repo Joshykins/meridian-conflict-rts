@@ -158,7 +158,6 @@ impl World {
                 for row in self.owned_or_rising(player, units) {
                     self.clear_orders(row)?;
                     self.release_well(row);
-                    self.cancel_edict(row);
                 }
                 Ok(())
             }
@@ -250,8 +249,7 @@ impl World {
                 {
                     o.radius = Fx::ONE;
                 }
-                let at = self.work_anchor(t);
-                let (pos, radius) = (self.state.units.pos[at], self.bp(at).radius);
+                let (pos, radius) = (self.state.units.pos[t], self.bp(t).radius);
                 let mut refused = false;
                 for row in self.owned(player, units, 0) {
                     if row == t || !self.bp(row).works_in_field() {
@@ -558,7 +556,6 @@ impl World {
                 self.order_fracture(player, units, *pos);
                 Ok(())
             }
-            Command::Edict { units, pos, queue } => self.order_edict(player, units, *pos, *queue),
             Command::LaunchNuke { units, pos } => {
                 self.launch_nuke(player, units, *pos);
                 Ok(())
@@ -1171,9 +1168,7 @@ impl World {
     fn abort_product(&mut self, row: usize) -> Result<(), SimError> {
         let units = &self.state.units;
         if let Some(t) = units.row(units.build_target[row]) {
-            // A yard's hull aloft is called off like a bay's product: gone, not fallen.
-            let aloft = self.builds_aloft(row) && units.has_flag(t, flag::UNDER_CONSTRUCTION);
-            if units.has_flag(t, flag::IN_FACTORY) || aloft {
+            if units.has_flag(t, flag::IN_FACTORY) {
                 self.despawn_unit(t, false)?;
             }
         }
@@ -2326,9 +2321,8 @@ impl World {
             AssistWork::Raise | AssistWork::Round | AssistWork::Shield => (t, false),
         });
         // An engineering station gives up what is out of its reach: a builder it helps
-        // walked off, or took up a site too far away. A hull going up aloft is reached
-        // at its yard.
-        let w = self.work_anchor(work.map_or(t, |(w, _)| w));
+        // walked off, or took up a site too far away.
+        let w = work.map_or(t, |(w, _)| w);
         if !self.reaches_work(row, units.pos[w], self.bp(w).radius) {
             self.state.units.build_target[row] = Handle::NONE;
             self.finish_order(row);
@@ -2387,18 +2381,14 @@ impl World {
             // Paused, or helping a builder that is paused: wait by the work, spending nothing.
             Some((w, _)) if self.work_paused(row) || (w != t && self.work_paused(t)) => {
                 self.state.units.build_target[row] = Handle::NONE;
-                let at = self.work_anchor(w);
-                let (pos, radius) = (self.state.units.pos[at], self.bp(at).radius);
+                let (pos, radius) = (self.state.units.pos[w], self.bp(w).radius);
                 self.approach(row, pos, radius)?;
             }
             Some((w, repairing)) => {
-                // Built at the work itself, or for a hull aloft at its yard, whose
-                // intakes the work pours into (`sky_yard.rs`).
-                let at = self.work_anchor(w);
-                let (pos, radius) = (self.state.units.pos[at], self.bp(at).radius);
+                let (pos, radius) = (self.state.units.pos[w], self.bp(w).radius);
                 if self.approach(row, pos, radius)? {
                     self.state.units.build_target[row] = self.state.units.id(w);
-                    let middle = self.state.units.z[at] + self.bp(at).height / 2;
+                    let middle = self.state.units.z[w] + self.bp(w).height / 2;
                     if self.face_work_at(row, pos, middle) {
                         self.state.units.flags[row] |= flag::BUILDING;
                         if repairing {
@@ -2468,13 +2458,6 @@ impl World {
             let owner = self.state.units.owner[row];
             let pos = self.state.units.pos[row];
             let heading = self.state.units.heading[row];
-            // A yard raises its hull in the sky over itself, out in the open
-            // (`sky_yard.rs`).
-            if self.builds_aloft(row) {
-                let t = self.spawn_aloft(o.blueprint, owner, pos, heading)?;
-                self.state.units.build_target[row] = self.state.units.id(t);
-                return Ok(());
-            }
             // Print on the lot centre so the finished hull walks out +x.
             let pad = pos;
             let t = self.spawn_unit(o.blueprint, owner, pad, heading, false)?;

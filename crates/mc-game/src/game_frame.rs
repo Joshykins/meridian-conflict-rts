@@ -462,7 +462,6 @@ impl Game {
             crate::titan_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));
             crate::dash_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));
             crate::gravitic_marks::draw(&mut ui, &field, self.ground_under_cursor(renderer));
-            crate::edict_marks::draw(&mut ui, &field, self.ground_under_cursor(renderer));
             crate::warp_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));
             crate::destruct_marks::draw(&mut ui, &field, alpha);
             crate::pings::draw(&mut ui, &field, &self.hud.pings);

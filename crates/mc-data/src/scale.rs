@@ -46,7 +46,6 @@ impl Unit {
             ("transport", self.transport.is_some()),
             ("gravitic", self.gravitic.is_some()),
             ("stomp", self.stomp.is_some()),
-            ("edict", self.edict.is_some()),
         ];
         if let Some((what, _)) = unscaled.iter().find(|(_, has)| *has) {
             return Err(DataError::Invalid(format!(

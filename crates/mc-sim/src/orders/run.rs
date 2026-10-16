@@ -133,7 +133,6 @@ impl World {
             OrderKind::Land | OrderKind::Unload => self.run_land(row, &o)?,
             OrderKind::Warp => self.run_warp_order(row, &o)?,
             OrderKind::Dash => self.run_dash_order(row, &o)?,
-            OrderKind::Edict => self.run_edict_order(row, &o)?,
             OrderKind::ReclaimArea => self.run_reclaim_area(row, &o)?,
             OrderKind::Stage => self.run_stage(row, &o)?,
         }

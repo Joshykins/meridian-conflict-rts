@@ -664,8 +664,6 @@ pub enum OrderKind {
     /// An aircraft goes down on the staging base in `target` to refuel and mend, and
     /// leaves again when done (`staging.rs`). `radius`: one once round astern of a carrier.
     Stage,
-    /// Close on `pos` and fire the Edict there (`edict.rs`); done once it gathers.
-    Edict,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]

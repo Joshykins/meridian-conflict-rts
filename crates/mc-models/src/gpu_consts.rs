@@ -809,36 +809,6 @@ shared! {
         /// middle, so the trail reads as coming out of it.
         pub const SEED_UNDER: f32 = 60.0;
         pub const SEED_DEPTH: f32 = 150.0;
-        /// The Edict's cut through the cloud deck (sky/cut.rs, renderer/edict_fx): a
-        /// capsule from `a.xy` to `c.xy` (`c.z` 1), or a ring of radius `b.y` round `a.xy`
-        /// (`c.z` 0; round when that is zero), `a.z` its half width. While `b.x` holds (0-1) the cover inside goes
-        /// to nothing and the air there churns; the deck heals back over it as any other.
-        pub const CUT: f32 = 4.0;
-    }
-
-    /// The Edict gathering in its ship's hull (renderer/edict_fx, regency.wgsl
-    /// `reg_edict`). The renderer hands the shader each ship's Edict in
-    /// `UnitInstance::mount` as `[a, b, along, kind]`, `along` metres forward of the ship's
-    /// origin of its firing point, times on the renderer's clock: gathering under power
-    /// `[share, tick, along, GATHERING - rate]` (the share at the tick's start, gaining
-    /// `rate` a second, under one, for at most `TICK_REACH` seconds past it); stalled
-    /// `[share, 0, along, STALLED]`; fired `[fired, 0, along, FIRED]`; let go before the
-    /// shot `[share, when, along, CANCELLED]`.
-    pub mod edict as "EDICT_" {
-        pub const GATHERING: f32 = -2000.0;
-        pub const STALLED: f32 = -2010.0;
-        pub const FIRED: f32 = -2020.0;
-        pub const CANCELLED: f32 = -2030.0;
-        /// Seconds past its tick a gather's share runs on: a little over a tick, so it
-        /// glides between ticks and holds still while the game is paused.
-        pub const TICK_REACH: f32 = 0.15;
-        /// The share of the gather by which the light run in from bow and stern meets at
-        /// the firing point; after it the whole charge is there.
-        pub const MEET: f32 = 0.9;
-        /// Seconds the seams' red after-glow lasts after the shot, and a let-go gather's
-        /// light takes to die.
-        pub const AFTERGLOW: f32 = 6.0;
-        pub const FADE: f32 = 1.2;
     }
 
     /// Graphics quality bits (renderer `SceneQuality`), in `Globals.detail.w`.
@@ -1007,10 +977,6 @@ shared! {
         /// The star beam's halo (`Weapon::star_beam`): a second, much wider beam laid round
         /// it, translucent, drifting veils of plasma that thin to nothing at its rim (`aim.w`).
         pub const HELD_STAR_HALO: f32 = 3.0;
-        /// The Edict's column (renderer/edict_fx/shot.rs): a broad white-hot core swelling
-        /// from the firing point to its full width at the ground, a thin prism rim and a
-        /// red fringe, pulses of light running down it (`aim.w`).
-        pub const HELD_EDICT: f32 = 4.0;
         /// A capital rail's channel (colour 6) laid along a fired gun's rails as they cool
         /// (renderer/heavy_rail_fx.rs `heat`), marked in `aim.w`: its ends glide over the
         /// tick from `prev_pos` and `pos` to `aim` and `prev_aim`, as a held beam's do, so
@@ -1384,9 +1350,7 @@ shared! {
         /// A nanite faction's reclaim: their stream reaching out to what it takes apart,
         /// the matter riding home down its strands (`reclaim::BEAM_NANITE_RECLAIM`).
         pub const NANITE_RECLAIM: u32 = 8;
-        /// The great beam a yard casts up to the hull it raises aloft
-        /// (`reclaim::BEAM_SKY_LIFT`): a column of strands and swarm, every quad its own.
-        pub const SKY_LIFT: u32 = 9;
+        // retired: 9 (a yard's great beam up to a hull it raised aloft)
         /// Quads drawn per beam (renderer `work_beams`, beams.wgsl `vs_beam`). A reclaim or
         /// repair beam uses as many of them for its bits as its length asks for.
         pub const QUADS: u32 = 64;
@@ -1418,10 +1382,6 @@ shared! {
         pub const WORK_FLOW_SPEED: f32 = 6.0;
         pub const WORK_GLOW: f32 = 6.0;
         pub const WORK_BEAT: f32 = 7.0;
-        /// `ModelInfo::nanite_order`: a site of it condenses along its keel from the
-        /// middle out (a hull raised aloft, `UnitBlueprint::built_aloft`), not from the
-        /// ground up (0).
-        pub const ORDER_KEEL: u32 = 1;
     }
 
     /// Materials as a light: the HUD's Materials red-orange
@@ -1747,26 +1707,6 @@ shared! {
         pub const FADE: f32 = 1.6;
         /// Seconds the front takes to thin away once it has rolled out to its radius.
         pub const SPENT: f32 = 0.5;
-        /// What a surge record draws (`GpuSurge::look`): a Saker shell's wake.
-        pub const SAKER: u32 = 0;
-        /// The Edict's molten wave (renderer/nuke_fx/edict.rs): a low molten crest
-        /// rolling out at the sim's pace, the ground behind it left molten, red-white
-        /// settling to crimson veins and pools.
-        pub const EDICT_WAVE: u32 = 1;
-        /// The Edict's shock: a hard line of light racing out over the ground on the blast
-        /// front's square-root law (`NuclearBlast::front_at`), over a skirt of dark dust.
-        pub const EDICT_SHOCK: u32 = 2;
-        /// The Edict's strike: a lens of white-hot pinched plasma pressed flat over the
-        /// mark, its rim the prism's, tearing into red as it cools.
-        pub const EDICT_STRIKE: u32 = 3;
-        /// Edict records drawn at once (three a shot), past the Saker's `MAX_SURGES`.
-        pub const MAX_EDICT: u32 = 12;
-        /// The Edict's meshes, finer for their kilometres: the burnt disc's rings and
-        /// every Edict mesh's segments round, and the front's (and the lens's) quads
-        /// across its section.
-        pub const EDICT_RINGS: u32 = 160;
-        pub const EDICT_SEGMENTS: u32 = 512;
-        pub const EDICT_SECTION: u32 = 24;
     }
 
     /// How a crater in the ground looks (`Crater::style`, renderer/craters.rs
@@ -1780,9 +1720,7 @@ shared! {
         pub const BLAST: u32 = 1;
         /// A Regency nova: glassed, its melt red and its glass black-crimson.
         pub const PLASMA: u32 = 2;
-        /// The Edict: the whole blast radius glassed, frozen ripples of the molten wave
-        /// in it, red-hot cooling to black glass with a crimson depth.
-        pub const EDICT: u32 = 3;
+        // retired: 3 (the Edict's glassed scar)
     }
 
     /// A gravitic lens at work, the Lodestone's (renderer/lens_fx.rs, lens_fx.wgsl): its

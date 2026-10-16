@@ -9,8 +9,8 @@
 //! the unit: a titan's torso stands 300 m and more over its feet, and a disc round its
 //! shins (or the point at its feet, for a drag box) missed everything a player aims at.
 //! A long hull (`UnitBlueprint::body`) is its spine instead, laid along its heading half
-//! way up, as wide as its beam: the Regent's radius is near two kilometres either way of
-//! a hull a few hundred metres across, and a disc that wide picked it from open sky.
+//! way up, as wide as its beam: a long hull's radius reaches far past its beam, and a
+//! disc that wide picked it from open sky.
 
 use glam::{Vec2, Vec3};
 use mc_data::{BlueprintId, Blueprints, IconKind};
@@ -283,10 +283,10 @@ mod tests {
     fn a_click_takes_a_long_hull_along_its_spine_only() {
         let blueprints = blueprints();
         let bp = blueprints
-            .unit_by_key("regency_t5_super_destroyer")
-            .expect("regent");
+            .unit_by_key("regency_t4_space_destroyer")
+            .expect("scourge");
         let at = Vec3::new(12000.0, 12000.0, 1500.0);
-        let regent = UnitInstance {
+        let ship = UnitInstance {
             pos: at.into(),
             prev_pos: at.into(),
             blueprint: bp.id.0 as u32,
@@ -298,12 +298,12 @@ mod tests {
         let camera = far_camera(at);
         let mid = Vec3::Z * bp.height.to_f32() * 0.5;
         let nose = camera
-            .project(at + mid + Vec3::X * 1500.0)
+            .project(at + mid + Vec3::X * 300.0)
             .expect("on screen");
-        assert_eq!(unit_at(&[regent], &blueprints, &camera, nose), Some(0));
+        assert_eq!(unit_at(&[ship], &blueprints, &camera, nose), Some(0));
         let beam = camera
-            .project(at + mid + Vec3::Y * 1500.0)
+            .project(at + mid + Vec3::Y * 300.0)
             .expect("on screen");
-        assert_eq!(unit_at(&[regent], &blueprints, &camera, beam), None);
+        assert_eq!(unit_at(&[ship], &blueprints, &camera, beam), None);
     }
 }

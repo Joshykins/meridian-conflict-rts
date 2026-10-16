@@ -14,7 +14,7 @@
 struct Beam {
     emitter: vec3<f32>,
     // 0 reclaim. 1 nanite stream. 2 repair. 3 relay. 4 replication ray, 5 print beam,
-    // 6 nanite site. 7 retired. 8 nanite reclaim. 9 a yard's great beam (`BEAM_SKY_LIFT`).
+    // 6 nanite site. 7 retired. 8 nanite reclaim.
     kind: u32,
     to_prev: vec3<f32>,
     radius: f32,
@@ -94,12 +94,8 @@ fn vs_beam(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     let b = beams[instance / BEAM_QUADS];
     let slot = instance % BEAM_QUADS;
     let time = globals.camera.w;
-    if b.kind != 0u && b.kind != 2u && b.kind != 3u && b.kind != BEAM_NANITE_SITE && b.kind != BEAM_SKY_LIFT
-        && slot >= BEAM_FIXED_QUADS {
+    if b.kind != 0u && b.kind != 2u && b.kind != 3u && b.kind != BEAM_NANITE_SITE && slot >= BEAM_FIXED_QUADS {
         return hidden();
-    }
-    if b.kind == BEAM_SKY_LIFT {
-        return sky_lift_vertex(b, slot, corner);
     }
     if b.kind == BEAM_NANITE_SITE {
         return nanite_site_vertex(b, slot, corner);
@@ -754,7 +750,7 @@ struct NaniteTint {
 }
 
 fn nanite_tint(kind: f32) -> NaniteTint {
-    if abs(kind - f32(BEAM_NANITE_RECLAIM)) < 0.5 {
+    if kind > f32(BEAM_NANITE_RECLAIM) - 0.5 {
         return NaniteTint(RED, MATERIALS, WHITE);
     }
     return NaniteTint(NANITE_VIOLET, NANITE_RED, NANITE_HOT);
@@ -1105,9 +1101,6 @@ fn nanite_fragment(in: BeamOut, n: f32) -> vec4<f32> {
     let time = globals.camera.w;
     let shape = in.state.x;
     let tint = nanite_tint(in.kind);
-    if shape > 15.5 {
-        return lift_core_fragment(in);
-    }
     if shape > 14.5 {
         return swarm_fragment(in);
     }
@@ -1140,7 +1133,7 @@ fn nanite_fragment(in: BeamOut, n: f32) -> vec4<f32> {
             flow = 1.2;
         } else if lead {
             flow = 30.0;
-        } else if abs(in.kind - f32(BEAM_NANITE_RECLAIM)) < 0.5 {
+        } else if in.kind > f32(BEAM_NANITE_RECLAIM) - 0.5 {
             // Taking something apart: what the strands carry rides home to the emitter.
             flow = -flow;
         }
@@ -1229,154 +1222,6 @@ fn swarm_fragment(in: BeamOut) -> vec4<f32> {
     let cover = clamp(mask * (0.6 + 0.4 * mote), 0.0, 0.85) * in.level;
     let color = vec3<f32>(0.012, 0.008, 0.02) * cover + NANITE_VIOLET * glint * mask * 2.2 * in.level;
     return vec4<f32>(color, cover);
-}
-
-// ---- A yard's great beam (`BEAM_SKY_LIFT`) ------------------------------------------
-// Straight up from the yard's emitter to the belly of the hull it raises aloft, kilometres
-// over it (`sky_yard.rs`). A column, not a stream: a core of violet light cooling to red
-// as it climbs, pulses running up it, a faint sheath round it; strands of the nanite
-// stream winding up round it in a slow helix; the dark swarm climbing it in ragged puffs,
-// a few motes glinting; a knot of light where it leaves and a bright one where it meets
-// the hull. It climbs from the emitter when the work starts and drains up into the hull
-// when it stops. `radius` is the column's.
-
-const SHAPE_LIFT_CORE: f32 = 16.0;
-// Strands winding up it, each in segments; then the core and its sheath, the two knots,
-// and the swarm's puffs in the rest of the beam's quads.
-const LIFT_STRANDS: u32 = 6u;
-const LIFT_SEGS: u32 = 6u;
-// Metres a second the light climbs at when the work starts, and drains up at after.
-const LIFT_SPEED: f32 = 520.0;
-// Turns the strands make round it from the emitter to the hull.
-const LIFT_TURNS: f32 = 1.25;
-
-// How far up the column (metres from the emitter) the light has climbed, and from how far
-// up it has drained, `delay` seconds behind the first.
-fn lift_reach(b: Beam, len: f32, delay: f32) -> vec2<f32> {
-    let time = globals.camera.w;
-    let head = clamp((time - b.start - delay) * LIFT_SPEED, 0.0, len);
-    var tail = 0.0;
-    if b.end >= 0.0 {
-        tail = clamp((time - b.end - delay) * LIFT_SPEED, 0.0, len);
-    }
-    return vec2<f32>(head, tail);
-}
-
-// Strand `i` of the column, `s` of the way up: wound round its axis at `r`.
-fn lift_strand_at(b: Beam, i: f32, s: f32, r: f32, time: f32) -> vec3<f32> {
-    let way = select(-1.0, 1.0, hash(i + 3.3) > 0.5);
-    let a = hash(i * 5.1 + 1.7) * 6.2832 + way * (s * LIFT_TURNS * 6.2832 + time * 0.22);
-    return mix(b.emitter, b.to, s) + vec3<f32>(cos(a), sin(a), 0.0) * r;
-}
-
-fn sky_lift_vertex(b: Beam, slot: u32, corner: vec2<f32>) -> BeamOut {
-    let time = globals.camera.w;
-    let len = max(distance(b.emitter, b.to), 0.01);
-    let r = max(b.radius, 1.0);
-    if slot < LIFT_STRANDS * LIFT_SEGS {
-        let i = f32(slot / LIFT_SEGS);
-        let j = f32(slot % LIFT_SEGS);
-        let reach = lift_reach(b, len, i * 0.12) / len;
-        if reach.x - reach.y < 0.002 {
-            return hidden();
-        }
-        let s0 = reach.y + (reach.x - reach.y) * j / f32(LIFT_SEGS);
-        let s1 = reach.y + (reach.x - reach.y) * (j + 1.0) / f32(LIFT_SEGS);
-        let wind = r * (0.55 + 0.35 * hash(i * 2.9 + 0.4));
-        var o = strand_ribbon(
-            lift_strand_at(b, i, s0, wind, time), lift_strand_at(b, i, s1, wind, time), b.emitter, corner,
-            r * 0.12, SHAPE_STRAND, vec4<f32>(reach.x * len, reach.y * len, len, hash(i * 7.7 + b.seed))
-        );
-        o.kind = f32(BEAM_NANITE);
-        return o;
-    }
-    let k = slot - LIFT_STRANDS * LIFT_SEGS;
-    let reach = lift_reach(b, len, 0.0);
-    if reach.x - reach.y < 0.5 {
-        return hidden();
-    }
-    let axis = (b.to - b.emitter) / len;
-    if k < 2u {
-        // The core, then its sheath.
-        let sheath = k == 1u;
-        let seg = rep_clip(b.emitter + axis * reach.y, b.emitter + axis * reach.x);
-        if seg[2].x < 0.0 {
-            return hidden();
-        }
-        var o = rep_ribbon(seg[0], seg[1], b.emitter, corner, select(r * 0.4, r * 1.6, sheath), 1.5, SHAPE_LIFT_CORE);
-        o.kind = f32(BEAM_SKY_LIFT);
-        o.level = select(1.0, 0.3, sheath);
-        o.strand = vec4<f32>(reach.x, reach.y, len, select(0.0, 1.0, sheath));
-        return o;
-    }
-    if k < 4u {
-        // The knots: where it meets the hull, bright, once the light gets there; and where
-        // it leaves the yard, smaller.
-        let at_hull = k == 2u;
-        let world = select(b.emitter, b.to, at_hull);
-        if (globals.view_proj * vec4<f32>(world, 1.0)).w < RAY_NEAR {
-            return hidden();
-        }
-        let arrived = select(1.0, smoothstep(len - 1.0, len, reach.x), at_hull);
-        let gone = select(1.0 - smoothstep(0.0, 1.0, reach.y), 1.0 - smoothstep(len * 0.9, len, reach.y), at_hull);
-        let throb = 0.85 + 0.15 * sin(time * 2.1) * sin(time * 3.3 + b.seed);
-        let size = select(r * 0.9, r * 2.4, at_hull) * throb;
-        var out: BeamOut;
-        out.kind = f32(BEAM_SKY_LIFT);
-        out.uv = corner;
-        out.clip = rep_billboard(world, corner, size, 3.0, size * 0.8);
-        out.state = vec3<f32>(SHAPE_NANITE_GLOW, 1.0, 0.0);
-        out.level = arrived * gone;
-        return out;
-    }
-    // A puff of the swarm, climbing the column, round it.
-    let m = f32(k - 4u);
-    let rate = 0.025 + 0.02 * hash(m * 1.3 + b.seed);
-    let t = time * rate + hash(m * 3.7 + b.seed);
-    let ph = fract(t);
-    let n = floor(t) * 1.618 + m * 2.9 + b.seed;
-    let up = ph * len;
-    if up < reach.y || up > reach.x {
-        return hidden();
-    }
-    let a = hash(n) * 6.2832 + time * 0.1;
-    let out_r = r * (0.6 + 1.4 * hash(n + 1.0));
-    let world = b.emitter + axis * up + vec3<f32>(cos(a), sin(a), 0.0) * out_r;
-    let c = globals.view_proj * vec4<f32>(world, 1.0);
-    if c.w < RAY_NEAR {
-        return hidden();
-    }
-    let size = r * (1.0 + 1.2 * hash(n + 2.0));
-    var out: BeamOut;
-    out.kind = f32(BEAM_SKY_LIFT);
-    out.extra = vec4<f32>(size, max(c.w, 1.0) / globals.lod.x, 0.0, 0.0);
-    out.uv = corner;
-    out.clip = rep_billboard(world, corner, size, 3.0, size * 0.3);
-    out.state = vec3<f32>(SHAPE_SWARM, ph, hash(n + 3.0));
-    out.level = smoothstep(0.0, 0.06, ph) * (1.0 - smoothstep(0.9, 1.0, ph));
-    return out;
-}
-
-// The column's core or sheath (`sky_lift_vertex`): bright down its middle, violet where it
-// leaves cooling to red as it climbs, pulses running up it; the sheath a faint haze.
-fn lift_core_fragment(in: BeamOut) -> vec4<f32> {
-    let time = globals.camera.w;
-    let m = in.state.y;
-    let head = in.strand.x;
-    let tail = in.strand.y;
-    let s = clamp(m / max(in.strand.z, 1.0), 0.0, 1.0);
-    let ends = smoothstep(tail, tail + 6.0, m) * (1.0 - smoothstep(head - 12.0, head, m));
-    if ends <= 0.001 {
-        discard;
-    }
-    let y = in.uv.y;
-    let sheath = in.strand.w > 0.5;
-    let body = exp(-y * y * select(5.0, 2.5, sheath));
-    let pulse = 0.6 + 0.4 * pow(0.5 + 0.5 * sin(m * 0.025 - time * 5.0), 3.0);
-    let color = mix(NANITE_VIOLET, NANITE_RED, smoothstep(0.05, 0.85, s));
-    let hot = select(exp(-y * y * 40.0) * 0.6, 0.0, sheath);
-    let light = (color * body * pulse * select(2.4, 0.9, sheath) + NANITE_HOT * hot * pulse) * ends * in.level;
-    return vec4<f32>(light, clamp(body * select(0.25, 0.08, sheath), 0.0, 0.4) * ends * in.level);
 }
 
 // fs_beam, seen through the water from under it (bindings.wgsl `under_sea_seen`) and

@@ -22,7 +22,6 @@
 //!   interceptor streaks up on a thinner one. The bodies and motor plumes are drawn in
 //!   `nuke.wgsl` from `Globals::strategic`; their trails are puffs in slots of their own
 //!   (`NUKE_PUFF_SLOTS`) so the battle's smoke cannot overwrite them.
-//! - The Edict's strike on the ground, a blast of its own kind (`edict.rs`).
 
 use super::{Puff, Renderer, PUFF_FIREBALL, PUFF_SMOKE, PUFF_SPARK, PUFF_TREE_SMOKE};
 use crate::camera::Camera;
@@ -32,7 +31,6 @@ use glam::{Vec2, Vec3};
 use mc_sim::mirror::{RenderFrame, SimEvent, StrategicInstance, STRATEGIC_WARHEAD};
 use std::mem::size_of;
 
-mod edict;
 mod nova;
 
 /// Blasts drawn as volumes at once, the nearest (`Globals::nukes`, four vec4 each;
@@ -312,8 +310,6 @@ pub(super) struct NukeFx {
     missiles: Vec<StrategicInstance>,
     /// Warheads out of a boat's tubes, not lit until clear of the sea (`sea_launch.rs`).
     pub(super) sea: super::sea_launch::SeaLaunches,
-    /// The Edict's strikes, for their trees (`edict.rs`).
-    edicts: Vec<edict::Strike>,
 }
 
 impl NukeFx {
@@ -329,9 +325,6 @@ impl NukeFx {
 
     /// What a tree at `at` that died this tick does, if a blast killed it.
     pub(super) fn tree_fate(&mut self, at: Vec2, time: f32) -> Option<TreeFate> {
-        if let Some(fate) = self.edict_tree_fate(at, time) {
-            return Some(fate);
-        }
         let b = self
             .blasts
             .iter_mut()
@@ -399,9 +392,6 @@ impl Renderer {
                     self.push_effect(at.to_array(), time, 9.0, 0.35, 1.0, 0.0);
                 }
             }
-            SimEvent::EdictFired {
-                blueprint, mark, ..
-            } => self.edict_strike(*blueprint, Vec3::from(mark.to_f32()), time),
             SimEvent::WarheadIntercepted {
                 pos, killed, look, ..
             } => {

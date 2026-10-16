@@ -1,6 +1,5 @@
 //! The range's scenarios that stage a whole batch of units: a space elevator's first
-//! platform (`Scenario::Elevator`), a gravitic engine's target camp (`Scenario::Fracture`)
-//! and the camp an Edict is fired on (`Scenario::Edict`).
+//! platform (`Scenario::Elevator`) and a gravitic engine's target camp (`Scenario::Fracture`).
 
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::{Blueprints, UnitBlueprint};
@@ -120,52 +119,4 @@ pub(super) fn fracture_camp(
         commands,
         Some((bp.id, PendingOrder::Fracture { pos: mark })),
     ))
-}
-
-/// How far down the range `Scenario::Edict` aims, metres: 3.5 km off a Regent's bow.
-pub(super) const EDICT_RANGE: i32 = 5000;
-
-/// `Scenario::Edict`: a red camp round `mark` (tanks in rings out to past the blast's
-/// reach, a dome and a few power plants), and the ship's Edict fired on it at once.
-pub(super) fn edict_camp(
-    blueprints: &Blueprints,
-    bp: &UnitBlueprint,
-    mark: FxVec2,
-) -> Result<Staged, &'static str> {
-    if bp.edict.is_none() {
-        return Err("This Ship Carries No Edict");
-    }
-    let id = |key: &str| blueprints.id_of(key).ok_or("No Camp To Strike");
-    let spawn = |blueprint, x: i32, y: i32| Command::DebugSpawn {
-        owner: RED,
-        blueprint,
-        pos: mark + FxVec2::from_ints(x, y),
-        heading: Angle::HALF_TURN,
-        count: 1,
-        flags: 0,
-        build: 1000,
-    };
-    let (tank, power, dome) = (
-        id(DEFAULT_SUBJECT)?,
-        id("aster_t1_power")?,
-        id("aster_t3_shield")?,
-    );
-    // The gather paid in full, so it never stalls.
-    let mut commands = vec![Command::DebugFreeBuild {
-        player: BLUE,
-        on: true,
-    }];
-    for ring in [0, 250, 600, 950, 1300] {
-        let n = if ring == 0 { 1 } else { 8 };
-        for k in 0..n {
-            let a = Angle::from_degrees(k * 360 / n + ring / 50);
-            let at = FxVec2::from_angle(a) * Fx::from_int(ring);
-            commands.push(spawn(tank, at.x.round_int(), at.y.round_int()));
-        }
-    }
-    for (x, y) in [(-180, -260), (220, 300), (520, -160)] {
-        commands.push(spawn(power, x, y));
-    }
-    commands.push(spawn(dome, -700, 500));
-    Ok((commands, Some((bp.id, PendingOrder::Edict { pos: mark }))))
 }

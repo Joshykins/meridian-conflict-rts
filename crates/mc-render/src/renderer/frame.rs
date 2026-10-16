@@ -401,16 +401,13 @@ impl Renderer {
                 self.ground_melt.upload();
             }
             self.gravitic_engine_frame(input.time, camera);
-            self.edict_frame(input.time, camera);
             self.gravitic_shell_frame(input.time, input.alpha.clamp(0.0, 1.0));
-            // The engines' lenses, the gravitic shells', then the shimmer round an
-            // Edict's column.
+            // The engines' lenses, then the gravitic shells'.
             let lenses: Vec<_> = self
                 .gravitic_engine_fx
                 .lenses
                 .iter()
                 .chain(&self.plasma_fx.shells.lenses)
-                .chain(&self.edict_fx.shimmer)
                 .copied()
                 .collect();
             self.heat_haze
@@ -1451,8 +1448,7 @@ impl Renderer {
                     device.cmd_draw(cmd, 3, 1, 0, 0);
                     device.cmd_end_render_pass(cmd);
                 };
-                let exposed = [TONEMAP[0] * self.edict_fx.exposure.value(), TONEMAP[1]];
-                glass_pass(self.pipelines.glass_source, 0, self.screen_set, exposed);
+                glass_pass(self.pipelines.glass_source, 0, self.screen_set, TONEMAP);
                 glass_pass(self.pipelines.glass_blur, 1, self.glass_sets[0], [1.0, 0.0]);
                 glass_pass(self.pipelines.glass_blur, 0, self.glass_sets[1], [0.0, 1.0]);
             }
@@ -1468,8 +1464,7 @@ impl Renderer {
             .filter(|(_, &end)| input.time < end)
             .fold(0u64, |mask, (i, _)| mask | 1 << i);
         let tonemap_push = [
-            // The Edict's white-out and the dark after it (renderer/edict_fx).
-            TONEMAP[0] * self.edict_fx.exposure.value(),
+            TONEMAP[0],
             TONEMAP[1],
             f32::from_bits(live_waves as u32),
             f32::from_bits((live_waves >> 32) as u32),

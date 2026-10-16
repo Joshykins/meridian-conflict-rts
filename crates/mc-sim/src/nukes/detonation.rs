@@ -1,6 +1,5 @@
 //! Nuclear blasts running out (`docs/NUKES.md`): a warhead's or a commander's, announced
-//! (`detonate`), and the Edict's (`edict.rs`), which starts the same front unannounced
-//! (`start_detonation`) and draws its own.
+//! (`detonate`), its front run out over the ticks after.
 
 use mc_core::{Fx, FxVec3};
 use mc_data::strategic::{NuclearBlast, StrategicLook};
@@ -33,21 +32,6 @@ impl World {
             commander,
             look,
         });
-        self.start_detonation(pos, blast, owner, source, Vec::new());
-        Ok(())
-    }
-
-    /// A blast's front starts running out from `pos`, with nothing announced: domes,
-    /// units, wrecks, city blocks and trees go under it as under a warhead's. `spared`
-    /// are never hit (the Edict's ship). The caller says what it looks and sounds like.
-    pub(crate) fn start_detonation(
-        &mut self,
-        pos: FxVec3,
-        blast: NuclearBlast,
-        owner: u8,
-        source: UnitId,
-        spared: Vec<UnitId>,
-    ) {
         self.state.strategic.detonations.push(Detonation {
             pos,
             owner,
@@ -59,11 +43,12 @@ impl World {
             front_ticks: blast.front_ticks,
             age: 0,
             reached: Fx::ZERO,
-            hit: spared,
+            hit: Vec::new(),
             screens: Vec::new(),
         });
         // The first ring lands the tick it forms.
         self.run_detonation(self.state.strategic.detonations.len() - 1);
+        Ok(())
     }
 
     pub(super) fn run_detonations(&mut self) -> Result<(), SimError> {

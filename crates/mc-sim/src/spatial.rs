@@ -6,8 +6,8 @@
 //! structures and giants on coarser ones. A query widens its search by each
 //! layer's largest radius, so one titan no longer makes every infantry query
 //! scan a 300 m square; a wide query reads one coarse grid of the kind
-//! instead, and the giants' layer beside it. The kilometres-long hulls (the
-//! Regent) have a layer of their own on 1 km cells and keep out of the coarse
+//! instead, and the giants' layer beside it. The kilometres-long hulls
+//! (survival's machines) have a layer of their own on 1 km cells and keep out of the coarse
 //! grid and the owner map's reach, so one of them does not widen every query
 //! on the map by its radius. Results come out kind by kind, layer by layer
 //! (smallest first, the giants last), and within a layer in (cell row-major,
@@ -54,7 +54,7 @@ const EMPTY: Entry = Entry {
 /// The layers as (cell edge shift, largest radius held): 16 m cells for
 /// anything up to 16 m (units, wrecks, stains), 64 m cells up to 64 m
 /// (structures, big hulls), 256 m cells up to 400 m (titans, capital ships),
-/// 1 km cells for the rest (`GIANT`: the Regent, survival's machines).
+/// 1 km cells for the rest (`GIANT`: survival's machines).
 const LAYERS: [(u32, i32); 4] = [(4, 16), (6, 64), (8, 400), (10, i32::MAX)];
 /// The giants' layer: not in the coarse grid (`Grids::wide`), which a wide
 /// query reads it beside, nor the owner map's reach (`SpatialIndex::unit_radius`):

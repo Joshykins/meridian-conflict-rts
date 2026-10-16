@@ -3,8 +3,7 @@
 //! across it. No ghost discs: the user ruled them out. The tone map draws them (`screen.wgsl`, `lens_flare`) over the scene and
 //! its bloom, and hides one whose light something solid stands in front of.
 //!
-//! An effect asks for a `Flare` that flashes and dies away (`flash`), or one held for this
-//! frame only (`hold`), laid again each frame for as long as it shines. Presentation only.
+//! An effect asks for a `Flare` that flashes and dies away (`flash`). Presentation only.
 
 use std::mem::size_of;
 
@@ -57,8 +56,6 @@ struct Timed {
 pub(super) struct LensFlares {
     buffer: Buffer,
     timed: Vec<Timed>,
-    /// Held for the next upload only.
-    held: Vec<(Vec3, Flare)>,
     scratch: Vec<(f32, GpuLensFlare)>,
 }
 
@@ -72,7 +69,6 @@ impl LensFlares {
         Ok(Self {
             buffer,
             timed: Vec::new(),
-            held: Vec::new(),
             scratch: Vec::new(),
         })
     }
@@ -95,24 +91,9 @@ impl LensFlares {
         });
     }
 
-    /// A flare shining at full this frame only (a light that holds: laid again each frame).
-    pub(super) fn hold(&mut self, at: Vec3, flare: Flare) {
-        self.held.push((at, flare));
-    }
-
     /// Hands the GPU this frame's flares, the strongest in view, dropping the spent ones.
     pub(super) fn upload(&mut self, time: f32, camera: &Camera) {
         self.timed.retain(|t| time < t.start + t.life);
-        // Held ones as timed ones struck this instant, so they are at full now and gone by
-        // the next upload.
-        for (at, flare) in std::mem::take(&mut self.held) {
-            self.timed.push(Timed {
-                flare,
-                at,
-                start: time,
-                life: f32::MIN_POSITIVE,
-            });
-        }
         let eye = camera.eye();
         let view_proj = camera.view_proj();
         let px_per_m = camera.projection_scale();

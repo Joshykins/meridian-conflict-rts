@@ -1,6 +1,5 @@
 //! The range's "At Work" scenario: the subject at its own work. A builder in the field
-//! raises the first thing it builds beside the pad; a factory makes its first product (a
-//! yard raises its hull in the sky over itself, `Builder::aloft`).
+//! raises the first thing it builds beside the pad; a factory makes its first product.
 
 use mc_core::FxVec2;
 use mc_data::{BlueprintId, UnitBlueprint};

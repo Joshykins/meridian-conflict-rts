@@ -34,10 +34,6 @@ pub(super) enum CraterStyle {
     /// A Regency nova: glassed as a nuclear blast, its melt glowing red and its glass
     /// black-crimson.
     Plasma,
-    /// The Edict's strike (`nuke_fx/edict.rs`): the whole blast radius glassed, red-hot
-    /// at first and cooling over minutes to black glass with a crimson depth, the
-    /// molten wave's last ripples frozen in it, charcoal feathering out past its shore.
-    Edict,
 }
 
 impl CraterStyle {
@@ -45,7 +41,7 @@ impl CraterStyle {
     fn pool(self) -> f32 {
         match self {
             CraterStyle::Glassed | CraterStyle::Plasma => 0.19,
-            CraterStyle::Edict | CraterStyle::Blast => 0.0,
+            CraterStyle::Blast => 0.0,
         }
     }
 
@@ -55,16 +51,14 @@ impl CraterStyle {
             CraterStyle::Glassed => crater::GLASSED,
             CraterStyle::Blast => crater::BLAST,
             CraterStyle::Plasma => crater::PLASMA,
-            CraterStyle::Edict => crater::EDICT,
         }
     }
 
     /// Seconds a pool `heat` hot takes to go black: a warhead's about six minutes, a
-    /// commander's four, the Edict's eight.
+    /// commander's four.
     fn cool(self, heat: f32) -> f32 {
         match self {
             CraterStyle::Glassed | CraterStyle::Plasma => 120.0 + 240.0 * heat,
-            CraterStyle::Edict => 200.0 + 280.0 * heat,
             CraterStyle::Blast => 60.0 + 60.0 * heat,
         }
     }
@@ -76,8 +70,7 @@ impl CraterStyle {
 pub(crate) struct GpuCrater {
     /// x, y, radius, the time it was made.
     pub(crate) at: [f32; 4],
-    /// heat (0-1), seconds it takes to cool, pool share of the radius (the Edict's:
-    /// seconds its wave takes to roll out to the radius), seed.
+    /// heat (0-1), seconds it takes to cool, pool share of the radius, seed.
     pub(crate) look: [f32; 4],
     /// `gpu_consts::crater` style.
     pub(crate) style: u32,
@@ -143,9 +136,7 @@ impl Craters {
         self.list.clear();
     }
 
-    /// A crater; `shape` is its pool share of the radius (`CraterStyle::pool`), or the
-    /// Edict's wave's seconds to roll out.
-    fn add(&mut self, at: Vec2, radius: f32, heat: f32, time: f32, style: CraterStyle, shape: f32) {
+    fn add(&mut self, at: Vec2, radius: f32, heat: f32, time: f32, style: CraterStyle) {
         if radius < 1.0 {
             return;
         }
@@ -171,7 +162,7 @@ impl Craters {
         let crater = Crater {
             gpu: GpuCrater {
                 at: [at.x, at.y, radius, time],
-                look: [heat, cool, shape, seed * 997.0 + 0.5],
+                look: [heat, cool, style.pool(), seed * 997.0 + 0.5],
                 style: style.gpu(),
                 _pad0: 0,
                 _pad1: 0,
@@ -243,15 +234,7 @@ impl Renderer {
         time: f32,
         style: CraterStyle,
     ) {
-        self.craters
-            .add(at, radius, heat, time, style, style.pool());
-    }
-
-    /// Leaves the Edict's scar: `radius` its blast's damage radius, glassed as its molten
-    /// wave rolls over it in `roll` seconds.
-    pub(super) fn add_edict_scar(&mut self, at: Vec2, radius: f32, time: f32, roll: f32) {
-        self.craters
-            .add(at, radius, 1.0, time, CraterStyle::Edict, roll.max(0.1));
+        self.craters.add(at, radius, heat, time, style);
     }
 
     /// Sends this frame's craters to the GPU and lets the hot ones warm the country

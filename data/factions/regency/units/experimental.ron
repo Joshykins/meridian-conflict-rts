@@ -440,28 +440,4 @@
         mesh: "regency_gravitic_engine", icon: GraviticEngine,
         sounds: (death: "blast_colossal"),
     ),
-    (
-        // The Regent Yard: the yard the Regent is raised from.
-        // Nothing stands on a lot three and a half kilometres long, so the Regent is built
-        // in the sky: its hull condenses at its cruise height over the yard, along its keel
-        // from the middle out, on one great beam the yard casts straight up from its
-        // emitter. Builders helping come to the yard and pour into it, not up to the hull;
-        // the hull hangs there where it can be seen and shot at, and if the yard falls the
-        // half-built hull comes down with it. When it is finished it gets under way.
-        key: "regency_t5_sky_yard",
-        name: "Regent Yard",
-        role: "Super Destroyer Yard", title: "Sky Shipyard",
-        tech: 5,
-        categories: ["Land", "Factory", "Experimental"],
-        health: 1000000,
-        cost: (materials: 120000, energy: 1200000, time: 400000),
-        radius: 140, height: 300, footprint: (24, 24), hull: (20, 20),
-        vision: 600,
-        // The first emitter casts the beam up to the hull; helpers' streams pour into the
-        // four intakes round its foot.
-        builder: (power: 1200, range: 0, aloft: true, builds: ["regency_t5_super_destroyer"],
-            emitters: [(0, 0, 292), (58, 0, 46), (0, 58, 46), (-58, 0, 46), (0, -58, 46)]),
-        mesh: "regency_sky_yard", icon: Factory,
-        sounds: (death: "blast_colossal"),
-    ),
 ]

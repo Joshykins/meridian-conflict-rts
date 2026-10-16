@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use crate::mirror::SimEvent;
 use crate::spatial::kind;
 use crate::tables::UnitId;
-use crate::well_area::{Aircraft, Sides, WellArea};
+use crate::well_area::{Aircraft, WellArea};
 use crate::{Handle, World};
 
 /// Metres past its range a hull's middle may stand and still be found: more than the
@@ -94,7 +94,7 @@ impl World {
             });
         if c.cooling > 0 {
             c.cooling -= 1;
-        } else if self.weapons_silent(row) || self.powered_down(row) {
+        } else if self.stunned(row) || self.powered_down(row) {
             c.charged = c.charged.saturating_sub(1);
         } else {
             let keep = self
@@ -176,8 +176,6 @@ impl World {
             source,
             per_tick: spec.damage,
             aircraft: Aircraft::Crushed(Fx::ONE),
-            edge: Fx::ONE,
-            sides: Sides::Enemies,
         });
         self.events.push(SimEvent::LanceStrike {
             unit: source,

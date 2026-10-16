@@ -764,52 +764,6 @@ ground broken into plates, a few great lit fissures and cracks lit in crawling p
 its slabs lifted and grinding and shards circling over it. No sphere of bent air
 anywhere (it reads as a bubble): a blow shows as dust driven over the ground.
 
-The Regent's Edict (tech 5) comes from no gun: the hull gathers it (renderer/edict_fx).
-Two lines of light sweep in along the hull from the bow and the stern, white-hot with the
-prism at their rim, in its long seams only, closing on the firing point where a pool of it
-grows; behind them the hull stays charcoal, a few long seams keeping a dim red that pulses
-toward the point (regency.wgsl `reg_edict`; never every plate's seams lit, which read as a
-brick grid). Under the keel there a star grows from a spark to a blinding point brighter
-than a warhead's flash, a rose-red corona and crimson licks round it, lightning crawling in
-to it off the hull, and in its last third of a second it draws in. The shot is a column of
-pinch fusion, a white-hot core widening where it meets the ground in a roiling sheath going
-from the prism's pink to red, the air round it shimmering, held a second and a quarter and
-collapsing into a red filament that cools and breaks up; a torn ring of pinched plasma and
-a pressure ring run out across it at the hull. The screen whites out for a third of a
-second, then the day goes dark (about half as bright) and comes back over six; the cloud
-deck is cut along the shot's line and cleared for a kilometre and more round the mark,
-blown outward, holding a few seconds and healing over a minute. Stalled, the seams and the
-star gutter. No violet, no orange, no mist.
-
-The Regent's Edict strikes the ground as neither a warhead's fireball nor the nova's star:
-nothing climbs and nothing hangs (renderer/nuke_fx/edict.rs). Where the column lands, a
-flash past what the screen shows lights the country white for a second, then red while
-the ground burns; a lens of pinched plasma is pressed flat over the mark, lobed, white-hot
-with the prism's warm colours (never its lavender) toward its limb, and tears apart into
-filaments within two seconds, hard globs of melt thrown out low. A broken line of light
-races out over the ground with the blast's front, a skirt of dark dust thrown up behind
-it, the trees bending, burnt away, thrown flat or, past the radius, set alight. The molten
-wave (the Saker's surge machinery at its own scale, `surge_fx::EDICT_WAVE`) is a low crest
-of melt rolling out at the sim's pace, the ground behind it white and rose for a moment,
-then crimson cracks and small pools that pulse, dimmer toward the rim, until the sim's
-wave dies; over the sea only its light. It leaves the blast radius glassed for the match
-(`CraterStyle::Edict`, scars.wgsl `edict_scar`): a lobed shore of slag, black glass with
-a crimson depth, the wave's last ripples frozen in broken rings, broad plates split by
-fissures that glow red and cool over minutes, the rim first, charcoal running out past
-the shore along rays. No orange, no violet, no mist.
-
-The Edict is heard as a ship drawing power, never as a gun (data/sounds/edict.ron,
-`audio/edict.rs`): the gather (15 s, held at the firing point and following it) opens
-with a contactor thud as the guns go cold and a felt drop, then a sub swell climbs under
-rough growls that start at the bow and the stern and work in toward the middle, the hull
-groaning under the load and a deep pulse quickening; it ends drawn in, on a held breath.
-Over its last 2.5 s the peak strains (a pressure swell, a shimmer beating faster). The shot
-is a short in-suck, a crack and slam together and a deep buzzing roar falling away; the
-strike a slam, the ground heaving and the glass seething low for ten seconds; each has a
-far form, crossfaded by distance and heard over the whole map. While it gathers and for
-three seconds after the shot the rest of the battle is held down (`Audio::duck_world`) for
-anyone who can see it, less the farther off they are.
-
 ## Ground contact
 
 Tracked vehicles mark the ground and raise dust while they move. Marks fade

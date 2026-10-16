@@ -16,7 +16,6 @@ pub mod cargo;
 mod dash;
 mod economy;
 mod economy_panel;
-mod edict;
 mod elevator;
 mod focus;
 mod frame_spans;
@@ -923,8 +922,7 @@ impl Hud {
                     }
                 }
                 // A tier-5 titan's great bore and its strike (`titan.rs`).
-                // A dasher's dash and its button in the same place (`dash.rs`), and a
-                // ship's Edict (`edict.rs`).
+                // A dasher's dash and its button in the same place (`dash.rs`).
                 if let Some((titan, count)) =
                     (panels.titan).and_then(|(id, n)| Some((unit(id)?, n)))
                 {
@@ -933,8 +931,6 @@ impl Hud {
                         let r = Rect::new(x, deck_y, pw, DECK_H);
                         if s.bp(titan).dash.is_some() {
                             dash::panel(self, ui, s, titan, count, r);
-                        } else if s.bp(titan).edict.is_some() {
-                            edict::panel(self, ui, s, titan, count, r);
                         } else {
                             titan::panel(self, ui, s, titan, count, r);
                         }
@@ -1122,7 +1118,6 @@ pub fn cursor_hint(
                 Targeting::Warp => warp::WARP,
                 Targeting::Dash => crate::dash_marks::DASH,
                 Targeting::Fracture => crate::gravitic_marks::WELL,
-                Targeting::Edict => crate::edict_marks::EDICT,
             },
         ),
         Mode::Ping(kind) => (format!("Ping: {}", kind.label()), kind.tone()),

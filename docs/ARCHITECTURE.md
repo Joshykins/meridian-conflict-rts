@@ -127,17 +127,6 @@ loadout's look bits and `UnitInstance::refit_modules` the loadout being fitted, 
 shader shows, raises or fades each piece. The HUD's refit tab (`hud/refit.rs`) is drawn from
 the data alone: any unit given `refits` gets it.
 
-**Production aloft** (`mc_sim::sky_yard`, `mc_data::Builder::aloft`). A hull too big for
-any lot (the Regent) is built by a yard that raises it in the sky over itself, at the
-hull's cruise height under the yard's heading, out in the open (never `IN_FACTORY`); the
-build economy finishes it through the yard's `build_target` as for any factory, and it sets
-off as an aircraft leaving its factory does. Builders helping go to the yard
-(`work_anchor`) and their streams pour into its intakes (its `emitters` after the first);
-the yard casts one great beam (`BEAM_SKY_LIFT`) up from its first emitter. Such a hull
-condenses along its keel from the middle out (`ModelInfo::nanite_order`,
-`nanite_site.wgsl`). If its yard goes, it falls half built (`AircraftCrash::built`), its
-wreck worth what was built; nothing else can build it (a load check).
-
 ## Frame / tick decoupling
 
 The sim runs on its own job-graph thread group. At the end of a tick it publishes a compact
@@ -332,7 +321,7 @@ What a fight looks and sounds like is decided outside the simulation; `docs/STYL
   tick's and this tick's pitch, and `prev_turret_yaw` beside `turret_yaw`; `entity.wgsl` interpolates both and pitches
   `rig::ARM_GUN` / `ARM_TOOL` vertices about `Model::arm_pivot` (`MeshBuilder::set_arm_pivot`) before the turret yaw.
 - **Weapon groups.** A weapon in a unit file with `mounts: [(pivot, facing, arc?), ...]` is
-  one kind of gun on many houses (the Regent's 72): its `muzzle`/`muzzles` are given about
+  one kind of gun on many houses: its `muzzle`/`muzzles` are given about
   the pivot as the house faces the nose, and loading makes each mount a whole `Weapon` of
   its own (`Weapon::mount_weapons`, `mc_data::mounts`); what keeps state for a whole unit
   (cells, orbs, a lens, a split salvo, a fed reload) is refused in a group. Gun slots number
@@ -444,8 +433,7 @@ session is as deterministic as any match, and the same code stages it headless
 (`--range --scenario NAME --screenshot ...`). Scenarios either stand something around the subject
 (`under-fire`, `close`, `targets`, `build`) or are an order to the subject itself (`work`, `upgrade`,
 `march`, `destruct`, `fracture`: a gravitic engine turned on a red camp 2 km off, and
-`fracture-release`, which then falters and lets its well go, `setup::late_orders`; `edict`: a
-Regent's Edict fired at once on a red camp 5 km off).
+`fracture-release`, which then falters and lets its well go, `setup::late_orders`).
 
 A scenario that needs a builder (BUILD IT) spawns it and keeps the order it owes in
 `Range::pending` until the unit shows up in the render mirror. RELOAD DATA/ is an application

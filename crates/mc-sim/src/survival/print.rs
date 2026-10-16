@@ -375,6 +375,24 @@ impl crate::World {
         Ok(started)
     }
 
+    /// A unit printed in the air at a Gatewright's berth: at its cruise height, a
+    /// construction site with no lot (a warship built by engineers stands on one).
+    fn spawn_aloft(
+        &mut self,
+        bp: BlueprintId,
+        side: u8,
+        at: FxVec2,
+        heading: Angle,
+    ) -> Result<usize, SimError> {
+        let row = self.spawn_unit(bp, side, at, heading, true)?;
+        let full = self.unit_max_health(row);
+        let units = &mut self.state.units;
+        units.flags[row] |= crate::tables::flag::UNDER_CONSTRUCTION;
+        units.build_progress[row] = Fx::ZERO;
+        units.health[row] = full / 10;
+        Ok(row)
+    }
+
     /// A formation still standing on its spot keeps it.
     pub(super) fn survival_spot_taken(&self, spot: Spot) -> bool {
         let s = self.state.survival.as_ref().unwrap();

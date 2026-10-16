@@ -330,8 +330,7 @@ impl World {
                 blueprint: bp.id.0 as u32,
                 owner_flags: KIND_WRECK,
                 health: 1.0,
-                // A hull that fell half built is drawn as far as it had formed.
-                build: crash.built.to_f32(),
+                build: 1.0,
                 radius: bp.radius.to_f32(),
                 unit_id: crash.unit_id,
                 packed: WRECK_FALLING,

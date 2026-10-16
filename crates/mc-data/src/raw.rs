@@ -449,9 +449,6 @@ pub(crate) struct Unit {
     /// ([`crate::gravitic::Gravitic`]).
     #[serde(default)]
     pub gravitic: Option<crate::gravitic::RawGravitic>,
-    /// The Edict, a barrel-less main gun fired from the hull ([`crate::edict::Edict`]).
-    #[serde(default)]
-    pub edict: Option<crate::edict::RawEdict>,
     #[serde(default)]
     pub motion: Option<RawMotion>,
     #[serde(default)]
@@ -824,9 +821,6 @@ pub(crate) struct RawBuilder {
     /// Where the gear carrying `emitters` pitches to point at the work, like the arm's elbow.
     #[serde(default)]
     pub hinge: Option<(f64, f64, f64)>,
-    /// Builds its products in the sky over it (`Builder::aloft`).
-    #[serde(default)]
-    pub aloft: bool,
 }
 
 #[derive(Deserialize, Clone)]
@@ -1891,7 +1885,6 @@ impl Unit {
                         .collect(),
                     unfold_ticks: ticks(b.unfold).clamp(0, 600) as u16,
                     hinge: b.hinge.map(|p| FxVec3::new(fx(p.0), fx(p.1), fx(p.2))),
-                    aloft: b.aloft,
                 })
             }
             None => None,
@@ -2587,15 +2580,6 @@ impl Unit {
                 Some(g) => Some(g.compile(key, fx, TICKS_PER_SECOND)?),
                 None => None,
             },
-            edict: match &self.edict {
-                Some(_) if self.motion.is_none() => {
-                    return Err(DataError::Invalid(format!(
-                        "{key}: the Edict is fired from a ship's hull"
-                    )));
-                }
-                Some(e) => Some(e.compile(key, fx, TICKS_PER_SECOND)?),
-                None => None,
-            },
             elevator: match &self.elevator {
                 Some(e) => Some(e.compile(key, fx, TICKS_PER_SECOND)?),
                 None => None,
@@ -2630,7 +2614,6 @@ impl Unit {
                 None => None,
             },
             builder,
-            built_aloft: false,
             reclaimer: match &self.reclaimer {
                 Some(r) => Some(compile_reclaimer(key, r, self.weapons.len())?),
                 None => None,
