@@ -132,6 +132,24 @@ fn thin_scale(index: u32, px: f32) -> f32 {
     return inverseSqrt(keep) * fade;
 }
 
+// A wreck's level of detail holds no more than this many triangles per pixel of the disc
+// it covers on screen; past that it takes the next coarser level. The levels switch at
+// fixed sizes, which suits a tank (its middle level, 300 triangles, is under one a pixel
+// where it is drawn) but not a capital ship's hull, ten thousand triangles in its middle
+// level: a late survival match's field of them seen from afar was three million
+// triangles, most of its frame, in wrecks a few dozen pixels across. A live unit that
+// small is its icon instead; a wreck has none.
+const WRECK_TRIS_PER_PX: f32 = 2.0;
+
+fn wreck_level(model: ModelInfo, px: f32, level: u32) -> u32 {
+    let room = WRECK_TRIS_PER_PX * 3.14159 * px * px;
+    var l = level;
+    while l < LOD_FAR - 1u && f32(slots[model.slot + l].index_count) > 3.0 * room {
+        l += 1u;
+    }
+    return l;
+}
+
 fn classify(e: Entity, index: u32, dynamic: bool) -> u32 {
     thin_grow = 1.0;
     let flags = e.owner_flags;
@@ -204,11 +222,17 @@ fn classify(e: Entity, index: u32, dynamic: bool) -> u32 {
     if (flags & KIND_PROP) != 0u {
         detail_bias *= globals.detail.y;
     }
+    var level = LOD_FAR - 1u;
     if px > globals.lod.z * detail_bias {
-        return model.slot;
+        level = 0u;
+    } else if px > globals.lod.w * select(1.0, globals.detail.y, (flags & KIND_PROP) != 0u) {
+        level = 1u;
     }
-    if px > globals.lod.w * select(1.0, globals.detail.y, (flags & KIND_PROP) != 0u) {
-        return model.slot + 1u;
+    if (flags & KIND_WRECK) != 0u {
+        level = wreck_level(model, px, level);
+    }
+    if level < LOD_FAR - 1u {
+        return model.slot + level;
     }
     // Cliff rock a few pixels across is lost in the wall's own stone (rock.wgsl).
     if (model.icon & ICON_CLIFF) != 0u && px < LOD_FAR_PX {
