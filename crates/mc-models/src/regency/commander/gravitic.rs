@@ -25,7 +25,7 @@ use super::shoulder::{DIAMOND, HEX, SLAB};
 pub(super) const TRUNNION: Vec3 = Vec3::new(-0.6, -3.2, 23.4);
 /// Between the tines' points: `MOUTH` metres ahead of the trunnions.
 pub(super) const MUZZLE: Vec3 = Vec3::new(TRUNNION.x + MOUTH, TRUNNION.y, TRUNNION.z);
-const MOUTH: f32 = 5.3;
+const MOUTH: f32 = 6.3;
 /// The pedestal's foot on the pad.
 const FOOT: Vec3 = Vec3::new(-1.0, -3.2, 21.95);
 /// Half the yoke's span: the cheeks stand this far either side of the line.
@@ -35,12 +35,12 @@ const KICK: f32 = 0.6;
 /// The breech's face, where the tines leave it.
 const FACE: f32 = 1.1;
 /// The tines' inner faces stand this far off the line.
-const GAP: f32 = 0.47;
+const GAP: f32 = 0.3;
 /// The crystal: its middle along the line, its half-length, and its radius, which keeps
 /// it clear of the tines as it turns.
 const CORE: f32 = 2.3;
 const CORE_HALF: f32 = 0.95;
-const CORE_R: f32 = 0.36;
+const CORE_R: f32 = 0.26;
 
 /// The suite's dark armour: Regency plate in the machined finish.
 fn machined(b: &mut MeshBuilder) {
@@ -185,14 +185,14 @@ fn gun(b: &mut MeshBuilder) {
     }
     // Bands down either side holding the tines apart, clear of the crystal.
     machined(b);
-    for t in [1.5, 3.4] {
+    for t in [1.5, 4.0] {
         for side in [1.0f32, -1.0] {
             let out = Vec3::NEG_Y * side;
             sleeve(
                 b,
                 &[
-                    ring(at(t) + out * 0.52 + Vec3::Z * 0.85, out, 0.2, 0.1),
-                    ring(at(t) + out * 0.52 - Vec3::Z * 0.85, out, 0.2, 0.1),
+                    ring(at(t) + out * 0.52 + Vec3::Z * 0.65, out, 0.2, 0.1),
+                    ring(at(t) + out * 0.52 - Vec3::Z * 0.65, out, 0.2, 0.1),
                 ],
                 &OCT,
             );
@@ -236,8 +236,8 @@ fn tine(b: &mut MeshBuilder, out: Vec3) {
         b,
         &[
             ring(off(FACE - 0.4, 0.3), out, 0.55, 0.3),
-            ring(off(3.3, 0.27), out, 0.48, 0.27),
-            ring(off(4.7, 0.2) - out * 0.05, out, 0.36, 0.2),
+            ring(off(3.8, 0.27), out, 0.48, 0.27),
+            ring(off(5.6, 0.2) - out * 0.05, out, 0.36, 0.2),
         ],
         &KEEL,
     );
@@ -245,8 +245,8 @@ fn tine(b: &mut MeshBuilder, out: Vec3) {
     sleeve(
         b,
         &[
-            ring(off(4.65, 0.2) - out * 0.05, out, 0.38, 0.22),
-            ring(MUZZLE + out * 0.3, out, 0.05, 0.05),
+            ring(off(5.55, 0.2) - out * 0.05, out, 0.38, 0.22),
+            ring(MUZZLE + out * 0.2, out, 0.05, 0.05),
         ],
         &KEEL,
     );
@@ -291,9 +291,9 @@ fn crystal(b: &mut MeshBuilder) {
         sleeve(
             b,
             &[
-                ring(at(CORE - 0.5) + r * 0.2, r, 0.02, 0.02),
-                ring(at(CORE - 0.1) + r * 0.32, r, 0.06, 0.12),
-                ring(at(CORE + 0.35) + r * 0.25, r, 0.02, 0.02),
+                ring(at(CORE - 0.5) + r * 0.14, r, 0.02, 0.02),
+                ring(at(CORE - 0.1) + r * 0.2, r, 0.06, 0.06),
+                ring(at(CORE + 0.35) + r * 0.16, r, 0.02, 0.02),
             ],
             &KEEL,
         );
@@ -313,7 +313,7 @@ pub(super) fn coarse(b: &mut MeshBuilder) {
                     let out = Vec3::Z * side;
                     b.beam(
                         at(FACE - 0.4) + out * (GAP + 0.3),
-                        MUZZLE + out * 0.3,
+                        MUZZLE + out * 0.2,
                         Vec2::new(1.0, 0.6),
                         Vec2::splat(0.1),
                     );
