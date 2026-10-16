@@ -449,8 +449,9 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_portcullis" => 9000,
         // A skirted tracked body, a turret, the gun and its caged core.
         "regency_skyspear" | "regency_fusion_howitzer" => 8000,
-        // Six plated shard legs, their thighs, a body, its well and its prongs.
-        "regency_gravitic_lens" => 8000,
+        // Six shard legs and their thighs, a body, its rotor well and its prongs: seen by the
+        // hundred, so its shards are the light ones.
+        "regency_gravitic_lens" => 4500,
         // Strategic: an 8 x 8 launch complex, and a 4 x 4 array; a few a match.
         "regency_nuke_silo" => 9000,
         "regency_nuke_defense" => 6000,
@@ -500,8 +501,6 @@ pub(super) fn reduced_share(key: &str) -> Option<f32> {
         }
         // Faceted plates and skirts that keep their sides when reduced.
         "regency_skyspear" | "regency_fusion_howitzer" => Some(0.52),
-        // Faceted shards and a plated body that keep their sides when reduced.
-        "regency_gravitic_lens" => Some(0.55),
         // A faceted hull and slotted emitter plates that keep their sides when reduced.
         "regency_censer" => Some(0.6),
         // A faceted hull, plated cheeks and lofted lance and tines: armour that keeps its

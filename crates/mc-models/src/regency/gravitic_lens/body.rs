@@ -89,7 +89,10 @@ fn hips(b: &mut MeshBuilder) {
                 Vec3::Z + out * 0.4,
             );
             b.with_facets(|b| armour(b, &f, &swept(1.9, 0.75, 0.0, 0.5), 0.22));
-            // Cheek plates either side of the socket.
+            // Cheek plates either side of the socket, at the full level.
+            if !b.fine() {
+                continue;
+            }
             for s in [-1.0, 1.0] {
                 let g = Frame::new(
                     hip - out * 0.9 + across * (s * 0.78) + Vec3::Z * 0.15,
@@ -104,34 +107,30 @@ fn hips(b: &mut MeshBuilder) {
 
 /// One rotor ring about the z axis, from `z0` to `z1`, `outer` to `inner` across, turning
 /// at `rate` (rad/s, the sign its way): a drum of dark plate girdled by a thin band rimmed
-/// violet (`NANITE_RIM`), a graphite race inside it, and swept vanes lying on its top,
-/// their points trailing the way it turns.
+/// violet (`NANITE_RIM`), and swept vanes lying on its top, their points trailing the way it
+/// turns. At the reduced level, the drum alone.
 fn rotor(b: &mut MeshBuilder, z0: f32, z1: f32, outer: f32, inner: f32, vanes: usize, rate: f32) {
     b.with_orbit(Vec3::Z, rate, |b| {
-        let segs = b.sides(14);
+        let segs = if b.fine() { 12 } else { 8 };
         let (mid, w, h) = ((outer + inner) * 0.5, outer - inner, z1 - z0);
         b.with_facets(|b| {
             dark_plate(b);
             hoop(b, Vec3::Z * (z0 + h * 0.5), mid, w, h, segs);
-            b.paint(PLATING_DARK).pattern(pattern::NANITE_RIM);
-            hoop(
-                b,
-                Vec3::Z * (z0 + h * 0.45),
-                outer + 0.03,
-                0.08,
-                h * 0.3,
-                segs,
-            );
-            metal(b);
-            hoop(
-                b,
-                Vec3::Z * (z0 + h * 0.5),
-                inner - 0.06,
-                0.14,
-                h * 0.8,
-                segs,
-            );
+            if b.fine() {
+                b.paint(PLATING_DARK).pattern(pattern::NANITE_RIM);
+                hoop(
+                    b,
+                    Vec3::Z * (z0 + h * 0.45),
+                    outer + 0.03,
+                    0.08,
+                    h * 0.3,
+                    segs,
+                );
+            }
         });
+        if !b.fine() {
+            return;
+        }
         let way = rate.signum();
         for i in 0..vanes {
             let a = TAU * i as f32 / vanes as f32;
@@ -164,9 +163,9 @@ fn rotor_well(b: &mut MeshBuilder) {
     b.prism(v3(0.0, 0.0, BAND + 0.3), sides, 2.1, 2.1, 0.12);
     seam(b);
     hoop(b, Vec3::Z * (collar + 0.06), 2.2, 0.3, 0.16, sides);
-    rotor(b, BAND + 0.45, collar - 0.15, 1.95, 1.4, 10, 0.9);
-    rotor(b, collar, collar + 0.75, 1.55, 1.1, 8, -1.3);
-    rotor(b, collar + 0.95, collar + 1.5, 1.15, 0.8, 6, 1.8);
+    rotor(b, BAND + 0.45, collar - 0.15, 1.95, 1.4, 6, 0.9);
+    rotor(b, collar, collar + 0.75, 1.55, 1.1, 5, -1.3);
+    rotor(b, collar + 0.95, collar + 1.5, 1.15, 0.8, 4, 1.8);
     cradle(b, 2.15, collar + 0.05, 0.42);
 }
 

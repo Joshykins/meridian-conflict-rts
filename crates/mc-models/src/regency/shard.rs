@@ -32,6 +32,11 @@ const PROFILE: [(f32, f32, f32); 5] = [
     (1.0, 0.0, 0.0),
 ];
 
+/// The spans of its height its glazed inner plates cover: two at the full level, one long
+/// one at the reduced level and on a small shard.
+const INNER_PAIR: [(f32, f32); 2] = [(0.08, 0.4), (0.44, 0.74)];
+const INNER_LONG: [(f32, f32); 1] = [(0.08, 0.6)];
+
 /// The corners of a shard's section: keel, back shoulders, edges, inner ridge. Indices into
 /// [`Shard::ring`].
 const KEEL: usize = 0;
@@ -141,7 +146,28 @@ impl Shard {
             self.boot(b);
             self.back_plates(b);
             self.flank_plates(b);
-            self.inner_plates(b);
+            if b.fine() {
+                self.inner_plates(b, &INNER_PAIR);
+            } else {
+                self.inner_plates(b, &INNER_LONG);
+            }
+        });
+    }
+
+    /// A small shard (a walker's leg, seen by the hundred): its boot, its back plates and one
+    /// long glazed plate each side, none down its flanks; at the reduced level only the
+    /// glazed plates on its core.
+    pub(super) fn build_light(&self, b: &mut MeshBuilder) {
+        b.with_facets(|b| {
+            self.core(b);
+            if b.coarse() {
+                return;
+            }
+            if b.fine() {
+                self.boot(b);
+                self.back_plates(b);
+            }
+            self.inner_plates(b, &INNER_LONG);
         });
     }
 
@@ -304,15 +330,11 @@ impl Shard {
         }
     }
 
-    /// Glazed plates on its inner faces, the held energy showing through them.
-    fn inner_plates(&self, b: &mut MeshBuilder) {
+    /// Glazed plates on its inner faces, the held energy showing through them, over `spans`
+    /// of its height.
+    fn inner_plates(&self, b: &mut MeshBuilder, spans: &[(f32, f32)]) {
         let thick = (self.depth * 0.1).clamp(0.5 * self.scale, self.scale);
         nanite_plate(b);
-        let spans: &[(f32, f32)] = if b.fine() {
-            &[(0.08, 0.4), (0.44, 0.74)]
-        } else {
-            &[(0.08, 0.6)]
-        };
         for &span in spans {
             for e in EDGE {
                 self.plate(b, (e, INNER), span, 0.15 * self.scale, 0.0, thick, 0.0);

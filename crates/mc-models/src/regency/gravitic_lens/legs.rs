@@ -62,7 +62,7 @@ fn shin(knee: Vec3, foot: Vec3, seed: u32) -> Shard {
         half: 0.8,
         depth: 0.5,
         skew: if seed.is_multiple_of(2) { 0.5 } else { -0.5 },
-        plates: 3,
+        plates: 1,
         seed,
         scale: SHARD_SCALE,
     }
@@ -82,7 +82,7 @@ pub(super) fn legs(b: &mut MeshBuilder) {
             b.with_pair(i, |b| {
                 if b.coarse() {
                     b.with_part(part::LOCOMOTION, |b| {
-                        b.with_limb(rig::SHIN, |b| shin(knee, foot, i as u32).build(b))
+                        b.with_limb(rig::SHIN, |b| shin(knee, foot, i as u32).build_light(b))
                     });
                 } else {
                     leg(b, hip, knee, foot, i as u32);
@@ -99,10 +99,11 @@ fn leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, foot: Vec3, seed: u32) {
     let axis = out.cross(Vec3::Z);
     b.with_part(part::LOCOMOTION, |b| {
         b.with_limb(rig::THIGH, |b| {
-            metal(b);
-            let sides = b.sides(8);
-            b.cylinder_between(hip - out * 0.5, hip + out * 0.3, 0.5, 0.45, sides);
+            // The hip drum and the strut under the plates, at the full level: a pixel or
+            // two at the reduced one.
             if b.fine() {
+                metal(b);
+                b.cylinder_between(hip - out * 0.5, hip + out * 0.3, 0.5, 0.45, 8);
                 b.cylinder_between(hip, knee, 0.2, 0.17, 6);
             }
             let thigh = knee - hip;
@@ -119,10 +120,11 @@ fn leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, foot: Vec3, seed: u32) {
             );
         });
         b.with_limb(rig::SHIN, |b| {
-            metal(b);
-            let sides = b.sides(8);
-            b.cylinder_between(knee - axis * 0.4, knee + axis * 0.4, 0.38, 0.38, sides);
-            shin(knee, foot, seed).build(b);
+            if b.fine() {
+                metal(b);
+                b.cylinder_between(knee - axis * 0.4, knee + axis * 0.4, 0.38, 0.38, 8);
+            }
+            shin(knee, foot, seed).build_light(b);
         });
     });
 }
