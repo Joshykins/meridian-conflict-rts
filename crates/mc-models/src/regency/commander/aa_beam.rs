@@ -18,10 +18,11 @@ use crate::pattern;
 use super::super::kit::{dark_plate, metal, v3};
 use super::form::{ring, sleeve, KEEL, OCT};
 
-/// The trunnions the projector pitches on, over the right pauldron's inboard crown.
-pub(super) const TRUNNION: Vec3 = Vec3::new(-1.1, -3.2, 23.2);
+/// The trunnions the projector pitches on, over the right pauldron's inboard crown. Any
+/// other right-shoulder gun pitches on the same point: the model has one mount.
+pub(super) const TRUNNION: Vec3 = Vec3::new(-0.6, -3.2, 23.4);
 /// The knot the beam leaves from, ahead of the trunnions with the projector level.
-pub(super) const MUZZLE: Vec3 = Vec3::new(2.5, -3.2, 23.2);
+pub(super) const MUZZLE: Vec3 = Vec3::new(3.0, -3.2, 23.4);
 /// The top of the race the yoke turns on.
 const RACE: f32 = 22.05;
 /// Half the yoke's span: the cheeks stand this far either side of the projector.
