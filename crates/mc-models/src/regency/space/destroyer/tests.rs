@@ -9,7 +9,7 @@ use mc_core::{Angle, FxVec3};
 use mc_data::Blueprints;
 
 use super::guns::{guns, GROUPS, RONDEL_LENS};
-use super::{mounts, A, CORE, HULL};
+use super::{mounts, CORE, HULL};
 use crate::{build_model, material};
 
 const KEY: &str = "regency_t4_space_destroyer";
@@ -51,7 +51,7 @@ fn the_unit_files_guns_are_the_models() {
     );
     // Each group's mounts are the model's guns of its kind, in gun-slot order: the same
     // pivots to the quarter metre, the same rest, the muzzles where the model's bores are.
-    let (port, rondels) = mounts(&A, &HULL);
+    let (port, rondels) = mounts(&HULL);
     let guns = guns(&port);
     let mut slot = 1;
     for (k, kind) in GROUPS.iter().enumerate() {

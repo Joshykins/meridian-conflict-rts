@@ -31,26 +31,4 @@ pub(crate) const MODELS: &[ModelDef] = &[
         DESTROYER_NOZZLES[2][1],
         DESTROYER_DRIVE,
     ),
-    ModelDef::new(
-        "regency_space_destroyer~b",
-        320.0,
-        130.0,
-        destroyer::destroyer_b,
-    )
-    .with_drives(
-        DESTROYER_NOZZLES[0],
-        DESTROYER_NOZZLES[2][1],
-        DESTROYER_DRIVE,
-    ),
-    ModelDef::new(
-        "regency_space_destroyer~c",
-        320.0,
-        130.0,
-        destroyer::destroyer_c,
-    )
-    .with_drives(
-        DESTROYER_NOZZLES[0],
-        DESTROYER_NOZZLES[2][1],
-        DESTROYER_DRIVE,
-    ),
 ];

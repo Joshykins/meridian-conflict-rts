@@ -51,49 +51,24 @@ const STATIONS: [Station; 8] = [
     st(362.0, 8.0, 3.0, 60.0, 65.0, 3.0, 70.0, 70.0),
 ];
 
-/// One design of the ship: how big its arms are and where they are rooted, and where the
-/// batteries' sockets stand down each chine, fore to aft, all ahead of the arms.
-pub(crate) struct Design {
-    wing: Wing,
-    mounts: [f32; 3],
-}
-
-/// The arms at three tenths of the Regent's, their claws reaching the stern.
-pub(crate) const A: Design = Design {
-    wing: Wing {
-        k: 0.30,
-        root: Vec3::new(-175.0, 60.0, 62.0),
-    },
-    mounts: [250.0, 170.0, 90.0],
+/// The arms: the Regent's at near half its size, rooted level with the tower so the hull
+/// stops short of their claws.
+const WING: Wing = Wing {
+    k: 0.46,
+    root: Vec3::new(-240.0, 60.0, 62.0),
 };
 
-/// Larger arms, their claws a little past the stern.
-pub(crate) const B: Design = Design {
-    wing: Wing {
-        k: 0.38,
-        root: Vec3::new(-170.0, 60.0, 62.0),
-    },
-    mounts: [270.0, 200.0, 130.0],
-};
+/// Where the batteries' sockets stand down each chine, fore to aft, all ahead of the arms.
+const BATTERIES: [f32; 3] = [300.0, 245.0, 190.0];
 
-/// The Regent's proportions: arms near half its size, rooted further forward, their claws
-/// well past the stern.
-pub(crate) const C: Design = Design {
-    wing: Wing {
-        k: 0.46,
-        root: Vec3::new(-160.0, 60.0, 62.0),
-    },
-    mounts: [300.0, 245.0, 190.0],
-};
-
-/// The hull of `d`: `STATIONS`, the chine pressed in round each battery's ball into a
+/// The hull: `STATIONS`, the chine pressed in round each battery's ball into a
 /// faceted pocket the hull's shoulder and bilge fold down and up into.
-fn hull(d: &Design) -> Body {
+fn hull() -> Body {
     let plain = Body {
         stations: STATIONS.to_vec(),
     };
     let mut stations = STATIONS.to_vec();
-    for &m in &d.mounts {
+    for &m in &BATTERIES {
         for (dx, notch) in [
             (POCKET.0, 0.0),
             (POCKET.1, NOTCH),
@@ -110,7 +85,7 @@ fn hull(d: &Design) -> Body {
     Body { stations }
 }
 
-static HULL: LazyLock<Body> = LazyLock::new(|| hull(&A));
+static HULL: LazyLock<Body> = LazyLock::new(hull);
 
 /// The core stands at the ship's middle, so the beam leaves the same point whichever
 /// way it is laid.
@@ -151,16 +126,15 @@ const RONDELS: [f32; 2] = [270.0, -110.0];
 const DECK_AA: f32 = -262.0;
 
 /// Every gun on a house, port side, and the Rondels' posts, port side.
-fn mounts(d: &Design, body: &Body) -> (Vec<Mount>, Vec<Vec3>) {
-    let mut port: Vec<Mount> = d
-        .mounts
+fn mounts(body: &Body) -> (Vec<Mount>, Vec<Vec3>) {
+    let mut port: Vec<Mount> = BATTERIES
         .iter()
         .map(|&x| Mount::port(Kind::Battery, body.out(x, CHINE, BALL_OUT)))
         .collect();
-    let corner = d.wing.root.y + 300.0 * d.wing.k;
+    let corner = WING.root.y + 300.0 * WING.k;
     port.push(Mount::port(
         Kind::Aa,
-        d.wing.rib_at(corner).top(0.8) + Vec3::Z * (AA * 0.5),
+        WING.rib_at(corner).top(0.8) + Vec3::Z * (AA * 0.5),
     ));
     port.push(Mount::port(
         Kind::Aa,
@@ -174,28 +148,17 @@ fn mounts(d: &Design, body: &Body) -> (Vec<Mount>, Vec<Vec3>) {
 }
 
 pub(super) fn destroyer(b: &mut MeshBuilder, _tech: u8) {
-    build(b, &A, &HULL);
-}
-
-pub(super) fn destroyer_b(b: &mut MeshBuilder, _tech: u8) {
-    build(b, &B, &hull(&B));
-}
-
-pub(super) fn destroyer_c(b: &mut MeshBuilder, _tech: u8) {
-    build(b, &C, &hull(&C));
-}
-
-fn build(b: &mut MeshBuilder, d: &Design, body: &Body) {
+    let body = &*HULL;
     if b.coarse() {
-        coarse(b, d);
+        coarse(b);
         return;
     }
-    let (port, rondels) = mounts(d, body);
+    let (port, rondels) = mounts(body);
     body.hull(b);
     b.mirror_y(|b| {
         plates(b, body);
         carapace(b, body);
-        arm(b, &d.wing);
+        arm(b, &WING);
         seams(b, body, 330.0, -280.0);
         guns::rondels(b, &rondels);
     });
@@ -221,13 +184,13 @@ fn build(b: &mut MeshBuilder, d: &Design, body: &Body) {
 
 /// Far off: the hull's plan as one slab, each arm a slab of its outline, and the owner's
 /// mark.
-fn coarse(b: &mut MeshBuilder, d: &Design) {
+fn coarse(b: &mut MeshBuilder) {
     let half = [[362.0, 0.0], [200.0, 54.0], [-160.0, 114.0], [-310.0, 58.0]];
     let mut outline: Vec<[f32; 2]> = half.to_vec();
     outline.extend(half[1..].iter().rev().map(|&[x, y]| [x, -y]));
     dark_plate(b);
     b.extrude_z(&outline, 40.0, 112.0);
-    b.mirror_y(|b| d.wing.coarse(b));
+    b.mirror_y(|b| WING.coarse(b));
     mark(b, v3(120.0, 0.0, 112.1), 50.0);
 }
 
