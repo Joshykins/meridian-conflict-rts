@@ -7,7 +7,8 @@
 //!    is a few refcounts) and of the field's previous data. Its output is a
 //!    pure function of that input; where and when it runs is irrelevant.
 //! 2. Its adoption tick is fixed when it is scheduled, from the request alone.
-//!    `begin_tick` adopts on exactly that tick and blocks if the task is late.
+//!    `begin_tick` adopts on exactly that tick; if the task is late it runs it
+//!    there and then when no worker has started it, else waits for it.
 //! 3. A field runs one build at a time. Anything that happens while a build is
 //!    in flight (blockers changing, `extend` calls) is recorded on the field
 //!    and acted on at adoption: the in-flight result is adopted as computed,
@@ -30,7 +31,7 @@ use crate::{Cell, CellRect, MoveLayer, PathError, SizeClass, SECTOR_CELLS};
 use mc_core::{Fx, FxVec2, StateHasher};
 use std::collections::BTreeMap;
 use std::sync::atomic::Ordering;
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 
 mod snapshot;
 
@@ -159,8 +160,34 @@ pub struct NavStats {
 }
 
 struct ResultSlot {
+    /// The build's input until a thread takes it to run it.
+    input: Mutex<Option<BuildInput>>,
     value: Mutex<Option<Result<FieldData, PathError>>>,
     ready: Condvar,
+}
+
+impl ResultSlot {
+    /// Runs the build unless another thread already has: a worker, or the tick
+    /// the build is due on when nobody had started it (a cheap build queued behind
+    /// heavy ones held a tick up for seconds). The output is the same either way.
+    fn run(self: &Arc<Self>) {
+        let Some(input) = self.input.lock().unwrap_or_else(|e| e.into_inner()).take() else {
+            return;
+        };
+        let guard = SlotGuard(self.clone());
+        let out = build(&input);
+        *guard.0.value.lock().unwrap_or_else(|e| e.into_inner()) = Some(out);
+    }
+
+    /// The build's output, running it here if nobody has started it.
+    fn join(self: &Arc<Self>) -> MutexGuard<'_, Option<Result<FieldData, PathError>>> {
+        self.run();
+        let mut v = self.value.lock().unwrap_or_else(|e| e.into_inner());
+        while v.is_none() {
+            v = self.ready.wait(v).unwrap_or_else(|e| e.into_inner());
+        }
+        v
+    }
 }
 
 /// Fills the slot with an error if the task unwinds, so `begin_tick` cannot hang.
@@ -403,18 +430,16 @@ impl Nav {
             }
             let pending = field.pending.take().unwrap();
             let result = {
-                let mut v = pending.slot.value.lock().unwrap_or_else(|e| e.into_inner());
-                if v.is_none() {
+                if pending
+                    .slot
+                    .value
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .is_none()
+                {
                     self.stats.late_joins += 1;
                 }
-                while v.is_none() {
-                    v = pending
-                        .slot
-                        .ready
-                        .wait(v)
-                        .unwrap_or_else(|e| e.into_inner());
-                }
-                v.take().unwrap()
+                pending.slot.join().take().unwrap()
             };
             self.stats.builds_adopted += 1;
             self.total_tiles -= field.data.as_ref().map_or(0, |d| d.tiles.len());
@@ -693,6 +718,7 @@ impl Nav {
             max_nodes: self.cfg.max_search_nodes,
         };
         let slot = Arc::new(ResultSlot {
+            input: Mutex::new(Some(input)),
             value: Mutex::new(None),
             ready: Condvar::new(),
         });
@@ -705,11 +731,7 @@ impl Nav {
             unblocked: false,
         });
         self.stats.builds_scheduled += 1;
-        self.spawner.spawn(Box::new(move || {
-            let guard = SlotGuard(slot);
-            let out = build(&input);
-            *guard.0.value.lock().unwrap_or_else(|e| e.into_inner()) = Some(out);
-        }));
+        self.spawner.spawn(Box::new(move || slot.run()));
     }
 
     /// Structure placed. Takes effect on the grid now; see the module docs for

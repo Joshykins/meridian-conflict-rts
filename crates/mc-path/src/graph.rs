@@ -471,9 +471,55 @@ pub(crate) enum Route {
 }
 
 const GOAL_NODE: u32 = u32::MAX;
-/// Portal nodes the goal-side flood in `find_route` visits before leaving the
-/// question to the full search. A walled base or a covered site is a few hundred.
+/// Portal nodes the goal-side flood in `find_route` visits before the full search
+/// starts. A walled base or a covered site is a few hundred.
 const GOAL_FLOOD_NODES: u32 = 4096;
+/// After that the flood goes on one node for every this many the search expands, so
+/// a goal cut off from the start in a region of its own is proven so as soon as
+/// either side runs out. A plateau of 12 000 portals in the middle of Meridian Crown
+/// was proven cut off from the plain round it by flooding all 155 000 of the plain's,
+/// two seconds of a late tick, every time a field to it was repaired.
+const GOAL_FLOOD_EVERY: u32 = 4;
+
+/// The goal side's breadth-first flood, kept over every anchor a build routes to
+/// one goal: what it has reached reaches the goal, whichever anchor asks.
+#[derive(Default)]
+pub(crate) struct GoalFlood {
+    started: bool,
+    reached: IdMap<()>,
+    open: VecDeque<u32>,
+}
+
+impl GoalFlood {
+    /// One more node of the flood: `None` when it has reached all there is, else
+    /// whether this step touched a node in `best` (the start's side).
+    fn step(
+        &mut self,
+        grid: &NavGrid,
+        graph_of: &mut impl FnMut(u32) -> Arc<SectorGraph>,
+        best: &IdMap<(u32, u32)>,
+    ) -> Option<bool> {
+        let node = self.open.pop_front()?;
+        let mut touched = false;
+        for (sector, side, start) in node_sides(grid, node) {
+            let graph = graph_of(sector);
+            let Some(me) = graph.find(side, start) else {
+                continue;
+            };
+            let n = graph.portals.len();
+            for (q, &portal) in graph.portals.iter().enumerate() {
+                if q != me && graph.costs[me * n + q] != INF {
+                    let next = node_id(grid, sector, portal);
+                    if self.reached.insert(next, ()).is_none() {
+                        touched |= best.contains_key(&next);
+                        self.open.push_back(next);
+                    }
+                }
+            }
+        }
+        Some(touched)
+    }
+}
 
 /// Search priority beyond g: the octile heuristic weighted 1.5, plus 2 per half
 /// cell of distance from the straight line. The search only has to pick a
@@ -490,7 +536,9 @@ fn weigh((dev, h): (u32, u32)) -> u32 {
 /// A* over portals from `from` toward `goal`. Stops early on any node in
 /// `known` (a node of an earlier route to the same goal) because the rest of
 /// the way is already covered; nodes of a found route are added to `known`.
-/// Ties break on (priority, h, node id), so the result is a pure function of the inputs.
+/// `flood` is the goal side's flood (`GoalFlood`), shared like `known` by the
+/// anchors of one build. Ties break on (priority, h, node id), so the result is a
+/// pure function of the inputs.
 pub(crate) fn find_route(
     grid: &NavGrid,
     cache: &GraphCache,
@@ -499,6 +547,7 @@ pub(crate) fn find_route(
     from: Cell,
     goal: Cell,
     known: &mut IdMap<()>,
+    flood: &mut GoalFlood,
     max_nodes: u32,
     expanded: &mut u32,
 ) -> Route {
@@ -546,51 +595,40 @@ pub(crate) fn find_route(
         }
     }
     // A goal cut off from the start is usually cut off near itself: a build site
-    // a structure now covers, a pocket in a base. Proving that from the start
-    // side floods every portal the start can reach, which on a large map is the
-    // whole map. So flood from the goal side first, a little way: if that runs
-    // out without touching a start portal, nothing links them. Passability is
-    // symmetric, so this gives the same answer the full search would.
-    // Breadth first, so a start just outside the goal's pocket ends it at once.
-    let linked = |node: u32| best.contains_key(&node) || known.contains_key(&node);
-    let goal_graph = graph_of(goal_sector);
-    let mut near_goal: IdMap<()> = IdMap::default();
-    let mut open: VecDeque<u32> = VecDeque::new();
-    let mut connected = false;
-    for &p in &goal_graph.portals {
-        if goal_costs[p.center_index()] != INF {
-            let node = node_id(grid, goal_sector, p);
-            connected |= linked(node);
-            if near_goal.insert(node, ()).is_none() {
-                open.push_back(node);
-            }
-        }
-    }
-    let mut flooded = 0;
-    while !connected && flooded < GOAL_FLOOD_NODES {
-        let Some(node) = open.pop_front() else { break };
-        flooded += 1;
-        for (sector, side, start) in node_sides(grid, node) {
-            let graph = graph_of(sector);
-            let Some(me) = graph.find(side, start) else {
-                continue;
-            };
-            let n = graph.portals.len();
-            for (q, &portal) in graph.portals.iter().enumerate() {
-                if q != me && graph.costs[me * n + q] != INF {
-                    let next = node_id(grid, sector, portal);
-                    if near_goal.insert(next, ()).is_none() {
-                        connected |= linked(next);
-                        open.push_back(next);
-                    }
+    // a structure now covers, a pocket in a base, a plateau. Proving that from the
+    // start side floods every portal the start can reach, which on a large map is
+    // the whole map. So the goal side floods too: a little way first, then a node
+    // every `GOAL_FLOOD_EVERY` the search expands. If it runs out without touching
+    // a start portal, nothing links them. Passability is symmetric, so this gives
+    // the same answer the full search would. Breadth first, so a start just
+    // outside the goal's pocket ends it at once.
+    if !flood.started {
+        flood.started = true;
+        for &p in &graph_of(goal_sector).portals {
+            if goal_costs[p.center_index()] != INF {
+                let node = node_id(grid, goal_sector, p);
+                if flood.reached.insert(node, ()).is_none() {
+                    flood.open.push_back(node);
                 }
             }
         }
     }
+    // An earlier anchor's flood may have got here already.
+    let mut connected = best.keys().any(|n| flood.reached.contains_key(n));
+    let mut flooded = 0;
+    while !connected && flooded < GOAL_FLOOD_NODES {
+        let Some(touched) = flood.step(grid, &mut graph_of, &best) else {
+            break;
+        };
+        flooded += 1;
+        connected |= touched;
+    }
     *expanded += flooded;
-    if !connected && open.is_empty() {
+    // Run out: the goal's whole region is known, and no start portal is in it.
+    if !connected && flood.open.is_empty() {
         return Route::Unreachable;
     }
+    let mut searched = 0u32;
     while let Some(Reverse((_, _, node, g))) = heap.pop() {
         if g > best[&node].0 {
             continue;
@@ -616,6 +654,16 @@ pub(crate) fn find_route(
         *expanded += 1;
         if *expanded > max_nodes {
             return Route::Limit;
+        }
+        searched += 1;
+        if !connected && searched.is_multiple_of(GOAL_FLOOD_EVERY) {
+            match flood.step(grid, &mut graph_of, &best) {
+                Some(touched) => {
+                    *expanded += 1;
+                    connected |= touched;
+                }
+                None => return Route::Unreachable,
+            }
         }
         for (sector, side, start) in node_sides(grid, node) {
             let graph = graph_of(sector);
@@ -665,6 +713,7 @@ mod tests {
             from,
             goal,
             &mut IdMap::default(),
+            &mut GoalFlood::default(),
             1 << 20,
             &mut 0,
         )
@@ -787,6 +836,7 @@ mod tests {
             Cell::new(10, 10),
             Cell::new(200, 10),
             &mut IdMap::default(),
+            &mut GoalFlood::default(),
             3,
             &mut n,
         );
@@ -820,6 +870,7 @@ mod tests {
                 Cell::new(20, 20),
                 goal,
                 &mut IdMap::default(),
+                &mut GoalFlood::default(),
                 1 << 20,
                 &mut n,
             );
@@ -847,11 +898,72 @@ mod tests {
             Cell::new(1515, 1520),
             Cell::new(1530, 1520),
             &mut IdMap::default(),
+            &mut GoalFlood::default(),
             1 << 20,
             &mut n,
         );
         assert!(matches!(r, Route::Found(_)));
         assert!(n < 64, "{n} nodes");
+    }
+
+    #[test]
+    fn a_cut_off_region_is_proven_by_its_own_flood_not_the_start_sides() {
+        // 128 x 128 sectors split by a wall at x = 3328: the start's side holds about
+        // 26 000 portals, the goal's (too many for the flood before the search) 6 000.
+        let grid = NavGrid::from_fn(
+            4096,
+            4096,
+            |x, _| if x == 3328 { LAND | STEEP } else { LAND },
+        )
+        .unwrap();
+        let cache = GraphCache::new();
+        let (mut known, mut flood) = (IdMap::default(), GoalFlood::default());
+        let goal = Cell::new(3700, 2000);
+        let mut first = 0;
+        let r = find_route(
+            &grid,
+            &cache,
+            MoveLayer::Land,
+            SizeClass::SMALL,
+            Cell::new(100, 2000),
+            goal,
+            &mut known,
+            &mut flood,
+            1 << 20,
+            &mut first,
+        );
+        assert!(matches!(r, Route::Unreachable));
+        assert!(first < 16_000, "{first} nodes");
+        // A second anchor of the same build is answered from the flood already done.
+        let mut second = 0;
+        let r = find_route(
+            &grid,
+            &cache,
+            MoveLayer::Land,
+            SizeClass::SMALL,
+            Cell::new(2000, 100),
+            goal,
+            &mut known,
+            &mut flood,
+            1 << 20,
+            &mut second,
+        );
+        assert!(matches!(r, Route::Unreachable));
+        assert_eq!(second, 0);
+        // And one on the goal's side is still found.
+        let r = find_route(
+            &grid,
+            &cache,
+            MoveLayer::Land,
+            SizeClass::SMALL,
+            Cell::new(4000, 100),
+            goal,
+            &mut known,
+            &mut flood,
+            1 << 20,
+            &mut 0,
+        );
+        assert!(matches!(r, Route::Found(_)));
     }
 
     fn cache_for(_: &NavGrid) -> GraphCache {

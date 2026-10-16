@@ -197,10 +197,7 @@ impl Nav {
                 out.u32s(&p.dirty);
                 out.u8(p.dirty_all as u8);
                 out.u8(p.unblocked as u8);
-                let mut v = p.slot.value.lock().unwrap_or_else(|e| e.into_inner());
-                while v.is_none() {
-                    v = p.slot.ready.wait(v).unwrap_or_else(|e| e.into_inner());
-                }
+                let v = p.slot.join();
                 match v.as_ref().unwrap() {
                     Ok(d) => {
                         out.u8(0);
@@ -302,6 +299,7 @@ impl Nav {
                         Ok(read_data(&mut r, &lim)?)
                     };
                     let slot = Arc::new(ResultSlot {
+                        input: Mutex::new(None),
                         value: Mutex::new(Some(result)),
                         ready: Condvar::new(),
                     });

@@ -13,8 +13,8 @@
 //! change, and tiles whose incoming costs did not move, are shared as-is.
 
 use crate::graph::{
-    find_route, flood, local_costs, step_cost, win, GraphCache, IdMap, Route, DIRS, INF, WIN,
-    WIN_W as W,
+    find_route, flood, local_costs, step_cost, win, GoalFlood, GraphCache, IdMap, Route, DIRS, INF,
+    WIN, WIN_W as W,
 };
 use crate::grid::{NavGrid, SectorKind, SECTOR, SECTOR_AREA};
 use crate::{Cell, MoveLayer, PathError, SizeClass, SECTOR_CELLS};
@@ -131,6 +131,7 @@ pub(crate) fn build(input: &BuildInput) -> Result<FieldData, PathError> {
         prev.map_or(Vec::new(), |p| p.unreachable.clone())
     };
     let mut known = IdMap::default();
+    let mut goal_flood = GoalFlood::default();
     for &anchor in &input.anchors {
         match find_route(
             grid,
@@ -140,6 +141,7 @@ pub(crate) fn build(input: &BuildInput) -> Result<FieldData, PathError> {
             anchor,
             goal,
             &mut known,
+            &mut goal_flood,
             input.max_nodes,
             &mut stats.search_nodes,
         ) {
