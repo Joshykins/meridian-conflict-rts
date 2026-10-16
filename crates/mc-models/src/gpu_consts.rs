@@ -1011,6 +1011,11 @@ shared! {
         /// from the firing point to its full width at the ground, a thin prism rim and a
         /// red fringe, pulses of light running down it (`aim.w`).
         pub const HELD_EDICT: f32 = 4.0;
+        /// A capital rail's channel (colour 6) laid along a fired gun's rails as they cool
+        /// (renderer/heavy_rail_fx.rs `heat`), marked in `aim.w`: its ends glide over the
+        /// tick from `prev_pos` and `pos` to `aim` and `prev_aim`, as a held beam's do, so
+        /// the heat stays on a gun that is moving.
+        pub const CHANNEL_GLIDES: f32 = 1.0;
         /// A warp dampener's tether (renderer/damper_fx.rs): crimson lightning with a
         /// white-pink core, crackling.
         pub const TETHER: u32 = 10;

@@ -103,7 +103,7 @@
         // an ordinary shot).
         weapons: [(
             name: "Twin Rail Cannon",
-            damage: 61, range: 360, reload: 1.6, salvo: 2, speed: 1100, rail: true, trajectory: Direct,
+            damage: 122, range: 360, reload: 3.2, salvo: 2, speed: 1100, rail: true, trajectory: Direct,
             turret_turn: 100, muzzle: (8.0, 0, 3.8), pivot: (2.6, 0, 3.8),
             muzzles: [(8.0, -0.6, 3.8), (8.0, 0.6, 3.8)],
             targets: ["Land", "Naval"], color: Orange, flash: 2.8, impact: 4.8, shockwave: 0.58,

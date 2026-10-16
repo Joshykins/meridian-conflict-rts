@@ -39,6 +39,7 @@ use super::{
     Renderer, PUFF_BOLT, PUFF_CLOD, PUFF_DUST, PUFF_FIREBALL, PUFF_SHARD, PUFF_SHOCK_DUST,
     PUFF_SMOKE, PUFF_SPARK, PUFF_TREE_SMOKE,
 };
+use crate::gpu_consts::fade_beam;
 use glam::{Vec2, Vec3};
 use mc_data::BlueprintId;
 use mc_sim::mirror::{
@@ -82,6 +83,16 @@ struct Stroke {
     life: f32,
     width: f32,
     color: u32,
+}
+
+/// A stroke of a fired gun's heat on its rails: `from` and `to` where its ends are at the
+/// start of this tick and at its end, which the sprite glides between as the gun is drawn
+/// moving (`FADE_BEAM_CHANNEL_GLIDES`).
+struct Heat {
+    from: [Vec3; 2],
+    to: [Vec3; 2],
+    start: f32,
+    width: f32,
 }
 
 /// A gun charging: its arcs and glow are laid a tick at a time on the barrel as it is then.
@@ -146,7 +157,7 @@ pub(super) struct HeavyRailFx {
     shots: Vec<Shot>,
     strokes: Vec<Stroke>,
     /// This tick's strokes of the fired rails' heat, laid afresh every tick.
-    heat: Vec<Stroke>,
+    heat: Vec<Heat>,
     last: f32,
     /// This tick's gun-house poses (`RenderFrame::houses`), for guns on houses of their own.
     houses: Vec<HousePose>,
@@ -440,22 +451,33 @@ impl Renderer {
             self.heavy_rail.strokes.drain(..extra);
         }
         let size = size_of::<ProjectileInstance>();
-        for s in self.heavy_rail.strokes.iter().chain(&self.heavy_rail.heat) {
+        let strokes = self.heavy_rail.strokes.iter().map(|s| ProjectileInstance {
+            prev_pos: s.from.to_array(),
+            color: PROJECTILE_FADE_BEAM | s.color,
+            pos: s.to.to_array(),
+            size: s.width,
+            wake: s.start,
+            plasma: s.life,
+            _pad: [0.0; 2],
+            aim: [0.0; 4],
+            prev_aim: [0.0; 4],
+        });
+        let heat = self.heavy_rail.heat.iter().map(|h| ProjectileInstance {
+            prev_pos: h.from[0].to_array(),
+            color: PROJECTILE_FADE_BEAM | CHANNEL,
+            pos: h.to[0].to_array(),
+            size: h.width,
+            wake: h.start,
+            plasma: RAIL_HEAT,
+            _pad: [0.0; 2],
+            aim: h.from[1].extend(fade_beam::CHANNEL_GLIDES).to_array(),
+            prev_aim: h.to[1].extend(0.0).to_array(),
+        });
+        for inst in strokes.chain(heat) {
             let i = self.projectile_count as usize;
             if i >= super::MAX_PROJECTILES {
                 break;
             }
-            let inst = ProjectileInstance {
-                prev_pos: s.from.to_array(),
-                color: PROJECTILE_FADE_BEAM | s.color,
-                pos: s.to.to_array(),
-                size: s.width,
-                wake: s.start,
-                plasma: s.life,
-                _pad: [0.0; 2],
-                aim: [0.0; 4],
-                prev_aim: [0.0; 4],
-            };
             self.projectiles
                 .write((i * size) as u64, bytemuck::bytes_of(&inst));
             self.projectile_count += 1;
@@ -1164,9 +1186,10 @@ impl Renderer {
                 .heavy_find(units, blueprint, near, unit)
                 .and_then(|row| {
                     let u = units[row];
-                    Some((u, self.heavy_barrel(&u, weapon, 0.5)?))
+                    let gun = |f| self.heavy_barrel(&u, weapon, f);
+                    Some((u, gun(0.0)?, gun(1.0)?))
                 });
-            let Some((u, b)) = found else {
+            let Some((u, b, b1)) = found else {
                 // Gone (or never seen): nothing to glow; don't look again.
                 let f = &mut self.heavy_rail.fired[i];
                 (f.vented, f.rails) = (true, None);
@@ -1175,7 +1198,7 @@ impl Renderer {
             {
                 let f = &mut self.heavy_rail.fired[i];
                 (f.unit, f.near, f.vented) = (Some(u.unit_id), Vec3::from(u.pos), true);
-                f.rails = Some((b.breech, b.muzzle));
+                f.rails = Some((b.breech.lerp(b1.breech, 0.5), b.muzzle.lerp(b1.muzzle, 0.5)));
             }
             // The open rails glow white-hot and cool to orange (where they are in the open:
             // from the first stretch as high as the last to the muzzle).
@@ -1187,13 +1210,18 @@ impl Renderer {
                 .find(|sp| (sp.2 - lift).abs() < 0.01)
                 .unwrap_or(b.spots[0]);
             for rail in [-1.0, 1.0] {
-                self.heavy_rail.heat.push(Stroke {
-                    from: b.on_rail(t0 - half0, rail, lift),
-                    to: b.on_rail(1.0, rail, lift),
+                let ends = |b: &Barrel| {
+                    (
+                        b.on_rail(t0 - half0, rail, lift),
+                        b.on_rail(1.0, rail, lift),
+                    )
+                };
+                let ((a0, z0), (a1, z1)) = (ends(&b), ends(&b1));
+                self.heavy_rail.heat.push(Heat {
+                    from: [a0, a1],
+                    to: [z0, z1],
                     start: fired,
-                    life: RAIL_HEAT,
                     width: b.gap * 0.8,
-                    color: CHANNEL,
                 });
             }
             if vented {

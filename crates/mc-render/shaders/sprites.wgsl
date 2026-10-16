@@ -278,8 +278,11 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     }
     // A held Regency beam (renderer/plasma_fx.rs) glides over the tick, as the units at its
     // two ends are drawn to: `aim` and `prev_aim` are where its tail and head get to.
+    // So does a rail's heat laid on a moving gun (`FADE_BEAM_CHANNEL_GLIDES`).
     let held = fade_beam && (p.color & 0xFu) == 7u;
-    if held {
+    let glides = held
+        || (fade_beam && (p.color & 0xFu) == 6u && p.aim.w == FADE_BEAM_CHANNEL_GLIDES);
+    if glides {
         head = mix(p.pos, p.prev_aim.xyz, globals.sun.w);
     }
     // A short burning trace, not a beam; and on a shot's first stretch it starts at the muzzle, not behind it.
@@ -348,7 +351,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     if fade_beam || beam {
         tail = p.prev_pos;
     }
-    if held {
+    if glides {
         tail = mix(p.prev_pos, p.aim.xyz, globals.sun.w);
     }
     // Keep only the part in front of the eye. A long beam often runs past the camera:
