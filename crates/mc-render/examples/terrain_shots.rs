@@ -24,7 +24,7 @@ fn main() {
         eprintln!("usage: terrain_shots MAP OUT_DIR name:x,y,dist,tilt[,yaw]...");
         std::process::exit(2);
     };
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let root = std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
     let map = Arc::new(MapFile::open(map_path).expect("map"));
     std::fs::create_dir_all(out).unwrap();
     // The forest cover the terrain shader sees, as a greyscale map.

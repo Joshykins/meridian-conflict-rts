@@ -27,7 +27,8 @@ mod tests {
     #[test]
     fn a_round_by_round_gun_is_heard_on_each_round() {
         let bps = mc_data::Blueprints::load(
-            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"),
+            &std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+                .join("../../data"),
         )
         .unwrap();
         let breacher = bps.unit(bps.id_of("aster_t4_breacher").unwrap());

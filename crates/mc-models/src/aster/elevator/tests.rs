@@ -30,7 +30,8 @@ fn swung(p: Vec3, open: f32) -> Vec3 {
 /// is the model's own (the shader's constants are in model metres).
 #[test]
 fn every_level_has_jaws_cable_and_crates() {
-    let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let data =
+        std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data");
     let blueprints = mc_data::Blueprints::load(&data).unwrap();
     let bp = blueprints.unit(blueprints.id_of("aster_t5_space_elevator").unwrap());
     assert_eq!((bp.radius.to_f32(), bp.height.to_f32()), (SIZE.0, SIZE.1));

@@ -25,7 +25,8 @@ mod tests {
 
     fn flak() -> Weapon {
         let bp = mc_data::Blueprints::load(
-            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"),
+            &std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+                .join("../../data"),
         )
         .unwrap();
         let squall = bp.unit(bp.id_of("aster_t2_mobile_aa").unwrap());

@@ -259,7 +259,8 @@ mod tests {
     /// its middle. Nothing aims: no turret, no arm.
     #[test]
     fn the_stream_leaves_the_crown() {
-        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+        let dir = std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+            .join("../../data");
         let blueprints = mc_data::Blueprints::load(&dir).unwrap();
         for tech in 1..=3u8 {
             let key = format!("regency_t{tech}_eng_station");

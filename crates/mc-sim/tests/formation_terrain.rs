@@ -45,8 +45,10 @@ fn terrain(cones: &[(i32, i32, i32)], wall: Option<(i32, i32, i32)>) -> Heightfi
 fn tank_scale() -> f64 {
     static SCALE: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
     *SCALE.get_or_init(|| {
-        let blueprints =
-            Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+        let blueprints = Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap();
         f64::from(
             blueprints
                 .unit(blueprints.id_of("aster_t1_tank").unwrap())
@@ -94,7 +96,10 @@ fn rough() -> Heightfield {
 
 fn world(terrain: Heightfield) -> World {
     let blueprints = Arc::new(
-        Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
+        Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap(),
     );
     let map = MapData {
         doodads: Default::default(),
@@ -533,7 +538,7 @@ fn probe() {
 #[test]
 #[ignore]
 fn real_map_probe() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let root = Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
     let file = mc_map::MapFile::open(root.join("maps/crosswater.mcmap")).unwrap();
     let relief = || Heightfield::load(&file).unwrap();
     let probe_world = world(relief());
@@ -629,7 +634,7 @@ fn real_map_probe() {
 #[test]
 #[ignore]
 fn real_map_movement_cost() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let root = Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
     let file = mc_map::MapFile::open(root.join("maps/crosswater.mcmap")).unwrap();
     let mut w = world(Heightfield::load(&file).unwrap());
     let bp = w.blueprints.id_of("aster_t1_tank").unwrap();

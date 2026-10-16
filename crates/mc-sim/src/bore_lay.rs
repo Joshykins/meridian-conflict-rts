@@ -58,7 +58,8 @@ mod tests {
     #[test]
     fn a_bore_off_its_pivot_lays_through_the_mark() {
         let bp = mc_data::Blueprints::load(
-            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"),
+            &std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+                .join("../../data"),
         )
         .unwrap();
         let mut w = bp.unit(bp.id_of("aster_t4_breacher").unwrap()).weapons[1].clone();

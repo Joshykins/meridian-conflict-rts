@@ -186,7 +186,8 @@ mod tests {
     /// Flamberge's fore house at rest, and turned to port.
     #[test]
     fn a_house_guns_mouths_follow_its_pose() {
-        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+        let dir = std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+            .join("../../data");
         let blueprints = mc_data::Blueprints::load(&dir).unwrap();
         let id = blueprints.id_of("regency_t3_battleship").unwrap();
         let bp = blueprints.unit(id);

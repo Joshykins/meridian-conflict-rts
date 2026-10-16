@@ -440,7 +440,8 @@ mod tests {
     #[test]
     fn ping_calls_are_clean() {
         let library = SoundLibrary::load(
-            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"),
+            &std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+                .join("../../data"),
         )
         .unwrap();
         let bank = Bank::synthesise(44_100, &library);

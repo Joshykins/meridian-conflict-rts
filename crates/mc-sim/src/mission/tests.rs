@@ -18,8 +18,10 @@ fn world_props(
     props: Vec<mc_map::Prop>,
     doodads: Vec<mc_map::placed::Doodad>,
 ) -> World {
-    let bp = mc_data::Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"))
-        .unwrap();
+    let bp = mc_data::Blueprints::load(
+        &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+    )
+    .unwrap();
     World::with_terrain(
         terrain(),
         MapData {

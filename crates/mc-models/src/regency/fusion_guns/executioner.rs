@@ -175,7 +175,8 @@ mod tests {
     use super::*;
     #[test]
     fn executioner_weapons_match_the_model() {
-        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+        let dir = std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+            .join("../../data");
         let bp = mc_data::Blueprints::load(&dir).unwrap();
         let id = bp.id_of("regency_t3_assault_tank").unwrap();
         let unit = bp.unit(id);

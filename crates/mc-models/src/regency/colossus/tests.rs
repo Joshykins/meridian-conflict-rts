@@ -32,7 +32,8 @@ fn fits_the_librarys_checks() {
 /// tube mouths are this file's times `SCALE`.
 #[test]
 fn the_unit_files_weapons_are_the_models() {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let dir =
+        std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data");
     let blueprints = mc_data::Blueprints::load(&dir).unwrap();
     let bp = blueprints.unit(blueprints.id_of("regency_t4_colossus").unwrap());
     assert_eq!(bp.visual.mesh, "regency_colossus");
@@ -284,7 +285,8 @@ fn the_jaws_part_round_the_bore() {
 /// of the battery on its turntable.
 #[test]
 fn the_cells_are_clear() {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let dir =
+        std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data");
     let blueprints = mc_data::Blueprints::load(&dir).unwrap();
     let bp = blueprints.unit(blueprints.id_of("regency_t4_colossus").unwrap());
     let rake = bp.weapons[3].rake.to_radians_f32();

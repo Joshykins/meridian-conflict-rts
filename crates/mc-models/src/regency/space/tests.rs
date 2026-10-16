@@ -4,8 +4,10 @@ use crate::{build_model, build_model_scaled, material};
 use glam::Vec3;
 
 fn blueprints() -> mc_data::Blueprints {
-    mc_data::Blueprints::load(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"))
-        .unwrap()
+    mc_data::Blueprints::load(
+        &std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+    )
+    .unwrap()
 }
 
 #[test]

@@ -634,7 +634,8 @@ mod tests {
     #[test]
     fn the_rails_stand_half_the_bores_gap_off_each_bore() {
         let bp = mc_data::Blueprints::load(
-            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"),
+            &std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+                .join("../../data"),
         )
         .unwrap();
         let ship = bp

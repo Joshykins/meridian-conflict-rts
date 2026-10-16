@@ -395,7 +395,8 @@ mod tests {
 
     #[test]
     fn the_unit_files_lance_is_the_models() {
-        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+        let dir = std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+            .join("../../data");
         let blueprints = mc_data::Blueprints::load(&dir).unwrap();
         let bp = blueprints.unit(blueprints.id_of("regency_t3_lance_aa").unwrap());
         let v = |p| crate::authored(bp, p);

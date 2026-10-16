@@ -11,7 +11,12 @@
 //!   Network players must run the same simulation code, which the map and unit
 //!   data hashes do not cover; the relay refuses players whose build differs.
 //!   Outside a git checkout (a source archive) the build has no commit.
-//!   `MERIDIAN_COMMIT` is the full commit hash, empty outside a checkout.
+//!   `MERIDIAN_COMMIT` is the full commit hash, empty outside a checkout. The
+//!   `gate` profile, which builds only tests (scripts/check.sh), is stamped as
+//!   outside a checkout too: its outputs then neither change with each commit
+//!   nor differ between worktrees, and a new worktree can reuse another's
+//!   (scripts/target-seed.sh). For the same reason every path this script
+//!   watches is relative to the crate.
 //! - Fingerprints the simulation: `MERIDIAN_SIM` is a hash of the sources of
 //!   every crate the simulation is built from (`sim_crates.txt`), with
 //!   `Cargo.lock` and the toolchain pin. Two builds with the same fingerprint
@@ -25,7 +30,16 @@
 use embed_resource::CompilationResult;
 use std::process::Command;
 
+/// Whether this is the `gate` profile (`target/gate/build/<pkg>/out`).
+fn tests_only() -> bool {
+    let out = std::path::PathBuf::from(std::env::var_os("OUT_DIR").unwrap_or_default());
+    out.ancestors().nth(3).and_then(|p| p.file_name()) == Some("gate".as_ref())
+}
+
 fn git(args: &[&str]) -> Option<String> {
+    if tests_only() {
+        return None;
+    }
     let out = Command::new("git").args(args).output().ok()?;
     out.status
         .success()
@@ -86,7 +100,7 @@ fn stamp_sim() {
         .filter(|l| !l.is_empty() && !l.starts_with('#'))
     {
         let dir = root.join("crates").join(krate);
-        println!("cargo:rerun-if-changed={}", dir.join("src").display());
+        println!("cargo:rerun-if-changed=../../crates/{krate}/src");
         files.push(dir.join("Cargo.toml"));
         walk(&dir.join("src"), &mut files);
     }
@@ -97,8 +111,8 @@ fn stamp_sim() {
         }
     };
     for f in &files {
-        println!("cargo:rerun-if-changed={}", f.display());
         let rel = f.strip_prefix(&root).unwrap_or(f);
+        println!("cargo:rerun-if-changed=../../{}", rel.display());
         let bytes = std::fs::read(f).unwrap_or_else(|e| panic!("{}: {e}", f.display()));
         eat(rel.to_string_lossy().replace('\\', "/").as_bytes());
         // Line endings follow the checkout (Windows or WSL), not the source.

@@ -1,8 +1,10 @@
 //! Preserve the chosen waveform while allowing intentional mix-level adjustment.
 use mc_data::{sounds::Layer, SoundLibrary};
 fn library() -> SoundLibrary {
-    SoundLibrary::load(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"))
-        .unwrap()
+    SoundLibrary::load(
+        &std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+    )
+    .unwrap()
 }
 #[test]
 fn approved_repeater_is_the_selected_waveform_not_a_reconstruction() {

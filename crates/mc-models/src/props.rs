@@ -1258,7 +1258,8 @@ fn dump_trees() {
     let dir = std::env::var_os("TREE_DUMP_DIR")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| {
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/tree-dump")
+            std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+                .join("../../target/tree-dump")
         });
     std::fs::create_dir_all(&dir).unwrap();
     for def in &MODELS[..4] {

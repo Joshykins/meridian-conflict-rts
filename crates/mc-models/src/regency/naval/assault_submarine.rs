@@ -898,7 +898,8 @@ mod tests {
     /// the sim reads them: given as if the house faced forward, mirrored).
     #[test]
     fn the_unit_files_weapons_are_the_models() {
-        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+        let dir = std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+            .join("../../data");
         let blueprints = mc_data::Blueprints::load(&dir).unwrap();
         let bp = blueprints.unit(blueprints.id_of("regency_t3_submarine").unwrap());
         assert_eq!(bp.visual.mesh, "regency_assault_submarine");

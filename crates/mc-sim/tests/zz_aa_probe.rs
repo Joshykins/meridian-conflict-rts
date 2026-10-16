@@ -54,8 +54,10 @@ const FLIGHT: i32 = 4;
 const TOUGH: i32 = 10_000_000;
 
 fn world(sea: bool) -> World {
-    let mut blueprints =
-        Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+    let mut blueprints = Blueprints::load(
+        &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+    )
+    .unwrap();
     for bp in &mut blueprints.units {
         for w in &mut bp.weapons {
             w.target_mask &= cat::AIR;

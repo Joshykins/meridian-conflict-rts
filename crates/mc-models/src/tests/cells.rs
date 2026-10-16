@@ -6,7 +6,8 @@ use crate::{build_model_scaled, part, CellBlock, Model};
 
 /// Every unit with a hatched weapon, built as the game draws it, with that weapon.
 fn launchers() -> Vec<(String, Model, mc_data::Weapon)> {
-    let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let data =
+        std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data");
     let bps = mc_data::Blueprints::load(&data).unwrap();
     bps.units
         .iter()

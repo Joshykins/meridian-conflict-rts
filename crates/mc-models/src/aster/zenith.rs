@@ -942,7 +942,8 @@ mod tests {
     }
 
     fn weapon() -> (Vec3, Vec3) {
-        let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+        let data = std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+            .join("../../data");
         let blueprints = mc_data::Blueprints::load(&data).unwrap();
         let bp = blueprints.unit(blueprints.id_of("aster_t4_anti_ship").unwrap());
         let w = &bp.weapons[0];

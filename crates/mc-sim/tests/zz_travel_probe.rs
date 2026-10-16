@@ -209,7 +209,7 @@ fn run(map: &mc_map::MapFile, bps: &Arc<Blueprints>, mix: &[(&str, u32)], from: 
 fn travel() {
     let spec = std::env::var("TRAVEL").unwrap_or_else(|_| "the_axis".into());
     let (name, pairs) = spec.split_once(':').unwrap_or((&spec, ""));
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let root = Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
     let bps = Arc::new(Blueprints::load(&root.join("data")).unwrap());
     let map = mc_map::MapFile::open(root.join(format!("maps/{name}.mcmap"))).unwrap();
     let n = map.start_positions().len();

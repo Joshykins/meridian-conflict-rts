@@ -691,7 +691,8 @@ fn last_harvest_matches_its_sidecar() {
     let path = std::env::var("MC_CHECK_HARVEST")
         .map(PathBuf::from)
         .unwrap_or_else(|_| {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../maps/last_harvest.mcmap")
+            PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+                .join("../../maps/last_harvest.mcmap")
         });
     if !path.exists() {
         eprintln!(

@@ -314,7 +314,8 @@ mod tests {
     /// scales the model, and the scale is the same across as up.
     #[test]
     fn blueprints_carry_the_arm() {
-        let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+        let data = std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+            .join("../../data");
         let bps = mc_data::Blueprints::load(&data).unwrap();
         for tech in 1..=3 {
             let key = format!("aster_t{tech}_eng_station");

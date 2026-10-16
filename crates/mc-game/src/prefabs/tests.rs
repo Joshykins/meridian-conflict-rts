@@ -1,7 +1,10 @@
 use super::*;
 
 fn blueprints() -> Blueprints {
-    Blueprints::load(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap()
+    Blueprints::load(
+        &std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+    )
+    .unwrap()
 }
 
 fn at(x: i32, y: i32) -> FxVec2 {

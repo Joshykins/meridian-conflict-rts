@@ -16,7 +16,12 @@ use std::sync::Arc;
 const WATER: i32 = 20;
 
 fn blueprints() -> Arc<Blueprints> {
-    Arc::new(Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap())
+    Arc::new(
+        Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap(),
+    )
 }
 
 fn shore(fog: bool, land: u16) -> World {

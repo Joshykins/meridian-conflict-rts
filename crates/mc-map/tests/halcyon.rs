@@ -13,7 +13,8 @@ use std::collections::VecDeque;
 use std::path::Path;
 
 fn open() -> Option<MapFile> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../maps/halcyon.mcmap");
+    let path = Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+        .join("../../maps/halcyon.mcmap");
     if !path.exists() {
         eprintln!("halcyon.mcmap not baked; skipping");
         return None;

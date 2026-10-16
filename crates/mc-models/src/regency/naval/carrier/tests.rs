@@ -144,7 +144,8 @@ fn it_carries_its_weapons() {
 /// The unit file's numbers are the model's.
 #[test]
 fn the_unit_files_numbers_are_the_models() {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let dir =
+        std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data");
     let blueprints = mc_data::Blueprints::load(&dir).unwrap();
     let bp = blueprints.unit(blueprints.id_of("regency_t3_carrier").unwrap());
     assert_eq!(bp.visual.mesh, "regency_carrier");

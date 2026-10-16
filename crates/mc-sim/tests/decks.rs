@@ -23,7 +23,12 @@ const BANK: u16 = 40;
 const ROAD: i32 = 1020;
 
 fn blueprints() -> Arc<Blueprints> {
-    Arc::new(Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap())
+    Arc::new(
+        Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap(),
+    )
 }
 
 /// The strait's ground and its deck.

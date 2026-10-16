@@ -22,7 +22,10 @@ fn terrain() -> Heightfield {
 /// up reaches nobody else's units.
 fn world(rule: FallenArmy, threads: usize) -> World {
     let blueprints = Arc::new(
-        Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
+        Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap(),
     );
     let map = MapData {
         doodads: Default::default(),

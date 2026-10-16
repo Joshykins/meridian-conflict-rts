@@ -15,7 +15,10 @@ use std::sync::Arc;
 
 fn world() -> World {
     let blueprints = Arc::new(
-        Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
+        Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap(),
     );
     let terrain = Heightfield::flat(256, 256, mc_core::Fx::from_int(20));
     let map = MapData {
@@ -360,7 +363,10 @@ fn a_station_lets_go_of_a_site_it_helped_finish() {
 #[test]
 fn a_station_takes_no_adjacency_saving() {
     use mc_sim::adjacency::{offers, uses, Resource};
-    let bps = Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+    let bps = Blueprints::load(
+        &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+    )
+    .unwrap();
     let bp = |key: &str| bps.unit(bps.id_of(key).unwrap());
     for key in ["aster_t2_eng_station", "regency_t3_eng_station"] {
         assert!(!uses(bp(key), Resource::Materials), "{key}");

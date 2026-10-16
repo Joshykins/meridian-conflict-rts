@@ -27,7 +27,10 @@ const WATER: i32 = 20;
 /// and 20 m of water past it.
 fn world(sea: bool) -> World {
     let blueprints = Arc::new(
-        Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
+        Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap(),
     );
     let cells = 512;
     let samples = (0..(cells + 1) * (cells + 1))

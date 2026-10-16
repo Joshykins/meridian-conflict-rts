@@ -16,7 +16,8 @@ fn tris(mesh: &MeshLod) -> usize {
 }
 
 fn weapon() -> (Vec3, Vec3) {
-    let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let data =
+        std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data");
     let blueprints = mc_data::Blueprints::load(&data).unwrap();
     let bp = blueprints.unit(blueprints.id_of("aster_t3_point_defense").unwrap());
     let w = &bp.weapons[0];
@@ -133,7 +134,8 @@ fn citadel_breech_door_rides_the_gun_and_swings_up() {
             assert!(v.pos[2] <= hinge.z + 0.3 && v.pos[0] < TRUNNION.x + BODY_FRONT);
         }
     }
-    let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let data =
+        std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data");
     let blueprints = mc_data::Blueprints::load(&data).unwrap();
     let bp = blueprints.unit(blueprints.id_of("aster_t3_point_defense").unwrap());
     let sabot = bp.weapons[0]

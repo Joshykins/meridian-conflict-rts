@@ -765,7 +765,8 @@ mod tests {
     #[test]
     fn a_shatter_gun_is_drawn_as_a_gravitic_shell() {
         let bp = mc_data::Blueprints::load(
-            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"),
+            &std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+                .join("../../data"),
         )
         .unwrap();
         let guns: Vec<&Weapon> = bp

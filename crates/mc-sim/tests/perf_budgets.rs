@@ -24,7 +24,10 @@ fn world(size_cells: u32) -> World {
 
 fn world_with(size_cells: u32, props: Vec<mc_map::Prop>) -> World {
     let blueprints = Arc::new(
-        Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
+        Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap(),
     );
     let terrain = Heightfield::flat(size_cells, size_cells, Fx::from_int(20));
     let map = MapData {
@@ -227,7 +230,10 @@ fn paladins_in_a_city() {
 /// on a pool of `threads` workers (all the machine's with `None`).
 fn ring_world(players: u8, fog: bool, threads: Option<usize>, ai: bool) -> World {
     let blueprints = Arc::new(
-        Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
+        Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap(),
     );
     let terrain = Heightfield::flat(2048, 2048, Fx::from_int(20));
     let starts = (0..players)

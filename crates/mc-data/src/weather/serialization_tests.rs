@@ -1,7 +1,7 @@
 use super::*;
 #[test]
 fn every_checked_in_map_configuration_roundtrips_without_losing_metadata() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../maps");
+    let root = Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../maps");
     let mut checked = 0;
     for entry in std::fs::read_dir(root).unwrap() {
         let path = entry.unwrap().path();

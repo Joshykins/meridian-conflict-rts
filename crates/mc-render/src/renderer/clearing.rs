@@ -255,7 +255,8 @@ mod tests {
     #[test]
     #[ignore = "requires Vulkan and maps/crosswater.mcmap"]
     fn a_clearing_field_vaporizes_a_wood_in_waves() {
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let root =
+            std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
         let out = std::env::var("CLEARING_DIR")
             .map(std::path::PathBuf::from)
             .ok();

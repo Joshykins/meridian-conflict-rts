@@ -159,7 +159,7 @@ fn the_bomb_leaves_from_between_the_claws_fingers() {
 #[test]
 fn the_unit_files_numbers_are_the_models_scaled() {
     let bp = mc_data::Blueprints::load(
-        &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"),
+        &std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
     )
     .unwrap();
     let unit = bp

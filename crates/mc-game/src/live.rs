@@ -397,9 +397,11 @@ mod tests {
 
     #[test]
     fn the_builder_picked_can_build_everything_asked() {
-        let b =
-            Blueprints::load(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"))
-                .unwrap();
+        let b = Blueprints::load(
+            &std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+                .join("../../data"),
+        )
+        .unwrap();
         let structures: Vec<BlueprintId> = (0..b.units.len())
             .map(|i| BlueprintId(i as u16))
             .filter(|&id| b.unit(id).is_structure())

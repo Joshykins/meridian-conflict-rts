@@ -2,12 +2,23 @@
 //! when building for Windows with a resource compiler at hand, and numbers the
 //! launcher as the game is numbered: `MERIDIAN_BUILD_NUMBER`, the count of
 //! commits up to HEAD (empty outside a git checkout). A launcher swaps itself
-//! only for one from a later build (`install.rs`, `stage_launcher`).
+//! only for one from a later build (`install.rs`, `stage_launcher`). The
+//! `gate` profile, which builds only tests, numbers it as outside a checkout,
+//! as mc-game's build script does.
 
 use embed_resource::CompilationResult;
 use std::process::Command;
 
+/// Whether this is the `gate` profile (`target/gate/build/<pkg>/out`).
+fn tests_only() -> bool {
+    let out = std::path::PathBuf::from(std::env::var_os("OUT_DIR").unwrap_or_default());
+    out.ancestors().nth(3).and_then(|p| p.file_name()) == Some("gate".as_ref())
+}
+
 fn git(args: &[&str]) -> Option<String> {
+    if tests_only() {
+        return None;
+    }
     let out = Command::new("git").args(args).output().ok()?;
     out.status
         .success()

@@ -23,7 +23,10 @@ const DEPTH: i32 = 82;
 /// Land either side of a strait 2 km across, from x = 1200 m to x = 3200 m.
 fn strait() -> World {
     let blueprints = Arc::new(
-        Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
+        Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap(),
     );
     let cells = 512u32;
     let stride = cells as usize + 1;

@@ -2073,7 +2073,8 @@ mod sea_shots {
     #[test]
     #[ignore = "requires Vulkan and maps/twin_shoals.mcmap"]
     fn sea_shots() {
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let root =
+            std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
         let map =
             Arc::new(mc_map::MapFile::open(root.join("maps/twin_shoals.mcmap")).expect("open map"));
         let blueprints = Arc::new(mc_data::Blueprints::load(&root.join("data")).unwrap());

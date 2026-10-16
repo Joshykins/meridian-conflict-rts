@@ -20,7 +20,10 @@ const LENS: &str = "regency_t3_gravitic_lens";
 
 fn world() -> World {
     let blueprints = Arc::new(
-        Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
+        Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap(),
     );
     let side = CELLS as usize + 1;
     let terrain = Heightfield::from_samples(

@@ -9,7 +9,10 @@ use mc_map::Heightfield;
 use std::{path::Path, sync::Arc};
 
 fn world() -> World {
-    let data = Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+    let data = Blueprints::load(
+        &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+    )
+    .unwrap();
     let config = MatchConfig {
         seed: 11,
         cheats: true,

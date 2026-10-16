@@ -69,7 +69,7 @@ mod tests {
     /// changing the fingerprint.
     #[test]
     fn sim_crates_txt_lists_every_crate_the_simulation_uses() {
-        let here = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let here = std::path::PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap());
         let list = std::fs::read_to_string(here.join("sim_crates.txt")).unwrap();
         let listed: Vec<&str> = list
             .lines()

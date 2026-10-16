@@ -56,7 +56,7 @@ fn bake() -> Vec<PathBuf> {
     })
     .collect();
     // The survival block lives in the map's settings file.
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let root = Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
     std::fs::copy(root.join("maps/threshold.ron"), dir.join("threshold.ron")).unwrap();
     paths
 }

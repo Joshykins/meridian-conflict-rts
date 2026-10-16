@@ -65,6 +65,7 @@ mod mistral;
 mod narwhal;
 mod naval;
 mod naval_roster;
+mod no_baked_paths;
 mod nuke_salvo;
 mod nukes;
 mod orbs;
@@ -144,7 +145,7 @@ mod zz_travel_probe;
 
 #[test]
 fn every_test_file_is_listed() {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
+    let dir = std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("tests");
     let listed = include_str!("all.rs");
     for entry in std::fs::read_dir(&dir).unwrap().flatten() {
         let path = entry.path();

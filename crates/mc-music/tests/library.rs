@@ -7,7 +7,7 @@ use mc_music::{Instrument, Mode, Song};
 use std::path::PathBuf;
 
 fn music_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data/music")
+    PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data/music")
 }
 
 /// One track playing `inst` one note: `key` at `vel`, `beats` long, in a 4-bar loop.

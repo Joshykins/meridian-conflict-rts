@@ -300,8 +300,10 @@ mod tests {
     /// Every unit of the data keeps to the gun limit, and its groups' guns are houses.
     #[test]
     fn every_units_guns_fit() {
-        let bp =
-            Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+        let bp = Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap();
         for unit in &bp.units {
             assert!(unit.gun_count() <= super::MAX_GUNS, "{}", unit.key);
             for weapon in unit.weapons.iter().filter(|w| w.is_group()) {

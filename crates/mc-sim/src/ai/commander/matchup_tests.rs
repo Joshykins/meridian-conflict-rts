@@ -11,7 +11,12 @@ use mc_map::Heightfield;
 use std::{path::Path, sync::Arc};
 
 fn roster() -> Arc<Blueprints> {
-    Arc::new(Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap())
+    Arc::new(
+        Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap(),
+    )
 }
 
 #[test]

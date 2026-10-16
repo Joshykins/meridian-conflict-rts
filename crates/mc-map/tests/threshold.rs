@@ -521,7 +521,8 @@ fn threshold_matches_its_sidecar() {
     let path = std::env::var("MC_CHECK_THRESHOLD")
         .map(PathBuf::from)
         .unwrap_or_else(|_| {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../maps/threshold.mcmap")
+            PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+                .join("../../maps/threshold.mcmap")
         });
     if !path.exists() {
         eprintln!(

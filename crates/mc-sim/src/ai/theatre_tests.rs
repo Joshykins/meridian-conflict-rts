@@ -10,7 +10,10 @@ use std::{path::Path, sync::Arc};
 /// Two islands 960 m square in opposite corners of a 4 km sea, a start on
 /// each; with `bridge`, a causeway joins them along the diagonal.
 fn islands(bridge: bool) -> World {
-    let data = Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+    let data = Blueprints::load(
+        &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+    )
+    .unwrap();
     let config = MatchConfig {
         seed: 5,
         cheats: true,

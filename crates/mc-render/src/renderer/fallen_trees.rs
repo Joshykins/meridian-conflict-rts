@@ -265,7 +265,8 @@ mod tests {
     #[test]
     #[ignore = "requires Vulkan and maps/crosswater.mcmap"]
     fn trampled_trees_fall_and_lie_down() {
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let root =
+            std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
         let out = std::env::var("FALLEN_TREES_DIR")
             .map(std::path::PathBuf::from)
             .ok();

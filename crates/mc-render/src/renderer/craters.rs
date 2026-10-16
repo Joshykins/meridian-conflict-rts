@@ -293,7 +293,8 @@ mod shots {
     #[test]
     #[ignore = "requires Vulkan and maps/crosswater.mcmap"]
     fn crater_shots() {
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let root =
+            std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
         let map = Arc::new(
             mc_map::MapFile::open(root.join(
                 std::env::var("CRATER_MAP").unwrap_or_else(|_| "maps/crosswater.mcmap".into()),

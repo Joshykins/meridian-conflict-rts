@@ -9,7 +9,8 @@ use crate::aster::naval::missile_ship;
 use crate::aster::titan;
 
 fn blueprints() -> mc_data::Blueprints {
-    let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let data =
+        std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data");
     mc_data::Blueprints::load(&data).unwrap()
 }
 

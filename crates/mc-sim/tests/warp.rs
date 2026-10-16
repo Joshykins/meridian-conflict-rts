@@ -19,7 +19,10 @@ const DAMPER: &str = "aster_t3_warp_damper";
 
 fn world() -> World {
     let blueprints = Arc::new(
-        Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
+        Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap(),
     );
     let terrain = Heightfield::flat(2048, 2048, Fx::from_int(20));
     let map = MapData {
@@ -262,8 +265,10 @@ fn a_starved_grid_charges_the_drive_only_as_far_as_it_can_pay() {
 
 #[test]
 fn a_larger_ship_pays_more_a_kilometre() {
-    let blueprints =
-        Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+    let blueprints = Blueprints::load(
+        &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+    )
+    .unwrap();
     let per_km = |key: &str| {
         let bp = blueprints.unit(blueprints.id_of(key).unwrap());
         bp.warp.expect("a drive").per_km

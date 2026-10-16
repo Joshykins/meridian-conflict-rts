@@ -2021,7 +2021,7 @@ mod tests {
     use super::*;
 
     fn data_dir() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")
+        Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data")
     }
 
     #[test]
@@ -2581,9 +2581,11 @@ mod effect_settings_tests {
 
     #[test]
     fn a_build_tile_title_is_a_short_role_not_the_name() {
-        let bp =
-            Blueprints::load(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"))
-                .unwrap();
+        let bp = Blueprints::load(
+            &std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+                .join("../../data"),
+        )
+        .unwrap();
         let titled: Vec<_> = bp.units.iter().filter(|u| u.title.is_some()).collect();
         assert!(titled.len() > 50, "only {} titled", titled.len());
         for u in titled {

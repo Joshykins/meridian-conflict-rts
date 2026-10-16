@@ -2112,7 +2112,8 @@ mod shots {
     #[test]
     #[ignore = "requires Vulkan and a map"]
     fn sky_shots() {
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let root =
+            std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
         let map_name = std::env::var("SKY_MAP").unwrap_or_else(|_| "crosswater".into());
         let map = Arc::new(
             mc_map::MapFile::open(root.join(format!("maps/{map_name}.mcmap"))).expect("open map"),

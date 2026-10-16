@@ -2,7 +2,7 @@
 use mc_sim::{MatchConfig, PlayerSetup, World};
 use std::{collections::BTreeSet, path::Path, sync::Arc};
 fn main() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let root = Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
     let map = mc_map::MapFile::open(root.join("maps/vela_m1/terrain.mcmap")).unwrap();
     let bp = Arc::new(mc_data::Blueprints::load(&root.join("data")).unwrap());
     let placed = map.placed().clone();

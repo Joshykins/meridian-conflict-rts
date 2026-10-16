@@ -1071,7 +1071,8 @@ mod tests {
     /// recipe kept to play against; a sound that did not change is left alone.
     #[test]
     fn a_changed_recipe_keeps_its_before() {
-        let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+        let data = std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+            .join("../../data");
         let mut s = Sounds {
             catalogue: catalogue::load(&data).unwrap(),
             ..Default::default()
@@ -1101,7 +1102,8 @@ mod tests {
 
     #[test]
     fn every_layer_has_words() {
-        let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+        let data = std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+            .join("../../data");
         for e in catalogue::load(&data).unwrap().entries {
             for l in e.sound.iter().flat_map(|s| &s.layers) {
                 assert!(!describe(l).is_empty());

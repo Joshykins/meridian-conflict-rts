@@ -20,7 +20,7 @@ fn layout() {
     let players: u8 = parts.get(1).and_then(|m| m.parse().ok()).unwrap_or(4);
     let minutes: u32 = parts.get(2).and_then(|m| m.parse().ok()).unwrap_or(30);
     let seed: u64 = parts.get(3).and_then(|m| m.parse().ok()).unwrap_or(7);
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let root = Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
     let bps = Arc::new(Blueprints::load(&root.join("data")).unwrap());
     let map = mc_map::MapFile::open(root.join(format!("maps/{}.mcmap", parts[0]))).unwrap();
     let config = MatchConfig {

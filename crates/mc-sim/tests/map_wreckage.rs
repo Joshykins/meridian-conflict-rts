@@ -12,7 +12,12 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 fn blueprints() -> Arc<Blueprints> {
-    Arc::new(Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap())
+    Arc::new(
+        Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap(),
+    )
 }
 
 #[test]
@@ -112,7 +117,7 @@ fn a_map_starts_with_its_wreckage_in_sight() {
 #[ignore]
 fn zz_map_salvage_report() {
     let bp = blueprints();
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../maps");
+    let dir = Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../maps");
     let mut maps: Vec<_> = std::fs::read_dir(&dir)
         .unwrap()
         .flatten()

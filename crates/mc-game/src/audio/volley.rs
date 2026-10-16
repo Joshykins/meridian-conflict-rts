@@ -61,8 +61,11 @@ mod tests {
     use mc_sim::Handle;
 
     fn blueprints() -> Blueprints {
-        Blueprints::load(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"))
-            .unwrap()
+        Blueprints::load(
+            &std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+                .join("../../data"),
+        )
+        .unwrap()
     }
 
     fn shot(b: BlueprintId, weapon: u8, x: i32) -> SimEvent {

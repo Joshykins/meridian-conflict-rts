@@ -1204,7 +1204,8 @@ fn units_wear_team_colour_at_every_lod() {
 /// files' `plasma_grade`).
 fn charge_guns() -> Vec<String> {
     use mc_data::PlasmaGrade;
-    let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let data =
+        std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data");
     let bps = mc_data::Blueprints::load(&data).unwrap();
     bps.units
         .iter()
@@ -1997,11 +1998,12 @@ fn dump_models() {
     let dir = std::env::var_os("MODEL_DUMP_DIR")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| {
-            let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+            let manifest =
+                std::path::PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap());
             manifest
                 .ancestors()
                 .find(|p| p.join("Cargo.lock").exists())
-                .unwrap_or(manifest)
+                .unwrap_or(&manifest)
                 .join("target/model-dump")
         });
     std::fs::create_dir_all(&dir).unwrap();
@@ -2092,7 +2094,8 @@ fn aircraft_have_swept_wings_nozzle_origins_and_bounded_lods() {
 /// on. Hover craft, VTOLs and capital ships burn other ways.
 #[test]
 fn every_jet_has_exhaust_ports() {
-    let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let data =
+        std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data");
     let bps = mc_data::Blueprints::load(&data).unwrap();
     for u in &bps.units {
         let Some(m) = u.motion else { continue };
@@ -2417,7 +2420,8 @@ fn tropical_trees_pick_the_tropical_atlas_and_pale_bark() {
 /// them when the module is fitted, so a module without any would change nothing.
 #[test]
 fn every_refit_module_has_pieces_on_the_model() {
-    let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let data =
+        std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data");
     let bps = mc_data::Blueprints::load(&data).unwrap();
     for set in &bps.refits {
         let bp = bps.unit(set.base);
@@ -3340,7 +3344,8 @@ fn electric_bore_pair_geometry_and_lod_budgets() {
 #[test]
 fn titan_casings_leave_by_the_models_port() {
     use super::aster::titan;
-    let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let data =
+        std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data");
     let bps = mc_data::Blueprints::load(&data).unwrap();
     let bp = bps.unit(bps.id_of("aster_t5_titan").unwrap());
     let gun = bp.weapons.iter().find(|w| w.sabot.is_some()).unwrap();
@@ -3545,7 +3550,8 @@ fn owner_and_pad_bits_match_the_sim() {
     assert_eq!((p >> pad::TURN_SHIFT) & pad::TURN_MASK, 3);
     assert_eq!(p >> pad::BLUEPRINT_SHIFT, 42);
     // Every blueprint's index fits above the turn.
-    let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let data =
+        std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data");
     let bps = mc_data::Blueprints::load(&data).unwrap();
     assert!(bps.units.len() < 1 << (32 - pad::BLUEPRINT_SHIFT));
 }

@@ -13,7 +13,10 @@ use std::sync::Arc;
 /// 256 cells of 8 m of flat dry ground at 20 m.
 fn field() -> World {
     let blueprints = Arc::new(
-        Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
+        Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap(),
     );
     let terrain = Heightfield::from_samples(
         256,

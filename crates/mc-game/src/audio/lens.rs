@@ -229,7 +229,8 @@ mod tests {
     /// looping.
     #[test]
     fn the_lodestone_has_all_its_sounds() {
-        let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+        let data = std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+            .join("../../data");
         let library = SoundLibrary::load(&data).unwrap();
         let blueprints = Blueprints::load(&data).unwrap();
         let mut lenses = 0;

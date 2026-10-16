@@ -19,8 +19,10 @@ fn terrain() -> Heightfield {
 }
 
 fn world() -> World {
-    let blueprints =
-        Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+    let blueprints = Blueprints::load(
+        &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+    )
+    .unwrap();
     let map = MapData {
         doodads: Default::default(),
         name: "small".into(),

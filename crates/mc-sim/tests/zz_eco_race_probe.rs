@@ -1175,7 +1175,7 @@ fn play(
 #[test]
 #[ignore]
 fn eco_race() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let root = Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
     let bps = Arc::new(Blueprints::load(&root.join("data")).unwrap());
     let spec = std::env::var("ECO").unwrap_or_else(|_| "serac_divide".into());
     let plans_spec = std::env::var("ECO_PLANS").unwrap_or_else(|_| "base".into());

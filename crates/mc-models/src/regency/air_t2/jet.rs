@@ -304,7 +304,8 @@ pub(super) mod check {
         radius: f32,
         height: f32,
     ) -> mc_data::UnitBlueprint {
-        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+        let dir = std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+            .join("../../data");
         let blueprints = mc_data::Blueprints::load(&dir).unwrap();
         let bp = blueprints.unit(blueprints.id_of(key).unwrap()).clone();
         assert_eq!(bp.visual.mesh, mesh);

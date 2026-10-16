@@ -30,7 +30,7 @@ const BANNED: &[&str] = &[
 const PRESENTATION_MODULES: &[&str] = &["mirror.rs"];
 
 fn crates() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("..")
+    Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("..")
 }
 
 fn read(path: &Path) -> String {

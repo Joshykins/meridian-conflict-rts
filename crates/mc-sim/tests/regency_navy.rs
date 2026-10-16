@@ -53,7 +53,10 @@ fn sea_of(water: i32) -> World {
         spawn_commanders: false,
     };
     let bp = Arc::new(
-        Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
+        Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap(),
     );
     World::with_terrain(terrain, map, bp, Arc::new(Pool::new(1)), &config).unwrap()
 }

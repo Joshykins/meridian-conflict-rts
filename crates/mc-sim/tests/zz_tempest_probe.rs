@@ -18,8 +18,10 @@ use std::sync::Arc;
 const TITAN: &str = "aster_t5_titan";
 
 fn world() -> World {
-    let mut blueprints =
-        Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+    let mut blueprints = Blueprints::load(
+        &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+    )
+    .unwrap();
     let titan = blueprints.id_of(TITAN).unwrap();
     let env = |k: &str| std::env::var(k).ok().and_then(|v| v.parse::<f64>().ok());
     for w in &mut blueprints.units[titan.0 as usize].weapons {

@@ -83,7 +83,8 @@ impl Map {
 #[test]
 fn haldens_grip_plays_the_same_from_both_sides() {
     let stem = "haldens_grip";
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("../../maps/{stem}.mcmap"));
+    let path = PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+        .join(format!("../../maps/{stem}.mcmap"));
     let Ok(file) = MapFile::open(&path) else {
         eprintln!("{} not baked; skipping", path.display());
         return;

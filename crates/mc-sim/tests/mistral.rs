@@ -19,7 +19,10 @@ const GUN: (i32, i32) = (2000, 2000);
 
 fn world() -> World {
     let blueprints = Arc::new(
-        Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
+        Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap(),
     );
     let terrain = Heightfield::flat(1024, 1024, Fx::from_int(20));
     let map = MapData {

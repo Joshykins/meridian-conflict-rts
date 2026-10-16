@@ -33,9 +33,10 @@ pub(super) fn world_salvage(blocking: bool, health: u32, reclaim: u32) -> World 
             height: Fx::from_int(18),
         }),
     };
-    let blueprints =
-        mc_data::Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"))
-            .unwrap();
+    let blueprints = mc_data::Blueprints::load(
+        &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+    )
+    .unwrap();
     World::with_terrain(
         terrain(),
         MapData {

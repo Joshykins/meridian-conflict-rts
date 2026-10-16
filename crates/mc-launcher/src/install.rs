@@ -153,10 +153,15 @@ fn own_number() -> Option<u32> {
     env!("MERIDIAN_BUILD_NUMBER").parse().ok()
 }
 
-/// A build numbered `number` is later than this launcher. A launcher without a
-/// number (built outside a checkout) takes any published one.
+/// A build numbered `number` is later than this launcher.
 fn newer_than_this(number: u32) -> bool {
-    own_number().is_none_or(|own| number > own)
+    newer_than(number, own_number())
+}
+
+/// A build numbered `number` is later than one numbered `own`. A launcher
+/// without a number (built outside a checkout) takes any published one.
+fn newer_than(number: u32, own: Option<u32>) -> bool {
+    own.is_none_or(|own| number > own)
 }
 
 /// `MeridianConflict.exe.new` beside this program is its update: swap it in
@@ -281,9 +286,11 @@ mod tests {
 
     #[test]
     fn only_a_later_build_brings_its_launcher() {
-        let own = own_number().expect("tests run in a git checkout");
-        assert!(newer_than_this(own + 1));
-        assert!(!newer_than_this(own));
-        assert!(!newer_than_this(own - 1));
+        // By number, not this build's own: tests (the gate profile) are built
+        // unnumbered, as outside a checkout (build.rs).
+        assert!(newer_than(8, Some(7)));
+        assert!(!newer_than(7, Some(7)));
+        assert!(!newer_than(6, Some(7)));
+        assert!(newer_than(1, None));
     }
 }

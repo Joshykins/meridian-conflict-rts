@@ -152,7 +152,7 @@ fn ledger() {
         .ok()
         .and_then(|n| n.parse().ok())
         .unwrap_or(3);
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let root = Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
     let bps = Arc::new(mc_data::Blueprints::load(&root.join("data")).unwrap());
     let map = mc_map::MapFile::open(root.join(format!("maps/{}.mcmap", parts[0]))).unwrap();
     let player = |i: u8| PlayerSetup {

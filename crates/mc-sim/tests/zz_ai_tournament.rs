@@ -88,7 +88,7 @@ fn match_up() {
         .ok()
         .and_then(|n| n.parse().ok())
         .unwrap_or(0);
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let root = Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
     let bps = Arc::new(Blueprints::load(&root.join("data")).unwrap());
     let map = mc_map::MapFile::open(root.join(format!("maps/{}.mcmap", parts[0]))).unwrap();
     let starts = map.start_positions().to_vec();

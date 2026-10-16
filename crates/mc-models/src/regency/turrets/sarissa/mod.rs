@@ -128,7 +128,8 @@ mod tests {
     #[test]
     fn sarissa_line_is_the_unit_files() {
         let bp = mc_data::Blueprints::load(
-            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"),
+            &std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+                .join("../../data"),
         )
         .unwrap();
         let unit = bp.unit(bp.id_of("regency_t4_anti_ship").unwrap());

@@ -17,7 +17,10 @@ const LOT: FxVec2 = FxVec2::from_ints(1100, 1000);
 
 fn world() -> World {
     let blueprints = Arc::new(
-        Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
+        Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap(),
     );
     let terrain = Heightfield::flat(512, 512, Fx::from_int(20));
     let map = MapData {

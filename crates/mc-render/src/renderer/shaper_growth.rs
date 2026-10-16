@@ -200,7 +200,8 @@ mod tests {
 
     #[test]
     fn the_halos_slots_follow_the_sims_interceptors() {
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let root =
+            std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
         let bps = mc_data::Blueprints::load(&root.join("data")).unwrap();
         for key in [
             "replication_node",

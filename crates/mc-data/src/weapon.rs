@@ -390,8 +390,10 @@ mod tests {
     /// its grade, and nothing of ARC's does.
     #[test]
     fn only_the_regency_fires_plasma() {
-        let bp =
-            Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+        let bp = Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap();
         let regency = bp.faction_by_key("regency").unwrap().id;
         let mut regency_guns = 0;
         for unit in &bp.units {
@@ -414,8 +416,10 @@ mod tests {
     /// bursts wide among aircraft.
     #[test]
     fn flak_is_slow_and_bursts_wide() {
-        let bp =
-            Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+        let bp = Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap();
         let mut guns = 0;
         for unit in &bp.units {
             for w in unit.weapons.iter().filter(|w| w.flak) {
@@ -435,8 +439,10 @@ mod tests {
     /// coast, no charge gathered over the cell first.
     #[test]
     fn a_gravitic_seeker_launches_at_once() {
-        let bp =
-            Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+        let bp = Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap();
         let mut seekers = 0;
         for unit in &bp.units {
             for w in unit.weapons.iter().filter(|w| w.gravitic_seeker()) {
@@ -453,8 +459,10 @@ mod tests {
     /// splash is the burst.
     #[test]
     fn an_airburst_is_plasma_on_a_fuse() {
-        let bp =
-            Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+        let bp = Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap();
         let mut guns = 0;
         for unit in &bp.units {
             for w in unit.weapons.iter().filter(|w| w.airburst) {
@@ -474,8 +482,10 @@ mod tests {
     /// Howitzer matches the Onager.
     #[test]
     fn the_onager_outranges_the_trebuchet_and_the_commander_matches_it() {
-        let bp =
-            Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+        let bp = Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap();
         let reach = |key: &str| bp.unit(bp.id_of(key).unwrap()).weapons[0].range_max;
         let onager = reach("aster_t2_artillery");
         let trebuchet = reach("aster_t3_artillery");
@@ -499,8 +509,10 @@ mod tests {
     /// the Kiln, and kills either in fewer hits than the Onager.
     #[test]
     fn the_basilisk_outranges_both_t3_siege_guns() {
-        let bp =
-            Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+        let bp = Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap();
         let unit = |key: &str| bp.unit(bp.id_of(key).unwrap());
         let reach = |key: &str| unit(key).weapons[0].range_max;
         let basilisk = reach("regency_t2_artillery");

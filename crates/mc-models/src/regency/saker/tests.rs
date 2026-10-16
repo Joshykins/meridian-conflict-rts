@@ -59,7 +59,8 @@ fn walks_on_four_legs_and_braces() {
 /// muzzle are the model's times `SCALE`.
 #[test]
 fn the_unit_files_gun_is_the_models() {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let dir =
+        std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data");
     let blueprints = mc_data::Blueprints::load(&dir).unwrap();
     let bp = blueprints.unit(blueprints.id_of("regency_t4_surge_artillery").unwrap());
     assert_eq!(bp.visual.mesh, KEY);

@@ -50,8 +50,10 @@ fn terrain() -> Heightfield {
 }
 
 fn world(threads: usize) -> World {
-    let blueprints =
-        Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+    let blueprints = Blueprints::load(
+        &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+    )
+    .unwrap();
     let mut props = city();
     let salvage_prop = props.len() as u32;
     props.push(mc_map::Prop {

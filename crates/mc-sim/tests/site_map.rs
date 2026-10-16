@@ -29,7 +29,7 @@ fn bake(params: &BakeParams) -> mc_map::MapFile {
 /// Returns how many sites of a water-only kind the sim took.
 fn agree_on(params: &BakeParams) -> usize {
     let name = &params.name;
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let root = Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
     let bps = Arc::new(Blueprints::load(&root.join("data")).unwrap());
     let map = bake(params);
     let player = |n: &str, team| PlayerSetup {

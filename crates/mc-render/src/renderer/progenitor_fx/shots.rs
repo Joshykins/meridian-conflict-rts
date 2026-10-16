@@ -477,7 +477,7 @@ fn write_ppm(renderer: &mut Renderer, path: &std::path::Path, w: u32, h: u32) {
 #[test]
 #[ignore = "requires Vulkan and maps/crosswater.mcmap"]
 fn progenitor_shots() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let root = std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
     let map =
         Arc::new(mc_map::MapFile::open(root.join("maps/crosswater.mcmap")).expect("open map"));
     let blueprints = Arc::new(mc_data::Blueprints::load(&root.join("data")).unwrap());

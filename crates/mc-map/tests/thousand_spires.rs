@@ -148,7 +148,8 @@ fn spread(v: [f64; 2]) -> f64 {
 
 #[test]
 fn thousand_spires_plays_the_same_for_both_players() {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../maps/thousand_spires.mcmap");
+    let path = PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+        .join("../../maps/thousand_spires.mcmap");
     let Ok(file) = MapFile::open(&path) else {
         eprintln!("{} not baked; skipping", path.display());
         return;

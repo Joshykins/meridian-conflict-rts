@@ -476,7 +476,8 @@ mod tests {
     #[test]
     fn warp_sounds_are_in_the_library() {
         let library = SoundLibrary::load(
-            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"),
+            &std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+                .join("../../data"),
         )
         .unwrap();
         for name in [
@@ -504,7 +505,8 @@ mod tests {
     #[test]
     fn the_nanite_drive_has_its_own_sounds() {
         let library = SoundLibrary::load(
-            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"),
+            &std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+                .join("../../data"),
         )
         .unwrap();
         let prefix = mc_data::WarpStyle::Nanite.sound_prefix().unwrap();

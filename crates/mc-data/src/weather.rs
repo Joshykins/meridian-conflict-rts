@@ -864,7 +864,8 @@ mod tests {
             (Biome::Tropical, MapStyle::Duel, MapStyle::Teams)
         );
         // Every map's own file still reads.
-        let maps = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../maps");
+        let maps = std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+            .join("../../maps");
         for e in std::fs::read_dir(maps).unwrap().flatten() {
             if e.path().extension().is_some_and(|x| x == "mcmap") {
                 MapConfig::for_map(&e.path()).unwrap();

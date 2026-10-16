@@ -16,7 +16,8 @@ fn radius(v: &MeshVertex) -> f32 {
 /// evenly in x and z, so a wheel stays round as it turns.
 #[test]
 fn fulgur_wheels_turn_about_their_axles() {
-    let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let data =
+        std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data");
     let bps = mc_data::Blueprints::load(&data).unwrap();
     let bp = bps.unit(bps.id_of("aster_t4_assault_tank").unwrap());
     assert_eq!(bp.visual.mesh, "assault_tank");

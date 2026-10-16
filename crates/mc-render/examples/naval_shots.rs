@@ -39,7 +39,7 @@ fn main() {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(10.0);
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let root = std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
     let map = Arc::new(MapFile::open(map_path).expect("map"));
     std::fs::create_dir_all(out).unwrap();
     let blueprints = Arc::new(Blueprints::load(&root.join("data")).expect("blueprints"));

@@ -3,7 +3,7 @@ use mc_sim::mission::Action;
 use std::{collections::BTreeMap, path::Path};
 #[test]
 fn the_contract_has_resolved_references_and_all_dialogue() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let root = Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
     let placed = ron::from_str(include_str!("../../../maps/vela_m1/placed.ron")).unwrap();
     let program = crate::definition(placed);
     let bp = mc_data::Blueprints::load(&root.join("data")).unwrap();

@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn a_skin_packs_each_slot_where_the_shader_reads_it() {
-        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+        let dir = Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data");
         let bps = Blueprints::load(&dir).unwrap();
         let arc = bps.skins.iter().find(|s| s.key == "arc").unwrap();
         let g = GpuSkin::of(arc);

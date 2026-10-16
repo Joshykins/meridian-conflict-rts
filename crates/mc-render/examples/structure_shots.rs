@@ -31,7 +31,7 @@ fn main() {
                 .map(|(a, b)| (a.parse().unwrap(), b.parse().unwrap()))
         })
         .unwrap_or((960u32, 640u32));
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let root = std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
     let map = Arc::new(MapFile::open(map_path).expect("map"));
     std::fs::create_dir_all(out).unwrap();
     let blueprints = Arc::new(Blueprints::load(&root.join("data")).expect("blueprints"));

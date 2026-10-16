@@ -20,7 +20,10 @@ const BASE: (i32, i32) = (14000, 8192);
 
 fn world(fog: bool) -> World {
     let blueprints = Arc::new(
-        Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
+        Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap(),
     );
     // 2048 cells of 8 m: 16 km a side.
     let terrain = Heightfield::flat(2048, 2048, Fx::from_int(20));

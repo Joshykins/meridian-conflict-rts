@@ -24,7 +24,10 @@ fn show(p: Vec3) -> String {
 
 #[test]
 fn the_unit_files_guns_are_the_models() {
-    let bp = Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+    let bp = Blueprints::load(
+        &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+    )
+    .unwrap();
     let unit = bp.unit(bp.id_of(KEY).unwrap());
     let model = build_model(&unit.visual.mesh).unwrap();
     // The lance is laid from the core's emitter lens at the ship's middle: no turret, nothing

@@ -14,7 +14,10 @@ const ELEVATOR: &str = "aster_t5_space_elevator";
 
 /// A flat 8 km map: an AI in slot 0 against an idle player.
 fn world() -> World {
-    let data = Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+    let data = Blueprints::load(
+        &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+    )
+    .unwrap();
     let config = MatchConfig {
         seed: 11,
         cheats: true,

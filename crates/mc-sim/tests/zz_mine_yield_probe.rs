@@ -16,7 +16,7 @@ use std::sync::Arc;
 #[test]
 #[ignore]
 fn probe() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let root = Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
     let bps = Arc::new(Blueprints::load(&root.join("data")).unwrap());
     let mine = bps.id_of("aster_core_mine").unwrap();
     let mut maps: Vec<_> = std::fs::read_dir(root.join("maps"))

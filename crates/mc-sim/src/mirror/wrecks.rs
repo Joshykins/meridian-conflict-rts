@@ -396,7 +396,8 @@ mod tests {
 
     fn blueprints() -> mc_data::Blueprints {
         mc_data::Blueprints::load(
-            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"),
+            &std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+                .join("../../data"),
         )
         .expect("blueprints")
     }

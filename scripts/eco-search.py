@@ -59,7 +59,9 @@ def run(plans, tag):
     """plans: {name: dials}. Returns {name: [minutes per game]} and raw lines."""
     f = os.path.join(SCR, f"plans_{tag}.txt")
     open(f, "w").write("\n".join(spec(n, d) for n, d in plans.items()))
-    env = dict(os.environ, ECO=MAPS, ECO_PLANS="@" + f, ECO_MIN=str(int(CAP)))
+    # The tests find data/ through CARGO_MANIFEST_DIR at run time, as cargo would set it.
+    env = dict(os.environ, ECO=MAPS, ECO_PLANS="@" + f, ECO_MIN=str(int(CAP)),
+               CARGO_MANIFEST_DIR=ROOT + "/crates/mc-sim")
     out = subprocess.run([BIN, "zz_eco_race_probe::", "--ignored", "--nocapture", "--test-threads=1"],
                          env=env, capture_output=True, text=True, cwd=ROOT + "/crates/mc-sim").stdout
     open(os.path.join(SCR, f"out_{tag}.txt"), "w").write(out)

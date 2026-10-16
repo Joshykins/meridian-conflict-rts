@@ -249,7 +249,8 @@ mod tests {
 
     #[test]
     fn the_unit_files_cradle_and_rails_are_the_models() {
-        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+        let dir = std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+            .join("../../data");
         let blueprints = mc_data::Blueprints::load(&dir).unwrap();
         for key in [
             "regency_t1_airbase",

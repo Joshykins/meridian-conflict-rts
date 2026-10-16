@@ -21,7 +21,8 @@ struct Data {
 }
 
 fn data() -> Data {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let dir =
+        std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data");
     let blueprints = mc_data::Blueprints::load(&dir).unwrap();
     let id = blueprints.id_of("regency_commander").unwrap();
     let bp = blueprints.unit(id);
@@ -232,7 +233,8 @@ fn fits_the_triangle_budgets() {
 
 /// The unit file's commander with `keys` fitted, one after another.
 fn loadout(keys: &[&str]) -> mc_data::UnitBlueprint {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let dir =
+        std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data");
     let blueprints = mc_data::Blueprints::load(&dir).unwrap();
     let mut at = blueprints.id_of("regency_commander").unwrap();
     for key in keys {

@@ -15,7 +15,10 @@ use std::sync::Arc;
 /// 256 cells of 8 m: dry ground (20 m) west of x = 1024 m, sea (-40 m) east of it.
 fn coast() -> World {
     let blueprints = Arc::new(
-        Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
+        Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap(),
     );
     let samples = (0..257 * 257)
         .map(|i| if i % 257 < 128 { 60 } else { 0 })

@@ -520,7 +520,8 @@ mod tests {
     #[test]
     fn search_intersects_role_category_and_tech() {
         let bp = mc_data::Blueprints::load(
-            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"),
+            &std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+                .join("../../data"),
         )
         .unwrap();
         let mut picker = Picker::new();
@@ -545,7 +546,8 @@ mod tests {
     #[test]
     fn faction_filter_keeps_only_its_own_units() {
         let bp = mc_data::Blueprints::load(
-            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"),
+            &std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+                .join("../../data"),
         )
         .unwrap();
         let mut picker = Picker::new();

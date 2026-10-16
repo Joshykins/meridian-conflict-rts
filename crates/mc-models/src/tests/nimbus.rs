@@ -23,7 +23,8 @@ fn v(x: f32, y: f32) -> Vec3 {
 /// barrel ends, and the missile-defence beams leave the laser heads.
 #[test]
 fn nimbus_unit_file_matches_the_model() {
-    let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let data =
+        std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data");
     let bps = mc_data::Blueprints::load(&data).unwrap();
     let bp = bps.unit(bps.id_of("aster_t4_storm_bomber").unwrap());
     assert_eq!(bp.visual.mesh, "storm_bomber");

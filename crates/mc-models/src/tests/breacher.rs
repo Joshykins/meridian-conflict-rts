@@ -10,7 +10,8 @@ use crate::aster::breacher::{muzzle, pods, GUN, PIVOT, POD};
 use crate::{build_model, part, rig, MeshVertex};
 
 fn blueprint() -> mc_data::UnitBlueprint {
-    let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let data =
+        std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data");
     let bps = mc_data::Blueprints::load(&data).unwrap();
     bps.unit(bps.id_of("aster_t4_breacher").unwrap()).clone()
 }

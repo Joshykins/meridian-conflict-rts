@@ -10,7 +10,7 @@ use super::FlakBurst;
 #[ignore = "requires Vulkan and maps/crosswater.mcmap"]
 fn flak_bursts_render() {
     use glam::Vec2;
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let root = std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
     let map = Arc::new(MapFile::open(root.join("maps/crosswater.mcmap")).unwrap());
     let blueprints = Arc::new(Blueprints::load(&root.join("data")).unwrap());
     let mut renderer = Renderer::new(

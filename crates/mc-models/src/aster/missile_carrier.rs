@@ -83,7 +83,8 @@ mod tests {
     /// The heads are the unit file's anti-missile mounts.
     #[test]
     fn the_unit_files_mounts_are_the_heads() {
-        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+        let dir = std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+            .join("../../data");
         let bps = mc_data::Blueprints::load(&dir).unwrap();
         let unit = bps.unit_by_key("aster_t2_mobile_missile_defense").unwrap();
         assert_eq!(unit.visual.mesh, "missile_carrier");

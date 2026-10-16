@@ -572,7 +572,8 @@ mod tests {
 
     #[test]
     fn the_beam_leaves_the_unit_files_emitter() {
-        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+        let dir = std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+            .join("../../data");
         let blueprints = mc_data::Blueprints::load(&dir).unwrap();
         for tech in 1..=3u8 {
             let bp = blueprints.unit(

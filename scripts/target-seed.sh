@@ -87,7 +87,7 @@ case "${1:-}" in
             copy "$seed/current/$p" "$dir"
             # Units built in the seed's own path rebuild here (see above).
             if [ -n "$from" ]; then
-                grep -laE "^# env-dep:(CARGO_MANIFEST_DIR|CARGO_TARGET_TMPDIR)=$from/" "$dir"/deps/*.d 2> /dev/null \
+                grep -laE "^# env-dep:(CARGO_MANIFEST_DIR|CARGO_TARGET_TMPDIR)=$from/" "$dir"/deps/*.d "$dir"/examples/*.d 2> /dev/null \
                     | while read -r d; do
                         hash=$(basename "$d" .d)
                         rm -rf "$dir"/.fingerprint/*-"${hash##*-}"

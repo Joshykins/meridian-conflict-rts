@@ -277,7 +277,8 @@ fn the_axis_holds_to_its_design() {
     let path = std::env::var("MC_CHECK_AXIS")
         .map(PathBuf::from)
         .unwrap_or_else(|_| {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../maps/the_axis.mcmap")
+            PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+                .join("../../maps/the_axis.mcmap")
         });
     if !path.exists() {
         eprintln!(

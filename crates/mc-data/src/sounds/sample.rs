@@ -154,7 +154,7 @@ mod tests {
         corrupt = F.to_vec();
         corrupt[22] = 3;
         assert!(decode(&corrupt).is_err());
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+        let root = Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data");
         for path in [
             "../Cargo.toml",
             "/etc/passwd",

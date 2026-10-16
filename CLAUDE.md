@@ -78,10 +78,15 @@ commit to them directly.
   In the shared tree it can fail because of another session's half-done work.
   That is not yours to fix: tell that session.
 - The tests build in the `gate` profile (optimised, incremental, no LTO), and a
-  new checkout's third-party crates come ready-built from
-  `scripts/target-seed.sh`, so a check after an edit takes under a minute. Run
+  new worktree starts from the latest checked build (`scripts/target-seed.sh`),
+  so a check after an edit takes under a minute. Run
   tests by hand the same way, `cargo test --profile gate -p <crate>`, not
   `--release`, which rebuilds everything a second time without incremental.
+- No crate compiles its checkout's path in **[gate]**: a test or example finds
+  its files with `std::env::var_os("CARGO_MANIFEST_DIR")` at run time, never
+  `env!("CARGO_MANIFEST_DIR")`, and a build script watches paths relative to
+  its crate. A baked path makes a unit differ in every worktree, so each new
+  worktree compiles it from nothing (`tests/no_baked_paths.rs`).
 - `scripts/check.sh --head` runs the same check on the last commit alone, in a
   worktree of its own (`../meridian-conflict-verify`). Run it after
   committing. If HEAD does not build because your commit needs a file another

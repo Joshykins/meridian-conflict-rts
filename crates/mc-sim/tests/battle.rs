@@ -14,7 +14,12 @@ use std::sync::Arc;
 const MAP_CELLS: u32 = 512; // 4 km
 
 fn blueprints() -> Arc<Blueprints> {
-    Arc::new(Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap())
+    Arc::new(
+        Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap(),
+    )
 }
 
 /// A square ore field `2 * half` metres across.

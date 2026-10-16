@@ -719,7 +719,8 @@ mod tests {
     /// gun reaches the muzzle at every level of detail.
     #[test]
     fn culverin_gun_ends_at_the_muzzle_and_pitches_about_the_trunnion() {
-        let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+        let data = std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+            .join("../../data");
         let blueprints = mc_data::Blueprints::load(&data).unwrap();
         let bp = blueprints.unit(blueprints.id_of("aster_t4_artillery").unwrap());
         let w = &bp.weapons[0];

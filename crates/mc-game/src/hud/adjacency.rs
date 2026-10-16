@@ -526,7 +526,10 @@ mod tests {
     use std::path::Path;
 
     fn blueprints() -> Blueprints {
-        Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap()
+        Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap()
     }
 
     fn unit(b: &Blueprints, key: &str, id: u32, x: f32, y: f32) -> UnitInstance {

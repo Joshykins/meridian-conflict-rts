@@ -14,8 +14,10 @@ pub(in crate::editor) fn fixture() -> (PathBuf, Document, mc_data::Blueprints) {
         &path,
     )
     .unwrap();
-    let bp = mc_data::Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"))
-        .unwrap();
+    let bp = mc_data::Blueprints::load(
+        &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+    )
+    .unwrap();
     let doc = Document::open(&path).unwrap();
     (folder, doc, bp)
 }

@@ -842,8 +842,11 @@ mod tests {
     use super::*;
 
     fn library() -> SoundLibrary {
-        SoundLibrary::load(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"))
-            .unwrap()
+        SoundLibrary::load(
+            &std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+                .join("../../data"),
+        )
+        .unwrap()
     }
 
     /// Two kilometres square: broadleaf forest to the west, open grass in the

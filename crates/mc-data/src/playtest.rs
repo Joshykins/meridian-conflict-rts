@@ -100,7 +100,7 @@ mod tests {
     use std::path::{Path, PathBuf};
 
     fn data_dir() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")
+        Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data")
     }
 
     /// The checked-in data, with `keys` marked playtest-only.

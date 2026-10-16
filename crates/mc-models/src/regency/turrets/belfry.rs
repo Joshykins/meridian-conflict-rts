@@ -284,7 +284,8 @@ mod tests {
     #[test]
     fn the_unit_files_muzzles_are_the_cells() {
         let bp = mc_data::Blueprints::load(
-            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"),
+            &std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+                .join("../../data"),
         )
         .unwrap();
         let unit = bp

@@ -682,7 +682,8 @@ mod tests {
     #[test]
     #[ignore]
     fn preview_dump() {
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let root =
+            std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
         let out = root.join("target/previews");
         std::fs::create_dir_all(&out).unwrap();
         let root = root.join("maps");

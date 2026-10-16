@@ -712,7 +712,8 @@ fn rimehold_matches_its_sidecar() {
     let path = std::env::var("MC_CHECK_RIMEHOLD")
         .map(PathBuf::from)
         .unwrap_or_else(|_| {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../maps/rimehold.mcmap")
+            PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+                .join("../../maps/rimehold.mcmap")
         });
     if !path.exists() {
         eprintln!(

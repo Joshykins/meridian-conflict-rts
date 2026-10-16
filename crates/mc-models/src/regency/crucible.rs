@@ -439,7 +439,8 @@ mod tests {
     /// its emitter, and the model has no house the blueprint lacks.
     #[test]
     fn the_unit_files_heads_are_the_models() {
-        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+        let dir = std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+            .join("../../data");
         let blueprints = mc_data::Blueprints::load(&dir).unwrap();
         let v = |p: mc_core::FxVec3| Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
         for tech in 1..=3u8 {

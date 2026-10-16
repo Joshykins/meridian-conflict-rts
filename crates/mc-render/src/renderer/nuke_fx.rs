@@ -1093,7 +1093,8 @@ mod shots {
     #[test]
     #[ignore = "requires Vulkan and maps/crosswater.mcmap"]
     fn nuke_shots() {
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let root =
+            std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
         let map = Arc::new(mc_map::MapFile::open(root.join("maps/crosswater.mcmap")).unwrap());
         let blueprints = Arc::new(mc_data::Blueprints::load(&root.join("data")).unwrap());
         let nums = |key: &str, def: &str| -> Vec<f32> {

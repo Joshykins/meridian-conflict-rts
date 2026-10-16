@@ -20,7 +20,10 @@ const HILL: (f64, f64) = (580.0, 512.0);
 /// Flat ground at 20 m with a 26 m hill on it, wide enough to drive over.
 fn world() -> World {
     let blueprints = Arc::new(
-        Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
+        Blueprints::load(
+            &Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data"),
+        )
+        .unwrap(),
     );
     let step = 1.0 / 64.0;
     let n = CELLS as usize + 1;

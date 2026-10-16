@@ -25,7 +25,7 @@ fn main() {
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(1000);
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let root = Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
     let blueprints = Arc::new(Blueprints::load(&root.join("data")).unwrap());
     let size = Vec2::from(map.info().size_metres().to_f32());
     let spot = Vec2::from(map.start_positions()[0].to_f32());

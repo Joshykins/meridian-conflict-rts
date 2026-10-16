@@ -520,7 +520,7 @@ mod tests {
     use super::*;
 
     fn data() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")
+        Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../../data")
     }
 
     #[test]

@@ -370,7 +370,8 @@ mod tests {
     /// star's scale, so the bang in the sound lands when the star goes.
     #[test]
     fn each_power_generator_sounds_at_its_stars_scale() {
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let root =
+            std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
         let blueprints = mc_data::Blueprints::load(&root.join("data")).unwrap();
         let sounds = mc_data::sounds::SoundLibrary::load(&root.join("data")).unwrap();
         let mut seen = 0;

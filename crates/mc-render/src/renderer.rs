@@ -5759,7 +5759,8 @@ mod environment_tests {
     #[test]
     #[ignore = "requires Vulkan and maps/crosswater.mcmap"]
     fn forest_fire_lifecycle_and_render() {
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let root =
+            std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
         let map = Arc::new(MapFile::open(root.join("maps/crosswater.mcmap")).unwrap());
         let blueprints = Arc::new(Blueprints::load(&root.join("data")).unwrap());
         let start = Vec2::from(map.start_positions()[0].to_f32());
@@ -5971,7 +5972,8 @@ mod shockwave_tests {
     fn shockwave_shield_color_render() {
         use super::*;
         use glam::Vec2;
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let root =
+            std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
         let map = Arc::new(MapFile::open(root.join("maps/crosswater.mcmap")).unwrap());
         let blueprints = Arc::new(Blueprints::load(&root.join("data")).unwrap());
         let mut renderer = Renderer::new(
@@ -6192,7 +6194,8 @@ mod glass_tests {
     fn glass_blurs_the_scene_behind_it() {
         use glam::Vec2;
         let (w, h) = (640u32, 360u32);
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let root =
+            std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
         let map = Arc::new(MapFile::open(root.join("maps/crosswater.mcmap")).unwrap());
         let blueprints = Arc::new(Blueprints::load(&root.join("data")).unwrap());
         let mut renderer = Renderer::new(
@@ -6452,7 +6455,8 @@ mod capital_cloud_tests {
     #[test]
     fn capital_hulls_never_clear_clouds_at_rest_or_underway() {
         let data = mc_data::Blueprints::load(
-            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"),
+            &std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+                .join("../../data"),
         )
         .unwrap();
         let bp = data.unit(data.id_of("aster_t3_lift_ship").unwrap());
