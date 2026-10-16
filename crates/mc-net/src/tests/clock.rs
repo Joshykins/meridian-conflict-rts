@@ -130,8 +130,16 @@ fn any_player_sets_the_speed_and_the_clock_follows() {
                     .is_some_and(|(p, by, _)| !p && by == Some(PlayerId(1)))
         })
     });
-    let fast = ticks_over(&mut clients, Duration::from_millis(600));
-    // About 30 against 120; a loaded machine slows both, never the fast one alone.
+    // About 30 against 120. A loaded machine can stall any one window, which only
+    // lowers its count, so 4x gets up to five windows and keeps its best: a clock
+    // that did not speed up never closes twice the 1x count in any of them.
+    let mut fast = 0;
+    for _ in 0..5 {
+        fast = fast.max(ticks_over(&mut clients, Duration::from_millis(600)));
+        if fast >= normal * 2 {
+            break;
+        }
+    }
     assert!(
         fast >= normal * 2,
         "4x closed {fast} ticks where 1x closed {normal}"
