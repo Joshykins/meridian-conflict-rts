@@ -104,16 +104,6 @@
  anti_missile_mounts: [(-2.53, 9.03, 3.77), (-2.53, -9.03, 3.77)],
 ),
 (
- key: "aster_reclaim_drone", name: "Salvage Drone", role: "Commander Reclaim Drone", tech: 1, categories: ["Air"],
- // Cheap: built on the commander's drone port pad under the side's materials
- // priority, like any other build.
- health: 150, cost: (materials: 3, energy: 30, time: 30),
- radius: 1.8, height: 1.2, scale: 1.6, vision: 360,
- motion: (layer: Air, size: 0, speed: 100, accel: 45, turn: 240, altitude: 22, hover: true),
- weapons: [], mesh: "reclaim_drone", icon: SalvageDrone,
- sounds: (death: "blast_small", moving: "aster_hover"), reclaimer: (power: 5, range: 35, heads: [(emitter: (1.15, 0, 0.35))]), wreck_fraction: 0,
-),
-(
  key: "aster_t2_gunship", name: "Kestrel", role: "Heavy Gunship", title: "Heavy Gunship", tech: 2, categories: ["Air"],
  health: 1300, cost: (materials: 220, energy: 7600, time: 1360),
  radius: 7.5, height: 3.5, scale: 1.4, vision: 560,

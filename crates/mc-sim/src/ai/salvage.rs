@@ -184,10 +184,7 @@ impl World {
         let wrecks = &self.state.wrecks;
         for &row in &census.salvagers_idle {
             let bp = self.bp(row);
-            let reach = bp
-                .reclaimer
-                .map_or(bp.drone_radius, |r| r.range)
-                .max(bp.drone_radius);
+            let reach = bp.reclaimer.map_or(Fx::ZERO, |r| r.range);
             let pos = self.state.units.pos[row];
             let busy = wrecks
                 .slots

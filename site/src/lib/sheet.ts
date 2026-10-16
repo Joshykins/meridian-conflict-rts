@@ -141,12 +141,7 @@ export function sheetOf(unit: Unit, makers: Maker[], droneName: (key: string) =>
       : []),
     ...(unit.drones
       ? [
-          row(
-            "Salvage drones",
-            `${unit.drones.count} × ${droneName(unit.drones.key)}`,
-            undefined,
-            `Range out to ${fmt(unit.drones.radius)} m`,
-          ),
+          row("Drones", `${unit.drones.count} × ${droneName(unit.drones.key)}`, undefined, "Launched as its weapon fires"),
         ]
       : []),
   ]);
@@ -332,7 +327,6 @@ export function moduleRows(m: RefitModule): Row[] {
     ...num("Build range", m.buildRange, "m").map((r) => ({ ...r, value: `+${r.value}` })),
     ...economyRows(m.economy),
     ...(m.shield ? shieldRows(m.shield) : []),
-    ...(m.drones ? [row("Salvage drones", String(m.drones.count), undefined, `Range out to ${fmt(m.drones.radius)} m`)] : []),
     ...num("Counts as tech", m.tech),
   ];
 }

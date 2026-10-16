@@ -1,6 +1,6 @@
-//! Carrier-owned salvage drones, paid production and incendiary damage.
+//! Carrier-owned drones, paid production and incendiary damage.
 use crate::spatial::kind;
-use crate::tables::{flag, OrderKind};
+use crate::tables::flag;
 use crate::{Handle, SimError, World};
 use mc_core::{Angle, Fx, FxVec2, FxVec3, TICKS_PER_SECOND};
 
@@ -69,124 +69,11 @@ impl World {
             self.state.units.flags[row] |= flag::RECLAIMED;
             self.state.units.health[row] = Fx::ZERO;
         }
-        let mut claimed = std::collections::BTreeSet::new();
+        // A carrier's drones are its shells (`strike_drones.rs`).
         for (parent, children) in self.drone_flocks() {
-            // A launcher's drones are its shells (`strike_drones.rs`).
-            if self.bp(parent).launches_drones() {
-                self.fly_strike_drones(parent, children)?;
-                continue;
-            }
-            // A port's drones salvage round it on their own; home when there is nothing.
-            let recalling = !self.port_has_work(parent);
-            let center = self.state.units.pos[parent];
-            let reach = self.bp(parent).drone_radius;
-            let owner = self.state.units.owner[parent];
-            let full = self.no_room_for_salvage(owner);
-            for row in children {
-                if !self.state.units.is_active(row) {
-                    // Still going up on its socket (`seat_drones` holds it there).
-                    continue;
-                }
-                let slot = self.state.units.drone_socket[row] as usize;
-                let dock = self.drone_socket(parent, slot);
-                let pos = self.state.units.pos[row];
-                let state = self.state.units.deploy[row];
-                // A drone left outside its port's reach (the commander walked on while it
-                // worked) is called home; back inside, it picks up work again.
-                let astray =
-                    state == dock::FLYING && pos.distance(center) > reach + self.work_range(row);
-                if recalling || astray {
-                    match state {
-                        dock::FLYING if pos.distance(dock.xy) <= DOCK_CAPTURE => {
-                            // Close enough to line up under (or over) its socket: the
-                            // glide in is flown after movement (`seat_drones`).
-                            self.clear_orders(row)?;
-                            self.state.units.deploy[row] = dock::DOCKING;
-                        }
-                        dock::FLYING => self.ensure_moving(row, dock.xy, dock.xy)?,
-                        dock::RELEASING => self.state.units.deploy[row] = dock::DOCKING,
-                        _ => {}
-                    }
-                    self.state.units.flags[row] &= !flag::AIR_RUN;
-                    continue;
-                }
-                if state != dock::FLYING {
-                    // Work to do: let go of the socket and drop clear before flying.
-                    self.state.units.deploy[row] = dock::RELEASING;
-                    continue;
-                }
-                let target = self
-                    .state
-                    .wrecks
-                    .slots
-                    .iter()
-                    .filter(|&w| !full && self.drones_may_take(parent, w))
-                    .min_by_key(|&w| {
-                        (
-                            claimed.contains(&w),
-                            self.state.wrecks.pos[w].distance_sq(pos),
-                        )
-                    });
-                if let Some(w) = target {
-                    claimed.insert(w);
-                    let wreck_at = self.state.wrecks.pos[w];
-                    let radial = pos - wreck_at;
-                    let radius = self.work_range(row) * Fx::ratio(3, 5);
-                    let bearing = if radial.length() > Fx::ONE {
-                        radial.angle()
-                    } else {
-                        self.state.units.heading[row]
-                    };
-                    let goal = self.clamp_to_map(
-                        wreck_at + FxVec2::from_angle(bearing + Angle::from_degrees(45)) * radius,
-                    );
-                    self.ensure_moving(row, goal, goal)?;
-                    self.state.units.air_aim[row] = wreck_at;
-                    self.state.units.flags[row] |= flag::AIR_RUN;
-                    if pos.distance(wreck_at) <= self.work_range(row) {
-                        let power = self.tool_power(row);
-                        self.drain_wreck(row, w, power, 0);
-                        self.state.units.flags[row] |= flag::RECLAIMING;
-                    }
-                } else {
-                    self.ensure_moving(row, dock.xy, dock.xy)?;
-                }
-            }
+            self.fly_strike_drones(parent, children)?;
         }
         Ok(())
-    }
-
-    fn port_has_work(&self, row: usize) -> bool {
-        !self.no_room_for_salvage(self.state.units.owner[row])
-            && self
-                .state
-                .wrecks
-                .slots
-                .iter()
-                .any(|w| self.drones_may_take(row, w))
-    }
-
-    /// Whether the drones of port `row` may go for wreck `w`: one it is
-    /// after (`port_wants`) within the drones' reach of the carrier.
-    fn drones_may_take(&self, row: usize, w: usize) -> bool {
-        self.state.wrecks.pos[w].distance(self.state.units.pos[row]) <= self.bp(row).drone_radius
-            && self.port_wants(row, w)
-    }
-
-    /// Whether port `row` is after wreck `w` at all: one with materials left that its side
-    /// knows of (`wreck_known`, as the player is shown it) and, while it is clearing a circle (`ReclaimArea`), inside that circle.
-    fn port_wants(&self, row: usize, w: usize) -> bool {
-        let units = &self.state.units;
-        let wrecks = &self.state.wrecks;
-        let at = wrecks.pos[w];
-        let circle = self
-            .state
-            .orders
-            .front(units, row)
-            .filter(|o| o.kind == OrderKind::ReclaimArea && o.radius > Fx::ZERO);
-        circle.is_none_or(|o| at.distance(o.pos) <= o.radius)
-            && wrecks.materials[w] > Fx::ZERO
-            && self.wreck_known(w, units.owner[row])
     }
 
     /// Where drone `slot` of `parent` sits when home (`drone_sockets`): on a pylon, a
@@ -233,9 +120,8 @@ impl World {
 
     /// Drones going up on their sockets, for the economy to pay for like any build:
     /// (carrier, drone, build-time units a tick at full speed, materials and energy that
-    /// asks for, the tier it is paid in). A drone makes materials, so the side's
-    /// materials priority (`Focus::mines`) says when it is paid in a stall, unless the
-    /// carrier has a priority of its own.
+    /// asks for, the tier it is paid in): with the rest, unless the carrier has a
+    /// priority of its own, as a launcher's round is.
     pub(crate) fn drone_jobs(&self) -> Vec<DroneJob> {
         let units = &self.state.units;
         units
@@ -252,16 +138,12 @@ impl World {
                     bp.cost_materials * rate / bp.build_time,
                     bp.cost_energy * rate / bp.build_time,
                 ];
-                let focus = self.state.players[units.owner[drone] as usize].focus;
                 Some(DroneJob {
                     carrier,
                     drone,
                     rate,
                     want,
-                    tier: match units.priority[carrier] {
-                        crate::focus::Priority::Even => focus.mines.tier(),
-                        own => own.tier(),
-                    },
+                    tier: units.priority[carrier].tier(),
                 })
             })
             .collect()
@@ -452,7 +334,6 @@ pub(crate) mod dock {
     pub(crate) const DOCK_CAPTURE: Fx = Fx::from_int(12);
 }
 
-use dock::DOCK_CAPTURE;
 /// How near under (or over) its socket a docking drone is before it rises onto it.
 const DOCK_ALIGNED: Fx = Fx::ratio(1, 5);
 /// The slowest a glide moves in a tick, so it never crawls to a stop short of the socket.

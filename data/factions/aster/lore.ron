@@ -197,9 +197,6 @@
     "aster_t3_support": (
         lore: "A radar, sonar and anti-missile airframe, built after the losses at Twin Shoals.",
     ),
-    "aster_reclaim_drone": (
-        lore: "A small, disposable reclaimer that rides the commander's drone port and works the wrecks round it.",
-    ),
     "aster_t2_gunship": (
         lore: "A vector-thrust gunship built to hover over a target and grind it down.",
         weapons: {

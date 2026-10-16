@@ -61,10 +61,8 @@ struct Plan {
     /// Builders reclaim only while the materials store is under this fraction full;
     /// over it they help spend it instead.
     reclaim_below: f32,
-    /// Commander refits: Material Formation Engine and Salvage Drone Port at this
-    /// income (negative: never).
+    /// Commander refit: the Material Formation Engine at this income (negative: never).
     mfe_at: f32,
-    drones_at: f32,
     /// Upgrade a mine besides the goal's when it pays back within this many seconds (0: never).
     horizon: f32,
     /// Such upgrades running at once.
@@ -106,7 +104,6 @@ impl Default for Plan {
             engineers_max: 8,
             reclaim_below: 0.5,
             mfe_at: 10.0,
-            drones_at: -1.0,
             horizon: 0.0,
             lanes: 1,
             build_dc: false,
@@ -148,7 +145,6 @@ impl Plan {
                 "engineers_max" => p.engineers_max = f as usize,
                 "reclaim_below" => p.reclaim_below = f,
                 "mfe_at" => p.mfe_at = f,
-                "drones_at" => p.drones_at = f,
                 "horizon" => p.horizon = f,
                 "lanes" => p.lanes = f as usize,
                 "build_dc" => p.build_dc = f != 0.0,
@@ -809,9 +805,6 @@ impl Bot {
             }
             if plan.mfe_at >= 0.0 && now.income >= plan.mfe_at {
                 kit = kit.or_else(|| refit_kit(w, row, "mfe"));
-            }
-            if plan.drones_at >= 0.0 && now.income >= plan.drones_at && !has_module(w, row, "mfe") {
-                kit = kit.or_else(|| refit_kit(w, row, "drone_port"));
             }
             if let Some(kit) = kit {
                 return Some(Some(Command::Refit {

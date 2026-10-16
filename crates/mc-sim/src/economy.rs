@@ -242,9 +242,8 @@ impl World {
             self.flows[row].wanted[0] += want[0];
             self.flows[row].wanted[1] += want[1];
         }
-        // Drones going up on their carriers (`air_support.rs`): paid in the tier the
-        // carrier's own priority or else the side's materials priority puts them in, and
-        // shown on the carrier.
+        // Drones going up on their carriers (`air_support.rs`): paid like a launcher's
+        // round, and shown on the carrier.
         let drones = self.drone_jobs();
         for job in &drones {
             let p = self.state.units.owner[job.drone] as usize;

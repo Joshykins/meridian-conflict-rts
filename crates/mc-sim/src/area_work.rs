@@ -145,7 +145,7 @@ impl World {
     }
 
     /// Whether `row` works its guard area as a salvager: it has a reclaimer that works on
-    /// the move (the Reclaimer, a salvage drone), not a builder's.
+    /// the move (the Reclaimer), not a builder's.
     fn salvages_on_guard(&self, row: usize) -> bool {
         self.bp(row).reclaimer.is_some_and(|r| r.mobile)
     }

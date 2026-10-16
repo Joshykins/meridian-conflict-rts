@@ -38,7 +38,6 @@ fn every_kind() -> Vec<IconKind> {
         Warship,
         Titan,
         Salvage,
-        SalvageCarrier,
         SalvageDrone,
         TorpedoBomber,
         SensorShip,
@@ -55,9 +54,8 @@ fn every_kind() -> Vec<IconKind> {
             Commander | Engineer | Bot | Tank | Artillery | AntiAir | Scout | Factory
             | Extractor | Power | Storage | Defense | Intel | Wall | Shield | Fighter | Bomber
             | Ship | Submarine | Gunship | Transport | Silo | AntiNuke | Warship | Titan
-            | Salvage | SalvageCarrier | SalvageDrone | TorpedoBomber | SensorShip | Damper
-            | Elevator | WingedTitan | SiegeWalker | AssaultWalker | GraviticEngine
-            | AirStaging => {}
+            | Salvage | SalvageDrone | TorpedoBomber | SensorShip | Damper | Elevator
+            | WingedTitan | SiegeWalker | AssaultWalker | GraviticEngine | AirStaging => {}
         }
     }
     all

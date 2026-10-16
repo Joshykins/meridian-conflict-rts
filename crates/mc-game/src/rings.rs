@@ -215,9 +215,7 @@ pub fn projections(bp: &UnitBlueprint) -> Vec<Projection> {
     ));
     all.push(Projection::round(
         Reach::Reclaim,
-        bp.reclaimer
-            .map_or(0.0, |r| r.range.to_f32())
-            .max(bp.drone_radius.to_f32()),
+        bp.reclaimer.map_or(0.0, |r| r.range.to_f32()),
         "Reclaim Reach",
     ));
     all.push(Projection::round(

@@ -1218,7 +1218,6 @@ pub fn aircraft_exhausts(mesh: &str) -> &'static [[f32; 3]] {
         "bomber" => &[[-3.0, -2.2, 1.0], [-3.0, 2.2, 1.0]],
         "air_scout" => &[[-2.97, 0.0, 0.65]],
         "support_air" => &aster::air::ARGUS_NOZZLES,
-        "reclaim_drone" => &aster::air::DRONE_NOZZLES,
         "fire_bomber" => &[
             [-4.17, -9.0, 1.6],
             [-4.17, -5.0, 1.6],

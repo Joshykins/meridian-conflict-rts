@@ -62,7 +62,6 @@
             Elevator: "select_elevator",
             // Salvage answers like the engineers it works beside.
             Salvage: "select_engineer",
-            SalvageCarrier: "select_engineer",
             SalvageDrone: "select_engineer",
         },
     ),

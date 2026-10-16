@@ -355,13 +355,7 @@ fn icon_shape(shape: u32, p: vec2<f32>) -> f32 {
         // Salvage: the Extractor's disc (salvage feeds materials as a mine does) with its
         // domain's mark (`hud/icons.rs` draws the same). A structure rings it with its reach.
         case 29u: { return min(sd_ore_disc(p, vec2<f32>(0.0), 0.5), abs(length(p) - 0.8) - 0.07); }
-        // Salvage carrier, from above: the disc with swept wings out of its sides and a tail.
-        case 32u: {
-            let wings = sd_segment(vec2<f32>(abs(p.x), p.y), vec2<f32>(0.45, -0.05), vec2<f32>(0.95, -0.3)) - 0.1;
-            let tail = sd_segment(p, vec2<f32>(0.0, -0.45), vec2<f32>(0.0, -0.8)) - 0.09;
-            return min(sd_ore_disc(p, vec2<f32>(0.0, 0.05), 0.52), min(wings, tail));
-        }
-        // Salvage drone: the disc alone, drawn small (`vs_icon`).
+        // A carrier's drone: the disc alone, drawn small (`vs_icon`).
         case 33u: { return sd_ore_disc(p, vec2<f32>(0.0), 0.6); }
         // Torpedo bomber: a gull-winged plane in the upper part, a finned torpedo under it
         // (`hud/icons.rs` draws the same).

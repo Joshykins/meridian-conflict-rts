@@ -69,7 +69,7 @@ impl Renderer {
                 continue;
             }
             let vtol = self.vtol.0.get(u.blueprint as usize).copied().flatten();
-            let fans = vtol.map_or(bp.visual.mesh == "reclaim_drone", |v| v.fans);
+            let fans = vtol.is_some_and(|v| v.fans);
             let hover_flight = bp.motion.is_some_and(|m| m.hover);
             let assault = bp.visual.mesh == "assault_air";
             // The ports are placed on the model as authored; a blueprint drawn bigger or

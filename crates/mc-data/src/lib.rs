@@ -492,7 +492,7 @@ pub struct BuildArm {
 pub const MAX_RECLAIM_HEADS: usize = 4;
 
 /// Takes things apart at a distance without being a builder: a reclaim tower, a salvage
-/// vehicle, boat or aircraft, a carrier's drone. Left alone it clears the wrecks within
+/// vehicle, boat or aircraft. Left alone it clears the wrecks within
 /// `range`; it takes orders for the rest.
 ///
 /// It works with one or more heads. Head `i` is posed as a gun in a house of its own
@@ -941,7 +941,6 @@ pub struct UnitBlueprint {
     /// Stands on the seabed under deep water (`RawUnit::seabed`).
     pub seabed: bool,
     pub drone: Option<BlueprintId>,
-    pub drone_radius: Fx,
     /// Where its drones sit when home, in the turret's frame: one drone for each.
     pub drone_sockets: Vec<FxVec3>,
     /// How far above (positive) or below (negative) its socket a drone lines up to
@@ -1029,7 +1028,7 @@ pub struct UnitBlueprint {
     pub scrap: bool,
     /// Authored scenario variant, excluded from ordinary production lists.
     pub mission_only: bool,
-    /// Some unit's salvage drone (`drone`): it flies for its carrier, is neither picked
+    /// Some unit's drone (`drone`): it flies for its carrier, is neither picked
     /// nor selected on its own, and is never ordered.
     pub carried_drone: bool,
 }
@@ -1161,19 +1160,13 @@ impl UnitBlueprint {
         }
     }
 
-    /// This unit reclaims (a commander's drone port works beside its own tools).
+    /// This unit reclaims.
     pub fn sends_reclaimers(&self) -> bool {
         self.reclaims().is_some()
     }
 
-    /// Its drones are its shells (`Weapon::launches`, the Quiver's Wicks): it fires them,
-    /// and they reclaim nothing.
-    pub fn launches_drones(&self) -> bool {
-        self.weapons.iter().any(|w| w.launches)
-    }
-
-    /// A salvage unit the factories make: mobile, unarmed, and it reclaims on its own
-    /// or with drones. Not an engineer (it builds nothing). The Argus (radar) has a job
+    /// A salvage unit the factories make: mobile, unarmed, and it reclaims on its own.
+    /// Not an engineer (it builds nothing). The Argus (radar) has a job
     /// of its own and is not one.
     pub fn is_salvager(&self) -> bool {
         self.is_mobile()
@@ -1705,7 +1698,6 @@ impl Blueprints {
             }
             h.write_u64(u.water_build as u64);
             h.write_u64(u.seabed as u64);
-            h.write_i64(u.drone_radius.0);
             h.write_u64(u.drone_sockets.len() as u64);
             for m in &u.drone_sockets {
                 h.write_i64(m.x.0);

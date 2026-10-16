@@ -39,7 +39,6 @@ pub(crate) use courier::{
     LAMPS as COURIER_LAMPS, LIFT_JETS as COURIER_LIFT_JETS, NOZZLES as COURIER_NOZZLES,
     RIG as COURIER_RIG,
 };
-mod drone;
 mod gannet;
 mod kestrel;
 pub(crate) mod nimbus;
@@ -53,7 +52,6 @@ pub(crate) use vigil::{
 };
 
 pub(crate) use argus::NOZZLES as ARGUS_NOZZLES;
-pub(crate) use drone::DRONE_NOZZLES;
 
 /// Loft rings for a hard-chined hull. Each station is x, then (half width, height)
 /// pairs from the keel up to the spine; `from..=to` picks the pairs, mirrored across
@@ -354,10 +352,6 @@ pub(crate) fn rotor_gunship(b: &mut MeshBuilder, _: u8) {
 /// under a rotodome ([`argus`]).
 pub(crate) fn support(b: &mut MeshBuilder, _: u8) {
     argus::build(b);
-}
-/// The Salvage Drone the commander's drone port fields ([`drone::build`]).
-pub(crate) fn drone(b: &mut MeshBuilder, _: u8) {
-    drone::build(b);
 }
 /// The Kestrel: the tech 2 vector-thrust heavy gunship ([`kestrel`]).
 pub(crate) fn gunship(b: &mut MeshBuilder, _: u8) {

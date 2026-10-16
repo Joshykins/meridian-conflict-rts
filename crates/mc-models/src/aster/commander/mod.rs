@@ -105,7 +105,6 @@ pub(super) fn commander(b: &mut MeshBuilder, _tech: u8) {
         arms::gun_arm(b, gun_y, ARM_Z);
         arms::tool_arm(b, tool_y, ARM_Z);
         refits::back(b);
-        super::drone_port::commander_drone_port(b);
         refits::shoulders(b);
     });
 }
@@ -230,5 +229,4 @@ fn coarse(b: &mut MeshBuilder) {
             b.beam(AUX_WRIST, AUX_EMITTER, v2(0.6, 0.6), v2(0.35, 0.35));
         });
     });
-    super::drone_port::commander_drone_port(b);
 }

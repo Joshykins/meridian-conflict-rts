@@ -360,7 +360,6 @@ function refitsOf(u, loreWeapons, factionKey) {
       builds: m.builds ?? [],
       economy: economyOf(m.economy),
       shield: shieldOf(m.shield),
-      drones: m.drone ? { key: m.drone, count: (m.drone_sockets ?? []).length, radius: m.drone_radius ?? 0 } : null,
       weapons: groupWeapons((m.weapons ?? []).map((w) => weaponOf(w, loreWeapons, factionKey))),
     })),
   }));
@@ -445,7 +444,7 @@ function unitOf(u, factionKey, lore) {
           heads: u.reclaimer.heads.length,
         }
       : null,
-    drones: u.drone ? { key: u.drone, count: (u.drone_sockets ?? []).length, radius: u.drone_radius ?? 0 } : null,
+    drones: u.drone ? { key: u.drone, count: (u.drone_sockets ?? []).length } : null,
     shield: shieldOf(u.shield),
     // `anti_missile` is the lasers' reach; they burn `anti_missile_lasers` missiles at once (at least one).
     antiMissile: u.anti_missile ? { range: u.anti_missile, lasers: Math.max(1, u.anti_missile_lasers ?? 1) } : null,
@@ -560,7 +559,7 @@ export function readUnits() {
     const lorePath = join(dir, "lore.ron");
     const lore = existsSync(lorePath) ? readRon(lorePath) : {};
     const all = [];
-    // Units no one builds or picks: a salvage drone flies for its carrier, never on its own.
+    // Units no one builds or picks: a drone flies for its carrier, never on its own.
     const carried = new Set();
     const raw = [];
     for (const f of readdirSync(join(dir, "units")).sort()) {
@@ -570,7 +569,6 @@ export function readUnits() {
         if (!u.key || !u.name || u.role === "Scrap") continue;
         raw.push(u);
         if (u.drone) carried.add(u.drone);
-        for (const slot of u.refits ?? []) for (const m of slot.modules) if (m.drone) carried.add(m.drone);
       }
     }
     for (const u of raw) all.push(unitOf(u, factionKey, lore));

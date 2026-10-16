@@ -1940,7 +1940,7 @@ shared! {
         pub const LEAN_CHARGE: f32 = 0.14;
     }
 
-    /// A salvage drone docked on an aircraft (`mc_sim::mirror::UNIT_RIDING`, a test holds
+    /// A drone docked on an aircraft (`mc_sim::mirror::UNIT_RIDING`, a test holds
     /// them equal): drawn in the frame its carrier is drawn in (entity.wgsl `riding_frame`).
     pub mod dock as "DOCK_" {
         /// `UnitInstance::status[0]`: riding; `status[2]` is one more than the carrier's

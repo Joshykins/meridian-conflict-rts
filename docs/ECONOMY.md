@@ -61,7 +61,7 @@ It has no enemy and no goal but finishing a Deep Core. Its choices are ~25 dials
 - how many mines, how far out, when to build the Forge and how many Masons
 - the energy margin, when to take each tech step
 - whether engineers or commander suites carry the tech
-- the MFE, drone port and Scavengers, reclaim
+- the MFE and Scavengers, reclaim
 - the focus switches, side upgrades
 - whether to climb one mine or build the Deep Core outright
 

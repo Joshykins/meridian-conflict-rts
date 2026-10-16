@@ -2242,7 +2242,6 @@ fn complete_air_roster_models_meet_lod_budgets() {
         "air_scout",
         "rotor_gunship",
         "support_air",
-        "reclaim_drone",
         "gunship",
         "fire_bomber",
         "torpedo_bomber",

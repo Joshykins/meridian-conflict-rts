@@ -105,7 +105,7 @@ export type Economy = {
 };
 
 export type Shield = { kind: "Dome" | "Hull"; radius: number | null; health: number; regen: number };
-export type Drones = { key: string; count: number; radius: number };
+export type Drones = { key: string; count: number };
 export type Cost = { materials: number; energy: number; time: number };
 
 /** A part fitted onto the unit where it stands, and what it adds. */
@@ -123,7 +123,6 @@ export type RefitModule = {
   builds: string[];
   economy: Economy;
   shield: Shield | null;
-  drones: Drones | null;
   weapons: Weapon[];
 };
 

@@ -58,7 +58,7 @@ impl Focus {
             self.mines
         } else if bp.categories & cat::POWER != 0 {
             self.power
-        } else if self.mines == Priority::First && reclaims(bp, blueprints) {
+        } else if self.mines == Priority::First && reclaims(bp) {
             Priority::First
         } else if let Some((set, slot, module)) = blueprints.kit(bp.id) {
             // A refit that makes materials or energy (the Material Formation Engine) goes
@@ -83,14 +83,10 @@ impl Focus {
     }
 }
 
-/// A unit whose work is reclaiming: a scavenger tower, a salvage unit, a salvage
-/// drone or the carrier of them. Builders reclaim too, but building is their work.
-fn reclaims(bp: &UnitBlueprint, blueprints: &Blueprints) -> bool {
-    bp.builder.is_none()
-        && (bp.reclaimer.is_some()
-            || bp
-                .drone
-                .is_some_and(|d| blueprints.unit(d).reclaimer.is_some()))
+/// A unit whose work is reclaiming: a scavenger tower or a salvage unit. Builders
+/// reclaim too, but building is their work.
+fn reclaims(bp: &UnitBlueprint) -> bool {
+    bp.builder.is_none() && bp.reclaimer.is_some()
 }
 
 /// Whether a unit of this kind has work a priority of its own can order: it builds

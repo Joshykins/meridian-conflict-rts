@@ -35,7 +35,6 @@ ALTS = {
     "engineers_max": [4, 8, 16],
     "reclaim_below": [0.2, 0.5, 0.9],
     "mfe_at": [-1, 10, 25],
-    "drones_at": [-1, 10],
     "horizon": [0, 200, 400, 800],
     "lanes": [1, 2, 4],
     "build_dc": [0, 1],
@@ -49,7 +48,7 @@ ALTS = {
 # The probe's Plan::default, which the search starts from.
 DEFAULT = {"mines": 6, "range": 4500, "eff": 0.7, "engineers": 8, "factory_after": 1, "ratio": 9,
     "reclaim": 4000, "towers": 2, "tech2_at": 20, "tech3_at": 25, "tech": 0, "eng_up": 1,
-    "engineers_max": 8, "reclaim_below": 0.5, "mfe_at": 10, "drones_at": -1, "horizon": 0,
+    "engineers_max": 8, "reclaim_below": 0.5, "mfe_at": 10, "horizon": 0,
     "lanes": 1, "build_dc": 0, "early_line": 1, "focus": 2, "assist": 1, "reclaim_first": 0,
     "t2_power_at": 3, "t3_power_at": 80}
 

@@ -97,65 +97,6 @@ fn gunships_orbit_and_keep_the_target_in_front() {
     }
 }
 #[test]
-fn port_drones_divide_and_orbit_wrecks_and_ignore_orders() {
-    let mut w = world();
-    let c = super::drone_port::ported_commander(&mut w, 900, 900);
-    w.state.players[0].materials = Fx::ZERO;
-    w.state.players[0].energy = Fx::ZERO;
-    w.state.players[0].materials_capacity = Fx::from_int(100000);
-    let parent = w.state.units.id(c);
-    let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
-    let mut drones = Vec::new();
-    let mut wrecks = Vec::new();
-    // One finished drone on each of the port's two pads.
-    for i in 0..2 {
-        let x = 810 + i * 180;
-        let d = add(&mut w, "aster_reclaim_drone", 0, x, 1030);
-        w.state.units.drone_parent[d] = parent;
-        w.state.units.drone_socket[d] = i as u8;
-        drones.push(d);
-        wrecks.push(
-            w.state
-                .wrecks
-                .spawn(
-                    tank,
-                    FxVec2::from_ints(x, 1030),
-                    Fx::from_int(20),
-                    Angle::ZERO,
-                    Fx::from_int(1000),
-                    0,
-                )
-                .unwrap(),
-        );
-    }
-    let ids = drones.iter().map(|&d| w.state.units.id(d)).collect();
-    w.tick(&[cmd(Command::Move {
-        units: ids,
-        target: FxVec2::from_ints(100, 100),
-        queue: false,
-    })])
-    .unwrap();
-    for &d in &drones {
-        assert_eq!(w.state.units.order_head[d], mc_sim::tables::NO_ORDER);
-    }
-    let mut distance = [Fx::ZERO; 2];
-    for _ in 0..500 {
-        w.tick(&[]).unwrap();
-        for (i, &d) in drones.iter().enumerate() {
-            distance[i] += w.state.units.pos[d].distance(w.state.units.prev_pos[d]);
-        }
-    }
-    for (i, &d) in drones.iter().enumerate() {
-        assert!(distance[i] > Fx::from_int(80), "drone stationary");
-        assert!(
-            w.state.wrecks.materials[wrecks[i]] < Fx::from_int(950),
-            "wreck {i} not reclaimed: {:?}, drone at {:?}",
-            w.state.wrecks.materials[wrecks[i]],
-            w.state.units.pos[d]
-        );
-    }
-}
-#[test]
 fn overlapping_aircraft_reserve_only_one_landing_site() {
     let mut w = world();
     let a = add(&mut w, "aster_t1_bomber", 0, 900, 900);

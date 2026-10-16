@@ -150,141 +150,11 @@ fn guard_circles_follows_a_friendly_and_stop_cancels() {
     assert!(w.state.orders.front(&w.state.units, scout).is_none());
 }
 #[test]
-fn port_builds_two_free_drones_and_reclaims_only_inside_radius() {
-    let mut w = world();
-    w.state.players[0].materials = Fx::from_int(100);
-    w.state.players[0].energy = Fx::from_int(100000);
-    w.state.players[0].materials_capacity = Fx::from_int(20000);
-    w.state.players[0].energy_capacity = Fx::from_int(200000);
-    let acu = super::drone_port::ported_commander(&mut w, 200, 900);
-    let reach = w.blueprints.unit(w.state.units.blueprint[acu]).drone_radius;
-    let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
-    let inside = w
-        .state
-        .wrecks
-        .spawn(
-            tank,
-            FxVec2::from_ints(500, 900),
-            Fx::from_int(20),
-            Angle::ZERO,
-            Fx::from_int(300),
-            0,
-        )
-        .unwrap();
-    // Past the drones' reach, by more than a drone's own beam.
-    let far = FxVec2::from_ints(1900, 900);
-    assert!(far.distance(w.state.units.pos[acu]) > reach + Fx::from_int(100));
-    let outside = w
-        .state
-        .wrecks
-        .spawn(
-            tank,
-            far,
-            Fx::from_int(20),
-            Angle::ZERO,
-            Fx::from_int(300),
-            0,
-        )
-        .unwrap();
-    for _ in 0..900 {
-        w.tick(&[]).unwrap();
-    }
-    let parent = w.state.units.id(acu);
-    let children: Vec<_> = w
-        .state
-        .units
-        .slots
-        .iter()
-        .filter(|&r| w.state.units.drone_parent[r] == parent)
-        .collect();
-    assert_eq!(children.len(), 2);
-    assert!(w.state.players[0].reclaimed_materials > Fx::from_int(100));
-    assert!(
-        !w.state.wrecks.slots.is_alive(inside)
-            || w.state.wrecks.materials[inside] < Fx::from_int(100)
-    );
-    assert_eq!(w.state.wrecks.materials[outside], Fx::from_int(300));
-    w.state.units.health[acu] = Fx::ZERO;
-    w.tick(&[]).unwrap();
-    assert!(children.iter().all(|&r| !w.state.units.slots.is_alive(r)));
-}
-/// A drone left behind outside its port's reach, the commander having walked on while
-/// it worked, is called home.
-#[test]
-fn port_calls_home_drones_left_behind() {
-    let mut w = world();
-    w.state.players[0].materials = Fx::from_int(100);
-    w.state.players[0].energy = Fx::from_int(100000);
-    w.state.players[0].materials_capacity = Fx::from_int(20000);
-    w.state.players[0].energy_capacity = Fx::from_int(200000);
-    let acu = super::drone_port::ported_commander(&mut w, 1000, 900);
-    for _ in 0..200 {
-        w.tick(&[]).unwrap();
-    }
-    let parent = w.state.units.id(acu);
-    let drones: Vec<_> = w
-        .state
-        .units
-        .slots
-        .iter()
-        .filter(|&r| w.state.units.drone_parent[r] == parent)
-        .collect();
-    assert_eq!(drones.len(), 2);
-    let reach = w.blueprints.unit(w.state.units.blueprint[acu]).drone_radius;
-    // Near the edge of its reach, with more in it than the drones take in the walk.
-    let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
-    let wreck = w
-        .state
-        .wrecks
-        .spawn(
-            tank,
-            FxVec2::from_ints(2000, 900),
-            Fx::from_int(20),
-            Angle::ZERO,
-            Fx::from_int(5000),
-            0,
-        )
-        .unwrap();
-    for _ in 0..250 {
-        w.tick(&[]).unwrap();
-    }
-    assert!(
-        w.state.wrecks.materials[wreck] < Fx::from_int(5000),
-        "the drones went to work on the far wreck"
-    );
-    // It walks away until the wreck lies well past its drones' reach.
-    let goal = FxVec2::from_ints(100, 900);
-    w.tick(&[cmd(Command::Move {
-        units: vec![parent],
-        target: goal,
-        queue: false,
-    })])
-    .unwrap();
-    for _ in 0..600 {
-        w.tick(&[]).unwrap();
-    }
-    assert!(
-        w.state.units.pos[acu].distance(goal) < Fx::from_int(30),
-        "the commander stopped for its drones: at {:?}",
-        w.state.units.pos[acu]
-    );
-    for _ in 0..300 {
-        w.tick(&[]).unwrap();
-    }
-    for &d in &drones {
-        assert!(
-            w.state.units.pos[d].distance(w.state.units.pos[acu]) <= reach,
-            "drone left outside the port's reach: {:?}",
-            w.state.units.pos[d]
-        );
-    }
-}
-#[test]
 fn an_empty_economy_still_starts_a_drone() {
     let mut w = world();
     w.state.players[0].materials = Fx::ZERO;
     w.state.players[0].energy = Fx::ZERO;
-    super::drone_port::ported_commander(&mut w, 900, 900);
+    add(&mut w, "regency_t2_drone_carrier", 0, 900, 900);
     for _ in 0..100 {
         w.tick(&[]).unwrap();
     }
@@ -528,12 +398,12 @@ fn overlapping_incendiaries_stack_and_the_patch_has_an_edge() {
     assert_eq!(w.state.units.health[far], far_before);
 }
 #[test]
-fn port_and_guard_snapshot_continue_deterministically() {
+fn carrier_and_guard_snapshot_continue_deterministically() {
     let mut a = world();
     let mut b = world();
     a.state.players[0].materials = Fx::from_int(10000);
     a.state.players[0].energy = Fx::from_int(100000);
-    let c = super::drone_port::ported_commander(&mut a, 900, 900);
+    let c = add(&mut a, "regency_t2_drone_carrier", 0, 900, 900);
     let id = a.state.units.id(c);
     a.tick(&[cmd(Command::Guard {
         units: vec![id],
@@ -694,9 +564,9 @@ fn lost_drone_is_replaced_and_projectile_guidance_survives_snapshot() {
     let mut a = world();
     let mut b = world();
     a.state.players[0].free_build = true;
-    let acu = super::drone_port::ported_commander(&mut a, 900, 900);
-    let parent = a.state.units.id(acu);
-    for _ in 0..230 {
+    let quiver = add(&mut a, "regency_t2_drone_carrier", 0, 900, 900);
+    let parent = a.state.units.id(quiver);
+    for _ in 0..300 {
         a.tick(&[]).unwrap();
     }
     let drone = a
@@ -719,7 +589,7 @@ fn lost_drone_is_replaced_and_projectile_guidance_survives_snapshot() {
             .iter()
             .filter(|&r| a.state.units.drone_parent[r] == parent)
             .count(),
-        2
+        6
     );
     let enemy = add(&mut a, "aster_t1_air_scout", 1, 1300, 900);
     let sam = a.blueprints.id_of("aster_t3_sam").unwrap();

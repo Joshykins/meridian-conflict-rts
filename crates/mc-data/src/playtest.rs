@@ -57,9 +57,6 @@ fn strip_unit(unit: &mut Unit, gone: &BTreeSet<String>) -> Result<(), DataError>
         for module in &mut slot.modules {
             let at = format!("{key}/{}", module.key);
             drop_from(&mut module.builds, gone, &at)?;
-            if let Some(drone) = &module.drone {
-                needed(gone, &at, drone)?;
-            }
             casings(&module.weapons, gone, &at)?;
         }
     }
@@ -181,12 +178,9 @@ mod tests {
 
     #[test]
     fn a_unit_that_needs_a_playtest_unit_is_refused() {
-        // The commander's drone port module makes this drone.
-        let err = strip(&mut marked(&["aster_reclaim_drone"])).unwrap_err();
-        assert!(
-            err.to_string().contains("needs aster_reclaim_drone"),
-            "{err}"
-        );
+        // The Quiver carries this drone.
+        let err = strip(&mut marked(&["regency_wick"])).unwrap_err();
+        assert!(err.to_string().contains("needs regency_wick"), "{err}");
     }
 
     #[test]

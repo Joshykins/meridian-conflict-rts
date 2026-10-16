@@ -61,15 +61,14 @@ thrust-vectoring engines. Wasp retains its tail, rotor and chin gun through its
 lower LODs and keeps full detail farther away. Hellkite gains nacelle armor,
 wing panels and a sensor spine.
 
-The commander's salvage drones cannot be selected or directly ordered, prefer
-separate wrecks, and keep circling while reclaiming. Each keeps its own socket on
-the drone port (`drone_sockets` in the commander's unit file, `drone_socket` in
-the unit table). Letting go, a drone drops 3 m clear (`drone_approach`) and flies;
-coming home it glides in over its pad, slowing all the way, and settles onto it
-from above (`air_support::seat_drones`). Docked drones are placed after movement,
-so they keep pace with the commander, and the shader draws them in the carrier's
-own drawn frame (`mirror::UNIT_RIDING`, `entity.wgsl` `riding_frame`), so they
-ride its heave, sway and lean.
+A carrier's drones (the Quiver's Wicks) cannot be selected or directly ordered.
+Each keeps its own socket on the carrier (`drone_sockets` in its unit file,
+`drone_socket` in the unit table). Letting go, a drone drops clear
+(`drone_approach`) and flies; coming home it glides in over its socket, slowing all
+the way, and settles onto it (`air_support::seat_drones`). Docked drones are placed
+after movement, so they keep pace with the carrier, and the shader draws them in the
+carrier's own drawn frame (`mirror::UNIT_RIDING`, `entity.wgsl` `riding_frame`), so
+they ride its heave, sway and lean.
 
 ## Kestrel
 
@@ -94,7 +93,7 @@ The Kestrel has a model file of its own (`models/aster/air/kestrel.rs`):
   (`lights` in `air.ron`). Hovering aircraft heave gently on their lift
   (`entity.wgsl`).
 - **Range**: `--scenario salvage` leaves six medium-tank wrecks 48 m east of the
-  pad for any reclaimer (builder, tower, Reclaimer or the commander's drones):
+  pad for any reclaimer (builder, tower or Reclaimer):
   `--range --unit aster_t2_mobile_reclaimer --scenario salvage --ticks
   140 --follow 12 --alpha 0.5 --camera 0,0,110,200`. Hover shots need `--follow`
   of ten or so ticks for the short-lived engine puffs to settle;
@@ -523,7 +522,7 @@ crackling under them. The Reaper is a jet (since 2026-10-09; it was a lift-bell 
   mark dies first takes the nearest enemy within 160 m or comes home unspent. The bays are
   the magazine: with none home the launcher waits, and the racked Wicks on the hull show
   it. Spent Wicks are built again in their bays, one at a time (2 materials, 20 energy, 1.5 s
-  each), as the commander's salvage drones are (`air_support.rs`). Wicks are aircraft: flak and
+  each, `air_support.rs`), paid like a launcher's round. Wicks are aircraft: flak and
   fighters shoot them down on the way in, and they die with their carrier.
 - **Reaper** (`regency_t3_assault_aircraft`, tech 3): a scythe-winged jet, an engine on
   each wing root, that strafes (since 2026-10-09; it used to hang over its mark on lift

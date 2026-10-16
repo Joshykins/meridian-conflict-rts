@@ -313,8 +313,7 @@ fn salvage_badges(ui: &mut Ui, s: &Scene, rise: f32) {
         let bp = s.bp(u);
         // The pixel size icons.wgsl `vs_icon` draws the kind at.
         let px = match bp.visual.icon {
-            IconKind::Salvage | IconKind::SalvageCarrier => 20.0,
-            IconKind::SalvageDrone => 14.0,
+            IconKind::Salvage => 20.0,
             _ => continue,
         };
         let xyz = Vec3::from(u.pos);
@@ -326,13 +325,8 @@ fn salvage_badges(ui: &mut Ui, s: &Scene, rise: f32) {
         }
         let owner = (u.owner_flags & 0xFF) as u8;
         let own = owner == s.view.local;
-        let reach = bp
-            .reclaimer
-            .as_ref()
-            .map(|r| r.range)
-            .or(bp.drone.map(|_| bp.drone_radius))
-            .map(|r| r.to_f32());
-        if let Some(reach) = reach.filter(|_| own && bp.visual.icon != IconKind::SalvageDrone) {
+        let reach = bp.reclaimer.as_ref().map(|r| r.range.to_f32());
+        if let Some(reach) = reach.filter(|_| own) {
             let centre = Vec2::new(u.pos[0], u.pos[1]);
             let ring: Vec<Vec2> = (0..REACH_SEGMENTS)
                 .filter_map(|i| {

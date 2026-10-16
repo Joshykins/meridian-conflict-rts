@@ -334,13 +334,9 @@ fn settled_wrecks(s: &Scene) -> Vec<(Vec2, f32)> {
         .collect()
 }
 
-/// Whether a wreck lies within a salvage unit's reach of `pos`: its reclaim range, or
-/// a carrier's drone radius.
+/// Whether a wreck lies within a salvage unit's reclaim range of `pos`.
 fn wreck_in_reach(bp: &UnitBlueprint, pos: [f32; 3], wrecks: &[(Vec2, f32)]) -> bool {
-    let reach = bp
-        .reclaims()
-        .map_or(bp.drone_radius, |(_, range)| range)
-        .to_f32();
+    let reach = bp.reclaims().map_or(0.0, |(_, range)| range.to_f32());
     let at = Vec2::new(pos[0], pos[1]);
     wrecks.iter().any(|&(w, r)| w.distance(at) <= reach + r)
 }

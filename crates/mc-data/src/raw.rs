@@ -115,10 +115,8 @@ pub enum IconKind {
     Salvage = 29,
     // retired: 30 (the salvage boat).
     // 31 is the shader's own unidentified radar contact (icons.wgsl), never a kind.
-    /// A salvage carrier (the commander's drone port) from above: the disc with swept
-    /// wings and a tail.
-    SalvageCarrier = 32,
-    /// A carrier's salvage drone: the disc alone, drawn small.
+    // retired: 32 (the commander's salvage drone port).
+    /// A carrier's drone: the disc alone, drawn small.
     SalvageDrone = 33,
     /// A torpedo bomber from above: a gull-winged plane with a finned torpedo under it.
     TorpedoBomber = 34,
@@ -408,12 +406,9 @@ pub(crate) struct Unit {
     /// model's spire runs up to the surface whatever the depth.
     #[serde(default)]
     pub seabed: bool,
-    /// A salvage drone it makes for itself and sends out to reclaim wrecks.
+    /// A drone it makes for itself on its sockets and launches (`RawWeapon::launches`).
     #[serde(default)]
     pub drone: Option<String>,
-    /// How far from it its drones go looking for wrecks.
-    #[serde(default)]
-    pub drone_radius: f64,
     /// Where its drones sit when home (x forward, y left, z up, metres, on the turret
     /// when it has one): one drone for each.
     #[serde(default)]
@@ -1757,9 +1752,10 @@ impl Unit {
                 "{key}: a unit with a drone has 1 to {MAX_DRONES} drone_sockets, and only it has any"
             )));
         }
-        if self.weapons.iter().filter(|w| w.launches).count() > 1 {
+        let launchers = self.weapons.iter().filter(|w| w.launches).count();
+        if launchers != usize::from(self.drone.is_some()) {
             return Err(DataError::Invalid(format!(
-                "{key}: one weapon at most launches the unit's drones"
+                "{key}: a unit with a drone has one weapon that launches it, and only it has one"
             )));
         }
         if !(1..=crate::MAX_TECH).contains(&self.tech) {
@@ -2465,7 +2461,6 @@ impl Unit {
                 }
                 None => None,
             },
-            drone_radius: fx(self.drone_radius),
             drone_sockets: self
                 .drone_sockets
                 .iter()
