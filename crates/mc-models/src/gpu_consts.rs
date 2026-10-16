@@ -1680,9 +1680,9 @@ shared! {
         pub const SHELL: u32 = 4;
         /// Records held at most (`RiftList` in bindings.wgsl): the engines' breaks, up to
         /// `TRAILS` lens trails and up to `SHELLS` shells' breaks.
-        pub const MAX: u32 = 68;
+        pub const MAX: u32 = 132;
         /// Lens trails held at most, of `MAX`: past it the oldest trail goes first.
-        pub const TRAILS: u32 = 32;
+        pub const TRAILS: u32 = 96;
         /// Shells' breaks held at most, of `MAX`: past it the oldest goes first.
         pub const SHELLS: u32 = 12;
     }
@@ -1773,8 +1773,9 @@ shared! {
     /// charge, the front it sends out, and the well that opens and collapses where it
     /// strikes.
     pub mod lens_fx as "LENS_FX_" {
-        /// Lenses drawn at once; past it the oldest goes first (`lens_fx`).
-        pub const MAX_LENSES: u32 = 32;
+        /// Lenses drawn at once, an army's volley and the prints of the last; past it the
+        /// least missed goes first (`lens_fx`).
+        pub const MAX_LENSES: u32 = 128;
         /// The well's ground disc: rings out from its middle and segments round it.
         pub const RINGS: u32 = 28;
         pub const SEGMENTS: u32 = 72;

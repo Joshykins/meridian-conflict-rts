@@ -144,6 +144,26 @@ impl Lens {
     }
 }
 
+/// Which of `lenses` is least missed: the print of the oldest strike, then the oldest
+/// lost from sight, then the oldest charge, and the oldest front in flight only when
+/// every lens is one (dropping fronts first left a crowd's shots vanishing mid-flight,
+/// striking nothing).
+fn least_missed(lenses: &[Lens]) -> usize {
+    let oldest = |key: fn(&Lens) -> Option<f32>| {
+        lenses
+            .iter()
+            .enumerate()
+            .filter_map(|(i, l)| key(l).map(|t| (i, t)))
+            .min_by(|a, b| a.1.total_cmp(&b.1))
+            .map(|(i, _)| i)
+    };
+    oldest(|l| l.strike)
+        .or_else(|| oldest(|l| l.lost))
+        .or_else(|| oldest(|l| l.launch.is_none().then(|| l.charge.map_or(0.0, |c| c.0))))
+        .or_else(|| oldest(|l| l.launch))
+        .unwrap_or(0)
+}
+
 /// The lenses at work and the pass that draws them.
 pub(super) struct LensFx {
     lenses: Vec<Lens>,
@@ -170,11 +190,11 @@ impl LensFx {
             .find(|l| l.unit == unit && l.weapon == weapon && l.live())
     }
 
-    /// A new lens, making room for it: a deliberate cosmetic cap, as many as are drawn;
-    /// the oldest goes first.
+    /// A new lens, making room for it: a deliberate cosmetic cap, as many as are drawn,
+    /// the least missed going first (`least_missed`).
     fn start(&mut self, lens: Lens) -> &mut Lens {
         if self.lenses.len() >= MAX_LENSES as usize {
-            self.lenses.remove(0);
+            self.lenses.remove(least_missed(&self.lenses));
         }
         self.lenses.push(lens);
         let last = self.lenses.len() - 1;
@@ -633,5 +653,29 @@ impl Renderer {
             let born = push + 0.05 * from;
             self.lens_dust(xy.extend(ground + 0.3), vel, born, 1.0, (size, size * 2.2));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A full list gives up a struck lens's print before a charge, and a charge before a
+    /// front in flight; fronts alone, the oldest.
+    #[test]
+    fn a_front_in_flight_goes_last() {
+        let at = Vec3::ZERO;
+        let mut front = Lens::new(1, 0, at, 0.0);
+        front.launch = Some(1.0);
+        let mut charge = Lens::new(2, 0, at, 0.0);
+        charge.charge = Some((3.0, 1.6));
+        let mut struck = Lens::new(3, 0, at, 0.0);
+        struck.launch = Some(0.5);
+        struck.strike = Some(2.0);
+        assert_eq!(least_missed(&[front, charge, struck]), 2);
+        assert_eq!(least_missed(&[front, charge]), 1);
+        let mut later = front;
+        later.launch = Some(4.0);
+        assert_eq!(least_missed(&[later, front]), 1);
     }
 }
