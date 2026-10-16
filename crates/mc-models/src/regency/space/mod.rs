@@ -22,7 +22,7 @@ pub(crate) const MODELS: &[ModelDef] = &[
     ModelDef::new("regency_space_cruiser", 96.0, 30.0, suzerain::build),
     ModelDef::new(
         "regency_space_destroyer",
-        320.0,
+        390.0,
         130.0,
         destroyer::destroyer,
     )

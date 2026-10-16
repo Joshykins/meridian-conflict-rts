@@ -135,7 +135,7 @@
         key: "regency_t4_space_destroyer", name: "Scourge", role: "Destroyer", title: "Destroyer",
         tech: 4, categories: ["Air", "Space", "Experimental"], health: 170000,
         cost: (materials: 48000, energy: 658000, time: 208000),
-        radius: 320, height: 130, footprint: (52, 20), hull: (330, 140), vision: 2400, radar: 3600,
+        radius: 390, height: 130, footprint: (52, 20), hull: (330, 140), vision: 2400, radar: 3600,
         // Shots meet the long hull along its length, not a disc of its radius.
         body: (fore: 320, aft: -320, beam: 110),
         motion: (layer: Air, size: 0, speed: 40, accel: 4, turn: 6, altitude: 700, hover: true, hangs: true),
