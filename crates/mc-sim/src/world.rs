@@ -1018,7 +1018,7 @@ impl World {
 
     pub(crate) fn rebuild_index(&mut self) {
         let s = &self.state;
-        self.index.clear();
+        self.index.clear_moving();
         for row in s.units.slots.iter() {
             if !s.units.has_flag(row, flag::IN_FACTORY) {
                 let bp = self.blueprints.unit(s.units.blueprint[row]);
@@ -1032,20 +1032,18 @@ impl World {
                     .insert(kinds, s.units.owner[row], row, s.units.pos[row], bp.radius);
             }
         }
-        for row in s.wrecks.slots.iter() {
-            let radius = self.blueprints.unit(s.wrecks.blueprint[row]).radius;
-            self.index
-                .insert(kind::WRECK, NO_OWNER, row, s.wrecks.pos[row], radius);
-        }
-        for row in 0..s.stains.len() {
-            self.index.insert(
-                kind::STAIN,
-                NO_OWNER,
-                row,
-                s.stains.pos[row],
-                s.stains.radius[row],
-            );
-        }
+        let blueprints = &self.blueprints;
+        self.index.restage(
+            kind::WRECK,
+            s.wrecks.slots.iter().map(|row| {
+                let radius = blueprints.unit(s.wrecks.blueprint[row]).radius;
+                (row, s.wrecks.pos[row], radius)
+            }),
+        );
+        self.index.restage(
+            kind::STAIN,
+            (0..s.stains.len()).map(|row| (row, s.stains.pos[row], s.stains.radius[row])),
+        );
         self.index.build_on(&self.pool);
         self.list_shielded();
     }

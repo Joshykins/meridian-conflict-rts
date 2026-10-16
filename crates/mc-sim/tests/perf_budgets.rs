@@ -378,6 +378,51 @@ fn eight_armies_clash() {
     );
 }
 
+/// A late match's ground: 6 000 wrecks and a full table of scorch marks round two
+/// armies of 400 fighting, as the user's survival marks of 2026-10-15 had it. The
+/// index keeps the wrecks' and marks' grids while they lie still
+/// (`SpatialIndex::restage`), and only units go in the big-entry grids: rebuilt every
+/// time and in every grid, they were 28% of that match's tick.
+#[test]
+fn a_late_battlefield() {
+    let mut w = world(2048);
+    let wrecks: Vec<mc_map::MapWreck> = (0..6000)
+        .map(|i| mc_map::MapWreck {
+            blueprint: [
+                "aster_t1_tank",
+                "aster_t2_point_defense",
+                "aster_t3_assault_bot",
+            ][i % 3]
+                .into(),
+            pos: FxVec2::from_ints(300 + (i % 80) as i32 * 90, 300 + (i / 80) as i32 * 90),
+            heading: Angle::ZERO,
+            bank: 0,
+            materials_milli: 1000,
+        })
+        .collect();
+    w.lay_map_wrecks(&wrecks).unwrap();
+    for i in 0..mc_sim::tables::MAX_STAINS as i32 {
+        let pos = FxVec2::from_ints(200 + (i % 181) * 41, 200 + (i / 181) * 41);
+        w.state
+            .stains
+            .push(pos, Fx::from_int(4 + i % 9), 120, i as u16);
+    }
+    let blue = block(&mut w, "aster_t1_tank", 0, 400, (3000, 3400), 10, 0);
+    let red = block(&mut w, "aster_t1_tank", 1, 400, (3700, 3400), 10, 180);
+    let report = w
+        .perf_ticks("a_late_battlefield", 200, |t, _| match t {
+            0 => vec![
+                attack_move(0, blue.clone(), (3800, 3500)),
+                attack_move(1, red.clone(), (2900, 3500)),
+            ],
+            _ => Vec::new(),
+        })
+        .unwrap();
+    mc_sim::perf::save(&report);
+    // About 2.3 ms; it was 7.7 when both rebuilds of a tick staged every wreck and mark.
+    mc_sim::perf::budget(&report, &[("fn.rebuild_index", 4.0), ("sim.tick", 60.0)]);
+}
+
 /// How the tick grows with unit and player count, for the 30 000 unit goal.
 /// Not a budget: it prints a table per case.
 ///

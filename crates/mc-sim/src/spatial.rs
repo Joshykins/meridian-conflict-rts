@@ -94,6 +94,8 @@ struct Layer {
     scratch: Vec<(u32, u32, Entry)>,
     counts: Vec<u32>,
     max_radius: Fx,
+    /// Cleared or staged since the last `build`; a layer left alone keeps what it holds.
+    dirty: bool,
 }
 
 impl Layer {
@@ -109,6 +111,7 @@ impl Layer {
             scratch: Vec::new(),
             counts: Vec::new(),
             max_radius: Fx::ZERO,
+            dirty: true,
         }
     }
 
@@ -123,11 +126,15 @@ impl Layer {
     fn clear(&mut self) {
         self.staged.clear();
         self.max_radius = Fx::ZERO;
+        self.dirty = true;
     }
 
     /// Two stable counting sorts, by column then by row: the result is in
     /// (row, column, insertion) order.
     fn build(&mut self) {
+        if !std::mem::replace(&mut self.dirty, false) {
+            return;
+        }
         let n = self.staged.len();
         if n == 0 {
             // Nothing to sort: `scan` reads an empty layer as nothing.
@@ -342,7 +349,13 @@ pub struct SpatialIndex {
     /// reads only the players it is after, never the shooter's own army
     /// round it. (Their big-entry grids stay empty.)
     by_owner: Vec<Vec<(u8, Grids)>>,
+    /// Per kind given to `restage`, in kind order, the entries its grids were last
+    /// built from: (row, centre, radius).
+    statics: Vec<(u8, Vec<StaticEntry>)>,
+    static_scratch: Vec<StaticEntry>,
 }
+
+type StaticEntry = (u32, FxVec2, Fx);
 
 impl SpatialIndex {
     pub fn new(map_size: FxVec2) -> SpatialIndex {
@@ -358,13 +371,23 @@ impl SpatialIndex {
             unit_radius: Fx::ZERO,
             kinds: Vec::new(),
             by_owner: Vec::new(),
+            statics: Vec::new(),
+            static_scratch: Vec::new(),
         }
     }
 
     pub fn clear(&mut self) {
+        self.statics.clear();
+        self.clear_moving();
+    }
+
+    /// Clears every kind but those `restage` keeps: they are cleared by it, when they change.
+    pub(crate) fn clear_moving(&mut self) {
+        let statics = &self.statics;
         for (_, grids) in self
             .kinds
             .iter_mut()
+            .filter(|(k, _)| statics.binary_search_by_key(k, |(s, _)| *s).is_err())
             .chain(self.by_owner.iter_mut().flatten())
         {
             for layer in grids.all_layers() {
@@ -373,6 +396,41 @@ impl SpatialIndex {
         }
         self.owners.fill(0);
         self.unit_radius = Fx::ZERO;
+    }
+
+    /// Stages every entry of `kind` (a kind with no owner: wrecks, scorch marks), as
+    /// (row, centre, radius), after `clear_moving`. When they are exactly the entries
+    /// its grids were last built from, the grids are kept as they are and `build`
+    /// passes them over: wrecks and scorch marks mostly lie still from one rebuild
+    /// to the next, and were most of a late battle's index. What a query finds, and
+    /// in what order, depends only on the entries, so keeping is the same as rebuilding.
+    pub(crate) fn restage(&mut self, kind: u8, entries: impl Iterator<Item = (usize, FxVec2, Fx)>) {
+        debug_assert!(kind & UNIT_KINDS == 0, "units have owners and move");
+        let mut now = std::mem::take(&mut self.static_scratch);
+        now.clear();
+        now.extend(entries.map(|(row, pos, radius)| (row as u32, pos, radius)));
+        let at = match self.statics.binary_search_by_key(&kind, |(k, _)| *k) {
+            Ok(i) => i,
+            Err(i) => {
+                // Not kept before: whatever its grids hold goes.
+                self.statics.insert(i, (kind, Vec::new()));
+                if let Ok(g) = self.kinds.binary_search_by_key(&kind, |(k, _)| *k) {
+                    self.kinds[g].1.all_layers().for_each(Layer::clear);
+                }
+                i
+            }
+        };
+        if self.statics[at].1 == now {
+            self.static_scratch = now;
+            return;
+        }
+        if let Ok(g) = self.kinds.binary_search_by_key(&kind, |(k, _)| *k) {
+            self.kinds[g].1.all_layers().for_each(Layer::clear);
+        }
+        for &(row, pos, radius) in &now {
+            self.insert(kind, NO_OWNER, row as usize, pos, radius);
+        }
+        self.static_scratch = std::mem::replace(&mut self.statics[at].1, now);
     }
 
     #[inline]
@@ -425,6 +483,7 @@ impl SpatialIndex {
             let (cx, cy) = layer.cell(pos);
             layer.max_radius = layer.max_radius.max(radius);
             layer.staged.push((cx, cy, entry));
+            layer.dirty = true;
         };
         let giant = at == GIANT;
         if kind & UNIT_KINDS != 0 && owner != NO_OWNER {
@@ -446,9 +505,11 @@ impl SpatialIndex {
             }
         }
         let grids = Self::grids_of(&mut self.kinds, kind, self.map_size);
+        // Only units are searched by size (`query_wider`): a battle's wrecks and scorch
+        // marks would fill the big-entry grids for nothing.
         let wider = BIG_FLOORS
             .iter()
-            .take_while(|&&floor| radius > Fx::from_int(floor))
+            .take_while(|&&floor| kind & UNIT_KINDS != 0 && radius > Fx::from_int(floor))
             .count();
         let (layers, wide, big) = (&mut grids.layers, &mut grids.wide, &mut grids.big);
         let bigs = big[..wider].iter_mut().map(|layers| &mut layers[at]);
@@ -605,7 +666,8 @@ impl SpatialIndex {
     }
 
     /// [`query`](Self::query) for the entries wider than `wider_than` alone,
-    /// visited in the order `query` visits them.
+    /// visited in the order `query` visits them. Units only: no other kind has
+    /// big-entry grids.
     pub fn query_wider(
         &self,
         center: FxVec2,
@@ -614,6 +676,7 @@ impl SpatialIndex {
         wider_than: Fx,
         mut visit: impl FnMut(&Entry) -> bool,
     ) {
+        debug_assert!(kinds & !UNIT_KINDS == 0, "only units have big-entry grids");
         let floor = BIG_FLOORS
             .iter()
             .rposition(|&floor| Fx::from_int(floor) <= wider_than);
@@ -897,6 +960,52 @@ mod tests {
                 .map(|(i, _)| i as u32)
                 .collect();
             assert_eq!(got, want, "query {q}");
+        }
+    }
+
+    #[test]
+    fn kept_static_kinds_answer_as_a_fresh_build() {
+        let size = FxVec2::from_ints(2048, 2048);
+        let mut rng = Rng::new(5);
+        let spot = |rng: &mut Rng| {
+            let pos = FxVec2::new(rng.range(Fx::ZERO, size.x), rng.range(Fx::ZERO, size.y));
+            (pos, rng.range(Fx::ONE, Fx::from_int(30)))
+        };
+        let mut wrecks: Vec<(FxVec2, Fx)> = (0..400).map(|_| spot(&mut rng)).collect();
+        let units: Vec<(FxVec2, Fx)> = (0..300).map(|_| spot(&mut rng)).collect();
+        let mut kept = SpatialIndex::new(size);
+        // Unchanged, unchanged, one moved, one gone, unchanged.
+        for step in 0..5 {
+            match step {
+                2 => wrecks[17].0 = FxVec2::from_ints(5, 5),
+                3 => {
+                    wrecks.pop();
+                }
+                _ => {}
+            }
+            let mut fresh = SpatialIndex::new(size);
+            fresh.clear();
+            kept.clear_moving();
+            for index in [&mut fresh, &mut kept] {
+                for (row, &(pos, radius)) in units.iter().enumerate() {
+                    index.insert(kind::UNIT, (row % 3) as u8, row, pos, radius);
+                }
+                let entries = wrecks.iter().enumerate().map(|(row, &(p, r))| (row, p, r));
+                index.restage(kind::WRECK, entries);
+                index.build();
+            }
+            for _ in 0..100 {
+                let (c, r) = spot(&mut rng);
+                let r = r * 8;
+                let mut got = [Vec::new(), Vec::new()];
+                for (i, index) in [&fresh, &kept].into_iter().enumerate() {
+                    index.query(c, r, kind::UNIT | kind::WRECK, |e| {
+                        got[i].push((e.kind, e.row));
+                        true
+                    });
+                }
+                assert_eq!(got[0], got[1], "step {step}");
+            }
         }
     }
 
