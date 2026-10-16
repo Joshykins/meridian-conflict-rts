@@ -380,8 +380,8 @@ fn rift_one(r: Rift, xy: vec2<f32>, px: f32, s_in: CraterShade) -> CraterShade {
         // A gravitic lens's trail: the Fallen's rift in small. A jagged crack splits the
         // ground under its front's path, the ground either side broken into plates tipped
         // toward it, and cracks branch off it at a slant, each its own length. Violet light
-        // burns down in the crack behind the head, cools to embers (pulsing toward the
-        // well while it holds) and goes out; the scar fades (`time.w`).
+        // burns down in the crack behind the head, cools to embers and goes out; the scar
+        // fades (`time.w`).
         let start = r.line.xy;
         let span = r.line.zw - start;
         let along = span / max(length(span), 1.0);
@@ -455,11 +455,10 @@ fn rift_one(r: Rift, xy: vec2<f32>, px: f32, s_in: CraterShade) -> CraterShade {
         branch *= scar;
         broken = max(max(band * 0.7, fissure), branch);
         // The light: hot behind the head, cooling as it falls behind (`RIFT_TRAIL_COOL`),
-        // embers fed while the lens holds, pulsing in toward the well.
+        // embers fed while the front runs.
         let passed = age - at / max(r.time.y, 1.0);
         let hot = select(0.0, exp(-passed / RIFT_TRAIL_COOL), passed >= 0.0) * r.glow.w;
-        let pulse = pow(0.5 + 0.5 * sin((at / 55.0 - now * 1.5) * 6.2831853), 4.0);
-        let ember = glow * (1.0 + r.glow.y * (1.8 * pulse - 0.45));
+        let ember = glow;
         // The embers glow in patches, crawling along it, never one ruled line.
         let seep = 0.1 + 0.9 * smoothstep(0.35, 0.75, grad_noise2(vec2<f32>(at - now * 6.0, 2.0) + o, 17.0));
         // Even burning hot the light comes and goes along it.

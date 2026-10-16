@@ -106,7 +106,7 @@ straight into a match instead.
                          its upkeep asks for) | elevator (a space elevator with tanks,
                          gunships and tech 4s queued for its first platform)
                          | dash (a pack of red tanks for a unit that dashes, the Seraph)
-                         | pack (a pack of red tanks for a gravitic lens to hold and crush)
+                         | pack (a pack of red tanks for a gravitic lens to crush)
                          | fracture (a gravitic engine turned at once on a red camp 2 km
                          down the range: tanks, power plants and gunships)
                          | fracture-release (the same, then the engine falters for 3 s

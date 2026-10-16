@@ -488,19 +488,14 @@ pub enum SimEvent {
         target: UnitId,
         from: FxVec3,
     },
-    /// Its front struck `target` at `pos`: the well opens `radius` round it.
+    /// Its front struck `target` at `pos`: a well opened `radius` round it and collapsed
+    /// at once, crushing all in it, and the front is gone.
     LensStruck {
         unit: UnitId,
         weapon: u8,
         target: UnitId,
         pos: FxVec3,
         radius: Fx,
-    },
-    /// The lens let go; its well collapses at `pos` (`None`: its target is gone).
-    LensReleased {
-        unit: UnitId,
-        weapon: u8,
-        pos: Option<FxVec3>,
     },
     /// A gravitic engine began gathering for a rift from `core` to `mark`, leaving in
     /// `ticks` (`gravitic.rs`); sent again when it is turned on a new point.
@@ -1727,7 +1722,7 @@ pub struct RenderFrame {
     pub warps: Vec<WarpView>,
     /// Dashes under way that the viewer may see (`crate::dash`, `mirror/dash.rs`).
     pub dashes: Vec<DashView>,
-    /// Gravitic lenses' fronts and wells that the viewer may see (`crate::lens`,
+    /// Gravitic lenses' fronts in flight that the viewer may see (`crate::lens`,
     /// `mirror/lens.rs`).
     pub lenses: Vec<LensView>,
     /// Gravitic engines' work that the viewer may see (`crate::gravitic`, `mirror/gravitic.rs`).

@@ -1,6 +1,7 @@
 //! The crush every gravity well deals, whoever holds it: the gravitic engine's
-//! (`gravitic.rs`, The Fallen) and a gravitic lens's (`lens.rs`); a surge shell's wake
-//! (`surge.rs`) burns the same way over the disc it has rolled over.
+//! (`gravitic.rs`, The Fallen) and a gravitic lens's (`lens.rs`, one tick's crush where its
+//! front strikes); a surge shell's wake (`surge.rs`) burns the same way over the disc it
+//! has rolled over.
 //!
 //! Each tick a well deals `WellArea::per_tick` the same anywhere in it:
 //! - **Shields first:** a live enemy dome reaching into the well takes it once, and what

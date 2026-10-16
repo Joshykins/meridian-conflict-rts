@@ -112,7 +112,7 @@ pub(crate) struct GraviticSounds {
     engines: HashMap<u32, (u32, u64)>,
     generation: Option<u32>,
     tick: u64,
-    /// Gravitic lenses' fronts, strikes and wells.
+    /// Gravitic lenses' fronts and strikes.
     lens: super::lens::LensSounds,
 }
 

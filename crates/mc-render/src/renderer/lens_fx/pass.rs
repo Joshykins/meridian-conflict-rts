@@ -1,5 +1,5 @@
 //! The gravitic lenses drawn (lens_fx.wgsl): the buffer of lenses at work, its descriptor
-//! set and the four pipelines that lay them over the scene after the water. Each reads
+//! set and the three pipelines that lay them over the scene after the water. Each reads
 //! the scene the water sees through (the copy taken before the water, `Renderer::refract`,
 //! scene set 2) to bend it: no light of its own beyond a faint rim. What each lens is,
 //! frame by frame, comes from `lens_fx`.
@@ -12,7 +12,7 @@ use bytemuck::{Pod, Zeroable};
 use crate::descriptors::SetPool;
 use crate::gpu::{Buffer, Gpu, GpuError};
 use crate::gpu_consts::lens_fx::{
-    BALLS, DOME_RINGS, MAX_LENSES, RIBBONS, RIBBON_QUADS, RINGS, SEGMENTS, SHARDS,
+    BALLS, DOME_RINGS, MAX_LENSES, RIBBONS, RIBBON_QUADS, RINGS, SEGMENTS,
 };
 use crate::pipelines::{self, Blend, Depth, Layouts, Passes, PipelineDesc, VertexKind, PASS_SET};
 use crate::shader_reload::spirv;
@@ -28,20 +28,20 @@ pub(crate) struct GpuLens {
     /// Where the front is (struck: the middle of the target), and when it was let go.
     pub(crate) front: [f32; 3],
     pub(crate) launch: f32,
-    /// The ground under the target, the well's foot, and when the front struck.
+    /// The ground under the target, the well's foot, and when the front struck (the well
+    /// collapses `IMPLODE + FLASH` after).
     pub(crate) ground: [f32; 3],
     pub(crate) strike: f32,
-    /// The well's radius, metres; seconds the charge takes; when the well let go.
+    /// The well's radius, metres; seconds the charge takes.
     pub(crate) radius: f32,
     pub(crate) charge_time: f32,
-    pub(crate) release: f32,
-    /// Sets each lens's noise and grit apart.
+    /// Sets each lens's noise apart.
     pub(crate) seed: f32,
     /// 0 gone, 1 full (one lost from sight fades out).
     pub(crate) fade: f32,
     /// Metres the front has run so far.
     pub(crate) run: f32,
-    pub(crate) _pad: [f32; 2],
+    pub(crate) _pad: [f32; 3],
 }
 
 pub(super) struct LensPass {
@@ -49,10 +49,9 @@ pub(super) struct LensPass {
     pool: vk::DescriptorPool,
     set: vk::DescriptorSet,
     module: vk::ShaderModule,
-    /// The well on the ground and its dome, the grit in it, the rippled air, and the
-    /// charge, front and strike, in the order drawn.
+    /// The well on the ground and its dome, the rippled air, and the charge, front and
+    /// strike, in the order drawn.
     well: vk::Pipeline,
-    shards: vk::Pipeline,
     ribbons: vk::Pipeline,
     balls: vk::Pipeline,
     /// Lenses written this frame.
@@ -105,7 +104,6 @@ impl LensPass {
         };
         Ok(Self {
             well: pipeline(c"vs_lens_well", c"fs_lens_well")?,
-            shards: pipeline(c"vs_lens_shard", c"fs_lens_shard")?,
             ribbons: pipeline(c"vs_lens_ribbon", c"fs_lens_ribbon")?,
             balls: pipeline(c"vs_lens_ball", c"fs_lens_ball")?,
             buffer,
@@ -152,7 +150,6 @@ impl LensPass {
             );
             for (pipeline, vertices) in [
                 (self.well, ground),
-                (self.shards, SHARDS * 24),
                 (self.ribbons, RIBBONS * RIBBON_QUADS * 6),
                 (self.balls, BALLS * 6),
             ] {
@@ -167,7 +164,7 @@ impl LensPass {
         // SAFETY: these were made by `new` on this device; this runs once, from the
         // renderer's `Drop` after the device has gone idle, the pipelines before their module.
         unsafe {
-            for p in [self.well, self.shards, self.ribbons, self.balls] {
+            for p in [self.well, self.ribbons, self.balls] {
                 gpu.device.destroy_pipeline(p, None);
             }
             gpu.device.destroy_shader_module(self.module, None);

@@ -256,7 +256,7 @@ impl World {
         // and a shot after sitting idle, start a real charge below once the tube is on.
         // Skip the tick that just began an idle charge (`!cooling` and cooldown
         // already set would be a second start, not this path).
-        // A lens with its front out or its well held is not charging (`lens.rs`).
+        // A lens with its front out is not charging (`lens.rs`).
         let lens_out = weapon.lens.is_some()
             && self
                 .state
@@ -834,8 +834,8 @@ impl World {
         let in_reach = gap
             <= self.reach_onto(row, weapon, t.z + t.height / 2, t.moved.xy().length())
             && gap >= weapon.range_min - t.radius * 2;
-        // A lens holding its link fires nothing more until it lets go (`lens.rs`).
-        if weapon.lens.is_some() && self.lens_holding(row, w) {
+        // A lens fires nothing more while its front is out (`lens.rs`).
+        if weapon.lens.is_some() && self.lens_out(row, w) {
             return Ok(());
         }
         let units = &mut self.state.units;

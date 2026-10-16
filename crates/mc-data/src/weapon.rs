@@ -253,7 +253,7 @@ pub struct Weapon {
     /// fan ahead of the gun at once (`combat::wake`), and nothing flies.
     pub cone: Option<Cone>,
     /// A gravitic lens (`RawWeapon::lens`): firing sends a front of gravity out to the
-    /// target that opens a well on it where it strikes (`lens.rs`); no round flies.
+    /// target that crushes all round it where it strikes (`lens.rs`); no round flies.
     pub lens: Option<Lens>,
     /// A surge shell (`RawWeapon::surge`): where it lands, a wake rolls out all round and
     /// burns lightly over a wide disc for a while (mc-sim `surge.rs`).

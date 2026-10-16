@@ -1,7 +1,7 @@
 //! Gravitic lenses (`Weapon::lens`, `lens.rs`): the Regency Lodestone plants, charges and
 //! sends a front of gravity out to its target; where it strikes, a well opens on the target
-//! that crushes and slows every enemy round it, never a friend, and lets go when the target
-//! leaves its reach.
+//! and collapses at once, one crush of the weapon's damage on every enemy round it, never a
+//! friend or an aircraft. Then the front is gone and the gun fires again after its reload.
 
 use mc_core::{Angle, Fx, FxVec2, TICKS_PER_SECOND};
 
@@ -9,7 +9,7 @@ const TPS: u32 = TICKS_PER_SECOND;
 use mc_data::Blueprints;
 use mc_jobs::Pool;
 use mc_map::Heightfield;
-use mc_sim::tables::{Controller, UnitId};
+use mc_sim::tables::{flag, Controller, UnitId};
 use mc_sim::world::MapData;
 use mc_sim::{Command, MatchConfig, PlayerCommand, PlayerSetup, SimEvent, World};
 use std::path::Path;
@@ -65,6 +65,14 @@ fn add(w: &mut World, key: &str, owner: u8, x: i32, y: i32) -> UnitId {
     w.state.units.id(row)
 }
 
+/// `add`, never picking a target or firing.
+fn passive(w: &mut World, key: &str, owner: u8, x: i32, y: i32) -> UnitId {
+    let id = add(w, key, owner, x, y);
+    let row = w.state.units.row(id).unwrap();
+    w.state.units.flags[row] |= flag::PASSIVE;
+    id
+}
+
 fn health(w: &World, id: UnitId) -> Fx {
     w.state
         .units
@@ -72,15 +80,33 @@ fn health(w: &World, id: UnitId) -> Fx {
         .map_or(Fx::ZERO, |r| w.state.units.health[r])
 }
 
-fn order(player: u8, command: Command) -> PlayerCommand {
-    PlayerCommand { player, command }
+fn attack(w: &mut World, lens: UnitId, target: UnitId) {
+    w.tick(&[PlayerCommand {
+        player: 0,
+        command: Command::Attack {
+            units: vec![lens],
+            target,
+            queue: false,
+        },
+    }])
+    .unwrap();
 }
 
-/// Ticks `w` until a lens's front has struck, at most `limit` ticks; the ticks from its
-/// launch to its strike, if it struck.
-fn until_struck(w: &mut World, limit: u32) -> Option<u32> {
+/// The lens's damage a strike and the reach of its crush round the target.
+fn lens_weapon(w: &World, lens: UnitId) -> (Fx, Fx) {
+    let row = w.state.units.row(lens).unwrap();
+    let weapon = &w.blueprints.unit(w.state.units.blueprint[row]).weapons[0];
+    (weapon.damage, weapon.lens.unwrap().radius)
+}
+
+/// Ticks `w` until a lens's front has struck, at most `limit` ticks, holding `pin` at its
+/// point (an idle gunship drifts off); the ticks from its launch to its strike, if it
+/// struck.
+fn until_struck(w: &mut World, limit: u32, (pin, at): (UnitId, FxVec2)) -> Option<u32> {
     let mut launched = None;
     for tick in 0..limit {
+        let row = w.state.units.row(pin).unwrap();
+        w.state.units.pos[row] = at;
         w.tick(&[]).unwrap();
         for e in &w.events {
             match e {
@@ -97,126 +123,115 @@ fn until_struck(w: &mut World, limit: u32) -> Option<u32> {
 }
 
 #[test]
-fn the_well_crushes_all_round_its_target_and_spares_friends() {
+fn one_strike_crushes_all_round_its_target_and_spares_friends_and_aircraft() {
     let mut w = world();
     let lens = add(&mut w, LENS, 0, 400, 1000);
-    let target = add(&mut w, "aster_t2_tank", 1, 1400, 1000);
-    let beside = add(&mut w, "aster_t1_tank", 1, 1400, 1020);
-    let outside = add(&mut w, "aster_t1_tank", 1, 1400, 1080);
-    let friend = add(&mut w, "regency_t1_tank", 0, 1380, 1000);
-    // Nobody but the lens fires: hold the rest.
-    for id in [target, beside, outside, friend] {
-        w.tick(&[order(
-            w.state.units.owner[w.state.units.row(id).unwrap()],
-            Command::Stop { units: vec![id] },
-        )])
-        .unwrap();
-    }
-    w.tick(&[order(
-        0,
-        Command::Attack {
-            units: vec![lens],
-            target,
-            queue: false,
-        },
-    )])
-    .unwrap();
-    // 1000 m at 400 m/s: the front runs two and a half seconds before it strikes.
-    let run = until_struck(&mut w, TPS * 20).expect("the front never struck");
+    // Walls, which stand where they are put (tanks this close push apart): the target, one
+    // whose side is 8 m from it, one 24 m off, a friend's 8 m off; and a gunship over it.
+    let all = [
+        ("aster_wall", 1, 1400, 1000),
+        ("aster_wall", 1, 1400, 1014),
+        ("aster_wall", 1, 1400, 1030),
+        ("regency_wall", 0, 1400, 986),
+        ("aster_t2_gunship", 1, 1404, 1000),
+    ]
+    .map(|(key, owner, x, y)| passive(&mut w, key, owner, x, y));
+    let (damage, radius) = lens_weapon(&w, lens);
+    assert_eq!(radius, Fx::from_int(10));
+    let before = all.map(|id| health(&w, id));
+    attack(&mut w, lens, all[0]);
+    // 1000 m at 700 m/s: the front runs a little under a second and a half.
+    let pin = (all[4], FxVec2::from_ints(1404, 1000));
+    let run = until_struck(&mut w, TPS * 20, pin).expect("the front never struck");
     assert!(
-        (TPS * 5 / 2 - 1..=TPS * 5 / 2 + 1).contains(&run),
+        (TPS * 10 / 7 - 1..=TPS * 10 / 7 + 2).contains(&run),
         "the front ran {run} ticks"
     );
-    assert_eq!(w.state.lenses.len(), 1);
-    assert_eq!(w.state.lenses[0].target, target);
+    // The well collapsed with the strike: nothing is left of the front.
+    assert!(w.state.lenses.is_empty(), "the front outlived its strike");
+    let after = all.map(|id| health(&w, id));
+    assert_eq!(before[0] - after[0], damage, "the target");
+    assert_eq!(before[1] - after[1], damage, "a hull beside the target");
+    assert_eq!(after[2], before[2], "a hull outside the well was struck");
+    assert_eq!(after[3], before[3], "a friend in the well was struck");
+    assert_eq!(after[4], before[4], "an aircraft over the well was struck");
 
-    let before = [target, beside, outside, friend].map(|id| health(&w, id));
-    for _ in 0..TPS {
+    // Nothing lingers: no more crush and no slow once it has struck.
+    for _ in 0..TPS * 2 {
         w.tick(&[]).unwrap();
     }
-    let after = [target, beside, outside, friend].map(|id| health(&w, id));
-    // Holding, it is not heard charging again.
-    for _ in 0..TPS * 3 {
+    let later = all.map(|id| health(&w, id));
+    assert_eq!(later, after, "the well kept crushing after its strike");
+}
+
+#[test]
+fn it_fires_again_once_its_reload_is_done() {
+    let mut w = world();
+    let lens = add(&mut w, LENS, 0, 400, 1000);
+    let target = passive(&mut w, "aster_t2_tank", 1, 1400, 1000);
+    // Struck and never harmed, so it stands to be shot again.
+    let row = w.state.units.row(target).unwrap();
+    w.state.units.flags[row] |= flag::INVULNERABLE;
+    attack(&mut w, lens, target);
+    let mut launches = Vec::new();
+    let mut strikes = 0;
+    for tick in 0..TPS * 30 {
+        w.tick(&[]).unwrap();
+        for e in &w.events {
+            match e {
+                SimEvent::LensLaunched { .. } => launches.push(tick),
+                SimEvent::LensStruck { .. } => strikes += 1,
+                _ => {}
+            }
+        }
+        assert!(w.state.lenses.len() <= 1, "a second front with one out");
+        if launches.len() == 3 {
+            break;
+        }
+    }
+    assert_eq!(launches.len(), 3, "it fired {launches:?}");
+    assert!(strikes >= 2, "{strikes} strikes");
+    // A shot every reload (6 s), the front's flight inside it.
+    for pair in launches.windows(2) {
+        let gap = pair[1] - pair[0];
+        assert!(
+            (TPS * 6..=TPS * 6 + 1).contains(&gap),
+            "{gap} ticks between shots"
+        );
+    }
+}
+
+#[test]
+fn a_front_whose_target_dies_on_the_way_strikes_nothing() {
+    let mut w = world();
+    let lens = add(&mut w, LENS, 0, 400, 1000);
+    let target = passive(&mut w, "aster_t2_tank", 1, 1400, 1000);
+    let beside = passive(&mut w, "aster_t2_tank", 1, 1400, 1014);
+    attack(&mut w, lens, target);
+    let mut out = false;
+    for _ in 0..TPS * 20 {
+        w.tick(&[]).unwrap();
+        if w.events
+            .iter()
+            .any(|e| matches!(e, SimEvent::LensLaunched { .. }))
+        {
+            out = true;
+            break;
+        }
+    }
+    assert!(out, "the lens never fired");
+    let full = health(&w, beside);
+    let row = w.state.units.row(target).unwrap();
+    w.state.units.health[row] = Fx::ZERO;
+    for _ in 0..TPS * 2 {
         w.tick(&[]).unwrap();
         assert!(
             !w.events
                 .iter()
-                .any(|e| matches!(e, SimEvent::WeaponCharging { .. })),
-            "the lens charged again while its well held"
+                .any(|e| matches!(e, SimEvent::LensStruck { .. })),
+            "a front struck with its target gone"
         );
     }
-    assert!(after[0] < before[0], "the target took nothing");
-    assert!(
-        after[1] < before[1],
-        "a hull beside the target took nothing"
-    );
-    assert_eq!(after[2], before[2], "a hull outside the well was struck");
-    assert_eq!(after[3], before[3], "a friend in the well was struck");
-}
-
-#[test]
-fn what_it_holds_keeps_a_fixed_share_of_its_speed_and_it_lets_go_out_of_reach() {
-    let mut w = world();
-    let lens = add(&mut w, LENS, 0, 400, 400);
-    let target = add(&mut w, "aster_t3_assault_bot", 1, 1300, 400);
-    w.tick(&[order(
-        0,
-        Command::Attack {
-            units: vec![lens],
-            target,
-            queue: false,
-        },
-    )])
-    .unwrap();
-    assert!(
-        until_struck(&mut w, TPS * 20).is_some(),
-        "the front never struck"
-    );
-    let row = w.state.units.row(target).unwrap();
-    let full = w
-        .blueprints
-        .unit(w.state.units.blueprint[row])
-        .motion
-        .unwrap()
-        .speed;
-
-    // It walks across the lens's front, staying in its reach.
-    w.tick(&[order(
-        1,
-        Command::Move {
-            units: vec![target],
-            target: FxVec2::from_ints(1300, 1300),
-            queue: false,
-        },
-    )])
-    .unwrap();
-    let mut seen = Vec::new();
-    for t in 0..(TPS * 8) {
-        w.tick(&[]).unwrap();
-        let r = w.state.units.row(target).unwrap();
-        if t % TPS == TPS - 1 {
-            seen.push(w.state.units.speed[r]);
-        }
-    }
-    // Up to its pace inside a couple of seconds, then held there: 40% of its full speed.
-    let cap = full * Fx::ratio(2, 5);
-    for &speed in &seen[2..] {
-        assert!(speed <= cap, "it makes {speed:?} in the well, over {cap:?}");
-        assert!(
-            speed >= cap * Fx::ratio(9, 10),
-            "it makes {speed:?}, short of {cap:?}"
-        );
-    }
-    let r = w.state.units.row(target).unwrap();
-
-    // Out of its reach, the link lets go.
-    w.state.units.pos[r] = FxVec2::from_ints(1900, 1900);
-    w.tick(&[]).unwrap();
-    assert!(
-        w.events
-            .iter()
-            .any(|e| matches!(e, SimEvent::LensReleased { .. })),
-        "the lens held a target out of its reach"
-    );
-    assert!(w.state.lenses.is_empty());
+    assert!(w.state.lenses.is_empty(), "the front was kept");
+    assert_eq!(health(&w, beside), full, "the hull beside it was struck");
 }

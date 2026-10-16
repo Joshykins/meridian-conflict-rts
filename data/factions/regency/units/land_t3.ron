@@ -138,21 +138,22 @@
     ),
     // Gravitic lens: a small cousin of The Fallen, the Regency's answer to the Arbalest. It
     // plants to fire (`deploy`), its crown opening round the emitter; told to move, it packs
-    // first. Planted, it charges, then sends a front of gravity rolling out to one target;
-    // where it strikes a gravity well opens, locked on the target until it dies, leaves the
-    // lens's reach, or the lens is told to let go (`lens`, mc-sim `lens.rs`): everything of
-    // the enemy's within 30 m of the target, aircraft aside, is crushed and slowed, the same
-    // anywhere in the well and however long it has been in it. It cannot defend itself up
-    // close.
+    // first. Planted, it charges, then sends one front of gravity rolling out to its target,
+    // following it wherever it goes; where it strikes a gravity well opens on the target and
+    // collapses at once (`lens`, mc-sim `lens.rs`): everything of the enemy's within 10 m of
+    // the target, aircraft aside, is crushed the same anywhere in it. Then it charges for
+    // the next. A front whose target dies before it arrives is spent on nothing. It cannot
+    // defend itself up close.
     //
-    // Balance: the Arbalest's class (560 materials, 4200 HP, 1250 every 6 s at 1400 m: 208 a
-    // second on one target). Bent the Regency way: a shorter reach (1200 m) and less on one
-    // target (160 a second), but on everything round it, and what it holds keeps only 40%
-    // of its speed. The front needs a line of fire to leave, none once out; it runs at
-    // 400 m/s, three seconds to its full reach. Four seconds to plant, four to pack.
+    // Balance: the Arbalest's class, and its numbers: 1250 every 6 s at 1400 m (208 a second
+    // on one target), 560 materials, 4200 HP. Bent the Regency way: the front takes time to
+    // get there (700 m/s, two seconds to its full reach) but cannot miss, and the crush
+    // takes everything within 10 m of the mark in full rather than a splash falling off.
+    // The front needs a line of fire to leave, none once out. Four seconds to plant, four
+    // to pack.
     //
     // Model: `regency_gravitic_lens` (`models::regency::gravitic_lens`), authored planted
-    // at this size; `pivot`/`muzzle` are the emitter the link leaves from.
+    // at this size; `pivot`/`muzzle` are the emitter the front leaves from.
     (
         key: "regency_t3_gravitic_lens",
         name: "Lodestone",
@@ -162,20 +163,18 @@
         health: 4200,
         cost: (materials: 560, energy: 5600, time: 3200),
         radius: 8.5, height: 7.5, scale: 1.3,
-        vision: 1250,
+        vision: 1420,
         motion: (layer: Land, size: 2, speed: 39, accel: 31, turn: 80, deploy: 4.0, deploy_idle: true),
         weapons: [(
             name: "Gravitic Well Projector",
-            // Damage a second while the well holds; `speed` is the front's; reload is the
-            // wait before it charges again once it lets go.
-            damage: 160, range: 1200, reload: 2.0, speed: 400, trajectory: Direct,
-            lens: (radius: 30, slow: 0.4), plasma_grade: Some(Gravitic),
+            // One crush where the front strikes; `speed` is the front's.
+            damage: 1250, range: 1400, reload: 6.0, speed: 700, trajectory: Direct,
+            lens: (radius: 10), plasma_grade: Some(Gravitic),
             turret_turn: 45, muzzle: (0, 0, 5.9), pivot: (0, 0, 5.9),
             targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
             flash: 0.6, impact: 0.0,
             sounds: (fire: "regency_lens_launch", charge: "regency_lens_charge", charge_time: 1.6,
-                flight: "regency_lens_front", impact: "regency_lens_strike",
-                hold: "regency_lens_hold", release: "regency_lens_release"),
+                flight: "regency_lens_front", impact: "regency_lens_strike"),
         )],
         mesh: "regency_gravitic_lens", icon: Artillery,
         sounds: (death: "blast_large", moving: "tracks_heavy"),

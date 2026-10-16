@@ -1,21 +1,18 @@
 //!use bindings
 // A gravitic lens at work, the Lodestone's (renderer/lens_fx.rs, lens_fx/pass.rs): one
-// record a lens, drawn by four meshes over the scene after the water. Each bends the scene
+// record a lens, drawn by three meshes over the scene after the water. Each bends the scene
 // behind it, read from the copy the water sees through (set 2), and darkens it; the light
 // is the Fallen's violet energy wound round that dark, at moderate gains. (Its trail in the
 // ground is the terrain's, scars.wgsl `RIFT_TRAIL`.)
 //
-// - **The well** (`vs_lens_well`): a disc laid over the ground round the target, carried
-//   with it, darkened, rippling in toward the middle with thin violet arms spiralling in,
-//   its edge a pressed ring with violet energy crawling along it; over it a low dome of
-//   bent air, seen at its edge and shimmering down over what stands in it. The strike's
-//   violet ring closes over the disc; the release's pulse runs out over it; the pressed
-//   ring is left fading.
-// - **The grit** (`vs_lens_shard`): chips of rock lifted off the ground in the well,
-//   circling slowly low down, dropping when it lets go.
+// - **The well** (`vs_lens_well`): where the front strikes, a disc laid over the ground
+//   round the target. The strike's violet ring closes over it; for a moment it is
+//   darkened, rippling in toward the middle with thin violet arms spiralling in, its edge a
+//   pressed ring with violet energy crawling along it, under a low dome of bent air; then
+//   it collapses (`collapse_at`), its pulse running out over the disc, and the pressed ring
+//   is left fading.
 // - **The air** (`vs_lens_ribbon`): a corridor of rippled air behind a running front with
-//   a frayed violet wake in it, and a thread of it from the lens to the well it holds,
-//   violet pulses running out along it.
+//   a frayed violet wake in it.
 // - **The charge, the front, the strike** (`vs_lens_ball`): turned to the eye, a black
 //   heart with the scene behind it bent round it as round a heavy mass, a thin rim where
 //   the light bends hardest, violet filaments swirling round it (`lens_energy`); drawn
@@ -35,16 +32,16 @@ struct LensWork {
     // The ground under the target, the well's foot, and when the front struck.
     ground: vec3<f32>,
     strike: f32,
-    // The well's radius, metres; seconds the charge takes; when the well let go.
+    // The well's radius, metres; seconds the charge takes.
     radius: f32,
     charge_time: f32,
-    release: f32,
     seed: f32,
     // 0 gone, 1 full; metres the front has run.
     fade: f32,
     run: f32,
     _pad0: f32,
     _pad1: f32,
+    _pad2: f32,
 }
 
 @group(1) @binding(0) var<storage, read> lenses: array<LensWork>;
@@ -60,8 +57,6 @@ const L_RIM: vec3<f32> = vec3<f32>(0.78, 0.11, 0.52);
 // The Fallen's energy round a dark heart: violet, and lilac where it runs hottest. Kept
 // to moderate gains: a bright violet line blooms to white.
 const L_LILAC: vec3<f32> = vec3<f32>(0.82, 0.6, 1.0);
-// The grit: dark rock.
-const L_ROCK: vec3<f32> = vec3<f32>(0.07, 0.063, 0.058);
 
 fn hidden_clip() -> vec4<f32> {
     return vec4<f32>(0.0, 0.0, 0.0, -1.0);
@@ -72,13 +67,16 @@ fn since(when: f32) -> f32 {
     return select(-1.0e6, globals.camera.w - when, when >= 0.0);
 }
 
-// How fully the well holds: 0 before it opens, up while the strike's ring closes, 1 while
-// it holds, back to 0 as it lets go.
-fn well_held(s: LensWork) -> f32 {
-    let a = since(s.strike);
-    let open = smoothstep(LENS_FX_IMPLODE * 0.6, LENS_FX_IMPLODE + 0.3, a);
-    let r = since(s.release);
-    let letting = select(1.0, 1.0 - smoothstep(0.0, LENS_FX_RELEASE * 0.6, r), s.release >= 0.0);
+// When the well collapses: at once after the strike's dark flash (below zero: no strike).
+fn collapse_at(s: LensWork) -> f32 {
+    return select(-1.0, s.strike + LENS_FX_IMPLODE + LENS_FX_FLASH, s.strike >= 0.0);
+}
+
+// How fully the well is open: 0 before the strike, up while its ring closes, back to 0 as
+// it collapses.
+fn well_open(s: LensWork) -> f32 {
+    let open = smoothstep(LENS_FX_IMPLODE * 0.6, LENS_FX_IMPLODE + 0.3, since(s.strike));
+    let letting = 1.0 - smoothstep(0.0, LENS_FX_COLLAPSE * 0.6, since(collapse_at(s)));
     return open * letting * s.fade;
 }
 
@@ -177,9 +175,8 @@ fn vs_lens_well(@builtin(vertex_index) v: u32, @builtin(instance_index) instance
     let s = lenses[instance];
     var out: WellOut;
     out.lens = instance;
-    let r = since(s.release);
-    let gone = select(false, r > LENS_FX_PRINT, s.release >= 0.0);
-    if s.strike < 0.0 || s.fade <= 0.0 || gone {
+    let r = since(collapse_at(s));
+    if s.strike < 0.0 || s.fade <= 0.0 || r > LENS_FX_PRINT {
         out.clip = hidden_clip();
         return out;
     }
@@ -204,8 +201,8 @@ fn vs_lens_well(@builtin(vertex_index) v: u32, @builtin(instance_index) instance
         out.clip = globals.view_proj * vec4<f32>(p, 1.0);
         return out;
     }
-    // The dome: only while it holds and as it lets go.
-    if select(false, r > LENS_FX_RELEASE, s.release >= 0.0) {
+    // The dome: only while it is open and as it collapses.
+    if r > LENS_FX_COLLAPSE {
         out.clip = hidden_clip();
         return out;
     }
@@ -213,7 +210,7 @@ fn vs_lens_well(@builtin(vertex_index) v: u32, @builtin(instance_index) instance
     let up = f32(g.x) / f32(LENS_FX_DOME_RINGS) * 0.5 * PI;
     let angle = f32(g.y) / f32(LENS_FX_SEGMENTS) * 2.0 * PI;
     let around = vec2<f32>(cos(angle), sin(angle));
-    let tall = LENS_FX_DOME_HEIGHT * radius * max(well_held(s), 0.05);
+    let tall = LENS_FX_DOME_HEIGHT * radius * max(well_open(s), 0.05);
     let xy = mid + around * cos(up) * radius;
     let foot = ground_or_sea(xy);
     let top = s.ground.z + tall;
@@ -249,9 +246,9 @@ fn well_ground(in: WellOut, s: LensWork) -> vec4<f32> {
     let px = max(fwidth(rr), 0.0005);
     let t = globals.camera.w;
     let a = since(s.strike);
-    let r = since(s.release);
-    let released = s.release >= 0.0;
-    let held = well_held(s);
+    let r = since(collapse_at(s));
+    let collapsed = r >= 0.0;
+    let open = well_open(s);
     let off = world.xy - s.ground.xy;
     let dir = off / max(length(off), 0.001);
     let metres = s.radius / 30.0;
@@ -260,9 +257,9 @@ fn well_ground(in: WellOut, s: LensWork) -> vec4<f32> {
     let body = smoothstep(0.05, 0.3, rr) * (1.0 - smoothstep(0.8, 1.0, rr));
     let churn = value_noise2(world.xy * 0.3 + vec2<f32>(s.seed, t * 0.4), 1.0) - 0.5;
     let wave = sin(phase * 2.0 * PI);
-    var bend = dir * (wave * 0.8 + churn * 0.5) * body * held;
+    var bend = dir * (wave * 0.8 + churn * 0.5) * body * open;
     // Each wave's trough a shade darker, so the waves read running in over even ground.
-    var dark = 0.07 * (0.5 - 0.5 * wave) * body * held;
+    var dark = 0.07 * (0.5 - 0.5 * wave) * body * open;
     var light = vec3<f32>(0.0);
     // The strike's ring closing in over the ground.
     if a >= 0.0 && a < LENS_FX_IMPLODE {
@@ -284,9 +281,9 @@ fn well_ground(in: WellOut, s: LensWork) -> vec4<f32> {
         bend += dir * 1.8 * metres * x * g;
         dark += 0.15 * g;
     }
-    // The release's soft pulse running out past the edge.
-    if released && r >= 0.0 && r < LENS_FX_RELEASE {
-        let f = r / LENS_FX_RELEASE;
+    // The collapse's soft pulse running out past the edge.
+    if collapsed && r < LENS_FX_COLLAPSE {
+        let f = r / LENS_FX_COLLAPSE;
         let ring = 1.0 + 0.45 * sqrt(f);
         let x = (rr - ring) / 0.08;
         let g = exp(-x * x) * (1.0 - f);
@@ -297,24 +294,24 @@ fn well_ground(in: WellOut, s: LensWork) -> vec4<f32> {
     let w = clamp(length(bend) / 0.06, 0.0, 1.0);
     // Darkened inside, a shallow trough pressed just inside the edge.
     let inside = 1.0 - smoothstep(1.0 - px * 1.5, 1.0 + px * 1.5, rr);
-    let print = select(held, (1.0 - smoothstep(LENS_FX_RELEASE, LENS_FX_PRINT, r)) * s.fade, released);
+    let print = select(open, (1.0 - smoothstep(LENS_FX_COLLAPSE, LENS_FX_PRINT, r)) * s.fade, collapsed);
     let trough = exp(-pow((rr - 0.955) / max(0.03, px * 2.0), 2.0));
     // The ground pushed up just outside the trough, catching a little more light.
     let lip = exp(-pow((rr - 1.025) / max(0.02, px * 2.0), 2.0));
     let pressed = smoothstep(LENS_FX_IMPLODE, LENS_FX_IMPLODE + 0.15, a);
-    let press = pressed * max(print, held);
-    dark += 0.14 * inside * held + 0.45 * trough * press;
+    let press = pressed * max(print, open);
+    dark += 0.14 * inside * open + 0.45 * trough * press;
     light += vec3<f32>(0.035, 0.03, 0.022) * lip * press;
     // The thin violet line at the edge, energy crawling along it.
     let edge_w = px * 1.6 + 0.006;
     let edge = 1.0 - smoothstep(0.0, edge_w, abs(rr - 1.0));
     let ang = atan2(off.y, off.x);
     let crawl = 0.45 + 0.55 * smoothstep(0.35, 0.8, value_noise2(vec2<f32>(ang * 5.0 + t * 1.7, t * 0.9) + s.seed, 1.0));
-    light += (L_RIM * 0.04 + L_VIOLET * 0.22 * crawl) * edge * held;
+    light += (L_RIM * 0.04 + L_VIOLET * 0.22 * crawl) * edge * open;
     // Violet energy spiralling in over the ground toward the middle, in thin arms.
     let arms = pow(0.5 + 0.5 * sin(ang * 3.0 + log(max(rr, 0.02)) * 4.0 + t * 2.4 + s.seed), 10.0);
     let thread = smoothstep(0.4, 0.75, value_noise2(world.xy * 0.18 + vec2<f32>(t * 0.6, s.seed), 1.0));
-    light += L_VIOLET * 0.09 * arms * (0.3 + 0.7 * thread) * body * held;
+    light += L_VIOLET * 0.09 * arms * (0.3 + 0.7 * thread) * body * open;
     return lay(seen, w, dark, light) * keep;
 }
 
@@ -323,7 +320,7 @@ fn well_dome(in: WellOut, s: LensWork, front: bool) -> vec4<f32> {
     if !front {
         return vec4<f32>(0.0);
     }
-    let held = well_held(s);
+    let open = well_open(s);
     let t = globals.camera.w;
     let n = normalize(in.normal);
     let view = normalize(globals.camera.xyz - in.world);
@@ -331,10 +328,10 @@ fn well_dome(in: WellOut, s: LensWork, front: bool) -> vec4<f32> {
     // Pulled toward the middle at its edge, and shimmering down over what stands in it.
     let shimmer = sin(in.world.z * 1.7 + t * 5.5 + in.world.x * 0.21 + in.world.y * 0.17);
     let bend = -n * pow(edge, 2.0) * 0.9 - vec3<f32>(0.0, 0.0, 0.18 * shimmer * (1.0 - in.at.x * 0.5));
-    let seen = bent_scene(in.world + bend * held, distance(globals.camera.xyz, in.world));
-    let w = clamp(length(bend * held) / 0.08, 0.0, 1.0) * (0.35 + 0.65 * edge);
-    let dark = 0.16 * pow(edge, 3.0) * held;
-    let light = L_RIM * 0.006 * pow(edge, 6.0) * held;
+    let seen = bent_scene(in.world + bend * open, distance(globals.camera.xyz, in.world));
+    let w = clamp(length(bend * open) / 0.08, 0.0, 1.0) * (0.35 + 0.65 * edge);
+    let dark = 0.16 * pow(edge, 3.0) * open;
+    let light = L_RIM * 0.006 * pow(edge, 6.0) * open;
     return lay(seen, w, dark, light);
 }
 
@@ -350,99 +347,6 @@ fn fs_lens_well(in: WellOut, @builtin(front_facing) front: bool) -> @location(0)
     return under_sea_seen(c, in.clip);
 }
 
-// ---------------------------------------------------------------- the grit
-
-struct ShardOut {
-    @builtin(position) clip: vec4<f32>,
-    @location(0) normal: vec3<f32>,
-    @location(1) @interpolate(flat) glow: f32,
-    @location(2) @interpolate(flat) fade: f32,
-}
-
-fn shard_hash(s: LensWork, i: u32, k: f32) -> f32 {
-    return hash11(s.seed * 13.17 + f32(i) * 7.31 + k * 3.97);
-}
-
-// How high shard `i` circles at renderer time `t`, lifted once the well opens.
-fn shard_height(s: LensWork, i: u32, t: f32) -> f32 {
-    let a = t - s.strike;
-    let late = 0.4 * shard_hash(s, i, 6.0);
-    let lift = smoothstep(LENS_FX_IMPLODE + 0.1 + late, LENS_FX_IMPLODE + 1.3 + late, a);
-    let high = 0.5 + 3.4 * pow(shard_hash(s, i, 4.0), 2.0);
-    let bob = 0.3 * sin(t * 1.1 + shard_hash(s, i, 2.0) * 6.28);
-    return (high + bob) * lift;
-}
-
-fn turn3(v: vec3<f32>, a: f32, b: f32) -> vec3<f32> {
-    let ca = cos(a);
-    let sa = sin(a);
-    let cb = cos(b);
-    let sb = sin(b);
-    let v1 = vec3<f32>(v.x * ca - v.y * sa, v.x * sa + v.y * ca, v.z);
-    return vec3<f32>(v1.x, v1.y * cb - v1.z * sb, v1.y * sb + v1.z * cb);
-}
-
-@vertex
-fn vs_lens_shard(@builtin(vertex_index) v: u32, @builtin(instance_index) instance: u32) -> ShardOut {
-    let s = lenses[instance];
-    var out: ShardOut;
-    let t = globals.camera.w;
-    let i = v / 24u;
-    let face = (v % 24u) / 3u;
-    let corner = v % 3u;
-    let r = since(s.release);
-    let released = s.release >= 0.0;
-    // Fallen and settled, it sinks out of sight.
-    let fall_from = shard_height(s, i, select(t, s.release, released));
-    let fall_time = sqrt(2.0 * fall_from / 14.0);
-    let after = select(-1.0, r - fall_time, released);
-    if s.strike < 0.0 || s.fade <= 0.0 || after > 0.6 || t - s.strike < LENS_FX_IMPLODE {
-        out.clip = hidden_clip();
-        return out;
-    }
-    var height = fall_from;
-    if released {
-        height = max(fall_from - 7.0 * r * r, 0.0);
-    }
-    let a = max(t - s.strike - LENS_FX_IMPLODE, 0.0);
-    let out_r = (0.18 + 0.74 * shard_hash(s, i, 1.0)) * s.radius;
-    let speed = (0.22 + 0.2 * shard_hash(s, i, 3.0)) / (0.45 + out_r / s.radius);
-    // Circling while it holds; let go, it keeps the way it was going a moment.
-    let spun = select(a, a - max(r, 0.0) * 0.5, released);
-    let angle = shard_hash(s, i, 2.0) * 6.28 + speed * spun;
-    let xy = s.ground.xy + vec2<f32>(cos(angle), sin(angle)) * out_r;
-    let size = (0.3 + 0.75 * pow(shard_hash(s, i, 5.0), 2.0)) * (1.0 - smoothstep(0.0, 0.6, after));
-    let shape = vec3<f32>(1.0, 0.6 + 0.5 * shard_hash(s, i, 7.0), 0.45 + 0.35 * shard_hash(s, i, 8.0));
-    let sx = select(1.0, -1.0, (face & 1u) != 0u);
-    let sy = select(1.0, -1.0, (face & 2u) != 0u);
-    let sz = select(1.0, -1.0, (face & 4u) != 0u);
-    var local = vec3<f32>(sx, 0.0, 0.0);
-    if corner == 1u {
-        local = vec3<f32>(0.0, sy, 0.0);
-    } else if corner == 2u {
-        local = vec3<f32>(0.0, 0.0, sz);
-    }
-    let tumble = select(1.0, 0.0, released && after > 0.0);
-    let ta = (t * (0.6 + shard_hash(s, i, 9.0)) + shard_hash(s, i, 10.0) * 6.28) * tumble;
-    let tb = (t * (0.4 + shard_hash(s, i, 11.0)) + shard_hash(s, i, 12.0) * 6.28) * tumble;
-    let p = vec3<f32>(xy, ground_or_sea(xy) + height + size * 0.5)
-        + turn3(local * shape * size, ta, tb);
-    out.normal = turn3(normalize(vec3<f32>(sx, sy, sz) / shape), ta, tb);
-    out.glow = well_held(s);
-    out.fade = s.fade;
-    out.clip = globals.view_proj * vec4<f32>(p, 1.0);
-    return out;
-}
-
-@fragment
-fn fs_lens_shard(in: ShardOut) -> @location(0) vec4<f32> {
-    let n = normalize(in.normal);
-    let sun = max(dot(n, globals.sun.xyz), 0.0);
-    // Dark rock in the sun, a trace of the well's red under it.
-    let rock = L_ROCK * (0.3 + 1.6 * sun) + L_RIM * 0.004 * max(-n.z, 0.0) * in.glow;
-    return under_sea_seen(vec4<f32>(rock, 1.0) * in.fade, in.clip);
-}
-
 // ---------------------------------------------------------------- the air
 
 struct RibbonOut {
@@ -453,7 +357,6 @@ struct RibbonOut {
     @location(2) @interpolate(flat) axis: vec3<f32>,
     @location(3) @interpolate(flat) side: vec3<f32>,
     @location(4) @interpolate(flat) lens: u32,
-    @location(5) @interpolate(flat) kind: u32,
 }
 
 @vertex
@@ -461,39 +364,23 @@ fn vs_lens_ribbon(@builtin(vertex_index) v: u32, @builtin(instance_index) instan
     let s = lenses[instance];
     var out: RibbonOut;
     out.lens = instance;
-    let per = LENS_FX_RIBBON_QUADS * 6u;
-    let kind = v / per;
-    out.kind = kind;
-    let g = lens_grid((v % per) / 6u, v % 6u, 1u);
+    let g = lens_grid(v / 6u, v % 6u, 1u);
     let u = f32(g.x) / f32(LENS_FX_RIBBON_QUADS);
     let across = f32(g.y) * 2.0 - 1.0;
     let to_front = s.front - s.emitter;
     let span = length(to_front);
-    let ahead = to_front / max(span, 0.001);
-    var head = s.front;
-    var length_m = 0.0;
-    var half = 0.0;
-    var strength = 0.0;
-    if kind == 0u {
-        // Behind a running front, drawn in after it strikes.
-        let a = since(s.strike);
-        let gone = select(0.0, smoothstep(0.0, 0.3, a), s.strike >= 0.0);
-        length_m = min(s.run, LENS_FX_CORRIDOR) * (1.0 - gone);
-        half = mix(2.8, 1.0, u);
-        strength = (1.0 - gone) * s.fade * select(0.0, 1.0, s.launch >= 0.0);
-    } else {
-        // The thread back to the lens while the well holds, from the emitter.
-        head = s.emitter;
-        length_m = span;
-        half = 0.9;
-        strength = well_held(s) * smoothstep(LENS_FX_IMPLODE, LENS_FX_IMPLODE + LENS_FX_FLASH, since(s.strike));
-    }
+    // Behind a running front, drawn in after it strikes.
+    let a = since(s.strike);
+    let gone = select(0.0, smoothstep(0.0, 0.3, a), s.strike >= 0.0);
+    let length_m = min(s.run, LENS_FX_CORRIDOR) * (1.0 - gone);
+    let half = mix(2.8, 1.0, u);
+    let strength = (1.0 - gone) * s.fade * select(0.0, 1.0, s.launch >= 0.0);
     if strength <= 0.0 || length_m < 1.0 || span < 1.0 {
         out.clip = hidden_clip();
         return out;
     }
-    let dir = select(-ahead, ahead, kind == 1u);
-    let p0 = head + dir * (u * length_m);
+    let dir = -to_front / span;
+    let p0 = s.front + dir * (u * length_m);
     let side = normalize(cross(dir, globals.camera.xyz - p0) + vec3<f32>(0.0, 0.0, 1e-5));
     let p = p0 + side * across * half;
     out.world = p;
@@ -513,31 +400,20 @@ fn fs_lens_ribbon(in: RibbonOut) -> @location(0) vec4<f32> {
     let m = in.at.z;
     let strength = in.at.w;
     let soft = 1.0 - across * across;
-    var bend = vec3<f32>(0.0);
-    var dark = 0.0;
-    var light = vec3<f32>(0.0);
-    if in.kind == 0u {
-        // Rippled air: bands across the corridor, settling behind the head.
-        let n1 = value_noise2(vec2<f32>(m * 0.45 - t * 2.0, across * 1.3) + s.seed, 1.0) - 0.5;
-        let n2 = value_noise2(vec2<f32>(m * 0.3 + 11.0, across * 1.7 - t * 1.5) + s.seed, 1.0) - 0.5;
-        let bands = sin(m * 1.1 - t * 25.0);
-        let amp = 1.1 * pow(1.0 - u, 1.4) * soft * strength;
-        bend = (in.axis * (n1 + 0.35 * bands) + in.side * n2) * amp;
-        // A violet wake streaming off the front's energy, frayed, gone a few tens of metres
-        // back.
-        let fray = smoothstep(0.35, 0.75, value_noise2(vec2<f32>(m * 0.25 - t * 6.0, across * 2.0) + s.seed, 1.0));
-        let lead = smoothstep(0.0, 0.12, u);
-        light = L_VIOLET * 0.2 * lead * pow(1.0 - u, 3.0) * pow(soft, 3.0) * (0.25 + 0.75 * fray) * strength;
-    } else {
-        // A faint thread: pulses running out to the well.
-        let pulse = pow(0.5 + 0.5 * sin(m * 0.08 - t * 7.0), 6.0);
-        let n = value_noise2(vec2<f32>(m * 0.5 - t * 3.0, across) + s.seed, 1.0) - 0.5;
-        bend = in.side * n * (0.25 + 0.35 * pulse) * soft * strength;
-        light = (L_RIM * 0.008 + L_VIOLET * 0.07) * pulse * pow(soft, 6.0) * strength;
-    }
+    // Rippled air: bands across the corridor, settling behind the head.
+    let n1 = value_noise2(vec2<f32>(m * 0.45 - t * 2.0, across * 1.3) + s.seed, 1.0) - 0.5;
+    let n2 = value_noise2(vec2<f32>(m * 0.3 + 11.0, across * 1.7 - t * 1.5) + s.seed, 1.0) - 0.5;
+    let bands = sin(m * 1.1 - t * 25.0);
+    let amp = 1.1 * pow(1.0 - u, 1.4) * soft * strength;
+    let bend = (in.axis * (n1 + 0.35 * bands) + in.side * n2) * amp;
+    // A violet wake streaming off the front's energy, frayed, gone a few tens of metres
+    // back.
+    let fray = smoothstep(0.35, 0.75, value_noise2(vec2<f32>(m * 0.25 - t * 6.0, across * 2.0) + s.seed, 1.0));
+    let lead = smoothstep(0.0, 0.12, u);
+    let light = L_VIOLET * 0.2 * lead * pow(1.0 - u, 3.0) * pow(soft, 3.0) * (0.25 + 0.75 * fray) * strength;
     let seen = bent_scene(in.world + bend, distance(globals.camera.xyz, in.world));
     let w = clamp(length(bend) / 0.06, 0.0, 1.0);
-    return under_sea_seen(lay(seen, w, dark, light), in.clip);
+    return under_sea_seen(lay(seen, w, 0.0, light), in.clip);
 }
 
 // ---------------------------------------------------------------- the charge, the front, the strike
@@ -638,7 +514,7 @@ fn vs_lens_ball(@builtin(vertex_index) v: u32, @builtin(instance_index) instance
             show = true;
         }
     } else if ball == 2u {
-        // The snap as it lets go: a ring of bent air thrown out from the emitter.
+        // The snap as the front leaves: a ring of bent air thrown out from the emitter.
         let a = since(s.launch);
         if s.launch >= 0.0 && a >= 0.0 && a < 0.3 {
             let f = a / 0.3;

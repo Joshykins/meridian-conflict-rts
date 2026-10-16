@@ -264,12 +264,10 @@ pub struct Cone {
     pub stun_ticks: u16,
 }
 
-/// A gravitic lens's well (`RawLens`): `radius` round its target; what is in it keeps
-/// `slow` of its speed.
+/// A gravitic lens's well (`RawLens`): the crush reaches `radius` round its target.
 #[derive(Clone, Copy, Debug)]
 pub struct Lens {
     pub radius: Fx,
-    pub slow: Fx,
 }
 
 /// A strafing beam's stroke (`RawStrafe`): it lands `ahead` of the hull along the nose,
@@ -1920,7 +1918,6 @@ impl Blueprints {
                 }
                 if let Some(l) = w.lens {
                     h.write_i64(l.radius.0);
-                    h.write_i64(l.slow.0);
                 }
                 if let Some(s) = w.surge {
                     for v in [s.radius, s.speed, s.damage] {

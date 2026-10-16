@@ -102,7 +102,7 @@ pub struct State {
     /// Cone weapons' wakes rolling out over the ground (`wake.rs`).
     #[serde(default)]
     pub wakes: Vec<crate::wake::Wake>,
-    /// Gravitic lenses' links and the wells they hold on their targets (`lens.rs`).
+    /// Gravitic lenses' fronts on their way to their targets (`lens.rs`).
     #[serde(default)]
     pub lenses: Vec<crate::lens::Tether>,
     /// Surge shells' wakes rolling out from where they landed (`surge.rs`).

@@ -1767,7 +1767,8 @@ shared! {
     }
 
     /// A gravitic lens at work, the Lodestone's (renderer/lens_fx.rs, lens_fx.wgsl): its
-    /// charge, the front it sends out, and the well it holds on its target.
+    /// charge, the front it sends out, and the well that opens and collapses where it
+    /// strikes.
     pub mod lens_fx as "LENS_FX_" {
         /// Lenses drawn at once; past it the oldest goes first (`lens_fx`).
         pub const MAX_LENSES: u32 = 32;
@@ -1778,22 +1779,21 @@ shared! {
         pub const DOME_RINGS: u32 = 12;
         /// The dome stands this share of the well's radius high at its crown.
         pub const DOME_HEIGHT: f32 = 0.3;
-        /// The ground disc reaches this many well radii, room for the release pulse.
+        /// The ground disc reaches this many well radii, room for the collapse's pulse.
         pub const DISC_REACH: f32 = 1.5;
-        /// Ribbons a lens draws (the rippled air behind its front, the thread to its
-        /// well) and the quads along each.
-        pub const RIBBONS: u32 = 2;
+        /// Ribbons a lens draws (the rippled air behind its front) and the quads along
+        /// each.
+        pub const RIBBONS: u32 = 1;
         pub const RIBBON_QUADS: u32 = 24;
         /// Billboards a lens draws (its charge or its front, the strike's core, and the
         /// snap of bent air as it lets go).
         pub const BALLS: u32 = 3;
-        /// Grit circling low in a held well, each an eight-faced chip.
-        pub const SHARDS: u32 = 22;
-        /// Seconds: the strike's ring closing in, the dark flash after it, the well
-        /// letting go, and its pressed ring left fading on the ground.
+        /// Seconds: the strike's ring closing in, the dark flash after it (the well
+        /// collapses as it ends), the collapse's pulse running out, and its pressed ring
+        /// left fading on the ground.
         pub const IMPLODE: f32 = 0.22;
         pub const FLASH: f32 = 0.35;
-        pub const RELEASE: f32 = 0.8;
+        pub const COLLAPSE: f32 = 0.8;
         pub const PRINT: f32 = 8.0;
         /// Metres of rippled air left behind a running front at most.
         pub const CORRIDOR: f32 = 70.0;

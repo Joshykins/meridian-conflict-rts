@@ -268,7 +268,7 @@ impl RiftGround {
 
     /// This tick of a lens's trail: the way it runs (toward `to`, where the target is
     /// now), how far its front may have got (`run`, metres), and its light fed as for
-    /// `feed`: embers, pulses toward the well, unused, the head, the scar.
+    /// `feed`: embers, unused, unused, the head, the scar.
     pub(crate) fn trail_run(&mut self, lens: u32, to: Vec2, run: f32, fed: [f32; 5]) {
         if let Some(r) = self.live(lens, rift::TRAIL) {
             r.gpu.line[2] = to.x;
@@ -283,7 +283,8 @@ impl RiftGround {
         self.has_live(lens, rift::TRAIL)
     }
 
-    /// The lens let go (or lost from sight): its trail's light dies and its scar fades.
+    /// The lens's front struck (or was lost from sight): its trail's light dies and its
+    /// scar fades.
     pub(crate) fn release_trail(&mut self, lens: u32, time: f32) {
         self.release_kind(lens, rift::TRAIL, time);
     }

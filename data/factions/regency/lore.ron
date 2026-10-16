@@ -58,9 +58,9 @@
         },
     ),
     "regency_t3_gravitic_lens": (
-        lore: "A walking shard of the great gravitic engines: it plants, opens its crown, and lays a well of gravity over one target that follows it wherever it runs, crushing everything near it and dragging it to a crawl.",
+        lore: "A walking shard of the great gravitic engines: it plants, opens its crown, and sends a front of gravity after one target that follows it wherever it runs, crushing it and everything beside it.",
         weapons: {
-            "Gravitic Well Projector": "A link of held gravity thrown onto one target; where it lands a small well opens and stays on the target until it dies, crushing what stands round it and slowing it more the longer it is held.",
+            "Gravitic Well Projector": "A front of gravity thrown after one target, slower than a shell but never missing; where it lands a small well opens and collapses at once, crushing the target and what stands round it.",
         },
     ),
     "regency_t3_field_mender": (

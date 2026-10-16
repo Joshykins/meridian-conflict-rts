@@ -128,8 +128,8 @@ pub enum Scenario {
     /// A unit that dashes (`UnitBlueprint::dash`): a pack of red tanks two thirds of its
     /// reach down the range, and it comes down in the middle of them.
     Dash,
-    /// A gun that holds a well on what it strikes (`Weapon::lens`, the Lodestone): a pack
-    /// of red medium tanks, passive, a sixth of its reach down the range.
+    /// A gravitic lens (`Weapon::lens`, the Lodestone), whose crush takes all round what it
+    /// strikes: a pack of red medium tanks, passive, a sixth of its reach down the range.
     Pack,
     /// A gravitic engine (`UnitBlueprint::gravitic`, The Fallen) turned at once on a red
     /// camp 2 km down the range: tanks, a few buildings and aircraft circling over them.
@@ -1118,8 +1118,9 @@ fn stage(
                 .weapons
                 .iter()
                 .find(|w| w.lens.is_some())
-                .ok_or("This Unit Holds No Well")?;
-            // Medium tanks: a well takes some seconds to crush one, then lets go.
+                .ok_or("This Unit Has No Gravitic Lens")?;
+            // Medium tanks in a loose pack: each crush takes the one it strikes and
+            // whatever stands close beside it.
             let tank = blueprints
                 .id_of("aster_t2_tank")
                 .or_else(|| blueprints.id_of(DEFAULT_SUBJECT))

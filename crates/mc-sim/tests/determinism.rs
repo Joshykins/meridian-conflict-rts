@@ -373,7 +373,7 @@ fn setup(w: &mut World) {
                 // (Clear of the projector past the deck's west end, where nothing stands.)
                 add("regency_t5_gravitic_engine", 1, 1000, 1900);
                 // The Regency gravitic lens: it plants, its front runs out to one of the
-                // south's army and a well holds on it, crushing and slowing (`lens.rs`).
+                // south's army and a well opens and collapses on it, crushing (`lens.rs`).
                 add("regency_t3_gravitic_lens", 1, 700, 1250);
                 // The Regency surge artillery: it plants and lobs a shell into the south's
                 // army, whose wake rolls out round the crater and burns (`surge.rs`).
@@ -898,7 +898,7 @@ fn reference() -> Vec<u64> {
     assert!(staged, "no aircraft went down on a staging base");
     // The Seraph dashed into the south's army.
     assert!(dashes > 0, "the Seraph never dashed");
-    // The lens's front struck and its well opened.
+    // The lens's front struck and its well crushed.
     assert!(lens_strikes > 0, "the gravitic lens never struck");
     // The Fulgur raised on Repeat drove off and its lot was laid again.
     assert!(relaid, "no lot was laid again on Repeat");

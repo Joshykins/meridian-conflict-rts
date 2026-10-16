@@ -724,7 +724,6 @@ impl World {
             .map(|f| f.speed.min(motion.speed))
             .unwrap_or(motion.speed);
         let max_speed = self.well_slow(row, pos, max_speed);
-        let max_speed = self.lens_slow(row, pos, max_speed);
         let accel = motion.accel / DT;
         let mut target_speed = Fx::ZERO;
         if dir != FxVec2::ZERO && !waiting && !(transit_air && dist <= Fx::HALF) {

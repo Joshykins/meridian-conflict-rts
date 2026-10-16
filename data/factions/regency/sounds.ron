@@ -2549,8 +2549,8 @@
         // ---- The Lodestone: the Regency's gravitic lens (tech 3) ----
         // The Lodestone (`regency_t3_gravitic_lens`): The Fallen's family on a gun a tank's size,
         // so shorter, tighter and nearer, with no lightning (nothing it does glows). Its weapon's
-        // `sounds` name them all; mc-game audio/lens.rs drives the front, strike, well and
-        // release. No beeps: every pitched voice is a rough Fm growl (ratio 0.5), and nothing
+        // `sounds` name them all; mc-game audio/lens.rs drives the front and the strike. No
+        // beeps: every pitched voice is a rough Fm growl (ratio 0.5), and nothing
         // rings on a note.
         //
         // The charge, 1.6 s, exactly the weapon's `charge_time` (the launch is heard as it
@@ -2623,7 +2623,7 @@
         ),
         // The front running out to its target, looped where it is: a dark lens rushing low
         // through the air, a rough deep growl under a tearing rush that flutters. Heard
-        // from up to 3 s of travel; whole cycles of every steady frequency in 2 s.
+        // for up to 2 s of travel; whole cycles of every steady frequency in 2 s.
         "regency_lens_front": (
             length: 2, peak: 0.4, room: 0.2, looped: true,
             layers: [
@@ -2675,57 +2675,6 @@
                 Burst(at: 1.45, low: 50, high: 500, attack: 0.002, decay: 0.06, gain: 1.4, pan: 0.2, seed: 12328),
                 // A low roll going off.
                 Roll(at: 0.25, from: 380, to: 50, glide: 2.2, attack: 0.3, decay: 0.6, gain: 0.6, swell: 2, depth: 0.5, seed: 12330),
-            ],
-        ),
-        // The well holding, looped on the target and carried with it: its pressure
-        // throbbing deep and slow (once a second), the hull in it groaning now
-        // and then, grit circling low and the odd stone knocking. Kept low, soft and without
-        // edges so several lenses holding at once do not tire the ear. Whole cycles of every
-        // steady frequency and wobble in 4 s.
-        "regency_lens_hold": (
-            length: 4, peak: 0.32, room: 0.25, looped: true,
-            layers: [
-                // The pressure throbbing.
-                Drone(freq: 41, gain: 0.22, wobble: 1, depth: 0.65),
-                Fm(from: 82, to: 82, glide: 1, ratio: 0.5, index: 1.3, fade: 1000, attack: 0.01, decay: 100000, gain: 0.12),
-                Rumble(freq: 190, q: 1, gain: 4.5, wobble: 1, depth: 0.6, seed: 12401),
-                Rumble(freq: 380, q: 1.3, gain: 2, wobble: 1, depth: 0.5, pan: 0.2, seed: 12402),
-                Drive(1.3),
-                // Grit circling low in it.
-                Foam(from: 650, to: 650, glide: 1, q: 0.8, attack: 0.01, decay: 100000, gain: 0.35, swell: 14, depth: 0.85, pan: -0.15, seed: 12403),
-                // What it holds groaning under the weight: slow low creaks.
-                Sweep(at: 0.6, from: 210, to: 150, glide: 1.2, q: 4, attack: 0.4, decay: 0.5, gain: 0.45, pan: -0.2, seed: 12404),
-                Sweep(at: 2.4, from: 190, to: 135, glide: 1.2, q: 4, attack: 0.4, decay: 0.5, gain: 0.4, pan: 0.25, seed: 12405),
-                // The odd stone knocking.
-                Burst(at: 0.6, low: 190, high: 1574, attack: 0.0004, decay: 0.010, gain: 0.76, pan: -0.59, seed: 12410),
-                Burst(at: 1.3, low: 226, high: 1918, attack: 0.0004, decay: 0.009, gain: 0.75, pan: 0.51, seed: 12411),
-                Burst(at: 1.9, low: 210, high: 1551, attack: 0.0004, decay: 0.008, gain: 0.77, pan: 0.64, seed: 12412),
-                Burst(at: 3.3, low: 181, high: 1462, attack: 0.0004, decay: 0.011, gain: 0.57, pan: -0.02, seed: 12413),
-            ],
-        ),
-        // The well let go: a soft heavy whump as the pressure comes off, the growl sinking
-        // away, the air let out in a falling sigh, and the grit it held dropping back in a
-        // patter that thins.
-        "regency_lens_release": (
-            length: 2.4, peak: 0.6, room: 0.4,
-            layers: [
-                Burst(low: 30, high: 260, attack: 0.02, decay: 0.22, gain: 4, seed: 12501),
-                Tone(from: 58, to: 30, glide: 0.8, attack: 0.02, decay: 0.5, gain: 0.6),
-                Fm(from: 90, to: 36, glide: 1.4, ratio: 0.5, index: 2, fade: 1, attack: 0.02, decay: 0.5, gain: 0.7),
-                Drive(1.5),
-                Sweep(from: 1000, to: 170, glide: 1.6, q: 0.7, attack: 0.06, decay: 0.5, gain: 1.2, seed: 12502),
-                Roll(at: 0.05, from: 500, to: 110, glide: 1.6, attack: 0.15, decay: 0.45, gain: 1.1, swell: 6, depth: 0.6, seed: 12503),
-                // The grit dropping back.
-                Burst(at: 0.16, low: 192, high: 1303, attack: 0.0004, decay: 0.010, gain: 1.5, pan: -0.18, seed: 12510),
-                Burst(at: 0.23, low: 274, high: 1783, attack: 0.0004, decay: 0.011, gain: 1.45, pan: 0.16, seed: 12511),
-                Burst(at: 0.31, low: 166, high: 1930, attack: 0.0004, decay: 0.012, gain: 1.4, pan: 0.52, seed: 12512),
-                Burst(at: 0.37, low: 207, high: 1579, attack: 0.0004, decay: 0.007, gain: 1.2, pan: 0.19, seed: 12513),
-                Burst(at: 0.48, low: 168, high: 1446, attack: 0.0004, decay: 0.007, gain: 1.1, pan: -0.22, seed: 12514),
-                Burst(at: 0.56, low: 160, high: 1406, attack: 0.0004, decay: 0.007, gain: 1.0, pan: -0.19, seed: 12515),
-                Burst(at: 0.7, low: 265, high: 1730, attack: 0.0004, decay: 0.009, gain: 0.85, pan: -0.35, seed: 12516),
-                Burst(at: 0.85, low: 204, high: 1386, attack: 0.0004, decay: 0.010, gain: 0.75, pan: 0.69, seed: 12517),
-                Burst(at: 1.02, low: 218, high: 1360, attack: 0.0004, decay: 0.009, gain: 0.6, pan: -0.22, seed: 12518),
-                Burst(at: 1.2, low: 259, high: 1413, attack: 0.0004, decay: 0.010, gain: 0.45, pan: 0.63, seed: 12519),
             ],
         ),
         // ---- tech 2 land units (land_t2.ron) ----
