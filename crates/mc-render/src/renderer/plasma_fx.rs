@@ -44,9 +44,10 @@ const GLASS_RADIUS: f32 = 2.8;
 /// Furthest a beam's strike may have moved since it last glassed the ground for the
 /// stretch between to be seared too: past it the beam jumped to a new mark.
 const RAKE_GAP: f32 = 40.0;
-/// Radius, in its pools' radii, of the plasma spreading over the ground where an Edict
-/// Lance strikes.
-const SPILL_RADIUS: f32 = 2.2;
+/// Radius, in column widths, of the plasma swirling out over the ground where an Edict
+/// Lance strikes: far wider than the ground it melts (its `splash`), as the column is.
+/// It is a decal (ground.wgsl `spill`), so its size heats nothing.
+const SPILL_RADIUS: f32 = 3.2;
 /// How hot an Edict Lance runs the ground (`GroundMelt::melt`'s `peak`): molten red-orange,
 /// not white-hot, under its red column.
 const EDICT_MELT_PEAK: f32 = 0.65;
@@ -363,7 +364,7 @@ impl Renderer {
             );
         }
         if edict {
-            self.edict_outflow(at, melt, on_unit, time);
+            self.edict_outflow(at, width, melt, on_unit, time);
         }
         // A fusion lance biting into a hull (`regency_guns_fx/lance.rs`).
         if bite {
@@ -465,8 +466,9 @@ impl Renderer {
 
     /// Where an Edict Lance strikes: a tight red-hot spot with a deeper red bloom under it,
     /// and a crown of molten droplets thrown up and out in arcs that fall back and cool.
-    /// Nothing hazy. Every tick the beam holds. `melt` is the radius it glasses.
-    fn edict_outflow(&mut self, at: Vec3, melt: f32, on_unit: bool, time: f32) {
+    /// Nothing hazy. Every tick the beam holds. `width` is the column's, `melt` the radius
+    /// it glasses: the spot is the melt's, the bloom and the crown the column's.
+    fn edict_outflow(&mut self, at: Vec3, width: f32, melt: f32, on_unit: bool, time: f32) {
         self.push_lit(
             puff::WARP_GLOW as f32,
             at + Vec3::Z * melt * 0.3,
@@ -479,25 +481,25 @@ impl Renderer {
         );
         self.push_lit(
             puff::WARP_GLOW as f32,
-            at + Vec3::Z * melt * 0.2,
+            at + Vec3::Z * width * 0.2,
             Vec3::ZERO,
             time,
             0.2,
-            (melt * 2.2, melt * 2.6),
+            (width * 0.9, width * 1.2),
             Vec3::new(1.0, 0.14, 0.08) * 2.5,
             0.0,
         );
         // Droplets of melt: out in a ring and up, falling back under gravity.
         let up = if on_unit { 0.6 } else { 1.0 };
-        for _ in 0..5 {
+        for _ in 0..8 {
             let a = self.scatter.unit() * std::f32::consts::TAU;
-            let out = 7.0 + self.scatter.unit() * 13.0;
+            let out = width * (0.25 + self.scatter.unit() * 0.5);
             let vel = Vec3::new(
                 a.cos() * out,
                 a.sin() * out,
-                (10.0 + self.scatter.unit() * 16.0) * up,
+                (14.0 + self.scatter.unit() * 22.0) * up,
             );
-            self.push_puff(PUFF_SPARK, at + Vec3::Z * 0.4, vel, time, 0.9, (0.34, 0.07));
+            self.push_puff(PUFF_SPARK, at + Vec3::Z * 0.4, vel, time, 1.1, (0.9, 0.2));
         }
     }
 
@@ -661,7 +663,7 @@ impl Renderer {
                 let fade = 1.0 - ((time - h.last - tick * 1.5) / CUT).clamp(0.0, 1.0);
                 fx.spills.push(StainInstance {
                     pos: h.to[1].truncate().to_array(),
-                    radius: h.melt * SPILL_RADIUS,
+                    radius: h.width * SPILL_RADIUS,
                     strength_seed: (fade * 255.0) as u32 | stain::SPILL,
                 });
             }

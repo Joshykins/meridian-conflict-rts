@@ -494,7 +494,8 @@ pub(crate) struct ModelInfo {
     /// Its surface marks in scene set 35 (renderer/surface_marks.rs): first | count << 24.
     pub(crate) marks: u32,
     /// 1: its orbit pieces turn by the instance's phase (`UnitInstance::deploy`, set by
-    /// renderer/gravitic_engine_fx), not the clock (`Model::gravity_core`).
+    /// renderer/gravitic_engine_fx for a gravitic engine, edict_lance_fx for an Edict
+    /// Lance's emitter), not the clock (`Model::gravity_core`, `Model::beam_core`).
     pub(crate) orbit_driven: u32,
     pub(crate) _skin_pad2: u32,
 }
@@ -1539,7 +1540,7 @@ impl Renderer {
             infos.push(ModelInfo {
                 skin,
                 marks: surface_marks.add(&model.marks),
-                orbit_driven: u32::from(model.gravity_core.is_some()),
+                orbit_driven: u32::from(model.gravity_core.is_some() || model.beam_core.is_some()),
                 _skin_pad2: 0,
                 slot: first_slot[at],
                 icon: *icon,
@@ -3308,7 +3309,9 @@ impl Renderer {
         );
         // An Edict Lance's charge in its hull (`edict_lance_fx`).
         let mut patched = patched;
-        self.plasma_fx.cores.patch(patched.to_mut(), time);
+        self.plasma_fx
+            .cores
+            .patch(patched.to_mut(), time, self.tick_seconds);
         drop(patch);
         let write = mc_core::perf_span!("inst.write");
         self.dynamic.write(0, bytemuck::cast_slice(&patched));

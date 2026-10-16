@@ -67,12 +67,17 @@ curving out to its corner and bending aft into a claw that reaches the stern
 at the Dominion's 700 m, closes to weapon range and holds station.
 
 Its main gun is the Edict Lance (`edict_beam`): the Regent's Edict made a held beam, laid
-from the lower lens of the energy core, a drum through the middle of the hull; nothing
-turns. The core charges for 3 s (`spin_up`): light runs in along the hull's seams from
-bow and stern to the core (regency.wgsl `reg_edict`), the Edict's star kindles under the
-lens, lightning crawling in to it off the hull, and `regency_edict_lance_charge` keeps
-time with it. The beam lights on its first shot, which may come after the charge once
-the hull bears on the mark: a red flash, a lens flare, a pressure ring and a hard ring of
+from the emitter under the energy core, a drum through the middle of the hull: a ribbed
+lens dome hung in a toothed crown, a vaned race and two crossed gimbal hoops
+(`destroyer/core.rs`). Nothing aims it, so dark it lays onto a mark at once
+(`lays_at_once`), and it charges only once its shot is laid. The core charges for 3 s
+(`spin_up`): a sphere of light closes in on the lens, crossing the hull as a ring drawn
+in round the emitter (regency.wgsl `reg_edict`), the emitter's rings spin up with the
+charge in opposite ways (orbit pieces driven by `edict_lance_fx`), the Edict's star
+kindles under the lens, lightning crawling in to it off the hull, and
+`regency_edict_lance_charge` keeps time with it, the rings unlocking with a clang and
+beating quicker as they spin. The beam lights as the charge fills: a red flash, a lens
+flare, a pressure ring and a hard ring of
 pinched plasma round the lens (`renderer/edict_lance_fx.rs`), heard as
 `regency_edict_lance_release`. The beam is the Edict's column, 108 m across: a red-hot
 core in a roiling scarlet and crimson sheath (`fade_beam::HELD_EDICT`), its roar the loop

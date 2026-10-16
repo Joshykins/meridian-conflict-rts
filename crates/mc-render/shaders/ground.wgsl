@@ -87,17 +87,19 @@ fn fs_stain(in: StainOut) -> @location(0) vec4<f32> {
     return vec4<f32>(apply_haze(lit, in.world, eye), alpha);
 }
 
-// Plasma spread over the ground where a star beam strikes: the beam halo's flowing veil,
-// run outward from the centre in rolling sheets, red-hot at the root and turning to the
-// Regency's crimson and a dark blood red as it goes. The rim wanders, so it is never a
-// round pool. The radius is the rim's mean.
+// Plasma spread over the ground where an Edict Lance strikes: a flowing veil run outward
+// from the centre in rolling sheets that wheel round it as they go, so it swirls,
+// red-hot at the root and turning to the Regency's crimson and a dark blood red as it
+// goes. The rim wanders, so it is never a round pool. The radius is the rim's mean.
 fn spill(in: StainOut) -> vec4<f32> {
     let left = f32(in.strength_seed & 0xFFu) / 255.0;
     let seed = f32((in.strength_seed >> 8u) & 0x7FFFu);
     let t = globals.camera.w;
     let q = in.uv * 1.35;
     let r = length(q);
-    let dir = q / max(r, 1e-4);
+    // The sheets' direction, wound into a spiral that turns as it flows out.
+    let wind = atan2(q.y, q.x) + r * 3.2 - t * 0.9;
+    let dir = vec2<f32>(cos(wind), sin(wind));
     let rim = 0.62 + 0.38 * value_noise2(dir * 2.4 + vec2<f32>(seed * 0.01, t * 0.35), 1.0);
     let sheets = value_noise2(dir * 2.6 + vec2<f32>(r * 5.0 - t * 4.5, seed * 0.02), 1.0) * 0.6
         + value_noise2(dir * 5.3 + vec2<f32>(r * 11.0 - t * 7.5, 3.1), 1.0) * 0.4;

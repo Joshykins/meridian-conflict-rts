@@ -1,6 +1,6 @@
 //! An Edict Lance on its ship (`Weapon::edict_beam`, the Scourge's): the Regent's Edict
-//! brought down to a held beam, laid from the core in the hull (`Model::beam_core`, its
-//! lower lens). What drives it is how far the beam's projector has run up
+//! brought down to a held beam, laid from the core in the hull (`Model::beam_core`, the
+//! emitter's lens under it). What drives it is how far the beam's projector has run up
 //! (`UnitInstance::recoil`, last tick's in `prev_recoil`: 0 cold to 1 lit;
 //! `mirror::beam_brace`: one only on a tick the beam fired), so it keeps time with the
 //! sim's charge, with the charge sound (`regency_edict_lance_charge`) and with the release
@@ -8,11 +8,14 @@
 //! red: red-hot, crimson round it; hard-edged, no mist.
 //!
 //! - **The gather** (regency.wgsl `reg_edict`, fed each ship's charge through
-//!   `UnitInstance::mount` as `gpu_consts::edict` lays out): light runs in along the plate
-//!   seams from the bow and the stern, two fronts closing on the core, red left burning in
-//!   the seams behind them and pulses running on toward it. While the beam burns the charge
+//!   `UnitInstance::mount` as `gpu_consts::edict` lays out): a sphere of light closing in
+//!   on the lens, crossing the hull as a ring drawn in round the emitter, red rings
+//!   rippling in after it through the seams. While the beam burns the charge
 //!   is held there, a white-hot pool round the core; let go before it lit it gutters out;
 //!   when the beam goes out the pool cools to red and the seams' last red dies.
+//! - **The emitter's rings** (the model's orbit pieces, `ModelInfo::orbit_driven`): turned
+//!   by a phase run up here (`UnitInstance::deploy`), idling, spinning up with the charge,
+//!   flat out while the beam burns and winding down after.
 //! - **The star** at the lens: from a spark to a blinding red-hot point as it charges, a
 //!   crimson corona round it, lightning crawling in to it off the hull and red
 //!   streamers licking off it; drawn in hard at the end, held beating while the beam
@@ -76,6 +79,12 @@ fn size(share: f32) -> (f32, f32) {
     (r, glare)
 }
 
+/// The lens's place in the model as the shader's record carries it (`gpu_consts::edict`):
+/// whole metres along model x, and its height over the model's origin in the fraction.
+fn firing_point(along: f32, height: f32) -> f32 {
+    along.round() + height.clamp(0.0, edict::HEIGHT_MOST) / edict::HEIGHT_SCALE
+}
+
 /// Where a ship's lance stands this tick.
 #[derive(Clone, Copy, PartialEq)]
 enum Stage {
@@ -98,8 +107,8 @@ struct Ship {
     lens: Vec3,
     r: f32,
     fwd: Vec3,
-    /// The core's place along model x, and the charge's rate a second.
-    along: f32,
+    /// The lens in the model (`firing_point`), and the charge's rate a second.
+    at: f32,
     rate: f32,
     seed: f32,
 }
@@ -111,18 +120,15 @@ impl Ship {
             Stage::Charging => Some([
                 self.level,
                 time,
-                self.along,
+                self.at,
                 edict::GATHERING - self.rate.min(0.99),
             ]),
-            Stage::Burning => Some([1.0, time, self.along, edict::GATHERING]),
-            Stage::Out(when) => (time < when + edict::AFTERGLOW + 1.0).then_some([
-                when,
-                0.0,
-                self.along,
-                edict::FIRED,
-            ]),
+            Stage::Burning => Some([1.0, time, self.at, edict::GATHERING]),
+            Stage::Out(when) => {
+                (time < when + edict::AFTERGLOW + 1.0).then_some([when, 0.0, self.at, edict::FIRED])
+            }
             Stage::LetGo(when, share) => {
-                (time < when + edict::FADE).then_some([share, when, self.along, edict::CANCELLED])
+                (time < when + edict::FADE).then_some([share, when, self.at, edict::CANCELLED])
             }
         }
     }
@@ -141,12 +147,23 @@ struct Ring {
     start: f32,
 }
 
+/// One ship's emitter rings (the model's orbit pieces round the lens,
+/// `ModelInfo::orbit_driven`): the phase they have turned through, and their pace, a share
+/// of their full rate.
+#[derive(Clone, Copy)]
+struct Turn {
+    id: u32,
+    phase: f32,
+    pace: f32,
+}
+
 /// Each blueprint's core (`None`: it has none), and the lances lit or cooling.
 #[derive(Default)]
 pub(super) struct EdictLances {
     cores: Vec<Option<[f32; 4]>>,
     ships: Vec<Ship>,
     rings: Vec<Ring>,
+    turns: Vec<Turn>,
     /// Light renewed each tick: where, colour times brightness, reach.
     lamps: Vec<(Vec3, Vec3, f32)>,
 }
@@ -164,24 +181,70 @@ impl EdictLances {
     pub(super) fn clear(&mut self) {
         self.ships.clear();
         self.rings.clear();
+        self.turns.clear();
         self.lamps.clear();
     }
 
-    /// Before the instances go to the GPU: hands each ship's hull its charge in `mount`
-    /// (`gpu_consts::edict`). A ship with an Edict Lance carries its guns on houses of
-    /// their own, so its `mount` is free for this.
-    pub(super) fn patch(&self, units: &mut [UnitInstance], time: f32) {
-        if self.ships.is_empty() {
-            return;
-        }
+    /// Once a sim tick, before the instances go to the GPU: hands each ship's hull its
+    /// charge in `mount` (`gpu_consts::edict`), and its emitter rings their turn over the
+    /// coming tick (`tick_seconds`) in `deploy` (last tick's in `prev_deploy`), which the
+    /// entity shader turns them by. A ship with an Edict Lance carries its guns on houses
+    /// of their own and has nothing to deploy, so both are free for this.
+    pub(super) fn patch(&mut self, units: &mut [UnitInstance], time: f32, tick_seconds: f32) {
+        let dt = tick_seconds.clamp(0.02, 0.5);
+        let ease = 1.0 - (-dt / TURN_INERTIA).exp();
+        let mut turns = Vec::with_capacity(self.turns.len());
         for u in units.iter_mut() {
-            let Some(s) = self.ships.iter().find(|s| s.id == u.unit_id) else {
+            if !matches!(self.cores.get(u.blueprint as usize), Some(Some(_)))
+                || u.owner_flags & (KIND_WRECK | KIND_GHOST) != 0
+            {
                 continue;
-            };
-            if let Some(record) = s.record(time) {
+            }
+            let ship = self.ships.iter().find(|s| s.id == u.unit_id);
+            if let Some(record) = ship.and_then(|s| s.record(time)) {
                 u.mount = record;
             }
+            let was = self.turns.iter().find(|t| t.id == u.unit_id);
+            let mut turn = was.copied().unwrap_or(Turn {
+                id: u.unit_id,
+                phase: (u.unit_id % 97) as f32,
+                pace: TURN_IDLE,
+            });
+            turn.pace += (turn_goal(ship) - turn.pace) * ease;
+            let start = turn.phase;
+            // Kept small so the shader's turn stays exact (every ring's rate is a whole
+            // number of `orbit::RATE_STEP`s, so a jump of 32 turns of 2 pi lands each on
+            // where it was).
+            turn.phase += turn.pace * dt;
+            if turn.phase > WRAP {
+                turn.phase -= WRAP;
+            }
+            u.prev_deploy = start;
+            u.deploy = start + turn.pace * dt;
+            turns.push(turn);
         }
+        self.turns = turns;
+    }
+}
+
+/// The emitter rings' pace with the lance at rest, and how long they take to take up a
+/// change of it (they are heavy).
+const TURN_IDLE: f32 = 0.05;
+const TURN_INERTIA: f32 = 0.7;
+/// Phase the rings' clock wraps at: 32 turns, so with every ring's rate a whole number of
+/// thirty-seconds a wrap turns each a whole number of times.
+const WRAP: f32 = 32.0 * TAU;
+
+/// The pace the rings run up toward: with the charge, quicker as it fills, flat out while
+/// the beam burns, idling once it is out or let go.
+fn turn_goal(ship: Option<&Ship>) -> f32 {
+    match ship.map(|s| s.stage) {
+        Some(Stage::Charging) => {
+            let p = ship.map_or(0.0, |s| s.level);
+            TURN_IDLE + (1.0 - TURN_IDLE) * p * p
+        }
+        Some(Stage::Burning) => 1.0,
+        _ => TURN_IDLE,
     }
 }
 
@@ -247,7 +310,7 @@ impl Renderer {
                 lens,
                 r: core[3],
                 fwd,
-                along: core[0],
+                at: firing_point(core[0], core[2]),
                 rate,
                 seed: (u.unit_id % 97) as f32 * 0.613,
             };
@@ -502,5 +565,57 @@ mod tests {
         assert!(full > 1.5);
         assert!(drawn < full * 0.6, "drawn in to {drawn} from {full}");
         assert!(blaze > GLARE_FULL);
+    }
+
+    /// The emitter's rings' turn over one tick, as `patch` hands it to the shader.
+    fn turned(lances: &mut EdictLances, u: &mut UnitInstance) -> f32 {
+        lances.patch(std::slice::from_mut(u), 0.0, 0.1);
+        u.deploy - u.prev_deploy
+    }
+
+    #[test]
+    fn the_emitter_rings_run_up_with_the_charge_and_idle_after() {
+        let mut lances = EdictLances::new(vec![Some([0.0, 0.0, 8.0, 12.0])]);
+        let mut u: UnitInstance = bytemuck::Zeroable::zeroed();
+        u.unit_id = 7;
+        let idle = turned(&mut lances, &mut u);
+        assert!(
+            idle > 0.0 && idle < 0.1 * TURN_IDLE * 1.01,
+            "idle turn {idle}"
+        );
+        lances.ships.push(Ship {
+            id: 7,
+            stage: Stage::Burning,
+            level: 1.0,
+            lens: Vec3::ZERO,
+            r: 12.0,
+            fwd: Vec3::X,
+            at: firing_point(0.0, 8.0),
+            rate: 1.0 / 3.0,
+            seed: 0.0,
+        });
+        let mut lit = 0.0;
+        for _ in 0..40 {
+            lit = turned(&mut lances, &mut u);
+        }
+        assert!(lit > 0.09, "lit, the rings turn {lit} a tick");
+        lances.ships.clear();
+        for _ in 0..60 {
+            lit = turned(&mut lances, &mut u);
+        }
+        assert!(
+            lit < 0.1 * TURN_IDLE * 1.5,
+            "gone out, they still turn {lit} a tick"
+        );
+    }
+
+    #[test]
+    fn the_firing_point_keeps_its_place_and_height() {
+        for (along, height) in [(0.0, 8.0), (-120.0, 15.2), (37.0, 0.0)] {
+            let at = firing_point(along, height);
+            assert_eq!(at.floor(), along);
+            // As WGSL's `fract` reads it: from the floor, not toward zero.
+            assert!(((at - at.floor()) * edict::HEIGHT_SCALE - height).abs() < 0.1);
+        }
     }
 }

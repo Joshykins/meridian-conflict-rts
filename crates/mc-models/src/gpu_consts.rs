@@ -828,8 +828,9 @@ shared! {
 
     /// An Edict Lance's charge gathering in its ship's hull (renderer/edict_lance_fx,
     /// regency.wgsl `reg_edict`). The renderer hands the shader each ship's lance in
-    /// `UnitInstance::mount` as `[a, b, along, kind]`, `along` metres forward of the ship's
-    /// origin of its firing point, times on the renderer's clock: charging
+    /// `UnitInstance::mount` as `[a, b, at, kind]`, `at` its firing point in the model
+    /// (whole metres forward of the ship's origin, plus its height over the origin over
+    /// `HEIGHT_SCALE`, at most `HEIGHT_MOST`), times on the renderer's clock: charging
     /// `[share, tick, along, GATHERING - rate]` (the share at the tick's start, gaining
     /// `rate` a second, under one, for at most `TICK_REACH` seconds past it; burning, the
     /// share one and the rate nothing); gone out `[when, 0, along, FIRED]`; let go before it
@@ -842,13 +843,16 @@ shared! {
         /// Seconds past its tick a charge's share runs on: a little over a tick, so it
         /// glides between ticks and holds still while the game is paused.
         pub const TICK_REACH: f32 = 0.15;
-        /// The share of the charge by which the light run in from bow and stern meets at
-        /// the firing point; after it the whole charge is there.
+        /// The share of the charge by which the sphere of light closing in on the firing
+        /// point reaches it; after it the whole charge is there.
         pub const MEET: f32 = 0.9;
         /// Seconds the seams' red after-glow lasts after the beam goes out, and a let-go
         /// charge's light takes to die.
         pub const AFTERGLOW: f32 = 6.0;
         pub const FADE: f32 = 1.2;
+        /// The firing point's height in `at`'s fraction: metres over this, kept under one.
+        pub const HEIGHT_SCALE: f32 = 1000.0;
+        pub const HEIGHT_MOST: f32 = 999.0;
     }
 
     /// Graphics quality bits (renderer `SceneQuality`), in `Globals.detail.w`.

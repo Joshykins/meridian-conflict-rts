@@ -717,7 +717,9 @@ pub struct Model {
     /// (`ModelInfo::orbit_driven`).
     pub gravity_core: Option<[f32; 4]>,
     /// The energy core a held beam is laid from (xyz its lens's face, w the lens's radius):
-    /// charged and lit by the renderer with the beam (`renderer/edict_lance_fx.rs`).
+    /// charged and lit by the renderer with the beam (`renderer/edict_lance_fx.rs`); the
+    /// model's orbit pieces (its emitter's rings) turn with the charge, not the clock
+    /// (`ModelInfo::orbit_driven`).
     pub beam_core: Option<[f32; 4]>,
     /// Engine exhaust ports whose hot air shimmers above them (`MeshBuilder::add_exhaust`,
     /// renderer `heat_haze.rs`).

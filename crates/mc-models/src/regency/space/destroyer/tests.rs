@@ -1,5 +1,5 @@
 //! The ship's guns as the unit file has them are the model's: the lance from the core's
-//! lower lens, each weapon group's mounts on the model's houses in gun-slot order, the
+//! emitter's lens, each weapon group's mounts on the model's houses in gun-slot order, the
 //! Rondels' lenses where the anti-missile mounts are.
 
 use std::path::Path;
@@ -27,7 +27,7 @@ fn the_unit_files_guns_are_the_models() {
     let bp = Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
     let unit = bp.unit(bp.id_of(KEY).unwrap());
     let model = build_model(&unit.visual.mesh).unwrap();
-    // The lance is laid from the core's lower lens at the ship's middle: no turret, nothing
+    // The lance is laid from the core's emitter lens at the ship's middle: no turret, nothing
     // turns or pitches (a pivot would pitch the hull: `capital_ship` in entity.wgsl).
     let lance = &unit.weapons[0];
     let lens = CORE.lens();
