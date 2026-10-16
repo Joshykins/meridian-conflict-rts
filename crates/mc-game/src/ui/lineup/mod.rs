@@ -17,6 +17,7 @@
 mod ai;
 mod chart;
 pub mod chat;
+mod fill;
 mod layout;
 pub mod roster;
 mod seats;
@@ -314,6 +315,8 @@ pub struct Lineup {
     pub races: RacePicker,
     /// The settings sheet: the theatre and the rules.
     pub sheet: Sheet,
+    /// The Fill with AI sheet, and the mix of AIs it was last set to.
+    fill: fill::Fill,
     /// The AI row (by seat key) whose settings are open under it, when the
     /// rows are too many to show every AI's.
     tuning: Option<u8>,
@@ -355,6 +358,7 @@ impl Lineup {
             last_map: [0; 2],
             races: RacePicker::default(),
             sheet: Sheet::default(),
+            fill: fill::Fill::default(),
             tuning: None,
             placing: None,
             hover_seat: None,
@@ -375,6 +379,12 @@ impl Lineup {
     /// Something else drew in the chart's image slot: draw the chart again.
     pub fn chart_lost(&mut self) {
         self.picture.lost();
+    }
+
+    /// A sheet (the settings, or Fill with AI) lies over the screen: nothing
+    /// under it takes the pointer.
+    pub fn sheet_open(&self) -> bool {
+        self.sheet.is_open() || self.fill.is_open()
     }
 
     /// A commander is being moved, and Escape puts that down before it leaves the screen.
@@ -444,6 +454,7 @@ impl Lineup {
             last_map: self.last_map,
             races: RacePicker::default(),
             sheet: Sheet::default(),
+            fill: fill::Fill::default(),
             tuning: None,
             placing: None,
             hover_seat: None,
@@ -774,7 +785,8 @@ pub fn match_card(
 /// shared rules on the right with whatever `more` draws under them (from the
 /// y it is given, returning the y under it), then the sky. A map with regions
 /// has a weather row for each, and the sheet grows by them. `live` is false
-/// while an overlay lies over the sheet.
+/// while an overlay lies over the sheet. The Fill with AI sheet is drawn here
+/// too.
 pub fn sheet(
     ui: &mut Ui,
     lineup: &mut Lineup,
@@ -801,7 +813,8 @@ pub fn sheet(
         sky(ui, &mut lineup.sky, &map, table.host, right, y);
     });
     lineup.sheet = sheet;
-    ask
+    let filled = fill::draw(ui, lineup, catalog, table, live);
+    ask.or(filled)
 }
 
 /// The sky, from `y`: the map's own weather (each region's, on a map with

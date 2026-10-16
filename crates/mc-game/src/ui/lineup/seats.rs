@@ -12,7 +12,9 @@
 //! the plan and each person picks their own race; an open seat shows who sits
 //! there, or a Sit Here for everyone else.
 
-use super::ai::{caret, dial_note, seat_line, settings_toggle, summary, SEAT_LINE};
+use super::ai::{
+    caret, dial_note, difficulty_at, seat_line, settings_toggle, summary, DIFFICULTIES, SEAT_LINE,
+};
 use super::roster::{Control, Seat};
 use super::{Ask, Catalog, Lineup, Mode, Occupant, Table};
 use crate::audio::Sfx;
@@ -20,9 +22,6 @@ use crate::setup::TEAM_COLORS;
 use crate::ui::race_picker::race_cell;
 use crate::ui::{id, ink, palette, rgb, teams, type_scale, ButtonKind, Id, Rect, Ui};
 use glam::Vec2;
-use mc_sim::Difficulty;
-
-const DIFFICULTIES: [Difficulty; 3] = [Difficulty::Easy, Difficulty::Normal, Difficulty::Hard];
 /// A seat's Control list on one machine; a lobby's adds Open (for a person) first.
 const CONTROL: [&str; 4] = [
     "Closed",
@@ -214,7 +213,8 @@ pub fn commanders(
     observe: Option<&mut bool>,
     area: Rect,
 ) -> Vec<Ask> {
-    let mut asks = heading(ui, lineup, catalog, table, observe, area);
+    heading(ui, lineup, table, observe, area);
+    let mut asks = Vec::new();
     let survival = lineup.mode == Mode::Survival;
 
     // Rows go in team order under a heading per team when anyone is allied;
@@ -318,22 +318,20 @@ pub fn commanders(
     asks
 }
 
-/// The column's heading: its title, Fill with AI while any seat is empty, and
+/// The column's heading: its title, Fill with AI (its sheet) while any seat is empty, and
 /// on one machine the watch switch. Strips open under rows that no longer
 /// have them to show close here.
 fn heading(
     ui: &mut Ui,
     lineup: &mut Lineup,
-    catalog: &mut Catalog,
     table: &Table,
     observe: Option<&mut bool>,
     area: Rect,
-) -> Vec<Ask> {
-    let mut asks = Vec::new();
+) {
     let survival = lineup.mode == Mode::Survival;
     let switch_w = 236.0;
     let fill_w = 132.0;
-    // Every empty seat an AI at once: a 32-seat map is otherwise 30 clicks.
+    // Empty seats AIs at once, set up first (`fill`): a 32-seat map is otherwise 30 clicks.
     let fill = table.host && lineup.roster.seats.iter().any(|s| !s.open());
     let title_w = area.w - switch_w - 16.0 - if fill { fill_w + 12.0 } else { 0.0 };
     ui.section(
@@ -357,21 +355,9 @@ fn heading(
             true,
         )
     {
-        let zones = lineup.zones(catalog);
-        match lineup.roster.fill_ai(zones, |j| table.occupied(j)) {
-            Ok(filled) => {
-                if survival {
-                    for i in filled {
-                        lineup.roster.seats[i].team = 0;
-                    }
-                }
-                ui.audio.play(Sfx::Select);
-            }
-            Err(e) => {
-                ui.audio.play(Sfx::Deny);
-                asks.push(Ask::Say(e));
-            }
-        }
+        let empty = lineup.roster.seats.iter().filter(|s| !s.open()).count();
+        lineup.fill.open(empty);
+        ui.audio.play(Sfx::Select);
     }
     if let Some(observe) = observe {
         watch_switch(ui, observe, area, switch_w);
@@ -397,8 +383,6 @@ fn heading(
     }) {
         lineup.coloring = None;
     }
-
-    asks
 }
 
 /// The seat rows in `order`, under team headings when `allied`, laid out in
@@ -1101,10 +1085,6 @@ pub(super) fn control_label(seat: &Seat) -> &'static str {
         Control::Closed => CONTROL[0],
         Control::Ai => CONTROL[1 + difficulty_at(seat.ai.difficulty)],
     }
-}
-
-fn difficulty_at(d: Difficulty) -> usize {
-    DIFFICULTIES.iter().position(|x| *x == d).unwrap_or(1)
 }
 
 /// Quick team layouts under the rows: sides drawn from where the landing zones

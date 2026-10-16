@@ -7,7 +7,7 @@
 use super::roster::Seat;
 use crate::ui::{id, palette, rgb, type_scale, Rect, Ui};
 use glam::Vec2;
-use mc_sim::Doctrine;
+use mc_sim::{AiConfig, Difficulty, Doctrine};
 
 /// The line of a seat's settings under its row.
 pub(super) const SEAT_LINE: f32 = 36.0;
@@ -21,6 +21,10 @@ const INCOME_LABELS: [&str; 7] = ["0.5x", "0.75x", "1x", "1.5x", "2x", "3x", "5x
 /// (`AiConfig::build`); said with the incomes' labels.
 const BUILDS: [u16; 7] = INCOMES;
 
+pub(super) const DIFFICULTIES: [Difficulty; 3] =
+    [Difficulty::Easy, Difficulty::Normal, Difficulty::Hard];
+pub(super) const DIFFICULTY_LABELS: [&str; 3] = ["Easy", "Normal", "Hard"];
+
 const DOCTRINES: [Doctrine; 4] = [
     Doctrine::Adaptive,
     Doctrine::Aggressive,
@@ -32,8 +36,19 @@ const DOCTRINES: [Doctrine; 4] = [
 /// it favours, its income and its build rate; a person's income and build rate. Whoever may plan changes
 /// them; everyone else reads them.
 pub(super) fn seat_line(ui: &mut Ui, seat: &mut Seat, r: Rect, host: bool, ai_seat: bool) {
-    let key = seat.key as usize;
-    let ai = &mut seat.ai;
+    config_line(ui, &mut seat.ai, seat.key as usize, r, host, ai_seat);
+}
+
+/// [`seat_line`] over a bare config: `line` keeps its choices apart from every
+/// other line's on screen (a seat's key, or past the seats for the fill sheet's kinds).
+pub(super) fn config_line(
+    ui: &mut Ui,
+    ai: &mut AiConfig,
+    line: usize,
+    r: Rect,
+    host: bool,
+    ai_seat: bool,
+) {
     let doctrines = DOCTRINES.map(doctrine_label);
     // A custom mix (from a saved config) is said as such until changed.
     let force_at = FORCE_PRESETS.iter().position(|w| *w == ai.domain_weights);
@@ -106,7 +121,8 @@ pub(super) fn seat_line(ui: &mut Ui, seat: &mut Seat, r: Rect, host: bool, ai_se
         let w = w * k;
         let cell = Rect::new(x, r.y, w, r.h);
         let label = if labelled || n >= 2 { *label } else { "" };
-        if let Some(pick) = ui.choice(id("ai-line", key * 4 + n), cell, label, options, *at, host) {
+        if let Some(pick) = ui.choice(id("ai-line", line * 4 + n), cell, label, options, *at, host)
+        {
             match n {
                 0 => ai.doctrine = DOCTRINES[pick],
                 1 => {
@@ -220,6 +236,11 @@ pub(super) fn caret(ui: &mut Ui, x: f32, y: f32, open: bool, glow: f32) {
         c + Vec2::new(0.0, 2.5 * d),
         tone,
     );
+}
+
+/// Where `d` stands in [`DIFFICULTIES`].
+pub(super) fn difficulty_at(d: Difficulty) -> usize {
+    DIFFICULTIES.iter().position(|x| *x == d).unwrap_or(1)
 }
 
 fn doctrine_label(d: Doctrine) -> &'static str {

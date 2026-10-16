@@ -43,7 +43,7 @@ pub(super) fn draw(
     } else if let Some(mut plan) = lobby.lineup.take() {
         // The line-up is lent out for the frame; the lobby gets it back below.
         let over = state.catalog.browsing() || plan.races.is_open();
-        ui.interactive = live && !over && !plan.sheet.is_open();
+        ui.interactive = live && !over && !plan.sheet_open();
         let people = lobby.occupants();
         let host = lobby.is_host() && lobby.planning();
         let name = state.name.clone();

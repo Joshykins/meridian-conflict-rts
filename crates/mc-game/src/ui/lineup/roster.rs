@@ -260,14 +260,19 @@ impl Roster {
         }
     }
 
-    /// Opens every closed seat to an AI commander. Returns the seats it opened.
+    /// Opens up to `most` closed seats, first to last, to AI commanders.
+    /// Returns the seats it opened, in the order it opened them.
     pub fn fill_ai(
         &mut self,
+        most: usize,
         zones: usize,
         occupied: impl Fn(usize) -> bool,
     ) -> Result<Vec<usize>, Refusal> {
         let mut filled = Vec::new();
-        while let Some(i) = self.seats.iter().position(|s| !s.open()) {
+        while filled.len() < most {
+            let Some(i) = self.seats.iter().position(|s| !s.open()) else {
+                break;
+            };
             filled.push(self.set_control(i, Control::Ai, zones, &occupied)?);
         }
         Ok(filled)
@@ -418,10 +423,12 @@ mod tests {
     }
 
     #[test]
-    fn fill_ai_opens_every_closed_seat() {
+    fn fill_ai_opens_as_many_closed_seats_as_asked() {
         let mut r = Roster::new(32, 1, 1, false);
-        let filled = r.fill_ai(32, |_| false).unwrap();
-        assert_eq!(filled.len(), 30);
+        assert_eq!(r.fill_ai(3, 32, |_| false).unwrap().len(), 3);
+        assert_eq!(r.in_play(), 5, "only as many as asked");
+        let filled = r.fill_ai(usize::MAX, 32, |_| false).unwrap();
+        assert_eq!(filled.len(), 27);
         assert_eq!(r.in_play(), 32);
         assert!(r.seats[1..].iter().all(|s| s.control == Control::Ai));
         assert_eq!(r.seats[0].control, Control::Person);

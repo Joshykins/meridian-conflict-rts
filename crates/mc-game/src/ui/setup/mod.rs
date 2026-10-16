@@ -306,7 +306,7 @@ pub fn draw(ui: &mut Ui, state: &mut SetupState, enter: f32) -> Option<SetupActi
     // While the map browser, race picker or a sheet is open, nothing under it takes the pointer.
     let interactive = ui.interactive;
     let over = state.catalog.browsing() || state.lineup.races.is_open();
-    let browsing = over || state.lineup.sheet.is_open() || state.share.is_open();
+    let browsing = over || state.lineup.sheet_open() || state.share.is_open();
     ui.interactive = interactive && !browsing;
     let action = screen(ui, state, enter);
     ui.interactive = interactive;

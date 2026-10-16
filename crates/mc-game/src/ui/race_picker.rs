@@ -39,7 +39,7 @@ pub struct Chosen {
 }
 
 /// Every choice in the order the cards show them: the races, then Random.
-fn choices() -> Vec<Pick> {
+pub(crate) fn choices() -> Vec<Pick> {
     (0..races().len() as u8)
         .map(Pick::Race)
         .chain([Pick::Random])
