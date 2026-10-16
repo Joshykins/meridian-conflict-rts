@@ -455,6 +455,9 @@ pub mod rig {
     }
     /// Rotary barrels: turn about the axis `Model::spins` gives for the loadout.
     pub const SPIN: u32 = 1 << 30;
+    /// On `part::LOCOMOTION`: a wheel turning about its axle with the ground covered
+    /// (`gpu_consts::wheel`). Shares its bit with `SPIN`, never on running gear.
+    pub const WHEEL: u32 = crate::gpu_consts::wheel::RIG;
     /// Build-arm gear that works while the unit builds, eased in and out with the builder's
     /// deploy: twists back and forth about the arm's axis, runs out along it, or opens and
     /// closes round it. Two bits: `WORK_TWIST`, `WORK_EXTEND`, or both (`WORK_BREATHE`).

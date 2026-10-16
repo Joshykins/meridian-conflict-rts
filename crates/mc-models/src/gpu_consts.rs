@@ -537,6 +537,21 @@ shared! {
         pub const RIG: u32 = 0x10000;
     }
 
+    /// A road wheel, sprocket or idler on a tracked hull's running gear (`rig::WHEEL`,
+    /// `MeshBuilder::with_wheel`): it turns about its axle, along y, as the hull covers
+    /// ground, its rim keeping pace with the belt. The vertex's `uv` carries the axle's
+    /// x and z (the wheel materials never read their uv) and the rig bits its radius.
+    pub mod wheel as "WHEEL_" {
+        /// The rig bit, on `part::LOCOMOTION` verts only: it shares `rig::SPIN`, which
+        /// only means anything on guns and rotors.
+        pub const RIG: u32 = 1 << 30;
+        /// The rolling radius in `RADIUS_STEP` metres, in the `UPGRADE_AT` bits: those
+        /// only mean anything on refit pieces, and running gear never is one.
+        pub const RADIUS_SHIFT: u32 = 16;
+        pub const RADIUS_MASK: u32 = 0xFF;
+        pub const RADIUS_STEP: f32 = 1.0 / 32.0;
+    }
+
     /// A charge gun's working gear (`rig::CHARGE_GEAR`, `Model::charge_gear`), posed by
     /// entity.wgsl `charge_gear_pose` from the unit's charge (`renderer/titan_charge.rs`):
     /// through the charge the gear opens, after the shot it holds open a moment and closes

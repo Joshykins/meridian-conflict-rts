@@ -2192,6 +2192,20 @@ fn vs_main(in: VsIn) -> VsOut {
             }
             p = rot_z(p - pivot, spin) + pivot;
             n = rot_z(n, spin);
+        } else if in.part == PART_LOCOMOTION && !walks && (in.rig & WHEEL_RIG) != 0u
+            && (e.owner_flags & KIND_WRECK) == 0u
+            && terrain_height(e.pos.xy) >= globals.map.z - 0.25 {
+            // A running-gear wheel (`gpu_consts::wheel`) rolls with the ground covered, as
+            // the belt crawls, its rim keeping pace with the links: turned about its axle
+            // (x and z in uv), wrapped at a whole turn so a long drive keeps its precision.
+            // Still while floating, as the belt is.
+            let r = f32((in.rig >> WHEEL_RADIUS_SHIFT) & WHEEL_RADIUS_MASK) * WHEEL_RADIUS_STEP;
+            let rolled = e.gait.x - e.gait.y * (1.0 - globals.sun.w);
+            let turn = fract(rolled / (2.0 * PI * r)) * 2.0 * PI;
+            let axle = vec3<f32>(in.uv.x, 0.0, in.uv.y);
+            let along = vec3<f32>(0.0, 1.0, 0.0);
+            p = rot_about(p - axle, along, turn) + axle;
+            n = rot_about(n, along, turn);
         } else if in.part == PART_LOCOMOTION && crawls && limb != 0u {
             let body = walk_bob(walk, model) + vec3<f32>(0.0, 0.0, footing.ground.z + crawl_set(e, model, t));
             // Clamped to the pairs the model has: `crawl` is a fixed array, never read past it.

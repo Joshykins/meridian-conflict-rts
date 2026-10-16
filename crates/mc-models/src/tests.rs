@@ -11,6 +11,7 @@ use super::{
 
 mod breacher;
 mod cells;
+mod fulgur_wheels;
 mod nimbus;
 mod pod_racks;
 

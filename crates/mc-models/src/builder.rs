@@ -126,6 +126,8 @@ pub struct MeshBuilder {
     houses: Vec<super::House>,
     cells: Vec<super::CellBlock>,
     spins: Vec<(u32, u32, [f32; 3])>,
+    /// The axle (x, z) of the wheel being built (`with_wheel`): the uv its verts carry.
+    wheel: Option<[f32; 2]>,
     pit: Option<super::Pit>,
     excavation: Option<super::Excavation>,
     star_core: Option<[f32; 4]>,
@@ -196,6 +198,7 @@ impl MeshBuilder {
             houses: Vec::new(),
             cells: Vec::new(),
             spins: Vec::new(),
+            wheel: None,
             pit: None,
             excavation: None,
             star_core: None,
@@ -845,6 +848,30 @@ impl MeshBuilder {
         self.rig |= rig::SPIN;
         f(self);
         self.rig = previous;
+    }
+
+    /// Runs `f` as a running-gear wheel of rolling radius `radius` turning about its axle
+    /// through `axle` (current frame), which runs along y in model space, as the hull
+    /// covers ground (`gpu_consts::wheel`). The shader turns it in model space, so the
+    /// frame should scale x and z alike or the wheel stretches as it turns.
+    pub fn with_wheel(&mut self, axle: Vec3, radius: f32, f: impl FnOnce(&mut Self)) {
+        use crate::gpu_consts::wheel as w;
+        assert_eq!(self.part, part::LOCOMOTION, "a wheel is running gear");
+        assert_eq!(
+            self.rig & rig::UPGRADE,
+            0,
+            "a wheel's radius borrows the refit bits"
+        );
+        let at = self.transform.transform_point3(axle);
+        let radius = radius * self.transform.matrix3.x_axis.length();
+        let steps = (radius / w::RADIUS_STEP)
+            .round()
+            .clamp(1.0, w::RADIUS_MASK as f32) as u32;
+        let previous = (self.rig, self.wheel);
+        self.rig |= w::RIG | steps << w::RADIUS_SHIFT;
+        self.wheel = Some([at.x, at.z]);
+        f(self);
+        (self.rig, self.wheel) = previous;
     }
 
     pub fn spins(&self) -> Vec<(u32, u32, [f32; 3])> {
@@ -1763,7 +1790,7 @@ impl MeshBuilder {
                         }
                     })
                     .to_array(),
-                uv,
+                uv: self.wheel.unwrap_or(uv),
                 material: self.material,
                 part: self.part,
                 rig: self.rig,

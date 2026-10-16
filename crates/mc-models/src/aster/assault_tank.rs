@@ -200,21 +200,27 @@ fn track_unit(b: &mut MeshBuilder, x0: f32, x1: f32) {
             b.paint(METAL);
             for f in [0.25, 0.5, 0.75] {
                 let x = x0 + (x1 - x0) * f;
-                b.cylinder_between(
-                    v3(x, face, 0.77 * h),
-                    v3(x, outer - 0.25, 0.77 * h),
-                    0.07 * h,
-                    0.07 * h,
-                    8,
-                );
+                b.with_wheel(v3(x, 0.0, 0.77 * h), 0.07 * h, |b| {
+                    b.cylinder_between(
+                        v3(x, face, 0.77 * h),
+                        v3(x, outer - 0.25, 0.77 * h),
+                        0.07 * h,
+                        0.07 * h,
+                        8,
+                    );
+                });
             }
         }
     });
 }
 
 /// A road wheel on the +y side, its outer face at `center.y`: a dark rim over a light
-/// disc, and a hub cap.
+/// disc, and a hub cap. It rolls on the belt's lower run.
 fn road_wheel(b: &mut MeshBuilder, center: Vec3, r: f32, width: f32) {
+    b.with_wheel(center, r, |b| road_wheel_parts(b, center, r, width));
+}
+
+fn road_wheel_parts(b: &mut MeshBuilder, center: Vec3, r: f32, width: f32) {
     let at = |y: f32| v3(center.x, center.y + y, center.z);
     b.paint(ACCENT);
     b.cylinder_between(at(-width + 0.05), at(-0.1), r, r, b.sides(12));
@@ -226,8 +232,13 @@ fn road_wheel(b: &mut MeshBuilder, center: Vec3, r: f32, width: f32) {
     }
 }
 
-/// A toothed drive sprocket or idler on the +y side, its outer face at `center.y`.
+/// A toothed drive sprocket or idler on the +y side, its outer face at `center.y`. It
+/// turns with the belt, its teeth (at 1.05 `r`) in the links.
 fn sprocket(b: &mut MeshBuilder, center: Vec3, r: f32) {
+    b.with_wheel(center, r * 1.05, |b| sprocket_parts(b, center, r));
+}
+
+fn sprocket_parts(b: &mut MeshBuilder, center: Vec3, r: f32) {
     let at = |y: f32| v3(center.x, center.y + y, center.z);
     b.paint(METAL);
     b.cylinder_between(at(-0.1), at(0.1), r, r, b.sides(12));
