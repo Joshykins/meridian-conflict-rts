@@ -45,7 +45,7 @@ impl Game {
         self.cine.hand_back_lift(&mut self.camera);
         if self.orbit_saved.is_none()
             && !self.hud.browser_open()
-            && !self.hud.net.typing()
+            && !self.hud.typing()
             && !cine
             && memory.editing.is_none()
         {
@@ -464,6 +464,7 @@ impl Game {
             crate::edict_marks::draw(&mut ui, &field, self.ground_under_cursor(renderer));
             crate::warp_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));
             crate::destruct_marks::draw(&mut ui, &field, alpha);
+            crate::pings::draw(&mut ui, &field, &self.hud.pings);
             self.draw_mind_map(&mut ui, &field, renderer);
             if self.pointer == Pointer::Attack {
                 if let Some(target) = self.unit_at(self.cursor) {

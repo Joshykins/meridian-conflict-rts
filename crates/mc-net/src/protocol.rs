@@ -24,7 +24,7 @@ use mc_core::{PlayerId, MAX_PLAYERS};
 use crate::wire::{Dec, Enc, NetError, Result};
 
 /// Bumped on any incompatible change. Checked before anything else in `Hello`.
-pub const PROTOCOL_VERSION: u32 = 47;
+pub const PROTOCOL_VERSION: u32 = 48;
 
 /// Hard cap on a frame payload, enforced on both send and receive.
 pub const MAX_FRAME_LEN: usize = 20 << 20;
@@ -43,6 +43,8 @@ pub const SNAPSHOT_CHUNK_LEN: usize = 256 << 10;
 pub const MAX_SNAPSHOT_LEN: usize = 256 << 20;
 pub const MAX_NAME_LEN: usize = 64;
 pub const MAX_CHAT_LEN: usize = 512;
+/// A map ping's message.
+pub const MAX_PING_TEXT_LEN: usize = 160;
 pub const MAX_SETUP_LEN: usize = 4 << 10;
 pub const MAX_OPTIONS_LEN: usize = 64 << 10;
 pub const MAX_INPUT_DELAY: u32 = 50;

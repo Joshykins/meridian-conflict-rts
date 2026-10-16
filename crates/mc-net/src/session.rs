@@ -78,6 +78,13 @@ pub enum SessionEvent {
         watchers: bool,
         text: String,
     },
+    /// An ally marked the map: `kind`, `at` and `text` are as the game sent them.
+    MapPing {
+        from: PlayerId,
+        kind: u8,
+        at: [i32; 2],
+        text: String,
+    },
     /// After `Started`: which slots have loaded (one bit each). The clock starts
     /// when all have, or when the relay stops waiting.
     Loading {
@@ -163,6 +170,18 @@ pub trait Session {
     /// match has anyone to hear it.
     fn chat(&mut self, _text: &str, _to: mc_core::PlayerMask) -> Result<(), NetError> {
         Err(NetError::Limit("there is nobody to talk to"))
+    }
+
+    /// Marks the map for the slots in `to` (one bit each, the sender left out).
+    /// Only a network match has anyone to show it to.
+    fn map_ping(
+        &mut self,
+        _kind: u8,
+        _at: [i32; 2],
+        _text: &str,
+        _to: mc_core::PlayerMask,
+    ) -> Result<(), NetError> {
+        Err(NetError::Limit("there is nobody to show it to"))
     }
 
     /// Runs the clock at `percent` of real time: a single-player match's own, or a

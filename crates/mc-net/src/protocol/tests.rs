@@ -143,6 +143,13 @@ fn samples() -> Vec<Message> {
             watchers: false,
             text: "".into(),
         },
+        Message::MapPing {
+            from: Some(PlayerId(3)),
+            to: 0b1001,
+            kind: 2,
+            at: [-15, 40_960],
+            text: "push here".into(),
+        },
         Message::Leave,
         Message::Watching,
         Message::MatchEnd,

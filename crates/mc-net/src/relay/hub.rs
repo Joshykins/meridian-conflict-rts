@@ -565,6 +565,13 @@ impl Hub {
             Message::Ping(n) => self.send(id, &Message::Pong(n)),
             Message::Pong(stamp) => self.on_pong(id, stamp),
             Message::Chat { to, text, .. } => self.on_chat(id, player, to, text),
+            Message::MapPing {
+                to, kind, at, text, ..
+            } => {
+                if let Some(from) = playing {
+                    self.on_map_ping(id, from, to, kind, at, text);
+                }
+            }
             Message::Leave => self.drop_conn(id, &NetError::Closed),
 
             // Lobby traffic can cross with `Start` on the wire; after the start it is ignored, not an offence.
@@ -700,27 +707,12 @@ impl Hub {
         to: mc_core::PlayerMask,
         text: String,
     ) {
-        let now = Instant::now();
-        let Some(conn) = self.conns.get_mut(&id) else {
+        if !self.spend_chat_token(id) {
+            return;
+        }
+        let Some(conn) = self.conns.get(&id) else {
             return;
         };
-        let refills =
-            (now.duration_since(conn.chat_refilled).as_millis() / CHAT_REFILL.as_millis()) as u32;
-        if refills > 0 {
-            conn.chat_tokens = (conn.chat_tokens + refills).min(CHAT_BURST);
-            conn.chat_refilled = now;
-        }
-        if conn.chat_tokens == 0 {
-            let notice = Message::Chat {
-                from: None,
-                name: String::new(),
-                to: 0,
-                watchers: false,
-                text: "Slow down: chat allows about one message a second.".into(),
-            };
-            return self.send(id, &notice);
-        }
-        conn.chat_tokens -= 1;
         // Once the match is on, those watching it (observers, and players already
         // out) see every side: what they say stays among themselves.
         let watcher = |slots: &[Slot], kind: Kind| match kind {
@@ -751,6 +743,70 @@ impl Hub {
                     Kind::Player(s) => **cid == id || to & mc_core::player_bit(s.0) != 0,
                     _ => false,
                 }
+            })
+            .map(|(cid, _)| *cid)
+            .collect();
+        for cid in ids {
+            self.send_frame(cid, &f);
+        }
+    }
+
+    /// Takes one of the connection's chat allowance (pings spend it too). With none
+    /// left the sender is told to slow down, and false says to drop the message.
+    fn spend_chat_token(&mut self, id: ConnId) -> bool {
+        let now = Instant::now();
+        let Some(conn) = self.conns.get_mut(&id) else {
+            return false;
+        };
+        let refills =
+            (now.duration_since(conn.chat_refilled).as_millis() / CHAT_REFILL.as_millis()) as u32;
+        if refills > 0 {
+            conn.chat_tokens = (conn.chat_tokens + refills).min(CHAT_BURST);
+            conn.chat_refilled = now;
+        }
+        if conn.chat_tokens == 0 {
+            let notice = Message::Chat {
+                from: None,
+                name: String::new(),
+                to: 0,
+                watchers: false,
+                text: "Slow down: chat allows about one message a second.".into(),
+            };
+            self.send(id, &notice);
+            return false;
+        }
+        conn.chat_tokens -= 1;
+        true
+    }
+
+    /// A ping goes to the players in `to` and never back to its sender. Only a
+    /// player still in the match may ping: those watching see every side.
+    fn on_map_ping(
+        &mut self,
+        id: ConnId,
+        from: PlayerId,
+        to: mc_core::PlayerMask,
+        kind: u8,
+        at: [i32; 2],
+        text: String,
+    ) {
+        if self.game.is_none() || to == 0 || !self.spend_chat_token(id) {
+            return;
+        }
+        let msg = Message::MapPing {
+            from: Some(from),
+            to,
+            kind,
+            at,
+            text,
+        };
+        let Some(f) = frame(&msg) else { return };
+        let ids: Vec<ConnId> = self
+            .conns
+            .iter()
+            .filter(|(cid, c)| match c.kind {
+                Kind::Player(s) => **cid != id && to & mc_core::player_bit(s.0) != 0,
+                _ => false,
             })
             .map(|(cid, _)| *cid)
             .collect();

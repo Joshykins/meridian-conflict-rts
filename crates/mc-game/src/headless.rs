@@ -917,6 +917,24 @@ pub fn screenshot(
     if shot.range_maps {
         hud.browse_range_maps(&map);
     }
+    // `MERIDIAN_PINGS=1|draft`: map pings standing round the camera, an Attack ping in
+    // hand, and with `draft` a message ping's words being typed.
+    if let Ok(v) = std::env::var("MERIDIAN_PINGS") {
+        let spread = camera.distance * 0.18;
+        let name = view
+            .status
+            .players
+            .first()
+            .map_or("Commander", |p| p.name.as_str());
+        hud.stage_pings(camera.focus.truncate(), spread, name);
+        view.mode = crate::game::Mode::Ping(crate::pings::PingKind::Attack);
+        if v == "draft" {
+            hud.pings.draft = Some(crate::pings::Draft {
+                at: camera.focus.truncate(),
+                text: "push with me at the bridge".into(),
+            });
+        }
+    }
     hud.details_open = shot.details;
     hud.mind_view.map = shot_mind_map();
     // `MERIDIAN_ISSUE_NOTE=TEXT`: the report card's note, typed.
@@ -1071,6 +1089,7 @@ pub fn screenshot(
         crate::edict_marks::draw(&mut ui, &field, pointer);
         crate::warp_marks::draw(&mut ui, &field, 1.0, pointer);
         crate::destruct_marks::draw(&mut ui, &field, 1.0);
+        crate::pings::draw(&mut ui, &field, &hud.pings);
         if let Some(who) = view.perspective.filter(|_| view.observing) {
             let mode = hud.mind_view.map;
             if let Some(z) = crate::mind_map::draw(&mut ui, &field, mode, who, pointer) {

@@ -5,8 +5,8 @@ use mc_core::{PlayerId, PlayerMask, MAX_PLAYERS};
 use super::{
     decode_commands, decode_slot, encode_commands, ContentId, Hello, Link, LobbyPlayer, LobbyState,
     MatchConfig, MatchStart, PeerStat, RefuseReason, Role, TickBundle, Welcome, HELLO_MAGIC,
-    MAX_BUILD_LEN, MAX_CHAT_LEN, MAX_DETAIL_LEN, MAX_NAME_LEN, MAX_OPTIONS_LEN, MAX_SECTIONS,
-    MAX_SETUP_LEN, MAX_TITLE_LEN, PROTOCOL_VERSION, SNAPSHOT_CHUNK_LEN,
+    MAX_BUILD_LEN, MAX_CHAT_LEN, MAX_DETAIL_LEN, MAX_NAME_LEN, MAX_OPTIONS_LEN, MAX_PING_TEXT_LEN,
+    MAX_SECTIONS, MAX_SETUP_LEN, MAX_TITLE_LEN, PROTOCOL_VERSION, SNAPSHOT_CHUNK_LEN,
 };
 use crate::wire::{Dec, Enc, NetError, Result};
 
@@ -121,6 +121,16 @@ pub enum Message {
         watchers: bool,
         text: String,
     },
+    /// A mark on the map for the slots in `to` (never the sender), from a player
+    /// still in the match; the relay fills in `from`. `kind`, `at` and `text` are
+    /// the game's.
+    MapPing {
+        from: Option<PlayerId>,
+        to: PlayerMask,
+        kind: u8,
+        at: [i32; 2],
+        text: String,
+    },
 }
 
 // Tags are the wire format: never renumber, never reuse a retired one.
@@ -161,6 +171,7 @@ pub(super) mod tag {
     pub(in crate::protocol) const SET_CONTENT: u8 = 34;
     pub(in crate::protocol) const SPEED: u8 = 35;
     pub(in crate::protocol) const WATCHING: u8 = 36;
+    pub(in crate::protocol) const MAP_PING: u8 = 37;
 }
 
 fn encode_opt_slot(e: &mut Enc, slot: Option<PlayerId>) {
@@ -346,6 +357,21 @@ impl Message {
                 e.str(name);
                 e.u32(*to);
                 e.bool(*watchers);
+                e.str(text);
+            }
+            Message::MapPing {
+                from,
+                to,
+                kind,
+                at,
+                text,
+            } => {
+                e.u8(tag::MAP_PING);
+                encode_opt_slot(e, *from);
+                e.u32(*to);
+                e.u8(*kind);
+                e.u32(at[0] as u32);
+                e.u32(at[1] as u32);
                 e.str(text);
             }
             Message::Leave => e.u8(tag::LEAVE),
@@ -547,6 +573,13 @@ impl Message {
                 to: d.u32()?,
                 watchers: d.bool()?,
                 text: d.str(MAX_CHAT_LEN)?,
+            },
+            tag::MAP_PING => Message::MapPing {
+                from: decode_opt_slot(d)?,
+                to: d.u32()?,
+                kind: d.u8()?,
+                at: [d.u32()? as i32, d.u32()? as i32],
+                text: d.str(MAX_PING_TEXT_LEN)?,
             },
             tag::LEAVE => Message::Leave,
             tag::WATCHING => Message::Watching,

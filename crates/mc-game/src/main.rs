@@ -47,6 +47,7 @@ mod nuke_marks;
 mod orders;
 mod perf_out;
 mod pick;
+mod pings;
 mod pointer;
 mod prefabs;
 mod range;
@@ -265,6 +266,8 @@ MERIDIAN_AIM=MODE with --screenshot: an order being aimed at --cursor, with the 
 (each ship's exit in formation and the energy card), dash a dash by hand (the wave where
 it would come down), fracture a gravitic engine's rift (its path and the well at the point),
 edict a ship's Edict (its 6 km reach, the firing point on the hull and the blast and wave rings).
+MERIDIAN_PINGS=1|draft with --screenshot: a map ping of each kind round the camera, one off
+the screen, an Attack ping in hand at --cursor; draft: a message ping's words being typed.
 
 MERIDIAN_SURVIVAL=rounds:grace:interval:intensity:fronts:tier:nodes with --scene survival:
 the rules it plays (docs/SWITCHES.md, with MERIDIAN_SURVIVAL_SPAWN and MERIDIAN_SURVIVAL_WHY);

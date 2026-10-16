@@ -225,6 +225,7 @@ Linux builds.
 | X / U / L | stop (a factory clears its queue and its orders) / upgrade the selection to its next tier (structures, the commander's engineering suites) / toggle a factory's repeat (Shift+L: its batch) |
 | G / FORMATION | open formation controls: together/free movement, compact/standard/wide spacing, and form up here |
 | minimap | left click or drag: look there (or aim the armed order); right click: order the selection there |
+| H, then left click / the ping buttons beside the minimap | ping the map for your allies: Look Here, Attack, Defend, Danger, On My Way, or a Message (type its words, Enter sends). With a ping in hand 1-6 picks the kind, a click on the ground or the minimap puts it down (shift keeps it in hand), right click or Esc puts it away. Each kind has its own call; a ping lands as rings on the ground under a badge saying who and why, ripples on the minimap, points from the screen's edge when it is off the screen, and gets a line in the chat feed: click the line (or press Space for the newest) to look at it |
 | selection panel | several units: one tile per type, click keeps only that type, shift-click drops it |
 | idle engineers / idle factories chips | select them all and bring the camera |
 | Pause | pause (any player in a network match; everyone sees who) |

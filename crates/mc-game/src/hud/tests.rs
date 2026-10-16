@@ -912,6 +912,45 @@ fn the_free_camera_folds_the_panels_away_and_gives_them_back() {
 }
 
 #[test]
+fn a_ping_button_arms_a_ping_that_the_minimap_puts_down() {
+    use crate::pings::PingKind;
+    let mut rig = Rig::new("aster_t1_tank");
+    // The column runs down the map's left side from its top.
+    let top = chart().y - MINIMAP * 0.5 - 11.0;
+    let button = |i: usize| {
+        Vec2::new(
+            1920.0 - EDGE - MINIMAP - GAP - 16.0,
+            top + i as f32 * 36.0 + 16.0,
+        )
+    };
+    assert_eq!(
+        rig.click(button(1)),
+        vec![HudAction::ArmPing(PingKind::Attack)]
+    );
+    rig.view.mode = Mode::Ping(PingKind::Attack);
+    assert!(matches!(rig.click(chart())[..], [HudAction::PingAt(_)]));
+    // A message ping's words: Enter sends them as a ping where it was placed.
+    let at = Vec2::new(300.0, 400.0);
+    rig.hud.pings.draft = Some(crate::pings::Draft {
+        at,
+        text: "hold here".into(),
+    });
+    let sent = rig.frame(&Input {
+        keys: vec![crate::ui::Key::Enter],
+        ..Default::default()
+    });
+    assert_eq!(
+        sent,
+        vec![HudAction::Ping {
+            kind: PingKind::Message,
+            at,
+            text: "hold here".into()
+        }]
+    );
+    assert!(!rig.hud.typing());
+}
+
+#[test]
 fn the_top_bar_and_the_minimap_report_what_was_asked() {
     let mut rig = Rig::new("aster_t1_tank");
     // Arrows step; the middle opens every speed, and a pick closes it.

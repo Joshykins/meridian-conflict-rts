@@ -29,7 +29,8 @@ use mc_core::{PlayerId, TICKS_PER_SECOND};
 use crate::protocol::{
     check_commands, command_cost, encode_frame, read_frame, snapshot_chunks, take_commands,
     ContentId, Hello, Message, Role, SnapshotAssembler, MAX_BUILD_LEN, MAX_CHAT_LEN,
-    MAX_COMMANDS_BYTES, MAX_NAME_LEN, MAX_OPTIONS_LEN, MAX_SECTIONS, MAX_SETUP_LEN, MAX_TITLE_LEN,
+    MAX_COMMANDS_BYTES, MAX_NAME_LEN, MAX_OPTIONS_LEN, MAX_PING_TEXT_LEN, MAX_SECTIONS,
+    MAX_SETUP_LEN, MAX_TITLE_LEN,
 };
 use crate::session::{EndReason, EventQueue, Session, SessionEvent};
 use crate::wire::NetError;
@@ -408,6 +409,25 @@ impl Session for NetSession {
         })
     }
 
+    fn map_ping(
+        &mut self,
+        kind: u8,
+        at: [i32; 2],
+        text: &str,
+        to: mc_core::PlayerMask,
+    ) -> Result<(), NetError> {
+        if text.len() > MAX_PING_TEXT_LEN {
+            return Err(NetError::Limit("ping message over MAX_PING_TEXT_LEN"));
+        }
+        self.send(&Message::MapPing {
+            from: None,
+            to,
+            kind,
+            at,
+            text: text.to_owned(),
+        })
+    }
+
     fn report_desync(&mut self, tick: u32, sections: &[u64]) {
         if self.role == Role::Player && sections.len() <= MAX_SECTIONS {
             let _ = self.send(&Message::DesyncReport {
@@ -559,6 +579,18 @@ impl Reader {
                 watchers,
                 text,
             }),
+            Message::MapPing {
+                from: Some(from),
+                kind,
+                at,
+                text,
+                ..
+            } => self.emit(SessionEvent::MapPing {
+                from,
+                kind,
+                at,
+                text,
+            }),
             Message::Loading { loaded } => self.emit(SessionEvent::Loading { loaded }),
             Message::Clock {
                 paused,
@@ -604,6 +636,11 @@ impl Reader {
             | Message::SetContent(_)
             | Message::Watching => {
                 return Err(NetError::Malformed("client-only message from the relay"))
+            }
+            Message::MapPing { from: None, .. } => {
+                return Err(NetError::Malformed(
+                    "a ping from the relay without its sender",
+                ))
             }
         }
         Ok(None)

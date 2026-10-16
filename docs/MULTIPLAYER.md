@@ -139,7 +139,10 @@ Games hosted from the client (LAN, direct IP) do not check names.
    the slowest machine still sets the pace.
    In the match, Enter opens chat to everyone and Shift+Enter to your allies.
    Observers talk among themselves: the relay never passes what they say to a
-   player still fighting, since they see every side.
+   player still fighting, since they see every side. A map ping (H, or the
+   buttons beside the minimap) goes to the sender's allies alone as
+   `MapPing`, from the chat allowance; only a player still in the match may
+   ping, and the relay never echoes it back (the sender shows its own at once).
 6. **End.** The match ends for a player when it is defeated, resigns or leaves.
    A player defeated while the match goes on watches the rest as an observer
    does (every side in view, the observer panel, observer chat); its client

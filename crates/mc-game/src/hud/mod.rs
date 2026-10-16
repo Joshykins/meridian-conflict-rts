@@ -34,6 +34,7 @@ mod netplay;
 pub mod notices;
 mod observer;
 mod pause;
+mod pings;
 pub(crate) mod prefabs;
 mod priority;
 mod profiler;
@@ -191,6 +192,16 @@ pub enum HudAction {
     OrderAt(Vec2),
     /// Minimap, left button while an order is being targeted.
     TargetAt(Vec2),
+    /// Take a ping of this kind in hand, or put it away (`crate::pings`).
+    ArmPing(crate::pings::PingKind),
+    /// Minimap, left button with a ping in hand.
+    PingAt(Vec2),
+    /// A message ping with its words typed.
+    Ping {
+        kind: crate::pings::PingKind,
+        at: Vec2,
+        text: String,
+    },
     Menu,
     Pause,
     /// One of `SPEEDS`, percent.
@@ -406,6 +417,8 @@ pub struct Hud {
     unclaimed: bool,
     /// Chat and the link's news in a network match (`netplay.rs`).
     pub net: netplay::NetHud,
+    /// Map pings standing and a message ping's words being typed (`crate::pings`).
+    pub pings: crate::pings::Pings,
     /// The prefab save box, and a prefab delete waiting to be confirmed (`prefabs.rs`).
     pub prefabs: prefabs::PrefabUi,
 }
@@ -615,6 +628,7 @@ impl Hud {
             self.build_keys = false;
             ui.mem.popup = None;
         }
+        self.pings.tick(dt);
         self.net_news(ui, s);
         // The mine survey lies on the world, under every panel.
         mine_marks(ui, s, &mut self.survey);
@@ -722,6 +736,13 @@ impl Hud {
             minimap::draw(self, ui, s, map_rect);
             (ui.fade, ui.shift, ui.interactive) = (fade, shift, live);
         }
+        // The ping buttons stand beside the map, or its tab.
+        let map_left = if self.minimap_hidden {
+            w - EDGE - 96.0
+        } else {
+            map_rect.x
+        };
+        self.ping_bar(ui, s, map_left - GAP, under_top + GAP);
         // Survival's rounds and Shapers, under the map.
         self.survival.card = survival::draw(
             self,
@@ -747,7 +768,11 @@ impl Hud {
         // The bottom deck: whatever the selection is.
         let deck_y = h - EDGE - DECK_H;
         // Chat rises from over the deck.
-        self.net_chat(ui, s, deck_y - 24.0 - 8.0 - 12.0, dt);
+        // A message ping's words are typed where chat's are, the feed over them.
+        let chat_bottom = deck_y - 24.0 - 8.0 - 12.0;
+        let feed_bottom = chat_bottom - if self.pings.typing() { 46.0 } else { 0.0 };
+        self.net_chat(ui, s, feed_bottom, dt);
+        self.ping_draft(ui, chat_bottom);
 
         drop(part);
         let part = mc_core::perf_span!("ui.hud.deck");
@@ -1099,6 +1124,7 @@ pub fn cursor_hint(
                 Targeting::Edict => crate::edict_marks::EDICT,
             },
         ),
+        Mode::Ping(kind) => (format!("Ping: {}", kind.label()), kind.tone()),
         Mode::Place(b) => {
             let name = blueprints.unit(b).name.clone();
             let why = sites.iter().find_map(|(_, f)| f.err());
@@ -1180,6 +1206,9 @@ pub fn cursor_hint(
         }
         Mode::Target(Targeting::Nuke) => {
             "Click anywhere on the map or the minimap  \u{b7}  RMB cancels"
+        }
+        Mode::Ping(_) => {
+            "Click the map or the minimap  \u{b7}  1-6 kind  \u{b7}  Shift keeps pinging  \u{b7}  RMB cancels"
         }
         _ => "LMB Confirms  \u{b7}  RMB Cancels",
     };

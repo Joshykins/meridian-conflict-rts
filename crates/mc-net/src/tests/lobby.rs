@@ -161,6 +161,31 @@ fn chat_to_allies_reaches_only_them_with_the_senders_name() {
 }
 
 #[test]
+fn pings_reach_the_allies_named_and_not_the_sender_or_enemy() {
+    let relay = relay(3, |_| {});
+    let mut clients = start_match(relay.local_addr(), 3);
+    // Player 0 pings for player 1; player 2 is the enemy.
+    clients[0]
+        .session
+        .map_ping(1, [120, -40], "here", 0b010)
+        .unwrap();
+    pump_until(&mut refs(&mut clients), "ping", |cs| {
+        !cs[1].pings.is_empty()
+    });
+    assert_eq!(
+        clients[1].pings,
+        [(PlayerId(0), 1, [120, -40], "here".to_owned())]
+    );
+    // A chat after the ping arrives after it: by then the ping would have too.
+    clients[0].session.chat("done", 0).unwrap();
+    pump_until(&mut refs(&mut clients), "chat", |cs| {
+        cs[0].chat.len() == 1 && cs[2].chat.len() == 1
+    });
+    assert!(clients[0].pings.is_empty() && clients[2].pings.is_empty());
+    relay.shutdown().unwrap();
+}
+
+#[test]
 fn chat_floods_are_slowed() {
     let relay = relay(1, |_| {});
     let mut clients = start_match(relay.local_addr(), 1);

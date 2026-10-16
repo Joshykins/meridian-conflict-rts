@@ -104,6 +104,13 @@ pub enum NetNotice {
         watchers: bool,
         text: String,
     },
+    /// An ally marked the map (`pings.rs`): `at` on the ground in metres.
+    MapPing {
+        from: u8,
+        kind: crate::pings::PingKind,
+        at: glam::Vec2,
+        text: String,
+    },
     Dropped(u8),
     Rejoined(u8),
     Paused(Option<u8>),
@@ -126,6 +133,13 @@ pub struct NetShared {
 /// What the interface asks the session for.
 pub enum NetRequest {
     Chat {
+        text: String,
+        to: mc_core::PlayerMask,
+    },
+    /// Mark the map for the slots in `to` (never this one).
+    MapPing {
+        kind: crate::pings::PingKind,
+        at: glam::Vec2,
         text: String,
         to: mc_core::PlayerMask,
     },
@@ -207,6 +221,16 @@ pub fn pair(
     )
 }
 
+/// A ping's ground position as the wire carries it: tenths of a metre.
+fn wire_at(at: glam::Vec2) -> [i32; 2] {
+    // `as` saturates: a point off any map stays off it.
+    [(at.x * 10.0).round() as i32, (at.y * 10.0).round() as i32]
+}
+
+fn ground_at(at: [i32; 2]) -> glam::Vec2 {
+    glam::Vec2::new(at[0] as f32, at[1] as f32) / 10.0
+}
+
 fn lock(m: &Mutex<NetShared>) -> std::sync::MutexGuard<'_, NetShared> {
     m.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
 }
@@ -219,6 +243,12 @@ impl NetDriver {
                 NetRequest::Chat { text, to } => {
                     if let Err(e) = session.chat(&text, to) {
                         log::warn!("chat not sent: {e}");
+                    }
+                }
+                NetRequest::MapPing { kind, at, text, to } => {
+                    let at = wire_at(at);
+                    if let Err(e) = session.map_ping(kind as u8, at, &text, to) {
+                        log::warn!("ping not sent: {e}");
                     }
                 }
                 NetRequest::Pause(paused) => {
@@ -296,6 +326,22 @@ impl NetDriver {
                 watchers: *watchers,
                 text: text.clone(),
             }),
+            SessionEvent::MapPing {
+                from,
+                kind,
+                at,
+                text,
+            } => {
+                // Only a broken or hostile peer sends a kind this build does not know.
+                if let Some(kind) = crate::pings::PingKind::from_wire(*kind) {
+                    s.notices.push(NetNotice::MapPing {
+                        from: from.0,
+                        kind,
+                        at: ground_at(*at),
+                        text: text.clone(),
+                    });
+                }
+            }
             SessionEvent::PlayerDropped(p) => s.notices.push(NetNotice::Dropped(p.0)),
             SessionEvent::PlayerRejoined(p) => {
                 if Some(p.0) == self.local {

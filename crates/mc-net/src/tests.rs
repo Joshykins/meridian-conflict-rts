@@ -84,6 +84,8 @@ struct Client<S: Session> {
     chat: Vec<(Option<PlayerId>, String)>,
     /// What was said among the watchers (`SessionEvent::Chat::watchers`).
     watchers_chat: Vec<(Option<PlayerId>, String)>,
+    /// Map pings: from, kind, at, text.
+    pings: Vec<(PlayerId, u8, [i32; 2], String)>,
     /// The last `Clock`: paused, by whom, input delay.
     clock: Option<(bool, Option<PlayerId>, u32)>,
     /// The last `Clock`'s speed.
@@ -120,6 +122,7 @@ impl<S: Session> Client<S> {
             rejoined: Vec::new(),
             chat: Vec::new(),
             watchers_chat: Vec::new(),
+            pings: Vec::new(),
             clock: None,
             speed: None,
             loading: None,
@@ -230,6 +233,12 @@ impl<S: Session> Client<S> {
                         self.chat.push((from, text));
                     }
                 }
+                SessionEvent::MapPing {
+                    from,
+                    kind,
+                    at,
+                    text,
+                } => self.pings.push((from, kind, at, text)),
                 SessionEvent::Clock {
                     paused,
                     speed,

@@ -12,7 +12,9 @@ use super::notices::Glyph;
 use super::{Hud, HudAction, Scene, EDGE};
 use crate::audio::Sfx;
 use crate::netplay::NetNotice;
+use crate::pings::PingKind;
 use crate::ui::{id, ink, palette, rgb, type_scale, Key, Rect, Ui};
+use glam::Vec2;
 use std::collections::VecDeque;
 
 /// Lines kept; the oldest go first.
@@ -36,6 +38,8 @@ struct Line {
     watchers: bool,
     text: String,
     age: f32,
+    /// A map ping's line: its kind and where it is, which a click on the line looks at.
+    ping: Option<(PingKind, Vec2)>,
 }
 
 struct Draft {
@@ -55,6 +59,27 @@ impl NetHud {
         self.draft.is_some()
     }
 
+    /// A map ping, as a line to the allies: its kind, or a message ping's words.
+    pub(super) fn ping_line(&mut self, from: u8, name: &str, kind: PingKind, at: Vec2, text: &str) {
+        let text = if text.is_empty() {
+            kind.label().to_owned()
+        } else {
+            text.to_owned()
+        };
+        self.lines.push_back(Line {
+            from: Some(from),
+            name: name.to_owned(),
+            private: true,
+            watchers: false,
+            text,
+            age: 0.0,
+            ping: Some((kind, at)),
+        });
+        if self.lines.len() > KEPT {
+            self.lines.pop_front();
+        }
+    }
+
     /// Opens the chat line with `text` typed (headless screenshots).
     pub fn stage_draft(&mut self, text: &str, allies: bool) {
         self.draft = Some(Draft {
@@ -65,7 +90,7 @@ impl NetHud {
 }
 
 /// A slot's name as the match knows it.
-fn name_of(s: &Scene, slot: u8) -> String {
+pub(super) fn name_of(s: &Scene, slot: u8) -> String {
     s.view
         .status
         .players
@@ -115,11 +140,18 @@ impl Hud {
                         watchers: *watchers,
                         text: text.clone(),
                         age: 0.0,
+                        ping: None,
                     });
                     if self.net.lines.len() > KEPT {
                         self.net.lines.pop_front();
                     }
                 }
+                NetNotice::MapPing {
+                    from,
+                    kind,
+                    at,
+                    text,
+                } => self.ping_arrived(ui, s, *from, *kind, *at, text),
                 NetNotice::Dropped(slot) => self.notices.note(
                     format!("net-drop-{slot}"),
                     format!("{} lost connection", name_of(s, *slot)),
@@ -177,7 +209,8 @@ impl Hud {
 
     /// The chat feed and its input line, their bottom edge at `bottom`.
     pub(super) fn net_chat(&mut self, ui: &mut Ui, s: &Scene, bottom: f32, dt: f32) {
-        if s.net.is_none() {
+        // On one machine there is nobody to talk to, but pings still have their lines.
+        if s.net.is_none() && self.net.lines.is_empty() {
             return;
         }
         for line in &mut self.net.lines {
@@ -188,7 +221,9 @@ impl Hud {
         let mut sent = None;
         match &mut self.net.draft {
             None => {
-                if ui.interactive && !typing && ui.input.key(Key::Enter) {
+                // A message ping's words take Enter while they are typed.
+                let typing = typing || self.pings.typing();
+                if s.net.is_some() && ui.interactive && !typing && ui.input.key(Key::Enter) {
                     ui.audio.play(Sfx::Tick);
                     self.net.draft = Some(Draft {
                         text: String::new(),
@@ -270,6 +305,10 @@ impl Hud {
             .rev()
             .take(shown)
             .filter(|l| open || l.age < LIFE);
+        // A ping's line looks at its ping when clicked; only those lines keep the
+        // pointer from the battlefield under the feed.
+        let mut ping_rows = Vec::new();
+        let mut look = None;
         // Newest at the bottom, just over the input line.
         for (i, line) in lines.enumerate() {
             let y = bottom - input_h - if open { 8.0 } else { 0.0 } - (i as f32 + 0.5) * LINE_H;
@@ -286,8 +325,36 @@ impl Hud {
                     ink(0.0),
                 );
             }
-            chat_line(ui, s, line, EDGE + 12.0, y, fade);
+            let mut x = EDGE + 12.0;
+            if let Some((kind, at)) = line.ping {
+                if fade > 0.2 {
+                    let w = 34.0
+                        + ui.text_width(type_scale::VALUE, &line.name)
+                        + ui.text_width(type_scale::BODY, &line.text);
+                    let row = Rect::new(EDGE, y - LINE_H * 0.5, w.min(WIDTH), LINE_H);
+                    let res = ui.interact(id("chat-ping", i), row, true);
+                    ui.fill(row, rgb(kind.tone(), 0.16 * res.glow * fade));
+                    if res.hovered {
+                        super::build::tip(ui, row.right() + 8.0, row.y - 2.0, "Click to look");
+                    }
+                    if res.clicked {
+                        ui.audio.play(Sfx::Tick);
+                        look = Some(at);
+                    }
+                    ping_rows.push(row);
+                }
+                let f = ui.fade;
+                ui.fade *= fade;
+                crate::pings::badge(ui, kind, Vec2::new(x + 7.0, y), 8.5);
+                ui.fade = f;
+                x += 22.0;
+            }
+            chat_line(ui, s, line, x, y, fade);
         }
+        for row in ping_rows {
+            self.claim(ui, row);
+        }
+        self.actions.extend(look.map(HudAction::LookAt));
         if k > 0.01 {
             self.chat_input(
                 ui,
@@ -389,7 +456,7 @@ fn chat_line(ui: &mut Ui, s: &Scene, line: &Line, x: f32, y: f32, fade: f32) {
             rgb(palette::DIM, fade),
             "Observers",
         ) + 8.0;
-    } else if line.private {
+    } else if line.private && line.ping.is_none() {
         x = ui.text(x, y, type_scale::MICRO, rgb(palette::DIM, fade), "Allies") + 8.0;
     }
     let tone = match line.from {

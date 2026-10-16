@@ -1,0 +1,77 @@
+// Map pings (`pings.rs`, `hud/pings.rs`): one call per kind, heard by whoever placed
+// it and the allies it was for, at interface volume and from no place in the world.
+// Each kind must be told apart with the eyes shut and the battle loud: a sonar ping
+// to look, a brass stab to attack, a shield's clang to defend, a falling alarm for
+// danger, a rising run for on my way, and a soft chime for a message. All short:
+// a team pings a lot.
+(
+    sounds: {
+        // Look here: a sonar ping, metal and bright, and its echo answering from the
+        // other side a beat later.
+        "ping_look": (
+            length: 1.3, peak: 0.34, room: 0.6,
+            layers: [
+                Fm(from: 1318.5, to: 1318.5, glide: 1, ratio: 3.5, index: 0.5, fade: 0.08, attack: 0.002, decay: 0.32, gain: 0.7, pan: -0.2),
+                Tone(from: 659.3, to: 659.3, glide: 1, attack: 0.002, decay: 0.22, gain: 0.35, pan: -0.2),
+                Fm(at: 0.2, from: 1318.5, to: 1318.5, glide: 1, ratio: 3.5, index: 0.4, fade: 0.08, attack: 0.002, decay: 0.26, gain: 0.3, pan: 0.3),
+                Sweep(from: 3200, to: 1600, glide: 0.08, q: 3, attack: 0.001, decay: 0.03, gain: 0.25),
+            ],
+        ),
+        // Attack: a hit and a low thump, then a brass stab up a fourth, twice, the
+        // second held: da-DAAH.
+        "ping_attack": (
+            length: 1.4, peak: 0.42, room: 0.5,
+            layers: [
+                Burst(low: 90, high: 900, attack: 0.0005, decay: 0.02, gain: 1.6),
+                Tone(from: 110, to: 46, glide: 0.12, attack: 0.002, decay: 0.16, gain: 1.0),
+                Fm(at: 0.02, from: 220, to: 220, glide: 1, ratio: 1, index: 2.0, fade: 0.06, attack: 0.004, decay: 0.07, gain: 0.5, pan: -0.1),
+                Fm(at: 0.02, from: 330, to: 330, glide: 1, ratio: 1, index: 1.6, fade: 0.06, attack: 0.004, decay: 0.07, gain: 0.3, pan: 0.1),
+                Fm(at: 0.16, from: 293.7, to: 293.7, glide: 1, ratio: 1, index: 2.2, fade: 0.2, attack: 0.006, decay: 0.3, gain: 0.55, pan: -0.1),
+                Fm(at: 0.16, from: 440, to: 440, glide: 1, ratio: 1, index: 1.7, fade: 0.2, attack: 0.006, decay: 0.3, gain: 0.32, pan: 0.1),
+                Drive(1.2),
+                Sweep(at: 0.16, from: 600, to: 2400, glide: 0.2, q: 2, attack: 0.01, decay: 0.08, gain: 0.2),
+            ],
+        ),
+        // Defend: a shield's clang, then a horn falling a fifth and holding, steady.
+        "ping_defend": (
+            length: 1.6, peak: 0.4, room: 0.7,
+            layers: [
+                Fm(from: 523.3, to: 523.3, glide: 1, ratio: 1.41, index: 1.4, fade: 0.1, attack: 0.001, decay: 0.24, gain: 0.5),
+                Burst(low: 200, high: 1400, attack: 0.0005, decay: 0.012, gain: 0.9),
+                Fm(at: 0.08, from: 392, to: 392, glide: 1, ratio: 1, index: 1.2, fade: 0.15, attack: 0.01, decay: 0.16, gain: 0.45, pan: 0.15),
+                Fm(at: 0.24, from: 261.6, to: 261.6, glide: 1, ratio: 1, index: 1.3, fade: 0.3, attack: 0.012, decay: 0.42, gain: 0.55, pan: -0.15),
+                Tone(at: 0.24, from: 130.8, to: 130.8, glide: 1, attack: 0.02, decay: 0.4, gain: 0.45),
+            ],
+        ),
+        // Danger: three quick falling calls, each a step lower, over a low pulse.
+        "ping_danger": (
+            length: 1.3, peak: 0.4, room: 0.45,
+            layers: [
+                Fm(from: 987.8, to: 830.6, glide: 0.1, ratio: 1, index: 1.5, fade: 0.06, attack: 0.003, decay: 0.07, gain: 0.5, pan: -0.2),
+                Fm(at: 0.13, from: 880, to: 740, glide: 0.1, ratio: 1, index: 1.5, fade: 0.06, attack: 0.003, decay: 0.07, gain: 0.5, pan: 0.2),
+                Fm(at: 0.26, from: 784, to: 587.3, glide: 0.18, ratio: 1, index: 1.6, fade: 0.1, attack: 0.003, decay: 0.2, gain: 0.55),
+                Tone(from: 98, to: 73.4, glide: 0.4, attack: 0.01, decay: 0.3, gain: 0.6),
+            ],
+        ),
+        // On my way: air rushing up, and a quick run up the major chord.
+        "ping_on_my_way": (
+            length: 1.2, peak: 0.36, room: 0.5,
+            layers: [
+                Sweep(from: 300, to: 2600, glide: 0.25, q: 1.6, attack: 0.08, decay: 0.12, gain: 0.5),
+                Fm(at: 0.04, from: 523.3, to: 523.3, glide: 1, ratio: 2, index: 0.8, fade: 0.06, attack: 0.003, decay: 0.07, gain: 0.4, pan: -0.25),
+                Fm(at: 0.1, from: 659.3, to: 659.3, glide: 1, ratio: 2, index: 0.8, fade: 0.06, attack: 0.003, decay: 0.07, gain: 0.4),
+                Fm(at: 0.16, from: 784, to: 784, glide: 1, ratio: 2, index: 0.8, fade: 0.1, attack: 0.003, decay: 0.07, gain: 0.4, pan: 0.25),
+                Fm(at: 0.22, from: 1046.5, to: 1046.5, glide: 1, ratio: 2, index: 0.7, fade: 0.15, attack: 0.004, decay: 0.26, gain: 0.45),
+            ],
+        ),
+        // A message: two soft bell notes up a fourth, like a letter landing.
+        "ping_message": (
+            length: 1.4, peak: 0.3, room: 0.65,
+            layers: [
+                Fm(from: 1174.7, to: 1174.7, glide: 1, ratio: 2, index: 0.6, fade: 0.1, attack: 0.003, decay: 0.2, gain: 0.5, pan: -0.15),
+                Fm(at: 0.11, from: 1568, to: 1568, glide: 1, ratio: 2, index: 0.5, fade: 0.12, attack: 0.003, decay: 0.34, gain: 0.5, pan: 0.15),
+                Tone(at: 0.11, from: 784, to: 784, glide: 1, attack: 0.004, decay: 0.3, gain: 0.25),
+            ],
+        ),
+    },
+)

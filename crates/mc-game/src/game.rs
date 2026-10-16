@@ -58,6 +58,8 @@ mod mine_placing;
 mod music_notes;
 #[path = "game_orbit.rs"]
 mod orbit_input;
+#[path = "game_pings.rs"]
+mod ping_input;
 #[path = "game_place.rs"]
 mod place_turn;
 #[path = "game_prefabs.rs"]
@@ -200,6 +202,8 @@ pub enum Mode {
     SpawnSubject,
     /// A saved prefab in hand: the next click places it (`game_prefabs.rs`).
     Prefab(crate::prefabs::PrefabId),
+    /// A map ping in hand: the next click puts it down (`game_pings.rs`).
+    Ping(crate::pings::PingKind),
 }
 
 pub struct View {
@@ -1366,6 +1370,10 @@ impl Game {
                 self.place_from = None;
             }
             Mode::Prefab(id) => self.place_prefab(id, r, audio),
+            Mode::Ping(_) => {
+                let ground = self.ground_under_cursor(r).map(|g| g.truncate());
+                self.ping_at(ground, audio);
+            }
             Mode::Target(Targeting::Patrol) => match self.ground_under_cursor(r) {
                 Some(g) => self.lay_patrol_post(g.truncate(), audio),
                 None => audio.play(Sfx::Deny),
@@ -2169,7 +2177,7 @@ impl Game {
                     Pointer::Denied
                 }
             }
-            Mode::Spawn | Mode::SpawnSubject => {
+            Mode::Spawn | Mode::SpawnSubject | Mode::Ping(_) => {
                 if ground().is_some() {
                     Pointer::Place
                 } else {
@@ -2453,6 +2461,9 @@ impl Game {
                     self.targeted_order(targeting, Some(at), None, audio);
                 }
             }
+            HudAction::ArmPing(kind) => self.arm_ping(kind, audio),
+            HudAction::PingAt(at) => self.ping_at(Some(at), audio),
+            HudAction::Ping { kind, at, text } => self.send_ping(kind, at, text, audio),
             HudAction::Menu => self.open_menu(audio),
             HudAction::Pause => self.toggle_pause(),
             HudAction::Seek(tick) => *self.sim.seek.lock().unwrap() = Some(tick),
@@ -2865,7 +2876,7 @@ impl Game {
 
     fn key_pressed(&mut self, code: KeyCode, r: &Renderer, audio: &Audio) {
         // The chat line has the keyboard: its letters are words, not orders.
-        if self.hud.net.typing() {
+        if self.hud.typing() {
             return;
         }
         // A structure or prefab in hand turns on R, a prefab mirrors on F (`game_place.rs`),
@@ -2938,6 +2949,9 @@ impl Game {
                 }
                 _ => {}
             }
+        }
+        if self.ping_key(code, audio) {
+            return;
         }
         // Another order key puts the formation panel away.
         if matches!(

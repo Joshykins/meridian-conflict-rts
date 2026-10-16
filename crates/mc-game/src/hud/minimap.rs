@@ -399,6 +399,9 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
     // Titans and their great bores' strikes (`titan.rs`).
     super::titan::minimap(ui, s, chart, &|p| chart_pos(s, chart, p));
 
+    // Map pings (`pings.rs`).
+    super::pings::chart(ui, &hud.pings, chart, &|p| chart_pos(s, chart, p));
+
     ui.frame(chart, rgb(palette::LINE, 0.22));
     // Scale ticks along the top and left edges, like a chart's border.
     for k in 1..8 {
@@ -424,6 +427,10 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
         if res.clicked {
             hud.actions.push(HudAction::TargetAt(at));
         }
+    } else if matches!(view.mode, Mode::Ping(_)) {
+        if res.clicked {
+            hud.actions.push(HudAction::PingAt(at));
+        }
     } else if res.held {
         hud.actions.push(HudAction::LookAt(at));
     }
@@ -433,7 +440,7 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
 }
 
 /// A circle on the chart, cut to its edge; too small to read is left off.
-fn ring(ui: &mut Ui, chart: Rect, c: Vec2, radius: f32, color: crate::ui::Color) {
+pub(super) fn ring(ui: &mut Ui, chart: Rect, c: Vec2, radius: f32, color: crate::ui::Color) {
     if radius < 2.0 {
         return;
     }

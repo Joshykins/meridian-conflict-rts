@@ -114,7 +114,7 @@ pub use protocol::{
     ContentId, Hello, Link, LobbyPlayer, LobbyState, MatchConfig, MatchStart, Message, PeerStat,
     PlayerCommands, PlayerSetup, RefuseReason, Role, TickBundle, Welcome, MAX_BUILD_LEN,
     MAX_CHAT_LEN, MAX_COMMANDS_BYTES, MAX_COMMAND_LEN, MAX_FRAME_LEN, MAX_NAME_LEN,
-    MAX_SNAPSHOT_LEN, MAX_SPEED, MAX_TITLE_LEN, MIN_SPEED, PROTOCOL_VERSION,
+    MAX_PING_TEXT_LEN, MAX_SNAPSHOT_LEN, MAX_SPEED, MAX_TITLE_LEN, MIN_SPEED, PROTOCOL_VERSION,
 };
 pub use relay::{
     Hold, RelayConfig, RelayHandle, RelayServer, RelaySummary, Room, RoomPhase, RoomStatus,
