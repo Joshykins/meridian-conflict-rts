@@ -402,11 +402,14 @@ impl Renderer {
             }
             self.gravitic_engine_frame(input.time, camera);
             self.edict_frame(input.time, camera);
-            // The engines' lenses, then the shimmer round an Edict's column.
+            self.gravitic_shell_frame(input.time, input.alpha.clamp(0.0, 1.0));
+            // The engines' lenses, the gravitic shells', then the shimmer round an
+            // Edict's column.
             let lenses: Vec<_> = self
                 .gravitic_engine_fx
                 .lenses
                 .iter()
+                .chain(&self.plasma_fx.shells.lenses)
                 .chain(&self.edict_fx.shimmer)
                 .copied()
                 .collect();

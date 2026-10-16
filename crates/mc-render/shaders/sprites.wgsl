@@ -343,6 +343,10 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     } else if look == PLASMA_LOOK_RAILED_LANCE {
         // A railed lance: long, longer than the Sunspear's slug.
         trace = length(stride) * 1.8;
+    } else if look == PLASMA_LOOK_GRAVITIC_SHELL {
+        // A gravitic shock shell: its knot is the shot's dot (`vs_shot`); this is the short
+        // twisting tail behind it, its filament trail laid on the CPU.
+        trace = min(length(stride) * 0.6, max(p.size, 1.0) * 5.0);
     }
     if (p.color & 0x200u) != 0u {
         trace = min(trace, distance(head, shot_muzzle(p)));
@@ -403,7 +407,8 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         * select(1.0, 1.9, look == 2u) * select(1.0, 0.45, look == PLASMA_LOOK_SURGE_SHELL)
         * select(1.0, 1.6, look == PLASMA_LOOK_AIRBURST)
         * select(1.0, 0.4, look == PLASMA_LOOK_KNOTTED_SHELL)
-        * select(1.0, 0.75, look == PLASMA_LOOK_RAILED_LANCE);
+        * select(1.0, 0.75, look == PLASMA_LOOK_RAILED_LANCE)
+        * select(1.0, 1.4, look == PLASMA_LOOK_GRAVITIC_SHELL);
     let plasma_m = p.extras.y;
     var core_frac = 0.0;
     if plasma_m > 0.0 && !beam && !fade_beam {
@@ -498,7 +503,8 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         out.shape.y = select(1.25, 1.4, red > 0.5);
         if look > 0u {
             // 7.6, 8.6, 9.6, 10.6, 14.6 (a surge shell), 15.6 (an airburst round), 16.6 (a
-            // knotted shell), 17.6 (a railed lance): the Regency plasma shots (`fs_sprite`).
+            // knotted shell), 17.6 (a railed lance), 18.6 (a gravitic shock shell): the
+            // Regency plasma shots (`fs_sprite`).
             out.color = vec3<f32>(1.0);
             out.shape.y = 6.6 + f32(look);
         }
@@ -602,6 +608,13 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
                 let white = smoothstep(0.6, 1.0, heat);
                 let cool = mix(vec3<f32>(0.3, 0.16, 0.6), mix(vec3<f32>(1.0, 0.55, 0.78), hue, 0.5), smoothstep(0.1, 0.6, heat));
                 out.color = mix(cool, vec3<f32>(1.0, 0.95, 0.98), white) * 5.0 * pow(heat, 1.3);
+            }
+            if abs(p.aim.w - FADE_BEAM_PLASMA_TRAIL_GRAVITIC) < 0.5 {
+                // A gravitic shock shell's: a lilac-white filament just behind the knot,
+                // deepening to violet and going out to a dark indigo; never red.
+                let lilac = mix(vec3<f32>(0.55, 0.12, 1.0), vec3<f32>(0.85, 0.66, 1.0), smoothstep(0.85, 1.0, heat) * 0.6);
+                let cool = mix(vec3<f32>(0.1, 0.02, 0.35), lilac, smoothstep(0.1, 0.6, heat));
+                out.color = cool * 2.6 * pow(heat, 1.3);
             }
             if knotted {
                 // White-hot for an instant behind the shell, then red, going out to a dark
@@ -716,6 +729,20 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     var center = globals.view_proj * vec4<f32>(head, 1.0);
     if (at.w < 0.0 && !beam && !fade_beam) || center.w < SHOT_NEAR {
         center = vec4<f32>(0.0, 0.0, 0.0, -1.0);
+    }
+    if plasma_look(p) == PLASMA_LOOK_GRAVITIC_SHELL && !beam && !fade_beam {
+        // A gravitic shock shell's knot (`fs_shot_lit`): a few pixels across at least, so it
+        // reads violet at any height; from orbit a violet marker, never the shells' yellow.
+        let strategic = strategic_view(center.w);
+        let px = max(size * 1.1 * globals.lod.x / max(center.w, 1.0), mix(6.0, 3.5, strategic));
+        let ndc = center.xy / center.w + corner * px * globals.viewport.zw;
+        var knot: SpriteOut;
+        knot.clip = vec4<f32>(ndc * center.w, center.z, center.w);
+        knot.uv = corner;
+        knot.color = vec3<f32>(strategic);
+        knot.shape = vec2<f32>(-3.0, px);
+        knot.share = layer_share(strategic, true);
+        return knot;
     }
     if (p.color & BOMB) != 0u {
         let ahead = globals.view_proj * vec4<f32>(head + normalize(shot_step(p) + vec3<f32>(0.0, 0.0, 1e-6)), 1.0);
@@ -869,6 +896,35 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
 }
 
 fn fs_shot_lit(in: SpriteOut) -> vec4<f32> {
+    if in.shape.x < -2.5 {
+        // A gravitic shock shell's knot (`vs_shot`): a lilac-white heart in a deep violet
+        // body that churns as the gravity holding it winds round, a thin bright rim of bent
+        // light, and outside it a dark ring where the light is pulled away. `color.r` how
+        // far it is a marker (from orbit: a plain violet dot).
+        let d = length(in.uv);
+        let now = globals.camera.w;
+        let angle = atan2(in.uv.y, in.uv.x);
+        let wind = 0.5 + 0.5 * sin(angle * 3.0 - now * 18.0 + d * 9.0);
+        let body_r = 0.5;
+        let body = 1.0 - smoothstep(body_r - 0.06, body_r, d);
+        let heart = pow(max(1.0 - d / (body_r * 0.45), 0.0), 2.0);
+        let rim = exp(-pow((d - body_r) / 0.05, 2.0));
+        let dark = smoothstep(body_r - 0.02, body_r + 0.08, d) * (1.0 - smoothstep(0.72, 1.0, d));
+        let deep = vec3<f32>(0.2, 0.025, 0.6);
+        let violet = vec3<f32>(0.55, 0.12, 1.0);
+        let lilac = vec3<f32>(0.85, 0.66, 1.0);
+        let near = mix(deep, violet, 0.4 + 0.6 * wind) * body * 1.8
+            + mix(lilac, vec3<f32>(1.0, 0.95, 1.0), heart) * heart * 4.5
+            + mix(violet, lilac, 0.5) * rim * 1.6;
+        let marker = smoothstep(0.3, 0.9, in.color.r);
+        let dot = 1.0 - smoothstep(0.6, 1.0, d);
+        let rgb = mix(near, violet * 2.5, marker);
+        let alpha = mix(max(body, dark * 0.7), dot, marker) * in.share;
+        if alpha <= 0.01 {
+            discard;
+        }
+        return vec4<f32>(rgb, alpha);
+    }
     if in.shape.x < 0.0 {
         let body = length(vec2<f32>(max(abs(in.uv.x) - 0.35, 0.0) * 1.3, in.uv.y));
         // A torpedo (-2) carries how much of it the water lets through.
@@ -1031,6 +1087,24 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
             let time = globals.camera.w;
             let red = vec3<f32>(1.0, 0.045, 0.02);
             let white = vec3<f32>(1.0, 0.86, 0.8);
+            if in.shape.y > 18.1 {
+                // A gravitic shock shell's tail (`PLASMA_LOOK_GRAVITIC_SHELL`; its knot is the
+                // shot's dot, `fs_shot_lit`): two violet filaments twisting round each other
+                // behind the knot, lilac where they leave it, deepening to violet and indigo
+                // and thinning out toward the tail, a faint violet sheath between them.
+                let deep = vec3<f32>(0.14, 0.012, 0.5);
+                let violet = vec3<f32>(0.55, 0.12, 1.0);
+                let lilac = vec3<f32>(0.82, 0.6, 1.0);
+                let twist = (u * 1.6 - time * 2.4) * 6.2831853;
+                let wide = mix(0.15, 0.6, smoothstep(0.0, 0.9, u));
+                let thin = mix(0.06, 0.16, u);
+                let a = exp(-pow((in.uv.y - sin(twist) * wide) / thin, 2.0));
+                let b = exp(-pow((in.uv.y + sin(twist) * wide) / thin, 2.0));
+                let sheath = pow(max(1.0 - abs(in.uv.y) / max(wide + thin, 0.01), 0.0), 2.0);
+                let hue = mix(deep, mix(violet, lilac, 0.4 * smoothstep(0.8, 1.0, u)), smoothstep(0.0, 0.6, u));
+                let rgb = hue * ((a + b) * 2.2 + sheath * 0.5) * (0.3 + 0.7 * u);
+                return vec4<f32>(rgb * smoothstep(0.0, 0.4, u) * in.color.r, 1.0);
+            }
             if in.shape.y > 17.1 {
                 // A railed lance (`PLASMA_LOOK_RAILED_LANCE`, the Flamberge's): long and thin,
                 // a hard white-hot core running its whole length, brightest and widest at the

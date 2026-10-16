@@ -9,6 +9,10 @@
 //! A gravitic lens's trail (`rift::TRAIL`, fed by `lens_fx`) shares the records: a crack
 //! split under its front's path, with broken ground and branching cracks either side, keyed by the lens's unit. Its scar does not stay: let go,
 //! it fades out over `TRAIL_SCAR` seconds and its record is dropped.
+//!
+//! A gravitic shock shell's landing (`rift::SHELL`, fed by `gravitic_shell_fx`) shares
+//! them too: the well's broken plates made small, never fed, let go as it lands. Its light
+//! dies first, then its scar fades away and its record is dropped.
 
 use ash::vk;
 use bytemuck::{Pod, Zeroable};
@@ -42,6 +46,11 @@ const PLATES_SETTLE: f32 = 6.0;
 const FOLLOW: f32 = 6.0;
 /// Seconds a lens's trail takes to fade out once it is let go.
 const TRAIL_SCAR: f32 = 14.0;
+/// Seconds a shell's break holds its light after it lands, the light then takes to die,
+/// and its scar takes to fade away from the landing.
+const SHELL_HOLD: f32 = 0.5;
+const SHELL_LIGHT: f32 = 2.8;
+const SHELL_SCAR: f32 = 9.0;
 
 struct Record {
     /// The engine (unit id) that broke it.
@@ -124,6 +133,14 @@ impl RiftGround {
                 .position(|r| trail(r) && r.released.is_some())
                 .or_else(|| self.records.iter().position(trail));
             if let Some(at) = at {
+                self.records.remove(at);
+            }
+        }
+        let shells = self.records.iter().filter(|r| r.kind == rift::SHELL);
+        if kind == rift::SHELL && shells.count() >= rift::SHELLS as usize {
+            // A deliberate cap (cosmetic): shells keep to their share of the records, so a
+            // barrage never pushes an engine's breaks out; the oldest shell goes first.
+            if let Some(at) = self.records.iter().position(|r| r.kind == rift::SHELL) {
                 self.records.remove(at);
             }
         }
@@ -271,6 +288,31 @@ impl RiftGround {
         self.release_kind(lens, rift::TRAIL, time);
     }
 
+    /// A gravitic shock shell landing at `centre` at `time`: the ground broken into plates
+    /// `radius` round, struck white-violet. Nothing feeds it: it is let go as it lands, its
+    /// light holding a moment and dying (`SHELL_LIGHT`), its scar fading (`SHELL_SCAR`).
+    pub(crate) fn shell(&mut self, centre: Vec2, radius: f32, time: f32) {
+        let seed = self.next_seed();
+        self.push(
+            0,
+            rift::SHELL,
+            GpuRift {
+                line: [centre.x, centre.y, centre.x, centre.y],
+                // The shatter crosses it in about a tenth of a second.
+                shape: [rift::SHELL as f32, radius, 0.0, seed],
+                time: [time, radius * 10.0, 0.0, 1.0],
+                glow: [0.0; 4],
+            },
+        );
+        if let Some(r) = self.records.last_mut() {
+            // Lit from the first frame, not eased in: glow, no pulse, the white heart, no
+            // head, the plates heaved.
+            r.fed = [1.4, 0.0, 0.8, 0.0, 1.0];
+            r.now = r.fed;
+            r.released = Some(time + SHELL_HOLD);
+        }
+    }
+
     /// This tick's feed to the engine's live break of `kind`: glow, pulse, heart, head,
     /// heave (`GpuRift::glow` and `time.w`).
     pub(super) fn feed(&mut self, engine: u32, kind: u32, fed: [f32; 5]) {
@@ -301,6 +343,7 @@ impl RiftGround {
         let follow = 1.0 - (-FOLLOW * dt).exp();
         self.records.retain(|r| match r.released {
             Some(at) if r.kind == rift::TRAIL => time - at < TRAIL_SCAR,
+            Some(at) if r.kind == rift::SHELL => time - at < SHELL_SCAR - SHELL_HOLD,
             _ => true,
         });
         let mut gpu = [GpuRift::zeroed(); rift::MAX as usize];
@@ -310,6 +353,17 @@ impl RiftGround {
                     for (now, fed) in r.now.iter_mut().zip(r.fed) {
                         *now += (fed - *now) * follow;
                     }
+                }
+                Some(at) if r.kind == rift::SHELL => {
+                    // Held lit until `at`; then the light dies, and from the landing the
+                    // scar fades, slowly at first, the plates settling as it goes.
+                    let gone = (time - at).max(0.0);
+                    let light = (1.0 - gone / SHELL_LIGHT).clamp(0.0, 1.0);
+                    let scar = (1.0 - (time - r.gpu.time[0]) / SHELL_SCAR).clamp(0.0, 1.0);
+                    for k in 0..4 {
+                        r.now[k] = r.fed[k] * light * light;
+                    }
+                    r.now[4] = r.fed[4] * scar.sqrt();
                 }
                 Some(at) => {
                     let gone = time - at;

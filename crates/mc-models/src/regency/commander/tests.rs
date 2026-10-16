@@ -320,3 +320,31 @@ fn the_auxiliary_arm_is_the_unit_files() {
     let off = middle.distance(shoulder::AUX_EMITTER);
     assert!(off < 0.05, "the emitter is {off} m off the bore");
 }
+
+#[test]
+fn the_mortar_is_the_unit_files() {
+    let bp = loadout(&["gravitic"]);
+    let gun = bp.weapons.iter().find(|w| w.mount).expect("a shoulder gun");
+    let v = |p| crate::authored(&bp, p);
+    assert!(v(gun.muzzle).distance(gravitic::MUZZLE) < 1e-3);
+    assert!(v(gun.pivot.unwrap()).distance(gravitic::TRUNNION) < 1e-3);
+    let model = build_model_fitted("regency_commander", 10.4, HEIGHT, 1, &["gravitic"]).unwrap();
+    let mount = model.mount.expect("the mortar is a mount");
+    assert!(Vec3::new(mount[0], mount[1], mount[2]).distance(gravitic::TRUNNION) < 1e-3);
+    // The halo spins about the bore, and the bore ends at the unit file's muzzle at every
+    // level of detail.
+    let [(_, _, axis)] = model.spins[..] else {
+        panic!("one spinning gear: {:?}", model.spins)
+    };
+    assert!((axis[1] - gravitic::TRUNNION.y).abs() < 1e-3);
+    assert!((axis[2] - gravitic::TRUNNION.z).abs() < 1e-3);
+    for lod in 0..3 {
+        let front = limb(&model, lod, rig::MOUNT)
+            .map(|v| v.pos[0])
+            .fold(f32::MIN, f32::max);
+        assert!(
+            (front - gravitic::MUZZLE.x).abs() < 0.05,
+            "lod{lod}: ends at {front}"
+        );
+    }
+}

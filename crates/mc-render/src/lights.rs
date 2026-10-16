@@ -1181,6 +1181,20 @@ fn glow_of(p: &ProjectileInstance) -> Option<Glow> {
             line: false,
         });
     }
+    // A gravitic shock shell (`plasma_look::GRAVITIC_SHELL`): its knot lights what it
+    // passes violet, as a gravitic seeker's charge does.
+    if p._pad[0] > 2.5
+        && ((p._pad[0] - 1.0) * 0.5).floor()
+            == crate::gpu_consts::plasma_look::GRAVITIC_SHELL as f32
+    {
+        return Some(Glow {
+            from,
+            to,
+            color: Vec3::new(0.55, 0.1, 1.0) * 240.0,
+            range: 34.0,
+            line: false,
+        });
+    }
     // Tracers: small, but a stream of them lights a night battle.
     let color = match flags & 0xF {
         0 => Vec3::new(0.35, 0.66, 1.0),

@@ -1350,6 +1350,10 @@ pub const PLASMA_LOOK_KNOTTED_SHELL: u32 = 10;
 /// `plasma_look` of a twin-rail Pinch-fusion gun's round (`Weapon::rails`, the Flamberge's):
 /// a long white-hot lance in a thin prism sheath. `mc_models::gpu_consts::plasma_look::RAILED_LANCE`.
 pub const PLASMA_LOOK_RAILED_LANCE: u32 = 11;
+/// `plasma_look` of a gravitic shock shell (`Weapon::shatter`, the Exarch's Gravitic Shock
+/// Mortar): a violet knot of held gravity with a filament trail, no shell or flame.
+/// `mc_models::gpu_consts::plasma_look::GRAVITIC_SHELL`.
+pub const PLASMA_LOOK_GRAVITIC_SHELL: u32 = 12;
 /// Set in `ProjectileInstance::color` for a torpedo running under the water: no
 /// tracer, flame or casing in the air; a dark body, bubbles and a wake instead.
 pub const PROJECTILE_TORPEDO: u32 = 1 << 4;
@@ -1533,13 +1537,16 @@ const _: () = assert!(std::mem::size_of::<ProjectileInstance>() == 80);
 /// `Weapon::surge`, `PLASMA_LOOK_SURGE_SHELL`), 9 an airburst round (`Weapon::airburst`,
 /// `PLASMA_LOOK_AIRBURST`), 10 a knotted Pinch-fusion gun's shell (`Weapon::knots`,
 /// `PLASMA_LOOK_KNOTTED_SHELL`), 11 a twin-rail Pinch-fusion gun's lance (`Weapon::rails`,
-/// `PLASMA_LOOK_RAILED_LANCE`), 5 and 7 beside
+/// `PLASMA_LOOK_RAILED_LANCE`), 12 a gravitic shock shell (`Weapon::shatter`, a `Gravitic`
+/// gun's, `PLASMA_LOOK_GRAVITIC_SHELL`), 5 and 7 beside
 /// `PROJECTILE_MISSILE`: its faceted body is drawn in the Regency's look, violet at the
 /// tail, so every Regency missile reads as one a missile defence can take. Zero for
 /// anything else.
 pub fn plasma_look(weapon: &mc_data::Weapon) -> u32 {
     use mc_data::PlasmaGrade;
     match weapon.plasma_shot() {
+        // Its grade is Gravitic, which no other shot has: `plasma_shot` is None for it.
+        _ if weapon.shatter > 0.0 => PLASMA_LOOK_GRAVITIC_SHELL,
         _ if weapon.seeker() && weapon.fusion_strike => PLASMA_LOOK_FUSION_SEEKER,
         _ if weapon.seeker() => PLASMA_LOOK_GRAVITIC_SEEKER,
         Some(_) if weapon.curve.0 > 0 => 3,
@@ -2387,7 +2394,10 @@ impl World {
                 // the white-hot of a shell. Above one, it leans on to red (`Weapon::red`).
                 // A Regency plasma shot (`plasma_grade`) is drawn that way too, whatever its size,
                 // and plus twice its look (`plasma_look`).
-                if (weapon.rounds > 1 || weapon.plasma_shot().is_some() || weapon.seeker())
+                if (weapon.rounds > 1
+                    || weapon.plasma_shot().is_some()
+                    || weapon.seeker()
+                    || weapon.shatter > 0.0)
                     && weapon.color == WeaponColor::Orange
                 {
                     1.0 + weapon.red + 2.0 * plasma_look(weapon) as f32

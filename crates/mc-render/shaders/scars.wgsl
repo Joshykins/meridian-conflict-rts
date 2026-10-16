@@ -478,7 +478,8 @@ fn melt_shade(xy: vec2<f32>, alt: f32, albedo_in: vec3<f32>, rough_in: f32, px: 
 // Three kinds of break, each shaded over whatever ground it lies on: cracks running out
 // round the engine's foot as it gathers (`RIFT_FOOT`), the rift's fissure opening behind
 // its front from the foot to the mark (`RIFT_LINE`), and the well's ground broken into
-// plates (`RIFT_WELL`); and a gravitic lens's trail of cracks (`RIFT_TRAIL`, lens_fx.rs).
+// plates (`RIFT_WELL`); a gravitic lens's trail of cracks (`RIFT_TRAIL`, lens_fx.rs); and
+// where a gravitic shock shell landed (`RIFT_SHELL`, gravitic_shell_fx.rs).
 // The cracks glow violet with white-hot hearts while the engine feeds them (`Rift::glow`,
 // which the CPU eases, dims and flickers), and the plates beside them are tilted up (`time.w`, read through the normal). Once let go the light goes out
 // and the cracks stay as a dark scar, the plates settling flat. Detail under a pixel is
@@ -670,7 +671,67 @@ fn rift_one(r: Rift, xy: vec2<f32>, px: f32, s_in: CraterShade) -> CraterShade {
         let dl = length(d);
         let ang = atan2(d.y, d.x);
         let outward = d / max(dl, 1e-3);
-        if kind == RIFT_FOOT {
+        if kind == RIFT_SHELL {
+            // A gravitic shock shell's landing (renderer/gravitic_shell_fx.rs): the well's
+            // shatter made small, every measure a share of its reach. Struck white-violet as
+            // the shatter runs out, the light then crawls in the cracks and dies; the plates
+            // tipped every way and the cracks dark stay a while, fading away with `time.w`.
+            if dl > reach * 1.4 {
+                return s;
+            }
+            let scar = heave;
+            let shattered = 1.0 - smoothstep(age * r.time.y - reach * 0.3, age * r.time.y, dl);
+            let edge = reach * (1.0 + (grad_noise2(outward * 3.0 + o, 1.0) - 0.5) * 0.22
+                + (grad_noise2(outward * 9.0 - o, 1.0) - 0.5) * 0.08);
+            let disc = (1.0 - smoothstep(edge * 0.88, edge * 1.02, dl)) * shattered;
+            // Plates small and crushed at the heart, bigger toward the edge.
+            let cell = reach * mix(0.1, 0.24, smoothstep(0.0, reach, dl));
+            let warp = vec2<f32>(grad_noise2(d + o, cell * 2.3), grad_noise2(d - o, cell * 2.3)) - 0.5;
+            let q = d / cell + o * 0.1 + warp * 1.2;
+            let cells = crater_cells(q);
+            let small = crater_cells(q * 2.6 + 17.0);
+            let pc = px / cell;
+            let gape = grad_noise2(d * 1.3 + o * 4.0, cell * 1.4);
+            let crack = crater_crack(cells.x, 0.04 + 0.08 * gape * gape, pc) * disc;
+            let heart = 1.0 - smoothstep(reach * 0.15, reach * 0.45, dl);
+            let fine = crater_crack(small.x, 0.06, pc * 2.6) * disc * heart;
+            // Six fissures from the heart out past the edge, each its own length.
+            let rays = 6.0;
+            let u = ang / 6.2831853 * rays + seed * 3.0;
+            let k = floor(u + 0.5);
+            let jag = (grad_noise2(vec2<f32>(dl, k * 7.7) + o, reach * 0.5) - 0.5) * 1.2
+                + (grad_noise2(vec2<f32>(dl * 2.1, k * 3.1) - o, reach * 0.15) - 0.5) * 0.4;
+            let off = abs(u - k - jag * 0.4) * dl * 6.2831853 / rays;
+            let run = edge * mix(0.7, 1.3, hash21(vec2<f32>(k, seed * 2.3)));
+            let fw = reach * 0.07 * (1.0 - 0.6 * dl / max(run, 1.0)) * smoothstep(0.0, reach * 0.08, dl);
+            let fissure = (1.0 - smoothstep(fw * 0.5, fw + px, off))
+                * (1.0 - smoothstep(run * 0.8, run, dl)) * shattered;
+            // Cracks run out across the rim here and there.
+            let rim_rays = 26.0;
+            let ur = ang / 6.2831853 * rim_rays + seed * 5.0;
+            let kr = floor(ur + 0.5);
+            let there = step(0.6, hash21(vec2<f32>(kr, seed + 1.7)));
+            let rjag = (grad_noise2(vec2<f32>(dl, kr * 3.3) + o, reach * 0.3) - 0.5) * 0.9;
+            let roff = abs(ur - kr - rjag * 0.45) * dl * 6.2831853 / rim_rays;
+            let hi = edge * mix(1.08, 1.35, hash21(vec2<f32>(kr + 3.0, seed)));
+            let rw = reach * mix(0.02, 0.05, hash21(vec2<f32>(kr + 5.0, seed)));
+            let rim_ray = there * (1.0 - smoothstep(rw * 0.5, rw + px, roff))
+                * smoothstep(edge * 0.8, edge * 0.9, dl) * (1.0 - smoothstep(hi * 0.85, hi, dl)) * shattered;
+            // Plates tipped every way, more toward the heart; settling as the scar fades.
+            let tilt = (0.06 + 0.22 * cells.y) * scar * disc * (1.0 - 0.5 * dl / reach);
+            s.slope += vec2<f32>(cos(cells.y * 53.0), sin(cells.y * 53.0)) * tilt;
+            // The light crawls through the cracks in patches; all of it burns white-violet
+            // for a moment as the shatter passes.
+            let crawl = smoothstep(0.45, 0.8, grad_noise2(d * 0.08 + vec2<f32>(now * 0.7, -now * 0.5) + o, 1.0));
+            let lit = 0.3 + 0.7 * crawl;
+            let strike = 1.8 * exp(-age / 0.35);
+            let heat = glow * (1.0 + 0.4 * heart) + strike * shattered;
+            light = (crack * lit * 0.9 + fine * 0.5 + fissure * (0.7 + 0.4 * crawl) + rim_ray * 0.5) * heat;
+            spill = heat * 0.08 * disc + heat * 0.2 * fissure;
+            broken = max(disc * 0.8, max(rim_ray, fissure)) * scar;
+            a = mix(a, a * 0.45 + vec3<f32>(0.012, 0.01, 0.018), disc * 0.65 * scar);
+            a *= 1.0 - 0.85 * max(max(crack, rim_ray), max(fissure, fine)) * scar;
+        } else if kind == RIFT_FOOT {
             let inner = r.shape.z;
             // How far out the breaking has got this way: a ragged front, not a circle.
             let ragged = (grad_noise2(outward * 2.2 + o, 1.0) - 0.5) * 0.5

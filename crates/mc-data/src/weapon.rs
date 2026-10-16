@@ -262,6 +262,12 @@ pub struct Weapon {
     /// A twin-rail Pinch-fusion gun (`RawWeapon::rails`): each bore's charge is held
     /// between rails. Cosmetic: not in the content hash.
     pub rails: bool,
+    /// Metres of ground a gravitic shock shell breaks into plates where it lands
+    /// (`RawWeapon::shatter`); zero for any other shot. Cosmetic: not in the content hash.
+    pub shatter: f32,
+    /// Whole turns a shoulder gun's spinning gear is flung through by each shot
+    /// (`RawWeapon::fling`). Cosmetic: not in the content hash.
+    pub fling: u8,
     /// A strafing beam (`RawWeapon::strafe`): fixed in the hull, it rakes a line over the
     /// ground through its mark as the aircraft flies its run (`strafe.rs`).
     pub strafe: Option<Strafe>,

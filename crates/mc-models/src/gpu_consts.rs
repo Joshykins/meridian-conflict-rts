@@ -1036,6 +1036,10 @@ shared! {
         /// thread that flashes through rose and lavender and goes out within a second or
         /// so, breaking up; never red.
         pub const PLASMA_TRAIL_RAILED: f32 = 5.0;
+        /// A gravitic shock shell's (`plasma_look::GRAVITIC_SHELL`): a lilac-white filament
+        /// just behind the knot, deepening to violet and going out to a dark indigo,
+        /// breaking up; never red.
+        pub const PLASMA_TRAIL_GRAVITIC: f32 = 6.0;
         /// A gravity crush's tether (renderer/crush_fx.rs), the Regency's missile defence
         /// gripping a missile: a thin hard red core, lensing ripples running out from the
         /// emitter to the missile, a faint prism shimmer at its edges. Struck and fading
@@ -1086,6 +1090,12 @@ shared! {
         /// shimmer, its head the brightest; no bursts strobing down it (that is the
         /// Sunspear's slug). `mc_sim::mirror::PLASMA_LOOK_RAILED_LANCE`.
         pub const RAILED_LANCE: u32 = 11;
+        /// A gravitic shock shell (`Weapon::shatter`, the Exarch's Gravitic Shock Mortar):
+        /// a knot of held gravity, a lilac-white heart in a deep violet body ringed dark
+        /// where it bends the light, a short twisting violet tail and a violet filament
+        /// trail behind it (renderer/gravitic_shell_fx.rs). Never orange, never red.
+        /// `mc_sim::mirror::PLASMA_LOOK_GRAVITIC_SHELL`.
+        pub const GRAVITIC_SHELL: u32 = 12;
     }
 
     /// A strategic launcher (models/aster/strategic.rs, entity.wgsl). The rounds word
@@ -1658,11 +1668,17 @@ shared! {
         pub const TRAIL: u32 = 3;
         /// Seconds the trail's seam takes to cool behind the front (to a third).
         pub const TRAIL_COOL: f32 = 0.6;
-        /// Records held at most (`RiftList` in bindings.wgsl): the engines' breaks and
-        /// up to `TRAILS` lens trails.
-        pub const MAX: u32 = 56;
+        /// Where a gravitic shock shell landed (renderer/gravitic_shell_fx.rs): the well's
+        /// broken plates made small, struck white-violet, the light in its cracks dying
+        /// over a few seconds and then the scar fading away (`time.w`).
+        pub const SHELL: u32 = 4;
+        /// Records held at most (`RiftList` in bindings.wgsl): the engines' breaks, up to
+        /// `TRAILS` lens trails and up to `SHELLS` shells' breaks.
+        pub const MAX: u32 = 68;
         /// Lens trails held at most, of `MAX`: past it the oldest trail goes first.
         pub const TRAILS: u32 = 32;
+        /// Shells' breaks held at most, of `MAX`: past it the oldest goes first.
+        pub const SHELLS: u32 = 12;
     }
 
     /// Heat haze over engine exhausts (renderer/heat_haze.rs, screen.wgsl `haze_bend`).

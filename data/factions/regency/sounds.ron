@@ -1357,6 +1357,11 @@
         // A sub-seeker coming down: the bomb's hit a size down, so a volley's twelve land
         // as a ripple of heavy whumps rather than one blast.
         "regency_seeker_hit": (like: "regency_gravitic_hit", size: 0.8, peak: 0.6),
+        // The Exarch's shoulder mortar: the Saker's shot a size down, a short gun's
+        // compressive whump; and its knot landing, the gravitic engine's rift striking home
+        // shrunk to a shell's: the pull in, the snaps and the ground splitting.
+        "regency_gravitic_mortar_fire": (like: "regency_surge_fire", size: 0.6, peak: 0.55),
+        "regency_gravitic_shatter": (like: "regency_fallen_strike", size: 0.4, peak: 0.6),
         // The Sower's walk and feet: the battle scorpion's, a size down.
         "regency_bombard_walk": (like: "regency_crawl", size: 0.75, peak: 0.2),
         "regency_bombard_step": (like: "regency_footfall", size: 0.7, peak: 0.26),

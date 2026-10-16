@@ -200,9 +200,19 @@ impl World {
         });
         let house = self.house_pose(row, mounted.or(twin.map(|t| t.0)), houses);
         // Each rotary gun's barrels, by its slot (`Weapon::rotary`): turned last tick and this.
+        // A shoulder gun's flung gear takes the first slot when the unit has no rotary gun.
         let spin = |slot: usize| {
             if bp.weapons.iter().filter(|w| w.spin_ticks > 0).count() <= slot {
-                return [0.0; 2];
+                return match mounted.filter(|_| slot == 0) {
+                    Some(w) if bp.weapons[w].fling > 0 => flung_pair(
+                        s.tick,
+                        s.units.id(row).0,
+                        s.units.weapon_cooldown[row][w],
+                        bp.weapons[w].reload_ticks,
+                        bp.weapons[w].fling,
+                    ),
+                    _ => [0.0; 2],
+                };
             }
             let [_, turn, step, _] = s.units.spin[row][slot];
             let step = step as f32 * (std::f32::consts::TAU / 65536.0);
@@ -538,4 +548,49 @@ fn dash_pose(dash: &mc_data::dash::Dash, s: &crate::dash::DashState) -> [f32; 2]
     // The landing tick follows the full windup.
     let was = if since == 0 { 1.0 } else { blow(since - 1) };
     [was, blow(since)]
+}
+
+/// Ticks a shoulder gun's flung gear takes to drift round once at rest.
+const FLING_DRIFT_TICKS: u32 = 320;
+
+/// How far a shoulder gun's flung gear (`Weapon::fling`, the Exarch mortar's halo) has
+/// turned, last tick and this, in radians: a slow drift at rest (one turn every
+/// `FLING_DRIFT_TICKS`, each unit from its own start), and each shot flinging it through
+/// `turns` whole turns, fast at the shot and easing to rest as the reload runs out. Both
+/// parts end on whole turns, so the next shot takes up from where this one left it.
+fn flung_pair(tick: u32, unit: u32, cooldown: u16, reload: u16, turns: u8) -> [f32; 2] {
+    use std::f32::consts::TAU;
+    let reload = reload.max(1);
+    let turns = turns as f32;
+    let flung = |c: u16| TAU * turns * (1.0 - (c.min(reload) as f32 / reload as f32).powi(3));
+    let drift = TAU / FLING_DRIFT_TICKS as f32;
+    let now_drift = (tick.wrapping_add(unit.wrapping_mul(97)) % FLING_DRIFT_TICKS) as f32 * drift;
+    // The tick it fires it starts from where the last shot left it: a whole number of turns.
+    let was = if cooldown == reload {
+        0.0
+    } else {
+        flung(cooldown.saturating_add(1))
+    };
+    [now_drift - drift + was, now_drift + flung(cooldown)]
+}
+
+#[cfg(test)]
+mod tests {
+    use std::f32::consts::TAU;
+
+    /// The halo is flung from where the last shot left it, fastest at the shot, and comes
+    /// to rest a whole number of turns on, so nothing jumps at the next shot.
+    #[test]
+    fn a_flung_gear_turns_whole_turns_fastest_at_the_shot() {
+        let off = |a: f32| (a / TAU - (a / TAU).round()).abs();
+        let at = |c: u16| super::flung_pair(1000, 7, c, 160, 3);
+        let [was, now] = at(160);
+        assert!(off(now - was) < 0.01, "the shot: {was} -> {now}");
+        let first = at(159);
+        let last = at(1);
+        assert!(first[1] - first[0] > 10.0 * (last[1] - last[0]));
+        let [_, ready] = at(0);
+        assert!(off(ready - at(160)[1]) < 0.01);
+        assert!((ready - at(160)[1] - 3.0 * TAU).abs() < 0.01);
+    }
 }

@@ -73,6 +73,7 @@ mod fx_share;
 pub(crate) mod grass;
 pub(crate) mod gravitic_engine_fx;
 mod gravitic_fx;
+mod gravitic_shell_fx;
 mod great_gun_fx;
 mod ground_contact;
 mod ground_melt;
@@ -3547,6 +3548,7 @@ impl Renderer {
         self.capital_lights(time, alpha);
         self.warp_lights(time);
         self.regency_guns_lights(time);
+        self.gravitic_shell_lights(time);
         self.gravitic_lights(time);
         self.star_core_lights(time);
         self.gravitic_engine_lights();
@@ -4620,6 +4622,7 @@ impl Renderer {
             && !self.great_gun_event(event, time)
             && !self.bolt_rifle_event(event, time)
             && !self.arc_howitzer_event(event, time)
+            && !self.gravitic_shell_event(event, time)
             && !self.storm_cloud_event(event, time)
             && !self.lens_event(event, time)
             && !self.progenitor_event(event, time)

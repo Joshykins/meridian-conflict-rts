@@ -2126,6 +2126,7 @@ mod tests {
                 "nano_repair",
                 "nano_field",
                 "mfe",
+                "gravitic",
                 "aux_eng"
             ]
         );

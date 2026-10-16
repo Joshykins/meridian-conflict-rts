@@ -536,6 +536,8 @@ impl Renderer {
         let tick = self.tick_seconds.max(0.02);
         let mut sparks = 0;
         let mut smoke = 0;
+        // A gravitic shock shell's filament trail is its own (`gravitic_shell_fx`).
+        self.gravitic_shells_flying(projectiles, time);
         for p in projectiles {
             let look = drawn_look(p);
             // A round of a jet that leaves the muzzle part of the way through the tick
@@ -696,6 +698,7 @@ impl Renderer {
             })
             .collect();
         self.push_projectiles(&out);
+        self.write_gravitic_shell_trails(time);
     }
 
     /// `span` seconds of a charge `f` of the way done, at `at`, `share` of a whole charge's

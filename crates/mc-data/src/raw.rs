@@ -1454,6 +1454,18 @@ pub struct RawWeapon {
     /// main battery). Cosmetic.
     #[serde(default)]
     pub rails: bool,
+    /// A gravitic shock shell (a `Gravitic` gun lobbing a shell, the Exarch's shoulder
+    /// mortar): a violet knot of held gravity in flight that, where it lands, breaks the
+    /// ground into plates over this many metres, violet light in the cracks, fading over
+    /// some seconds (renderer `gravitic_shell_fx`). Zero (the default): not one. Cosmetic.
+    #[serde(default)]
+    pub shatter: f64,
+    /// Whole turns a shoulder gun's spinning gear (`MeshBuilder::with_spin` on a `mount`
+    /// gun's unit with no rotary barrels) is flung through by each shot: fast at the shot,
+    /// slowing to a stop as the reload runs out (the Exarch mortar's halo). Zero (the
+    /// default): none. Cosmetic.
+    #[serde(default)]
+    pub fling: u8,
     /// A strafing beam (`RawStrafe`).
     #[serde(default)]
     pub strafe: Option<RawStrafe>,
@@ -2102,6 +2114,22 @@ impl Unit {
                      shell: no missile, beam, knots, surge or airburst"
                 )));
             }
+            if w.shatter != 0.0
+                && (!(4.0..=80.0).contains(&w.shatter)
+                    || w.missile
+                    || w.hitscan
+                    || w.trajectory != Trajectory::Ballistic
+                    || w.plasma_grade != Some(PlasmaGrade::Gravitic))
+            {
+                return Err(DataError::Invalid(format!(
+                    "{ctx}: shatter is 4 to 80 m, on a Gravitic gun lobbing a shell"
+                )));
+            }
+            if w.fling > 0 && (!w.mount || w.fling > 12) {
+                return Err(DataError::Invalid(format!(
+                    "{ctx}: fling is up to 12 turns, on a shoulder gun (mount)"
+                )));
+            }
             if w.dash_only && w.cone.is_none() {
                 return Err(DataError::Invalid(format!(
                     "{ctx}: a dash_only weapon is a cone, let go at the unit's feet as it lands"
@@ -2290,6 +2318,8 @@ impl Unit {
                 }),
                 knots: w.knots,
                 rails: w.rails,
+                shatter: w.shatter as f32,
+                fling: w.fling,
                 surge: match &w.surge {
                     Some(s) => Some(s.compile(key, fx, TICKS_PER_SECOND)?),
                     None => None,

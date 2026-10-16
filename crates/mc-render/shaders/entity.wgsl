@@ -1629,6 +1629,19 @@ fn vs_main(in: VsIn) -> VsOut {
             p = posed[0];
             n = posed[1];
         }
+        // Rotary barrels turn about their axis while they are spun up, and a shoulder gun's
+        // flung gear (the Exarch mortar's halo, `Weapon::fling`) by its turn: in the rest
+        // frame, before the gun pitches and turns below.
+        // Only the barrels this loadout's axis is for: while a refit moves the gun, the ones
+        // arriving or leaving stay still rather than turning about the other gun's axis.
+        let spin_tags = ((in.rig >> 9u) & 63u) | (((in.rig >> 24u) & 63u) << 6u);
+        if (in.rig & RIG_SPIN) != 0u && model.spin.w > 0.0 && spin_tags == u32(model.spin.x + 0.5) {
+            let turn = mix(e.spin_recoil.x, e.spin_recoil.y, t);
+            let axis = vec3<f32>(0.0, model.spin.y, model.spin.z);
+            let q = p - axis;
+            p = vec3<f32>(q.x, q.y * cos(turn) - q.z * sin(turn), q.y * sin(turn) + q.z * cos(turn)) + axis;
+            n = vec3<f32>(n.x, n.y * cos(turn) - n.z * sin(turn), n.y * sin(turn) + n.z * cos(turn));
+        }
         // A shoulder gun: the tube kicks back, pitches about its trunnion, and turns off the torso.
         if limb == LIMB_MOUNT && model.mount.w >= 0.0 && any(model.mount.xyz != vec3<f32>(0.0)) {
             let pivot = model.mount.xyz;
@@ -1642,17 +1655,6 @@ fn vs_main(in: VsIn) -> VsOut {
             let yaw = lerp_angle(e.mount.x, e.mount.y, t);
             p = rot_z(p - pivot, yaw) + pivot;
             n = rot_z(n, yaw);
-        }
-        // Rotary barrels turn about their axis while they are spun up.
-        // Only the barrels this loadout's axis is for: while a refit moves the gun, the ones
-        // arriving or leaving stay still rather than turning about the other gun's axis.
-        let spin_tags = ((in.rig >> 9u) & 63u) | (((in.rig >> 24u) & 63u) << 6u);
-        if (in.rig & RIG_SPIN) != 0u && model.spin.w > 0.0 && spin_tags == u32(model.spin.x + 0.5) {
-            let turn = mix(e.spin_recoil.x, e.spin_recoil.y, t);
-            let axis = vec3<f32>(0.0, model.spin.y, model.spin.z);
-            let q = p - axis;
-            p = vec3<f32>(q.x, q.y * cos(turn) - q.z * sin(turn), q.y * sin(turn) + q.z * cos(turn)) + axis;
-            n = vec3<f32>(n.x, n.y * cos(turn) - n.z * sin(turn), n.y * sin(turn) + n.z * cos(turn));
         }
         // Suite gear on the build arm works while the unit builds, eased with the deploy.
         let work = ((in.rig >> 15u) & 1u) | ((in.rig >> 30u) & 2u);

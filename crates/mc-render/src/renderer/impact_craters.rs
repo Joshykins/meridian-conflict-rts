@@ -8,7 +8,8 @@
 //! `fs_stain` draws a bowl, lip and spoil for them), uploaded after the sim's own
 //! stains. Nothing is made up after the fact: a wreck first seen (map wreckage, or one
 //! scrolled into view) gets none. Beams, plasma and the heavy rail mark the ground
-//! their own way; fire weapons scorch, they do not dig.
+//! their own way, as a gravitic shock shell does (`gravitic_shell_fx`); fire weapons scorch,
+//! they do not dig.
 
 use super::Renderer;
 use crate::gpu_consts::stain;
@@ -109,6 +110,7 @@ impl Renderer {
                     || w.plasma_shot().is_some()
                     || w.heavy_rail > 0.0
                     || w.great_gun > 0.0
+                    || w.shatter > 0.0
                     || w.burn_ticks > 0
                 {
                     return;

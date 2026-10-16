@@ -471,6 +471,22 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     after another and swell into one bloom, a fireball climbs out of it, plasma rolls
     out low, globs are flung out, the ground melts into a pool and dark smoke climbs over
     it. No supernova, no pillar, no lightning anywhere on this gun (user calls 10-10).
+    The Exarch's **Gravitic Shock Mortar** (a shoulder refit, `Weapon::shatter`) throws
+    knots of held gravity, violet from the bore to the ground, never an orange shell
+    (renderer/gravitic_shell_fx.rs). On the shot a ring of bent light tightens on the
+    knot at the mouth, a white-violet flash and a violet pressure ring punch out along
+    the bore, motes and short arcs of lilac thrown after it; no powder smoke. In flight
+    (`plasma_look` `GRAVITIC_SHELL`) the knot is a lilac-white heart in a churning deep
+    violet body, a thin bright rim and a dark ring round it where the light is pulled
+    away, the view bent round it; two violet filaments twist behind it and a filament
+    trail deepens to violet and goes out to indigo. Where it lands the light and motes are
+    drawn in to the point for a breath (the pull), then the ground shatters over its
+    `shatter` metres: the gravitic engine's broken plates made small (scars.wgsl
+    `RIFT_SHELL`), struck white-violet as the break runs out, fissures and cracks
+    across the rim, a violet pressure ring and dust driven out, clods and violet motes
+    thrown up, violet lightning run over the breaking ground. The light in the cracks dies
+    in a few seconds; the tipped plates and dark cracks stay a while longer and fade away.
+    No crater, no fireball, no red plasma.
     The **Skyward Pinch-fusion Lance** (the T4 Sarissa, anti-ship) is a held fusion
     beam that charges (renderer/regency_guns_fx/lance.rs, `Grade::Lance`, picked by
     data: a `beam` with a charge and `PinchFusion`, not `star_beam`). Through its 3.5 s

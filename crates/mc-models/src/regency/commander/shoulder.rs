@@ -38,7 +38,7 @@ const AUX_STOWED: f32 = 0.2;
 const AUX_HEAD_STOWED: f32 = 0.45;
 
 /// A hexagon flat on top and bottom: broad faces, each wide enough for a nanite slot.
-const HEX: [[f32; 2]; 6] = [
+pub(super) const HEX: [[f32; 2]; 6] = [
     [1.0, 0.0],
     [0.5, 0.87],
     [-0.5, 0.87],
@@ -47,7 +47,7 @@ const HEX: [[f32; 2]; 6] = [
     [0.5, -0.87],
 ];
 /// A flat plate with bevelled edges: one broad face each side for a nanite slot.
-const SLAB: [[f32; 2]; 8] = [
+pub(super) const SLAB: [[f32; 2]; 8] = [
     [1.0, 0.35],
     [0.9, 1.0],
     [-0.9, 1.0],
@@ -58,7 +58,7 @@ const SLAB: [[f32; 2]; 8] = [
     [1.0, -0.35],
 ];
 /// A square stood on its corner: the crystal's four long faces.
-const DIAMOND: [[f32; 2]; 4] = [[1.0, 0.0], [0.0, 1.0], [-1.0, 0.0], [0.0, -1.0]];
+pub(super) const DIAMOND: [[f32; 2]; 4] = [[1.0, 0.0], [0.0, 1.0], [-1.0, 0.0], [0.0, -1.0]];
 
 pub(super) fn aux_eng(b: &mut MeshBuilder) {
     b.module("aux_eng", 0.0, pad);

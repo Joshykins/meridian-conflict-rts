@@ -44,9 +44,9 @@ use crate::gpu::{Gpu, GpuError};
 pub(crate) use slabs::MOST as MOST_SLABS;
 
 /// The light of it: deep violet, violet, lilac, and the white of its hearts.
-const VIOLET: Vec3 = Vec3::new(0.55, 0.12, 1.0);
-const LILAC: Vec3 = Vec3::new(0.82, 0.6, 1.0);
-const WHITE: Vec3 = Vec3::new(1.0, 0.95, 1.0);
+pub(super) const VIOLET: Vec3 = Vec3::new(0.55, 0.12, 1.0);
+pub(super) const LILAC: Vec3 = Vec3::new(0.82, 0.6, 1.0);
+pub(super) const WHITE: Vec3 = Vec3::new(1.0, 0.95, 1.0);
 /// The machinery's turn, as a share of its full rate: idle, and flat out as it launches.
 const SPIN_IDLE: f32 = 0.06;
 const SPIN_LAUNCH: f32 = 5.5;

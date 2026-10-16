@@ -97,6 +97,8 @@ pub(super) struct PlasmaFx {
     pub(super) guns: super::regency_guns_fx::RegencyGunFx,
     /// The Gravitic Seekers' lights, and a gravity crush's (`gravitic_fx`, `crush_fx`).
     pub(super) seekers: super::gravitic_fx::GraviticFx,
+    /// Gravitic shock shells' trails, lights and lenses (`gravitic_shell_fx`).
+    pub(super) shells: super::gravitic_shell_fx::GraviticShellFx,
     /// Cone weapons' wakes rolling out (`wake_fx`).
     pub(super) wakes: Vec<super::wake_fx::RollingWake>,
     /// Held beams' energy cores (`lance_core_fx`).
