@@ -144,7 +144,7 @@ const BALL_OUT: f32 = NOTCH - 0.1 * BALL_R;
 /// The command tower on the spine aft: its middle, length and half-width, and its tiers
 /// `(tall, scale)`.
 const TOWER: (f32, f32, f32) = (-196.0, 118.0, 36.0);
-const TOWER_TIERS: [(f32, f32); 3] = [(15.0, 1.0), (13.0, 0.8), (10.0, 0.6)];
+const TOWER_TIERS: [(f32, f32); 3] = [(12.0, 1.0), (10.0, 0.8), (8.0, 0.6)];
 
 /// The Rondels down each deck edge, fore to aft, and the AA repeaters on the after deck.
 const RONDELS: [f32; 2] = [270.0, -110.0];
@@ -413,7 +413,7 @@ fn horns(b: &mut MeshBuilder, (x, len, half): (f32, f32, f32), top: f32) {
     b.mirror_y(|b| {
         let f = Frame::new(
             v3(x + 40.0 * s, half * 0.25, top - 8.0 * s),
-            v3(-1.0, 0.3, 0.2),
+            v3(-1.0, 0.3, 0.08),
             v3(0.1, 0.35, 1.0),
         );
         shard(b, &f, (240.0 * s, 18.0 * s, 0.7), 5.0 * s, Finish::Dark);

@@ -91,17 +91,14 @@ impl Wing {
     /// Far off: the arm's outline as one slab.
     pub(super) fn coarse(&self, b: &mut MeshBuilder) {
         let r = self.ribs();
-        let (root, corner, claw) = (r[0], r[7], r[10]);
+        let (root, corner) = (r[0], r[7]);
         let z = root.z;
         dark_plate(b);
         b.extrude_z(
             &[
                 [root.le, root.y],
-                [r[3].le, r[3].y],
                 [corner.le, corner.y],
                 [corner.te, corner.y],
-                [claw.te, claw.y],
-                [r[4].te, r[4].y],
                 [root.te, root.y],
             ],
             z - root.t * 0.3,
