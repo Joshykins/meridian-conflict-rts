@@ -154,8 +154,7 @@ fn rotor(b: &mut MeshBuilder, z0: f32, z1: f32, outer: f32, inner: f32, vanes: u
 }
 
 /// The well in the back, open: three rotor rings stacked in it, each smaller and higher,
-/// neighbours turning opposite ways, the top one ringed by three prongs leaning up toward
-/// the core.
+/// neighbours turning opposite ways, and three prongs rising off its lip to hold the core.
 fn rotor_well(b: &mut MeshBuilder) {
     b.set_spinner_pivot(Vec3::ZERO);
     let collar = BACK - 0.5;
@@ -168,18 +167,21 @@ fn rotor_well(b: &mut MeshBuilder) {
     rotor(b, BAND + 0.45, collar - 0.15, 1.95, 1.4, 10, 0.9);
     rotor(b, collar, collar + 0.75, 1.55, 1.1, 8, -1.3);
     rotor(b, collar + 0.95, collar + 1.5, 1.15, 0.8, 6, 1.8);
-    prongs(b, 2.15, collar + 0.05, 0.3);
+    cradle(b, 2.15, collar + 0.05, 0.42);
 }
 
-/// Three prongs standing off a rim of radius `r` at `z`, leaning up toward the core and
-/// stopping short of it.
-fn prongs(b: &mut MeshBuilder, r: f32, z: f32, width: f32) {
-    dark_plate(b);
+/// Three tall prongs standing off a rim of radius `r` at `z`, bending at a knee and rising
+/// on round the core to hold it between their points, glazed above the knee.
+fn cradle(b: &mut MeshBuilder, r: f32, z: f32, width: f32) {
     for k in 0..3 {
         let a = (120.0 * k as f32 + 60.0f32).to_radians();
         let d = v3(a.cos(), a.sin(), 0.0);
         let root = d * r + Vec3::Z * z;
-        let to = CORE + d - Vec3::Z;
-        spike(b, root, root.lerp(to, 0.8), width);
+        let knee = d * 1.9 + Vec3::Z * (CORE.z - 1.4);
+        let tip = d * 1.25 + Vec3::Z * (CORE.z + 0.7);
+        dark_plate(b);
+        spike(b, root, knee + (knee - root).normalize() * 0.3, width);
+        nanite_plate(b);
+        spike(b, knee, tip, width * 0.7);
     }
 }

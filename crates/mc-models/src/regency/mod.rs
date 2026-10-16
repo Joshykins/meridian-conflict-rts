@@ -130,8 +130,8 @@ pub(super) const MODELS: &[ModelDef] = &[
         fusion_guns::SKYSPEAR_HEIGHT,
         fusion_guns::skyspear,
     ),
-    // The tech 3 gravitic sniper: a body hung between four shard legs that lean in to hold
-    // its gravity over it (`gravitic_lens`).
+    // The tech 3 gravitic sniper: a body hung low between six shard legs planted wide, its
+    // gravity held over it between three prongs (`gravitic_lens`).
     ModelDef::new(
         "regency_gravitic_lens",
         gravitic_lens::RADIUS,
@@ -449,8 +449,8 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_portcullis" => 9000,
         // A skirted tracked body, a turret, the gun and its caged core.
         "regency_skyspear" | "regency_fusion_howitzer" => 8000,
-        // Four plated shard legs, their thighs, a body and its well.
-        "regency_gravitic_lens" => 6000,
+        // Six plated shard legs, their thighs, a body, its well and its prongs.
+        "regency_gravitic_lens" => 8000,
         // Strategic: an 8 x 8 launch complex, and a 4 x 4 array; a few a match.
         "regency_nuke_silo" => 9000,
         "regency_nuke_defense" => 6000,

@@ -1,9 +1,9 @@
-//! The Lens's legs: four great shards standing on their boots round it and leaning in to
-//! meet over its middle. Each is a shin; it meets a plated thigh at a knee high over the
-//! body and runs on past the knee into its point, so the four points close over the core.
-//! Posed by entity.wgsl `crawl_leg` (`set_crawl_legs`), and braced by the deploy
-//! (`set_crawl_brace`): packed, the feet stand in and the body rides high; planting, each
-//! leg steps out in turn and the body settles to the ground between them.
+//! The Lens's legs: six black shards it walks on like a crab, low and planted wide. Each
+//! is a shin standing on its boot that meets a plated thigh at a knee just outside the
+//! body and runs on past it into its point. Posed by entity.wgsl `crawl_leg`
+//! (`set_crawl_legs`), and braced by the deploy (`set_crawl_brace`): packed, the feet stand
+//! in and the body rides high; planting, each leg steps out in turn and the body settles to
+//! the ground between them.
 
 use glam::Vec3;
 
@@ -14,36 +14,43 @@ use super::super::commander::form::{ring, sleeve, OCT};
 use super::super::kit::{dark_plate, metal};
 use super::super::shard::Shard;
 
-/// The left legs, front and back: hip, knee, the foot's middle on the ground, and where in
-/// the cycle it lands. A heavy walk, one foot at a time and three always down: back left,
-/// front left, back right, front right, a quarter of a cycle apart (the right legs land
-/// half a cycle after their left).
-pub(super) const CRAWL: [(Vec3, Vec3, Vec3, f32); 2] = [
+/// The left legs, front, middle and back: hip, knee, the foot's middle on the ground, and
+/// where in the cycle it lands. It walks in two tripods: the front and back legs of one
+/// side with the middle leg of the other (the right legs land half a cycle after their
+/// left).
+pub(super) const CRAWL: [(Vec3, Vec3, Vec3, f32); 3] = [
     (
-        Vec3::new(2.0, 2.0, 2.0),
-        Vec3::new(1.28, 0.62, 6.6),
-        Vec3::new(4.6, 7.0, 0.0),
-        0.125,
+        Vec3::new(2.3, 1.9, 1.8),
+        Vec3::new(3.6, 4.0, 4.6),
+        Vec3::new(5.4, 5.9, 0.0),
+        0.0,
     ),
     (
-        Vec3::new(-2.0, 2.0, 2.0),
-        Vec3::new(-1.28, 0.62, 6.6),
-        Vec3::new(-4.6, 7.0, 0.0),
-        -0.125,
+        Vec3::new(0.0, 2.6, 1.8),
+        Vec3::new(0.0, 4.9, 4.8),
+        Vec3::new(0.0, 7.4, 0.0),
+        0.5,
+    ),
+    (
+        Vec3::new(-2.3, 1.9, 1.8),
+        Vec3::new(-3.6, 4.0, 4.6),
+        Vec3::new(-5.4, 5.9, 0.0),
+        0.0,
     ),
 ];
 /// The walk: how far the body goes in one cycle, the share of it each foot stands, and
-/// how high a shard is lifted to step: high enough that each one is seen to step.
-pub(super) const STRIDE: f32 = 7.0;
-pub(super) const STANCE: f32 = 0.75;
-pub(super) const LIFT: f32 = 1.5;
+/// how high a shard is lifted to step.
+pub(super) const STRIDE: f32 = 5.6;
+pub(super) const STANCE: f32 = 0.6;
+pub(super) const LIFT: f32 = 1.2;
 /// The body's heft (`set_walk_sway`): its roll over the side whose feet are down, its dip
-/// toward each foot as it lands, and how far it settles onto it.
-const SWAY: (f32, f32, f32) = (0.035, 0.03, 0.22);
+/// toward each foot as it lands, and how far it settles onto it. Six feet keep it steadier
+/// than four would.
+const SWAY: (f32, f32, f32) = (0.02, 0.015, 0.12);
 /// The shards' size against the Fallen's.
 const SHARD_SCALE: f32 = 0.075;
 /// How far past its knee a shin runs on into its point.
-const POINT: f32 = 1.0;
+const POINT: f32 = 1.5;
 
 /// A shin: the shard from its foot up past its knee to its point.
 fn shin(knee: Vec3, foot: Vec3, seed: u32) -> Shard {
@@ -52,8 +59,8 @@ fn shin(knee: Vec3, foot: Vec3, seed: u32) -> Shard {
         root: foot,
         tip: knee + up * POINT,
         back: (foot - knee).with_z(0.0).normalize(),
-        half: 1.15,
-        depth: 0.62,
+        half: 0.8,
+        depth: 0.5,
         skew: if seed.is_multiple_of(2) { 0.5 } else { -0.5 },
         plates: 3,
         seed,
@@ -62,7 +69,7 @@ fn shin(knee: Vec3, foot: Vec3, seed: u32) -> Shard {
 }
 
 /// Packed, how much higher the body rides, and what share nearer its hips the feet stand.
-pub(super) const SINK: f32 = 1.2;
+pub(super) const SINK: f32 = 1.0;
 pub(super) const WIDEN: f32 = 0.05;
 
 /// The rig and every leg, at the builder's level of detail.

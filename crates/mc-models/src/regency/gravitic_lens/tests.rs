@@ -10,11 +10,12 @@ fn fits_the_librarys_checks() {
     super::super::check(KEY, RADIUS, HEIGHT, None, &[]);
 }
 
-/// The core is left open and held between shards on opposite sides, at every level.
+/// The core is left open and held between prongs on opposite sides, at every level that
+/// draws them (the coarse one, a few pixels across, leaves them off).
 #[test]
-fn the_shards_hold_the_core() {
+fn the_prongs_hold_the_core() {
     let model = build_model_scaled(KEY, RADIUS, HEIGHT, 3).unwrap();
-    for (lod, mesh) in model.lods.iter().enumerate() {
+    for (lod, mesh) in model.lods.iter().enumerate().take(2) {
         let round: Vec<Vec3> = mesh
             .vertices
             .iter()
@@ -36,13 +37,13 @@ fn the_shards_hold_the_core() {
     }
 }
 
-/// It walks on two pairs of shard legs and braces with its deploy: packed, its feet stand
+/// It walks on three pairs of shard legs and braces with its deploy: packed, its feet stand
 /// in and its body rides higher, and its legs still reach (no bone stretched).
 #[test]
-fn walks_on_four_shards_and_braces() {
+fn walks_on_six_shards_and_braces() {
     let model = build_model_scaled(KEY, RADIUS, HEIGHT, 3).unwrap();
     let crawl = model.legs.and_then(|l| l.crawl).expect("a crawler");
-    assert_eq!(crawl.pairs, 2);
+    assert_eq!(crawl.pairs, 3);
     let [sink, widen] = crawl.brace.expect("it braces");
     assert!((sink - legs::SINK).abs() < 1e-4 && widen == legs::WIDEN);
     assert_eq!(crawl.gpu()[crate::CRAWL_SLOTS - 1], [sink, widen, 0.0, 0.0]);
