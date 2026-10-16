@@ -1467,10 +1467,49 @@
         // as a ripple of heavy whumps rather than one blast.
         "regency_seeker_hit": (like: "regency_gravitic_hit", size: 0.8, peak: 0.6),
         // The Exarch's shoulder mortar: the Saker's shot a size down, a short gun's
-        // compressive whump; and its knot landing, the gravitic engine's rift striking home
-        // shrunk to a shell's: the pull in, the snaps and the ground splitting.
+        // compressive whump.
         "regency_gravitic_mortar_fire": (like: "regency_surge_fire", size: 0.6, peak: 0.55),
-        "regency_gravitic_shatter": (like: "regency_fallen_strike", size: 0.4, peak: 0.6),
+        // Its knot landing: the gravitic engine's rift strike cut down to a shell's, at the
+        // strike's own pitch so the boom stays in the floor (shrinking it with `size`
+        // pitches every layer up with it): a short pull in, the snaps, a sub slam that
+        // holds, a growl sinking, the ground cracking and a few rocks coming down.
+        "regency_gravitic_shatter": (
+            length: 3, peak: 0.75, room: 0.6,
+            layers: [
+                // The pinch: the ground pulled in for a twentieth of a second.
+                Roll(from: 90, to: 240, glide: 0.06, attack: 0.055, decay: 0.01, gain: 1.1, swell: 6, depth: 0.4, seed: 9501),
+                // The snaps, then the slam's body: bursts reaching down into the sub.
+                Burst(at: 0.06, low: 900, high: 4500, attack: 0.0001, decay: 0.004, gain: 12, seed: 9502),
+                Burst(at: 0.061, low: 300, high: 2500, attack: 0.0002, decay: 0.01, gain: 18, seed: 9503),
+                Burst(at: 0.062, low: 30, high: 600, attack: 0.0005, decay: 0.1, gain: 26, seed: 9504),
+                Burst(at: 0.062, low: 22, high: 180, attack: 0.0015, decay: 0.45, gain: 24, seed: 9505),
+                // The boom: a thump dropping into the sub, and a low one that holds.
+                Tone(at: 0.06, from: 140, to: 38, glide: 0.1, attack: 0.0006, decay: 0.35, gain: 3),
+                Tone(at: 0.06, from: 62, to: 28, glide: 1.2, attack: 0.002, decay: 1.1, gain: 2),
+                Tone(at: 0.06, from: 36, to: 24, glide: 2, attack: 0.01, decay: 1.6, gain: 1.1),
+                // The gravity letting go: a rough growl sinking.
+                Fm(at: 0.06, from: 100, to: 40, glide: 0.8, ratio: 0.5, index: 2.6, fade: 0.6, attack: 0.002, decay: 0.9, gain: 1),
+                Drive(3.0),
+                // The ground giving way round it, rolling out in both ears.
+                Roll(at: 0.08, from: 700, to: 140, glide: 1.2, attack: 0.03, decay: 0.6, gain: 0.9, swell: 12, depth: 0.6, seed: 9506),
+                Roll(at: 0.11, from: 600, to: 120, glide: 1.4, attack: 0.1, decay: 0.6, gain: 0.55, swell: 14, depth: 0.7, pan: -0.6, seed: 9507),
+                Roll(at: 0.13, from: 560, to: 110, glide: 1.4, attack: 0.1, decay: 0.6, gain: 0.55, swell: 14, depth: 0.7, pan: 0.6, seed: 9508),
+                // The plates cracking apart, low and thick at first, thinning out.
+                Burst(at: 0.075, low: 120, high: 1100, attack: 0.0004, decay: 0.014, gain: 15, pan: -0.5, seed: 9510),
+                Burst(at: 0.095, low: 150, high: 1400, attack: 0.0004, decay: 0.012, gain: 15, pan: 0.4, seed: 9511),
+                Burst(at: 0.12, low: 110, high: 1000, attack: 0.0004, decay: 0.016, gain: 14, pan: -0.2, seed: 9512),
+                Burst(at: 0.15, low: 160, high: 1300, attack: 0.0004, decay: 0.012, gain: 13, pan: 0.7, seed: 9513),
+                Burst(at: 0.19, low: 130, high: 1200, attack: 0.0004, decay: 0.015, gain: 12, pan: -0.7, seed: 9514),
+                Burst(at: 0.24, low: 140, high: 1100, attack: 0.0004, decay: 0.013, gain: 11, pan: 0.2, seed: 9515),
+                Burst(at: 0.3, low: 120, high: 1000, attack: 0.0004, decay: 0.015, gain: 9, pan: 0.5, seed: 9516),
+                Burst(at: 0.38, low: 150, high: 1200, attack: 0.0004, decay: 0.012, gain: 8, pan: -0.4, seed: 9517),
+                // Rocks coming back down: dull thuds, fewer and further between.
+                Burst(at: 0.55, low: 45, high: 450, attack: 0.002, decay: 0.06, gain: 5, pan: 0.6, seed: 9520),
+                Burst(at: 0.78, low: 45, high: 500, attack: 0.002, decay: 0.065, gain: 5.5, pan: -0.6, seed: 9521),
+                Burst(at: 1.05, low: 45, high: 420, attack: 0.002, decay: 0.055, gain: 4, pan: 0.1, seed: 9522),
+                Burst(at: 1.4, low: 45, high: 480, attack: 0.002, decay: 0.06, gain: 3, pan: -0.3, seed: 9523),
+            ],
+        ),
         // The Sower's walk and feet: the battle scorpion's, a size down.
         "regency_bombard_walk": (like: "regency_crawl", size: 0.75, peak: 0.2),
         "regency_bombard_step": (like: "regency_footfall", size: 0.7, peak: 0.26),

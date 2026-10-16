@@ -553,7 +553,7 @@ fn dash_pose(dash: &mc_data::dash::Dash, s: &crate::dash::DashState) -> [f32; 2]
 /// Ticks a shoulder gun's flung gear takes to drift round once at rest.
 const FLING_DRIFT_TICKS: u32 = 320;
 
-/// How far a shoulder gun's flung gear (`Weapon::fling`, the Exarch mortar's halo) has
+/// How far a shoulder gun's flung gear (`Weapon::fling`, the Exarch mortar's crystal) has
 /// turned, last tick and this, in radians: a slow drift at rest (one turn every
 /// `FLING_DRIFT_TICKS`, each unit from its own start), and each shot flinging it through
 /// `turns` whole turns, fast at the shot and easing to rest as the reload runs out. Both
@@ -578,7 +578,7 @@ fn flung_pair(tick: u32, unit: u32, cooldown: u16, reload: u16, turns: u8) -> [f
 mod tests {
     use std::f32::consts::TAU;
 
-    /// The halo is flung from where the last shot left it, fastest at the shot, and comes
+    /// The crystal is flung from where the last shot left it, fastest at the shot, and comes
     /// to rest a whole number of turns on, so nothing jumps at the next shot.
     #[test]
     fn a_flung_gear_turns_whole_turns_fastest_at_the_shot() {

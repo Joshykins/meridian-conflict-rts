@@ -1459,7 +1459,7 @@ pub struct RawWeapon {
     pub shatter: f64,
     /// Whole turns a shoulder gun's spinning gear (`MeshBuilder::with_spin` on a `mount`
     /// gun's unit with no rotary barrels) is flung through by each shot: fast at the shot,
-    /// slowing to a stop as the reload runs out (the Exarch mortar's halo). Zero (the
+    /// slowing to a stop as the reload runs out (the Exarch mortar's crystal). Zero (the
     /// default): none. Cosmetic.
     #[serde(default)]
     pub fling: u8,

@@ -3,13 +3,13 @@
 //! ground they land on. A keeled pad lies on the pauldron's inboard crown, mirroring the
 //! auxiliary suite's on the left; a pedestal stands on it and carries a yoke whose cheeks
 //! turn with the gun but do not pitch, and the gun pitches between them on its trunnions
-//! (`TRUNNION`, the unit file's `pivot`): a breech block, a long slotted barrel and a
-//! flared muzzle collar, the knot leaving the middle of its bore (`MUZZLE`, its `muzzle`).
+//! (`TRUNNION`, the unit file's `pivot`).
 //!
-//! Round the barrel floats the halo: a ring of plates held off it by gravity alone, three
-//! shards on its inside pointing in at the bore. It drifts round at rest; each shot flings
-//! it round the barrel (`with_spin`, the unit file's `fling`), fast at the shot and
-//! slowing to rest over the reload, while the barrel kicks back through it.
+//! The gun is a split bore: a breech block, and out of its face two long keeled tines
+//! above and below the line, closing to points; the knot leaves between the points
+//! (`MUZZLE`, its `muzzle`). A violet crystal hangs free between the tines. It turns slowly
+//! at rest; each shot flings it round the line (`with_spin`, the unit file's `fling`), fast
+//! at the shot and slowing to rest over the reload, while the gun kicks back.
 
 use glam::{Vec2, Vec3};
 
@@ -19,23 +19,28 @@ use crate::pattern;
 
 use super::super::kit::{cable, metal, nanite_plate, v3};
 use super::form::{ring, sleeve, Ring, KEEL, OCT};
-use super::shoulder::{HEX, SLAB};
+use super::shoulder::{DIAMOND, HEX, SLAB};
 
 /// The trunnions the gun pitches on, over the right pauldron's inboard crown.
 pub(super) const TRUNNION: Vec3 = Vec3::new(-0.6, -3.2, 23.4);
-/// The bore's mouth: `MOUTH` metres ahead of the trunnions.
+/// Between the tines' points: `MOUTH` metres ahead of the trunnions.
 pub(super) const MUZZLE: Vec3 = Vec3::new(TRUNNION.x + MOUTH, TRUNNION.y, TRUNNION.z);
-const MOUTH: f32 = 4.4;
+const MOUTH: f32 = 5.3;
 /// The pedestal's foot on the pad.
 const FOOT: Vec3 = Vec3::new(-1.0, -3.2, 21.95);
 /// Half the yoke's span: the cheeks stand this far either side of the line.
 const YOKE: f32 = 1.1;
-/// How far the barrel kicks back through the halo on a shot.
+/// How far the gun kicks back on a shot.
 const KICK: f32 = 0.6;
-/// The halo: its middle along the barrel, its radius, its plates.
-const HALO_AT: f32 = 2.45;
-const HALO: f32 = 1.4;
-const HALO_PLATES: usize = 12;
+/// The breech's face, where the tines leave it.
+const FACE: f32 = 1.1;
+/// The tines' inner faces stand this far off the line.
+const GAP: f32 = 0.47;
+/// The crystal: its middle along the line, its half-length, and its radius, which keeps
+/// it clear of the tines as it turns.
+const CORE: f32 = 2.3;
+const CORE_HALF: f32 = 0.95;
+const CORE_R: f32 = 0.36;
 
 /// The suite's dark armour: Regency plate in the machined finish.
 fn machined(b: &mut MeshBuilder) {
@@ -64,7 +69,7 @@ pub(super) fn mortar(b: &mut MeshBuilder) {
             b.with_yoke(yoke);
             b.with_recoil(|b| {
                 gun(b);
-                b.with_spin(at(HALO_AT), halo);
+                b.with_spin(at(CORE), crystal);
             });
         });
     });
@@ -140,7 +145,7 @@ fn yoke(b: &mut MeshBuilder) {
 }
 
 /// The gun that pitches and kicks: the trunnion pin, the breech block and the
-/// counterweights at its back, the slotted barrel, its bands and the muzzle collar.
+/// counterweights at its back, the tines out of its face and the bands between them.
 fn gun(b: &mut MeshBuilder) {
     metal(b);
     b.cylinder_between(
@@ -154,53 +159,49 @@ fn gun(b: &mut MeshBuilder) {
     sleeve(
         b,
         &[
-            hex(-1.4, 0.62),
-            hex(-1.1, 0.85),
-            hex(0.45, 0.85),
-            hex(0.75, 0.7),
+            hex(-1.6, 0.6),
+            hex(-1.3, 0.8),
+            hex(FACE - 0.3, 0.8),
+            hex(FACE, 0.68),
         ],
         &HEX,
     );
+    socket(b);
     // Counterweight slabs either side of the breech's back.
+    machined(b);
     for side in [1.0f32, -1.0] {
         let out = Vec3::Y * side;
         sleeve(
             b,
             &[
-                ring(at(-1.3) + out * 0.78, out, 0.55, 0.12),
-                ring(at(-0.15) + out * 0.85, out, 0.55, 0.12),
+                ring(at(-1.5) + out * 0.73, out, 0.55, 0.12),
+                ring(at(-0.3) + out * 0.8, out, 0.55, 0.12),
             ],
             &SLAB,
         );
     }
-    // The barrel: a slotted jacket tapering to the collar, bound by two bands either side
-    // of the halo.
-    nanite_plate(b);
-    sleeve(b, &[hex(0.7, 0.62), hex(3.85, 0.5)], &HEX);
-    machined(b);
-    for t in [1.2, 3.65] {
-        sleeve(
-            b,
-            &[hex(t - 0.15, 0.6), hex(t, 0.68), hex(t + 0.15, 0.6)],
-            &HEX,
-        );
+    for side in [1.0f32, -1.0] {
+        tine(b, Vec3::Z * side);
     }
-    sleeve(
-        b,
-        &[
-            hex(3.8, 0.56),
-            hex(4.0, 0.72),
-            hex(MOUTH - 0.12, 0.76),
-            hex(MOUTH, 0.68),
-        ],
-        &HEX,
-    );
-    bore(b);
+    // Bands down either side holding the tines apart, clear of the crystal.
+    machined(b);
+    for t in [1.5, 3.4] {
+        for side in [1.0f32, -1.0] {
+            let out = Vec3::NEG_Y * side;
+            sleeve(
+                b,
+                &[
+                    ring(at(t) + out * 0.52 + Vec3::Z * 0.85, out, 0.2, 0.1),
+                    ring(at(t) + out * 0.52 - Vec3::Z * 0.85, out, 0.2, 0.1),
+                ],
+                &OCT,
+            );
+        }
+    }
     if b.fine() {
         // Heat spines along the breech's top and a feed line down each side of it.
-        machined(b);
-        for (t, h) in [(-0.8, 0.55), (-0.1, 0.45)] {
-            let root = at(t) + Vec3::Z * 0.82;
+        for (t, h) in [(-1.0, 0.55), (-0.3, 0.45)] {
+            let root = at(t) + Vec3::Z * 0.78;
             sleeve(
                 b,
                 &[
@@ -216,9 +217,9 @@ fn gun(b: &mut MeshBuilder) {
             cable(
                 b,
                 &[
-                    at(-0.9) + s * 0.88 - Vec3::Z * 0.35,
-                    at(0.6) + s * 0.72 - Vec3::Z * 0.4,
-                    at(1.05) + s * 0.6 - Vec3::Z * 0.35,
+                    at(-1.1) + s * 0.83 - Vec3::Z * 0.35,
+                    at(0.4) + s * 0.75 - Vec3::Z * 0.4,
+                    at(FACE - 0.05) + s * 0.62 - Vec3::Z * 0.3,
                 ],
                 0.08,
             );
@@ -226,83 +227,105 @@ fn gun(b: &mut MeshBuilder) {
     }
 }
 
-/// The bore sunk into the collar's face: a dark lip round a violet gasket, and the cavity
-/// behind it, the knot leaving the middle of the mouth.
-fn bore(b: &mut MeshBuilder) {
+/// A tine on the `out` side of the line: slotted along its length from the breech's
+/// face, closing on the line to a machined point.
+fn tine(b: &mut MeshBuilder, out: Vec3) {
+    let off = |t: f32, h: f32| at(t) + out * (GAP + h);
+    nanite_plate(b);
+    sleeve(
+        b,
+        &[
+            ring(off(FACE - 0.4, 0.3), out, 0.55, 0.3),
+            ring(off(3.3, 0.27), out, 0.48, 0.27),
+            ring(off(4.7, 0.2) - out * 0.05, out, 0.36, 0.2),
+        ],
+        &KEEL,
+    );
+    machined(b);
+    sleeve(
+        b,
+        &[
+            ring(off(4.65, 0.2) - out * 0.05, out, 0.38, 0.22),
+            ring(MUZZLE + out * 0.3, out, 0.05, 0.05),
+        ],
+        &KEEL,
+    );
+}
+
+/// The socket in the breech's face the crystal hangs off: a dark lip round a violet
+/// gasket, and the cavity behind it.
+fn socket(b: &mut MeshBuilder) {
     let loop_at = |t: f32, r: f32| -> Vec<Vec3> {
         HEX.iter()
             .map(|&[s, u]| at(t) + (Vec3::NEG_Y * s + Vec3::Z * u) * r)
             .collect()
     };
-    let rim = loop_at(MOUTH, 0.68);
-    let lip = loop_at(MOUTH, 0.42);
+    let rim = loop_at(FACE, 0.68);
+    let lip = loop_at(FACE, 0.42);
     b.paint(PLATING_DARK).pattern(pattern::NANITE_RIM);
     for k in 0..HEX.len() {
         let n = (k + 1) % HEX.len();
         b.face(&[rim[k], rim[n], lip[n], lip[k]]);
     }
     metal(b);
-    b.with_facets(|b| b.loft(&[lip, loop_at(MOUTH - 0.4, 0.3)], false, true));
+    b.with_facets(|b| b.loft(&[lip, loop_at(FACE - 0.4, 0.3)], false, true));
 }
 
-/// The halo, held free of the barrel: a ring of plates, every other one slotted, and
-/// three shards on its inside pointing in at the bore.
-fn halo(b: &mut MeshBuilder) {
-    let step = std::f32::consts::TAU / HALO_PLATES as f32;
-    for k in 0..HALO_PLATES {
-        // Each plate a little short of the next, so the ring reads as plates, not a hoop.
-        let (p, q) = (
-            round(k as f32 * step + 0.03),
-            round((k + 1) as f32 * step - 0.03),
-        );
-        let mid = (p + q).normalize();
-        if k % 2 == 0 {
-            nanite_plate(b);
-        } else {
-            machined(b);
-        }
-        sleeve(
-            b,
-            &[
-                ring(at(HALO_AT) + p * HALO, mid, 0.34, 0.2),
-                ring(at(HALO_AT) + q * HALO, mid, 0.34, 0.2),
-            ],
-            &OCT,
-        );
-    }
+/// The crystal, held free between the tines: a long violet diamond on the line, with
+/// three vanes round its waist so its turning reads from afar.
+fn crystal(b: &mut MeshBuilder) {
     nanite_plate(b);
+    sleeve(
+        b,
+        &[
+            ring(at(CORE - CORE_HALF), Vec3::Z, 0.02, 0.02),
+            ring(at(CORE - 0.2), Vec3::Z, CORE_R, CORE_R),
+            ring(at(CORE + 0.2), Vec3::Z, CORE_R, CORE_R),
+            ring(at(CORE + CORE_HALF), Vec3::Z, 0.02, 0.02),
+        ],
+        &DIAMOND,
+    );
+    machined(b);
     for k in 0..3 {
-        let r = round(std::f32::consts::TAU * (k as f32 / 3.0) + step * 0.5);
+        let r = round(std::f32::consts::TAU * (k as f32 / 3.0) + 0.4);
         sleeve(
             b,
             &[
-                ring(at(HALO_AT) + r * (HALO - 0.1), r, 0.3, 0.16),
-                ring(at(HALO_AT + 0.15) + r * 0.95, r, 0.02, 0.02),
+                ring(at(CORE - 0.5) + r * 0.2, r, 0.02, 0.02),
+                ring(at(CORE - 0.1) + r * 0.32, r, 0.06, 0.12),
+                ring(at(CORE + 0.35) + r * 0.25, r, 0.02, 0.02),
             ],
             &KEEL,
         );
     }
 }
 
-/// From far off: the pedestal as a bar, the gun as another, still pitching, and the halo
-/// as a square about the barrel.
+/// From far off: the pedestal as a bar, the breech and each tine as others, still
+/// pitching, and the crystal as a bar turning between the tines.
 pub(super) fn coarse(b: &mut MeshBuilder) {
     b.module("gravitic", 0.3, |b| {
         machined(b);
         b.beam(FOOT, TRUNNION, Vec2::splat(0.9), Vec2::splat(0.9));
         b.with_mount(TRUNNION, KICK, |b| {
             b.with_recoil(|b| {
-                b.beam(at(-1.4), MUZZLE, Vec2::splat(1.5), Vec2::splat(1.2));
-                b.with_spin(at(HALO_AT), |b| {
-                    for k in 0..4 {
-                        let a = std::f32::consts::FRAC_PI_2 * k as f32;
-                        b.beam(
-                            at(HALO_AT) + round(a) * HALO,
-                            at(HALO_AT) + round(a + std::f32::consts::FRAC_PI_2) * HALO,
-                            Vec2::splat(0.4),
-                            Vec2::splat(0.4),
-                        );
-                    }
+                b.beam(at(-1.6), at(FACE), Vec2::splat(1.6), Vec2::splat(1.4));
+                for side in [1.0f32, -1.0] {
+                    let out = Vec3::Z * side;
+                    b.beam(
+                        at(FACE - 0.4) + out * (GAP + 0.3),
+                        MUZZLE + out * 0.3,
+                        Vec2::new(1.0, 0.6),
+                        Vec2::splat(0.1),
+                    );
+                }
+                nanite_plate(b);
+                b.with_spin(at(CORE), |b| {
+                    b.beam(
+                        at(CORE - CORE_HALF),
+                        at(CORE + CORE_HALF),
+                        Vec2::splat(CORE_R),
+                        Vec2::splat(CORE_R),
+                    );
                 });
             });
         });
