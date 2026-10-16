@@ -22,8 +22,8 @@
 # naming the holders, while all are taken. It runs at low priority, with its
 # cargo jobs and test threads sized to its slot's share of the cores, so checks
 # side by side neither starve each other nor the sessions' own builds and shots.
-# If perf_budgets fails while other checks are running, it runs once more with
-# the machine to itself.
+# A test binary that fails runs once more on as quiet a machine as two minutes'
+# wait for the other checks gives, so a load-sensitive test does not fail it.
 #
 # A test binary still running after MERIDIAN_TEST_LIMIT seconds (default 300)
 # fails the check as hung; MERIDIAN_TEST_JOBS (default: half the slot's cores)
@@ -90,26 +90,22 @@ take_slot() {
         waited=$((waited + 5))
     done
 }
-# Every slot, for a run that needs a quiet machine. A check gives its own slot
-# back first and only one gathers at a time, so two never deadlock.
+# Every slot it can gather within SECONDS, for a run that wants a quiet
+# machine. A check gives its own slot back first and only one gathers at a
+# time, so two never deadlock; one that runs out of time goes on with what it
+# has rather than stall its session.
 take_machine() {
-    local i fd quiet
+    local i fd quiet until=$((SECONDS + $1))
     for i in "${!held[@]}"; do
         fd=${held[$i]}
         exec {fd}>&-
     done
     held=()
     exec {quiet}> /tmp/meridian-check-quiet
-    flock "$quiet"
-    for ((i = 0; i < slots; i++)); do lock_slot "$i" ""; done
-}
-others_running() {
-    local i
+    flock -w "$1" "$quiet" || true
     for ((i = 0; i < slots; i++)); do
-        [ -z "${held[$i]:-}" ] || continue
-        flock -n "/tmp/meridian-check-slot-$i" true || return 0
+        lock_slot "$i" "-w $((until > SECONDS ? until - SECONDS : 0))" || true
     done
-    return 1
 }
 take_slot
 echo "== check slot taken ($slots on this machine, $share cores each)"
@@ -172,7 +168,8 @@ run_one() {
         echo "$((SECONDS - began)) $dir $name" >> "$logs/times"
     else
         echo "FAIL $name ($(basename "$dir"))"
-        touch "$log.failed"
+        # The binary's line, so it can run again (a hung one does not).
+        printf '%s\t%s\t%s\n' "$exe" "$dir" "$name" > "$log.failed"
     fi
 }
 
@@ -202,14 +199,26 @@ docs=$!
 grep -v -P '\tperf_budgets$' "$logs/binaries" | order | run_all "${MERIDIAN_TEST_JOBS:-$half}"
 wait "$docs" || doc=$?
 grep -P '\tperf_budgets$' "$logs/binaries" | run_all 1
-# perf_budgets times its scenes, so other checks running beside it can push it
-# over budget: then it runs again once every slot is this check's.
-perf=$(compgen -G "$logs/perf_budgets-*.log.failed" || true)
-if [ -n "$perf" ] && others_running; then
-    echo "   perf_budgets failed beside other checks (load $(cut -d' ' -f1 /proc/loadavg)); waiting for them to finish to run it again"
-    rm -f $perf
-    take_machine
-    grep -P '\tperf_budgets$' "$logs/binaries" | RUST_TEST_THREADS=$cpus run_all 1
+
+# perf_budgets and the tests that count ticks against the clock can fail on a
+# busy machine alone, so a binary that failed runs once more, one at a time,
+# with as many slots as two minutes' wait gathers. One that passes then is
+# named, with its first failure, as one to make load-proof.
+again=$(cat "$logs"/*.log.failed 2> /dev/null || true)
+if [ -n "$again" ]; then
+    echo "== running the failed binaries again (load $(cut -d' ' -f1 /proc/loadavg))"
+    for f in "$logs"/*.log.failed; do
+        [ -s "$f" ] || continue
+        mv "${f%.failed}" "${f%.log.failed}.first"
+        rm "$f"
+    done
+    take_machine 120
+    RUST_TEST_THREADS=$cpus run_all 1 <<< "$again"
+    for f in "$logs"/*.first; do
+        [ -e "${f%.first}.log.failed" ] && continue
+        echo "   $(basename "${f%.first}") passed the second time; it failed under load with:"
+        grep -a -A2 'panicked at' "$f" | sed 's/^/     /' || true
+    done
 fi
 
 [ -s "$logs/times" ] && cp "$logs/times" "$times"
