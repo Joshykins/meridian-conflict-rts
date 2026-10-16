@@ -1474,9 +1474,9 @@
         // vanes whumping past faster and faster (in time with the model: two turns,
         // quickening, three vanes), the pressure swelling deep under it, air drawn in down
         // the bore, violet crackle walking up the tines, and a last short suck as the knot
-        // pinches. It stops dead for the shot (`regency_gravitic_mortar_fire`).
+        // pinches, dying away under the shot (`regency_gravitic_mortar_fire`).
         "regency_gravitic_mortar_charge": (
-            length: 1.65, peak: 0.5, room: 0.3,
+            length: 1.9, peak: 0.5, room: 0.3,
             layers: [
                 // The breech locking: a deep clunk and a metal clank.
                 Burst(low: 50, high: 450, attack: 0.001, decay: 0.035, gain: 3.5, seed: 14101),
