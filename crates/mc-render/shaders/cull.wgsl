@@ -313,9 +313,65 @@ fn other_lists(e: Entity) -> u32 {
         if any(abs(q.xy / q.w) > vec2<f32>(1.0) + reach) {
             continue;
         }
+        // Nor into one whose every point its shadow can fall on reads the nearer one.
+        if c > 0u && held_nearer(c - 1u, center, slack) {
+            continue;
+        }
         lists |= 1u << (CULL_LIST_SHADOW + c);
     }
     return lists;
+}
+
+// Where a pixel's shadow comes from (`SHADOW_RIM_*`): the nearest cascade that holds
+// it, blended into the next only across its outer rim. A shadow falls along the light,
+// so in light space it lies under its caster: a caster `slack` metres round `center`
+// whose shadow stays inside cascade `c`'s rim, a few texels to spare for the filter and
+// the bias, and well within its depth, darkens only pixels that read `c`, and the
+// cascades past it need not draw it. Seen from straight down the cascades overlap
+// almost whole, and this is most of an army in each. (The terrain's nodes are held
+// back the same way, renderer/shadow_terrain.rs.)
+fn held_nearer(c: u32, center: vec3<f32>, slack: f32) -> bool {
+    let m = globals.shadow_cascades[c];
+    let q = m * vec4<f32>(center, 1.0);
+    let per_metre = vec2<f32>(
+        length(vec3<f32>(m[0].x, m[1].x, m[2].x)),
+        length(vec3<f32>(m[0].y, m[1].y, m[2].y)),
+    );
+    let info = globals.shadow_info[c];
+    let out = abs(q.xy) + per_metre * (slack + SHADOW_RIM_TEXELS * info.x);
+    let depth = (slack + SHADOW_RIM_DEPTH_M) / info.y;
+    return all(out < vec2<f32>(SHADOW_RIM_INNER)) && q.z > depth && q.z < 1.0 - depth;
+}
+
+// Cascade texels in a model's radius past which it casts with its full level, and its
+// reduced one; under those, its coarse level. A shadow is a soft-edged silhouette on
+// the ground, so it does with less than the model drawn on screen at the same size.
+const SHADOW_FULL_TEXELS: f32 = 48.0;
+const SHADOW_REDUCED_TEXELS: f32 = 14.0;
+
+// The draw slot entity `e`, drawn on screen with `slot`, casts into cascade `c` with:
+// never finer than the screen's. Units only; props keep their own levels.
+fn shadow_slot(e: Entity, slot: u32, c: u32) -> u32 {
+    let model = models[e.blueprint];
+    if (e.owner_flags & KIND_PROP) != 0u || slot < model.slot || slot >= model.slot + LOD_FAR - 1u {
+        return slot;
+    }
+    let texels = model.bounds_radius / globals.shadow_info[c].x;
+    var level = LOD_FAR - 1u;
+    if texels > SHADOW_FULL_TEXELS {
+        level = 0u;
+    } else if texels > SHADOW_REDUCED_TEXELS {
+        level = 1u;
+    }
+    return max(slot, model.slot + level);
+}
+
+// The draw slot entity `e`, drawn on screen with `slot`, is drawn with in list `l`.
+fn list_slot(e: Entity, slot: u32, l: u32) -> u32 {
+    if l >= CULL_LIST_SHADOW {
+        return shadow_slot(e, slot, l - CULL_LIST_SHADOW);
+    }
+    return slot;
 }
 
 // Where the blasts on screen (renderer/tree_wind.rs) push the top of a tree `tall`
@@ -403,7 +459,7 @@ fn cs_cull(@builtin(global_invocation_id) id: vec3<u32>) {
     atomicAdd(&counters[slot], 1u);
     for (var l = 1u; l < CULL_LIST_COUNT; l++) {
         if (lists & (1u << l)) != 0u {
-            atomicAdd(&counters[l * globals.counts.z + slot], 1u);
+            atomicAdd(&counters[l * globals.counts.z + list_slot(e, slot, l)], 1u);
         }
     }
 }
@@ -445,14 +501,15 @@ fn cs_scatter(@builtin(global_invocation_id) id: vec3<u32>) {
     }
     var vis_index = i;
     var entity_index = i;
-    var flags: u32;
+    var e: Entity;
     if push.dynamic == 1u {
         vis_index = globals.counts.y + i;
         entity_index = i | DYNAMIC_BIT;
-        flags = dynamic_entities[i].owner_flags;
+        e = dynamic_entities[i];
     } else {
-        flags = static_entities[i].owner_flags;
+        e = static_entities[i];
     }
+    let flags = e.owner_flags;
     let v = vis[vis_index];
     let slot = vis_slot(v);
     let icon_slot = globals.counts.z - 1u;
@@ -462,7 +519,7 @@ fn cs_scatter(@builtin(global_invocation_id) id: vec3<u32>) {
         let lists = v >> LISTS_SHIFT;
         for (var l = 1u; l < CULL_LIST_COUNT; l++) {
             if (lists & (1u << l)) != 0u {
-                visible[atomicAdd(&counters[l * globals.counts.z + slot], 1u)] = entity_index;
+                visible[atomicAdd(&counters[l * globals.counts.z + list_slot(e, slot, l)], 1u)] = entity_index;
             }
         }
     }

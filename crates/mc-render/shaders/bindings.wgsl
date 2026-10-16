@@ -379,16 +379,16 @@ fn sun_shadow(world: vec3<f32>, n: vec3<f32>) -> f32 {
     var lit = 1.0;
     for (var i = 0u; i < 3u; i++) {
         let c = shadow_coord(i, world, n);
-        if c.w >= 0.97 {
+        if c.w >= SHADOW_RIM_OUTER {
             continue;
         }
         lit = shadow_pcf(i, c);
-        let rim = smoothstep(0.82, 0.97, c.w);
+        let rim = smoothstep(SHADOW_RIM_INNER, SHADOW_RIM_OUTER, c.w);
         if rim > 0.0 {
             var beyond = 1.0;
             if i < 2u {
                 let next = shadow_coord(i + 1u, world, n);
-                if next.w < 0.97 {
+                if next.w < SHADOW_RIM_OUTER {
                     beyond = shadow_pcf(i + 1u, next);
                 }
             }

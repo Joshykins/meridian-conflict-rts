@@ -43,7 +43,7 @@ fn shaft_map(x: vec3<f32>) -> f32 {
     if globals.map.w > 0.0 {
         for (var i = 0u; i < 3u; i++) {
             let c = shadow_coord(i, x, globals.sun.xyz);
-            if c.w < 0.97 {
+            if c.w < SHADOW_RIM_OUTER {
                 lit = mix(1.0, textureSampleCompareLevel(shadow_map, shadow_sampler, c.xy, i, c.z), globals.map.w);
                 break;
             }

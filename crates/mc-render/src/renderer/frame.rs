@@ -297,6 +297,7 @@ impl Renderer {
         let shadow_strength = self.quality.shadow_strength(camera.distance);
         let cascades = shadow_cascades::fit(camera, sun, z_range, self.shadow.size());
         let shadow_view_proj: Mat4 = cascades[0].view_proj;
+        let shadow_nodes = self.write_shadow_nodes(&cascades, z_used);
 
         let view_proj = camera.view_proj();
         let eye = camera.eye();
@@ -665,7 +666,12 @@ impl Renderer {
                         &[],
                     )
                 };
-                draw_terrain(self.pipelines.terrain_shadow, kind);
+                terrain.draw_nodes(
+                    self.pipelines.terrain_shadow,
+                    self.layouts.scene,
+                    kind,
+                    shadow_nodes[cascade].clone(),
+                );
                 self.foundations
                     .record(&self.gpu, cmd, self.layouts.scene, kind);
                 draw_entities(

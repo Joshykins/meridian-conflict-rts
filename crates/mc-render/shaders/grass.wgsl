@@ -46,7 +46,7 @@ fn grass_shadow(world: vec3<f32>) -> f32 {
     }
     for (var i = 0u; i < 3u; i++) {
         let c = shadow_coord(i, world, vec3<f32>(0.0, 0.0, 1.0));
-        if c.w >= 0.97 {
+        if c.w >= SHADOW_RIM_OUTER {
             continue;
         }
         let lit = textureSampleCompareLevel(shadow_map, shadow_sampler, c.xy, i, c.z);

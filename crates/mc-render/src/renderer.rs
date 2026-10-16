@@ -146,6 +146,7 @@ mod breadcrumbs;
 mod gpu_timers;
 mod shadow_cascades;
 mod shadow_map;
+mod shadow_terrain;
 mod shaper_growth;
 mod titan_charge;
 mod titan_fx;
@@ -1719,7 +1720,11 @@ impl Renderer {
         )?;
         let props_dead = gpu.host_buffer((static_count as u64).div_ceil(32).max(1) * 4, storage)?;
         props_dead.write(0, &vec![0u8; props_dead.size as usize]);
-        let nodes = gpu.host_buffer((MAX_NODES * size_of::<TerrainNode>()) as u64, storage)?;
+        // The camera's nodes, then each shadow cascade's of them (`shadow_terrain`).
+        let nodes = gpu.host_buffer(
+            (MAX_NODES * (1 + shadow_cascades::CASCADES) * size_of::<TerrainNode>()) as u64,
+            storage,
+        )?;
         let marks = gpu.host_buffer((MAX_MARKS * size_of::<Mark>()) as u64, storage)?;
         let ranges = gpu.host_buffer((MAX_RANGES * size_of::<RangeRing>()) as u64, storage)?;
         let projectiles = gpu.host_buffer(

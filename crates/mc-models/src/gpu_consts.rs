@@ -150,6 +150,22 @@ shared! {
         pub const COUNT: u32 = 6;
     }
 
+    /// Where a point reads its sun shadow (bindings.wgsl `sun_shadow`, grass, shafts):
+    /// the nearest cascade that holds it, blended into the next across its rim. So a
+    /// caster whose shadow stays inside a cascade's rim casts into none past it
+    /// (cull.wgsl `held_nearer`, renderer/shadow_terrain.rs).
+    pub mod shadow_rim as "SHADOW_RIM_" {
+        /// How far out a cascade's own map is read alone (0 its middle, 1 its edge).
+        pub const INNER: f32 = 0.82;
+        /// Past it, the outer rim blends into the next cascade until this; beyond it the
+        /// next is read alone.
+        pub const OUTER: f32 = 0.97;
+        /// Texels of the nearer cascade to spare round a caster for the filter and bias.
+        pub const TEXELS: f32 = 4.0;
+        /// Metres of depth past a caster its shadow may still fall in the nearer cascade.
+        pub const DEPTH_M: f32 = 200.0;
+    }
+
     /// Levels of detail past a model's own (`models::LOD_COUNT` of them), as draw slots
     /// after its first.
     pub mod lod as "LOD_" {

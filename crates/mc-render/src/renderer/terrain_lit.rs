@@ -55,6 +55,34 @@ impl TerrainDraw<'_> {
         pass_kind: u32,
         lit: Option<vk::DescriptorSet>,
     ) {
+        self.draw_run(pipeline, layout, pass_kind, lit, 0..self.node_count);
+    }
+
+    /// A shadow cascade's run of nodes, written after the camera's
+    /// (`Renderer::write_shadow_nodes`).
+    pub(super) fn draw_nodes(
+        &self,
+        pipeline: vk::Pipeline,
+        layout: vk::PipelineLayout,
+        pass_kind: u32,
+        nodes: std::ops::Range<u32>,
+    ) {
+        if !nodes.is_empty() {
+            self.draw_run(pipeline, layout, pass_kind, None, nodes);
+        }
+    }
+
+    /// Nodes `nodes` of the buffer: drawn as instances from `nodes.start`, and
+    /// terrain.wgsl's `instance_index` (Vulkan's, which counts the first instance in)
+    /// is the node's place in the buffer.
+    fn draw_run(
+        &self,
+        pipeline: vk::Pipeline,
+        layout: vk::PipelineLayout,
+        pass_kind: u32,
+        lit: Option<vk::DescriptorSet>,
+        nodes: std::ops::Range<u32>,
+    ) {
         let (dev, cmd) = (&self.gpu.device, self.cmd);
         let sets = [self.nodes_set, lit.unwrap_or_default()];
         let sets = &sets[..1 + lit.is_some() as usize];
@@ -73,11 +101,12 @@ impl TerrainDraw<'_> {
         }
         self.push(layout, pass_kind);
         // SAFETY: inside the same render pass; the grid buffers are live, made with
-        // vertex/index usage, and `index_count` indices fit `grid_ib`.
+        // vertex/index usage, `index_count` indices fit `grid_ib`, and `nodes` lies in
+        // the written part of the nodes buffer.
         unsafe {
             dev.cmd_bind_vertex_buffers(cmd, 0, &[self.grid_vb.buffer], &[0]);
             dev.cmd_bind_index_buffer(cmd, self.grid_ib.buffer, 0, vk::IndexType::UINT32);
-            dev.cmd_draw_indexed(cmd, self.index_count, self.node_count, 0, 0, 0);
+            dev.cmd_draw_indexed(cmd, self.index_count, nodes.len() as u32, 0, 0, nodes.start);
         }
     }
 }
