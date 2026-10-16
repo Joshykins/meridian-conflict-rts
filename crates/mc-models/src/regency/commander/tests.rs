@@ -348,3 +348,31 @@ fn the_mortar_is_the_unit_files() {
         );
     }
 }
+
+#[test]
+fn the_aa_beam_mount_is_the_unit_files() {
+    let bp = loadout(&["aa_beam"]);
+    let gun = bp
+        .weapons
+        .iter()
+        .find(|w| w.name == "AA Beam Projector")
+        .expect("the refit adds the projector");
+    assert!(gun.mount && gun.beam, "a held beam on a mount of its own");
+    let v = |p| crate::authored(&bp, p);
+    assert!(v(gun.pivot.unwrap()).distance(aa_beam::TRUNNION) < 1e-3);
+    assert!(v(gun.muzzle).distance(aa_beam::MUZZLE) < 1e-3);
+    let model = build_model_fitted("regency_commander", 10.4, HEIGHT, 1, &["aa_beam"]).unwrap();
+    let mount = model.mount.expect("the projector turns on its own");
+    assert!(Vec3::new(mount[0], mount[1], mount[2]).distance(aa_beam::TRUNNION) < 1e-3);
+    // The knot is held between the prongs: each reaches past it, one either side.
+    let ahead: Vec<Vec3> = limb(&model, 0, rig::MOUNT)
+        .map(|v| Vec3::from(v.pos))
+        .filter(|p| p.x > aa_beam::MUZZLE.x)
+        .collect();
+    for side in [1.0f32, -1.0] {
+        assert!(
+            ahead.iter().any(|p| (p.y - aa_beam::MUZZLE.y) * side > 0.1),
+            "no prong past the knot on side {side}"
+        );
+    }
+}

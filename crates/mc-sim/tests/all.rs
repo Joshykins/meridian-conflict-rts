@@ -164,4 +164,5 @@ fn every_test_file_is_listed() {
 }
 
 mod colossus;
+mod exarch_aa_beam;
 mod executioner;

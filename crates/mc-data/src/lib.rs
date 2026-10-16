@@ -2127,7 +2127,8 @@ mod tests {
                 "nano_field",
                 "mfe",
                 "gravitic",
-                "aux_eng"
+                "aux_eng",
+                "aa_beam"
             ]
         );
         // The rebuilt cannon takes the Repeater's place: still one gun, at the same index.

@@ -23,10 +23,12 @@
 //!   forearm is rebuilt as the pinched-plasmeric, then the pinch-fusion cannon
 //!   (`cannons`). The back carries Nanite Repair, a stack of slotted plates the field
 //!   fans out into wings, or the Material Formation Engine (`back`); the shoulder slot
-//!   either the auxiliary engineering projector in its yoke on the left (`shoulder`) or
-//!   the Gravitic Shock Mortar on the right, its halo spinning round the barrel
-//!   (`gravitic`, the model's one `with_mount` gun).
+//!   one of the auxiliary engineering projector in its yoke on the left (`shoulder`), the
+//!   Gravitic Shock Mortar on the right, its halo spinning round the barrel (`gravitic`),
+//!   or the AA Beam Projector on the right (`aa_beam`). The right-shoulder guns are the
+//!   model's one `with_mount` gun and pitch on the same trunnion.
 
+mod aa_beam;
 mod arms;
 mod back;
 mod body;
@@ -97,6 +99,7 @@ pub(super) fn commander(b: &mut MeshBuilder, _tech: u8) {
         back::back(b);
         shoulder::aux_eng(b);
         gravitic::mortar(b);
+        aa_beam::aa_beam(b);
     });
 }
 
@@ -167,6 +170,7 @@ fn coarse(b: &mut MeshBuilder) {
         back::coarse(b);
         shoulder::coarse(b);
         gravitic::coarse(b);
+        aa_beam::coarse(b);
     });
 }
 
