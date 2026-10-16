@@ -138,18 +138,22 @@ it must not need the GPU driver the game needs. The game never updates itself.
 
 - **The window:** down the left, the brand, the channel picker (Release, Playtest) and
   the picked channel's build: its number and date, how it stands (up to date, an
-  update downloading with its speed and time left, offline), its server (a connection
-  to it answers or not), what is installed, and **Play** at the foot. To the right,
-  an open window onto the backdrop (`crates/mc-launcher/assets/backdrop.png`, framed
-  by `FRAMING` in `paint/backdrop.rs`) with the latest news on a strip along its foot,
-  and under it **Patch Notes** (the channel's history), **News** and **Builds**; the
-  news's links along the foot.
+  update downloading with its speed and time left, offline), and **Play** at the foot.
+  To the right, an open window onto the backdrop (`crates/mc-launcher/assets/backdrop.png`,
+  framed by `FRAMING` in `paint/backdrop.rs`) with the latest news on a strip along its
+  foot, and under it **Patch Notes** (the channel's history, a row per build: the
+  newest open and marked *Latest*, the rest shut to their first line until clicked),
+  **News** and **Builds**; the news's links along the foot. The window opens at
+  1280 x 760 and resizes (no narrower than 1280, no shorter than 700); the right-hand
+  panel takes what it gains.
 - **Updates:** on opening, and again every 10 minutes while it stays open, the
   launcher reads each channel's newest build and history and the news (what it shows
   stays until the new answer is in). When the picked channel names a build that is not installed, it
   downloads it at once and **Play** waits for it (a network match needs everyone on
   one build); a failed download leaves Play on the installed build with *Try the
-  update again*. A channel with nothing installed offers **Install**. A finished
+  update again*. A channel with nothing installed offers **Install**. A channel the
+  store has nothing on yet (its `channels/<channel>/<platform>.json` answers 404, as
+  Release does before it comes out) reads *Coming soon*, with Play off and no Retry. A finished
   update becomes its channel's current build; when it brings a different launcher
   (`launcher/MeridianConflict.exe` in the build) from a later build than the running
   launcher's own, that goes beside the running one as `MeridianConflict.exe.new` and the
@@ -172,8 +176,9 @@ it must not need the GPU driver the game needs. The game never updates itself.
   which is the newer build's), then starts the current build again on Match History
   (`--open history`).
 - **Looking at it:** `MeridianConflict --screenshot DIR` draws the window in each of
-  its states (up to date, updating, news, builds with a check running, a channel to
-  install, offline, an old replay) at 1x and 1.5x, from sample builds in a scratch
+  its states (up to date, updating with an older build's notes open, news, builds with
+  a check running, a channel to install, offline, an old replay, and Release not out
+  yet at the smallest size) at 1x and 1.5x, from sample builds in a scratch
   install, with no window and no store.
 
 ### Patch notes

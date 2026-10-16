@@ -1,7 +1,8 @@
 //! The launcher's one screen, laid out like the game's front end: the brand
 //! and the build's state in a column of glass down the left, Play at its foot;
 //! patch notes, news and the installed builds in a panel to the right; links
-//! along the foot. 1280 x 760 points.
+//! along the foot. 1280 x 760 points to start with; the window resizes, and
+//! the panel on the right takes what it gains.
 
 mod builds;
 mod home;
@@ -11,8 +12,12 @@ use crate::app::{Action, App, Page, ReplayStep};
 use crate::paint::{ink, palette, rgb, type_scale, Rect};
 use crate::ui::{id, ButtonKind, Ui};
 
-/// The window's size in points.
+/// The window's size in points when it opens.
 pub(crate) const SIZE: (f32, f32) = (1280.0, 760.0);
+/// The smallest it may be made: no narrower, so the Builds page's columns
+/// stay clear of its buttons, and short enough for a 768-high laptop screen
+/// with Play still clear of the build's facts.
+pub(crate) const MIN_SIZE: (f32, f32) = (1280.0, 700.0);
 const MARGIN: f32 = 24.0;
 const COLUMN_W: f32 = 404.0;
 const FOOT_H: f32 = 44.0;
@@ -107,8 +112,7 @@ fn hero(ui: &mut Ui, app: &mut App, r: Rect) {
             more,
         )
     {
-        app.page = page;
-        app.scroll = 0.0;
+        app.show(page);
     }
 }
 

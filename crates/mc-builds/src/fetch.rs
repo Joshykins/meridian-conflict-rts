@@ -80,10 +80,17 @@ impl Store {
             .read_to_end(&mut out)?;
         let done = child.wait_with_output()?;
         if !done.status.success() {
-            return Err(Error::Fetch(format!(
-                "{path}: {}",
-                String::from_utf8_lossy(&done.stderr).trim()
-            )));
+            let why = String::from_utf8_lossy(&done.stderr).trim().to_owned();
+            // curl's 22 is an HTTP error (--fail), 37 a file:// path that is not there.
+            let missing = match done.status.code() {
+                Some(22) => why.ends_with(" 404"),
+                Some(37) => true,
+                _ => false,
+            };
+            if missing {
+                return Err(Error::Missing(path.to_owned()));
+            }
+            return Err(Error::Fetch(format!("{path}: {why}")));
         }
         if out.len() as u64 > max {
             return Err(Error::Fetch(format!("{path}: larger than {max} bytes")));
@@ -271,6 +278,16 @@ mod tests {
             Store::new("https://a.b/").unwrap().url("blobs/x"),
             "https://a.b/blobs/x"
         );
+    }
+
+    #[test]
+    fn an_unpublished_channel_is_missing_not_failed() {
+        let dir = std::env::temp_dir().join(format!("mc-builds-missing-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let store = Store::new(&file_url(&dir)).unwrap();
+        let got = store.newest(Channel::Release);
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(matches!(got, Err(Error::Missing(_))), "{got:?}");
     }
 
     #[test]

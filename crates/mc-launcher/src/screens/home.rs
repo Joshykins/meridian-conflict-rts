@@ -52,10 +52,11 @@ fn title(c: Channel) -> &'static str {
     }
 }
 
-fn blurb(c: Channel) -> &'static str {
-    match c {
+fn blurb(app: &App) -> &'static str {
+    match app.channel {
+        _ if app.lane().unreleased() => "Not out yet. Pick Playtest to play now",
         Channel::Release => "The game as everyone plays it",
-        Channel::Playtest => "Builds ahead of release, on their own server",
+        Channel::Playtest => "Try what is coming next, before everyone else",
         Channel::Dev => "",
     }
 }
@@ -129,7 +130,7 @@ fn dot(ui: &mut Ui, x: f32, y: f32, c: Color) {
     ui.p.ring((x, y), 7.0, 1.0, [c[0], c[1], c[2], c[3] * 0.35]);
 }
 
-/// The selected channel's build: which, how it stands, its server, Play.
+/// The selected channel's build: which, how it stands, Play.
 pub(super) fn status(ui: &mut Ui, app: &mut App, r: Rect) -> Option<Action> {
     ui.p.panel(r);
     let channel = app.channel;
@@ -169,12 +170,17 @@ pub(super) fn status(ui: &mut Ui, app: &mut App, r: Rect) -> Option<Action> {
             );
         }
         None => {
+            let none = if lane.unreleased() {
+                "Coming soon"
+            } else {
+                "No build"
+            };
             ui.p.text(
                 x,
                 r.y + 62.0,
                 type_scale::HERO,
                 rgb(palette::TEXT, 0.5),
-                "No build",
+                none,
             );
         }
     }
@@ -184,10 +190,41 @@ pub(super) fn status(ui: &mut Ui, app: &mut App, r: Rect) -> Option<Action> {
         r.w - 48.0,
         type_scale::BODY,
         rgb(palette::DIM, 1.0),
-        blurb(channel),
+        blurb(app),
     );
 
-    // How it stands.
+    // How it stands; an unreleased channel's heading has said it all.
+    if !app.lane().unreleased() {
+        stands(ui, app, x, r);
+    }
+
+    // An update waiting, under a rule.
+    if let (Some(n), Some(c)) = (&newest, &current) {
+        if n.number > c.number {
+            let fy = r.y + 236.0;
+            ui.p.hline(x, fy - 22.0, r.w - 48.0, rgb(palette::LINE, 0.1));
+            ui.p.text(x, fy, type_scale::MICRO, rgb(palette::DIM, 1.0), "UPDATE");
+            let pending = format!(
+                "Build {}   \u{b7}   {}",
+                n.number,
+                megabytes(app.install.versions.download_size(n))
+            );
+            ui.p.text_fit(
+                x + 96.0,
+                fy,
+                r.w - 48.0 - 96.0,
+                type_scale::CAPTION,
+                rgb(palette::ACCENT, 1.0),
+                &pending,
+            );
+        }
+    }
+
+    play(ui, app, r, current, newest)
+}
+
+/// The status line under the build, with the update's meter while it runs.
+fn stands(ui: &mut Ui, app: &mut App, x: f32, r: Rect) {
     let (line, tone) = state(app);
     let y = r.y + 146.0;
     dot(ui, x + 4.0, y, rgb(tone, 1.0));
@@ -224,64 +261,6 @@ pub(super) fn status(ui: &mut Ui, app: &mut App, r: Rect) -> Option<Action> {
             app.cancel_update();
         }
     }
-
-    // The facts underneath.
-    let mut fy = r.y + 236.0;
-    let fact = |ui: &mut Ui, fy: f32, label: &str, value: &str, tone: Color| {
-        ui.p.text(x, fy, type_scale::MICRO, rgb(palette::DIM, 1.0), label);
-        ui.p.text_fit(
-            x + 96.0,
-            fy,
-            r.w - 48.0 - 96.0,
-            type_scale::CAPTION,
-            tone,
-            value,
-        );
-    };
-    ui.p.hline(x, fy - 22.0, r.w - 48.0, rgb(palette::LINE, 0.1));
-    let lane = app.lane();
-    let (server, server_tone) = match (lane.addr.as_deref(), &lane.server) {
-        (None, _) => ("Local network only".to_owned(), rgb(palette::DIM, 1.0)),
-        (Some(addr), Some(job)) => match job.peek(|r| r.cloned()) {
-            Some(Ok(true)) => (format!("Online   \u{b7}   {addr}"), rgb(palette::GOOD, 1.0)),
-            Some(_) => (
-                format!("Not answering   \u{b7}   {addr}"),
-                rgb(palette::WARN, 1.0),
-            ),
-            None => (
-                format!("Checking   \u{b7}   {addr}"),
-                rgb(palette::DIM, 1.0),
-            ),
-        },
-        (Some(addr), None) => (addr.to_owned(), rgb(palette::DIM, 1.0)),
-    };
-    fact(ui, fy, "SERVER", &server, server_tone);
-    fy += 26.0;
-    let (all, total) = &app.installed;
-    let here = if all.is_empty() {
-        "Nothing installed yet".to_owned()
-    } else {
-        format!(
-            "{} build{} installed   \u{b7}   {}",
-            all.len(),
-            if all.len() == 1 { "" } else { "s" },
-            megabytes(*total)
-        )
-    };
-    fact(ui, fy, "ON DISK", &here, rgb(palette::TEXT, 0.85));
-    fy += 26.0;
-    if let (Some(n), Some(c)) = (&newest, &current) {
-        if n.number > c.number {
-            let pending = format!(
-                "Build {}   \u{b7}   {}",
-                n.number,
-                megabytes(app.install.versions.download_size(n))
-            );
-            fact(ui, fy, "UPDATE", &pending, rgb(palette::ACCENT, 1.0));
-        }
-    }
-
-    play(ui, app, r, current, newest)
 }
 
 /// The big button: Play, or what stands before it.
@@ -299,6 +278,8 @@ fn play(
         lane.update_error().is_some() || (current.is_none() && lane.remote_error().is_some());
     let (label, enabled) = if updating {
         ("Updating".to_owned(), false)
+    } else if current.is_none() && lane.unreleased() {
+        ("Coming soon".to_owned(), false)
     } else if current.is_some() {
         ("Play".to_owned(), true)
     } else if failed {

@@ -1,12 +1,12 @@
 //! What the launcher knows and does, apart from drawing it (`screens/`): each
-//! channel's newest build and history, the update to it, the news, the
-//! server's state, checking and repairing files, and an old replay's build.
+//! channel's newest build and history, the update to it, the news, checking
+//! and repairing files, and an old replay's build.
 //!
 //! The selected channel's update starts by itself once the store names a
 //! build that is not installed, and Play waits for it: a network match needs
 //! everyone on the same build.
 
-use std::net::{TcpStream, ToSocketAddrs};
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
@@ -15,7 +15,7 @@ use mc_builds::versions::Progress;
 use mc_builds::{Entry, Manifest, Store};
 use mc_core::Channel;
 
-use crate::install::{self, Install, Log, CHANNELS};
+use crate::install::{Install, Log, CHANNELS};
 use crate::work::{Job, Meter};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -27,21 +27,19 @@ pub(crate) enum Page {
 
 /// What the store says of a channel.
 pub(crate) struct Remote {
-    pub(crate) newest: Manifest,
+    /// `None`: nothing is published on the channel yet (Release, before it
+    /// comes out).
+    pub(crate) newest: Option<Manifest>,
     pub(crate) history: History,
 }
 
-/// One channel: what the store says, its update, its server.
+/// One channel: what the store says, and its update.
 pub(crate) struct Lane {
     pub(crate) channel: Channel,
     pub(crate) remote: Option<Job<Remote>>,
     /// A later look at the store, while `remote` still shows the last one.
     recheck: Option<Job<Remote>>,
     pub(crate) update: Option<Job<Manifest>>,
-    /// The channel's server, `host[:port]`, if it has one.
-    pub(crate) addr: Option<String>,
-    /// Reachable, from a connection to the channel's server.
-    pub(crate) server: Option<Job<bool>>,
     /// The update whose result was acted on, so it is acted on once.
     applied: bool,
 }
@@ -53,17 +51,26 @@ impl Lane {
             remote: None,
             recheck: None,
             update: None,
-            addr: install::server(channel).map(str::to_owned),
-            server: None,
             applied: false,
         }
     }
 
     /// The store's newest build of this channel, once known.
     pub(crate) fn newest(&self) -> Option<Manifest> {
-        self.remote
-            .as_ref()?
-            .peek(|r| r.and_then(|r| r.as_ref().ok()).map(|r| r.newest.clone()))
+        self.remote.as_ref()?.peek(|r| {
+            r.and_then(|r| r.as_ref().ok())
+                .and_then(|r| r.newest.clone())
+        })
+    }
+
+    /// The store answered, and has nothing on this channel yet.
+    pub(crate) fn unreleased(&self) -> bool {
+        self.remote.as_ref().is_some_and(|j| {
+            j.peek(|r| {
+                r.and_then(|r| r.as_ref().ok())
+                    .is_some_and(|r| r.newest.is_none())
+            })
+        })
     }
 
     pub(crate) fn remote_error(&self) -> Option<String> {
@@ -105,6 +112,30 @@ pub(crate) enum ReplayStep {
     Failed(String),
 }
 
+/// Where the player is in the right-hand panel.
+#[derive(Default)]
+pub(crate) struct Reader {
+    /// How far down the page is scrolled, in points.
+    pub(crate) scroll: f32,
+    /// How far it can scroll, as the last frame measured it.
+    pub(crate) room: f32,
+    /// Builds whose patch notes the player opened or shut: the newest starts
+    /// open and the rest shut, and a build here is the other way round.
+    pub(crate) toggled: BTreeSet<String>,
+}
+
+impl Reader {
+    pub(crate) fn notes_open(&self, build: &str, newest: bool) -> bool {
+        newest != self.toggled.contains(build)
+    }
+
+    pub(crate) fn toggle_notes(&mut self, build: &str) {
+        if !self.toggled.remove(build) {
+            self.toggled.insert(build.to_owned());
+        }
+    }
+}
+
 /// What the window does for the app.
 pub(crate) enum Action {
     /// Start this build with these arguments, and close.
@@ -133,7 +164,7 @@ pub(crate) struct App {
     pub(crate) replay: Option<Replay>,
     /// A build waiting for a second press of Remove.
     pub(crate) removing: Option<String>,
-    pub(crate) scroll: f32,
+    pub(crate) reader: Reader,
     /// Something to tell the player at the foot of the window.
     pub(crate) notice: Option<String>,
     /// The scenes for `--screenshot` start no work of their own.
@@ -157,7 +188,7 @@ impl App {
             installed,
             replay: None,
             removing: None,
-            scroll: 0.0,
+            reader: Reader::default(),
             notice: None,
             still: false,
         }
@@ -186,9 +217,15 @@ impl App {
     pub(crate) fn pick_channel(&mut self, channel: Channel) {
         if channel != self.channel {
             self.channel = channel;
-            self.scroll = 0.0;
+            self.reader.scroll = 0.0;
             self.install.set_channel(channel);
         }
+    }
+
+    /// Opens `page` in the right-hand panel, at its top.
+    pub(crate) fn show(&mut self, page: Page) {
+        self.page = page;
+        self.reader.scroll = 0.0;
     }
 
     /// Starts what needs starting and acts on what finished. Once a frame.
@@ -210,13 +247,6 @@ impl App {
                 }
             }
             self.look_again(store);
-        }
-        for lane in &mut self.lanes {
-            if lane.server.is_none() {
-                if let Some(addr) = lane.addr.clone() {
-                    lane.server = Some(Job::spawn("server", move |_| Ok(reachable(&addr))));
-                }
-            }
         }
         // The selected channel updates by itself.
         let channel = self.channel;
@@ -345,7 +375,6 @@ impl App {
             lane.update = None;
         } else {
             lane.remote = None;
-            lane.server = None;
         }
         // Nothing installed: the check alone does not start an install.
         if let (Some(store), Some(newest)) = (store, lane.newest()) {
@@ -560,35 +589,28 @@ const LOOK_AGAIN: Duration = Duration::from_secs(10 * 60);
 fn check(store: &Store, channel: Channel) -> Job<Remote> {
     let s = store.clone();
     Job::spawn("check", move |_| {
-        let newest = s.newest(channel).map_err(|e| e.to_string())?;
+        let newest = match s.newest(channel) {
+            Ok(m) => m,
+            Err(mc_builds::Error::Missing(_)) => {
+                return Ok(Remote {
+                    newest: None,
+                    history: History::default(),
+                })
+            }
+            Err(e) => return Err(e.to_string()),
+        };
         // A store without a history yet still has builds.
         let history = s.history(channel).unwrap_or_default();
-        Ok(Remote { newest, history })
+        Ok(Remote {
+            newest: Some(newest),
+            history,
+        })
     })
 }
 
 fn read_news(store: &Store) -> Job<News> {
     let s = store.clone();
     Job::spawn("news", move |_| s.news().map_err(|e| e.to_string()))
-}
-
-/// Seconds a server has to answer.
-const PROBE: Duration = Duration::from_secs(4);
-
-/// The server takes a connection: `host[:port]`, port 7777 when left out.
-fn reachable(addr: &str) -> bool {
-    let with_port = if addr
-        .rsplit_once(':')
-        .is_some_and(|(_, p)| p.parse::<u16>().is_ok())
-    {
-        addr.to_owned()
-    } else {
-        format!("{addr}:7777")
-    };
-    with_port
-        .to_socket_addrs()
-        .map(|mut a| a.any(|a| TcpStream::connect_timeout(&a, PROBE).is_ok()))
-        .unwrap_or(false)
 }
 
 /// "84.2 MB".

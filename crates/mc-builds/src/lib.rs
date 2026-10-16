@@ -74,8 +74,11 @@ pub fn key_of(build: &str) -> String {
 #[derive(Debug)]
 pub enum Error {
     Io(io::Error),
-    /// The store could not be reached, or did not have the file.
+    /// The store could not be reached, or failed to send the file.
     Fetch(String),
+    /// The store answered, and has no such file: a channel nothing has been
+    /// published on yet.
+    Missing(String),
     /// A manifest's signature does not verify: not published by us.
     Signature,
     /// Something read from the store or an install is not well formed.
@@ -94,6 +97,7 @@ impl fmt::Display for Error {
         match self {
             Error::Io(e) => write!(f, "{e}"),
             Error::Fetch(e) => write!(f, "download failed: {e}"),
+            Error::Missing(path) => write!(f, "the store has no {path}"),
             Error::Signature => {
                 f.write_str("the build's manifest is not signed by the release key")
             }

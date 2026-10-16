@@ -20,28 +20,31 @@ pub(super) fn panel(ui: &mut Ui, app: &mut App, r: Rect) -> Option<Action> {
     for (i, (page, label)) in PAGES.iter().enumerate() {
         let tab = Rect::new(r.x + 20.0 + i as f32 * 150.0, r.y + 12.0, 146.0, 38.0);
         if ui.tab(id("page", i), tab, label, app.page == *page) {
-            app.page = *page;
-            app.scroll = 0.0;
+            app.show(*page);
         }
     }
     let view = Rect::new(r.x + 28.0, r.y + 66.0, r.w - 56.0, r.h - 80.0);
+    let reader = &mut app.reader;
     if view.contains(ui.cursor()) {
-        app.scroll += ui.scroll() * NOTCH;
+        reader.scroll += ui.scroll() * NOTCH;
     }
-    app.scroll = app.scroll.max(0.0);
+    // Held to the room the last frame measured before drawing, so the wheel
+    // at the end never draws a frame past it that springs back on the next.
+    reader.scroll = reader.scroll.clamp(0.0, reader.room);
     ui.p.clip_to(view);
-    let top = view.y - app.scroll;
+    let top = view.y - reader.scroll;
     let (height, action) = match app.page {
         Page::Notes => (patch_notes(ui, app, view, top), None),
         Page::News => (news(ui, app, view, top), None),
         Page::Builds => super::builds::page(ui, app, view, top),
     };
     ui.p.unclip();
-    // Never past the end.
-    let most = (height - view.h).max(0.0);
-    app.scroll = app.scroll.min(most);
-    if most > 0.0 {
-        scrollbar(ui, view, app.scroll, most, height);
+    // The page grew or shrank (notes opened or shut, the window resized).
+    let reader = &mut app.reader;
+    reader.room = (height - view.h).max(0.0);
+    reader.scroll = reader.scroll.min(reader.room);
+    if reader.room > 0.0 {
+        scrollbar(ui, view, reader.scroll, reader.room, height);
     }
     action
 }
@@ -93,24 +96,15 @@ pub(super) fn blocks(ui: &mut Ui, x: f32, mut y: f32, width: f32, blocks: &[Bloc
     y
 }
 
-/// A heading for one build or news item: a title, then a caption at the right.
-fn head(ui: &mut Ui, view: Rect, y: f32, title: &str, caption: &str, tags: &[(&str, u32)]) {
-    let end = ui.p.text(
+/// A heading for one news item: a title, then a caption at the right.
+fn head(ui: &mut Ui, view: Rect, y: f32, title: &str, caption: &str) {
+    ui.p.text(
         view.x,
         y + 12.0,
         type_scale::TITLE,
         rgb(palette::TEXT, 1.0),
         title,
     );
-    let mut tx = end + 14.0;
-    for (tag, tone) in tags {
-        let w = ui.p.text_width(type_scale::MICRO, tag) + 14.0;
-        let r = Rect::new(tx, y + 3.0, w, 18.0);
-        ui.p.fill(r, rgb(*tone, 0.16));
-        ui.p.frame(r, rgb(*tone, 0.7));
-        ui.p.text(tx + 7.0, r.mid_y(), type_scale::MICRO, rgb(*tone, 1.0), tag);
-        tx += w + 8.0;
-    }
     ui.p.text_right(
         view.right(),
         y + 12.0,
@@ -120,9 +114,37 @@ fn head(ui: &mut Ui, view: Rect, y: f32, title: &str, caption: &str, tags: &[(&s
     );
 }
 
-/// Every build in the channel's history, newest first, with its notes; or,
-/// when the store cannot be read, the installed builds' own.
-fn patch_notes(ui: &mut Ui, app: &App, view: Rect, top: f32) -> f32 {
+/// Small framed words in a row from `x`, centred on `y`; returns the x after them.
+fn tags(ui: &mut Ui, mut x: f32, y: f32, tags: &[(&str, u32)]) -> f32 {
+    for (tag, tone) in tags {
+        let w = ui.p.text_width(type_scale::MICRO, tag) + 14.0;
+        let r = Rect::new(x, y - 9.0, w, 18.0);
+        ui.p.fill(r, rgb(*tone, 0.16));
+        ui.p.frame(r, rgb(*tone, 0.7));
+        ui.p.text(x + 7.0, r.mid_y(), type_scale::MICRO, rgb(*tone, 1.0), tag);
+        x += w + 8.0;
+    }
+    x
+}
+
+/// One build's patch notes as the panel lists them.
+struct Release {
+    build: String,
+    number: u32,
+    created: u64,
+    notes: String,
+}
+
+/// A build's row in the patch notes, taller than a line so it is easy to hit.
+const ROW_H: f32 = 50.0;
+/// How far a build's notes sit in from its row, under its title.
+const INDENT: f32 = 30.0;
+
+/// Every build in the channel's history, newest first; or, when the store
+/// cannot be read, the installed builds' own. Each is a row that opens to its
+/// notes: the newest starts open and marked, the rest shut, so the list stays
+/// short however many builds there have been.
+fn patch_notes(ui: &mut Ui, app: &mut App, view: Rect, top: f32) -> f32 {
     let lane = app.lane();
     let history = lane.remote.as_ref().and_then(|j| {
         j.peek(|r| {
@@ -130,21 +152,33 @@ fn patch_notes(ui: &mut Ui, app: &App, view: Rect, top: f32) -> f32 {
                 .map(|r| r.history.builds.clone())
         })
     });
-    let releases: Vec<(String, u32, u64, String)> = match history {
+    let releases: Vec<Release> = match history {
         Some(h) if !h.is_empty() => h
             .into_iter()
-            .map(|r| (r.build, r.number, r.created, r.notes))
+            .map(|r| Release {
+                build: r.build,
+                number: r.number,
+                created: r.created,
+                notes: r.notes,
+            })
             .collect(),
         _ => app
             .installed
             .0
             .iter()
             .filter(|(m, _)| m.channel() == Some(app.channel))
-            .map(|(m, _)| (m.build.clone(), m.number, m.created, m.notes.clone()))
+            .map(|(m, _)| Release {
+                build: m.build.clone(),
+                number: m.number,
+                created: m.created,
+                notes: m.notes.clone(),
+            })
             .collect(),
     };
     if releases.is_empty() {
-        let line = if lane.remote.as_ref().is_some_and(|j| j.running()) {
+        let line = if lane.unreleased() {
+            "Not out yet. Its patch notes will be here when it is."
+        } else if lane.remote.as_ref().is_some_and(|j| j.running()) {
             "Reading the patch notes\u{2026}"
         } else {
             "No patch notes yet."
@@ -160,31 +194,92 @@ fn patch_notes(ui: &mut Ui, app: &App, view: Rect, top: f32) -> f32 {
     }
     let current = app.current().map(|m| m.build);
     let mut y = top;
-    for (i, (build, number, created, text)) in releases.iter().enumerate() {
-        if i > 0 {
-            y += 18.0;
-            ui.p.hline(view.x, y, view.w, rgb(palette::LINE, 0.1));
-            y += 22.0;
+    for (i, release) in releases.iter().enumerate() {
+        let installed = current.as_deref() == Some(release.build.as_str());
+        y = note(ui, app, view, y, i, release, installed);
+    }
+    y - top + 12.0
+}
+
+/// Build `i`'s row, and its notes under it if open; returns the y under it.
+fn note(
+    ui: &mut Ui,
+    app: &mut App,
+    view: Rect,
+    top: f32,
+    i: usize,
+    release: &Release,
+    installed: bool,
+) -> f32 {
+    let newest = i == 0;
+    let open = app.reader.notes_open(&release.build, newest);
+    let row = Rect::new(view.x, top, view.w, ROW_H);
+    let res = ui.interact(id("notes", i), row, true);
+    if res.clicked {
+        app.reader.toggle_notes(&release.build);
+    }
+    let open_k = ui.ease(id("notes-open", i), if open { 1.0 } else { 0.0 }, 18.0);
+    if newest {
+        ui.p.gradient_h(row, rgb(palette::ACCENT, 0.14), rgb(palette::ACCENT, 0.0));
+    }
+    ui.p.fill(row, rgb(palette::LINE, 0.05 * res.glow));
+    let mid = row.mid_y();
+    chevron(
+        ui,
+        view.x + 13.0,
+        mid,
+        open_k,
+        rgb(palette::TEXT, 0.55 + 0.45 * res.glow.max(open_k)),
+    );
+    let end = ui.p.text(
+        view.x + INDENT,
+        mid,
+        type_scale::TITLE,
+        rgb(palette::TEXT, 1.0),
+        &format!("Build {}", release.number),
+    );
+    let mut marks = Vec::new();
+    if newest {
+        marks.push(("LATEST", palette::ACCENT));
+    }
+    if installed {
+        marks.push(("INSTALLED", palette::GOOD));
+    }
+    let after = tags(ui, end + 14.0, mid, &marks);
+    let when = date(release.created);
+    let when_x = view.right() - ui.p.text_width(type_scale::CAPTION, &when);
+    ui.p.text(
+        when_x,
+        mid,
+        type_scale::CAPTION,
+        rgb(palette::DIM, 1.0),
+        &when,
+    );
+    let parsed = notes::parse(&release.notes);
+    // Shut, the row says what the build is about: its notes' first line.
+    if !open {
+        let first = parsed.iter().find_map(|b| match b {
+            Block::Paragraph(t) | Block::Bullet(t) => Some(t.as_str()),
+            Block::Heading(_) => None,
+        });
+        let room = when_x - 24.0 - (after + 8.0);
+        if let (Some(first), true) = (first, room > 60.0) {
+            ui.p.text_fit(
+                after + 8.0,
+                mid,
+                room,
+                type_scale::BODY,
+                rgb(palette::DIM, 0.9),
+                first,
+            );
         }
-        let mut tags = Vec::new();
-        if current.as_deref() == Some(build.as_str()) {
-            tags.push(("INSTALLED", palette::GOOD));
-        } else if i == 0 {
-            tags.push(("NEW", palette::ACCENT));
-        }
-        head(
-            ui,
-            view,
-            y,
-            &format!("Build {number}"),
-            &date(*created),
-            &tags,
-        );
-        y += 40.0;
-        let parsed = notes::parse(text);
+    }
+    let mut y = row.bottom();
+    if open {
+        y += 4.0;
         if parsed.is_empty() {
             ui.p.text(
-                view.x,
+                view.x + INDENT,
                 y + 10.0,
                 type_scale::BODY,
                 rgb(palette::FAINT, 1.0),
@@ -192,10 +287,30 @@ fn patch_notes(ui: &mut Ui, app: &App, view: Rect, top: f32) -> f32 {
             );
             y += 26.0;
         } else {
-            y = blocks(ui, view.x, y, view.w, &parsed);
+            y = blocks(ui, view.x + INDENT, y, view.w - INDENT, &parsed);
         }
+        y += 10.0;
     }
-    y - top + 12.0
+    if newest {
+        ui.p.fill(
+            Rect::new(view.x, top, 3.0, y - top),
+            rgb(palette::ACCENT, 1.0),
+        );
+    }
+    ui.p.hline(view.x, y, view.w, rgb(palette::LINE, 0.1));
+    y + 1.0
+}
+
+/// A chevron at `(x, y)` turning from pointing right (`k` 0, shut) to
+/// pointing down (`k` 1, open).
+fn chevron(ui: &mut Ui, x: f32, y: f32, k: f32, c: crate::paint::Color) {
+    let (s, co) = (k * std::f32::consts::FRAC_PI_2).sin_cos();
+    let turn = |(px, py): (f32, f32)| (x + px * co - py * s, y + px * s + py * co);
+    ui.p.polyline(
+        &[turn((-2.5, -5.0)), turn((2.5, 0.0)), turn((-2.5, 5.0))],
+        1.6,
+        c,
+    );
 }
 
 fn news(ui: &mut Ui, app: &App, view: Rect, top: f32) -> f32 {
@@ -251,14 +366,7 @@ fn news(ui: &mut Ui, app: &App, view: Rect, top: f32) -> f32 {
             ui.p.hline(view.x, y, view.w, rgb(palette::LINE, 0.1));
             y += 22.0;
         }
-        head(
-            ui,
-            view,
-            y,
-            &item.title,
-            &crate::app::news_date(&item.date),
-            &[],
-        );
+        head(ui, view, y, &item.title, &crate::app::news_date(&item.date));
         y += 40.0;
         y = blocks(ui, view.x, y, view.w, &notes::parse(&item.body));
     }

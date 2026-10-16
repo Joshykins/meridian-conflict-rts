@@ -71,11 +71,13 @@ pub(crate) fn run(app: App, log: &mut Log) -> Result<Option<Action>, String> {
 
 fn attributes(event_loop: &ActiveEventLoop) -> WindowAttributes {
     let (w, h) = screens::SIZE;
+    let (min_w, min_h) = screens::MIN_SIZE;
     let attrs = Window::default_attributes()
         .with_title("Meridian Conflict")
         .with_inner_size(LogicalSize::new(w as f64, h as f64))
-        .with_resizable(false)
-        .with_enabled_buttons(WindowButtons::CLOSE | WindowButtons::MINIMIZE)
+        .with_min_inner_size(LogicalSize::new(min_w as f64, min_h as f64))
+        .with_resizable(true)
+        .with_enabled_buttons(WindowButtons::all())
         .with_theme(Some(Theme::Dark));
     windows_frame(attrs, event_loop)
 }
@@ -205,6 +207,12 @@ impl ApplicationHandler for Launcher<'_> {
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => self.redraw(event_loop),
+            // Drawn at once, so the frame keeps up with a drag of the window's edge.
+            WindowEvent::Resized(_) => {
+                if let Some(s) = &self.shown {
+                    s.window.request_redraw();
+                }
+            }
             WindowEvent::CursorMoved { position, .. } => {
                 let p = position.to_logical::<f32>(scale);
                 self.input.cursor = (p.x, p.y);

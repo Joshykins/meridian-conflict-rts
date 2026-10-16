@@ -35,17 +35,6 @@ pub(crate) fn home_channel() -> Channel {
 /// lists them, so the window looks as it will.
 pub(crate) const CHANNELS: [Channel; 2] = [Channel::Release, Channel::Playtest];
 
-/// The multiplayer server a channel's builds play on, set when the launcher
-/// is built (scripts/release.sh, as for the game).
-pub(crate) fn server(channel: Channel) -> Option<&'static str> {
-    match channel {
-        Channel::Release => option_env!("MERIDIAN_SERVER_RELEASE"),
-        Channel::Playtest => option_env!("MERIDIAN_SERVER_PLAYTEST"),
-        Channel::Dev => None,
-    }
-    .filter(|s| !s.is_empty())
-}
-
 #[derive(Serialize, Deserialize, Default)]
 struct Prefs {
     #[serde(default)]

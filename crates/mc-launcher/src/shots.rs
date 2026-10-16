@@ -22,7 +22,7 @@ const NOTES_OLD: &str = "# Interface\n- Prefabs: save a block of structures and 
 const NOTES_OLDER: &str = "- The Last Harvest: a 24 km survival map for four defenders.\n- Site Repeat lays a half-built field again with one key.";
 
 /// The scenes, by file name.
-const SCENES: [&str; 7] = [
+const SCENES: [&str; 8] = [
     "1-home",
     "2-updating",
     "3-news",
@@ -30,6 +30,7 @@ const SCENES: [&str; 7] = [
     "5-playtest-install",
     "6-offline",
     "7-replay",
+    "8-release-soon",
 ];
 
 pub(crate) fn write_all(dir: &Path) -> Result<Vec<PathBuf>, String> {
@@ -131,6 +132,7 @@ fn stage(scene: &str, root: &Path) -> Result<App, String> {
         "2-updating" => vec![&r1588],
         "4-builds" => vec![&r1603, &r1588, &r1561],
         "7-replay" => vec![&r1603],
+        "8-release-soon" => vec![&p1622],
         _ => vec![&r1603, &r1588],
     };
     for m in &installed {
@@ -141,6 +143,9 @@ fn stage(scene: &str, root: &Path) -> Result<App, String> {
             .versions
             .set_current(first)
             .map_err(|e| e.to_string())?;
+    }
+    if scene == "8-release-soon" {
+        install.set_channel(Channel::Release);
     }
     if scene == "5-playtest-install" {
         install.set_channel(Channel::Playtest);
@@ -160,11 +165,11 @@ fn stage(scene: &str, root: &Path) -> Result<App, String> {
             .collect(),
     };
     let release = Remote {
-        newest: r1603.clone(),
+        newest: Some(r1603.clone()),
         history: history(&[&r1603, &r1588, &r1561]),
     };
     let playtest = Remote {
-        newest: p1622.clone(),
+        newest: Some(p1622.clone()),
         history: history(&[&p1622]),
     };
     app.news = done(News {
@@ -190,6 +195,11 @@ fn stage(scene: &str, root: &Path) -> Result<App, String> {
         set_lane(lane, scene, &release, &playtest);
     }
     match scene {
+        // The patch notes with the newest shut and an older build opened.
+        "2-updating" => {
+            app.reader.toggle_notes(&r1603.build);
+            app.reader.toggle_notes(&r1588.build);
+        }
         "3-news" => app.page = Page::News,
         "4-builds" => {
             app.page = Page::Builds;
@@ -220,10 +230,12 @@ fn set_lane(lane: &mut Lane, scene: &str, release: &Remote, playtest: &Remote) {
     };
     match lane.channel {
         Channel::Release => {
-            lane.addr = Some("play.example.invalid".into());
-            lane.server = done(true);
             lane.remote = match scene {
                 "6-offline" => failed("could not resolve host builds.example.invalid"),
+                "8-release-soon" => done(Remote {
+                    newest: None,
+                    history: History::default(),
+                }),
                 _ => done(clone(release)),
             };
             if scene == "2-updating" {
@@ -231,15 +243,18 @@ fn set_lane(lane: &mut Lane, scene: &str, release: &Remote, playtest: &Remote) {
             }
         }
         _ => {
-            lane.addr = Some("playtest.example.invalid".into());
-            lane.server = done(false);
             lane.remote = done(clone(playtest));
         }
     }
 }
 
 fn draw(app: &mut App, scene: &str, scale: f32) -> Result<Vec<u8>, String> {
-    let (w, h) = screens::SIZE;
+    // The last scene at the smallest the window goes, to see that it fits.
+    let (w, h) = if scene == "8-release-soon" {
+        screens::MIN_SIZE
+    } else {
+        screens::SIZE
+    };
     let (pw, ph) = ((w * scale) as u32, (h * scale) as u32);
     let mut painter = Painter::new(pw, ph, scale, Backdrop::new());
     let mut memory = Memory::default();

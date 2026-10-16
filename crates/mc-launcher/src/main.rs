@@ -56,8 +56,7 @@ MeridianConflict: keeps Meridian Conflict up to date and starts it.
   MeridianConflict --help          this
 
 Built in at compile time (scripts/release.sh): MERIDIAN_CHANNEL (the channel it opens
-on), MERIDIAN_STORE (the build store), MERIDIAN_SERVER_PLAYTEST and
-MERIDIAN_SERVER_RELEASE (the servers it checks). docs/RELEASES.md has the rest.
+on) and MERIDIAN_STORE (the build store). docs/RELEASES.md has the rest.
 ";
 
 fn main() -> ExitCode {
