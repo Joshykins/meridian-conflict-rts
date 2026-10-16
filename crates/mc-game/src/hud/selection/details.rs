@@ -119,7 +119,7 @@ pub(super) fn details_card(
                 let n = row * 2 + i;
                 let mine: Vec<usize> = set
                     .iter()
-                    .filter_map(|&k| crate::rings::projection_of(bp, k))
+                    .flat_map(|&k| crate::rings::projections_of(bp, k))
                     .collect();
                 let mask = mine.iter().fold(0, |m, &k| m | bit(k));
                 let r = Rect::new(x + i as f32 * (card_w + 12.0), y, card_w, row_h);

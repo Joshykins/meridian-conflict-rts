@@ -125,13 +125,65 @@ pub struct Arc {
     pub half: f32,
 }
 
+/// A whole turn in angle steps.
+const TURN: i32 = 0x10000;
+
 impl Arc {
-    fn of(weapon: &Weapon) -> Option<Arc> {
-        (weapon.half_arc < 0x8000).then(|| Arc {
-            aft: weapon.rear || weapon.facing.0 == 0x8000,
-            turn: weapon.facing.0 as i16 as f32 / 32768.0 * std::f32::consts::PI,
-            half: weapon.half_arc as f32 / 32768.0 * std::f32::consts::PI,
-        })
+    /// A wedge centred `facing` angle steps off the nose, `half` steps either side.
+    fn steps(facing: u16, half: u16, rear: bool) -> Arc {
+        Arc {
+            aft: rear || facing == 0x8000,
+            turn: facing as i16 as f32 / 32768.0 * std::f32::consts::PI,
+            half: half as f32 / 32768.0 * std::f32::consts::PI,
+        }
+    }
+
+    /// Where `weapon` can shoot, a wedge for each stretch of bearings; `[None]`: all the
+    /// way round. A weapon group's guns each cover their own arc (`Weapon::gun`), so the
+    /// group reaches wherever any of them does: a ship's port and starboard batteries
+    /// together reach all round, not only where the first of them points.
+    fn of(weapon: &Weapon) -> Vec<Option<Arc>> {
+        let guns: Vec<&Weapon> = (0..weapon.guns()).map(|m| weapon.gun(m)).collect();
+        if guns.iter().any(|g| g.half_arc >= 0x8000) {
+            return vec![None];
+        }
+        if let [gun] = guns.as_slice() {
+            return vec![Some(Arc::steps(gun.facing.0, gun.half_arc, gun.rear))];
+        }
+        // Each gun's bearings as steps from `lo` to `hi`, `lo` within the first turn.
+        let mut spans: Vec<(i32, i32)> = guns
+            .iter()
+            .map(|g| {
+                let lo = (g.facing.0 as i32 - g.half_arc as i32).rem_euclid(TURN);
+                (lo, lo + 2 * g.half_arc as i32)
+            })
+            .collect();
+        spans.sort_unstable();
+        let mut union: Vec<(i32, i32)> = Vec::new();
+        for (lo, hi) in spans {
+            match union.last_mut() {
+                Some(last) if lo <= last.1 => last.1 = last.1.max(hi),
+                _ => union.push((lo, hi)),
+            }
+        }
+        // The last stretch may run on past a whole turn into the first, and from there on.
+        while union.len() > 1 && union[union.len() - 1].1 - TURN >= union[0].0 {
+            let (lo, hi) = union.pop().unwrap_or_default();
+            union[0] = (lo - TURN, union[0].1.max(hi - TURN));
+            while union.len() > 1 && union[1].0 <= union[0].1 {
+                union[0].1 = union[0].1.max(union.remove(1).1);
+            }
+        }
+        if union.iter().any(|&(lo, hi)| hi - lo >= TURN) {
+            return vec![None];
+        }
+        union
+            .into_iter()
+            .map(|(lo, hi)| {
+                let facing = ((lo + hi) / 2).rem_euclid(TURN) as u16;
+                Some(Arc::steps(facing, ((hi - lo) / 2) as u16, false))
+            })
+            .collect()
     }
 
     /// The whole arc in degrees, and which way it faces: "150\u{b0} Aft".
@@ -180,24 +232,32 @@ impl Projection {
     }
 }
 
-/// Every ring `bp` projects, by kind and then farthest first. Twin weapons are one ring.
+/// Where `bp`'s weapon `w` can shoot (`Arc::of`).
+fn arcs_of(bp: &UnitBlueprint, i: usize, w: &Weapon) -> Vec<Option<Arc>> {
+    // A spinal gun is laid by turning the whole ship: it reaches all the way round.
+    if i == 0 && spinal(bp) {
+        vec![None]
+    } else {
+        Arc::of(w)
+    }
+}
+
+/// Every ring `bp` projects, by kind and then farthest first. Twin weapons are one ring;
+/// a weapon group whose guns leave a gap between them projects a wedge for each side of it.
 pub fn projections(bp: &UnitBlueprint) -> Vec<Projection> {
     let mut all: Vec<Projection> = bp
         .weapons
         .iter()
         .enumerate()
-        .map(|(i, w)| Projection {
-            reach: Reach::of(w),
-            rank: 0,
-            inner: w.range_min.to_f32(),
-            outer: w.range_max.to_f32(),
-            // A spinal gun is laid by turning the whole ship: it reaches all the way round.
-            arc: if i == 0 && spinal(bp) {
-                None
-            } else {
-                Arc::of(w)
-            },
-            name: w.name.clone(),
+        .flat_map(|(i, w)| {
+            arcs_of(bp, i, w).into_iter().map(|arc| Projection {
+                reach: Reach::of(w),
+                rank: 0,
+                inner: w.range_min.to_f32(),
+                outer: w.range_max.to_f32(),
+                arc,
+                name: w.name.clone(),
+            })
         })
         .collect();
     all.push(Projection::round(Reach::Radar, bp.radar.to_f32(), "Radar"));
@@ -303,25 +363,28 @@ fn spinal(bp: &UnitBlueprint) -> bool {
     })
 }
 
-/// Which of `all` (`projections(bp)`) is the ring of `bp`'s weapon `i`.
-fn span_of(bp: &UnitBlueprint, all: &[Projection], i: usize) -> Option<usize> {
-    let w = bp.weapons.get(i)?;
-    let arc = if i == 0 && spinal(bp) {
-        None
-    } else {
-        Arc::of(w)
+/// Which of `all` (`projections(bp)`) are the rings of `bp`'s weapon `i`: one, or a
+/// wedge for each side of a gap a weapon group leaves.
+fn spans_of(bp: &UnitBlueprint, all: &[Projection], i: usize) -> Vec<usize> {
+    let Some(w) = bp.weapons.get(i) else {
+        return Vec::new();
     };
-    all.iter().position(|p| {
-        p.reach == Reach::of(w)
-            && p.outer == w.range_max.to_f32()
-            && p.inner == w.range_min.to_f32()
-            && p.arc == arc
-    })
+    arcs_of(bp, i, w)
+        .into_iter()
+        .filter_map(|arc| {
+            all.iter().position(|p| {
+                p.reach == Reach::of(w)
+                    && p.outer == w.range_max.to_f32()
+                    && p.inner == w.range_min.to_f32()
+                    && p.arc == arc
+            })
+        })
+        .collect()
 }
 
-/// Which of `projections(bp)` is the ring of `bp`'s weapon `i`.
-pub fn projection_of(bp: &UnitBlueprint, i: usize) -> Option<usize> {
-    span_of(bp, &projections(bp), i)
+/// Which of `projections(bp)` are the rings of `bp`'s weapon `i`.
+pub fn projections_of(bp: &UnitBlueprint, i: usize) -> Vec<usize> {
+    spans_of(bp, &projections(bp), i)
 }
 
 /// `bp`'s spans with a dead zone under the hull.
@@ -333,19 +396,16 @@ fn dives(bp: &UnitBlueprint) -> Vec<Dive> {
         if !(i == 0 && spinal(bp)) && depression.is_none() {
             continue;
         }
-        let Some(span) = span_of(bp, &all, i) else {
-            continue;
+        let height = if depression.is_some() {
+            w.pivot.unwrap_or(w.muzzle).z.to_f32()
+        } else {
+            w.muzzle.z.to_f32()
         };
-        let height = w.pivot.unwrap_or(w.muzzle).z.to_f32();
-        out.push(Dive {
+        out.extend(spans_of(bp, &all, i).into_iter().map(|span| Dive {
             span,
-            height: if depression.is_some() {
-                height
-            } else {
-                w.muzzle.z.to_f32()
-            },
+            height,
             depression,
-        });
+        }));
     }
     out
 }

@@ -450,3 +450,43 @@ fn placing_sonar_or_missile_defence_shows_that_network() {
     let am = Reach::AntiMissile as u32;
     assert_eq!(reach("aster_t3_missile_defense"), [(300.0, 300.0, am)]);
 }
+
+/// A weapon group reaches wherever any of its guns does: the Scourge's batteries and AA
+/// repeaters, port and starboard, together reach all round, not only to port as the first
+/// mount points. Narrower guns leave a gap fore and aft, and the group projects a wedge
+/// for each side.
+#[test]
+fn a_groups_ring_is_the_union_of_its_guns_arcs() {
+    let b = blueprints();
+    let scourge = b.unit(b.id_of("regency_t4_space_destroyer").unwrap());
+    let all = projections(scourge);
+    for name in ["Pinch-plasma Battery", "Twin AA Repeater"] {
+        let rings: Vec<_> = all.iter().filter(|p| p.name.contains(name)).collect();
+        assert_eq!(rings.len(), 1, "{name}: {rings:?}");
+        assert_eq!(rings[0].arc, None, "{name}");
+    }
+
+    let mut battery = scourge
+        .weapons
+        .iter()
+        .find(|w| w.name == "Pinch-plasma Battery")
+        .unwrap()
+        .clone();
+    for gun in &mut battery.mount_weapons {
+        gun.half_arc = 0x3000;
+    }
+    let arcs = Arc::of(&battery);
+    let labels: Vec<String> = arcs.iter().map(|a| a.unwrap().label()).collect();
+    assert_eq!(labels, ["135\u{b0} Port", "135\u{b0} Starboard"]);
+    // Overlapping guns join into one wedge across the nose.
+    for gun in &mut battery.mount_weapons {
+        gun.facing = mc_core::Angle((gun.facing.0 as i16 / 3) as u16);
+    }
+    let arcs = Arc::of(&battery);
+    assert_eq!(arcs.len(), 1, "{arcs:?}");
+    let arc = arcs[0].unwrap();
+    assert!(
+        arc.turn.abs() < 1e-3 && (arc.half.to_degrees() - 97.5).abs() < 0.5,
+        "{arc:?}"
+    );
+}
