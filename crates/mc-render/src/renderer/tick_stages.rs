@@ -265,8 +265,8 @@ impl Renderer {
                     self.elevator_tick(units, &frame.events, time, camera);
                 }
                 {
-                    let _t = mc_core::perf_span!("wfx.lance_core_tick");
-                    self.lance_core_tick(units, time, camera);
+                    let _t = mc_core::perf_span!("wfx.edict_lance_tick");
+                    self.edict_lance_tick(units, time, camera);
                 }
                 {
                     let _t = mc_core::perf_span!("wfx.bolt_rifle_tick");

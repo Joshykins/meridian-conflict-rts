@@ -166,9 +166,9 @@ pub struct Weapon {
     /// A Gravitic Seeker that strikes as a Pinch-fusion shot (`RawWeapon::fusion_strike`).
     /// Cosmetic.
     pub fusion_strike: bool,
-    /// A held pinch-fusion beam drawn as the star, melting the ground without a crater
-    /// (`RawWeapon::star_beam`). Cosmetic.
-    pub star_beam: bool,
+    /// A held pinch-fusion beam drawn as an Edict Lance, melting the ground without a
+    /// crater (`RawWeapon::edict_beam`). Cosmetic.
+    pub edict_beam: bool,
     /// How far a gun house on a capital hull may dip below its deck; zero: no limit.
     pub depression: Angle,
     /// How far a torso gun may swing off the torso, pitching on its own (`RawWeapon::sway`).

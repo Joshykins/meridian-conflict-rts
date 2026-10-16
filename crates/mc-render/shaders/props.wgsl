@@ -266,7 +266,7 @@ fn fs_prop(p: PropOut) -> @location(0) vec4<f32> {
     in.wreck = vec4<f32>(-1e6, 1e6, 0.0, 0.0);
     in.drive = vec4<f32>(-1.0, 0.0, 0.0, 0.0);
     in.drive_at = vec4<f32>(0.0);
-    in.crackle = vec2<f32>(0.0);
+    in.crackle = vec4<f32>(0.0);
     in.refit = vec3<f32>(0.0);
     in.skin = model.skin;
     in.marks = model.marks;

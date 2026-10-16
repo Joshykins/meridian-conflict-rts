@@ -58,6 +58,7 @@ mod cluster_fx;
 pub(crate) mod craters;
 mod crush_fx;
 mod cull_lists;
+mod edict_lance_fx;
 mod editor;
 mod effect_barriers;
 mod elevator_fx;
@@ -82,7 +83,6 @@ mod heavy_rail_fx;
 mod hull_frame;
 mod impact_craters;
 mod impact_fx;
-mod lance_core_fx;
 mod laser_fx;
 mod launch_fx;
 pub(crate) mod lens_flare;
@@ -3306,6 +3306,9 @@ impl Renderer {
             },
             self.tick_seconds,
         );
+        // An Edict Lance's charge in its hull (`edict_lance_fx`).
+        let mut patched = patched;
+        self.plasma_fx.cores.patch(patched.to_mut(), time);
         drop(patch);
         let write = mc_core::perf_span!("inst.write");
         self.dynamic.write(0, bytemuck::cast_slice(&patched));
@@ -3532,7 +3535,7 @@ impl Renderer {
         self.star_core_lights(time);
         self.gravitic_engine_lights();
         self.elevator_lights(time, alpha);
-        self.lance_core_lights(time);
+        self.edict_lance_lights();
         self.progenitor_lights(time);
         self.heavy_rail_lights(time);
         self.emp_lights(time);

@@ -39,12 +39,23 @@ const GLASS_STEP: f32 = 2.4;
 /// Furthest a beam's strike may have moved since it last glassed the ground for the
 /// stretch between to be seared too: past it the beam jumped to a new mark.
 const RAKE_GAP: f32 = 40.0;
-/// How many times wider than the star beam its halo is.
-const HALO: f32 = 4.5;
-/// Radius, in beam widths, of the plasma spreading over the ground where a star beam strikes.
+/// Radius, in beam widths, of the plasma spreading over the ground where an Edict Lance
+/// strikes.
 const SPILL_RADIUS: f32 = 9.0;
 /// Seconds a glassed pool takes to crust over and cool.
 const GLASS_COOL: f32 = 9.0;
+/// The red filament an Edict Lance leaves along its line when it goes out: its width
+/// against the column's, and the seconds it burns as it cools and breaks up.
+const THREAD: f32 = 0.22;
+const FILAMENT: f32 = 4.0;
+
+/// An Edict Lance's filament: where its line ran, its width and when it went out.
+struct Filament {
+    from: Vec3,
+    to: Vec3,
+    width: f32,
+    start: f32,
+}
 
 /// One held beam: the same gun (owner, blueprint, weapon) from one tick to the next.
 struct Held {
@@ -60,8 +71,9 @@ struct Held {
     range: f32,
     width: f32,
     fusion: bool,
-    /// Drawn as the star, and melts the ground without digging (`Weapon::star_beam`).
-    star: bool,
+    /// Drawn as an Edict Lance's column, and melts the ground without digging
+    /// (`Weapon::edict_beam`).
+    edict: bool,
     /// When it was last fed, whether this tick's strike has come in, and whether it had
     /// struck anything before (a new beam starts at its first strike, not from nowhere).
     last: f32,
@@ -90,8 +102,10 @@ struct Charge {
 #[derive(Default)]
 pub(super) struct PlasmaFx {
     held: Vec<Held>,
-    /// The plasma spread over the ground at each star beam's strike, drawn as stains.
+    /// The plasma spread over the ground at each Edict Lance's strike, drawn as stains.
     pub(super) spills: Vec<StainInstance>,
+    /// The filaments Edict Lances left as they went out.
+    filaments: Vec<Filament>,
     charges: Vec<Charge>,
     /// The direct-fire guns' charges and lights (`regency_guns_fx`).
     pub(super) guns: super::regency_guns_fx::RegencyGunFx,
@@ -101,15 +115,15 @@ pub(super) struct PlasmaFx {
     pub(super) shells: super::gravitic_shell_fx::GraviticShellFx,
     /// Cone weapons' wakes rolling out (`wake_fx`).
     pub(super) wakes: Vec<super::wake_fx::RollingWake>,
-    /// Held beams' energy cores (`lance_core_fx`).
-    pub(super) cores: super::lance_core_fx::LanceCores,
+    /// Edict Lances' cores: the charge, the star and the light (`edict_lance_fx`).
+    pub(super) cores: super::edict_lance_fx::EdictLances,
 }
 
 impl PlasmaFx {
-    /// The blueprints' beam cores (`lance_core_fx`), per blueprint in id order.
+    /// The blueprints. beam cores (`edict_lance_fx`), per blueprint in id order.
     pub(super) fn new(cores: Vec<Option<[f32; 4]>>) -> Self {
         PlasmaFx {
-            cores: super::lance_core_fx::LanceCores::new(cores),
+            cores: super::edict_lance_fx::EdictLances::new(cores),
             ..PlasmaFx::default()
         }
     }
@@ -181,7 +195,7 @@ impl Renderer {
         let width =
             (0.5 + w.damage.to_f32().max(1.0).sqrt() * 0.08) * w.flash.max(1.0) * w.tracer.max(0.1);
         let fusion = w.plasma_grade == Some(PlasmaGrade::PinchFusion);
-        let star = fusion && w.star_beam;
+        let edict = fusion && w.edict_beam;
         let start = muzzle - travel;
         let reach = travel.length() + 6.0;
         let fx = &mut self.plasma_fx;
@@ -222,7 +236,7 @@ impl Renderer {
                 range,
                 width,
                 fusion,
-                star,
+                edict,
                 last: time,
                 struck: false,
                 new: true,
@@ -272,7 +286,7 @@ impl Renderer {
         h.struck = true;
         let width = h.width;
         let fusion = h.fusion;
-        let star = h.star;
+        let edict = h.edict;
         // It glasses the ground where it lands, a pool at a time as the strike walks. A
         // beam raking fast over the ground (a strafe) lays the stretch it crossed since
         // its last pool too, so it leaves an unbroken line.
@@ -280,7 +294,7 @@ impl Renderer {
         h.boiling = sea.is_some();
         if h.boiling {
             h.glassed = None;
-            self.beam_boils(at, width, star, time);
+            self.beam_boils(at, width, edict, time);
             return;
         }
         let glass = !on_unit && last.is_none_or(|g| g.distance(at.truncate()) > GLASS_STEP);
@@ -295,10 +309,10 @@ impl Renderer {
             self.plasma_left_burning(from, at, width, burn, time);
         }
         if glass {
-            // A star's beam runs the ground white-hot; any other glows it red at first,
+            // An Edict Lance runs the ground white-hot; any other glows it red at first,
             // and melts it as it drags on over ground it has already heated. One that
             // leaves it burning only sears it: the burning plasma is its mark.
-            let peak = if star {
+            let peak = if edict {
                 1.0
             } else if burn > 0.0 {
                 (0.12 + 0.08 * width).min(0.5)
@@ -315,8 +329,8 @@ impl Renderer {
             }
             self.ground_melt
                 .melt(at.truncate(), width * 2.8, peak, time, GLASS_COOL);
-            // The excavation lance digs as it glasses; the star only melts.
-            if fusion && !star {
+            // The excavation lance digs as it glasses; the Edict Lance only melts.
+            if fusion && !edict {
                 self.impact_craters.dig(at.truncate(), width * 2.2, time);
             }
             self.push_puff(
@@ -328,8 +342,8 @@ impl Renderer {
                 (width * 1.2, width * 3.5),
             );
         }
-        if star {
-            self.star_outflow(at, width, on_unit, time);
+        if edict {
+            self.edict_outflow(at, width, on_unit, time);
         }
         // A fusion lance biting into a hull (`regency_guns_fx/lance.rs`).
         if bite {
@@ -337,7 +351,7 @@ impl Renderer {
             self.lance_bite(at, dir, width, time);
         }
         // A fusion lance's bite on a hull is its own (`lance_bite`).
-        if fusion && !star && !bite {
+        if fusion && !edict && !bite {
             self.push_lit(
                 puff::WARP_GLOW as f32,
                 at + Vec3::Z * width,
@@ -393,8 +407,8 @@ impl Renderer {
     /// Where a held beam strikes the sea: the water flashes to steam round it, white puffs
     /// rolling up and out off the surface and a ring running out over the water. Every
     /// tick the beam holds.
-    fn beam_boils(&mut self, at: Vec3, width: f32, star: bool, time: f32) {
-        let s = if star { 1.6 } else { 1.0 };
+    fn beam_boils(&mut self, at: Vec3, width: f32, edict: bool, time: f32) {
+        let s = if edict { 1.6 } else { 1.0 };
         self.push_lit(
             puff::WARP_GLOW as f32,
             at + Vec3::Z * width * 0.3,
@@ -423,10 +437,10 @@ impl Renderer {
         }
     }
 
-    /// Where a star beam strikes: a tight white-hot spot with a red bloom under it, and a
+    /// Where an Edict Lance strikes: a tight white-hot spot with a red bloom under it, and a
     /// crown of molten droplets thrown up and out in arcs that fall back and cool. Nothing
     /// hazy. Every tick the beam holds.
-    fn star_outflow(&mut self, at: Vec3, width: f32, on_unit: bool, time: f32) {
+    fn edict_outflow(&mut self, at: Vec3, width: f32, on_unit: bool, time: f32) {
         self.push_lit(
             puff::WARP_GLOW as f32,
             at + Vec3::Z * width * 0.3,
@@ -577,7 +591,18 @@ impl Renderer {
     pub(super) fn write_plasma_fx(&mut self, units: &[UnitInstance], time: f32) {
         let tick = self.tick_seconds.max(0.02);
         let fx = &mut self.plasma_fx;
-        fx.held.retain(|h| time < h.last + tick * 1.5 + CUT);
+        // An Edict Lance going out leaves its filament along the line it last held.
+        let gone = |h: &Held| time >= h.last + tick * 1.5 + CUT;
+        for h in fx.held.iter().filter(|h| h.edict && !h.new && gone(h)) {
+            fx.filaments.push(Filament {
+                from: h.from[1],
+                to: h.to[1],
+                width: h.width,
+                start: h.last + tick * 1.5,
+            });
+        }
+        fx.held.retain(|h| !gone(h));
+        fx.filaments.retain(|f| time < f.start + FILAMENT);
         // One that still has throws to come waits a little longer for its shot.
         fx.charges
             .retain(|c| time < c.due + tick * if c.left > 1 { 3.0 } else { 1.0 });
@@ -599,28 +624,34 @@ impl Renderer {
                 (h.last + tick * 1.5, CUT)
             };
             let mut beam = held_instance(HELD_BEAM, h.from, h.to, h.width, start, life);
-            if h.star {
-                beam.aim[3] = fade_beam::HELD_STAR;
+            if h.edict {
+                beam.aim[3] = fade_beam::HELD_EDICT;
             } else if h.fusion {
                 beam.aim[3] = fade_beam::HELD_FUSION;
             }
             out.push(beam);
-            if h.star {
-                // Its halo: the same stroke drawn far wider and faint.
-                let mut halo = held_instance(HELD_BEAM, h.from, h.to, h.width * HALO, start, life);
-                halo.aim[3] = fade_beam::HELD_STAR_HALO;
-                out.push(halo);
-                if h.struck && !h.boiling {
-                    // Plasma spreading out over the ground from the strike (ground.wgsl).
-                    let fade = 1.0 - ((time - h.last - tick * 1.5) / CUT).clamp(0.0, 1.0);
-                    fx.spills.push(StainInstance {
-                        pos: h.to[1].truncate().to_array(),
-                        radius: h.width * SPILL_RADIUS,
-                        strength_seed: (fade * 255.0) as u32 | stain::SPILL,
-                    });
-                }
+            if h.edict && h.struck && !h.boiling {
+                // Plasma spreading out over the ground from the strike (ground.wgsl).
+                let fade = 1.0 - ((time - h.last - tick * 1.5) / CUT).clamp(0.0, 1.0);
+                fx.spills.push(StainInstance {
+                    pos: h.to[1].truncate().to_array(),
+                    radius: h.width * SPILL_RADIUS,
+                    strength_seed: (fade * 255.0) as u32 | stain::SPILL,
+                });
             }
         }
+        // A Pinched bolt's trail (`aim.w` 0): red, cooling and breaking up.
+        out.extend(fx.filaments.iter().map(|f| ProjectileInstance {
+            prev_pos: f.from.to_array(),
+            color: PROJECTILE_FADE_BEAM | fade_beam::PLASMA_TRAIL,
+            pos: f.to.to_array(),
+            size: f.width * THREAD,
+            wake: f.start,
+            plasma: FILAMENT,
+            _pad: [0.0; 2],
+            aim: [0.0; 4],
+            prev_aim: [0.0; 4],
+        }));
         let legs = &self.legs;
         for c in &mut fx.charges {
             let Some(u) = units.iter().find(|u| u.unit_id == c.unit) else {

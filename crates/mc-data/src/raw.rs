@@ -1295,12 +1295,14 @@ pub struct RawWeapon {
     /// Cosmetic. False (the default): a seeker's own strike.
     #[serde(default)]
     pub fusion_strike: bool,
-    /// A held pinch-fusion beam (`beam` and the `PinchFusion` grade) drawn as the power
-    /// generator's star, not as an excavation lance: a white-hot core in a broad prism
-    /// sheath, and where it lands it melts the ground to glass and digs no crater.
-    /// Cosmetic. False (the default): the excavation lance, which digs as it glasses.
+    /// A held pinch-fusion beam (`beam` and the `PinchFusion` grade) laid from the hull's
+    /// core (`Model::beam_core`) as an Edict Lance, not as an excavation lance: its charge
+    /// gathers along the hull's seams into a star at the lens, the beam is a white-hot
+    /// column in a pink and red sheath, and where it lands it melts the ground to glass
+    /// and digs no crater. Cosmetic. False (the default): the excavation lance, which
+    /// digs as it glasses.
     #[serde(default)]
-    pub star_beam: bool,
+    pub edict_beam: bool,
     /// Degrees a gun house on a capital hull may dip below its deck before its rails
     /// would run into the hull. A mark lower than that is out of its reach (the range
     /// rings show the dead zone under the hull). Zero (the default): no limit.
@@ -2251,7 +2253,7 @@ impl Unit {
                 caliber: w.caliber.clamp(0.0, 20.0) as f32,
                 plasma_grade: w.plasma_grade,
                 fusion_strike: w.fusion_strike,
-                star_beam: w.star_beam,
+                edict_beam: w.edict_beam,
                 depression: Angle(steps(w.depression.clamp(0.0, 89.0)).round() as i64 as u16),
                 sway: Angle(steps(w.sway.clamp(0.0, 60.0)).round() as i64 as u16),
                 rake: Angle(steps(w.rake.clamp(0.0, 80.0)).round() as i64 as u16),

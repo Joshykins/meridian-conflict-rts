@@ -811,6 +811,31 @@ shared! {
         pub const SEED_DEPTH: f32 = 150.0;
     }
 
+    /// An Edict Lance's charge gathering in its ship's hull (renderer/edict_lance_fx,
+    /// regency.wgsl `reg_edict`). The renderer hands the shader each ship's lance in
+    /// `UnitInstance::mount` as `[a, b, along, kind]`, `along` metres forward of the ship's
+    /// origin of its firing point, times on the renderer's clock: charging
+    /// `[share, tick, along, GATHERING - rate]` (the share at the tick's start, gaining
+    /// `rate` a second, under one, for at most `TICK_REACH` seconds past it; burning, the
+    /// share one and the rate nothing); gone out `[when, 0, along, FIRED]`; let go before it
+    /// lit `[share, when, along, CANCELLED]`.
+    pub mod edict as "EDICT_" {
+        pub const GATHERING: f32 = -2000.0;
+        // retired: -2010.0 (an Edict's gather stalled for want of power)
+        pub const FIRED: f32 = -2020.0;
+        pub const CANCELLED: f32 = -2030.0;
+        /// Seconds past its tick a charge's share runs on: a little over a tick, so it
+        /// glides between ticks and holds still while the game is paused.
+        pub const TICK_REACH: f32 = 0.15;
+        /// The share of the charge by which the light run in from bow and stern meets at
+        /// the firing point; after it the whole charge is there.
+        pub const MEET: f32 = 0.9;
+        /// Seconds the seams' red after-glow lasts after the beam goes out, and a let-go
+        /// charge's light takes to die.
+        pub const AFTERGLOW: f32 = 6.0;
+        pub const FADE: f32 = 1.2;
+    }
+
     /// Graphics quality bits (renderer `SceneQuality`), in `Globals.detail.w`.
     pub mod quality as "QUALITY_" {
         /// Single-patch terrain textures, one-tap shadows, staggered cloud shade.
@@ -971,12 +996,11 @@ shared! {
     pub mod fade_beam as "FADE_BEAM_" {
         /// Held lance takes the Sunspear prism rather than red plasma (`aim.w`).
         pub const HELD_FUSION: f32 = 1.0;
-        /// Held pinch-fusion beam drawn as the star (`Weapon::star_beam`): a white-hot core
-        /// in a broad prism sheath, fusion bursts strobing down it (`aim.w`).
-        pub const HELD_STAR: f32 = 2.0;
-        /// The star beam's halo (`Weapon::star_beam`): a second, much wider beam laid round
-        /// it, translucent, drifting veils of plasma that thin to nothing at its rim (`aim.w`).
-        pub const HELD_STAR_HALO: f32 = 3.0;
+        // retired: 2.0 (the star beam), 3.0 (its halo)
+        /// An Edict Lance's column (`Weapon::edict_beam`, renderer/plasma_fx.rs): a broad
+        /// white-hot core swelling from the lens to its full width at the ground, a thin
+        /// prism rim and a red fringe, pulses of light running down it (`aim.w`).
+        pub const HELD_EDICT: f32 = 4.0;
         /// A capital rail's channel (colour 6) laid along a fired gun's rails as they cool
         /// (renderer/heavy_rail_fx.rs `heat`), marked in `aim.w`: its ends glide over the
         /// tick from `prev_pos` and `pos` to `aim` and `prev_aim`, as a held beam's do, so

@@ -153,7 +153,7 @@
             // melting a line of glass between them; it digs no crater.
             (
                 name: "Edict Lance", damage: 160, splash: 20, range: 2200, reload: 0.1,
-                hitscan: true, beam: true, star_beam: true, trajectory: Direct, spin_up: 3.0,
+                hitscan: true, beam: true, edict_beam: true, trajectory: Direct, spin_up: 3.0,
                 turret_turn: 12, muzzle: (0, 0, 15.2), sweep: 10,
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
                 plasma_grade: Some(PinchFusion), flash: 0.4, impact: 3.2, tracer: 26.0,

@@ -91,7 +91,7 @@ pub fn weapon_rows(w: &Weapon) -> (String, Vec<(&'static str, String)>) {
             format!("{:.0} energy / s", w.reload_energy.to_f32()),
         ));
     }
-    if w.star_beam {
+    if w.edict_beam {
         rows.push(("Full burn", whole(w.damage.to_f32() * shots as f32)));
         rows.push((
             "Burn time",

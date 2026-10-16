@@ -59,6 +59,9 @@ struct RegencyIn {
     unit: f32,
     // One while the unit builds (`FLAG_BUILDING`): its nanite slots run fast and burn bright.
     working: f32,
+    // Its Edict Lance (`reg_edict`): x its state (entity.wgsl `edict_state`), y the firing
+    // point along model x, z the model's reach.
+    edict: vec3<f32>,
 }
 
 struct RegencyLook {
@@ -280,10 +283,13 @@ fn reg_panel_line(i: RegencyIn, o: RegOutline) -> vec4<f32> {
 struct RegSeams {
     d: vec4<f32>,
     id: f32,
+    // The long seams alone (the courses' joins, not the cuts across them): the distance to
+    // the nearest and its own random, zero to one (`reg_edict` lights a few of them).
+    course: vec2<f32>,
 }
 
 fn reg_seams(i: RegencyIn, o: RegOutline) -> RegSeams {
-    var out = RegSeams(vec4<f32>(1e4, 0.0, 0.0, 0.0), i.seed);
+    var out = RegSeams(vec4<f32>(1e4, 0.0, 0.0, 0.0), i.seed, vec2<f32>(1e4, 0.0));
     let want = i.scale * mix(1.1, 1.7, fract(i.seed * 5.31));
     if o.tube {
         return out;
@@ -325,6 +331,7 @@ fn reg_seams(i: RegencyIn, o: RegOutline) -> RegSeams {
     if n > 0.5 && last > pitch * 0.45 {
         let off = u - n * pitch;
         out.d = vec4<f32>(abs(off), gn * sign(off + 1e-6));
+        out.course = vec2<f32>(abs(off), hash11(n * 5.17 + i.seed * 37.0));
     }
     // Across the course, along the edge: cuts at a longer pitch, staggered per course.
     let t = normalize(cross(i.n, gn) + vec3<f32>(1e-6, 0.0, 0.0));
@@ -424,7 +431,100 @@ fn regency_plate(i: RegencyIn) -> RegencyLook {
     if i.nanite {
         out = reg_nanite(i, out, fw);
     }
+    if i.edict.x != 0.0 {
+        // The face's own edge counts as a long seam only on a broad face (a chine, a deck's
+        // edge), never round every small facet.
+        let edge = select(1e4, o.e, o.small > i.scale * 3.0);
+        let charge = reg_edict(i, seams.course, edge, seams.id, fw);
+        out.glow = out.glow * (1.0 + charge.w) + charge.rgb;
+    }
     return out;
+}
+
+// An Edict Lance's charge gathering in the hull (`EDICT_*`, renderer/edict_lance_fx): two
+// lines of light sweeping in along the hull from the bow and the stern, closing on the
+// firing point: white-hot at each front with the prism's pink at its rim, in the long seams
+// only (the courses' joins and a broad face's edge, never every plate's outline), and a pool
+// of it growing round the point. Behind the fronts the hull stays charcoal: a few long seams
+// keep a dim red, pulses running in toward the point. While the beam burns the charge is
+// held there; let go before it lit it gutters out; after the beam goes out the pool cools
+// from white to red and the last red dies out of those few seams. Its lengths are the
+// Regent's (a reach of 1900 m), drawn to the hull's own reach. `course` is
+// the nearest long seam (distance, its random), `edge` a broad face's edge, `plate` the
+// plate's random. Returns the light, and in w how much brighter the plate's lamps burn.
+fn reg_edict(i: RegencyIn, course: vec2<f32>, edge: f32, plate: f32, fw: f32) -> vec4<f32> {
+    let s = i.edict.x;
+    let x = i.local.x;
+    let at = i.edict.y;
+    let reach = max(i.edict.z, 1.0);
+    let k = clamp(reach / 1900.0, 0.05, 1.0);
+    let t = i.time;
+    let red = vec3<f32>(1.0, 0.05, 0.035);
+    let white = vec3<f32>(1.0, 0.95, 0.97);
+    // A lit seam is drawn at least most of a pixel wide so it reads from afar, its light
+    // spread thinner as it is widened.
+    let own = i.scale * 0.025;
+    let w = max(own, fw * 0.7);
+    let thin = pow(own / w, 0.6);
+    let on_course = (1.0 - smoothstep(w * 0.4, w, course.x)) * thin;
+    let on_edge = (1.0 - smoothstep(w * 0.4, w, edge)) * thin;
+    // The few long seams that carry light behind the fronts and after the shot.
+    let few = step(0.8, course.y);
+    let long_lit = max(on_course * few, on_edge);
+    let every = max(on_course, on_edge);
+    let from_at = abs(x - at);
+    if s >= 2.0 {
+        // Fired: the pool flares and cools from white through red, the few long seams
+        // dying out last.
+        let age = s - 2.0;
+        let near = exp(-from_at / (260.0 * k));
+        let flash = exp(-age / 0.15) * near;
+        let hot = exp(-age / 0.7) * near;
+        let ember = (1.0 - smoothstep(0.0, EDICT_AFTERGLOW * mix(0.4, 1.0, plate), age))
+            * exp(-age / 2.0);
+        let rgb = (white * (flash * 18.0 + hot * 8.0) + red * hot * 6.0) * every
+            + red * ember * (0.8 + 4.0 * near) * long_lit;
+        return vec4<f32>(rgb, 2.0 * flash + 1.5 * ember * near);
+    }
+    let p = abs(s);
+    let run = clamp(p / EDICT_MEET, 0.0, 1.0);
+    let e = pow(run, 1.15);
+    // The two fronts: from the bow (reach) and the stern, closing on the firing point.
+    let bow = mix(reach, at, e);
+    let stern = mix(-reach * 0.8, at, e);
+    // How far the front on this side has swept past here: positive behind it, toward the
+    // end it came from. Each seam leads or lags a little: a front, not a ruled line.
+    let rag = ((course.y - 0.5) * 30.0 + 12.0 * sin(x * 0.011 / k + plate * 5.0)) * k;
+    let past = select(stern - x, x - bow, x > at) + rag * (1.0 - run);
+    let width = (18.0 + 22.0 * run) * k;
+    // The crest: sharp on its leading edge, trailing off behind.
+    let lead = exp(-pow(max(-past, 0.0) / (width * 0.3), 2.0));
+    let trail = exp(-pow(max(past, 0.0) / width, 2.0));
+    let crest = select(lead, trail, past >= 0.0) * (1.0 - smoothstep(0.9, 1.0, run));
+    // Behind the front: a dim red in a few long seams, pulses running on toward the point.
+    let burnt = smoothstep(-10.0 * k, 80.0 * k, past);
+    let pulse = pow(0.5 + 0.5 * sin(from_at * 0.02 / k - t * (3.0 + 7.0 * p) + course.y * 6.0), 10.0);
+    let ember = burnt * (0.1 + 0.9 * pulse) * (0.4 + 0.8 * p)
+        * mix(1.0, 0.25, smoothstep(0.0, 1000.0 * k, past)) * (1.0 - 0.8 * smoothstep(0.88, 1.0, p));
+    // Round the firing point the charge pools, white-hot by the end.
+    let near = exp(-from_at / (mix(160.0, 90.0, p) * k)) * smoothstep(0.3, 1.0, p);
+    let rim = prism(course.y + x * 0.002 / k - t * PRISM_RATE * 3.0);
+    let pink = mix(vec3<f32>(1.0, 0.45, 0.62), rim, 0.5);
+    // The front's light is in every long seam it crosses, and a breath of it on the plate
+    // round them, so the sweep reads as a line of light from afar.
+    let front = mix(pink, white, smoothstep(0.35, 1.0, crest)) * crest * (10.0 + 14.0 * p);
+    let pool = mix(red, white, smoothstep(0.4, 1.0, near * p)) * near * (3.0 + 18.0 * p * p);
+    var rgb = (front + pool) * (every + 0.03) + red * ember * 2.0 * long_lit;
+    var lamps = 0.6 * ember + 3.0 * near + 2.0 * crest;
+    if s < 0.0 {
+        // Let go: the light gutters out, catching and failing in its own places.
+        let k = floor(t * 13.0 + plate * 5.0);
+        let catches = step(0.55, hash11(k + plate * 17.0));
+        let gutter = 0.2 + 0.5 * catches;
+        rgb *= gutter;
+        lamps *= gutter;
+    }
+    return vec4<f32>(rgb, lamps);
 }
 
 // Height along a machinery column: a turned collar a little in from each end.

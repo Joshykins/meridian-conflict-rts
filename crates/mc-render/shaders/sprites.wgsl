@@ -534,8 +534,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
             // A Pinched-plasmeric beam: holds, then is cut (renderer/plasma_fx.rs).
             out.color = vec3<f32>(1.0 - smoothstep(0.72, 1.0, age));
             var look = select(6.0, 6.3, p.aim.w == FADE_BEAM_HELD_FUSION);
-            look = select(look, 6.45, p.aim.w == FADE_BEAM_HELD_STAR);
-            look = select(look, 6.52, p.aim.w == FADE_BEAM_HELD_STAR_HALO);
+            look = select(look, 6.45, p.aim.w == FADE_BEAM_HELD_EDICT);
             out.shape = vec2<f32>(-distance(head, tail), look);
             // Its width in metres (green), to swell out of the muzzle rather than start as a
             // flat edge (`fs_sprite`).
@@ -1259,54 +1258,44 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
             let sheath = pow(across, 2.2) * 0.3 * (1.0 - age);
             return vec4<f32>(in.color * (thread + sheath) * alive, 1.0);
         }
-        if in.shape.y > 6.5 {
-            // The star's halo: a soft translucent veil round the beam. Its look is 6.52, well
-            // clear of the trails' 6.6 and over: interpolated, a look on a branch's edge
-            // flickers into the next, which drew its width (green) as colour. It flares out of the
-            // muzzle as a cone over a couple of its widths, never starting as a flat edge.
-            // Slow broad sheets of plasma stream down it, twisting about it, so it reads as
-            // flowing gas and never a solid tube; it thins to nothing at its rim and is faint
-            // everywhere, laid over what it hides rather than blotting it.
-            let run = (in.uv.x * 0.5 + 0.5) * -in.shape.x;
-            let flare = smoothstep(0.0, 2.0, run / max(in.color.g, 1.0));
-            let y = abs(in.uv.y) / max(flare, 0.05);
-            if y >= 1.0 {
-                discard;
-            }
-            let t = globals.camera.w;
-            let twist = in.uv.y * 1.6 + run * 0.004;
-            let sheets = value_noise2(vec2<f32>(run * 0.012 - t * 20.0, twist + t * 0.7), 1.0);
-            let veil = smoothstep(0.2, 0.9, sheets);
-            let hue = prism(run * 0.008 + sheets * 0.8 - t * PRISM_RATE * 2.0);
-            let body = pow(1.0 - y, 2.2);
-            let haze = mix(vec3<f32>(0.62, 0.42, 1.0), hue, 0.6);
-            return vec4<f32>(haze * body * (0.2 + 0.7 * veil) * flare * in.color.r, 1.0);
-        }
         if in.shape.y > 6.4 {
-            // The star (`Weapon::star_beam`): pinch fusion held as one beam, drawn as the
-            // power generator's star is. A white-hot core of fusing plasma in a broad sheath
-            // of the prism's pinks, drifting patches of colour run down it and cool to
-            // lavender at its rim (never red), and fusion events strobe along it, each
-            // swelling the core and flaring the sheath for an instant.
+            // An Edict Lance's column (`Weapon::edict_beam`, renderer/plasma_fx.rs): the
+            // Regency's pinch fusion held as one column, swelling from the lens to its full
+            // width at the ground. A white-hot core, widening where it meets the ground, in a
+            // roiling sheath of plasma: the prism's pink next to the core going to the
+            // Regency's red at its torn, flickering edge, pulses of light running down it
+            // from the hull.
             let run = (in.uv.x * 0.5 + 0.5) * -in.shape.x;
-            // Out of the muzzle it swells from a white-hot thread to its full width over a
-            // width and a half, so it starts at a point, not along a flat edge.
-            let swell = smoothstep(0.0, 1.5, run / max(in.color.g, 1.0));
-            let y = abs(in.uv.y) / mix(0.2, 1.0, swell);
+            let u = in.uv.x * 0.5 + 0.5;
+            let t = globals.camera.w;
+            // Out of the lens it swells from a white-hot thread over a couple of its widths,
+            // so it starts at a point, not along a flat edge; wider still toward the ground.
+            let swell = smoothstep(0.0, 2.0, run / max(in.color.g, 1.0));
+            let prof = mix(0.2, 1.0, swell) * mix(0.75, 1.0, smoothstep(0.0, 0.8, u));
+            // The sheath boils: its edge torn by noise running down the column.
+            let churn = value_noise2(vec2<f32>(run * 0.02 - t * 22.0, in.uv.y * 2.5 + t * 3.0), 1.0);
+            let lick = value_noise2(vec2<f32>(run * 0.06 - t * 40.0, in.uv.y * 6.0), 1.0);
+            let edge = prof * (0.72 + 0.2 * churn + 0.08 * lick);
+            let y = abs(in.uv.y) / edge;
             if y >= 1.0 {
                 discard;
             }
-            let across = 1.0 - y;
-            let t = globals.camera.w;
-            let cell = run * 0.03 - t * 14.0;
-            let burst = exp(-pow(fract(cell) - 0.5, 2.0) * 60.0) * step(0.35, hash11(floor(cell) + 3.7));
-            let drift = value_noise2(vec2<f32>(run * 0.04 - t * 6.0, in.uv.y * 2.0), 1.0);
-            let hue = prism(run * 0.012 + drift * 0.7 - t * PRISM_RATE * 3.0);
-            let warm = mix(hue, vec3<f32>(1.0, 0.1, 0.14), 0.7);
-            let sheath = mix(vec3<f32>(0.8, 0.62, 1.0), warm, 0.9) * pow(across, 0.8)
-                * (3.4 + 3.0 * burst);
-            let core = vec3<f32>(1.0, 0.95, 0.96) * pow(across, mix(9.0, 4.5, burst)) * (11.0 + 20.0 * burst);
-            return vec4<f32>((sheath + core) * in.color.r, 1.0);
+            // The core: a third of the width, half where it meets the ground.
+            let core_w = mix(0.24, 0.45, smoothstep(0.75, 1.0, u)) * (0.95 + 0.1 * lick);
+            let core = 1.0 - smoothstep(core_w * 0.75, core_w, y);
+            let pulse = exp(-pow(fract(run * 0.005 - t * 2.6) - 0.5, 2.0) * 30.0);
+            let hue = prism(run * 0.012 + churn * 0.6 - t * PRISM_RATE * 4.0);
+            let pink = mix(vec3<f32>(1.0, 0.3, 0.5), hue, 0.35);
+            let crimson = vec3<f32>(1.0, 0.04, 0.03);
+            // Out through the sheath: pink, then red, cells of it brighter and darker.
+            let out_t = smoothstep(core_w, 1.0, y);
+            let cells = 0.3 + 1.4 * churn * (0.6 + 0.4 * lick);
+            let flicker = 0.85 + 0.15 * sin(t * 37.0 + run * 0.03);
+            let sheath = mix(pink * 4.0, crimson * 3.2, smoothstep(0.0, 0.3, out_t))
+                * cells * flicker * (1.0 - smoothstep(0.85, 1.0, y) * 0.5);
+            let white = vec3<f32>(1.0, 0.97, 0.98) * (30.0 + 24.0 * pulse);
+            let rgb = mix(sheath, white, core);
+            return vec4<f32>(rgb * in.color.r, 1.0);
         }
         if in.shape.y > 6.1 {
             // Excavation fusion: the Sunspear/shield prism around a white-hot core, swelling

@@ -45,11 +45,11 @@ const PULSE_GAP: f32 = 0.55;
 const PULSE_SPEED: f32 = 2400.0;
 
 /// A held Pinch-fusion beam that charges (`Weapon::charge_ticks`): a fusion lance. The
-/// star beam (`Weapon::star_beam`, the Scourge's) is drawn as the star instead.
+/// Edict Lance (`Weapon::edict_beam`, the Scourge's) is drawn by `edict_lance_fx` instead.
 pub(super) fn lance(w: &Weapon) -> bool {
     w.beam
         && w.charge_ticks > 0
-        && !w.star_beam
+        && !w.edict_beam
         && w.plasma_shot() == Some(PlasmaGrade::PinchFusion)
 }
 
