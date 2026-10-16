@@ -35,8 +35,12 @@ fn a_player_out_of_the_match_watches_and_talks_with_the_observers() {
     });
     clients[3].session.chat("welcome", 0b001).unwrap();
     clients[0].session.chat("push mid", 0).unwrap();
+    // Everyone the checks below read, the watchers too: each line comes on its own
+    // connection, and a loaded machine can deliver them in any order.
     pump_until(&mut refs(&mut clients), "chat", |cs| {
-        cs[2].watchers_chat.len() == 2 && cs[3].watchers_chat.len() == 2 && cs[1].chat.len() == 1
+        cs[2].watchers_chat.len() == 2
+            && cs[3].watchers_chat.len() == 2
+            && cs[1..].iter().all(|c| c.chat.len() == 1)
     });
     let said = vec![
         (Some(PlayerId(2)), "gg, watching now".to_owned()),
