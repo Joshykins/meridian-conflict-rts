@@ -20,7 +20,10 @@ in `crates/mc-net/src/lib.rs`; this page is the whole picture.
   `relay`) is the match clock: it closes tick N once every caught-up player has
   sent its commands for N, or once `turn_timeout` has passed, and whatever it
   put in the bundle *is* tick N everywhere. A lagging player never stalls the
-  others. The hub also compares hashes, serves late joiners and reconnects from
+  others. It also holds the clock while a caught-up player's sim (read from its
+  hash reports) trails by more than the input delay plus a second of ticks, so a
+  machine that cannot keep up sets the pace rather than piling up a backlog its
+  orders wait behind. The hub also compares hashes, serves late joiners and reconnects from
   a snapshot, and records the replay.
 - **Relay, not peer-to-peer.** All match traffic goes through the server. Every
   player can always reach it (no NAT traversal), there is one authority for
@@ -170,6 +173,7 @@ Games hosted from the client (LAN, direct IP) do not check names.
 | What happens | What the player sees |
 | --- | --- |
 | A player lags | Their name marked lagging in the scoreboard; the match carries on |
+| A player's machine cannot simulate as fast as the clock | The match slows to that machine's pace; nobody's orders queue behind a backlog. A sim frozen for 5 s stops holding it |
 | A player drops | Notice "X lost connection"; their side stands; "X is back" when they return |
 | This machine loses the connection | "Reconnecting…" over the match, automatic retries; the match resumes from a snapshot |
 | Desync | The match stops with a report: the tick, which parts of the state differ (units, projectiles, economy, AI, …), and where the dump was written |

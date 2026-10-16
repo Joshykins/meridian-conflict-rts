@@ -97,6 +97,7 @@ impl Hub {
             s.synced = false;
             s.lagging = true;
             s.received_through = None;
+            s.sim_moved = None;
             PlayerId(i as u8)
         } else {
             let free = (0..self.slots.len()).find(|&i| {
@@ -373,14 +374,16 @@ impl Hub {
             }
         }
 
+        let now = Instant::now();
         for s in self.slots.iter_mut().filter(|s| s.occupied) {
             s.synced = true;
             s.watching = false;
+            s.sim_next = 0;
+            s.sim_moved = Some(now);
         }
         for c in self.conns.values_mut().filter(|c| c.kind != Kind::Pending) {
             c.live = true;
         }
-        let now = Instant::now();
         self.game = Some(Match {
             start_frame: start_frame.clone(),
             log: Vec::new(),

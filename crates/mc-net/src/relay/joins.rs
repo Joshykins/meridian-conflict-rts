@@ -92,6 +92,8 @@ impl Hub {
                 let s = &mut self.slots[slot.index()];
                 s.synced = true;
                 s.hash_from = hash_from;
+                s.sim_next = hash_from;
+                s.sim_moved = Some(Instant::now());
                 // Coming in after the clock started needs no load barrier; at tick 0 it still does.
                 s.loaded |= from_tick > 0;
                 self.broadcast(&Message::PlayerRejoined(slot));

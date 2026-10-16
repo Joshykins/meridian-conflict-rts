@@ -26,6 +26,15 @@
 //! unconditionally: clients send `Commands` for `R + input_delay` in response to
 //! bundle `R`, so nobody can have sent anything for them.
 //!
+//! **Pace.** Clients send their turn when a bundle *arrives*, so a machine whose
+//! sim cannot keep up with the clock (a big late game at 12x) would still answer
+//! every tick on time and fall further behind without end, every order it gave
+//! queued behind the backlog. So the relay also watches how far each player has
+//! really simulated, from its hash reports, and holds the clock while a caught-up
+//! player is more than `input_delay` plus a second of ticks behind: the match
+//! runs at the slowest machine's pace. A player far behind (catching up after a
+//! rejoin) is not held for, nor one whose sim has not moved for `sim_stall`.
+//!
 //! **Input delay.** The relay pings every connection and, with
 //! `adaptive_delay`, sets the delay to cover the slowest player's round trip
 //! (raised at once, lowered slowly). Clients stamp with the delay from the last
@@ -83,6 +92,9 @@ pub struct RelayConfig {
     pub tick_interval: Duration,
     /// How long past its due time a tick waits for stragglers.
     pub turn_timeout: Duration,
+    /// A player whose sim has not stepped for this long is frozen: the clock stops
+    /// waiting for it to catch up (see *Pace*).
+    pub sim_stall: Duration,
     /// A connection must say `Hello` within this.
     pub handshake_timeout: Duration,
     /// A connection silent for this long is dropped. Clients ping every second.
@@ -117,6 +129,7 @@ impl Default for RelayConfig {
             adaptive_delay: true,
             tick_interval: Duration::from_millis(1000 / TICKS_PER_SECOND as u64),
             turn_timeout: Duration::from_millis(300),
+            sim_stall: Duration::from_secs(5),
             handshake_timeout: Duration::from_secs(5),
             peer_timeout: Duration::from_secs(30),
             snapshot_timeout: Duration::from_secs(20),

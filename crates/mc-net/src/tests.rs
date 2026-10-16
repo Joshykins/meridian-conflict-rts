@@ -19,6 +19,7 @@ use crate::*;
 mod clock;
 mod lobby;
 mod local_seek;
+mod pace;
 mod watching;
 
 const DEADLINE: Duration = Duration::from_secs(30);

@@ -108,6 +108,11 @@ pub(super) struct Slot {
     pub(super) synced: bool,
     /// First tick this player can report a hash for.
     pub(super) hash_from: u32,
+    /// The next tick its sim will step, from its hash reports: how far it has really got,
+    /// as against how far it has heard.
+    pub(super) sim_next: u32,
+    /// When `sim_next` last moved (or the slot synced); `None` while not synced.
+    pub(super) sim_moved: Option<Instant>,
     /// Has built the match from `Start` (or joined after the clock started).
     pub(super) loaded: bool,
     /// Its side is out of the match and it watches (`Message::Watching`): its turns
@@ -290,7 +295,13 @@ impl Hub {
             if let Some(until) = m.loading_until {
                 deadline = deadline.min(until);
             } else if m.paused.is_none() {
-                let turn = if now >= m.due && !self.awaited(m.log.len() as u32).is_empty() {
+                let tick = m.log.len() as u32;
+                let turn = if now < m.due {
+                    m.due
+                } else if let Some(frozen_at) = self.sim_held(tick, now) {
+                    // A hash report wakes the hub sooner.
+                    frozen_at
+                } else if !self.awaited(tick).is_empty() {
                     m.due + self.config.turn_timeout
                 } else {
                     m.due

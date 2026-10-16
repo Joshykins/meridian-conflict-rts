@@ -17,6 +17,9 @@ use crate::wire::NetError;
 const HASH_WINDOW: usize = 512;
 /// Added to the slowest round trip before it is turned into ticks of delay.
 const DELAY_MARGIN_MS: u32 = 30;
+/// Ticks a caught-up player's sim may trail the clock by, beyond the input delay,
+/// before the clock waits for it: what bounds the lag of a slow machine's orders.
+const SIM_LEAD: u32 = mc_core::TICKS_PER_SECOND;
 /// A higher delay is taken at most this often...
 const RAISE_EVERY: Duration = Duration::from_secs(1);
 /// ...a lower one only after it would have done for this long.
@@ -315,6 +318,20 @@ impl Hub {
             .collect()
     }
 
+    /// Whether tick `tick` waits for a caught-up player's sim (relay.rs, *Pace*); if so,
+    /// when the soonest of them counts as frozen and stops holding the clock.
+    pub(super) fn sim_held(&self, tick: u32, now: Instant) -> Option<Instant> {
+        let lead = self.input_delay + SIM_LEAD;
+        self.slots
+            .iter()
+            .filter(|s| s.conn.is_some() && s.synced && !s.lagging)
+            // Far behind is catching up from a rejoin: the others are not held for that.
+            .filter(|s| tick > s.sim_next + lead && tick <= s.sim_next.saturating_add(2 * lead))
+            .filter_map(|s| s.sim_moved.map(|at| at + self.config.sim_stall))
+            .filter(|frozen_at| *frozen_at > now)
+            .min()
+    }
+
     /// Closes at most one tick; the next one is due an interval later at the earliest.
     pub(super) fn try_close_tick(&mut self, now: Instant) {
         let interval = self.tick_interval();
@@ -323,6 +340,13 @@ impl Hub {
             return;
         }
         let tick = m.log.len() as u32;
+        if self.sim_held(tick, now).is_some() {
+            // The stragglers' timeout runs from when the hold ends, not from the due time.
+            if let Some(m) = &mut self.game {
+                m.due = now;
+            }
+            return;
+        }
         let stragglers = self.awaited(tick);
         if !stragglers.is_empty() && now < m.due + self.config.turn_timeout {
             return;
@@ -391,6 +415,11 @@ impl Hub {
             return Err(NetError::Malformed("Hash for a tick that has not closed"));
         }
         if let Some(slot) = player {
+            let s = &mut self.slots[slot.index()];
+            if tick >= s.sim_next {
+                s.sim_next = tick + 1;
+                s.sim_moved = Some(Instant::now());
+            }
             let reports = m.hashes.entry(tick).or_default();
             let wanted =
                 self.summary.desync_tick.is_none() && tick >= self.slots[slot.index()].hash_from;
