@@ -81,6 +81,9 @@ shared! {
         pub const DEEP: u32 = 160;
         /// How much of the plate's tone a deep plate keeps.
         pub const DEEP_TONE: f32 = 0.38;
+        /// Plate whose walls carry decks of small white-lit ports (regency.wgsl
+        /// `reg_ports`), laid level in model space so their rows run on from plate to plate.
+        pub const PORTS: u32 = 161;
     }
 
     /// Courier stern door leaves: the side is attached to the whole leaf, including

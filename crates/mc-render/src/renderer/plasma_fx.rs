@@ -26,7 +26,7 @@ use mc_data::{BlueprintId, PlasmaGrade, Trajectory, Weapon};
 use mc_sim::mirror::{ProjectileInstance, StainInstance, UnitInstance, PROJECTILE_FADE_BEAM};
 use std::mem::size_of;
 
-use super::water_fx::PUFF_STEAM;
+use super::water_fx::{self, PUFF_STEAM};
 use super::{beam_score, rail_fx, Renderer, MAX_PROJECTILES, PUFF_SPARK, PUFF_TREE_SMOKE};
 
 /// Fade-beam colour of a held beam and of a charge (sprites.wgsl).
@@ -314,8 +314,11 @@ impl Renderer {
         h.boiling = sea.is_some();
         if h.boiling {
             h.glassed = None;
-            // An Edict Lance boils what it would melt on land, not its column's width.
-            self.beam_boils(at, if edict { melt } else { width }, edict, time);
+            if edict {
+                self.edict_boils(at, width, melt, time);
+            } else {
+                self.beam_boils(at, width, time);
+            }
             return;
         }
         let step = GLASS_STEP.max(melt * GLASS_STEP_SHARE);
@@ -428,22 +431,15 @@ impl Renderer {
     /// Where a held beam strikes the sea: the water flashes to steam round it, white puffs
     /// rolling up and out off the surface and a ring running out over the water. Every
     /// tick the beam holds.
-    fn beam_boils(&mut self, at: Vec3, width: f32, edict: bool, time: f32) {
-        let s = if edict { 1.6 } else { 1.0 };
-        // An Edict Lance's strike is red-hot, as on the ground (`edict_outflow`).
-        let hot = if edict {
-            Vec3::new(1.0, 0.32, 0.18)
-        } else {
-            Vec3::new(1.0, 0.92, 0.85)
-        };
+    fn beam_boils(&mut self, at: Vec3, width: f32, time: f32) {
         self.push_lit(
             puff::WARP_GLOW as f32,
             at + Vec3::Z * width * 0.3,
             Vec3::ZERO,
             time,
             0.12,
-            (width * 1.1 * s, width * 1.5 * s),
-            hot * 5.0,
+            (width * 1.1, width * 1.5),
+            Vec3::new(1.0, 0.92, 0.85) * 5.0,
             0.0,
         );
         for _ in 0..2 {
@@ -453,14 +449,114 @@ impl Renderer {
             self.push_puff(
                 PUFF_STEAM,
                 at,
-                out * speed * s,
+                out * speed,
                 time,
                 2.5,
-                (width * 1.2 * s, width * 4.0 * s),
+                (width * 1.2, width * 4.0),
             );
         }
         if self.scatter.unit() < 0.25 {
-            self.push_ripple(at, time, width * 6.0 * s, 1.6, 0.0, 0.6);
+            self.push_ripple(at, time, width * 6.0, 1.6, 0.0, 0.6);
+        }
+    }
+
+    /// Where an Edict Lance strikes the sea, every tick it holds: the water where it
+    /// touches flashed white-hot in a red-orange bloom, a pit of foam boiling round it; a
+    /// tower of steam torn up the column and rolling out low over the water; white water
+    /// thrown up in spouts and a crown of droplets out of the boil; rings running out,
+    /// lit red. `width` is the column's, `melt` the radius it would glass on land: the
+    /// boil is the melt's, the steam and the rings the column's.
+    fn edict_boils(&mut self, at: Vec3, width: f32, melt: f32, time: f32) {
+        // The contact: white-hot in the middle, red-orange round it, beating.
+        let beat = 0.8 + 0.4 * self.scatter.unit();
+        self.push_lit(
+            puff::WARP_GLOW as f32,
+            at + Vec3::Z * melt * 0.15,
+            Vec3::ZERO,
+            time,
+            0.12,
+            (melt * 0.7, melt * 0.9),
+            Vec3::new(1.0, 0.85, 0.75) * 9.0 * beat,
+            0.0,
+        );
+        self.push_lit(
+            puff::WARP_GLOW as f32,
+            at + Vec3::Z * melt * 0.3,
+            Vec3::ZERO,
+            time,
+            0.15,
+            (melt * 1.8, melt * 2.2),
+            Vec3::new(1.0, 0.3, 0.12) * 4.0 * beat,
+            0.0,
+        );
+        // The steam torn up the column: thick at its foot, climbing fast and spreading.
+        for _ in 0..3 {
+            let a = self.scatter.unit() * std::f32::consts::TAU;
+            let off = Vec3::new(a.cos(), a.sin(), 0.0) * melt * (0.3 + 0.6 * self.scatter.unit());
+            let rise = 18.0 + self.scatter.unit() * 26.0;
+            let when = time + self.scatter.unit() * self.tick_seconds;
+            let life = 2.2 + self.scatter.unit();
+            self.push_puff(
+                PUFF_STEAM,
+                at + off,
+                off.normalize_or_zero() * 4.0 + Vec3::Z * rise,
+                when,
+                life,
+                (melt * 0.9, width * 1.4),
+            );
+        }
+        // And rolling out low over the water round it.
+        for _ in 0..2 {
+            let a = self.scatter.unit() * std::f32::consts::TAU;
+            let out = Vec3::new(a.cos(), a.sin(), 0.0);
+            let speed = 10.0 + self.scatter.unit() * 12.0;
+            let when = time + self.scatter.unit() * self.tick_seconds;
+            let life = 3.0 + self.scatter.unit();
+            self.push_puff(
+                PUFF_STEAM,
+                at + out * melt,
+                out * speed + Vec3::Z * 3.0,
+                when,
+                life,
+                (melt * 0.8, width * 1.1),
+            );
+        }
+        // White water thrown up out of the boil, now and then a spout.
+        for _ in 0..5 {
+            let a = self.scatter.unit() * std::f32::consts::TAU;
+            let out = Vec3::new(a.cos(), a.sin(), 0.0);
+            let vel = out * (6.0 + self.scatter.unit() * 10.0)
+                + Vec3::Z * (16.0 + self.scatter.unit() * 18.0);
+            let size = 0.8 + self.scatter.unit() * 1.2;
+            self.push_puff(
+                water_fx::PUFF_DROPLET,
+                at + out * melt * 0.6,
+                vel,
+                time,
+                4.0,
+                (size, size * 2.0),
+            );
+        }
+        if self.scatter.unit() < 0.3 {
+            let a = self.scatter.unit() * std::f32::consts::TAU;
+            let p =
+                at + Vec3::new(a.cos(), a.sin(), 0.0) * melt * (0.4 + 0.5 * self.scatter.unit());
+            let v0 = 20.0 + self.scatter.unit() * 14.0;
+            self.push_puff(
+                water_fx::PUFF_COLUMN,
+                p,
+                Vec3::Z * v0,
+                time,
+                2.0 * v0 / 11.0 + 0.6,
+                (melt * 0.25, melt * 0.6),
+            );
+        }
+        // The boil's foam, and a ring run out lit red every few ticks.
+        if self.scatter.unit() < 0.4 {
+            self.push_ripple(at, time, melt * 2.5, 1.2, 0.0, 1.0);
+        }
+        if self.scatter.unit() < 0.25 {
+            self.push_ripple(at, time, width * 5.0, 2.4, 0.8, 0.5);
         }
     }
 

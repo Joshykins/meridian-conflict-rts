@@ -19,8 +19,8 @@ use super::super::style::{shard, Finish};
 #[derive(Clone, Copy)]
 pub(super) struct Rib {
     pub(super) y: f32,
-    le: f32,
-    te: f32,
+    pub(super) le: f32,
+    pub(super) te: f32,
     z: f32,
     t: f32,
 }
@@ -123,6 +123,11 @@ impl Rib {
         ]
     }
 
+    /// The underside, at its deepest.
+    pub(super) fn underside(&self) -> f32 {
+        self.z - self.t * 0.5
+    }
+
     /// The top at `along` the chord (0 the leading edge, 1 the trailing).
     pub(super) fn top(&self, along: f32) -> Vec3 {
         let x = self.le + (self.te - self.le) * along;
@@ -138,6 +143,7 @@ pub(super) fn arm(b: &mut MeshBuilder, w: &Wing) {
     let k = w.k;
     let rings: Vec<Vec<Vec3>> = ribs.iter().map(Rib::ring).collect();
     dark_plate(b);
+    b.pattern(pattern::EMBER_PORTS);
     b.with_facets(|b| b.loft(&rings, true, true));
     if b.coarse() {
         return;

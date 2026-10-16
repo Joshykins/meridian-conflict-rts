@@ -91,7 +91,7 @@ fn regency_none() -> RegencyLook {
 fn regency_pattern(p: u32) -> bool {
     return p == PAT_EMBER || p == NANITE_PATTERN_SLOT
         || p == EMBER_PLATE_SLOT || p == EMBER_PLATE_RIM || p == EMBER_PLATE_MACHINED
-        || p == EMBER_PLATE_DEEP
+        || p == EMBER_PLATE_DEEP || p == EMBER_PLATE_PORTS
         || p == NANITE_PATTERN_RIM;
 }
 
@@ -354,6 +354,55 @@ fn reg_scan(i: RegencyIn) -> MetalScan {
     return metal_scan(ScanAt(i.local, i.n, i.dl1, i.dl2, i.scale, i.seed, METAL_SCAN_LAYER, REG_SCAN_LUM, REG_SCAN_ROUGH, METAL_SCAN_TILE_M));
 }
 
+// A capital hull's ports (`EMBER_PLATE_PORTS`): pinpricks of white light in short runs
+// of two to four, many decks of them, as a starship's walls carry theirs. Laid level in
+// model space, so a deck runs on from plate to plate across the seams; the odd deck dark
+// its whole length and the odd port dark. Only on walls, kept off each face's edge. In
+// metres: a deck every `REG_PORT_DECK`, a port every `REG_PORT_PITCH` along a run, each
+// `REG_PORT_SIZE` across. A port is never drawn finer than most of a pixel, so a far hull
+// keeps its ports as points of light, dimmed by how little of the pixel each fills; once
+// they would run together they are gone. x: how much of the point is port glass, y: its
+// light.
+const REG_PORT_LIGHT: vec3<f32> = vec3<f32>(4.0, 4.05, 4.2);
+const REG_PORT_DECK: f32 = 5.5;
+const REG_PORT_PITCH: f32 = 4.0;
+const REG_PORT_SIZE: vec2<f32> = vec2<f32>(1.0, 0.7);
+
+fn reg_ports(i: RegencyIn, o: RegOutline, fw: f32) -> vec2<f32> {
+    // Walls, and the steep flanks either side of a chine.
+    let wall = 1.0 - smoothstep(0.8, 0.92, abs(i.n.z));
+    if wall <= 0.0 {
+        return vec2<f32>(0.0);
+    }
+    let along = normalize(cross(vec3<f32>(0.0, 0.0, 1.0), i.n) + vec3<f32>(1e-6, 0.0, 0.0));
+    // Either side of a mirrored hull reads the same: along runs bow-ward on both.
+    let u = dot(i.local, along) * select(1.0, -1.0, along.x < 0.0);
+    let deck = REG_PORT_DECK;
+    let pitch = REG_PORT_PITCH;
+    let row = floor(i.local.z / deck);
+    let col = floor(u / pitch);
+    // Bays of six ports' room, each holding one run of two to four set somewhere in it;
+    // most bays lit, and about a deck in four dark its whole length.
+    let bay = floor(col / 6.0);
+    let k = col - bay * 6.0;
+    let run = 2.0 + floor(hash21(vec2<f32>(bay * 0.71 + 9.0, row * 1.3)) * 3.0);
+    let start = floor(hash21(vec2<f32>(bay * 2.3 + 1.0, row * 0.9 + 4.0)) * (6.0 - run + 0.99));
+    let on = step(0.3, hash21(vec2<f32>(bay * 1.7 + 0.3, row * 3.1 + 0.7)))
+        * step(0.25, hash11(row * 7.31 + 0.27))
+        * step(start, k) * step(k, start + run - 1.0);
+    let real = REG_PORT_SIZE * 0.5;
+    let half = max(real, vec2<f32>(fw * 0.35));
+    let fill = real.x * real.y / (half.x * half.y);
+    let apart = smoothstep(1.6 * fw, 2.4 * fw, pitch);
+    let q = vec2<f32>(u - (col + 0.5) * pitch, i.local.z - (row + 0.55) * deck);
+    let d = max(abs(q.x) - half.x, abs(q.y) - half.y);
+    let clear = smoothstep(0.4, 1.2, o.e) * wall * apart;
+    let glass = (1.0 - smoothstep(-fw * 0.5, fw * 0.5, d)) * on * clear;
+    let lit = step(0.22, hash21(vec2<f32>(col * 0.37 + 5.0, row + 17.0)))
+        * (0.65 + 0.35 * hash11(col * 3.7 + row * 11.0));
+    return vec2<f32>(glass * fill, glass * lit * sqrt(fill));
+}
+
 fn regency_plate(i: RegencyIn) -> RegencyLook {
     var out = regency_none();
     let fw = max(i.px, 1e-4);
@@ -418,6 +467,10 @@ fn regency_plate(i: RegencyIn) -> RegencyLook {
             out.tone *= 1.0 - 0.9 * (1.0-smoothstep(-fw, fw, d-half));
             out.glow = regency_lamp_light(i.skin) * lit;
         }
+    } else if i.optic == EMBER_PLATE_PORTS {
+        let ports = reg_ports(i, o, fw);
+        out.tone *= 1.0 - 0.7 * ports.x;
+        out.glow = REG_PORT_LIGHT * ports.y;
     } else if i.optic == EMBER_PLATE_RIM || i.optic == NANITE_PATTERN_RIM {
         let inset = max(i.scale * 0.028, o.small * 0.18);
         let lit = surf_band(o.e - inset, i.scale * 0.013, fw);

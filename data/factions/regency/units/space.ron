@@ -127,8 +127,8 @@
     ),
     // The Scourge: the Regency's capital warship, the Dominion's peer, the Regent brought
     // down to tech 4 (docs/REGENCY_SPACE_FLEET.md). It fights from the Dominion's height with
-    // the lance held from its core under it, six batteries in ball mounts in pockets in its
-    // chines, four AA repeaters on the arms and the after deck and four Rondels. Its guns
+    // the lance held from its core under it, six batteries in ball mounts down its chines and
+    // on its arms, four AA repeaters on the arms and the after deck and four Rondels. Its guns
     // are weapon groups after the lance (`models::regency::space::destroyer`, `guns.rs`):
     // each mount a house of its own, muzzles about its pivot as the house faces the nose.
     (
@@ -154,7 +154,7 @@
             // melting a line of glass between them; it digs no crater.
             (
                 name: "Edict Lance", damage: 160, splash: 20, range: 2200, reload: 0.1,
-                hitscan: true, beam: true, edict_beam: true, trajectory: Direct, spin_up: 3.0,
+                hitscan: true, beam: true, edict_beam: true, trajectory: Direct, spin_up: 5.0,
                 turret_turn: 12, lays_at_once: true, muzzle: (0, 0, 22), sweep: 10,
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
                 plasma_grade: Some(PinchFusion), flash: 0.4, impact: 3.2, tracer: 36.0,
@@ -163,18 +163,19 @@
                     hold: "regency_edict_lance_hold", spindown: "regency_edict_lance_vent",
                 ),
             ),
-            // Six Pinch-plasma Batteries, three a side, fore to aft, port first: twin forks
-            // out of a ball mount seated in a pocket pressed into the chine, clear of the hull
-            // below, each fork gathering plasma in the gap ahead of its blades and pinching it
-            // out as one jet. Each bears from a little past the nose round its own side to a
-            // little past the stern.
+            // Six Pinch-plasma Batteries, three a side, port first: twin forks out of a ball
+            // mount, two seated in pockets pressed into the chine (at the bow and amidships)
+            // and one in a barbette on the arm, each fork gathering plasma in the gap ahead of
+            // its blades and pinching it out as one jet. Each bears from a little past the nose
+            // round its own side to a little past the stern, and turns onto spacecraft before
+            // anything else (`prefer`).
             (
                 name: "Pinch-plasma Battery",
                 damage: 1400, splash: 18, range: 2600, reload: 8, salvo: 2, salvo_delay: 0.35, speed: 900, trajectory: Direct,
                 rounds: 8, round_span: 0.3,
                 turret_turn: 40, arc: 220,
                 muzzle: (32.4, 4.86, 0), muzzles: [(32.4, 4.86, 0), (32.4, -4.86, 0)],
-                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, red: 1.0,
+                targets: ["Land", "Naval", "Structure", "Space"], prefer: ["Space"], color: Orange, red: 1.0,
                 plasma_grade: Some(Pinched), flash: 1.8, impact: 2.6, tracer: 2.0,
                 sounds: (
                     fire: "regency_halberd_fire", charge: "regency_halberd_charge", charge_time: 1.0,
@@ -182,11 +183,11 @@
                 ),
                 mounts: [
                     (pivot: (300, 37, 64.25), facing: 90),
-                    (pivot: (245, 42, 64.75), facing: 90),
-                    (pivot: (190, 54.75, 63.75), facing: 90),
+                    (pivot: (160, 61, 63.25), facing: 90),
+                    (pivot: (-134.5, 140, 85), facing: 90),
                     (pivot: (300, -37, 64.25), facing: -90),
-                    (pivot: (245, -42, 64.75), facing: -90),
-                    (pivot: (190, -54.75, 63.75), facing: -90),
+                    (pivot: (160, -61, 63.25), facing: -90),
+                    (pivot: (-134.5, -140, 85), facing: -90),
                 ],
             ),
             // Four Twin AA Repeaters raised on pedestals, one on each arm's corner and one each

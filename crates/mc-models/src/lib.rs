@@ -204,7 +204,10 @@ pub mod pattern {
     pub const NANITE_RIM: u32 = crate::gpu_consts::nanite::PATTERN_RIM;
     /// Standard Regency armour in a deeper shade (`gpu_consts::ember_plate::DEEP`).
     pub const EMBER_DEEP: u32 = crate::gpu_consts::ember_plate::DEEP;
-    pub const LAST: u32 = EMBER_DEEP;
+    /// Standard Regency armour whose walls carry decks of white-lit ports
+    /// (`gpu_consts::ember_plate::PORTS`): a capital hull's windows, drawn by the plate.
+    pub const EMBER_PORTS: u32 = crate::gpu_consts::ember_plate::PORTS;
+    pub const LAST: u32 = EMBER_PORTS;
 }
 
 /// Which rigid part of the model a vertex belongs to. The vertex shader

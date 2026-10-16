@@ -1178,7 +1178,7 @@ fn surf_relief(i: SurfaceIn, st: vec2<f32>) -> f32 {
             h = min(h, 0.5 + 0.5 * surf_rise(d, i.scale * 0.05, bevel));
         }
         // Regency plate: its outline only; its panel line is regency.wgsl's.
-        case PAT_EMBER, NANITE_PATTERN_SLOT, EMBER_PLATE_MACHINED, EMBER_PLATE_DEEP: {}
+        case PAT_EMBER, NANITE_PATTERN_SLOT, EMBER_PLATE_MACHINED, EMBER_PLATE_DEEP, EMBER_PLATE_PORTS: {}
         case 18u: {
             // Deep incised grooves; panels either side stand at slightly different heights,
             // and a light sits down in its slot.
@@ -1418,7 +1418,7 @@ fn surface_at(i: SurfaceIn) -> Surface {
         let worn = (1.0 - smoothstep(0.0, bevel * (1.0 + 2.5 * hurt), d_face)) * outlined;
         out.bare = worn * smoothstep(0.75 - 0.55 * hurt, 0.95 - 0.5 * hurt, scuff + worn * 0.35);
         if i.pattern == PAT_EMBER || i.pattern == NANITE_PATTERN_SLOT || i.pattern == EMBER_PLATE_MACHINED
-            || i.pattern == EMBER_PLATE_DEEP {
+            || i.pattern == EMBER_PLATE_DEEP || i.pattern == EMBER_PLATE_PORTS {
             // Regency hide is not paint over steel: its edges only go raw where it is hurt.
             out.bare *= hurt;
         }
@@ -1838,7 +1838,7 @@ fn surface_at(i: SurfaceIn) -> Surface {
                 out.rough -= 0.3 * lips;
             }
             // Regency plate: plain, coloured and lined in regency.wgsl.
-            case PAT_EMBER, NANITE_PATTERN_SLOT, EMBER_PLATE_MACHINED, EMBER_PLATE_DEEP: {}
+            case PAT_EMBER, NANITE_PATTERN_SLOT, EMBER_PLATE_MACHINED, EMBER_PLATE_DEEP, EMBER_PLATE_PORTS: {}
             default: {
                 if i.metal {
                     // Machined metal: a fine grain along its length, darker where it

@@ -437,7 +437,8 @@ struct LensFlare {
     distance: f32,
     // Colour times brightness.
     color: vec3<f32>,
-    _pad0: f32,
+    // How much nearer than the light the scene may stand and not hide it, metres.
+    slack: f32,
 }
 struct LensFlares {
     // x: flares in use.
@@ -450,11 +451,10 @@ struct LensFlares {
 fn flare_seen(f: LensFlare) -> f32 {
     let eye = wave_globals.camera.xyz;
     let step = 2.5 * wave_globals.viewport.zw;
-    let slack = 4.0 + f.distance * 0.02;
     var seen = 0.0;
     for (var i = 0; i < 5; i++) {
         let o = vec2<f32>(f32(i == 1) - f32(i == 2), f32(i == 3) - f32(i == 4)) * step;
-        seen += select(0.0, 0.2, scene_distance_at(f.at + o, eye) + slack > f.distance);
+        seen += select(0.0, 0.2, scene_distance_at(f.at + o, eye) + f.slack > f.distance);
     }
     return seen;
 }

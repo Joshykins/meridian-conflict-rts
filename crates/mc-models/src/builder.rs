@@ -1754,6 +1754,7 @@ impl MeshBuilder {
                 | pattern::EMBER_RIM
                 | pattern::EMBER_MACHINED
                 | pattern::EMBER_DEEP
+                | pattern::EMBER_PORTS
                 | pattern::NANITE_RIM
         );
         let frame = match self.framing {

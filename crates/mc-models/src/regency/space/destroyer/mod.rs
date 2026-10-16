@@ -5,9 +5,11 @@
 //! the Regent's two great arms, curving out to their corners and bending aft into claws
 //! that reach the stern (`wings.rs`); the Regent's terraced command tower and its horns
 //! aft. Through the ship's middle stands the drum of the energy core the main lance is laid
-//! from (`core.rs`); six Pinch-plasma Batteries turn in ball mounts seated in pockets
-//! pressed into the chines (`battery.rs`), four Twin AA Repeaters stand on pedestals on the
-//! arms and the after deck and four Rondels guard the deck (`guns.rs`).
+//! from (`core.rs`); six Pinch-plasma Batteries turn in ball mounts, four seated in pockets
+//! pressed into the chines fore and amidships and one in a barbette on each arm
+//! (`battery.rs`), four Twin AA Repeaters stand on pedestals on the arms and the after deck
+//! and four Rondels guard the deck (`guns.rs`). A blade hangs under each arm, raked aft
+//! (`blades.rs`). The walls carry decks of white-lit ports (`pattern::EMBER_PORTS`).
 //! +X is forward, +Y port, the ground at z 0 (it is built on its lot, the core lowest).
 //! Authored in metres as built.
 //!
@@ -16,6 +18,7 @@
 //! `anti_missile_mounts`.
 
 pub(super) mod battery;
+mod blades;
 mod core;
 mod guns;
 #[cfg(test)]
@@ -58,8 +61,13 @@ const WING: Wing = Wing {
     root: Vec3::new(-240.0, 60.0, 62.0),
 };
 
-/// Where the batteries' sockets stand down each chine, fore to aft, all ahead of the arms.
-const BATTERIES: [f32; 3] = [300.0, 245.0, 190.0];
+/// Where the batteries' sockets stand down each chine, fore to aft, ahead of the arms.
+const BATTERIES: [f32; 2] = [300.0, 160.0];
+/// The battery on each arm: how far out, and how far back along its chord.
+const ARM_BATTERY: (f32, f32) = (140.0, 0.3);
+/// How far the arm battery's ball stands over the arm's top, in ball radii: its barbette
+/// holds its lower half.
+const BARBETTE: f32 = 0.55;
 
 /// The hull: `STATIONS`, the chine pressed in round each battery's ball into a
 /// faceted pocket the hull's shoulder and bilge fold down and up into.
@@ -131,6 +139,7 @@ fn mounts(body: &Body) -> (Vec<Mount>, Vec<Vec3>) {
         .iter()
         .map(|&x| Mount::port(Kind::Battery, body.out(x, CHINE, BALL_OUT)))
         .collect();
+    port.push(Mount::port(Kind::Battery, arm_battery()));
     let corner = WING.root.y + 300.0 * WING.k;
     port.push(Mount::port(
         Kind::Aa,
@@ -147,6 +156,45 @@ fn mounts(body: &Body) -> (Vec<Mount>, Vec<Vec3>) {
     (port, rondels)
 }
 
+/// The arm battery's ball's middle, port.
+fn arm_battery() -> Vec3 {
+    let (y, along) = ARM_BATTERY;
+    WING.rib_at(y).top(along) + Vec3::Z * (BALL_R * BARBETTE)
+}
+
+/// The arm battery's barbette, port: a faceted drum on the arm's top the ball sits in, a
+/// lit rim round its lip.
+fn barbette(b: &mut MeshBuilder) {
+    let ball = arm_battery();
+    let (y, along) = ARM_BATTERY;
+    let foot = WING.rib_at(y).top(along).z - 6.0;
+    let lip = ball.z - BALL_R * 0.25;
+    let r = BALL_R * 1.2;
+    dark_plate(b);
+    b.with_facets(|b| {
+        b.cylinder_between(
+            v3(ball.x, ball.y, foot),
+            v3(ball.x, ball.y, lip),
+            r * 1.25,
+            r,
+            8,
+        )
+    });
+    if !b.coarse() {
+        dark_plate(b);
+        b.pattern(pattern::EMBER_RIM);
+        b.with_facets(|b| {
+            b.cylinder_between(
+                v3(ball.x, ball.y, lip - 1.2),
+                v3(ball.x, ball.y, lip),
+                r * 1.02,
+                r * 1.02,
+                8,
+            )
+        });
+    }
+}
+
 pub(super) fn destroyer(b: &mut MeshBuilder, _tech: u8) {
     let body = &*HULL;
     if b.coarse() {
@@ -159,6 +207,8 @@ pub(super) fn destroyer(b: &mut MeshBuilder, _tech: u8) {
         plates(b, body);
         carapace(b, body);
         arm(b, &WING);
+        barbette(b);
+        blades::blade(b, &WING, blades::BLADE);
         seams(b, body, 330.0, -280.0);
         guns::rondels(b, &rondels);
     });
@@ -217,6 +267,7 @@ fn plates(b: &mut MeshBuilder, body: &Body) {
             1.6,
         );
     }
+    b.pattern(pattern::EMBER_PORTS);
     course(
         b,
         body,
@@ -236,6 +287,7 @@ fn plates(b: &mut MeshBuilder, body: &Body) {
     );
     // The pale stripe down the shoulder.
     pale_plate(b);
+    b.pattern(pattern::EMBER_PORTS);
     course(
         b,
         body,
@@ -339,6 +391,7 @@ fn terrace(
         let p = plan(l, h);
         b.at(v3(x + back, 0.0, 0.0), |b| {
             dark_plate(b);
+            b.pattern(pattern::EMBER_PORTS);
             b.with_facets(|b| {
                 b.loft_z(
                     &p,

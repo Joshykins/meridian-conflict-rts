@@ -26,7 +26,8 @@ pub(crate) struct GpuLensFlare {
     pub(crate) distance: f32,
     /// Its colour times its brightness (HDR, before exposure).
     pub(crate) color: [f32; 3],
-    pub(crate) _pad: f32,
+    /// How much nearer than the light the scene may stand and not hide it, metres.
+    pub(crate) slack: f32,
 }
 
 /// How a flare looks at its brightest.
@@ -44,6 +45,13 @@ const MIN_PX: f32 = 22.0;
 const MAX_PX: f32 = 240.0;
 /// Past this many metres from the eye a flare is not drawn.
 const REACH_M: f32 = 6000.0;
+/// How much nearer than a flare's light the scene may stand and not hide it: a few metres
+/// and a share of the light's distance, for a light on the very face that would hide it.
+/// A light hung under a hull (`flash_close`) takes a far smaller share: at strategic zoom
+/// the usual share is more than the hull is deep, and the light would show through it.
+const SLACK_M: f32 = 4.0;
+const SLACK_SHARE: f32 = 0.02;
+const SLACK_SHARE_CLOSE: f32 = 0.002;
 
 #[derive(Clone, Copy)]
 struct Timed {
@@ -51,6 +59,8 @@ struct Timed {
     at: Vec3,
     start: f32,
     life: f32,
+    /// Its slack's share of its distance (`SLACK_SHARE`).
+    slack: f32,
 }
 
 pub(super) struct LensFlares {
@@ -83,11 +93,22 @@ impl LensFlares {
 
     /// A flare that strikes at `start` and dies away over `life` seconds.
     pub(super) fn flash(&mut self, at: Vec3, flare: Flare, start: f32, life: f32) {
+        self.push(at, flare, start, life, SLACK_SHARE);
+    }
+
+    /// The same for a light hung close under something solid (a hull over it): hidden by
+    /// anything more than a few metres nearer than it, at any zoom.
+    pub(super) fn flash_close(&mut self, at: Vec3, flare: Flare, start: f32, life: f32) {
+        self.push(at, flare, start, life, SLACK_SHARE_CLOSE);
+    }
+
+    fn push(&mut self, at: Vec3, flare: Flare, start: f32, life: f32, slack: f32) {
         self.timed.push(Timed {
             flare,
             at,
             start,
             life: life.max(0.01),
+            slack,
         });
     }
 
@@ -130,7 +151,7 @@ impl LensFlares {
                     radius: radius * fade.sqrt(),
                     distance,
                     color: color.to_array(),
-                    _pad: 0.0,
+                    slack: SLACK_M + distance * t.slack,
                 },
             ));
         }

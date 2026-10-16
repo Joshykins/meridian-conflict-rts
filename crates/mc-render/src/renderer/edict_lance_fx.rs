@@ -393,7 +393,8 @@ impl Renderer {
         let reach = s.r * (8.0 + LIGHT_REACH * share.sqrt());
         self.plasma_fx.cores.lamps.push((at, LIGHT * power, reach));
         if share > 0.2 {
-            self.lens_flares.flash(
+            // Hung under the hull: the hull hides it from above at every zoom.
+            self.lens_flares.flash_close(
                 at,
                 Flare {
                     color: FLARE * (0.5 + 20.0 * share.powi(3)),
@@ -494,7 +495,7 @@ impl Renderer {
             range: s.r * 100.0,
             flicker: 0.0,
         });
-        self.lens_flares.flash(
+        self.lens_flares.flash_close(
             at,
             Flare {
                 color: FLARE * 30.0,
