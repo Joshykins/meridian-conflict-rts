@@ -1048,6 +1048,19 @@ impl World {
             } else {
                 local
             };
+            // A rail gun's slugs leave down their own rails and fly on side by side, the
+            // rails' spacing apart, not crossed onto one point: each is laid on the mark
+            // moved over by its rail's offset from the bore.
+            let aim = if weapon.rail && !weapon.muzzles.is_empty() {
+                let bore = if weapon.rear {
+                    -weapon.muzzle.y
+                } else {
+                    weapon.muzzle.y
+                };
+                aim + FxVec2::new(Fx::ZERO, local.y - bore).rotate(facing)
+            } else {
+                aim
+            };
             let at = crate::world::pitched(local, pivot, arm_pitch);
             // Aircraft turrets yaw around their chin mount, not the hull origin.
             let yaw_pivot = if bp.unit(blueprint).visual.mesh == "assault_air" && w == 0 {

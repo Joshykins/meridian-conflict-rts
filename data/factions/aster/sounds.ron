@@ -203,6 +203,8 @@
         // The Bulwark's pair of rails: the commander's rail cannon, a little lighter,
         // still loud: nothing in its class hits this fast.
         "aster_rail_tank": (like: "aster_rail_cannon", size: 0.85, peak: 0.86),
+        // Its charge: the commander's, smaller and quicker, heard just before each pair.
+        "aster_rail_tank_charge": (like: "citadel_rail_charge", size: 0.55, length: 0.6, peak: 0.2),
         // The Resolute's rail turrets.
         "aster_rail_heavy": (like: "aster_rail_cannon", size: 1.2, peak: 0.94),
         // A rail slug arriving: harder and sharper than a shell, a hit you feel.

@@ -645,9 +645,15 @@ fn bulwark_dumps_both_rails() {
     let mut shots = Vec::new();
     let mut record = |w: &World| {
         for e in &w.events {
-            if let SimEvent::ShotFired { blueprint, pos, .. } = e {
+            if let SimEvent::ShotFired {
+                blueprint,
+                pos,
+                vel,
+                ..
+            } = e
+            {
                 if *blueprint == bulwark {
-                    shots.push((w.tick_count(), *pos));
+                    shots.push((w.tick_count(), *pos, *vel));
                 }
             }
         }
@@ -660,14 +666,21 @@ fn bulwark_dumps_both_rails() {
 
     assert!(shots.len() >= 2, "the Bulwark never opened up: {shots:?}");
     let first = shots[0].0;
-    let salvo: Vec<_> = shots.iter().filter(|(t, _)| *t == first).collect();
+    let salvo: Vec<_> = shots.iter().filter(|(t, ..)| *t == first).collect();
     assert_eq!(salvo.len(), 2, "both rails should fire together: {shots:?}");
-    let ys: Vec<f32> = salvo.iter().map(|(_, p)| p.y.to_f32()).collect();
+    let ys: Vec<f32> = salvo.iter().map(|(_, p, _)| p.y.to_f32()).collect();
     let (lo, hi) = (
         ys.iter().copied().fold(f32::MAX, f32::min),
         ys.iter().copied().fold(f32::MIN, f32::max),
     );
     assert!(hi - lo > 0.8, "shots left from the same mouth: y {ys:?}");
+    // The slugs fly on side by side down their rails, not crossed onto one point.
+    let (a, b) = (salvo[0].2.to_f32(), salvo[1].2.to_f32());
+    let across = (a[1] - b[1]).abs().max((a[0] - b[0]).abs());
+    assert!(
+        across < 0.002 * a[0].hypot(a[1]),
+        "the rails' slugs converge: {a:?} {b:?}"
+    );
 }
 
 fn unit_of(w: &World, owner: u8, key: &str) -> usize {

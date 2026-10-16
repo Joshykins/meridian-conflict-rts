@@ -11,6 +11,8 @@ mod airbase;
 mod assault_tank;
 mod bolt_rifle;
 mod bore_tank;
+mod bulwark;
+pub(crate) use bulwark::RAIL_CHARGE as BULWARK_RAIL;
 pub(super) mod breacher;
 mod citadel;
 mod commander;
@@ -66,7 +68,7 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("bot_light", 2.6, 5.2, mechs::bot_light),
     ModelDef::new("tank_light", 4.6, 3.4, vehicles::tank_light),
     ModelDef::new("artillery_light", 4.2, 3.2, vehicles::artillery_light),
-    ModelDef::new("tank_heavy", 6.2, 4.4, vehicles::tank_heavy),
+    ModelDef::new("tank_heavy", 6.2, 4.4, bulwark::build),
     ModelDef::new("hover_tank", 5.4, 3.2, vehicles::hover_tank),
     ModelDef::new("missile_launcher", 5.2, 4.0, vehicles::missile_launcher),
     ModelDef::new("mobile_shield", 5.4, 6.4, mobile_shield::mobile_shield),

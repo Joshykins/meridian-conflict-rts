@@ -96,14 +96,19 @@
         radius: 6.2, height: 4.4, scale: 1.6,
         vision: 380,
         motion: (layer: Land, size: 2, speed: 38, accel: 31, turn: 90),
+        // `pivot`/`muzzle` are the model's trunnion and the rails' mouths (models
+        // aster/vehicles.rs `tank_heavy`): the pair elevate together onto the mark, and their
+        // slugs fly on side by side, the rails' spacing apart. It charges before it fires,
+        // arcs crawling the rails (`heavy_rail` under 0.15: the charge and the rails' heat,
+        // an ordinary shot).
         weapons: [(
             name: "Twin Rail Cannon",
             damage: 61, range: 360, reload: 1.6, salvo: 2, speed: 1100, rail: true, trajectory: Direct,
-            turret_turn: 100, muzzle: (8.0, 0, 3.8),
+            turret_turn: 100, muzzle: (8.0, 0, 3.8), pivot: (2.6, 0, 3.8),
             muzzles: [(8.0, -0.6, 3.8), (8.0, 0.6, 3.8)],
             targets: ["Land", "Naval"], color: Orange, flash: 2.8, impact: 4.8, shockwave: 0.58,
-            tracer: 0.75,
-            sounds: (fire: "aster_rail_tank", impact: "aster_rail_hit"),
+            tracer: 0.75, heavy_rail: 0.1,
+            sounds: (fire: "aster_rail_tank", charge: "aster_rail_tank_charge", charge_time: 0.5, impact: "aster_rail_hit"),
         )],
         mesh: "tank_heavy", icon: Tank,
         effects: (dust_visibility: 0.42),

@@ -840,12 +840,63 @@ pub(super) struct Chassis {
 
 /// Emits the chassis and returns its flat deck for the caller to furnish.
 pub(super) fn tracked_chassis(b: &mut MeshBuilder, c: &Chassis) -> Roof {
+    tracked_chassis_with(b, c, pattern::GENERIC, true)
+}
+
+/// The near-level shell of a [`tracked_chassis`]: its plan ([`hull_plan`]) and the
+/// sections it is lofted through, belt, waist and deck.
+fn chassis_shell(c: &Chassis) -> (Vec<[f32; 2]>, [Section; 3]) {
+    let (inner, outer, track_height) = c.track;
+    let length = c.front - c.rear;
+    let half_width = inner + 0.42 * (outer - inner);
+    let belt = track_height * 0.74;
+    let waist = belt + (c.deck - belt) * 0.42;
+    (
+        hull_plan(c.rear, c.front, half_width, length * 0.13),
+        [
+            Section::new(belt, 0.95),
+            Section::new(waist, 1.0),
+            Section::scaled(c.deck, 0.8, 0.76).shifted(-0.04 * length, 0.0),
+        ],
+    )
+}
+
+/// The clipped corners of a [`tracked_chassis`]'s near-level shell, the nose's and the
+/// tail's: each band's facet (belt to waist, waist to deck) as its four corners, wound
+/// counter-clockwise seen from outside.
+pub(super) fn chassis_corners(c: &Chassis) -> Vec<[Vec3; 4]> {
+    let (plan, sections) = chassis_shell(c);
+    let ring = |s: &Section| -> Vec<Vec3> {
+        plan.iter()
+            .map(|p| (Vec2::new(p[0], p[1]) * s.scale + s.shift).extend(s.z))
+            .collect()
+    };
+    let rings: Vec<Vec<Vec3>> = sections.iter().map(ring).collect();
+    let mut corners = Vec::new();
+    for band in rings.windows(2) {
+        let (lo, hi) = (&band[0], &band[1]);
+        // `hull_plan`'s corner edges: nose left, tail left, tail right, nose right.
+        for (i, j) in [(1, 2), (3, 4), (5, 6), (7, 0)] {
+            corners.push([lo[i], lo[j], hi[j], hi[i]]);
+        }
+    }
+    corners
+}
+
+/// [`tracked_chassis`] with `plates` (a [`pattern`]) drawn on the shell instead of the
+/// generic fitted plates, and without the plain skirt panels over the tracks unless
+/// `skirts` (a model that hangs its own).
+pub(super) fn tracked_chassis_with(
+    b: &mut MeshBuilder,
+    c: &Chassis,
+    plates: u32,
+    skirts: bool,
+) -> Roof {
     let (inner, outer, track_height) = c.track;
     let length = c.front - c.rear;
     let half_width = inner + 0.42 * (outer - inner);
     let nose = length * 0.13;
     let (scale, shift) = (v2(0.8, 0.76), -0.04 * length);
-    let plan = hull_plan(c.rear, c.front, half_width, nose);
     let belt = track_height * 0.74;
     let waist = belt + (c.deck - belt) * 0.42;
     b.set_treads((inner + outer) * 0.5, outer - inner, c.rear);
@@ -919,14 +970,9 @@ pub(super) fn tracked_chassis(b: &mut MeshBuilder, c: &Chassis) -> Roof {
             v2(shift, 0.0),
         );
     } else {
-        b.loft_z(
-            &plan,
-            &[
-                Section::new(belt, 0.95),
-                Section::new(waist, 1.0),
-                Section::scaled(c.deck, scale.x, scale.y).shifted(shift, 0.0),
-            ],
-        );
+        b.pattern(plates);
+        let (plan, sections) = chassis_shell(c);
+        b.loft_z(&plan, &sections);
         b.paint(ACCENT);
         b.block(
             v3(c.rear + 0.3, -inner, track_height * 0.3),
@@ -945,6 +991,9 @@ pub(super) fn tracked_chassis(b: &mut MeshBuilder, c: &Chassis) -> Roof {
             );
         }
         b.mirror_y(|b| {
+            if !skirts {
+                return;
+            }
             b.paint(PLATING);
             let panels = if c.split_tracks { 4 } else { 3 };
             let pitch = length * 0.84 / panels as f32;

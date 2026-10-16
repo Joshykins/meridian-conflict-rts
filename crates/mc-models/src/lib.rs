@@ -1176,6 +1176,7 @@ pub fn turret_rail(mesh: &str, weapon: usize) -> Option<&'static TurretRail> {
     match (mesh, weapon) {
         ("citadel", 0) => Some(&aster::CITADEL_RAIL),
         ("commander", _) => Some(&aster::COMMANDER_RAIL),
+        ("tank_heavy", 0) => Some(&aster::BULWARK_RAIL),
         ("space_frigate", 1..=4) => Some(&aster::air::RESOLUTE_TURRET_RAIL),
         ("rail_corvette", 0) => Some(&aster::air::VALIANT_RAIL_CHARGE),
         ("rail_trimaran", 0) => Some(&aster::NARWHAL_RAIL),
