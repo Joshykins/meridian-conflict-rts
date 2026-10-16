@@ -136,6 +136,26 @@
                 key: "shoulder", name: "Shoulder",
                 modules: [
                     (
+                        key: "aa_beam", icon: AntiAir, name: "AA Beam Projector",
+                        summary: "A pinched-plasmeric beam on the right shoulder that holds on aircraft; fires while the Exarch builds.",
+                        cost: (materials: 900, energy: 10800, time: 1100),
+                        categories: ["AntiAir"],
+                        weapons: [(
+                            // A projector in a yoke of its own on the pauldron (`aa_beam.rs`):
+                            // it turns and pitches at what it shoots whatever the torso does,
+                            // and holds its beam on one aircraft, 220 a second where ARC's
+                            // shoulder flak scatters about as much over a flight.
+                            name: "AA Beam Projector", mount: true,
+                            damage: 22, range: 640, reload: 0.1, hitscan: true, beam: true, trajectory: Direct,
+                            // At rest it waits pointed up at the sky.
+                            turret_turn: 240, rest_pitch: 45,
+                            muzzle: (3.0, -3.2, 23.4), pivot: (-0.6, -3.2, 23.4),
+                            targets: ["Air"], color: Orange, red: 1.0,
+                            flash: 1.0, impact: 1.2, plasma_grade: Some(Pinched),
+                            sounds: (hold: "regency_pinched_beam"),
+                        )],
+                    ),
+                    (
                         key: "gravitic", icon: Artillery, name: "Gravitic Shock Mortar",
                         summary: "A mortar on the right shoulder throws knots of held gravity at long range that shatter the ground they land on; fires while the Exarch builds.",
                         // ARC's Shoulder Howitzer's price and reach.
@@ -163,26 +183,6 @@
                         // out, it pitches on its trunnions (`hinge`) to point at the work, the
                         // beam leaving the crystal at its muzzle (`shoulder.rs`).
                         emitters: [(3.4, 3.2, 23.55)], unfold: 1.4, hinge: (-0.6, 3.2, 23.889),
-                    ),
-                    (
-                        key: "aa_beam", icon: AntiAir, name: "AA Beam Projector",
-                        summary: "A pinched-plasmeric beam on the right shoulder that holds on aircraft; fires while the Exarch builds.",
-                        cost: (materials: 900, energy: 10800, time: 1100),
-                        categories: ["AntiAir"],
-                        weapons: [(
-                            // A projector in a yoke of its own on the pauldron (`aa_beam.rs`):
-                            // it turns and pitches at what it shoots whatever the torso does,
-                            // and holds its beam on one aircraft, 220 a second where ARC's
-                            // shoulder flak scatters about as much over a flight.
-                            name: "AA Beam Projector", mount: true,
-                            damage: 22, range: 640, reload: 0.1, hitscan: true, beam: true, trajectory: Direct,
-                            // At rest it waits pointed up at the sky.
-                            turret_turn: 240, rest_pitch: 45,
-                            muzzle: (3.0, -3.2, 23.4), pivot: (-0.6, -3.2, 23.4),
-                            targets: ["Air"], color: Orange, red: 1.0,
-                            flash: 1.0, impact: 1.2, plasma_grade: Some(Pinched),
-                            sounds: (hold: "regency_pinched_beam"),
-                        )],
                     ),
                 ],
             ),
