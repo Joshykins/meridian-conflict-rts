@@ -10,7 +10,7 @@ dimensions; weapon mounts and cargo apertures use the same metre coordinates.
 | Ark | 3 | Artificer III; Exarch Engineering Suite III | Heavy transport; 192 slots, 44 m bay width and 36 m clearance |
 | Vassal | 3 | Artificer III; Exarch Engineering Suite III | Escort frigate, the Valiant's peer: a Pinch-plasma Lance under the keel and three Twin Escort Plasma Repeaters |
 | Suzerain | 3 | Artificer III; Exarch Engineering Suite III | Monitor with two anti-ship guns and six area suppression batteries |
-| Scourge | 4 | Artificer III; Exarch Engineering Suite III | Capital destroyer, the Dominion's peer: a Heavy Pinch-fusion Lance from the energy core through its middle, six Pinch-plasma Batteries, sixteen hatched seeker cells |
+| Scourge | 4 | Artificer III; Exarch Engineering Suite III | Capital destroyer, the Dominion's peer: an Edict Lance from the energy core through its middle, six Pinch-plasma Batteries, four Twin AA Repeaters, four Rondels |
 
 All five are site-built aircraft tagged Space (the Scourge also Experimental). Select an appropriate engineer,
 place the ship on its own lot and let construction finish. The Space subject/spawn
@@ -56,30 +56,46 @@ pressed into it under a hooded plate, so each battery bears across its own side
 (`facing` ±90, `arc` 220). The heavy guns turn in armoured wells let into the
 deck, the after one on a raised step so it fires over the forward one.
 
-Scourge is the tech 4 capital ship, about 750 m long: one faceted arrowhead of hard
-chines with two great blades swept back past the stern, plated in two tones (charcoal,
-and a paler steel stripe down each shoulder: `PLATING` under `pattern::EMBER`). It flies
-at the Dominion's 700 m, closes to weapon range and holds station. The lance is laid from the lower lens of
-the energy core, a drum through the middle of the hull lit at both ends; nothing turns. The core charges
-for 2.5 s (`spin_up`: the core's charge animation and `regency_lance_charge` keep time
-with it) before the beam lights. The lance is a held beam fired down its line (`sweep`):
-locked on, it stays on the mark; when the mark dies the beam stays lit while it slowly
-slews (12°/s) onto the next, and the stretch between lands on the ground and melts it
-to glass (the renderer's ground melt). It is drawn as the power generator's star
-(`star_beam`: a white-hot core in a broad prism sheath) and, unlike an excavation lance,
-digs no crater. With nothing left to shoot the core winds down and vents
-(`regency_lance_vent`). Six Pinch-plasma Batteries stand in gun houses down the
-shoulders, three a side, each bearing from past the bow round its own side to past the
-stern. Two blocks of eight hatched cells on the stern deck fire as one launcher, a
-Belfry's gravitic seekers twice over. Its stern drives burn as
-plasma (`models::plasma_drives`): violet plumes with rings carried down them, arcs at
-the mouths.
+Scourge is the tech 4 capital ship, about 700 m long, the Scourge's hull dressed as the
+Regent was (the Regent, the tech 5 super destroyer, merged into it). One faceted
+arrowhead of hard chines, two-toned (charcoal, and a paler steel stripe down each
+shoulder: `PLATING` under `pattern::EMBER`), under the Regent's carapace of feathered
+plates lifted over one another; red lines run down its chines and along its arms
+(`pattern::EMBER_SLOT`). Out of its chines amidships stand the Regent's two arms, each
+curving out to its corner and bending aft into a claw that reaches the stern
+(`destroyer/wings.rs`); the Regent's terraced tower with its horns stands aft. It flies
+at the Dominion's 700 m, closes to weapon range and holds station.
+
+Its main gun is the Edict Lance (`edict_beam`): the Regent's Edict made a held beam, laid
+from the lower lens of the energy core, a drum through the middle of the hull; nothing
+turns. The core charges for 3 s (`spin_up`): light runs in along the hull's seams from
+bow and stern to the core (regency.wgsl `reg_edict`), the Edict's star kindles under the
+lens, lightning crawling in to it off the hull, and `regency_edict_lance_charge` keeps
+time with it, ending on the Edict's release as the beam lights: a flash, a lens flare, a
+pressure ring and a hard ring of pinched plasma round the lens
+(`renderer/edict_lance_fx.rs`). The beam is the Edict's column, 108 m across: a white-hot
+core in a roiling pink and red sheath (`fade_beam::HELD_EDICT`), its roar the loop
+`regency_edict_lance_hold`. It is fired down its line (`sweep`): locked on, it stays on
+the mark; when the mark dies the beam stays lit while it slowly slews (12°/s) onto the
+next, and the stretch between lands on the ground and melts it to glass; unlike an
+excavation lance it digs no crater. With nothing left to shoot it goes out
+(`regency_edict_lance_vent`), leaving a red filament along its line that cools and
+breaks up, the star collapsing and the seams' red dying out of the hull. It reaches
+2.2 km.
+
+Six Pinch-plasma Batteries turn in ball mounts in pockets pressed into the chines, three
+a side ahead of the arms, each bearing from past the bow round its own side to past the
+stern (2.6 km). Four Twin AA Repeaters stand on pedestals, one on each arm's corner and
+one each side of the after deck, and four Rondel crush lenses on the deck edges meet
+missiles. The guns after the lance are weapon groups (`mounts`), each mount a house of
+its own (`destroyer/guns.rs`). Its stern drives burn as plasma (`models::plasma_drives`):
+violet plumes with rings carried down them, arcs at the mouths.
 
 Inspect the fleet with:
 
 ```sh
 scripts/shot.sh variants regency_t2_transport=base regency_t3_assault_transport=base regency_t2_space_frigate=base regency_t3_space_cruiser=base regency_t4_space_destroyer=base --views front34,rear34,top
-scripts/shot.sh unit regency_t4_space_destroyer --scenario targets --ticks 160 --views 200:50 --look 400,0,-500 --zoom 1   (the lance on its mark)
+scripts/shot.sh unit regency_t4_space_destroyer --scenario targets --ticks 60 --views 60:-5,120:20 --look 0,0,-300 --zoom 0.7   (the lance on its mark)
 scripts/shot.sh unit regency_t4_space_destroyer --scenario targets --ticks 20 --views 60:-5 --look 0,0,0 --zoom 2   (the core charging)
 ```
 

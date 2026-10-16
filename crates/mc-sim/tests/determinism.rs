@@ -336,6 +336,10 @@ fn setup(w: &mut World) {
                 // The Regency siege walker: a lance that charges and burns a salvo of ticks, twin
                 // mounts turning on their own, unguided lofted rockets and a hull field.
                 add("regency_t4_colossus", 1, 1500, 900);
+                // The Regency capital ship: a held beam charged from its core ahead of two
+                // weapon groups whose guns each choose their own marks (`mounts.rs`), and
+                // Rondels against the strike missiles.
+                add("regency_t4_space_destroyer", 1, 1800, 1300);
                 // Its hull field runs on power: a plant for it, or the Courier's warp has none left.
                 add("aster_t3_power", 1, 600, 150);
                 // A survival Shaper (`lance.rs`): its Lance charges on what comes in reach

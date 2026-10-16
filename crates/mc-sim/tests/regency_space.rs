@@ -269,14 +269,16 @@ fn destroyers_batteries_all_bear_on_a_ground_mark_ahead_from_cruise_height() {
     for _ in 0..300 {
         w.tick(&[]).unwrap();
         for event in &w.events {
+            // The batteries are one weapon group after the lance: guns 1 to 6.
             if let SimEvent::ShotFired {
                 blueprint: b,
-                weapon,
+                weapon: 1,
+                gun,
                 ..
             } = event
             {
-                if *b == blueprint && (1..=6).contains(weapon) {
-                    fired.insert(*weapon);
+                if *b == blueprint {
+                    fired.insert(*gun);
                 }
             }
         }
@@ -376,7 +378,7 @@ fn destroyers_core_charges_before_the_lance_lights() {
     w.state.units.health[tank] = Fx::from_int(500000);
     let blueprint = w.state.units.blueprint[ship];
     let spin_ticks = w.blueprints.unit(blueprint).weapons[0].spin_ticks as usize;
-    assert_eq!(spin_ticks, 25, "a 2.5 s charge");
+    assert_eq!(spin_ticks, 30, "a 3 s charge");
     let (id, tank_id) = (w.state.units.id(ship), w.state.units.id(tank));
     w.tick(&[cmd(Command::Attack {
         units: vec![id],
@@ -406,13 +408,14 @@ fn destroyers_core_charges_before_the_lance_lights() {
 }
 
 #[test]
-fn destroyers_seeker_cells_see_off_fighters() {
+fn destroyers_aa_repeaters_see_off_fighters() {
     let mut w = world();
     let ship = add(&mut w, "regency_t4_space_destroyer", 0, 500, 700);
     let blueprint = w.state.units.blueprint[ship];
     let bp = w.blueprints.unit(blueprint);
-    let cells = &bp.weapons[7];
-    assert!(cells.missile && cells.guided && cells.hatch_ticks > 0 && cells.muzzles.len() == 16);
+    let aa = &bp.weapons[2];
+    assert!(aa.mounts.len() == 4 && aa.target_mask != 0);
+    assert_eq!(bp.anti_missile_mounts.len(), 4, "four Rondels");
     let fighters: Vec<usize> = (0..3)
         .map(|i| add(&mut w, "aster_t1_interceptor", 1, 900 + i * 40, 760))
         .collect();
@@ -420,23 +423,29 @@ fn destroyers_seeker_cells_see_off_fighters() {
         w.state.units.flags[f] |= flag::PASSIVE;
     }
     let ids: Vec<Handle> = fighters.iter().map(|&f| w.state.units.id(f)).collect();
-    let mut launched = 0;
+    let mut guns = std::collections::BTreeSet::new();
     for _ in 0..300 {
         w.tick(&[]).unwrap();
-        launched += w
-            .events
-            .iter()
-            .filter(|e| {
-                matches!(e, SimEvent::ShotFired { blueprint: b, weapon: 7, .. } if *b == blueprint)
-            })
-            .count();
+        for e in &w.events {
+            if let SimEvent::ShotFired {
+                blueprint: b,
+                weapon: 2,
+                gun,
+                ..
+            } = e
+            {
+                if *b == blueprint {
+                    guns.insert(*gun);
+                }
+            }
+        }
     }
-    assert!(launched >= 4, "{launched} seekers launched");
+    assert!(guns.len() >= 2, "AA repeaters fired: {guns:?}");
     let alive = ids
         .iter()
         .filter(|&&id| w.state.units.row(id).is_some())
         .count();
-    assert!(alive < 3, "the seekers killed none of the fighters");
+    assert!(alive < 3, "the AA repeaters killed none of the fighters");
 }
 
 #[test]

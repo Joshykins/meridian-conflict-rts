@@ -489,7 +489,7 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     No crater, no fireball, no red plasma.
     The **Skyward Pinch-fusion Lance** (the T4 Sarissa, anti-ship) is a held fusion
     beam that charges (renderer/regency_guns_fx/lance.rs, `Grade::Lance`, picked by
-    data: a `beam` with a charge and `PinchFusion`, not `star_beam`). Through its 3.5 s
+    data: a `beam` with a charge and `PinchFusion`, not `edict_beam`). Through its 3.5 s
     charge the split bore's jaws part up and down off the core (charge gear `PART`),
     their slots rippling toward the lens, rose-white fusion streaks run up the bore in
     pulses and a star kindles at the lens, held by lightning tethers from the lens heads
