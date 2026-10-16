@@ -158,7 +158,7 @@ fn square(c: Vec2, half_w: f32, half_h: f32) -> Rect {
     Rect::new(c.x - half_w, c.y - half_h, half_w * 2.0, half_h * 2.0)
 }
 
-/// The strategic icon of a unit class in a box of half-size `r`, with tech pips under it.
+/// The strategic icon of a unit class in a box of half-size `r`, with its tech mark under it.
 /// `cut` is the colour of whatever is behind the icon, for the shapes that have a hole.
 pub fn strategic(ui: &mut Ui, kind: IconKind, tech: u8, c: Vec2, r: f32, color: Color, cut: Color) {
     let line = (r * 0.2).max(1.4);
@@ -492,13 +492,24 @@ pub fn strategic(ui: &mut Ui, kind: IconKind, tech: u8, c: Vec2, r: f32, color: 
             ui.fill(Rect::new(c.x, c.y - r * 0.36, r * 0.3, r * 0.4), color);
         }
     }
-    let pips = tech.min(5);
-    for i in 0..pips {
-        let x = c.x + (i as f32 - (pips as f32 - 1.0) * 0.5) * r * 0.42;
-        ui.fill(
-            Rect::new(x - r * 0.15, c.y + r * 1.08, r * 0.3, r * 0.16),
-            color,
-        );
+    // The tech mark, as `icons.wgsl` draws it (`sd_tech_mark`): a square pip per level
+    // for tech 1 to 3, a bar as wide as three for tech 4, none for a tier 5.
+    let (side, step, top) = (r * 0.26, r * 0.48, c.y + r * 1.04);
+    match tech {
+        1..=3 => {
+            for i in 0..tech {
+                let x = c.x + (i as f32 - (tech as f32 - 1.0) * 0.5) * step;
+                ui.fill(Rect::new(x - side * 0.5, top, side, side), color);
+            }
+        }
+        4 => {
+            let w = step * 2.0 + side;
+            ui.fill(
+                Rect::new(c.x - w * 0.5, top + side * 0.1, w, side * 0.8),
+                color,
+            );
+        }
+        _ => {}
     }
 }
 

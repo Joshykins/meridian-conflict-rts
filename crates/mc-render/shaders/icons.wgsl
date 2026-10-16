@@ -84,6 +84,10 @@ fn vs_icon(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     let left = select(1.0, 2.0 * PAUSE_REACH - 1.0, priority != 0u);
     let right = select(1.0, 2.0 * PAUSE_REACH - 1.0, paused || repeat);
     c.x = mix(-left, right, corner.x * 0.5 + 0.5);
+    // Tech 1 to 4: the quad reaches down under the symbol for the tech mark (`fs_icon`).
+    let tech = select((model.icon >> 8u) & 0xFFu, 0u, (e.owner_flags & STATE_UNIDENTIFIED) != 0u);
+    let bottom = select(1.0, TECH_REACH, tech >= 1u && tech <= 4u);
+    c.y = mix(-bottom, 1.0, corner.y * 0.5 + 0.5);
     let ndc = center.xy / center.w + c * size_px * globals.viewport.zw;
     // Icons ignore depth; keep w so clipping behind the camera still works.
     out.clip = vec4<f32>(ndc * center.w, center.w * 0.5, center.w);
@@ -103,6 +107,8 @@ const ICON_PAUSED: u32 = 0x80000000u;
 const ICON_REPEAT: u32 = 0x40000000u;
 // `IconOut::icon` bits 16..18: the unit's own priority, as `UNIT_PRIORITY_*` numbers it.
 const ICON_PRIORITY_SHIFT: u32 = 16u;
+// A tech 1 to 4 icon's quad runs down to -TECH_REACH; its tech mark sits in the added part.
+const TECH_REACH: f32 = 1.3;
 // A paused icon's quad runs from -1 to 2 * PAUSE_REACH - 1 across; the mark sits in the
 // added part. A prioritised one reaches as far the other way, for its chevron.
 const PAUSE_REACH: f32 = 1.55;
@@ -584,18 +590,34 @@ fn sd_titan_frame(uv: vec2<f32>) -> f32 {
     return min(across, down);
 }
 
+// The tech mark under the symbol (in `uv`): tech 1 to 3 a row of square pips, tech 4 a
+// bar as wide as three; none at 0 or from 5 up. `hud/icons.rs` draws the same.
+fn sd_tech_mark(tech: u32, uv: vec2<f32>) -> f32 {
+    let q = uv - vec2<f32>(0.0, -0.98);
+    if tech == 4u {
+        return sd_box(q, vec2<f32>(0.48, 0.08)) - 0.02;
+    }
+    var d = 1e9;
+    if tech <= 3u {
+        for (var i = 0u; i < tech; i++) {
+            let x = (f32(i) - (f32(tech) - 1.0) * 0.5) * 0.38;
+            d = min(d, sd_box(q - vec2<f32>(x, 0.0), vec2<f32>(0.1)) - 0.02);
+        }
+    }
+    return d;
+}
+
 @fragment
 fn fs_icon(in: IconOut) -> @location(0) vec4<f32> {
     let shape = in.icon & 0xFFu;
     let tech = (in.icon >> 8u) & 0xFFu;
-    // The symbol sits in the upper part; tech pips go underneath.
+    // The symbol sits in the upper part; the tech mark goes underneath.
     let p = (in.uv - vec2<f32>(0.0, 0.12)) / 0.84;
     var d = icon_shape(shape, p);
-    // One pip per tech level, up to 5: five still fit inside the quad with their outline.
-    for (var i = 0u; i < tech && i < 5u; i++) {
-        let x = (f32(i) - (f32(min(tech, 5u)) - 1.0) * 0.5) * 0.3;
-        d = min(d, sd_box(in.uv - vec2<f32>(x, -0.84), vec2<f32>(0.1, 0.07)));
-    }
+    // The tech mark, white so it reads on any team colour: a square pip per level for
+    // tech 1 to 3, a solid bar for tech 4. A tier 5 has its frame instead.
+    let mark = sd_tech_mark(tech, in.uv);
+    d = min(d, mark);
     // A tier 5's corner brackets: drawn paler than the figure, outlined like it.
     var frame = 0.0;
     if is_tier5(shape) {
@@ -645,7 +667,11 @@ fn fs_icon(in: IconOut) -> @location(0) vec4<f32> {
     } else if (in.owner_flags & FLAG_UNDER_CONSTRUCTION) != 0u {
         color = color * 0.45;
     }
-    let icon = mix(mix(vec3<f32>(0.0), color * 1.3, fill), mix(color, vec3<f32>(1.0), 0.55) * 1.3, frame);
+    var icon = mix(mix(vec3<f32>(0.0), color * 1.3, fill), mix(color, vec3<f32>(1.0), 0.55) * 1.3, frame);
+    // The tech mark in white, dimmed with the symbol while it is still being built.
+    let aak = fwidth(mark) * 1.2;
+    let white = select(1.25, 0.56, (in.owner_flags & FLAG_UNDER_CONSTRUCTION) != 0u);
+    icon = mix(icon, vec3<f32>(white), 1.0 - smoothstep(-aak, aak, mark));
     // Construction amber (0xFFA928), a little over one so it holds its own beside team colours.
     let amber = vec3<f32>(1.0, 0.40, 0.024) * 1.35;
     let chev = select(vec3<f32>(0.62, 0.65, 0.70), amber, priority == UNIT_PRIORITY_FIRST);
