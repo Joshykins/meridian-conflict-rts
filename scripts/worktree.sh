@@ -4,7 +4,8 @@
 # breaks your build and your shots never wait on their builds.
 #
 #   scripts/worktree.sh start TOPIC   make ../mc-TOPIC on a new branch TOPIC from
-#                                     dev, with the baked maps; prints its path
+#                                     dev, with the baked maps and the latest
+#                                     checked build; prints its path
 #   scripts/worktree.sh land          from inside the worktree: everything must be
 #                                     committed; rebases onto dev, runs
 #                                     scripts/check.sh, fast-forwards dev to it
@@ -36,6 +37,9 @@ case "$cmd" in
         for m in "$main"/maps/*.mcmap; do
             [[ -e $m ]] && { ln "$m" "$dir/maps/" 2>/dev/null || cp "$m" "$dir/maps/"; }
         done
+        # The latest checked build, before anything builds here by hand and
+        # leaves the seed untaken (scripts/target-seed.sh).
+        "$dir/scripts/target-seed.sh" take >&2
         echo "$dir"
         ;;
     land)
