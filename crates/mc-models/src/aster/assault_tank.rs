@@ -1,6 +1,8 @@
-//! Fulgur: a long, faceted super-heavy hull with a broad centred turret and its
-//! AEB-2 set back between armoured cheeks. A bolt rifle on each flank sponson, and on
-//! the engine deck a rotary AA gun that rests facing aft, raised to the sky.
+//! Fulgur, the super-heavy sniper tank: a long, faceted hull with a broad centred turret
+//! and its AEB-2 set back between armoured cheeks, a gunner's sight beside it. A bolt
+//! rifle on each flank sponson, and on the engine deck a rotary AA gun that rests facing
+//! aft, raised to the sky. Its armour is laid in uneven strakes, the lower hull dark under
+//! a light tier and turret.
 
 use glam::{Affine3A, Vec2, Vec3};
 
@@ -45,6 +47,17 @@ pub(super) fn assault_tank(b: &mut MeshBuilder, _tech: u8) {
     build(b);
 }
 
+/// Paints the main armour: light plate laid in uneven strakes, each its own shade.
+fn armour(b: &mut MeshBuilder) {
+    b.paint(PLATING).pattern(pattern::HULL_PLATE);
+}
+
+/// Paints the lower armour (the outer hull, skirts and sponson boxes): the same
+/// strakes, dark, so the hull reads in two tones under the light tier and turret.
+fn lower(b: &mut MeshBuilder) {
+    b.paint(PLATING_DARK).pattern(pattern::HULL_PLATE);
+}
+
 fn build(b: &mut MeshBuilder) {
     let (inner, outer, _) = TRACK;
     b.set_treads((inner + outer) * 0.5, outer - inner, -18.6);
@@ -55,7 +68,54 @@ fn build(b: &mut MeshBuilder) {
     sponson(b, 1, 1.0);
     sponson(b, 2, -1.0);
     engine_deck(b);
+    if b.fine() {
+        deck_kit(b);
+    }
     turret(b);
+}
+
+/// What the crew live with on the hull: the driver's hatch and periscopes at the
+/// front of the centre tier, and stowage bins on the outer deck aft, clear of the
+/// turret's sweep.
+fn deck_kit(b: &mut MeshBuilder) {
+    b.paint(PLATING_DARK).pattern(pattern::PLAIN);
+    b.prism(v3(11.6, 2.2, DECK - 0.15), 8, 1.0, 0.9, 0.3);
+    b.paint(ACCENT).pattern(pattern::PLAIN);
+    b.cylinder_between(
+        v3(11.0, 1.5, DECK + 0.15),
+        v3(12.2, 1.5, DECK + 0.15),
+        0.08,
+        0.08,
+        6,
+    );
+    for k in 0..3 {
+        let y = 0.9 + k as f32 * 1.1;
+        b.paint(PLATING_DARK).pattern(pattern::PLAIN);
+        b.block(
+            v3(12.6, y - 0.35, DECK - 0.1),
+            v3(13.1, y + 0.35, DECK + 0.3),
+        );
+        b.paint(GLASS);
+        b.block(
+            v3(13.1, y - 0.28, DECK + 0.05),
+            v3(13.14, y + 0.28, DECK + 0.22),
+        );
+    }
+    b.mirror_y(|b| {
+        for (x0, x1) in [(-16.2, -13.4), (-13.1, -10.6)] {
+            b.paint(PLATING_DARK).pattern(pattern::PLAIN);
+            b.chamfered_box(
+                v3((x0 + x1) * 0.5, 9.0, OUTER_DECK + 0.45),
+                v3(x1 - x0, 1.9, 0.9),
+                0.1,
+            );
+            b.paint(ACCENT).pattern(pattern::PLAIN);
+            b.block(
+                v3(x0 + 0.2, 9.96, OUTER_DECK + 0.55),
+                v3(x1 - 0.2, 10.0, OUTER_DECK + 0.65),
+            );
+        }
+    });
 }
 
 /// Two track units each side, a gap between them for the drive.
@@ -211,7 +271,7 @@ fn hull(b: &mut MeshBuilder) {
         v3(FRONT - 0.9, inner, belt + 0.1),
     );
     b.loft_z(&plan, &[Section::new(belt, 0.96), Section::new(band, 1.0)]);
-    b.paint(PLATING);
+    lower(b);
     b.loft_z(
         &plan,
         &[
@@ -221,6 +281,7 @@ fn hull(b: &mut MeshBuilder) {
         ],
     );
     // The centre tier the turret stands on: a second layer of plate, sloped all round.
+    armour(b);
     b.loft_z(
         &hull_plan(-9.2, 13.8, 7.4, 2.6),
         &[
@@ -235,7 +296,7 @@ fn hull(b: &mut MeshBuilder) {
     on_slope(b, glacis.0, glacis.1, 0.45, |b| {
         b.paint(ACCENT);
         b.plate(Vec3::ZERO, v2(1.9, 12.4), 0.14, 0.05);
-        b.paint(PLATING);
+        armour(b);
         b.plate(v3(0.0, 0.0, 0.14), v2(1.6, 11.6), 0.3, 0.12);
     });
     // Team colour flash on the deck behind each sponson, clear of the turret's sweep.
@@ -248,13 +309,12 @@ fn hull(b: &mut MeshBuilder) {
     });
     b.mirror_y(|b| {
         // Skirts over each track's upper run, hung off the frame band.
-        b.paint(PLATING);
         for (x0, x1) in [(-15.8, -1.6), (1.6, 14.9)] {
             // Three plates a run, hung over the upper run so the wheels show under them.
             let step = (x1 - x0) / 3.0;
             for k in 0..3 {
                 let a = x0 + step * k as f32 + 0.08;
-                b.paint(PLATING);
+                lower(b);
                 b.block(
                     v3(a, outer + 0.05, 2.9),
                     v3(a + step - 0.16, outer + 0.4, belt + 0.05),
@@ -268,9 +328,19 @@ fn hull(b: &mut MeshBuilder) {
         }
         // Blue deck-edge strips: the earned emitters, more than any tier below.
         glow_strip(b, v3(-4.0, 9.6, OUTER_DECK), v2(8.0, 0.22), GLOW);
-        // Tow shackles at the nose.
+        // Tow lugs on the tub's nose, a pin through each.
         b.paint(ACCENT);
-        b.block(v3(FRONT - 0.3, 6.0, 2.2), v3(FRONT + 0.25, 6.9, 3.0));
+        let nose = FRONT - 0.9;
+        b.block(v3(nose - 0.1, 5.7, 2.0), v3(nose + 0.5, 5.9, 3.0));
+        b.block(v3(nose - 0.1, 6.6, 2.0), v3(nose + 0.5, 6.8, 3.0));
+        b.paint(METAL);
+        b.cylinder_between(
+            v3(nose + 0.28, 5.6, 2.6),
+            v3(nose + 0.28, 6.9, 2.6),
+            0.13,
+            0.13,
+            8,
+        );
     });
 }
 
@@ -283,7 +353,7 @@ fn sponson(b: &mut MeshBuilder, weapon: usize, side: f32) {
         return;
     }
     // The box, sloped at its face, standing out over the front track.
-    b.paint(PLATING);
+    lower(b);
     let (near, far) = if side > 0.0 {
         (8.0, 12.9)
     } else {
@@ -312,7 +382,7 @@ fn sponson(b: &mut MeshBuilder, weapon: usize, side: f32) {
 
     let pivot = v3(SPONSON.x, y, SPONSON.z);
     b.with_house(weapon, pivot, 0.25, |b| {
-        b.paint(PLATING);
+        armour(b);
         b.at(v3(8.5, y, 0.0), |b| {
             b.loft_z(
                 &turret_plan(4.4, 3.8),
@@ -498,7 +568,7 @@ fn turret(b: &mut MeshBuilder) {
                 &plan,
                 &[Section::new(DECK + 0.2, 0.97), Section::new(8.4, 0.97)],
             );
-            b.paint(PLATING);
+            armour(b);
             b.loft_z(
                 &plan,
                 &[
@@ -511,7 +581,7 @@ fn turret(b: &mut MeshBuilder) {
         // Armoured cheeks either side of the gun, higher than the roof: the gun rides
         // deep between them.
         b.mirror_y(|b| {
-            b.paint(PLATING);
+            armour(b);
             b.at(v3(0.0, 2.3, 0.0), |b| {
                 b.extrude_y_chamfered(
                     &[
@@ -543,6 +613,7 @@ fn turret(b: &mut MeshBuilder) {
             b.paint(PLATING_DARK);
             b.chamfered_box(v3(-7.4, 0.0, roof + 0.3), v3(1.6, 2.2, 0.7), 0.2);
             antenna(b, v3(-7.6, 3.6, roof), 2.4, 0.2);
+            gunsight(b);
             // Smoke dischargers at the front corners.
             b.mirror_y(|b| {
                 b.paint(ACCENT);
@@ -551,6 +622,9 @@ fn turret(b: &mut MeshBuilder) {
                     b.cylinder_between(at, at + v3(0.5, 0.35, 0.3), 0.18, 0.18, 6);
                 }
             });
+        }
+        if b.fine() {
+            turret_kit(b);
         }
         b.with_limb(rig::ARM_GUN | rig::RECOIL, |b| {
             main_gun(b, BREECH, MUZZLE, 1.0)
@@ -569,6 +643,29 @@ fn main_gun(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, r: f32) {
         capacitor(b, length, r);
         crown(b, length, r);
     });
+}
+
+/// The gunner's sight on the right cheek beside the gun: an armoured head on a short
+/// neck, its glass looking down the barrel, a laser rangefinder's lens under it.
+fn gunsight(b: &mut MeshBuilder) {
+    let (x, y, z) = (2.6, -3.0, 12.7);
+    b.paint(PLATING_DARK).pattern(pattern::PLAIN);
+    b.block(
+        v3(x - 0.5, y - 0.3, z - 0.1),
+        v3(x + 0.5, y + 0.3, z + 0.35),
+    );
+    b.paint(PLATING).pattern(pattern::PLAIN);
+    b.chamfered_box(v3(x, y, z + 0.85), v3(2.6, 1.1, 1.0), 0.18);
+    b.paint(GLASS);
+    b.chamfered_box(v3(x + 1.32, y, z + 1.0), v3(0.1, 0.8, 0.45), 0.04);
+    b.paint(ACCENT).pattern(pattern::PLAIN);
+    b.cylinder_between(
+        v3(x + 1.2, y, z + 0.6),
+        v3(x + 1.45, y, z + 0.6),
+        0.2,
+        0.2,
+        8,
+    );
 }
 
 /// An octagonal core, `r0` across, along x.
@@ -591,7 +688,7 @@ fn housing(b: &mut MeshBuilder, length: f32, r: f32) {
     b.loft(
         &[
             ring(&hexagon(r * 1.9, r * 1.8), l(-0.12)),
-            ring(&hexagon(r * 2.1, r * 2.0), l(-0.04)),
+            ring(&hexagon(r * 1.6, r * 1.5), l(-0.04)),
         ],
         true,
         true,
@@ -735,6 +832,27 @@ fn capacitor(b: &mut MeshBuilder, length: f32, r: f32) {
                 r * 0.09,
                 6,
             );
+        }
+    });
+}
+
+/// Spaced armour on the turret's flanks: three plates stood off the wall on dark
+/// brackets, and a grab rail along each side of the roof.
+fn turret_kit(b: &mut MeshBuilder) {
+    b.mirror_y(|b| {
+        for (x0, x1) in [(-5.8, -2.8), (-2.6, 0.2), (0.4, 3.2)] {
+            b.paint(ACCENT).pattern(pattern::PLAIN);
+            for x in [x0 + 0.4, x1 - 0.4] {
+                b.block(v3(x - 0.15, 6.5, 8.6), v3(x + 0.15, 6.95, 9.3));
+            }
+            b.paint(PLATING).pattern(pattern::HULL_PLATE);
+            b.block(v3(x0, 6.95, 8.1), v3(x1, 7.25, 9.85));
+        }
+        b.paint(METAL).pattern(pattern::PLAIN);
+        let (z, y) = (10.7 + 0.35, 4.9);
+        b.cylinder_between(v3(-8.6, y, z), v3(-5.6, y, z), 0.07, 0.07, 6);
+        for x in [-8.6, -7.1, -5.6] {
+            b.cylinder_between(v3(x, y, 10.65), v3(x, y, z), 0.07, 0.07, 6);
         }
     });
 }

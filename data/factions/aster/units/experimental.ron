@@ -3,14 +3,16 @@
 // finished machine drives off it.
 [
     (
-        // A super-heavy assault tank built round the AEB-2, the electric bore scaled up
+        // A super-heavy sniper tank built round the AEB-2, the electric bore scaled up
         // until it no longer aims well: the bolt strays, and the charge sears everything
         // along its channel on the way down, leaving the ground molten behind it. A bolt
         // rifle on each sponson for what gets close, a rotary AA gun on the engine deck
         // that rests facing aft, and a hull field over all of it.
         key: "aster_t4_assault_tank",
         name: "Fulgur",
-        role: "Super-Heavy Assault Tank",
+        role: "Super-Heavy Sniper Tank",
+        // On the build tile over its name, so the role reads at a glance.
+        title: "Sniper Tank",
         tech: 4,
         categories: ["Land", "DirectFire", "Experimental"],
         health: 60000,

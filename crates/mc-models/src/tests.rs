@@ -804,10 +804,11 @@ pub(crate) const REACTOR_TRIANGLES: usize = 8000;
 const FABRICATOR_TRIANGLES: usize = 10000;
 /// The tech 4 Megalodon: a 110 m experimental submarine, under the Leviathan's budget.
 const SUBMARINE_TITAN_TRIANGLES: usize = 8000;
-/// The tech 4 assault tank runs on four open track units (road wheels, toothed
-/// sprockets, return rollers seen through the side) and carries two bolt rifles and the
-/// capacitor-fed AEB-2, and finned heat sinks.
-const ASSAULT_TANK_TRIANGLES: usize = 9200;
+/// The tech 4 sniper tank (the Fulgur) runs on four open track units (road wheels,
+/// toothed sprockets, return rollers seen through the side) and carries two bolt rifles
+/// and the capacitor-fed AEB-2, finned heat sinks, spaced turret armour, a gunner's
+/// sight, the driver's periscopes and stowage bins.
+const ASSAULT_TANK_TRIANGLES: usize = 10000;
 /// The ARC Commander, one a player and the faction's hero: armour plated over its
 /// machinery, and every refit's pieces on it at once.
 const COMMANDER_TRIANGLES: usize = 6000;
