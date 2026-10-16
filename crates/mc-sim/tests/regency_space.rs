@@ -408,9 +408,9 @@ fn destroyers_core_charges_before_the_lance_lights() {
 }
 
 #[test]
-fn destroyers_lance_charges_only_once_laid_and_lights_as_it_fills() {
-    // The mark astern: the hull must come round before the lance bears. The charge waits
-    // for it, and the beam lights as the charge fills, not seconds after.
+fn destroyers_lance_lays_at_once_and_lights_as_it_fills() {
+    // The mark astern: nothing visible turns to aim the lance, so it lays onto the mark at
+    // once (`lays_at_once`) and charges, and the beam lights as the charge fills.
     let mut w = world();
     let ship = add(&mut w, "regency_t4_space_destroyer", 0, 500, 700);
     let tank = add(&mut w, "aster_t4_assault_tank", 1, -200, 700);
@@ -439,12 +439,9 @@ fn destroyers_lance_charges_only_once_laid_and_lights_as_it_fills() {
         }
     }
     let (start, lit) = (start.expect("never charged"), lit.expect("never lit"));
+    assert!(start <= 2, "it began to charge only on tick {start}");
     assert!(
-        start > 30,
-        "it charged on tick {start}, before the hull came round"
-    );
-    assert!(
-        lit - start < spin_ticks + 3,
+        lit < spin_ticks + 3,
         "charged from tick {start}, lit on {lit}: a {spin_ticks}-tick charge"
     );
 }

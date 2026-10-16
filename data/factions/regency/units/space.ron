@@ -146,7 +146,8 @@
         anti_missile_mounts: [(270, 22.75, 88.5), (-110, 61, 110.5), (270, -22.75, 88.5), (-110, -61, 110.5)],
         weapons: [
             // One held beam laid from the lower lens of the energy core in the drum through
-            // the ship's middle (nothing turns: the beam is aimed from the lens). The core
+            // the ship's middle (nothing turns: the beam is aimed from the lens, so dark it lays
+            // onto a mark at once, `lays_at_once`, and only drags at its rate once lit). The core
             // charges (`spin_up`) before the beam lights, and winds down when it has nothing
             // left. It fires down its line (`sweep`): locked on, it holds on the mark; when
             // the mark dies it stays lit as it slowly drags across the ground onto the next,
@@ -154,7 +155,7 @@
             (
                 name: "Edict Lance", damage: 160, splash: 20, range: 2200, reload: 0.1,
                 hitscan: true, beam: true, edict_beam: true, trajectory: Direct, spin_up: 3.0,
-                turret_turn: 12, muzzle: (0, 0, 15.2), sweep: 10,
+                turret_turn: 12, lays_at_once: true, muzzle: (0, 0, 15.2), sweep: 10,
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
                 plasma_grade: Some(PinchFusion), flash: 0.4, impact: 3.2, tracer: 36.0,
                 sounds: (

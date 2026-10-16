@@ -243,6 +243,13 @@ impl World {
             units.weapon_salvo_left[row][w] = 0;
             return Ok(());
         };
+        // How far it may traverse and pitch this tick: a gun that nothing visible turns
+        // (`Weapon::lays_at_once`) lays at once until it is lit, then drags at its rate.
+        let traverse = if weapon.lays_at_once && !units.streaming[row] {
+            0x8000
+        } else {
+            weapon.turret_turn
+        };
 
         // Heard charging a fixed time before the salvo is due. During a reload that
         // is presentation only: the countdown is already the wait. The first shot,
@@ -512,10 +519,13 @@ impl World {
                     crate::world::pitch_to(yaw_origin.distance(aim), rise)
                 }
             };
-            let rate = if weapon.trajectory == Trajectory::Ballistic || weapon.missile {
-                weapon.turret_turn
+            let rate = if weapon.trajectory == Trajectory::Ballistic
+                || weapon.missile
+                || traverse != weapon.turret_turn
+            {
+                traverse
             } else {
-                weapon.turret_turn / 2
+                traverse / 2
             };
             units.arm_pitch[row][slot] = units.arm_pitch[row][slot].turn_toward(want, rate);
             if weapon.trajectory == Trajectory::Ballistic || weapon.missile {
@@ -721,10 +731,10 @@ impl World {
                     let limit = half_arc as i32;
                     let from = (Angle::ZERO.delta_to(held - base) as i32).clamp(-limit, limit);
                     let to = Angle::ZERO.delta_to(want) as i32;
-                    let step = weapon.turret_turn as i32;
+                    let step = traverse as i32;
                     base + Angle((from + (to - from).clamp(-step, step)) as i16 as u16)
                 } else {
-                    held.turn_toward(want + base, weapon.turret_turn)
+                    held.turn_toward(want + base, traverse)
                 }
             };
             if on_body {

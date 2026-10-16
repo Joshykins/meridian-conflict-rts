@@ -156,6 +156,8 @@ pub struct Weapon {
     pub great_gun: f32,
     /// Stays laid where it last aimed while it has nothing to shoot (`RawWeapon::keeps_aim`).
     pub keeps_aim: bool,
+    /// Lays onto its mark at once while it is not firing (`RawWeapon::lays_at_once`).
+    pub lays_at_once: bool,
     /// The widest circle a `Bombard` order may spread this gun's shots over, metres
     /// (`RawWeapon::bombard`); never under `BOMBARD_RADIUS`.
     pub bombard_radius: Fx,

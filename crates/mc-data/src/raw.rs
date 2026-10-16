@@ -1279,6 +1279,11 @@ pub struct RawWeapon {
     /// coming back to rest.
     #[serde(default)]
     pub keeps_aim: bool,
+    /// Nothing turns to aim it (a beam laid from a lens in the hull, the Edict Lance): while
+    /// it is not firing it lays onto its mark at once, so it never waits on a traverse no
+    /// one can see. Once lit, its stroke is held to `turret_turn` as it drags.
+    #[serde(default)]
+    pub lays_at_once: bool,
     /// Metres: the widest circle a `Bombard` order may spread this gun's shots over.
     /// Below `BOMBARD_RADIUS` (the default, zero) it is that: a map gun is given more.
     #[serde(default)]
@@ -2252,6 +2257,7 @@ impl Unit {
                 flat_fire: w.flat_fire,
                 great_gun: w.great_gun.clamp(0.0, 4.0) as f32,
                 keeps_aim: w.keeps_aim,
+                lays_at_once: w.lays_at_once,
                 bombard_radius: fx(w.bombard.clamp(crate::weapon::BOMBARD_RADIUS, 6000.0)),
                 caliber: w.caliber.clamp(0.0, 20.0) as f32,
                 plasma_grade: w.plasma_grade,
