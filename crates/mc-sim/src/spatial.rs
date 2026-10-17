@@ -43,14 +43,6 @@ const UNIT_KINDS: u8 = kind::UNIT | kind::AIRCRAFT;
 /// `Entry::owner` of what no player owns (wrecks, stains, props).
 pub const NO_OWNER: u8 = u8::MAX;
 
-const EMPTY: Entry = Entry {
-    kind: 0,
-    owner: NO_OWNER,
-    row: 0,
-    pos: FxVec2::ZERO,
-    radius: Fx::ZERO,
-};
-
 /// The layers as (cell edge shift, largest radius held): 16 m cells for
 /// anything up to 16 m (units, wrecks, stains), 64 m cells up to 64 m
 /// (structures, big hulls), 256 m cells up to 400 m (titans, capital ships),
@@ -91,7 +83,9 @@ struct Layer {
     sorted: Vec<Entry>,
     cell_x: Vec<u32>,
     staged: Vec<(u32, u32, Entry)>,
-    scratch: Vec<(u32, u32, Entry)>,
+    /// `build`'s two orders of `staged`, by index.
+    by_column: Vec<u32>,
+    by_row: Vec<u32>,
     counts: Vec<u32>,
     max_radius: Fx,
     /// Cleared or staged since the last `build`; a layer left alone keeps what it holds.
@@ -108,7 +102,8 @@ impl Layer {
             sorted: Vec::new(),
             cell_x: Vec::new(),
             staged: Vec::new(),
-            scratch: Vec::new(),
+            by_column: Vec::new(),
+            by_row: Vec::new(),
             counts: Vec::new(),
             max_radius: Fx::ZERO,
             dirty: true,
@@ -142,32 +137,38 @@ impl Layer {
             self.cell_x.clear();
             return;
         }
-        self.scratch.clear();
-        self.scratch.resize(n, (0, 0, EMPTY));
+        // Indices go through the sorts, not entries: a tenth of the bytes moved, and a
+        // battle of a hundred thousand builds a dozen layers three times a tick.
+        let staged = &self.staged;
+        self.by_row.clear();
+        self.by_row.extend(0..n as u32);
+        self.by_column.clear();
+        self.by_column.resize(n, 0);
         stable_scatter(
-            &self.staged,
-            &mut self.scratch,
+            &self.by_row,
+            &mut self.by_column,
             &mut self.counts,
             self.width,
-            |e| e.0,
+            |i| staged[i as usize].0,
         );
-        self.staged.clear();
-        self.staged.resize(n, (0, 0, EMPTY));
         stable_scatter(
-            &self.scratch,
-            &mut self.staged,
+            &self.by_column,
+            &mut self.by_row,
             &mut self.counts,
             self.height,
-            |e| e.1,
+            |i| staged[i as usize].1,
         );
         self.row_start.clear();
         self.row_start.extend_from_slice(&self.counts);
         self.sorted.clear();
         self.cell_x.clear();
-        for &(x, _, e) in &self.staged {
+        for &i in &self.by_row {
+            let (x, _, e) = staged[i as usize];
             self.sorted.push(e);
             self.cell_x.push(x);
         }
+        // `staged` stays in insertion order: entries added before the next build land
+        // after these in their cells, as they did when it was left sorted.
     }
 
     /// Visits the entries of cells `x0..=x1` by `y0..=y1`; false from `visit` stops.
@@ -270,24 +271,24 @@ fn owner_bit(owner: u8) -> PlayerMask {
 /// Stable counting sort of `from` into `to` by `key(e)` in `0..buckets`;
 /// leaves `counts` as the bucket starts (length `buckets + 1`).
 fn stable_scatter(
-    from: &[(u32, u32, Entry)],
-    to: &mut [(u32, u32, Entry)],
+    from: &[u32],
+    to: &mut [u32],
     counts: &mut Vec<u32>,
     buckets: u32,
-    key: impl Fn(&(u32, u32, Entry)) -> u32,
+    key: impl Fn(u32) -> u32,
 ) {
     counts.clear();
     counts.resize(buckets as usize + 1, 0);
-    for e in from {
+    for &e in from {
         counts[key(e) as usize + 1] += 1;
     }
     for i in 1..counts.len() {
         counts[i] += counts[i - 1];
     }
     let mut cursor = counts[..buckets as usize].to_vec();
-    for e in from {
+    for &e in from {
         let c = &mut cursor[key(e) as usize];
-        to[*c as usize] = *e;
+        to[*c as usize] = e;
         *c += 1;
     }
 }
