@@ -102,51 +102,60 @@ impl World {
             let mut pushed_any = false;
             for (turn, ran) in turns.iter().zip(&mut ran) {
                 step += 1;
-                let mut live: Vec<usize> = (0..turn.len())
+                let span = mc_core::perf_span!("contacts.live");
+                let live: Vec<usize> = (0..turn.len())
                     .filter(|&t| {
                         let (when, pushed) = ran[t];
                         pushed || turn[t].units.iter().any(|&k| moved[k] > when)
                     })
                     .collect();
                 mc_core::perf_count!("move.tile_runs", live.len());
-                // Biggest first, a tile at a time: the workers take them in turn, and
-                // a crowd's dense tile no longer leaves the rest waiting on its chunk.
-                // The tiles of a turn share no hull, so the order changes nothing.
-                live.sort_by_key(|&t| std::cmp::Reverse(turn[t].pairs.len()));
-                let chunk = 1;
-                let done: Vec<Vec<(bool, Vec<FxVec2>)>> =
-                    self.pool
-                        .parallel_map_chunks(live.len(), chunk, |_, range| {
-                            let _work = mc_core::perf_span!("contacts.tile_work");
-                            live[range]
-                                .iter()
-                                .map(|&t| {
-                                    let tile = &turn[t];
-                                    let mut any = false;
-                                    let mut local: Vec<FxVec2> =
-                                        tile.units.iter().map(|&k| at[k]).collect();
-                                    for &(a, b) in &tile.pairs {
-                                        let (a, b) = (a as usize, b as usize);
-                                        let (pa, pb) = (local[a], local[b]);
-                                        if let Some((pa, pb)) =
-                                            self.push_pair(&tile.hulls[a], &tile.hulls[b], pa, pb)
-                                        {
-                                            any = true;
-                                            (local[a], local[b]) = (pa, pb);
-                                        }
+                // The tiles of a turn share no hull, so the order they run and land in
+                // changes nothing. They go out in a few batches a worker, not a tile a
+                // job (a big battle's 27 000 tile runs a tick each paid a job's handing
+                // out and gathering for a few dozen pushes), the batches even: biggest
+                // tile first, each to the lightest batch so far.
+                let batches = batch_tiles(&live, |t| turn[t].pairs.len(), self.pool.thread_count());
+                drop(span);
+                let done: Vec<Vec<(usize, bool, Vec<(usize, FxVec2)>)>> =
+                    self.pool.parallel_map_chunks(batches.len(), 1, |b, _| {
+                        let _work = mc_core::perf_span!("contacts.tile_work");
+                        batches[b]
+                            .iter()
+                            .map(|&t| {
+                                let tile = &turn[t];
+                                let mut any = false;
+                                let mut local: Vec<FxVec2> =
+                                    tile.units.iter().map(|&k| at[k]).collect();
+                                for &(a, b) in &tile.pairs {
+                                    let (a, b) = (a as usize, b as usize);
+                                    let (pa, pb) = (local[a], local[b]);
+                                    if let Some((pa, pb)) =
+                                        self.push_pair(&tile.hulls[a], &tile.hulls[b], pa, pb)
+                                    {
+                                        any = true;
+                                        (local[a], local[b]) = (pa, pb);
                                     }
-                                    (any, local)
-                                })
-                                .collect()
-                        });
-                for (&t, (any, local)) in live.iter().zip(done.into_iter().flatten()) {
+                                }
+                                // Only the hulls it moved go back.
+                                let moved: Vec<(usize, FxVec2)> = tile
+                                    .units
+                                    .iter()
+                                    .zip(local)
+                                    .filter(|&(&k, pos)| at[k] != pos)
+                                    .map(|(&k, pos)| (k, pos))
+                                    .collect();
+                                (t, any, moved)
+                            })
+                            .collect()
+                    });
+                let _span = mc_core::perf_span!("contacts.merge");
+                for (t, any, shifted) in done.into_iter().flatten() {
                     pushed_any |= any;
                     ran[t] = (step, any);
-                    for (&k, pos) in turn[t].units.iter().zip(local) {
-                        if at[k] != pos {
-                            at[k] = pos;
-                            moved[k] = step;
-                        }
+                    for (k, pos) in shifted {
+                        at[k] = pos;
+                        moved[k] = step;
                     }
                 }
             }
@@ -284,6 +293,27 @@ impl World {
     pub(crate) fn give_way(&self, row: usize, other: usize) -> Fx {
         share(self.crowd_mass(row), self.crowd_mass(other))
     }
+}
+
+/// The `live` tiles shared out into a few batches for each of `threads` workers, as
+/// even as their sizes allow: biggest first (ties to the lower tile), each into the
+/// lightest batch so far (ties to the lower batch).
+fn batch_tiles(live: &[usize], size: impl Fn(usize) -> usize, threads: usize) -> Vec<Vec<usize>> {
+    use std::cmp::Reverse;
+    let count = (threads.max(1) * 4).min(live.len());
+    let mut order = live.to_vec();
+    order.sort_by_key(|&t| (Reverse(size(t)), t));
+    let mut lightest: std::collections::BinaryHeap<Reverse<(usize, usize)>> =
+        (0..count).map(|b| Reverse((0, b))).collect();
+    let mut batches = vec![Vec::new(); count];
+    for t in order {
+        let Some(Reverse((load, b))) = lightest.pop() else {
+            break;
+        };
+        batches[b].push(t);
+        lightest.push(Reverse((load + size(t).max(1), b)));
+    }
+    batches
 }
 
 /// [`World::give_way`] from the two crowd masses.
