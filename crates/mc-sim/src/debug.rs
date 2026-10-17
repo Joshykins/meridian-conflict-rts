@@ -59,22 +59,54 @@ impl World {
                         rows.push(self.spawn_unit(*blueprint, *owner, site, *heading, true)?);
                     }
                 } else {
-                    // A square block centred on `pos`.
+                    // A square block centred on `pos`, row by row. A place where the
+                    // hull cannot stand (a ship on a headland, a tank in the sea) is
+                    // passed over, and the block takes as many places again from the
+                    // rings round it, nearest first, so a block across a shore wraps
+                    // onto ground it can stand on. Sending each such hull to its nearest
+                    // standable point instead piled hundreds of them onto one cell,
+                    // sunk into each other for good: a pile of 300 is 45 000 hull
+                    // contacts a tick.
                     let n = (*count).clamp(1, crate::command::MAX_DEBUG_SPAWN) as i32;
                     let cols = (Fx::from_int(n).sqrt().ceil_int()).max(1);
                     let spacing = bp.radius * 2 + Fx::from_int(3);
-                    for i in 0..n {
-                        let offset = FxVec2::new(
-                            spacing * (i % cols - cols / 2),
-                            spacing * (i / cols - cols / 2),
-                        );
-                        let p = self.clamp_to_map(*pos + offset);
-                        // A hull put down where it cannot stand (a ship on a headland
-                        // or in a shallow) goes on the nearest ground it can.
-                        let p = bp
-                            .motion
-                            .and_then(|m| self.nav.nearest_passable(m.layer, m.size_class, p))
-                            .unwrap_or(p);
+                    let place = |x: i32, y: i32| {
+                        self.clamp_to_map(*pos + FxVec2::new(spacing * x, spacing * y))
+                    };
+                    let stands = |p: FxVec2| {
+                        bp.motion
+                            .is_none_or(|m| self.nav.passable(m.layer, m.size_class, p))
+                    };
+                    // Whether the block's own rows hold the place `x, y` from the middle.
+                    let in_block = |x: i32, y: i32| {
+                        let (c, r) = (x + cols / 2, y + cols / 2);
+                        (0..cols).contains(&c) && r >= 0 && r * cols + c < n
+                    };
+                    let mut places: Vec<FxVec2> = (0..n)
+                        .map(|i| place(i % cols - cols / 2, i / cols - cols / 2))
+                        .filter(|&p| stands(p))
+                        .collect();
+                    // A deliberate bound: rings out to two blocks wide. Past that the
+                    // ground is mostly what the hull cannot stand on, and the block is
+                    // put down short (a cheat; the spawn is all it does).
+                    'rings: for r in 1..=cols + 1 {
+                        if places.len() == n as usize {
+                            break;
+                        }
+                        let ring = (-r..=r)
+                            .flat_map(|i| [(i, -r), (i, r)])
+                            .chain(((1 - r)..r).flat_map(|i| [(-r, i), (r, i)]));
+                        for (x, y) in ring.filter(|&(x, y)| !in_block(x, y)) {
+                            let p = place(x, y);
+                            if stands(p) {
+                                places.push(p);
+                                if places.len() == n as usize {
+                                    break 'rings;
+                                }
+                            }
+                        }
+                    }
+                    for p in places {
                         rows.push(self.spawn_unit(*blueprint, *owner, p, *heading, true)?);
                     }
                 }
