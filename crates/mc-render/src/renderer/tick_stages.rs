@@ -424,12 +424,29 @@ mod tests {
         let mut events: Vec<SimEvent> = (0..SMALL_EVENTS as i32 + 50).map(|x| shot(0, x)).collect();
         events.push(shot(1, 1000));
         events.push(shot(1, 1_000_000));
-        let drawn = drawn_events(&events, Vec3::ZERO, 5000.0, |_| true, |b, _| b.0 == 1);
+        let drawn = drawn_events(&events, Vec3::ZERO, 100_000.0, |_| true, |b, _| b.0 == 1);
         assert_eq!(drawn.iter().filter(|&&d| d).count(), SMALL_EVENTS + 2);
         assert!(drawn[drawn.len() - 2] && drawn[drawn.len() - 1]);
         assert!(
             !drawn[SMALL_EVENTS + 10],
             "a far ordinary shot over the cap is drawn"
+        );
+    }
+
+    /// A shot the view cannot take in is not drawn, and does not count against the cap.
+    #[test]
+    fn shots_out_of_view_are_not_drawn() {
+        let events: Vec<SimEvent> = (0..10).map(|x| shot(0, x * 100)).collect();
+        let drawn = drawn_events(
+            &events,
+            Vec3::ZERO,
+            100_000.0,
+            |at| at.x < 450.0,
+            |_, _| false,
+        );
+        assert_eq!(
+            drawn,
+            [true, true, true, true, true, false, false, false, false, false]
         );
     }
 
