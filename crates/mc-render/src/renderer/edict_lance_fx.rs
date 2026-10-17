@@ -190,7 +190,29 @@ impl EdictLances {
     /// coming tick (`tick_seconds`) in `deploy` (last tick's in `prev_deploy`), which the
     /// entity shader turns them by. A ship with an Edict Lance carries its guns on houses
     /// of their own and has nothing to deploy, so both are free for this.
-    pub(super) fn patch(&mut self, units: &mut [UnitInstance], time: f32, tick_seconds: f32) {
+    pub(super) fn patch_cow<'a>(
+        &mut self,
+        mut units: std::borrow::Cow<'a, [UnitInstance]>,
+        time: f32,
+        tick_seconds: f32,
+    ) -> std::borrow::Cow<'a, [UnitInstance]> {
+        // Copied only when a ship among them has a lance: copying every instance for it
+        // was most of a 100 000 unit tick's upload.
+        let cores = &self.cores;
+        let carried = |u: &UnitInstance| {
+            matches!(cores.get(u.blueprint as usize), Some(Some(_)))
+                && u.owner_flags & (KIND_WRECK | KIND_GHOST) == 0
+        };
+        if !units.iter().any(carried) {
+            self.turns.clear();
+            return units;
+        }
+        self.patch(units.to_mut(), time, tick_seconds);
+        units
+    }
+
+    /// [`patch_cow`](Self::patch_cow) on instances already copied.
+    fn patch(&mut self, units: &mut [UnitInstance], time: f32, tick_seconds: f32) {
         let dt = tick_seconds.clamp(0.02, 0.5);
         let ease = 1.0 - (-dt / TURN_INERTIA).exp();
         let mut turns = Vec::with_capacity(self.turns.len());

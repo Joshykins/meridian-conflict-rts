@@ -3338,10 +3338,10 @@ impl Renderer {
             self.tick_seconds,
         );
         // An Edict Lance's charge in its hull (`edict_lance_fx`).
-        let mut patched = patched;
-        self.plasma_fx
+        let patched = self
+            .plasma_fx
             .cores
-            .patch(patched.to_mut(), time, self.tick_seconds);
+            .patch_cow(patched, time, self.tick_seconds);
         drop(patch);
         let write = mc_core::perf_span!("inst.write");
         self.dynamic.write(0, bytemuck::cast_slice(&patched));
