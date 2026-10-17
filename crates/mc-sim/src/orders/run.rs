@@ -98,7 +98,7 @@ impl World {
             if self.state.units.has_flag(row, flag::HAS_FIELD) {
                 self.stop_moving(row);
             }
-            let _span = mc_core::perf_span!("orders.idle");
+            mc_core::perf_count!("orders.idle");
             if self.idle_air_land(row)? {
                 return Ok(());
             }
@@ -108,12 +108,14 @@ impl World {
             return Ok(());
         };
         match o.kind {
+            // Counted, not timed: a timer read twice for each of a hundred thousand units
+            // was most of what the phase cost them (`sim.orders` times the whole loop).
             OrderKind::Move | OrderKind::AttackMove => {
-                let _span = mc_core::perf_span!("orders.move");
+                mc_core::perf_count!("orders.move");
                 self.run_move(row, &o, fights)?
             }
             OrderKind::Attack => {
-                let _span = mc_core::perf_span!("orders.attack");
+                mc_core::perf_count!("orders.attack");
                 self.run_attack(row, &o)?
             }
             OrderKind::Build => self.run_build(row, &o)?,
