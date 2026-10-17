@@ -168,7 +168,7 @@ else
     if [[ -n $last ]] && git rev-parse -q --verify "$last^{commit}" >/dev/null; then
         range=$last..$commit
     fi
-    git log --no-merges --format=%s "$range" | head -n 40 \
+    git log --no-merges --format=%s -n 40 "$range" \
         | sed -e 's/:.*//' -e 's/^/- /' >"$notes"
     echo "patch notes for $build (drafted from ${range}; pass --notes FILE to write them):"
     sed 's/^/    /' "$notes"
