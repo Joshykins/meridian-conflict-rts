@@ -1032,10 +1032,6 @@ impl World {
                 (row, s.wrecks.pos[row], radius)
             }),
         );
-        self.index.restage(
-            kind::STAIN,
-            (0..s.stains.len()).map(|row| (row, s.stains.pos[row], s.stains.radius[row])),
-        );
         self.index.build_on(&self.pool);
         self.list_shielded();
     }

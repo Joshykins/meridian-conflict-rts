@@ -1099,26 +1099,18 @@ impl World {
         if self.terrain.height_at(pos) < self.terrain.water_level() {
             return;
         }
-        // A hit well inside a mark already there deepens it: within half its radius, a
-        // long battle's front filled the table and the oldest marks went from the ground.
-        let mut existing = None;
-        self.index.query(pos, Fx::ZERO, kind::STAIN, |e| {
-            let near = e.radius * 3 / 4;
-            if e.pos.distance_sq(pos) <= near * near && e.radius >= radius / 2 {
-                existing = Some(e.row as usize);
-                return false;
-            }
-            true
-        });
+        // A hit well inside a mark already there deepens it (`Stains::landing_in`):
+        // within only half its radius, a long battle's front filled the table and the
+        // oldest marks went from the ground.
         let stains = &mut self.state.stains;
-        match existing {
-            Some(i) if i < stains.len() => {
+        match stains.landing_in(pos, radius) {
+            Some(i) => {
                 stains.strength[i] = stains.strength[i].saturating_add(strength / 2);
-                stains.radius[i] = stains.radius[i].max(radius);
+                stains.widen(i, radius);
             }
-            _ => {
+            None => {
                 let seed = self.state.rng.next_u32() as u16;
-                stains.push(pos, radius, strength, seed);
+                self.state.stains.push(pos, radius, strength, seed);
             }
         }
     }

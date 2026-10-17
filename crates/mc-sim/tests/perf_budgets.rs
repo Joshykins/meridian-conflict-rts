@@ -386,8 +386,8 @@ fn eight_armies_clash() {
 
 /// A late match's ground: 6 000 wrecks and a full table of scorch marks round two
 /// armies of 400 fighting, as the user's survival marks of 2026-10-15 had it. The
-/// index keeps the wrecks' and marks' grids while they lie still
-/// (`SpatialIndex::restage`), and only units go in the big-entry grids: rebuilt every
+/// index keeps the wrecks' grids while they lie still (`SpatialIndex::restage`), the
+/// marks keep a grid of their own (`Stains`), and only units go in the big-entry grids: rebuilt every
 /// time and in every grid, they were 28% of that match's tick.
 #[test]
 fn a_late_battlefield() {
@@ -425,7 +425,9 @@ fn a_late_battlefield() {
         })
         .unwrap();
     mc_sim::perf::save(&report);
-    // About 2.3 ms; it was 7.7 when both rebuilds of a tick staged every wreck and mark.
+    // About 0.7 ms: scorch marks keep a grid of their own (`Stains::landing_in`) and the
+    // index restages only still wrecks. It was 7.7 when both rebuilds of a tick staged
+    // every wreck and mark.
     mc_sim::perf::budget(&report, &[("fn.rebuild_index", 4.0), ("sim.tick", 60.0)]);
 }
 

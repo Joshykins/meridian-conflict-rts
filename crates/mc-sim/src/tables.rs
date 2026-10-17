@@ -1301,9 +1301,87 @@ pub struct Stains {
     /// With the table full, the row the next mark replaces.
     #[serde(default)]
     pub oldest: u32,
+    /// The rows whose mark reaches into each `STAIN_CELL`, for finding the mark a hit
+    /// lands in (`landing_in`). Worked out from the table, not part of it: not saved or
+    /// hashed, and made on first use (`cells_built`). Kept up as marks come and grow, so
+    /// the tick never looks the whole table over: as an index rebuilt each tick, a
+    /// battlefield's 65 536 marks cost every tick a millisecond and more.
+    #[serde(skip)]
+    cells: std::collections::BTreeMap<(i32, i32), Vec<u32>>,
+    #[serde(skip)]
+    cells_built: bool,
 }
 
+/// Edge of the cells a mark is found by: 32 m (`1 << STAIN_CELL_SHIFT`).
+const STAIN_CELL_SHIFT: i32 = 5;
+
 impl Stains {
+    /// The cells mark `row` reaches into.
+    fn cells_of(&self, row: usize) -> impl Iterator<Item = (i32, i32)> {
+        let (p, r) = (self.pos[row], self.radius[row]);
+        let lo = |v: Fx| (v - r).floor_int() >> STAIN_CELL_SHIFT;
+        let hi = |v: Fx| (v + r).floor_int() >> STAIN_CELL_SHIFT;
+        let (x0, x1, y0, y1) = (lo(p.x), hi(p.x), lo(p.y), hi(p.y));
+        (x0..=x1).flat_map(move |x| (y0..=y1).map(move |y| (x, y)))
+    }
+
+    fn link(&mut self, row: usize) {
+        for c in self.cells_of(row).collect::<Vec<_>>() {
+            self.cells.entry(c).or_default().push(row as u32);
+        }
+    }
+
+    fn unlink(&mut self, row: usize) {
+        for c in self.cells_of(row).collect::<Vec<_>>() {
+            if let Some(rows) = self.cells.get_mut(&c) {
+                rows.retain(|&k| k as usize != row);
+                if rows.is_empty() {
+                    self.cells.remove(&c);
+                }
+            }
+        }
+    }
+
+    /// The mark a hit of `radius` at `pos` deepens rather than adding its own: one at
+    /// least half its size, within three quarters of its own radius of the hit; the
+    /// lowest row of those.
+    pub(crate) fn landing_in(&mut self, pos: FxVec2, radius: Fx) -> Option<usize> {
+        if !self.cells_built {
+            self.cells.clear();
+            for row in 0..self.len() {
+                self.link(row);
+            }
+            self.cells_built = true;
+        }
+        let cell = (
+            pos.x.floor_int() >> STAIN_CELL_SHIFT,
+            pos.y.floor_int() >> STAIN_CELL_SHIFT,
+        );
+        self.cells
+            .get(&cell)?
+            .iter()
+            .map(|&k| k as usize)
+            .filter(|&k| {
+                let near = self.radius[k] * 3 / 4;
+                self.pos[k].distance_sq(pos) <= near * near && self.radius[k] >= radius / 2
+            })
+            .min()
+    }
+
+    /// Mark `row` grown to `radius`, if that is wider.
+    pub(crate) fn widen(&mut self, row: usize, radius: Fx) {
+        if radius <= self.radius[row] {
+            return;
+        }
+        if self.cells_built {
+            self.unlink(row);
+        }
+        self.radius[row] = radius;
+        if self.cells_built {
+            self.link(row);
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.pos.len()
     }
@@ -1321,15 +1399,25 @@ impl Stains {
             mc_core::perf_count!("stains.recycled");
             let i = self.oldest as usize % self.len();
             self.oldest = ((i + 1) % self.len()) as u32;
+            if self.cells_built {
+                self.unlink(i);
+            }
             (self.pos[i], self.radius[i]) = (pos, radius);
             (self.strength[i], self.seed[i]) = (strength, seed);
+            if self.cells_built {
+                self.link(i);
+            }
             return i;
         }
         self.pos.push(pos);
         self.radius.push(radius);
         self.strength.push(strength);
         self.seed.push(seed);
-        self.len() - 1
+        let row = self.len() - 1;
+        if self.cells_built {
+            self.link(row);
+        }
+        row
     }
 
     pub fn hash(&self, h: &mut StateHasher) {
