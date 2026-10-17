@@ -202,7 +202,7 @@ impl World {
                 ))
             })
             .collect();
-        let mut spots = SpatialIndex::new(self.terrain.size_metres());
+        let mut spots = SpatialIndex::narrow(self.terrain.size_metres());
         for (i, hull) in hulls.iter().enumerate() {
             if let Some((radius, ..)) = *hull {
                 spots.insert(kind::UNIT, NO_OWNER, i, at[i], radius);

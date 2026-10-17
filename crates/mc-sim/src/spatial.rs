@@ -354,6 +354,9 @@ pub struct SpatialIndex {
     /// built from: (row, centre, radius).
     statics: Vec<(u8, Vec<StaticEntry>)>,
     static_scratch: Vec<StaticEntry>,
+    /// For near searches alone (`SpatialIndex::narrow`): entries go in their size's grid
+    /// only, not the coarse or big-entry ones.
+    narrow: bool,
 }
 
 type StaticEntry = (u32, FxVec2, Fx);
@@ -374,6 +377,17 @@ impl SpatialIndex {
             by_owner: Vec::new(),
             statics: Vec::new(),
             static_scratch: Vec::new(),
+            narrow: false,
+        }
+    }
+
+    /// An index for near searches only (under `WIDE_QUERY`, and never by size): it keeps
+    /// no coarse grid and no big-entry grids, so it builds in half the time. Hull contacts
+    /// index every proposed spot afresh each tick, and asked nothing else of it.
+    pub(crate) fn narrow(map_size: FxVec2) -> SpatialIndex {
+        SpatialIndex {
+            narrow: true,
+            ..SpatialIndex::new(map_size)
         }
     }
 
@@ -506,6 +520,10 @@ impl SpatialIndex {
             }
         }
         let grids = Self::grids_of(&mut self.kinds, kind, self.map_size);
+        if self.narrow {
+            stage(&mut grids.layers[at]);
+            return;
+        }
         // Only units are searched by size (`query_wider`): a battle's wrecks and scorch
         // marks would fill the big-entry grids for nothing.
         let wider = BIG_FLOORS
@@ -608,6 +626,10 @@ impl SpatialIndex {
         friends: PlayerMask,
         mut visit: impl FnMut(&Entry) -> bool,
     ) {
+        debug_assert!(
+            !self.narrow || radius < WIDE_QUERY,
+            "a narrow index has no coarse grid"
+        );
         let (mut tested, mut hits, mut cells) = (0u64, 0u64, 0i64);
         mc_core::perf_count!("spatial.queries");
         // Only units have owners: a search for them alone asks the owner map
@@ -678,6 +700,7 @@ impl SpatialIndex {
         mut visit: impl FnMut(&Entry) -> bool,
     ) {
         debug_assert!(kinds & !UNIT_KINDS == 0, "only units have big-entry grids");
+        debug_assert!(!self.narrow, "a narrow index has no big-entry grids");
         let floor = BIG_FLOORS
             .iter()
             .rposition(|&floor| Fx::from_int(floor) <= wider_than);
