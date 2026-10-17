@@ -1323,7 +1323,7 @@ impl Renderer {
                 treads.push(treads[base.index()]);
                 legs.push(legs[base.index()]);
                 hover.push(hover[base.index()]);
-                vtol.0.push(vtol.0[base.index()]);
+                vtol.pods.push(vtol.pods[base.index()]);
                 excavations.push(excavations[base.index()].clone());
                 stars.push(stars[base.index()]);
                 burn_sites.push(burn_sites[base.index()].clone());
@@ -1399,7 +1399,7 @@ impl Renderer {
             treads.push(model.treads);
             legs.push(model.legs);
             hover.push(model.hover);
-            vtol.0.push(model.vtol);
+            vtol.pods.push(model.vtol);
             excavations.push(model.excavation.clone().zip(model.pit));
             stars.push(model.star_core);
             beam_cores.push(model.beam_core);

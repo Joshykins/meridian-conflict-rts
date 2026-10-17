@@ -19,9 +19,17 @@ use mc_sim::mirror::UnitInstance;
 /// drawn. A deliberate cap: the trails are cosmetic.
 const TRAIL_PUFFS: usize = PUFF_RING / 2;
 
-/// Per blueprint: its VTOL pods, if it has any (`Model::vtol`).
+/// Per blueprint: its VTOL pods, if it has any (`Model::vtol`), and whether it lays a
+/// trail at all.
 #[derive(Default)]
-pub(super) struct VtolPods(pub(super) Vec<Option<Vtol>>);
+pub(super) struct VtolPods {
+    pub(super) pods: Vec<Option<Vtol>>,
+    /// Whether the blueprint has anything to trail from (a capital ship's drives, VTOL
+    /// pods, a jet's ports), worked out on the first tick. An army of tanks is passed
+    /// over a look each: asking each tank's mesh for its exhausts by name was 6 ms a tick
+    /// for 100 000 of them, and counting them as jets thinned the real jets' trails.
+    trails: Vec<bool>,
+}
 
 /// Where a pod's nozzle is, and which way its gas leaves, in the hull's frame (+x
 /// forward, +y left, +z up): the pod tilted `tilt` about its pivot.
@@ -45,8 +53,32 @@ impl Renderer {
         // Trails further out than this are specks; the same reach `damage_smoke` keeps.
         let reach = camera.distance * 2.5 + 600.0;
         let in_reach = |u: &UnitInstance| Vec3::from(u.pos).distance(camera.focus) <= reach;
+        if self.vtol.trails.len() != self.blueprints.units.len() {
+            self.vtol.trails = self
+                .blueprints
+                .units
+                .iter()
+                .map(|bp| {
+                    bp.is_capital_ship()
+                        || self
+                            .vtol
+                            .pods
+                            .get(bp.id.index())
+                            .is_some_and(Option::is_some)
+                        || !models::aircraft_exhausts(&bp.visual.mesh).is_empty()
+                        || (bp
+                            .motion
+                            .is_some_and(|m| m.layer == mc_data::MoveLayer::Air)
+                            && !self.heat_haze.ports(bp.id.index() as u32).is_empty())
+                })
+                .collect();
+        }
+        // Held out of `self` while the jets below lay their puffs.
+        let table = std::mem::take(&mut self.vtol.trails);
+        let trails = |u: &UnitInstance| table.get(u.blueprint as usize).copied() == Some(true);
         let flying = units
             .iter()
+            .filter(|u| trails(u))
             .filter(|u| {
                 let d = Vec3::from(u.prev_pos).distance(Vec3::from(u.pos));
                 u.owner_flags & hidden == 0 && u.build >= 1.0 && (0.08..=40.0).contains(&d)
@@ -58,7 +90,7 @@ impl Renderer {
         let most_samples = (TRAIL_PUFFS / (flying.max(1) * 2)).clamp(1, 16) as f32;
         let share = super::fx_share::Share::new(flying * 2, TRAIL_PUFFS);
         for u in units {
-            if u.owner_flags & hidden != 0 || u.build < 1.0 {
+            if u.owner_flags & hidden != 0 || u.build < 1.0 || !trails(u) {
                 continue;
             }
             let bp = self
@@ -68,7 +100,7 @@ impl Renderer {
             if !capital && (!in_reach(u) || !share.takes(u.unit_id)) {
                 continue;
             }
-            let vtol = self.vtol.0.get(u.blueprint as usize).copied().flatten();
+            let vtol = self.vtol.pods.get(u.blueprint as usize).copied().flatten();
             let fans = vtol.is_some_and(|v| v.fans);
             let hover_flight = bp.motion.is_some_and(|m| m.hover);
             let assault = bp.visual.mesh == "assault_air";
@@ -191,6 +223,7 @@ impl Renderer {
                 }
             }
         }
+        self.vtol.trails = table;
     }
 
     /// A VTOL's four pods this tick: each burns out of its nozzle, tilted with the pod.
