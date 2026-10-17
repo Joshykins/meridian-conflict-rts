@@ -24,7 +24,7 @@ pub const MAX_UNITS: usize = 147_456;
 /// Shots in flight: about one each for every unit at the cap.
 pub const MAX_PROJECTILES: usize = 262_144;
 pub const MAX_WRECKS: usize = 131_072;
-pub const MAX_STAINS: usize = 32_768;
+pub const MAX_STAINS: usize = 65_536;
 /// Incendiary patches. A Hellkite pass is 24 bombs that burn 20 s, so one bomber keeps ~50
 /// alight and a big air war a few thousand. When it is full the patch nearest to burning out
 /// gives way to the new one (`Fires::light`): the match never stops for fire.
@@ -1318,6 +1318,7 @@ impl Stains {
 
     pub fn push(&mut self, pos: FxVec2, radius: Fx, strength: u8, seed: u16) -> usize {
         if self.len() >= MAX_STAINS {
+            mc_core::perf_count!("stains.recycled");
             let i = self.oldest as usize % self.len();
             self.oldest = ((i + 1) % self.len()) as u32;
             (self.pos[i], self.radius[i]) = (pos, radius);

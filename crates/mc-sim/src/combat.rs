@@ -1099,9 +1099,12 @@ impl World {
         if self.terrain.height_at(pos) < self.terrain.water_level() {
             return;
         }
+        // A hit well inside a mark already there deepens it: within half its radius, a
+        // long battle's front filled the table and the oldest marks went from the ground.
         let mut existing = None;
         self.index.query(pos, Fx::ZERO, kind::STAIN, |e| {
-            if e.pos.distance_sq(pos) <= (e.radius / 2) * (e.radius / 2) && e.radius >= radius / 2 {
+            let near = e.radius * 3 / 4;
+            if e.pos.distance_sq(pos) <= near * near && e.radius >= radius / 2 {
                 existing = Some(e.row as usize);
                 return false;
             }

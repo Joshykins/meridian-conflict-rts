@@ -256,6 +256,10 @@ const RANGE_SEGMENTS: [u32; 2] = [256, 96];
 const RANGE_LONG: f32 = 450.0;
 const MAX_PROJECTILES: usize = mc_sim::tables::MAX_PROJECTILES;
 const MAX_STAINS: usize = mc_sim::tables::MAX_STAINS;
+/// Slots in the stain buffer: the sim's scorch, then the craters, spills, structure pads
+/// and ore fields in room of their own. Sharing the sim's room, a battle that filled its
+/// scorch table left none: every crater, building pad and ore field went from the ground.
+const STAIN_SLOTS: usize = MAX_STAINS + 32_768;
 
 pub enum Target {
     Window {
@@ -1781,7 +1785,7 @@ impl Renderer {
         let shield_hits =
             gpu.host_buffer((MAX_SHIELD_HITS * size_of::<ShieldHit>()) as u64, storage)?;
         shield_hits.write(0, &vec![0u8; shield_hits.size as usize]);
-        let stains = gpu.host_buffer((MAX_STAINS * size_of::<StainInstance>()) as u64, storage)?;
+        let stains = gpu.host_buffer((STAIN_SLOTS * size_of::<StainInstance>()) as u64, storage)?;
         let puffs = gpu.host_buffer((MAX_PUFFS * size_of::<Puff>()) as u64, storage)?;
         puffs.write(0, &vec![0u8; puffs.size as usize]);
         let beams = gpu.host_buffer(
@@ -3407,7 +3411,7 @@ impl Renderer {
         }
         self.impact_craters.land(time);
         let craters = self.impact_craters.craters();
-        let craters = &craters[..craters.len().min(MAX_STAINS - stains.len())];
+        let craters = &craters[..craters.len().min(STAIN_SLOTS - stains.len())];
         if !craters.is_empty() {
             self.stains.write(
                 std::mem::size_of_val(stains) as u64,
@@ -3415,7 +3419,7 @@ impl Renderer {
             );
         }
         let spills = &self.plasma_fx.spills;
-        let spills = &spills[..spills.len().min(MAX_STAINS - stains.len() - craters.len())];
+        let spills = &spills[..spills.len().min(STAIN_SLOTS - stains.len() - craters.len())];
         if !spills.is_empty() {
             self.stains.write(
                 ((stains.len() + craters.len()) * size_of::<StainInstance>()) as u64,
@@ -3427,7 +3431,7 @@ impl Renderer {
         self.stain_runs = [stains.len() as u32, crater_count as u32];
         drop(stains_span);
         let pads_span = mc_core::perf_span!("lists.pads");
-        let pads = self.structure_pads(units, &frame.pads, MAX_STAINS.saturating_sub(stained));
+        let pads = self.structure_pads(units, &frame.pads, STAIN_SLOTS.saturating_sub(stained));
         if !pads.is_empty() {
             self.stains.write(
                 (stained * size_of::<StainInstance>()) as u64,
@@ -3436,7 +3440,7 @@ impl Renderer {
         }
         self.pad_count = pads.len() as u32;
         let used = stained + pads.len();
-        self.ore.upload(&self.stains, used, MAX_STAINS, time);
+        self.ore.upload(&self.stains, used, STAIN_SLOTS, time);
         drop(pads_span);
         let props_span = mc_core::perf_span!("lists.props");
 
