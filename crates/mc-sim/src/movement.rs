@@ -57,6 +57,16 @@ pub(crate) struct FormationMotion {
 /// leg, short of the post; its members take that leg at once.
 pub(crate) const PHASE_NEXT_LEG: u8 = 4;
 
+/// What a move does to its hull besides where it goes (`World::plan_apply`).
+struct Applied {
+    step: u16,
+    vertical_delta: Fx,
+    want_bank: i32,
+    assault_pitch: Option<mc_core::Angle>,
+    capital_pitch: Option<mc_core::Angle>,
+    hover_flies: bool,
+}
+
 struct MoveOut {
     row: usize,
     pos: FxVec2,
@@ -140,250 +150,32 @@ impl World {
             .filter(|m| self.bp(m.row).stomp.is_some())
             .map(|m| (m.row, self.state.units.gait[m.row]))
             .collect();
-        for m in moves {
+        // What each move does to its hull, worked out side by side: it reads the world
+        // and writes nothing. Then each is written in row order (`nav` and the stomps
+        // after it, in that order). Serial, this was a hundred thousand units' heights,
+        // banks and strides one after another every tick.
+        let this = &*self;
+        let attack = &attack_altitudes;
+        let planned: Vec<Applied> = self
+            .pool
+            .parallel_map_chunks(moves.len(), CHUNK, |_, range| {
+                range
+                    .map(|k| this.plan_apply(&moves[k], attack[moves[k].row]))
+                    .collect::<Vec<_>>()
+            })
+            .into_iter()
+            .flatten()
+            .collect();
+        for (m, a) in moves.into_iter().zip(planned) {
             let row = m.row;
-            // A stride's worth of ground: the way made, plus the feet shuffling round in a turn.
-            let radius = self.blueprints.unit(self.state.units.blueprint[row]).radius;
-            let turned = self.state.units.heading[row]
-                .delta_to(m.heading)
-                .unsigned_abs() as i32;
-            let ground = m.pos.distance(self.state.units.pos[row])
-                + (radius * turned).mul_div(355, 113 * 0x10000);
-            let step = (ground * 256).floor_int().clamp(0, u16::MAX as i32) as u16;
-            let mut want_z = self.stand_z(row, m.pos);
-            let assault = self.bp(row).visual.mesh == "assault_air";
-            if let Some(target_z) = attack_altitudes[row] {
-                let ahead = m.pos + FxVec2::from_angle(m.heading) * m.speed;
-                let surface = self.ground_surface(m.pos).max(self.ground_surface(ahead));
-                want_z = target_z.max(surface + FIGHTER_ATTACK_CLEARANCE);
-            }
-            if assault && self.state.units.has_flag(row, flag::AIR_RUN) {
-                let units = &self.state.units;
-                let motion = self.bp(row).motion.expect("assault aircraft");
-                if m.speed >= motion.speed / 2 {
-                    // Descend on ingress, level over the target, climb on egress.
-                    // Keep the recorded attack point outside the gun's arc/range.
-                    // Altitude eases over twelve ticks below. Aim that far
-                    // along the flight path so the descent lines the fixed gun
-                    // up on ingress instead of lagging until almost overhead.
-                    let lookahead = m.speed * 12 / DT;
-                    let pass_ahead = m.pos + FxVec2::from_angle(m.heading) * lookahead;
-                    let distance = pass_ahead.distance(units.air_aim[row]);
-                    // The glide leaves cruise height about where the cannon comes into
-                    // range, so the nose is already down on the target when it does.
-                    let reach = self
-                        .bp(row)
-                        .weapons
-                        .first()
-                        .map_or(Fx::from_int(360), |w| w.range_max);
-                    let glide = ((motion.altitude - ASSAULT_PASS_CLEARANCE)
-                        / (reach - lookahead - Fx::from_int(60)).max(Fx::from_int(100)))
-                    .clamp(Fx::ratio(1, 20), Fx::ratio(8, 25));
-                    let pass_height = ASSAULT_PASS_CLEARANCE
-                        + (distance - Fx::from_int(60)).max(Fx::ZERO) * glide;
-                    let ahead = m.pos + FxVec2::from_angle(m.heading) * motion.speed;
-                    let surface = self.ground_surface(m.pos).max(self.ground_surface(ahead));
-                    want_z =
-                        (surface + pass_height).min(want_z.max(surface + ASSAULT_PASS_CLEARANCE));
-                }
-            }
-            // A bomber on its run climbs ahead of rising ground, so a cliff top at the
-            // mark does not find it still coming up off the low ground below.
-            let bomb_run = !assault
-                && attack_altitudes[row].is_none()
-                && self.state.units.has_flag(row, flag::AIR_RUN)
-                && self
-                    .bp(row)
-                    .motion
-                    .is_some_and(|mo| mo.layer == MoveLayer::Air && !mo.hover)
-                && self.bp(row).weapons.iter().any(|w| {
-                    w.trajectory == mc_data::Trajectory::Ballistic && !w.missile && !w.torpedo
-                })
-                && !self.bp(row).weapons.first().is_some_and(|w| w.torpedo);
-            if bomb_run {
-                let motion = self.bp(row).motion.expect("bomber");
-                let nose = FxVec2::from_angle(m.heading);
-                // Far enough out to make a big rise at the run's climb rate.
-                let ahead = (1..=9)
-                    .map(|s| self.ground_surface(m.pos + nose * (motion.speed * s)))
-                    .fold(self.ground_surface(m.pos), Fx::max);
-                want_z = want_z.max(ahead + motion.altitude);
-            }
-            // A torpedo bomber comes down to the wave tops on its run in, reaching them
-            // by its drop range, holds there until it is past the mark,
-            // then climbs back to cruise on the way out.
-            let torpedo_run = self.state.units.has_flag(row, flag::AIR_RUN)
-                && self
-                    .bp(row)
-                    .motion
-                    .is_some_and(|mo| mo.layer == MoveLayer::Air && !mo.hover)
-                && self.bp(row).weapons.first().is_some_and(|w| w.torpedo);
-            if torpedo_run {
-                let motion = self.bp(row).motion.expect("torpedo bomber");
-                if m.speed >= motion.speed / 2 {
-                    let reach = self.bp(row).weapons[0].range_max;
-                    let distance = m.pos.distance(self.state.units.air_aim[row]);
-                    let pass_height =
-                        TORPEDO_RUN_HEIGHT + (distance - reach).max(Fx::ZERO) * Fx::ratio(7, 20);
-                    let ahead = m.pos + FxVec2::from_angle(m.heading) * motion.speed;
-                    let surface = self.ground_surface(m.pos).max(self.ground_surface(ahead));
-                    want_z = (surface + pass_height).min(want_z.max(surface + TORPEDO_RUN_HEIGHT));
-                }
-            }
-            // A drone let go at a mark dives onto it (`strike_drones.rs`).
-            let strike = self.drone_striking(row);
-            if strike {
-                want_z = self.strike_height(row, m.pos, want_z);
-            }
-            // Coming down on a staging base it holds to its glide (`staging.rs`).
-            let staging = self.stage_glide_z(row, m.pos, want_z).is_some();
-            let vertical_delta = match self.bp(row).motion {
-                // A lift ship eases up and down at its own rate (`transport.rs`).
-                Some(mo) if mo.layer == MoveLayer::Air && self.lands_on_order(row) => {
-                    self.lift_vertical(row, m.pos, want_z)
-                }
-                Some(mo) if mo.layer == MoveLayer::Air => {
-                    let height_left = self.state.units.z[row] - want_z;
-                    // A lift ship comes down from the clouds and climbs back at its own rate.
-                    let lift = self.bp(row).transport.map(|t| t.descent);
-                    if height_left > Fx::ZERO && want_z == self.ground_surface(m.pos) {
-                        // Ease the last 24 metres and cap the final step so landing
-                        // never snaps to the ground. Takeoff retains its climb rate.
-                        -((height_left / 2).clamp(TOUCHDOWN_SPEED, lift.unwrap_or(LANDING_SPEED))
-                            / DT)
-                            .min(height_left)
-                    } else {
-                        // Ease toward cruise altitude and limit changes in vertical
-                        // velocity, so terrain steps do not jerk the airframe.
-                        let previous = self.state.units.air_velocity[row].z;
-                        // Taking off, or far under the height it wants (a tower ahead).
-                        let takeoff = self.state.units.z[row]
-                            < self.ground_surface(m.pos) + mo.altitude / 2
-                            || self.state.units.z[row] < want_z - mo.altitude / 2;
-                        let limit = if let Some(rate) = lift {
-                            rate / DT
-                        } else if takeoff {
-                            mo.speed / 2 / DT
-                        } else if attack_altitudes[row].is_some()
-                            || (assault && self.state.units.has_flag(row, flag::AIR_RUN))
-                            || torpedo_run
-                            || bomb_run
-                            || strike
-                            || staging
-                        {
-                            mo.speed * Fx::ratio(7, 20) / DT
-                        } else {
-                            (mo.speed / 4).clamp(Fx::from_int(6), Fx::from_int(18)) / DT
-                        };
-                        let remaining = want_z - self.state.units.z[row];
-                        // Start braking before a fast pursuit descent reaches its
-                        // altitude; damping alone can overshoot low targets.
-                        let limit = if attack_altitudes[row].is_some() {
-                            limit.min((remaining.abs() * Fx::ratio(3, 10)).sqrt() * Fx::ratio(4, 5))
-                        } else {
-                            limit
-                        };
-                        let desired = if staging {
-                            remaining.clamp(-limit, limit)
-                        } else {
-                            (remaining / 12).clamp(-limit, limit)
-                        };
-                        // A strafing run at speed has to tip into its dive quickly, or the
-                        // fixed nose gun comes down on the target too shallow to bear.
-                        let ease = if torpedo_run
-                            || strike
-                            || (assault && self.state.units.has_flag(row, flag::AIR_RUN))
-                        {
-                            Fx::ratio(3, 10)
-                        } else if staging {
-                            Fx::ratio(1, 2)
-                        } else {
-                            Fx::ratio(3, 20)
-                        };
-                        let velocity = previous.approach(desired, ease);
-                        if remaining.abs() < Fx::ratio(1, 100) && velocity.abs() < Fx::ratio(1, 100)
-                        {
-                            remaining
-                        } else {
-                            velocity
-                        }
-                    }
-                }
-                // A floater rises over a roof and settles past it on its lift, not in a step.
-                Some(mo) if mo.floats => {
-                    let remaining = want_z - self.state.units.z[row];
-                    let limit = mo.speed / 2 / DT;
-                    if remaining.abs() <= Fx::ratio(1, 4) {
-                        remaining
-                    } else {
-                        (remaining / 3).clamp(-limit, limit)
-                    }
-                }
-                _ => want_z - self.state.units.z[row],
-            };
-            let want_bank = match self.bp(row).motion {
-                Some(mo) if mo.layer == MoveLayer::Air => {
-                    let turn = self.state.units.heading[row].delta_to(m.heading) as i32;
-                    if self.bp(row).transport.is_some() {
-                        let share = (m.speed / mo.speed).clamp(Fx::ZERO, Fx::ONE);
-                        -(Fx::from_int(turn * 1200 / self.air_turn_rate(row, &mo).max(1)) * share)
-                            .floor_int()
-                    } else if mo.hover {
-                        0
-                    } else {
-                        let speed_share = if m.speed > Fx::ONE { Fx::ONE } else { Fx::ZERO };
-                        // Left turn lowers the left wing: negative local-X roll.
-                        -(Fx::from_int(turn * 8192 / self.air_turn_rate(row, &mo).max(1))
-                            * speed_share)
-                            .floor_int()
-                    }
-                }
-                _ => 0,
-            };
-            let assault_pitch = if assault {
-                // Hull, muzzle and exhaust follow the actual flight slope.
-                Some(crate::world::pitch_to(
-                    m.pos
-                        .distance(self.state.units.pos[row])
-                        .max(Fx::from_int(2)),
-                    vertical_delta,
-                ))
-            } else {
-                None
-            };
-            let capital_pitch = if self.bp(row).transport.is_some() {
-                let speed = m.speed;
-                let run = m.pos.distance(self.state.units.pos[row]);
-                let slope = crate::world::pitch_to_limit(run.max(Fx::ONE), vertical_delta, 2184);
-                let slope = mc_core::Angle::ZERO.delta_to(slope) as i32;
-                // Lift straight up level; align to the flight path once underway.
-                let share = (speed / Fx::from_int(20)).clamp(Fx::ZERO, Fx::ONE);
-                let accel = ((speed - self.state.units.speed[row]) * Fx::from_int(360)).round_int();
-                let clear = self.state.units.z[row] > self.ground_surface(m.pos) + Fx::from_int(12);
-                let desired = if clear {
-                    ((Fx::from_int(slope) * share).round_int() - accel).clamp(-2184, 2184)
-                } else {
-                    0
-                };
-                let current =
-                    mc_core::Angle::ZERO.delta_to(self.state.units.arm_pitch[row][0]) as i32;
-                let delta = desired - current;
-                let step = if delta.abs() < 8 {
-                    delta
-                } else {
-                    (delta / 8).clamp(-80, 80)
-                };
-                Some(mc_core::Angle((current + step) as u16))
-            } else {
-                None
-            };
-            let hover_flies = self.bp(row).motion.is_some_and(|mo| {
-                crate::hover_flight::flies(
-                    &mo,
-                    self.bp(row).transport.is_some(),
-                    self.bp(row).is_capital_ship(),
-                )
-            });
+            let Applied {
+                step,
+                vertical_delta,
+                want_bank,
+                assault_pitch,
+                capital_pitch,
+                hover_flies,
+            } = a;
             let units = &mut self.state.units;
             if let Some(pitch) = capital_pitch {
                 units.arm_pitch[row][0] = pitch;
@@ -441,6 +233,258 @@ impl World {
             self.run_stomps(&striders);
         }
         Ok(())
+    }
+
+    /// What move `m` does to its hull (`run_movement`): the stride, the climb or descent,
+    /// the bank and pitch, from the world as it stands; `attack` is the height a fighter
+    /// diving on a target wants.
+    fn plan_apply(&self, m: &MoveOut, attack: Option<Fx>) -> Applied {
+        let row = m.row;
+        // A stride's worth of ground: the way made, plus the feet shuffling round in a turn.
+        let radius = self.blueprints.unit(self.state.units.blueprint[row]).radius;
+        let turned = self.state.units.heading[row]
+            .delta_to(m.heading)
+            .unsigned_abs() as i32;
+        let ground = m.pos.distance(self.state.units.pos[row])
+            + (radius * turned).mul_div(355, 113 * 0x10000);
+        let step = (ground * 256).floor_int().clamp(0, u16::MAX as i32) as u16;
+        let mut want_z = self.stand_z(row, m.pos);
+        let assault = self.bp(row).visual.mesh == "assault_air";
+        if let Some(target_z) = attack {
+            let ahead = m.pos + FxVec2::from_angle(m.heading) * m.speed;
+            let surface = self.ground_surface(m.pos).max(self.ground_surface(ahead));
+            want_z = target_z.max(surface + FIGHTER_ATTACK_CLEARANCE);
+        }
+        if assault && self.state.units.has_flag(row, flag::AIR_RUN) {
+            let units = &self.state.units;
+            let motion = self.bp(row).motion.expect("assault aircraft");
+            if m.speed >= motion.speed / 2 {
+                // Descend on ingress, level over the target, climb on egress.
+                // Keep the recorded attack point outside the gun's arc/range.
+                // Altitude eases over twelve ticks below. Aim that far
+                // along the flight path so the descent lines the fixed gun
+                // up on ingress instead of lagging until almost overhead.
+                let lookahead = m.speed * 12 / DT;
+                let pass_ahead = m.pos + FxVec2::from_angle(m.heading) * lookahead;
+                let distance = pass_ahead.distance(units.air_aim[row]);
+                // The glide leaves cruise height about where the cannon comes into
+                // range, so the nose is already down on the target when it does.
+                let reach = self
+                    .bp(row)
+                    .weapons
+                    .first()
+                    .map_or(Fx::from_int(360), |w| w.range_max);
+                let glide = ((motion.altitude - ASSAULT_PASS_CLEARANCE)
+                    / (reach - lookahead - Fx::from_int(60)).max(Fx::from_int(100)))
+                .clamp(Fx::ratio(1, 20), Fx::ratio(8, 25));
+                let pass_height =
+                    ASSAULT_PASS_CLEARANCE + (distance - Fx::from_int(60)).max(Fx::ZERO) * glide;
+                let ahead = m.pos + FxVec2::from_angle(m.heading) * motion.speed;
+                let surface = self.ground_surface(m.pos).max(self.ground_surface(ahead));
+                want_z = (surface + pass_height).min(want_z.max(surface + ASSAULT_PASS_CLEARANCE));
+            }
+        }
+        // A bomber on its run climbs ahead of rising ground, so a cliff top at the
+        // mark does not find it still coming up off the low ground below.
+        let bomb_run = !assault
+            && attack.is_none()
+            && self.state.units.has_flag(row, flag::AIR_RUN)
+            && self
+                .bp(row)
+                .motion
+                .is_some_and(|mo| mo.layer == MoveLayer::Air && !mo.hover)
+            && self.bp(row).weapons.iter().any(|w| {
+                w.trajectory == mc_data::Trajectory::Ballistic && !w.missile && !w.torpedo
+            })
+            && !self.bp(row).weapons.first().is_some_and(|w| w.torpedo);
+        if bomb_run {
+            let motion = self.bp(row).motion.expect("bomber");
+            let nose = FxVec2::from_angle(m.heading);
+            // Far enough out to make a big rise at the run's climb rate.
+            let ahead = (1..=9)
+                .map(|s| self.ground_surface(m.pos + nose * (motion.speed * s)))
+                .fold(self.ground_surface(m.pos), Fx::max);
+            want_z = want_z.max(ahead + motion.altitude);
+        }
+        // A torpedo bomber comes down to the wave tops on its run in, reaching them
+        // by its drop range, holds there until it is past the mark,
+        // then climbs back to cruise on the way out.
+        let torpedo_run = self.state.units.has_flag(row, flag::AIR_RUN)
+            && self
+                .bp(row)
+                .motion
+                .is_some_and(|mo| mo.layer == MoveLayer::Air && !mo.hover)
+            && self.bp(row).weapons.first().is_some_and(|w| w.torpedo);
+        if torpedo_run {
+            let motion = self.bp(row).motion.expect("torpedo bomber");
+            if m.speed >= motion.speed / 2 {
+                let reach = self.bp(row).weapons[0].range_max;
+                let distance = m.pos.distance(self.state.units.air_aim[row]);
+                let pass_height =
+                    TORPEDO_RUN_HEIGHT + (distance - reach).max(Fx::ZERO) * Fx::ratio(7, 20);
+                let ahead = m.pos + FxVec2::from_angle(m.heading) * motion.speed;
+                let surface = self.ground_surface(m.pos).max(self.ground_surface(ahead));
+                want_z = (surface + pass_height).min(want_z.max(surface + TORPEDO_RUN_HEIGHT));
+            }
+        }
+        // A drone let go at a mark dives onto it (`strike_drones.rs`).
+        let strike = self.drone_striking(row);
+        if strike {
+            want_z = self.strike_height(row, m.pos, want_z);
+        }
+        // Coming down on a staging base it holds to its glide (`staging.rs`).
+        let staging = self.stage_glide_z(row, m.pos, want_z).is_some();
+        let vertical_delta = match self.bp(row).motion {
+            // A lift ship eases up and down at its own rate (`transport.rs`).
+            Some(mo) if mo.layer == MoveLayer::Air && self.lands_on_order(row) => {
+                self.lift_vertical(row, m.pos, want_z)
+            }
+            Some(mo) if mo.layer == MoveLayer::Air => {
+                let height_left = self.state.units.z[row] - want_z;
+                // A lift ship comes down from the clouds and climbs back at its own rate.
+                let lift = self.bp(row).transport.map(|t| t.descent);
+                if height_left > Fx::ZERO && want_z == self.ground_surface(m.pos) {
+                    // Ease the last 24 metres and cap the final step so landing
+                    // never snaps to the ground. Takeoff retains its climb rate.
+                    -((height_left / 2).clamp(TOUCHDOWN_SPEED, lift.unwrap_or(LANDING_SPEED)) / DT)
+                        .min(height_left)
+                } else {
+                    // Ease toward cruise altitude and limit changes in vertical
+                    // velocity, so terrain steps do not jerk the airframe.
+                    let previous = self.state.units.air_velocity[row].z;
+                    // Taking off, or far under the height it wants (a tower ahead).
+                    let takeoff = self.state.units.z[row]
+                        < self.ground_surface(m.pos) + mo.altitude / 2
+                        || self.state.units.z[row] < want_z - mo.altitude / 2;
+                    let limit = if let Some(rate) = lift {
+                        rate / DT
+                    } else if takeoff {
+                        mo.speed / 2 / DT
+                    } else if attack.is_some()
+                        || (assault && self.state.units.has_flag(row, flag::AIR_RUN))
+                        || torpedo_run
+                        || bomb_run
+                        || strike
+                        || staging
+                    {
+                        mo.speed * Fx::ratio(7, 20) / DT
+                    } else {
+                        (mo.speed / 4).clamp(Fx::from_int(6), Fx::from_int(18)) / DT
+                    };
+                    let remaining = want_z - self.state.units.z[row];
+                    // Start braking before a fast pursuit descent reaches its
+                    // altitude; damping alone can overshoot low targets.
+                    let limit = if attack.is_some() {
+                        limit.min((remaining.abs() * Fx::ratio(3, 10)).sqrt() * Fx::ratio(4, 5))
+                    } else {
+                        limit
+                    };
+                    let desired = if staging {
+                        remaining.clamp(-limit, limit)
+                    } else {
+                        (remaining / 12).clamp(-limit, limit)
+                    };
+                    // A strafing run at speed has to tip into its dive quickly, or the
+                    // fixed nose gun comes down on the target too shallow to bear.
+                    let ease = if torpedo_run
+                        || strike
+                        || (assault && self.state.units.has_flag(row, flag::AIR_RUN))
+                    {
+                        Fx::ratio(3, 10)
+                    } else if staging {
+                        Fx::ratio(1, 2)
+                    } else {
+                        Fx::ratio(3, 20)
+                    };
+                    let velocity = previous.approach(desired, ease);
+                    if remaining.abs() < Fx::ratio(1, 100) && velocity.abs() < Fx::ratio(1, 100) {
+                        remaining
+                    } else {
+                        velocity
+                    }
+                }
+            }
+            // A floater rises over a roof and settles past it on its lift, not in a step.
+            Some(mo) if mo.floats => {
+                let remaining = want_z - self.state.units.z[row];
+                let limit = mo.speed / 2 / DT;
+                if remaining.abs() <= Fx::ratio(1, 4) {
+                    remaining
+                } else {
+                    (remaining / 3).clamp(-limit, limit)
+                }
+            }
+            _ => want_z - self.state.units.z[row],
+        };
+        let want_bank = match self.bp(row).motion {
+            Some(mo) if mo.layer == MoveLayer::Air => {
+                let turn = self.state.units.heading[row].delta_to(m.heading) as i32;
+                if self.bp(row).transport.is_some() {
+                    let share = (m.speed / mo.speed).clamp(Fx::ZERO, Fx::ONE);
+                    -(Fx::from_int(turn * 1200 / self.air_turn_rate(row, &mo).max(1)) * share)
+                        .floor_int()
+                } else if mo.hover {
+                    0
+                } else {
+                    let speed_share = if m.speed > Fx::ONE { Fx::ONE } else { Fx::ZERO };
+                    // Left turn lowers the left wing: negative local-X roll.
+                    -(Fx::from_int(turn * 8192 / self.air_turn_rate(row, &mo).max(1)) * speed_share)
+                        .floor_int()
+                }
+            }
+            _ => 0,
+        };
+        let assault_pitch = if assault {
+            // Hull, muzzle and exhaust follow the actual flight slope.
+            Some(crate::world::pitch_to(
+                m.pos
+                    .distance(self.state.units.pos[row])
+                    .max(Fx::from_int(2)),
+                vertical_delta,
+            ))
+        } else {
+            None
+        };
+        let capital_pitch = if self.bp(row).transport.is_some() {
+            let speed = m.speed;
+            let run = m.pos.distance(self.state.units.pos[row]);
+            let slope = crate::world::pitch_to_limit(run.max(Fx::ONE), vertical_delta, 2184);
+            let slope = mc_core::Angle::ZERO.delta_to(slope) as i32;
+            // Lift straight up level; align to the flight path once underway.
+            let share = (speed / Fx::from_int(20)).clamp(Fx::ZERO, Fx::ONE);
+            let accel = ((speed - self.state.units.speed[row]) * Fx::from_int(360)).round_int();
+            let clear = self.state.units.z[row] > self.ground_surface(m.pos) + Fx::from_int(12);
+            let desired = if clear {
+                ((Fx::from_int(slope) * share).round_int() - accel).clamp(-2184, 2184)
+            } else {
+                0
+            };
+            let current = mc_core::Angle::ZERO.delta_to(self.state.units.arm_pitch[row][0]) as i32;
+            let delta = desired - current;
+            let step = if delta.abs() < 8 {
+                delta
+            } else {
+                (delta / 8).clamp(-80, 80)
+            };
+            Some(mc_core::Angle((current + step) as u16))
+        } else {
+            None
+        };
+        let hover_flies = self.bp(row).motion.is_some_and(|mo| {
+            crate::hover_flight::flies(
+                &mo,
+                self.bp(row).transport.is_some(),
+                self.bp(row).is_capital_ship(),
+            )
+        });
+        Applied {
+            step,
+            vertical_delta,
+            want_bank,
+            assault_pitch,
+            capital_pitch,
+            hover_flies,
+        }
     }
 
     /// Lower airspeed buys a tighter fighter turn, up to 1.8 times cruise yaw.
