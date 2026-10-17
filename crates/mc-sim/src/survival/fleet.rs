@@ -12,12 +12,11 @@
 //!
 //! A fleet may warp into a defender's dampening field, unlike a Seedcaster's squads: the
 //! field is its counter, and drags, hurts and stuns it as it does any jump. It prefers a
-//! mark clear of every field when one is near its target. Its ships count toward the
-//! field cap (`FIELD_CAP`): a fleet that would pass it waits (`Hold::FieldFull`).
+//! mark clear of every field when one is near its target.
 
 use super::print::{Job, Route};
 use super::rules::{fleet_classes, fleet_gap_ticks, fleet_size, shaper_foot, FLEET_LEAD_TICKS};
-use super::{Hold, Spot, FIELD_CAP, HZ};
+use super::{Hold, Spot, HZ};
 use crate::mirror::SimEvent;
 use crate::tables::{OrderKind, WarpPhase};
 use crate::{Command, SimError, UnitId};
@@ -222,18 +221,10 @@ impl crate::World {
         if now < n.next_fire {
             return Ok(());
         }
-        let side = s.config.engine_player;
         let tier = s.config.rules.tier_at(s.round.max(1));
         let fleet = self.fleet_of(n.level, tier);
         if fleet.is_empty() {
             self.state.survival.as_mut().unwrap().nodes[i].next_fire = now + RETRY_TICKS;
-            return Ok(());
-        }
-        let pending = s.warp_ins.pending_units();
-        if self.hostile_count(side) + pending + fleet.len() > FIELD_CAP {
-            let node = &mut self.state.survival.as_mut().unwrap().nodes[i];
-            node.hold = Hold::FieldFull;
-            node.next_fire = now + RETRY_TICKS;
             return Ok(());
         }
         let Some(row) = self.state.units.row(n.unit) else {

@@ -9,13 +9,6 @@ use mc_data::survival::Domain;
 use mc_data::{cat, BlueprintId, FactionId};
 use serde::{Deserialize, Serialize};
 
-/// Most units of a round's ordinary formations, and separately of its heavy
-/// wave: the field never holds more than this at once (`FIELD_CAP`), so a
-/// bigger plan could never come at once anyway. A deliberate guard on how much
-/// a late endless round plans, not a limit a round reaches before about round
-/// 40; the HUD shows the field cap holding the printing back.
-const PLAN_CAP: usize = super::FIELD_CAP;
-
 /// `Formation::front` of one no front leads from: only a Shaper's platform takes it.
 pub(super) const NO_FRONT: u8 = u8::MAX;
 
@@ -105,7 +98,6 @@ impl crate::World {
         let budget = rules.formation_budget(round);
         let total: i64 = domains.iter().map(|d| domain_weight(*d)).sum();
         let size = rules.formation_size(round);
-        let mut planned = 0;
         for d in &domains {
             let mut left = budget * domain_weight(*d) / total.max(1);
             let roster = self.roster(*d, tier);
@@ -113,7 +105,7 @@ impl crate::World {
             factions.sort_by_key(|f| f.0);
             factions.dedup();
             let mut first = true;
-            while left > 0 && planned < PLAN_CAP {
+            while left > 0 {
                 // Most formations are one faction's; one in four mixes them.
                 let pool: Vec<Fighter> = if factions.len() > 1 && rng.below(4) == 0 {
                     roster.clone()
@@ -124,7 +116,7 @@ impl crate::World {
                 let kinds = pick_kinds(&pool, rng);
                 let mut units = Vec::new();
                 let mut k = 0;
-                while units.len() < size && planned + units.len() < PLAN_CAP {
+                while units.len() < size {
                     let u = kinds[k % kinds.len()];
                     k += 1;
                     // The domain's first formation always gets its first unit,
@@ -139,7 +131,6 @@ impl crate::World {
                     break;
                 }
                 first = false;
-                planned += units.len();
                 out.push(Formation {
                     units,
                     front: pick_lane(*d, rng),
@@ -182,12 +173,11 @@ impl crate::World {
             .max(1);
         let floor = wave.floor as usize;
         let worth = (wave.value / par) as usize;
-        let count = floor.max(worth).min(PLAN_CAP);
+        let count = floor.max(worth);
         let squads = (1 + rng.below(1 + count as u32 / 4) as usize).min(count);
         let per_value = wave.value / squads as i64;
         let per_floor = floor.div_ceil(squads);
         let mut out = Vec::new();
-        let mut sent = 0;
         for _ in 0..squads {
             let t5 = wave.t5_share > 0 && rng.below(100) < wave.t5_share;
             let want = if t5 { 5 } else { 4 };
@@ -205,11 +195,6 @@ impl crate::World {
             } else {
                 n.max(per_floor)
             };
-            let n = n.min(PLAN_CAP - sent);
-            if n == 0 {
-                break;
-            }
-            sent += n;
             out.push((u.id, n));
         }
         out

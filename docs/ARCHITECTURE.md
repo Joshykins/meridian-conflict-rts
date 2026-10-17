@@ -526,9 +526,8 @@ invulnerable unit, and the mirror marks it `SHIELD_VEIL` so it is drawn apart fr
   `(3 + 2·tech)` s plus a quarter of that per extra unit; the formation then musters near the head of its front. When
   the last is out, the round goes, each formation as one block (`FormationMove`, attack-move, together) down its front
   and on at the defenders. Ships go down the nearest sea front and on to open water by the nearest defender they can
-  reach. Idle hostiles are re-sent every 5 s. The only hard limit is `FIELD_CAP` (900 hostiles in the field), which
-  holds the printing back and shows on the HUD; a plan never holds more than that many units. After the last round,
-  the defenders win once none of the rounds' units are left.
+  reach. Idle hostiles are re-sent every 5 s. Nothing caps how many hostiles the field holds: printing never waits
+  on the defenders. After the last round, the defenders win once none of the rounds' units are left.
 - **Nodes.** The facility wakes as the rounds climb (`survival/shapers.rs`): at each round's start it raises
   `nodes_raised(round)` Shapers at once (more as the rounds go, up to `node_limit`), each by its own ray (`kind` 4)
   from the heart's Lens for 20 s, building up a `replication_node` on a free Printer site, **one Shaper to a site**.
@@ -598,8 +597,7 @@ invulnerable unit, and the mirror marks it `SHIELD_VEIL` so it is drawn apart fr
   16 points); else another target is tried (8 tries); with none left the volley is held (`Hold::Dampened`,
   `SurvivalStatus::dampened`, "Dampened" on the HUD and the card) and retried in 5 s. One Undertow pushes squads
   to its edge; overlapping ones hold them off. A field that comes up over an announced mark cancels it (checked
-  twice a second, `WarpInCancelled`): that squad is lost. A volley the field cap cannot take (hostiles + squads
-  marked + this squad over `FIELD_CAP`) is held (`Hold::FieldFull`).
+  twice a second, `WarpInCancelled`): that squad is lost.
   An **Unmaker** (`SiteKind::Nuke`, 2) raises `progenitor_silo`s behind itself (`PieceKind::Silo`, `shaper_silos`:
   one, one more every eighth level), each a nuclear launcher (`nukes.rs`, free for the engine's side) that grows
   with its Unmaker's level by its `growth` block (stock, round time, blast radius and damage) and looks
@@ -620,7 +618,7 @@ invulnerable unit, and the mirror marks it `SHIELD_VEIL` so it is drawn apart fr
   `Command::Warp` there in the formation they were built in (`warp.rs`: spool, transit, emerge), so a field over
   the mark drags, hurts and stuns them as any jump; the fleet may warp into one. Out of the warp (or 120 s after
   the order) it attack-moves at the defenders and the Gatewright rests `fleet_gap_ticks` (90 s at level 1, 60 s at
-  10, at least 40 s) before the next. Its ships count toward the field cap (`Hold::FieldFull`); the hunt leaves a
+  10, at least 40 s) before the next. The hunt leaves a
   fleet's ships to it (`Fleet::holds`). State: `Survival::fleets` (`Fleet`: stage Resting/Building/Marked/Warping,
   ships, mark, serial, ships in the field). Events: `WarpInMarked`, `WarpInArrived`, `WarpInCancelled`,
   `FleetMarked` (the jump's own `WarpSpooling`/`WarpJumped`/`WarpArrived` follow); `NodeRaising`/`NodeOnline` carry
@@ -664,7 +662,7 @@ invulnerable unit, and the mirror marks it `SHIELD_VEIL` so it is drawn apart fr
   names the Progenitor's side.
 - **Interface.** `SimStatus::survival` (`World::survival_status`) feeds the HUD's survival card under the minimap
   (`hud/survival.rs`, `SurvivalHud`: round, what the engine is doing, the tier chip, what is coming per domain, the
-  heavy wave squad by squad or when the next tier comes, the field cap when it holds, reclaim income) and one Shaper
+  heavy wave squad by squad or when the next tier comes, reclaim income) and one Shaper
   row per cradle and domain (level, kinds, click to look); a new tier puts a banner across the screen and makes the
   chip pulse. The minimap draws the fronts, the engine and the nodes; toasts and stingers
   (`data/sounds/survival.ron`) announce rounds, tiers, heavy waves, nodes and the Shaper levels that bring a new kind,

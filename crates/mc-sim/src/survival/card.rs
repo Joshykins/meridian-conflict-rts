@@ -123,8 +123,8 @@ pub struct ArtilleryCard {
     pub shock_damage: f32,
     /// Its squads marked and not yet in.
     pub marked: u16,
-    /// Why its last volley was held back, if it was: the field full, or every target in
-    /// the defenders' dampening fields.
+    /// Why its last volley was held back, if it was: every target in the defenders'
+    /// dampening fields.
     pub hold: Hold,
 }
 
@@ -150,7 +150,7 @@ pub struct FleetCard {
     pub lead_secs: f32,
     /// Its ships sent at the defenders and still alive.
     pub in_field: u16,
-    /// Why its next fleet waits, if it does: the field full.
+    /// Why its next fleet waits, if it does.
     pub hold: Hold,
 }
 

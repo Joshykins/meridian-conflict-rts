@@ -399,17 +399,7 @@ pub fn draw(
     } else {
         palette::DIM
     };
-    if status.held {
-        // The field cap holds the printing: say so, not just slow down.
-        let pulse = 0.6 + 0.4 * (t * 3.0).sin().abs();
-        ui.text_right(
-            rx,
-            y - 6.0,
-            type_scale::MICRO,
-            rgb(palette::WARN, pulse),
-            &format!("Field full ({}): printing waits", status.hostile),
-        );
-    } else if status.dampened {
+    if status.dampened {
         // A Seedcaster holds: every target lies in a warp dampening field.
         let pulse = 0.6 + 0.4 * (t * 3.0).sin().abs();
         ui.text_right(

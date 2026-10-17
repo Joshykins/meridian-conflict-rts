@@ -315,7 +315,6 @@ fn anti_nuke_block(card: &ShaperCard, bp: Option<&UnitBlueprint>, next_round: f3
 fn hold_text(hold: Hold) -> Option<&'static str> {
     match hold {
         Hold::None => None,
-        Hold::FieldFull => Some("Held: field full"),
         Hold::Dampened => Some("Dampened: every target in a warp field"),
     }
 }

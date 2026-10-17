@@ -16,7 +16,6 @@
 //! - A field that comes up over a mark already announced cancels it
 //!   (`SimEvent::WarpInCancelled`): that squad is lost.
 //!
-//! A volley the field cap (`FIELD_CAP`) cannot take is held too (`Hold::FieldFull`).
 //! Squad size, heavies, squads a volley, the beat, the countdown and the shock grow with
 //! the level (`rules.rs`); a squad is made of the Seedcaster's products, which it takes
 //! on as it levels like a printing Shaper.
@@ -26,7 +25,7 @@ use super::rules::{
     arrival_shock, squad_size, squads_per_volley, volley_ticks, warp_in_ticks, WARP_IN_PRINT_TICKS,
     WARP_IN_WHOLE,
 };
-use super::{Hold, Spot, FIELD_CAP, HZ};
+use super::{Hold, Spot, HZ};
 use crate::mirror::SimEvent;
 use crate::well_area::{Aircraft, WellArea};
 use crate::{SimError, UnitId};
@@ -128,11 +127,6 @@ impl WarpIns {
                 h.write_u64(b.0 as u64);
             }
         }
-    }
-
-    /// Units the squads marked will bring.
-    pub(super) fn pending_units(&self) -> usize {
-        self.pending.iter().map(|w| w.squad.len()).sum()
     }
 
     /// Every blueprint the marked squads carry, for `State::validate_ids`.
@@ -249,7 +243,6 @@ impl crate::World {
     fn survival_volley(&mut self, i: usize, now: u32) -> Result<(), SimError> {
         let s = self.state.survival.as_ref().unwrap();
         let n = s.nodes[i].clone();
-        let side = s.config.engine_player;
         let Some(row) = self.state.units.row(n.unit) else {
             return Ok(());
         };
@@ -264,17 +257,12 @@ impl crate::World {
             .unwrap_or(0);
         let reach = squad_reach(bps, &squad) + Fx::from_int(EDGE);
         let fields = self.survival_fields();
-        let mut pending = s.warp_ins.pending_units();
         let mut rng = s.warp_ins.rng;
         let mut marks: Vec<(FxVec2, Vec<FxVec2>, Angle)> = Vec::new();
         let mut hold = Hold::None;
         let want = squads_per_volley(n.level);
         for _ in 0..want {
             if squad.is_empty() {
-                break;
-            }
-            if self.hostile_count(side) + pending + squad.len() > FIELD_CAP {
-                hold = Hold::FieldFull;
                 break;
             }
             let taken: Vec<FxVec2> = marks.iter().map(|m| m.0).collect();
@@ -299,7 +287,6 @@ impl crate::World {
                 break;
             }
             marks.push((mark, places, heading));
-            pending += squad.len();
         }
         let ticks = warp_in_ticks(n.level);
         let mut announced = Vec::new();

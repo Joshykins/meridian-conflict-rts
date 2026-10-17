@@ -125,10 +125,6 @@ impl crate::World {
         if s.queue.is_empty() {
             return Ok(());
         }
-        let side = s.config.engine_player;
-        if self.hostile_count(side) >= super::FIELD_CAP {
-            return Ok(());
-        }
         let spots = self.survival_spots();
         let mut queue = std::mem::take(&mut self.state.survival.as_mut().unwrap().queue);
         let mut i = 0;

@@ -374,7 +374,6 @@ impl crate::World {
         let Some(s) = self.state.survival.as_ref() else {
             return Ok(());
         };
-        let side = s.config.engine_player;
         let ready: Vec<usize> = (0..s.nodes.len())
             .filter(|i| {
                 let n = &s.nodes[*i];
@@ -386,7 +385,6 @@ impl crate::World {
             let n = s.nodes[i].clone();
             if self.state.units.row(n.unit).is_none()
                 || s.printing.iter().any(|p| p.source == n.unit && !p.round)
-                || self.hostile_count(side) >= super::FIELD_CAP
             {
                 continue;
             }

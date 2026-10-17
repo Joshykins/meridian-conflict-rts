@@ -399,9 +399,6 @@ impl crate::World {
                 .filter(|u| st.units.row(**u).is_some())
                 .count() as u32,
             hostile: hostile as u32,
-            held: (hostile >= super::FIELD_CAP
-                && (!s.queue.is_empty() || s.nodes.iter().any(|n| n.raised)))
-                || s.nodes.iter().any(|n| n.hold == super::Hold::FieldFull),
             dampened: s.nodes.iter().any(|n| n.hold == super::Hold::Dampened),
             engine: s.config.engine.to_f32(),
             activity: self.survival_activity(),

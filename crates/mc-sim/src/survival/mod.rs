@@ -91,9 +91,6 @@ pub const BEAM_FROM_GATE: u32 = 1 << 28;
 pub const GATE_EMITTERS: usize = 5;
 /// How long the ray takes to raise a node.
 const RAISE_TICKS: u32 = 20 * HZ;
-/// The engine stops printing while it has this many units in the field, so a
-/// late endless round cannot outgrow the simulation. The HUD says when it holds.
-const FIELD_CAP: usize = 900;
 /// Idle hostile units are sent at the defenders this often.
 const HUNT_EVERY: u32 = 5 * HZ;
 
@@ -201,8 +198,7 @@ enum Spot {
 pub enum Hold {
     #[default]
     None = 0,
-    /// The field cap (`FIELD_CAP`): it waits for room.
-    FieldFull = 1,
+    // retired: 1 (the field cap)
     /// Every target lies in the defenders' warp dampening fields (`warp_in.rs`).
     Dampened = 2,
 }
@@ -371,8 +367,6 @@ pub struct SurvivalStatus {
     pub printed: (u16, u16),
     /// Hostile units in the field.
     pub hostile: u32,
-    /// The field is full (`FIELD_CAP`): printing waits for room.
-    pub held: bool,
     /// A Seedcaster's volley is held: every target lies in the defenders' warp
     /// dampening fields.
     pub dampened: bool,
