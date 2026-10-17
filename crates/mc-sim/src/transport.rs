@@ -273,7 +273,7 @@ impl World {
         } else {
             OrderKind::Land
         };
-        for row in self.owned(player, ids, 0) {
+        for row in self.owned_or_raising(player, ids, 0) {
             if !self.lands_on_order(row) || (unload && self.transport(row).is_none()) {
                 continue;
             }
@@ -401,7 +401,7 @@ impl World {
         };
         let pos = self.state.units.pos[ship];
         let mut any = false;
-        for row in self.owned(player, ids, 0) {
+        for row in self.owned_or_raising(player, ids, 0) {
             let fits = self.cargo_fits(row, ship);
             if fits && row != ship && self.state.units.hangar[row] == Handle::NONE {
                 self.give(row, order(OrderKind::Board, pos, carrier), queue)?;

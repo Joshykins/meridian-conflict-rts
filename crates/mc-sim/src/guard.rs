@@ -55,7 +55,7 @@ impl World {
             .filter(|&t| !self.are_enemies(player, self.state.units.owner[t]))
             .map_or(Handle::NONE, |_| target);
         let (air, movers): (Vec<usize>, Vec<usize>) = self
-            .owned(player, ids, mc_data::cat::MOBILE)
+            .owned_or_raising(player, ids, mc_data::cat::MOBILE)
             .into_iter()
             .partition(|&row| self.is_air(row));
         // The unit being followed cannot guard itself: it guards the spot.

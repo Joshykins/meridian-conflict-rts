@@ -259,7 +259,7 @@ impl World {
             return Ok(());
         };
         let pos = self.state.units.pos[b];
-        for row in self.owned(player, ids, 0) {
+        for row in self.owned_or_raising(player, ids, 0) {
             if self.bp(row).fuel.is_some()
                 && self.state.units.hangar[row] == Handle::NONE
                 && self.stage_base(row, base).is_some()

@@ -101,6 +101,7 @@ mod self_destruct;
 mod seraph;
 mod shield;
 mod site_map;
+mod site_orders;
 mod site_repeat;
 mod skyguard;
 mod storm_bomber;

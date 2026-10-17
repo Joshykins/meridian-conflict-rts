@@ -38,7 +38,7 @@ impl World {
         }
         // A station's plans are among the side's plans (`planned_sites`): left behind,
         // its copy would stand in the way of the drop and stay where it was.
-        let rows: Vec<usize> = (self.owned(player, ids, 0).into_iter())
+        let rows: Vec<usize> = (self.owned_or_raising(player, ids, 0).into_iter())
             .filter(|&row| {
                 let bp = self.bp(row);
                 bp.has(cat::MOBILE) || (kind == OrderKind::Build && bp.works_in_field())

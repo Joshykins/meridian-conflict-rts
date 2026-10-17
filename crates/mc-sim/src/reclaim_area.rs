@@ -38,7 +38,7 @@ impl World {
         let pos = self.clamp_to_map(pos);
         let radius = radius.clamp(Fx::ZERO, MAX_RECLAIM_RADIUS);
         let rows: Vec<usize> = self
-            .owned(player, ids, mc_data::cat::MOBILE)
+            .owned_or_raising(player, ids, mc_data::cat::MOBILE)
             .into_iter()
             .filter(|&row| self.bp(row).sends_reclaimers())
             .collect();

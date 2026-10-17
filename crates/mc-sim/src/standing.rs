@@ -101,9 +101,28 @@ impl World {
         rows
     }
 
-    /// `ids`' own units that carry orders, and the factories among them still being built.
+    /// `owned`, and the units among `ids` still being raised on lots of their own (a
+    /// warship, a titan): orders queue on one and are carried out once it is finished,
+    /// since `run_orders` passes a unit under construction by.
+    pub(crate) fn owned_or_raising(
+        &self,
+        player: u8,
+        ids: &[UnitId],
+        categories: u32,
+    ) -> Vec<usize> {
+        let mut rows = self.owned(player, ids, categories);
+        for row in self.owned_repeat_sites(player, ids) {
+            if self.bp(row).has(categories) && !rows.contains(&row) {
+                rows.push(row);
+            }
+        }
+        rows
+    }
+
+    /// `ids`' own units that carry orders, the units among them still being raised on
+    /// their lots and the factories among them still being built.
     pub(crate) fn owned_or_rising(&self, player: u8, ids: &[UnitId]) -> Vec<usize> {
-        let mut rows = self.owned(player, ids, 0);
+        let mut rows = self.owned_or_raising(player, ids, 0);
         for row in self.owned_factories(player, ids) {
             if !rows.contains(&row) {
                 rows.push(row);

@@ -145,7 +145,7 @@ impl World {
                     return Ok(());
                 };
                 let pos = self.state.units.pos[t];
-                for row in self.owned(player, units, 0) {
+                for row in self.owned_or_raising(player, units, 0) {
                     if self.are_enemies(player, self.state.units.owner[t])
                         && self.bp(row).can_attack(self.bp(t))
                     {
@@ -183,7 +183,7 @@ impl World {
                 // other builders in the selection go too and help once it stands (`run_build`).
                 // An engineering station takes only the sites within its reach.
                 let (rows, far): (Vec<usize>, Vec<usize>) = self
-                    .owned(player, units, 0)
+                    .owned_or_raising(player, units, 0)
                     .into_iter()
                     .filter(|&row| self.bp(row).works_in_field())
                     .partition(|&row| self.reaches_work(row, site, bp.radius));
@@ -251,7 +251,7 @@ impl World {
                 }
                 let (pos, radius) = (self.state.units.pos[t], self.bp(t).radius);
                 let mut refused = false;
-                for row in self.owned(player, units, 0) {
+                for row in self.owned_or_raising(player, units, 0) {
                     if row == t || !self.bp(row).works_in_field() {
                         continue;
                     }
@@ -277,7 +277,7 @@ impl World {
                 let pos = self.state.wrecks.pos[w];
                 let radius = self.blueprints.unit(self.state.wrecks.blueprint[w]).radius;
                 let mut refused = false;
-                for row in self.owned(player, units, 0) {
+                for row in self.owned_or_raising(player, units, 0) {
                     if !self.bp(row).sends_reclaimers() {
                         continue;
                     }
@@ -302,7 +302,7 @@ impl World {
                 };
                 let (pos, radius) = (self.state.units.pos[t], self.bp(t).radius);
                 let mut refused = false;
-                for row in self.owned(player, units, 0) {
+                for row in self.owned_or_raising(player, units, 0) {
                     let bp = self.bp(row);
                     if !bp.sends_reclaimers() || !self.can_reclaim_unit(row, t) {
                         continue;
@@ -657,7 +657,7 @@ impl World {
         queue: bool,
     ) -> Result<(), SimError> {
         let pos = self.clamp_to_map(pos);
-        for row in self.owned(player, ids, 0) {
+        for row in self.owned_or_raising(player, ids, 0) {
             // The widest circle any of its ground guns may spread over; none: it
             // cannot fire at the ground.
             let widest = (self.bp(row).weapons.iter())
@@ -683,7 +683,7 @@ impl World {
         points: &[FxVec2],
         queue: bool,
     ) -> Result<(), SimError> {
-        let rows = self.owned(player, ids, cat::MOBILE);
+        let rows = self.owned_or_raising(player, ids, cat::MOBILE);
         if rows.is_empty() || points.is_empty() {
             return Ok(());
         }
@@ -739,7 +739,7 @@ impl World {
         // The leg into `after`, by group: the new leg's group, shared the same way.
         let mut groups = std::collections::BTreeMap::<u64, u64>::new();
         let mut full = false;
-        for row in self.owned(player, ids, cat::MOBILE) {
+        for row in self.owned_or_raising(player, ids, cat::MOBILE) {
             let mut queue: Vec<Order> = self
                 .state
                 .orders
@@ -898,7 +898,7 @@ impl World {
         spacing_level: u8,
         shape: i8,
     ) -> Result<(), SimError> {
-        let rows = self.owned(player, ids, cat::MOBILE);
+        let rows = self.owned_or_raising(player, ids, cat::MOBILE);
         let target = self.clamp_to_map(target);
         let span = mc_core::perf_span!("cmd.layouts");
         let layouts = self.formation_layouts(rows, target, queue, facing, spacing_level, shape);

@@ -30,7 +30,7 @@ impl World {
         shape: i8,
     ) -> Result<(), SimError> {
         let mut queues: BTreeMap<usize, Vec<Order>> = self
-            .owned(player, ids, cat::MOBILE)
+            .owned_or_raising(player, ids, cat::MOBILE)
             .into_iter()
             .map(|row| {
                 let q = self

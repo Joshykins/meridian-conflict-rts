@@ -194,7 +194,7 @@ impl World {
     ) -> Result<(), SimError> {
         let pos = self.clamp_to_map(pos);
         let rows: Vec<usize> = self
-            .owned(player, ids, 0)
+            .owned_or_raising(player, ids, 0)
             .into_iter()
             .filter(|&r| self.bp(r).dash.is_some())
             .collect();

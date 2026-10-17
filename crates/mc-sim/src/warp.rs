@@ -124,7 +124,7 @@ impl World {
         queue: bool,
     ) -> Result<(), SimError> {
         let rows: Vec<usize> = self
-            .owned(player, ids, 0)
+            .owned_or_raising(player, ids, 0)
             .into_iter()
             .filter(|&r| self.bp(r).warp.is_some())
             .collect();
