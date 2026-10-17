@@ -66,7 +66,7 @@
 
 use super::hull_frame::GunFrame;
 use super::star_core_fx::{LAVENDER, ROSE, STAR};
-use super::{Puff, Renderer, PUFF_RING};
+use super::{Puff, Renderer};
 use crate::gpu_consts::{fade_beam, plasma_look, puff};
 use glam::Vec3;
 use mc_data::{BlueprintId, PlasmaGrade, Trajectory, Weapon};
@@ -74,7 +74,6 @@ use mc_sim::mirror::{
     HousePose, ProjectileInstance, UnitInstance, KIND_GHOST, KIND_WRECK, PROJECTILE_ENDS_SHIFT,
     PROJECTILE_FADE_BEAM, PROJECTILE_MISSILE, PROJECTILE_STARTS_SHIFT,
 };
-use std::mem::size_of;
 
 mod airburst;
 mod burning;
@@ -1295,11 +1294,7 @@ impl Renderer {
                 self.scatter.unit().min(0.999) + f32::from(linger),
             ],
         };
-        self.puffs.write(
-            (self.puff_cursor * size_of::<Puff>()) as u64,
-            bytemuck::bytes_of(&p),
-        );
-        self.puff_cursor = (self.puff_cursor + 1) % PUFF_RING;
+        self.write_puff(&p);
     }
 }
 

@@ -30,14 +30,13 @@
 
 mod nanite;
 
-use super::{Puff, Renderer, PUFF_RING, PUFF_SPARK};
+use super::{Puff, Renderer, PUFF_SPARK};
 use crate::camera::Camera;
 use crate::gpu_consts::puff;
 use glam::Vec3;
 use mc_data::WarpStyle;
 use mc_sim::mirror::{RenderFrame, WarpView};
 use mc_sim::tables::WarpPhase;
-use std::mem::size_of;
 
 const PUFF_WARP_GLOW: f32 = puff::WARP_GLOW as f32;
 const PUFF_WARP_STREAK: f32 = puff::WARP_STREAK as f32;
@@ -687,11 +686,7 @@ impl Renderer {
             life,
             params: [size.0, size.1, kind, self.scatter.unit()],
         };
-        self.puffs.write(
-            (self.puff_cursor * size_of::<Puff>()) as u64,
-            bytemuck::bytes_of(&p),
-        );
-        self.puff_cursor = (self.puff_cursor + 1) % PUFF_RING;
+        self.write_puff(&p);
     }
 }
 

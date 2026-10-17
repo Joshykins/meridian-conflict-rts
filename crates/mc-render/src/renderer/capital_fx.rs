@@ -37,13 +37,12 @@
 //! draw only the plumes and lamps.
 
 use super::water_fx::{PUFF_DROPLET, PUFF_SPRAY};
-use super::{Puff, Renderer, PUFF_CLOUD_WISP, PUFF_RING, PUFF_SHOCK_DUST};
+use super::{Puff, Renderer, PUFF_CLOUD_WISP, PUFF_SHOCK_DUST};
 use crate::gpu_consts;
 use crate::models::CapitalLamps;
 use glam::{Vec2, Vec3};
 use mc_sim::mirror::UnitInstance;
 use std::collections::HashMap;
-use std::mem::size_of;
 
 /// A drive plume: a ribbon from the nozzle along `vel` (axis times length), carried
 /// with the ship (`appearance.xyz`), `appearance.w` its heat (0 idle to 1 full).
@@ -699,11 +698,7 @@ impl Renderer {
             life,
             params,
         };
-        self.puffs.write(
-            (self.puff_cursor * size_of::<Puff>()) as u64,
-            bytemuck::bytes_of(&p),
-        );
-        self.puff_cursor = (self.puff_cursor + 1) % PUFF_RING;
+        self.write_puff(&p);
     }
 
     /// A drive puff: like `push_puff_with_motion`, with the heat in `appearance.w`.
@@ -731,11 +726,7 @@ impl Renderer {
             life,
             params: [size.0, size.1, kind, self.scatter.unit()],
         };
-        self.puffs.write(
-            (self.puff_cursor * size_of::<Puff>()) as u64,
-            bytemuck::bytes_of(&p),
-        );
-        self.puff_cursor = (self.puff_cursor + 1) % PUFF_RING;
+        self.write_puff(&p);
     }
 
     /// The drives' and the lamps' light this frame, `alpha` of the way through the tick.

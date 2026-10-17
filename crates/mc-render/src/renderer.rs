@@ -50,6 +50,7 @@ mod damper_fx;
 mod dash_fx;
 mod dive_fx;
 mod drive_swing;
+mod fx_ring;
 pub use capture::Shot;
 mod burn_site;
 mod city_fx;
@@ -182,6 +183,23 @@ pub const MAX_EFFECTS: usize = 2048;
 pub const MAX_SHOCKWAVES: usize = 64;
 /// Must match the missile mesh dimensions in sprites.wgsl (`missile_half_length`): a
 /// rocket sized to its tube (`caliber` across) or, with none, from its `size`.
+/// Puffs that come by the dozen and make a cloud between them (dust, smoke, clods,
+/// sparks, shards, casings, spray and droplets, shrapnel): fewer and bigger reads as the
+/// same cloud. Trails, plumes, fireballs and rings are each a shape and always laid.
+fn fine_puff(kind: f32) -> bool {
+    kind == PUFF_DUST
+        || kind == PUFF_SMOKE
+        || kind == PUFF_CLOD
+        || kind == PUFF_SPARK
+        || kind == PUFF_SHARD
+        || kind == PUFF_SHOCK_DUST
+        || kind == PUFF_SHOCK_SMOKE
+        || kind == PUFF_CASING
+        || kind == water_fx::PUFF_DROPLET
+        || kind == water_fx::PUFF_SPRAY
+        || kind == flak_fx::PUFF_SHRAPNEL
+}
+
 fn missile_half_length(size: f32, caliber: f32) -> f32 {
     if caliber > 0.0 {
         caliber / 0.28
@@ -204,7 +222,7 @@ const SMOKERS: usize = 2000;
 /// Most shots, hits and discharges a tick whose flash and sparks are drawn, the nearest
 /// the camera's focus (`upload_sim`).
 const SMALL_EVENTS: usize = 1200;
-pub const MAX_PUFFS: usize = 24576 + nuke_fx::NUKE_PUFF_SLOTS;
+pub const MAX_PUFFS: usize = 131_072 + nuke_fx::NUKE_PUFF_SLOTS;
 /// Tail of the puff buffer. Smoke over a fire is rewritten here every frame,
 /// so a carpet cannot wrap the ring and erase a column halfway through.
 const GROUND_FIRE_SLOTS: usize = 512;
@@ -1067,11 +1085,11 @@ pub struct Renderer {
     pad_count: u32,
     /// The ore fields on the ground and the mines' reaches they dim under.
     ore: ore_fields::OreFields,
-    effect_cursor: usize,
+    effect_ring: fx_ring::FxRing,
     shockwave_cursor: usize,
     /// When each shockwave slot's wave is over, so the tone map visits only live ones.
     shockwave_ends: [f32; MAX_SHOCKWAVES],
-    puff_cursor: usize,
+    puff_ring: fx_ring::FxRing,
     shield_count: u32,
     hull_shield_count: u32,
     /// Per model (blueprint): its first draw slot and how many (one per LOD).
@@ -2633,10 +2651,10 @@ impl Renderer {
             stain_runs: [0; 2],
             pad_count: 0,
             ore,
-            effect_cursor: 0,
+            effect_ring: fx_ring::FxRing::new(EFFECT_RING),
             shockwave_cursor: 0,
             shockwave_ends: [f32::NEG_INFINITY; MAX_SHOCKWAVES],
-            puff_cursor: 0,
+            puff_ring: fx_ring::FxRing::new(PUFF_RING),
             shield_count: 0,
             hull_shield_count: 0,
             model_draws,
@@ -3653,11 +3671,12 @@ impl Renderer {
             start,
             params: [radius, life, kind, ring],
         };
-        self.effects.write(
-            (self.effect_cursor * size_of::<Effect>()) as u64,
-            bytemuck::bytes_of(&e),
-        );
-        self.effect_cursor = (self.effect_cursor + 1) % EFFECT_RING;
+        let (at, cut) = self.effect_ring.take(start, start + life);
+        if cut {
+            mc_core::perf_count!("fx.effects_cut");
+        }
+        self.effects
+            .write((at * size_of::<Effect>()) as u64, bytemuck::bytes_of(&e));
     }
 
     /// An expanding 3D pressure sphere. `radius` is the reach in metres.
@@ -3780,6 +3799,17 @@ impl Renderer {
         }
     }
 
+    /// Puts `p` in the puff ring's next slot.
+    fn write_puff(&mut self, p: &Puff) {
+        mc_core::perf_count!("fx.puffs");
+        let (at, cut) = self.puff_ring.take(p.start, p.start + p.life);
+        if cut {
+            mc_core::perf_count!("fx.puffs_cut");
+        }
+        self.puffs
+            .write((at * size_of::<Puff>()) as u64, bytemuck::bytes_of(p));
+    }
+
     fn push_puff(
         &mut self,
         kind: f32,
@@ -3814,6 +3844,20 @@ impl Renderer {
         {
             return;
         }
+        if !self.puff_ring.seen(pos, vel, life, size.0.max(size.1)) {
+            mc_core::perf_count!("fx.puffs_unseen");
+            return;
+        }
+        // Fine stuff, one of many: laid sparser and bigger when the ring runs full.
+        let size = if fine_puff(kind) {
+            let Some(grow) = self.puff_ring.thin() else {
+                mc_core::perf_count!("fx.puffs_thinned");
+                return;
+            };
+            (size.0 * grow, size.1 * grow)
+        } else {
+            size
+        };
         // An origin this high marks a puff no shield clips (puffs.wgsl `fs_puff`).
         let origin = if outbound {
             Vec3::new(pos.x, pos.y, PUFF_UNCLIPPED_Z)
@@ -3871,11 +3915,7 @@ impl Renderer {
             life,
             params: [size.0, size.1, kind, seed],
         };
-        self.puffs.write(
-            (self.puff_cursor * size_of::<Puff>()) as u64,
-            bytemuck::bytes_of(&p),
-        );
-        self.puff_cursor = (self.puff_cursor + 1) % PUFF_RING;
+        self.write_puff(&p);
     }
 
     fn push_mark(&mut self, mark: TrackMark) {
@@ -6124,18 +6164,20 @@ mod shockwave_tests {
                 }
             }
         }
-        let cursor = renderer.puff_cursor;
+        let cursor = renderer.puff_ring.cursor();
         renderer.effect_settings.dust_visibility = 0.0;
         renderer.push_puff(PUFF_SHOCK_DUST, center, Vec3::Z, 20.0, 2.0, (5.0, 10.0));
         assert_eq!(
-            renderer.puff_cursor, cursor,
+            renderer.puff_ring.cursor(),
+            cursor,
             "zero visibility must disable emission"
         );
         renderer.effect_settings.dust_visibility = 1.0;
         renderer.effect_settings.dust_lifetime = 0.0;
         renderer.push_puff(PUFF_SMOKE, center, Vec3::Z, 20.0, 2.0, (5.0, 10.0));
         assert_eq!(
-            renderer.puff_cursor, cursor,
+            renderer.puff_ring.cursor(),
+            cursor,
             "zero lifetime must disable emission"
         );
     }

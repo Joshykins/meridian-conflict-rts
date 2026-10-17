@@ -52,6 +52,8 @@ impl Renderer {
 
     fn render_frame(&mut self, input: &FrameInput) -> Result<bool, GpuError> {
         let device = self.gpu.device.clone();
+        // Puffs laid this frame are judged by what it shows (`FxRing::seen`).
+        self.puff_ring.set_view(input.camera);
         {
             // Time spent waiting for the GPU to finish the frame before this one.
             let _t = mc_core::perf_span!("cpu.gpu_wait");
