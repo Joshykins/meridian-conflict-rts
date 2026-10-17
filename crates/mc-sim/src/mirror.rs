@@ -2272,22 +2272,21 @@ impl World {
 
         // A drone docked on an aircraft rides it as it is drawn, heave, sway and lean
         // included (`entity.wgsl` `riding_frame`): it names its carrier's instance.
-        let riders: Vec<(usize, u32)> = frame
+        // Found from the sim's drone column, nearly all empty, not by looking every
+        // instance's row up (2 ms a tick for 100 000 units with not a drone among them).
+        let riders: Vec<(u32, u32)> = s
             .units
+            .slots
             .iter()
-            .enumerate()
-            .filter(|(_, u)| u.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST) == 0)
-            .filter_map(|(i, u)| {
-                let row = s.units.row(crate::Handle(u.unit_id))?;
-                Some((i, s.units.id(self.drone_riding(row)?).0))
-            })
+            .filter(|&row| s.units.drone_parent[row] != crate::Handle::NONE)
+            .filter_map(|row| Some((s.units.id(row).0, s.units.id(self.drone_riding(row)?).0)))
             .collect();
         if !riders.is_empty() {
             let drawn = drawn_units(&frame.units);
-            for (i, carrier) in riders {
-                if let Some(at) = drawn_at(&drawn, carrier) {
-                    frame.units[i].status[0] |= UNIT_RIDING;
-                    frame.units[i].status[2] = at + 1;
+            for (rider, carrier) in riders {
+                if let (Some(i), Some(at)) = (drawn_at(&drawn, rider), drawn_at(&drawn, carrier)) {
+                    frame.units[i as usize].status[0] |= UNIT_RIDING;
+                    frame.units[i as usize].status[2] = at + 1;
                 }
             }
         }

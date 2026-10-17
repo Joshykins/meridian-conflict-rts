@@ -171,38 +171,35 @@ impl World {
             frame.beams.push(beam);
         }
         // Sites of a faction that builds with nanites condense out of a swarm, and its
-        // refits go up the same way.
-        for u in frame.units.iter_mut() {
-            let working = u.owner_flags & ((crate::tables::flag::UNDER_CONSTRUCTION as u32) << 8)
-                != 0
-                || (u.upgrade > 0.0 && u.upgrade < 1.0);
-            if u.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST) == 0
-                && working
-                && self
-                    .blueprints
-                    .units
-                    .get(u.blueprint as usize)
-                    .is_some_and(|b| self.faction_uses_nanites(b.faction))
-            {
-                u.status[1] |= UNIT_NANITE;
-            }
-        }
-        // Round each Regency site at work, its swarm and rings: one record a site,
-        // timed by the site's id with bits 27..31 set (no stream's source has them all). A
-        // Regency refit gets the same, fed or not: it goes up the way a new hull does.
+        // refits go up the same way. Round each Regency site at work, its swarm and rings:
+        // one record a site, timed by the site's id with bits 27..31 set (no stream's
+        // source has them all). A Regency refit gets the same, fed or not: it goes up the
+        // way a new hull does. One look over the instances for both, and none at all with
+        // nothing being printed or refitted.
         nanite_sites.sort_unstable();
         nanite_sites.dedup();
-        for u in frame.units.iter() {
-            let printing = (crate::tables::flag::UNDER_CONSTRUCTION as u32) << 8;
-            let fed =
-                u.owner_flags & printing != 0 && nanite_sites.binary_search(&u.unit_id).is_ok();
-            let refit = u.upgrade > 0.0 && u.upgrade < 1.0 && u.status[1] & UNIT_NANITE != 0;
-            if !fed && !refit {
+        let printing = (crate::tables::flag::UNDER_CONSTRUCTION as u32) << 8;
+        for u in frame.units.iter_mut() {
+            let refitting = u.upgrade > 0.0 && u.upgrade < 1.0;
+            if u.owner_flags & printing == 0 && !refitting {
+                continue;
+            }
+            if u.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST) != 0 {
                 continue;
             }
             let Some(bp) = self.blueprints.units.get(u.blueprint as usize) else {
                 continue;
             };
+            let nanites = self.faction_uses_nanites(bp.faction);
+            if nanites {
+                u.status[1] |= UNIT_NANITE;
+            }
+            let fed =
+                u.owner_flags & printing != 0 && nanite_sites.binary_search(&u.unit_id).is_ok();
+            let refit = refitting && nanites;
+            if !fed && !refit {
+                continue;
+            }
             let height = bp.height.to_f32();
             // Where the hull has condensed to (`nanite_grow` in entity.wgsl); a refit's
             // work climbs it as the refit goes.

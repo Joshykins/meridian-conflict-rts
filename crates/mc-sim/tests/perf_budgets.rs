@@ -453,6 +453,8 @@ fn a_late_battlefield() {
 /// `MERIDIAN_SCALE_TICKS` plays that many ticks of each case instead of 300, and
 /// `MERIDIAN_SCALE_EVERY=N` prints every Nth tick's time, its orders phase and the
 /// units left, to see a fight's course (the approach, the merge, the melee).
+/// `MERIDIAN_SCALE_MIRROR=1` also writes the render mirror before every tick, as a
+/// match's sim thread does after each, and the table ends with what that cost.
 #[test]
 #[ignore]
 fn zz_scale_probe() {
@@ -483,8 +485,16 @@ fn zz_scale_probe() {
         };
         let cpu_before = thread_cpu_ns();
         let every: u32 = std::env::var("MERIDIAN_SCALE_EVERY").map_or(0, |n| n.parse().unwrap());
+        let mirror = std::env::var("MERIDIAN_SCALE_MIRROR").is_ok_and(|v| v == "1");
+        let mut frame = mc_sim::mirror::RenderFrame::default();
+        let mut mirror_ns = 0u128;
         let report = w
             .perf_ticks(&format!("scale {case}"), ticks, |t, w| {
+                if mirror && t > 0 {
+                    let started = std::time::Instant::now();
+                    w.write_render_frame(None, &mut frame);
+                    mirror_ns += started.elapsed().as_nanos();
+                }
                 if every > 0 && t > 0 && t % every == 0 {
                     let phase = |name| {
                         w.timings
@@ -504,6 +514,10 @@ fn zz_scale_probe() {
             })
             .unwrap();
         println!("{}", report.text());
+        if mirror {
+            let per_tick = mirror_ns as f64 / ticks.saturating_sub(1).max(1) as f64 / 1e6;
+            println!("   mirror ms per tick: {per_tick:.2}");
+        }
         if serial {
             let per_tick = (thread_cpu_ns() - cpu_before) as f64 / ticks as f64 / 1e6;
             println!("   cpu ms per tick (this thread): {per_tick:.2}");
