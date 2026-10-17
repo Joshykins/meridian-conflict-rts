@@ -1241,11 +1241,26 @@ fn surf_resolved(cell: f32, px: f32) -> f32 {
 
 // Noise around zero from three octaves, each dropped as it goes under the pixel.
 fn surf_fbm3(p: vec3<f32>, cell: f32, px: f32) -> f32 {
-    var sum = (surf_noise3(p / cell) - 0.5) * surf_resolved(cell, px);
+    // An octave too fine to resolve weighs nothing, so it is not worked out at all; each
+    // octave is finer than the last, so once one is gone the rest are too. A unit a few
+    // pixels across asks for dozens of octaves a pixel and resolves none of them.
+    let w1 = surf_resolved(cell, px);
+    if w1 <= 0.0 {
+        return 0.0;
+    }
+    var sum = (surf_noise3(p / cell) - 0.5) * w1;
     let c2 = cell * 0.41;
-    sum += (surf_noise3(p / c2 + vec3<f32>(17.1, 9.2, 5.3)) - 0.5) * 0.5 * surf_resolved(c2, px);
+    let w2 = surf_resolved(c2, px);
+    if w2 <= 0.0 {
+        return sum;
+    }
+    sum += (surf_noise3(p / c2 + vec3<f32>(17.1, 9.2, 5.3)) - 0.5) * 0.5 * w2;
     let c3 = cell * 0.17;
-    sum += (surf_noise3(p / c3 + vec3<f32>(3.7, 21.4, 11.9)) - 0.5) * 0.25 * surf_resolved(c3, px);
+    let w3 = surf_resolved(c3, px);
+    if w3 <= 0.0 {
+        return sum;
+    }
+    sum += (surf_noise3(p / c3 + vec3<f32>(3.7, 21.4, 11.9)) - 0.5) * 0.25 * w3;
     return sum;
 }
 
@@ -1350,14 +1365,22 @@ fn surf_dirt(p_model: vec3<f32>, rise: f32, up: f32, kick: f32, grit: f32, seam:
     let cake = caked * saturate(0.95 + drying * 0.6 + grain * 0.8);
     // Spatter flung up past it: flecks a few centimetres across, thicker low down.
     let fleck_cell = 0.018;
-    let flecks = surf_blot(surf_noise3(p / fleck_cell + vec3<f32>(41.0, 13.0, 29.0)),
-        mix(0.6, 0.8, saturate(rise * 0.8)), fleck_cell, px) * (1.0 - smoothstep(0.8, 1.4, at));
+    // (`surf_blot` reads its noise only once the cell is resolved: not looked up till then.)
+    var fleck_noise = 0.0;
+    if surf_resolved(fleck_cell, px) > 0.0 {
+        fleck_noise = surf_noise3(p / fleck_cell + vec3<f32>(41.0, 13.0, 29.0));
+    }
+    let flecks = surf_blot(fleck_noise, mix(0.6, 0.8, saturate(rise * 0.8)), fleck_cell, px)
+        * (1.0 - smoothstep(0.8, 1.4, at));
     let thrown = max(max(film * 0.8, cake), flecks * 0.8) * kick;
 
     // Runs down the steep faces: grime washed from the ledges in narrow streaks.
     let steep = 1.0 - smoothstep(0.35, 0.8, abs(up));
     let run_cell = 0.05;
-    let run = surf_noise3(vec3<f32>(hz.x / run_cell, hz.y / run_cell, hz.z / 0.9) + vec3<f32>(3.0, 19.0, 7.0));
+    var run = 0.0;
+    if surf_resolved(run_cell, px) > 0.0 {
+        run = surf_noise3(vec3<f32>(hz.x / run_cell, hz.y / run_cell, hz.z / 0.9) + vec3<f32>(3.0, 19.0, 7.0));
+    }
     let runs = surf_blot(run, 0.62, run_cell, px) * steep;
     // A thin, even dust on what faces the sky. Barely varied: the grain at full strength
     // mottled a sunlit deck into a checker of 5 cm squares.

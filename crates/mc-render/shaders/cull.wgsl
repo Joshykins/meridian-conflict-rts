@@ -140,9 +140,10 @@ fn thin_scale(index: u32, px: f32) -> f32 {
 // triangles, most of its frame, in wrecks a few dozen pixels across. A live unit that
 // small is its icon instead; a wreck has none.
 const WRECK_TRIS_PER_PX: f32 = 2.0;
+const UNIT_TRIS_PER_PX: f32 = 0.5;
 
-fn wreck_level(model: ModelInfo, px: f32, level: u32) -> u32 {
-    let room = WRECK_TRIS_PER_PX * 3.14159 * px * px;
+fn dense_level(model: ModelInfo, px: f32, level: u32, per_px: f32) -> u32 {
+    let room = per_px * 3.14159 * px * px;
     var l = level;
     while l < LOD_FAR - 1u && f32(slots[model.slot + l].index_count) > 3.0 * room {
         l += 1u;
@@ -229,7 +230,9 @@ fn classify(e: Entity, index: u32, dynamic: bool) -> u32 {
         level = 1u;
     }
     if (flags & KIND_WRECK) != 0u {
-        level = wreck_level(model, px, level);
+        level = dense_level(model, px, level, WRECK_TRIS_PER_PX);
+    } else if (flags & KIND_PROP) == 0u {
+        level = dense_level(model, px, level, UNIT_TRIS_PER_PX);
     }
     if level < LOD_FAR - 1u {
         return model.slot + level;

@@ -3642,6 +3642,9 @@ fn shade_entity(in: VsOut) -> vec4<f32> {
         // rubber but is not a belt. The crawl is already in uv.x (vertex stage, from the
         // ground covered); afloat the belt has nothing to drive on and stands still.
         tread = 0.45;
+    }
+    // The links blend in over the last 500 m (`detail` below): past that they are left out.
+    if in.material == MAT_TREAD && (in.model_class & CLASS_NO_BELT) == 0u && dist < 500.0 {
         let pitch = tread_pitch(in.weld.z);
         let along = in.uv.x / pitch;
         let detail = clamp(1.0 - dist / 500.0, 0.0, 1.0);
