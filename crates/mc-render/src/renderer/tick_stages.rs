@@ -123,9 +123,14 @@ impl Renderer {
                 drop(pre);
                 let reach = camera.distance * 3.0 + 1500.0;
                 let blueprints = &self.blueprints;
-                let drawn = drawn_events(&frame.events, camera.focus, reach, |b, w| {
-                    blueprints.unit(b).weapons[w as usize].beam
-                });
+                let ring = &self.puff_ring;
+                let drawn = drawn_events(
+                    &frame.events,
+                    camera.focus,
+                    reach,
+                    |at| ring.seen(at, Vec3::ZERO, 1.0, 6.0),
+                    |b, w| blueprints.unit(b).weapons[w as usize].beam,
+                );
                 {
                     let _t = mc_core::perf_span!("ev.effects");
                     for (event, drawn) in frame.events.iter().zip(drawn) {
@@ -345,9 +350,10 @@ impl Renderer {
 
 /// Which of a tick's events have their effects drawn. A shot, a hit or a charged shell's
 /// discharge makes a flash and sparks gone in under a second. Far past `reach` from the
-/// camera's `focus` they are out of sight, and of a sky-wide air war's tens of thousands a
-/// tick only the nearest `SMALL_EVENTS` are drawn (a deliberate cap: they are cosmetic,
-/// and the shots themselves are drawn whatever). Their craters and the clouds they stir
+/// camera's `focus`, or where the view cannot take them in (`in_view`), they are out of
+/// sight, and of the rest only the nearest `SMALL_EVENTS` are drawn (a deliberate cap:
+/// they are cosmetic, and the shots themselves are drawn whatever; off-screen fights no
+/// longer count against it, so it holds a battle filling the screen). Their craters and the clouds they stir
 /// are still made. A held beam's shot and strike (`beam` of its blueprint and weapon) are
 /// always drawn: they are what feeds the beam (`plasma_fx`), and it goes out on a tick
 /// without them, so a big fight near it, or its ship far off, would put it out.
@@ -355,6 +361,7 @@ fn drawn_events(
     events: &[SimEvent],
     focus: Vec3,
     reach: f32,
+    in_view: impl Fn(Vec3) -> bool,
     beam: impl Fn(mc_data::BlueprintId, u8) -> bool,
 ) -> Vec<bool> {
     let small: Vec<(f32, usize)> = events
@@ -370,7 +377,9 @@ fn drawn_events(
             SimEvent::ShotFired { pos, .. }
             | SimEvent::Impact { pos, .. }
             | SimEvent::ShellDischarge { to: pos, .. } => {
-                Some((Vec3::from(pos.to_f32()).distance(focus), i))
+                let at = Vec3::from(pos.to_f32());
+                let d = at.distance(focus);
+                Some((if in_view(at) { d } else { f32::INFINITY }, i))
             }
             _ => None,
         })
@@ -415,7 +424,7 @@ mod tests {
         let mut events: Vec<SimEvent> = (0..SMALL_EVENTS as i32 + 50).map(|x| shot(0, x)).collect();
         events.push(shot(1, 1000));
         events.push(shot(1, 1_000_000));
-        let drawn = drawn_events(&events, Vec3::ZERO, 5000.0, |b, _| b.0 == 1);
+        let drawn = drawn_events(&events, Vec3::ZERO, 5000.0, |_| true, |b, _| b.0 == 1);
         assert_eq!(drawn.iter().filter(|&&d| d).count(), SMALL_EVENTS + 2);
         assert!(drawn[drawn.len() - 2] && drawn[drawn.len() - 1]);
         assert!(

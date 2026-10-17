@@ -178,7 +178,9 @@ pub const MAX_HOUSES: usize = mc_sim::tables::MAX_UNITS + EXTRA_HOUSES;
 const EXTRA_HOUSES: usize = 4096;
 /// Selection rings and status bars: at most one per unit or wreck drawn.
 pub const MAX_MARKS: usize = mc_sim::tables::MAX_UNITS + mc_sim::tables::MAX_WRECKS;
-pub const MAX_EFFECTS: usize = 2048;
+/// Flash sprites in flight. A screen-filling battle's tick draws thousands of shots' and
+/// hits' flashes (`SMALL_EVENTS`), each a few ticks long.
+pub const MAX_EFFECTS: usize = 32_768;
 /// Expanding 3D pressure spheres. The oldest are overwritten.
 pub const MAX_SHOCKWAVES: usize = 64;
 /// Must match the missile mesh dimensions in sprites.wgsl (`missile_half_length`): a
@@ -221,7 +223,7 @@ const CRASH_TRAILS: usize = 1500;
 const SMOKERS: usize = 2000;
 /// Most shots, hits and discharges a tick whose flash and sparks are drawn, the nearest
 /// the camera's focus (`upload_sim`).
-const SMALL_EVENTS: usize = 1200;
+const SMALL_EVENTS: usize = 6000;
 pub const MAX_PUFFS: usize = 131_072 + nuke_fx::NUKE_PUFF_SLOTS;
 /// Tail of the puff buffer. Smoke over a fire is rewritten here every frame,
 /// so a carpet cannot wrap the ring and erase a column halfway through.
