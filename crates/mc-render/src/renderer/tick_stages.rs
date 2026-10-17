@@ -121,37 +121,11 @@ impl Renderer {
                 // Before the events: a Lance's strike and a shell's landing read this tick's Shapers.
                 self.progenitor_tick(frame, time);
                 drop(pre);
-                // A shot, a hit or a charged shell's discharge makes a flash and sparks gone in
-                // under a second. Far past what the camera shows they are out of sight, and of a
-                // sky-wide air war's tens of thousands a tick only the nearest `SMALL_EVENTS`
-                // are drawn (a deliberate cap: they are cosmetic, and the shots themselves are
-                // drawn whatever). Their craters and the clouds they stir are still made.
                 let reach = camera.distance * 3.0 + 1500.0;
-                let small: Vec<(f32, usize)> = frame
-                    .events
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(i, event)| match event {
-                        SimEvent::ShotFired { pos, .. }
-                        | SimEvent::Impact { pos, .. }
-                        | SimEvent::ShellDischarge { to: pos, .. } => {
-                            Some((Vec3::from(pos.to_f32()).distance(camera.focus), i))
-                        }
-                        _ => None,
-                    })
-                    .collect();
-                let mut drawn = vec![true; frame.events.len()];
-                for &(d, i) in &small {
-                    drawn[i] = d <= reach;
-                }
-                let mut near: Vec<(f32, usize)> =
-                    small.into_iter().filter(|&(d, _)| d <= reach).collect();
-                if near.len() > SMALL_EVENTS {
-                    near.select_nth_unstable_by(SMALL_EVENTS, |a, b| a.0.total_cmp(&b.0));
-                    for &(_, i) in &near[SMALL_EVENTS..] {
-                        drawn[i] = false;
-                    }
-                }
+                let blueprints = &self.blueprints;
+                let drawn = drawn_events(&frame.events, camera.focus, reach, |b, w| {
+                    blueprints.unit(b).weapons[w as usize].beam
+                });
                 {
                     let _t = mc_core::perf_span!("ev.effects");
                     for (event, drawn) in frame.events.iter().zip(drawn) {
@@ -369,9 +343,86 @@ impl Renderer {
     }
 }
 
+/// Which of a tick's events have their effects drawn. A shot, a hit or a charged shell's
+/// discharge makes a flash and sparks gone in under a second. Far past `reach` from the
+/// camera's `focus` they are out of sight, and of a sky-wide air war's tens of thousands a
+/// tick only the nearest `SMALL_EVENTS` are drawn (a deliberate cap: they are cosmetic,
+/// and the shots themselves are drawn whatever). Their craters and the clouds they stir
+/// are still made. A held beam's shot and strike (`beam` of its blueprint and weapon) are
+/// always drawn: they are what feeds the beam (`plasma_fx`), and it goes out on a tick
+/// without them, so a big fight near it, or its ship far off, would put it out.
+fn drawn_events(
+    events: &[SimEvent],
+    focus: Vec3,
+    reach: f32,
+    beam: impl Fn(mc_data::BlueprintId, u8) -> bool,
+) -> Vec<bool> {
+    let small: Vec<(f32, usize)> = events
+        .iter()
+        .enumerate()
+        .filter_map(|(i, event)| match event {
+            SimEvent::ShotFired {
+                blueprint, weapon, ..
+            }
+            | SimEvent::Impact {
+                blueprint, weapon, ..
+            } if beam(*blueprint, *weapon) => None,
+            SimEvent::ShotFired { pos, .. }
+            | SimEvent::Impact { pos, .. }
+            | SimEvent::ShellDischarge { to: pos, .. } => {
+                Some((Vec3::from(pos.to_f32()).distance(focus), i))
+            }
+            _ => None,
+        })
+        .collect();
+    let mut drawn = vec![true; events.len()];
+    for &(d, i) in &small {
+        drawn[i] = d <= reach;
+    }
+    let mut near: Vec<(f32, usize)> = small.into_iter().filter(|&(d, _)| d <= reach).collect();
+    if near.len() > SMALL_EVENTS {
+        near.select_nth_unstable_by(SMALL_EVENTS, |a, b| a.0.total_cmp(&b.0));
+        for &(_, i) in &near[SMALL_EVENTS..] {
+            drawn[i] = false;
+        }
+    }
+    drawn
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use mc_core::{Fx, FxVec3};
+    use mc_data::{BlueprintId, WeaponColor};
+
+    fn shot(blueprint: u16, x: i32) -> SimEvent {
+        SimEvent::ShotFired {
+            pos: FxVec3::new(Fx::from_int(x), Fx::ZERO, Fx::ZERO),
+            vel: FxVec3::ZERO,
+            travel: FxVec3::ZERO,
+            color: WeaponColor::Orange,
+            owner: 0,
+            blueprint: BlueprintId(blueprint),
+            weapon: 0,
+            gun: 0,
+        }
+    }
+
+    /// A held beam (blueprint 1 here) is fed by its shot every tick: neither a crowd of
+    /// nearer shots nor its distance from the camera may drop it, or the beam goes out.
+    #[test]
+    fn a_held_beams_shot_is_always_drawn() {
+        let mut events: Vec<SimEvent> = (0..SMALL_EVENTS as i32 + 50).map(|x| shot(0, x)).collect();
+        events.push(shot(1, 1000));
+        events.push(shot(1, 1_000_000));
+        let drawn = drawn_events(&events, Vec3::ZERO, 5000.0, |b, _| b.0 == 1);
+        assert_eq!(drawn.iter().filter(|&&d| d).count(), SMALL_EVENTS + 2);
+        assert!(drawn[drawn.len() - 2] && drawn[drawn.len() - 1]);
+        assert!(
+            !drawn[SMALL_EVENTS + 10],
+            "a far ordinary shot over the cap is drawn"
+        );
+    }
 
     /// The weapons' beams and strokes go in the projectile list the tick's own frame
     /// writes; run on a later frame, they were drawn only from then to the next tick.
