@@ -140,7 +140,7 @@ fn thin_scale(index: u32, px: f32) -> f32 {
 // triangles, most of its frame, in wrecks a few dozen pixels across. A live unit that
 // small is its icon instead; a wreck has none.
 const WRECK_TRIS_PER_PX: f32 = 2.0;
-const UNIT_TRIS_PER_PX: f32 = 0.5;
+const UNIT_TRIS_PER_PX: f32 = 0.3;
 
 fn dense_level(model: ModelInfo, px: f32, level: u32, per_px: f32) -> u32 {
     let room = per_px * 3.14159 * px * px;

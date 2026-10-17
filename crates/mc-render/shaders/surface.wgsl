@@ -1428,9 +1428,13 @@ fn surface_at(i: SurfaceIn) -> Surface {
         hollow = mix(1.0, mix(0.4, 1.0, smoothstep(0.2, 0.72, h0)), saturate(surf_seam_depth(i) - 1.0));
         // Seams cut as deep as the skin says.
         let depth = bevel * 0.85 * surf_seam_depth(i);
-        out.slope = vec2<f32>(surf_relief(i, st + vec2<f32>(e, 0.0)) - h0, surf_relief(i, st + vec2<f32>(0.0, e)) - h0) * (depth / e);
-        // Nothing to resolve once a bevel is a small part of a pixel.
-        out.slope *= 1.0 - smoothstep(bevel * 3.0, bevel * 9.0, fw);
+        // Nothing to resolve once a bevel is a small part of a pixel: the two more
+        // looks at the relief its slope takes are not made then (a unit a few dozen
+        // pixels across has every face past that).
+        let resolved = 1.0 - smoothstep(bevel * 3.0, bevel * 9.0, fw);
+        if resolved > 0.0 {
+            out.slope = vec2<f32>(surf_relief(i, st + vec2<f32>(e, 0.0)) - h0, surf_relief(i, st + vec2<f32>(0.0, e)) - h0) * (depth / e) * resolved;
+        }
 
         let small = select(min(i.half.x, i.half.y), i.half.y, i.wraps);
         let outlined = smoothstep(bevel * 2.5, bevel * 5.0, small);
