@@ -16,11 +16,16 @@ use crate::gpu_consts::stain;
 use glam::{Vec2, Vec3};
 use mc_sim::mirror::{SimEvent, StainInstance};
 
-/// Craters kept, at most; past that the oldest go first.
-const MAX_CRATERS: usize = 1024;
+/// Craters kept, at most; past that the oldest go first. A long artillery battle's front
+/// is thousands: at a thousand, its first craters went from the ground as it went on.
+const MAX_CRATERS: usize = 16_384;
 /// Smallest splash, metres, that digs a crater. A tank gun's round or a light rocket
 /// only scorches.
 const MIN_SPLASH: f32 = 5.0;
+/// Edge of the cells craters are found by when a shell lands, metres: at least the
+/// widest a crater grows to (16 m dug, then widened), so one a shell lands in lies in
+/// its cell or a next-door one.
+const CELL: f32 = 24.0;
 
 #[derive(Default)]
 pub(super) struct ImpactCraters {
@@ -30,6 +35,13 @@ pub(super) struct ImpactCraters {
     /// Where the next crater goes once the ring is full.
     next: usize,
     seed: u32,
+    /// The craters in each `CELL`, by index: a shell landing looks at the few round it,
+    /// not at every crater on the map.
+    cells: std::collections::HashMap<(i32, i32), Vec<u32>>,
+}
+
+fn cell_of(at: Vec2) -> (i32, i32) {
+    ((at.x / CELL).floor() as i32, (at.y / CELL).floor() as i32)
 }
 
 impl ImpactCraters {
@@ -67,23 +79,41 @@ impl ImpactCraters {
             }
             let (_, crater) = self.pending.swap_remove(i);
             let at = Vec2::from(crater.pos);
-            if let Some(old) = self
-                .craters
-                .iter_mut()
-                .find(|c| Vec2::from(c.pos).distance(at) < 0.5 * c.radius.max(crater.radius))
-            {
+            let (cx, cy) = cell_of(at);
+            let craters = &self.craters;
+            let near = (cx - 1..=cx + 1)
+                .flat_map(|x| (cy - 1..=cy + 1).map(move |y| (x, y)))
+                .filter_map(|c| self.cells.get(&c))
+                .flatten()
+                .map(|&k| k as usize)
+                .filter(|&k| {
+                    let c = &craters[k];
+                    Vec2::from(c.pos).distance(at) < 0.5 * c.radius.max(crater.radius)
+                })
+                .min();
+            if let Some(k) = near {
+                let old = &mut self.craters[k];
                 let r = old.radius.max(crater.radius);
                 old.radius = r.max((r * 1.06).min(crater.radius * 1.4));
                 let strength = ((old.strength_seed & 0xFF) + 20).min(255);
                 old.strength_seed = old.strength_seed & !0xFF | strength;
                 continue;
             }
-            if self.craters.len() < MAX_CRATERS {
+            let slot = if self.craters.len() < MAX_CRATERS {
                 self.craters.push(crater);
+                self.craters.len() - 1
             } else {
-                self.craters[self.next] = crater;
+                mc_core::perf_count!("fx.craters_recycled");
+                let slot = self.next;
+                let gone = cell_of(Vec2::from(self.craters[slot].pos));
+                if let Some(list) = self.cells.get_mut(&gone) {
+                    list.retain(|&k| k as usize != slot);
+                }
+                self.craters[slot] = crater;
                 self.next = (self.next + 1) % MAX_CRATERS;
-            }
+                slot
+            };
+            self.cells.entry((cx, cy)).or_default().push(slot as u32);
         }
     }
 }
