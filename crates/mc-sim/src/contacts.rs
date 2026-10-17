@@ -22,6 +22,13 @@ const CONTACT_PUSH_ROOM: Fx = Fx::from_int(12);
 const MOST_PUSH: Fx = Fx::from_int(6);
 /// A crowd pressed against a slope needs more passes to spread.
 const PASSES: usize = 8;
+/// Pair visits a tick's passes may make between them, at most: a crowd with more pairs
+/// than this over `PASSES` takes fewer passes, down to `FEWEST_PASSES`. A deliberate
+/// cap: a hundred thousand units in one melee part over a few ticks rather than in
+/// one, where eight passes over their 400 000 pairs were a quarter of the tick. Any
+/// fight short of about 150 000 pairs runs every pass, as it always has.
+const PAIR_VISITS: usize = 1_200_000;
+const FEWEST_PASSES: usize = 4;
 /// Tile edge: 64 m. Two hulls of up to 16 m paired within
 /// `CONTACT_PUSH_ROOM` of touching stand in the same tile or next-door ones.
 const TILE_SHIFT: u32 = 6;
@@ -100,7 +107,8 @@ impl World {
         let mut ran: Vec<Vec<(u32, bool)>> =
             turns.iter().map(|t| vec![(0, true); t.len()]).collect();
         let mut step = 0u32;
-        for _ in 0..PASSES {
+        let passes = (PAIR_VISITS / pairs.len().max(1)).clamp(FEWEST_PASSES, PASSES);
+        for _ in 0..passes {
             mc_core::perf_count!("move.pair_passes");
             let mut pushed_any = false;
             for (turn, ran) in turns.iter().zip(&mut ran) {
