@@ -22,6 +22,11 @@ fontdue = { workspace = true }
 png = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+fs4 = { workspace = true }
+
+# The native folder dialog; elsewhere the launcher asks zenity (folder.rs).
+[target.'cfg(windows)'.dependencies]
+rfd = { workspace = true }
 
 [build-dependencies]
 embed-resource = { workspace = true }

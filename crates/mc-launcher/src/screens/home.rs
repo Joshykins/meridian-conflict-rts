@@ -106,13 +106,7 @@ fn state(app: &App) -> (String, u32) {
     match (lane.newest(), lane.remote_error(), &current) {
         (Some(n), _, Some(c)) if n.number <= c.number => ("Up to date".into(), palette::GOOD),
         (Some(n), _, Some(_)) => (format!("Build {} is out", n.number), palette::ACCENT),
-        (Some(n), _, None) => (
-            format!(
-                "Not installed   \u{b7}   {} to download",
-                megabytes(app.install.versions.download_size(&n))
-            ),
-            palette::DIM,
-        ),
+        (Some(_), _, None) => ("Not installed yet".into(), palette::DIM),
         (None, Some(_), Some(_)) => (
             "Offline: the build store did not answer".into(),
             palette::WARN,
@@ -198,6 +192,13 @@ pub(super) fn status(ui: &mut Ui, app: &mut App, r: Rect) -> Option<Action> {
         stands(ui, app, x, r);
     }
 
+    // Where a first install goes, under a rule.
+    if let (Some(n), None) = (&newest, &current) {
+        if !app.lane().unreleased() {
+            install_to(ui, app, x, r, n);
+        }
+    }
+
     // An update waiting, under a rule.
     if let (Some(n), Some(c)) = (&newest, &current) {
         if n.number > c.number {
@@ -221,6 +222,101 @@ pub(super) fn status(ui: &mut Ui, app: &mut App, r: Rect) -> Option<Action> {
     }
 
     play(ui, app, r, current, newest)
+}
+
+/// Where the first build goes, with a way to change it before Install, and
+/// what the download needs of that drive.
+fn install_to(ui: &mut Ui, app: &mut App, x: f32, r: Rect, n: &mc_builds::Manifest) {
+    let (y, w) = (r.y + 236.0, r.w - 48.0);
+    ui.p.hline(x, y - 22.0, w, rgb(palette::LINE, 0.1));
+    ui.p.text(
+        x,
+        y,
+        type_scale::MICRO,
+        rgb(palette::DIM, 1.0),
+        "INSTALL TO",
+    );
+    let right = r.right() - 24.0;
+    if app.folder.asking.is_some() {
+        ui.p.text_right(
+            right,
+            y,
+            type_scale::CAPTION,
+            rgb(palette::FAINT, 1.0),
+            "Choosing\u{2026}",
+        );
+    } else if !app.builds_busy() {
+        let label = "Change Folder";
+        let lw = ui.p.text_width(type_scale::CAPTION, label);
+        if ui.link(
+            id("change-folder", 0),
+            right - lw,
+            y,
+            type_scale::CAPTION,
+            label,
+        ) {
+            app.choose_folder();
+        }
+    }
+    let path = fit_path(ui, &app.install.builds, w);
+    ui.p.text_fit(
+        x,
+        y + 26.0,
+        w,
+        type_scale::VALUE,
+        rgb(palette::TEXT, 0.95),
+        &path,
+    );
+    let room = app
+        .folder
+        .room(&app.install.versions, &app.install.builds, n, app.still);
+    let on = crate::folder::drive(&app.install.builds)
+        .map(|d| format!(" on {d}"))
+        .unwrap_or_default();
+    let (line, tone) = match room.free {
+        Some(free) if room.short() => (
+            format!(
+                "Not enough room{on}: it needs {}, and {} is free",
+                megabytes(room.needed),
+                megabytes(free)
+            ),
+            palette::WARN,
+        ),
+        Some(free) => (
+            format!(
+                "{} to download   \u{b7}   {} free{on}",
+                megabytes(room.download),
+                megabytes(free)
+            ),
+            palette::DIM,
+        ),
+        None => (
+            format!("{} to download", megabytes(room.download)),
+            palette::DIM,
+        ),
+    };
+    ui.p.text_fit(x, y + 50.0, w, type_scale::CAPTION, rgb(tone, 1.0), &line);
+}
+
+/// A path cut to `width` in its middle, so the drive and the folder it ends
+/// in both show: `C:\Users\…\Programs\Meridian Conflict`.
+pub(super) fn fit_path(ui: &mut Ui, path: &std::path::Path, width: f32) -> String {
+    let full = path.display().to_string();
+    if ui.p.text_width(type_scale::VALUE, &full) <= width {
+        return full;
+    }
+    let sep = std::path::MAIN_SEPARATOR;
+    let parts: Vec<&str> = full.split(sep).collect();
+    // Drop folders after the first until it fits, keeping at least the last.
+    for cut in 1..parts.len().saturating_sub(1) {
+        let mut kept = vec![parts[0], "\u{2026}"];
+        kept.extend(&parts[cut + 1..]);
+        let trial = kept.join(&sep.to_string());
+        if ui.p.text_width(type_scale::VALUE, &trial) <= width {
+            return trial;
+        }
+    }
+    full
 }
 
 /// The status line under the build, with the update's meter while it runs.
@@ -272,12 +368,21 @@ fn play(
     newest: Option<mc_builds::Manifest>,
 ) -> Option<Action> {
     let button = Rect::new(r.x + 16.0, r.bottom() - 16.0 - 68.0, r.w - 32.0, 68.0);
+    let short = match (&current, &newest) {
+        (None, Some(n)) => app
+            .folder
+            .room(&app.install.versions, &app.install.builds, n, app.still)
+            .short(),
+        _ => false,
+    };
     let lane = app.lane();
     let updating = lane.updating();
     let failed =
         lane.update_error().is_some() || (current.is_none() && lane.remote_error().is_some());
     let (label, enabled) = if updating {
         ("Updating".to_owned(), false)
+    } else if app.folder.moving.is_some() {
+        ("Moving Builds".to_owned(), false)
     } else if current.is_none() && lane.unreleased() {
         ("Coming soon".to_owned(), false)
     } else if current.is_some() {
@@ -285,7 +390,8 @@ fn play(
     } else if failed {
         ("Retry".to_owned(), true)
     } else if newest.is_some() {
-        ("Install".to_owned(), true)
+        // Not while the folder is being picked, nor onto a drive too full.
+        ("Install".to_owned(), !short && !app.folder.busy())
     } else {
         ("Play".to_owned(), false)
     };

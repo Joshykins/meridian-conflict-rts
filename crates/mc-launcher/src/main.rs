@@ -1,9 +1,10 @@
 //! `MeridianConflict(.exe)`: what a player starts (docs/RELEASES.md).
 //!
 //! A window in the game's look that keeps the game up to date and starts it:
-//! it checks the store for the picked channel's newest build and installs it
-//! before Play lights up, shows each build's patch notes and the news, lists
-//! the installed builds (checking, repairing and removing them), and says
+//! it checks the store for the picked channel's newest build, installs it
+//! when the player presses Install (into a folder they may pick first) and
+//! keeps it updated after, shows each build's patch notes and the news, lists
+//! the installed builds (checking, repairing, removing and moving them), and says
 //! whether the channel's server answers. It draws on the CPU, so it runs
 //! where the game's GPU driver will not.
 //!
@@ -24,6 +25,7 @@
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
 mod app;
+mod folder;
 mod install;
 mod notes;
 mod paint;

@@ -8,8 +8,9 @@
 //! - puts "Meridian Conflict" shortcuts in the Start menu and on the desktop;
 //! - lists the game in Settings > Apps (uninstall runs `MeridianConflict --uninstall`);
 //!
-//! and starts the installed launcher, which downloads the game with its
-//! progress in the window. Run again over an install, it starts that install.
+//! and starts the installed launcher, where the player can pick another folder
+//! for the builds before pressing Install. Run again over an install, it
+//! starts that install.
 //!
 //! `--uninstall` takes all of that away again, but keeps the replays folder.
 
@@ -128,6 +129,13 @@ pub(crate) fn uninstall(exe: &Path, root: &Path, log: &mut Log) -> Result<(), St
         return Ok(());
     }
     log.line("uninstalling");
+    // Builds kept in a folder of the player's choosing go too, and that
+    // folder with them once nothing else is in it.
+    let builds = install::Install::new(exe.to_path_buf(), root.to_path_buf()).builds;
+    if builds != root {
+        let _ = std::fs::remove_dir_all(builds.join("versions"));
+        let _ = std::fs::remove_dir(&builds);
+    }
     let script = "foreach ($f in 'Programs', 'Desktop') { \
             Remove-Item -LiteralPath (Join-Path ([Environment]::GetFolderPath($f)) \"$env:MC_NAME.lnk\") -ErrorAction SilentlyContinue }";
     let _ = powershell(script).env("MC_NAME", NAME).status();

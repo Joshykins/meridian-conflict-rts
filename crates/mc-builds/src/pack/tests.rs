@@ -196,3 +196,69 @@ fn a_damaged_install_is_found_and_repaired() {
     assert!(versions.installed().is_empty());
     let _ = std::fs::remove_dir_all(&root);
 }
+
+#[test]
+fn installed_builds_move_to_another_folder() {
+    let root = scratch("move");
+    let store_dir = root.join("store");
+    stage(&root.join("a"), b"game one");
+    let a = pack(
+        &root.join("a"),
+        &store_dir,
+        identity("0.1.0-playtest+eeeeeeeeee", 4),
+        String::new(),
+        4,
+    )
+    .unwrap();
+    stage(&root.join("b"), b"game two");
+    let b = pack(
+        &root.join("b"),
+        &store_dir,
+        identity("0.1.0-playtest+ffffffffff", 5),
+        String::new(),
+        5,
+    )
+    .unwrap();
+    let store = Store::new(&file_url(&store_dir)).unwrap();
+    let versions = Versions::new(&root.join("install"));
+    let never = AtomicBool::new(false);
+    for m in [&a.manifest, &b.manifest] {
+        versions.install(&store, m, &mut |_| {}, &never).unwrap();
+    }
+    versions.set_current(&a.manifest).unwrap();
+    let needed = versions.room_needed(&a.manifest);
+    assert_eq!(needed, 0, "an installed build needs no room");
+
+    // Into a folder of its own: never inside the builds, never over others.
+    assert!(versions
+        .move_to(&versions.dir("x"), &mut |_| {}, &never)
+        .is_err());
+    let moved = versions
+        .move_to(&root.join("elsewhere"), &mut |_| {}, &never)
+        .unwrap();
+    assert!(versions.installed().is_empty());
+    assert_eq!(moved.installed().len(), 2);
+    assert_eq!(
+        moved.current(Channel::Playtest).unwrap().build,
+        a.manifest.build
+    );
+
+    // The copy another drive takes: whole, current files and all, and a file
+    // two builds share copied once.
+    let copy = root.join("copy").join("versions");
+    let mut last = Progress::default();
+    moved.copy_into(&copy, &mut |p| last = p, &never).unwrap();
+    assert_eq!(last.done, last.total);
+    let copied = Versions::new(&root.join("copy"));
+    assert_eq!(copied.installed().len(), 2);
+    assert_eq!(
+        copied.current(Channel::Playtest).unwrap().build,
+        a.manifest.build
+    );
+    for m in [&a.manifest, &b.manifest] {
+        assert!(copied.verify(m, &mut |_| {}, &never).unwrap().is_empty());
+    }
+    let (_, total) = copied.usage();
+    assert_eq!(last.total, total, "a shared file is counted once");
+    let _ = std::fs::remove_dir_all(&root);
+}

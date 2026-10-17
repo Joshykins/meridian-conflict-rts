@@ -30,6 +30,8 @@ const CURRENT: &str = "current-";
 const LAST_USED: &str = "last-used";
 const PARTIAL: &str = ".partial-";
 const REPAIR: &str = ".repair-";
+/// Beside `versions/`: builds being copied there from another drive.
+const MOVING: &str = ".moving-versions";
 
 pub struct Versions {
     dir: PathBuf,
@@ -261,6 +263,125 @@ impl Versions {
         m.packed_size(|e| !local.contains_key(&e.sha256))
     }
 
+    /// The most room installing `m` takes on its drive while it runs, in
+    /// bytes: the files no installed build has, with their downloads beside
+    /// them until they are unpacked.
+    pub fn room_needed(&self, m: &Manifest) -> u64 {
+        if self.has(&m.build) {
+            return 0;
+        }
+        let local = self.local_copies();
+        m.files
+            .iter()
+            .filter(|e| !local.contains_key(&e.sha256))
+            .map(|e| e.size + e.packed)
+            .sum()
+    }
+
+    /// Moves every installed build, with which build each channel starts, to
+    /// the `versions/` folder of `root`, and returns the builds there. On one
+    /// drive that is a rename; to another the builds are copied (a file two
+    /// builds share is copied once and linked) into a staging folder that is
+    /// renamed into place once whole, and only then are the old ones removed.
+    /// `progress` counts bytes copied.
+    pub fn move_to(
+        &self,
+        root: &Path,
+        progress: &mut dyn FnMut(Progress),
+        cancel: &AtomicBool,
+    ) -> Result<Versions> {
+        let to = Versions::new(root);
+        if to.dir == self.dir {
+            return Ok(to);
+        }
+        if to.dir.starts_with(&self.dir) {
+            return Err(Error::Folder(format!(
+                "{} is inside the builds' own folder",
+                root.display()
+            )));
+        }
+        if std::fs::read_dir(&to.dir).is_ok_and(|mut d| d.next().is_some()) {
+            return Err(Error::Folder(format!(
+                "{} already holds builds",
+                to.dir.display()
+            )));
+        }
+        std::fs::create_dir_all(root)?;
+        if !self.dir.exists() {
+            return Ok(to);
+        }
+        // An empty versions/ there would stop the rename.
+        let _ = std::fs::remove_dir(&to.dir);
+        if std::fs::rename(&self.dir, &to.dir).is_ok() {
+            return Ok(to);
+        }
+        let stage = root.join(MOVING);
+        if stage.exists() {
+            std::fs::remove_dir_all(&stage)?;
+        }
+        std::fs::create_dir_all(&stage)?;
+        if let Err(e) = self.copy_into(&stage, progress, cancel) {
+            let _ = std::fs::remove_dir_all(&stage);
+            return Err(e);
+        }
+        std::fs::rename(&stage, &to.dir)?;
+        // The builds are whole in their new place; what cannot be removed
+        // from the old one is left behind, never half of the new.
+        let _ = std::fs::remove_dir_all(&self.dir);
+        Ok(to)
+    }
+
+    /// Copies the installed builds and the channels' current files into
+    /// `stage`, a file shared between builds once.
+    pub(crate) fn copy_into(
+        &self,
+        stage: &Path,
+        progress: &mut dyn FnMut(Progress),
+        cancel: &AtomicBool,
+    ) -> Result<()> {
+        let installed = self.installed();
+        let mut sizes = HashMap::new();
+        for m in &installed {
+            for e in &m.files {
+                sizes.insert(e.sha256.as_str(), e.size);
+            }
+        }
+        let total = sizes.values().sum();
+        let mut done = 0;
+        progress(Progress { done, total });
+        let mut copied: HashMap<String, PathBuf> = HashMap::new();
+        for m in &installed {
+            let (from, to) = (self.dir(&m.key()), stage.join(m.key()));
+            for e in &m.files {
+                let dest = to.join(&e.path);
+                if let Some(parent) = dest.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+                if let Some(first) = copied.get(&e.sha256) {
+                    if std::fs::hard_link(first, &dest).is_ok() {
+                        continue;
+                    }
+                }
+                copy_file(&from.join(&e.path), &dest, cancel, &mut |n| {
+                    progress(Progress {
+                        done: (done + n).min(total),
+                        total,
+                    })
+                })?;
+                done += e.size;
+                copied.insert(e.sha256.clone(), dest);
+            }
+            // The rest of its folder: its manifest, and when it was last used.
+            copy_rest(&from, &to)?;
+        }
+        for e in std::fs::read_dir(&self.dir)?.flatten() {
+            if e.file_name().to_string_lossy().starts_with(CURRENT) {
+                std::fs::copy(e.path(), stage.join(e.file_name()))?;
+            }
+        }
+        Ok(())
+    }
+
     /// Installs `m` from `store`, unless it already is. Returns its folder.
     pub fn install(
         &self,
@@ -365,6 +486,60 @@ impl Versions {
             }
         }
     }
+}
+
+/// Copies `from` to `to`, telling `progress` the bytes copied so far.
+fn copy_file(
+    from: &Path,
+    to: &Path,
+    cancel: &AtomicBool,
+    progress: &mut dyn FnMut(u64),
+) -> Result<()> {
+    let mut input = File::open(from)?;
+    let mut out = BufWriter::new(File::create(to)?);
+    let mut buf = vec![0u8; 1 << 20];
+    let mut n = 0u64;
+    loop {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        match input.read(&mut buf) {
+            Ok(0) => break,
+            Ok(k) => {
+                out.write_all(&buf[..k])?;
+                n += k as u64;
+                progress(n);
+            }
+            Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
+            Err(e) => return Err(e.into()),
+        }
+    }
+    out.flush()?;
+    drop(out);
+    // The game stays executable.
+    std::fs::set_permissions(to, from.metadata()?.permissions())?;
+    Ok(())
+}
+
+/// Copies what of `from` is not yet in `to`, keeping each file's modified
+/// time (`last-used` orders the builds by it).
+fn copy_rest(from: &Path, to: &Path) -> Result<()> {
+    std::fs::create_dir_all(to)?;
+    for e in std::fs::read_dir(from)?.flatten() {
+        let (src, dest) = (e.path(), to.join(e.file_name()));
+        if e.file_type()?.is_dir() {
+            copy_rest(&src, &dest)?;
+        } else if !dest.exists() {
+            std::fs::copy(&src, &dest)?;
+            if let Ok(when) = e.metadata().and_then(|md| md.modified()) {
+                File::options()
+                    .write(true)
+                    .open(&dest)?
+                    .set_modified(when)?;
+            }
+        }
+    }
+    Ok(())
 }
 
 fn hash_file(path: &Path) -> io::Result<String> {

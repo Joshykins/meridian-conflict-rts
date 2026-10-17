@@ -4,9 +4,10 @@
 //!
 //! ```text
 //! MeridianConflict.exe      this program
-//! launcher.json             the player's choices (the channel)
+//! launcher.json             the player's choices (the channel, the builds' folder)
 //! launcher.log              what the last run did
-//! versions/                 the builds (mc_builds::versions)
+//! versions/                 the builds (mc_builds::versions), unless the player
+//!                           put them in a folder of their own (folder.rs)
 //! replays/, ...             the game's working folder: the install's root
 //! ```
 
@@ -39,31 +40,52 @@ pub(crate) const CHANNELS: [Channel; 2] = [Channel::Release, Channel::Playtest];
 struct Prefs {
     #[serde(default)]
     channel: Option<String>,
+    /// The folder holding `versions/`, when it is not the install's own.
+    #[serde(default)]
+    builds: Option<PathBuf>,
+}
+
+impl Prefs {
+    fn read(root: &Path) -> Prefs {
+        std::fs::read(root.join("launcher.json"))
+            .ok()
+            .and_then(|b| serde_json::from_slice(&b).ok())
+            .unwrap_or_default()
+    }
+
+    fn write(&self, root: &Path) -> std::io::Result<()> {
+        let bytes = serde_json::to_vec_pretty(self).map_err(std::io::Error::other)?;
+        std::fs::write(root.join("launcher.json"), bytes)
+    }
 }
 
 pub(crate) struct Install {
     /// This program.
     pub(crate) exe: PathBuf,
     pub(crate) root: PathBuf,
+    /// The folder holding `versions/`: the install's own, unless the player
+    /// picked another.
+    pub(crate) builds: PathBuf,
     pub(crate) versions: Versions,
 }
 
 impl Install {
     pub(crate) fn new(exe: PathBuf, root: PathBuf) -> Install {
-        let versions = Versions::new(&root);
+        let builds = Prefs::read(&root).builds.unwrap_or_else(|| root.clone());
+        let versions = Versions::new(&builds);
         Install {
             exe,
             root,
+            builds,
             versions,
         }
     }
 
     /// The channel the player last picked, else this launcher's own.
     pub(crate) fn channel(&self) -> Channel {
-        std::fs::read(self.root.join("launcher.json"))
-            .ok()
-            .and_then(|b| serde_json::from_slice::<Prefs>(&b).ok())
-            .and_then(|p| p.channel?.parse().ok())
+        Prefs::read(&self.root)
+            .channel
+            .and_then(|c| c.parse().ok())
             .filter(|c| CHANNELS.contains(c))
             .unwrap_or_else(|| match home_channel() {
                 Channel::Dev => Channel::Release,
@@ -72,12 +94,19 @@ impl Install {
     }
 
     pub(crate) fn set_channel(&self, channel: Channel) {
-        let prefs = Prefs {
-            channel: Some(channel.name().to_owned()),
-        };
-        if let Ok(bytes) = serde_json::to_vec_pretty(&prefs) {
-            let _ = std::fs::write(self.root.join("launcher.json"), bytes);
-        }
+        let mut prefs = Prefs::read(&self.root);
+        prefs.channel = Some(channel.name().to_owned());
+        let _ = prefs.write(&self.root);
+    }
+
+    /// Keeps the builds in `dir` (the folder holding `versions/`) from now on.
+    pub(crate) fn set_builds(&mut self, dir: PathBuf) -> std::io::Result<()> {
+        let mut prefs = Prefs::read(&self.root);
+        prefs.builds = (dir != self.root).then(|| dir.clone());
+        prefs.write(&self.root)?;
+        self.versions = Versions::new(&dir);
+        self.builds = dir;
+        Ok(())
     }
 
     /// A build's game, run from the install's root (where `replays/` lives)

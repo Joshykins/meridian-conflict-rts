@@ -2,9 +2,10 @@
 //! channel's newest build and history, the update to it, the news, checking
 //! and repairing files, and an old replay's build.
 //!
-//! The selected channel's update starts by itself once the store names a
-//! build that is not installed, and Play waits for it: a network match needs
-//! everyone on the same build.
+//! A channel with nothing installed waits for the player to press Install,
+//! so they can pick where the builds go first (folder.rs). Once a channel has
+//! a build, its update starts by itself when the store names a later one, and
+//! Play waits for it: a network match needs everyone on the same build.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -15,6 +16,7 @@ use mc_builds::versions::Progress;
 use mc_builds::{Entry, Manifest, Store};
 use mc_core::Channel;
 
+use crate::folder::Folder;
 use crate::install::{Install, Log, CHANNELS};
 use crate::work::{Job, Meter};
 
@@ -162,6 +164,8 @@ pub(crate) struct App {
     /// Installed builds with the bytes only each holds, and the total.
     pub(crate) installed: (Vec<(Manifest, u64)>, u64),
     pub(crate) replay: Option<Replay>,
+    /// Where the builds go, and changing it.
+    pub(crate) folder: Folder,
     /// A build waiting for a second press of Remove.
     pub(crate) removing: Option<String>,
     pub(crate) reader: Reader,
@@ -187,6 +191,7 @@ impl App {
             files: None,
             installed,
             replay: None,
+            folder: Folder::default(),
             removing: None,
             reader: Reader::default(),
             notice: None,
@@ -248,26 +253,137 @@ impl App {
             }
             self.look_again(store);
         }
-        // The selected channel updates by itself.
+        self.step_folder(log);
+        // The selected channel updates by itself, once it has a build; the
+        // first one waits for Install.
         let channel = self.channel;
         let current = self.current();
+        if self.folder.busy() {
+            return self.apply_update(log);
+        }
         let lane = self.lanes.iter().find(|l| l.channel == channel)?;
         // A finished update of another build does not stand in the way of this one.
         let free = lane.update.as_ref().is_none_or(|j| {
             j.peek(|r| matches!(r, Some(Ok(m)) if Some(&m.build) != lane.newest().as_ref().map(|n| &n.build)))
         });
-        if let (Some(newest), true, Some(store)) = (lane.newest(), free, &store) {
-            let wanted = !self.install.versions.has(&newest.build)
-                && current.as_ref().is_none_or(|c| newest.number > c.number);
-            // An update; or a fresh install (the setup just ran), which gets
-            // its picked channel's build straight away.
-            let fresh = self.installed.0.is_empty();
-            if wanted && (current.is_some() || fresh) {
-                log.line(&format!("installing {}", newest.build));
+        if let (Some(newest), true, Some(store), Some(current)) =
+            (lane.newest(), free, &store, &current)
+        {
+            if !self.install.versions.has(&newest.build) && newest.number > current.number {
+                log.line(&format!("updating to {}", newest.build));
                 self.start_install(store.clone(), newest);
             }
         }
         self.apply_update(log)
+    }
+
+    /// Something is reading or writing the builds, so they may not move.
+    pub(crate) fn builds_busy(&self) -> bool {
+        self.lanes.iter().any(Lane::updating)
+            || matches!(
+                self.files,
+                Some(Files::Checking(..)) | Some(Files::Repairing(..))
+            )
+            || self
+                .replay
+                .as_ref()
+                .is_some_and(|r| matches!(r.step, ReplayStep::Fetching(_)))
+            || self.folder.busy()
+    }
+
+    /// Opens the folder dialog to pick where the builds go.
+    pub(crate) fn choose_folder(&mut self) {
+        if !self.builds_busy() {
+            self.notice = None;
+            self.folder.asking = Some(crate::folder::ask(&self.install.builds));
+        }
+    }
+
+    /// Acts on the folder dialog's answer, and on a move that finished.
+    fn step_folder(&mut self, log: &mut Log) {
+        let picked = self
+            .folder
+            .asking
+            .as_ref()
+            .and_then(|j| j.peek(|r| r.cloned()));
+        if let Some(picked) = picked {
+            self.folder.asking = None;
+            match picked {
+                Ok(Some(dir)) => self.set_folder(crate::folder::place(&dir), log),
+                Ok(None) => {}
+                Err(e) => self.notice = Some(format!("Could not open the folder dialog: {e}")),
+            }
+        }
+        let moved = self
+            .folder
+            .moving
+            .as_ref()
+            .and_then(|(to, j)| j.peek(|r| r.map(|r| (to.clone(), r.clone()))));
+        if let Some((to, moved)) = moved {
+            self.folder.moving = None;
+            match moved {
+                Ok(()) => {
+                    log.line(&format!("moved the builds to {}", to.display()));
+                    self.keep_builds_in(to, log);
+                }
+                Err(e) => {
+                    log.line(&format!("could not move the builds: {e}"));
+                    if e != mc_builds::Error::Cancelled.to_string() {
+                        self.notice = Some(format!("The builds did not move: {e}"));
+                    }
+                }
+            }
+        }
+    }
+
+    /// Puts the builds in `dir`: at once when none are installed, else by
+    /// moving them there.
+    fn set_folder(&mut self, dir: std::path::PathBuf, log: &mut Log) {
+        if dir == self.install.builds {
+            return;
+        }
+        if let Err(e) = crate::folder::writable(&dir) {
+            self.notice = Some(e);
+            return;
+        }
+        if self.install.versions.installed().is_empty() {
+            log.line(&format!("builds go in {}", dir.display()));
+            self.keep_builds_in(dir, log);
+            return;
+        }
+        log.line(&format!(
+            "moving the builds from {} to {}",
+            self.install.builds.display(),
+            dir.display()
+        ));
+        let (from, to) = (self.install.builds.clone(), dir.clone());
+        let job = Job::spawn("move builds", move |r| {
+            r.stage("Moving");
+            mc_builds::Versions::new(&from)
+                .move_to(&to, &mut |p| r.progress(p), r.cancel_flag())
+                .map(drop)
+                .map_err(|e| e.to_string())?;
+            // The old folder goes too, when the move left it empty.
+            let _ = std::fs::remove_dir(&from);
+            Ok(())
+        });
+        self.folder.moving = Some((dir, job));
+    }
+
+    fn keep_builds_in(&mut self, dir: std::path::PathBuf, log: &mut Log) {
+        if let Err(e) = self.install.set_builds(dir) {
+            log.line(&format!("could not save the builds' folder: {e}"));
+            self.notice = Some(format!("Could not save the builds' folder: {e}"));
+        }
+        self.refresh_installed();
+    }
+
+    /// Stops a move; the builds stay where they were. The job is kept till
+    /// it answers: a move that finished just before still counts.
+    pub(crate) fn cancel_move(&mut self) {
+        if let Some((_, job)) = &self.folder.moving {
+            job.cancel();
+        }
     }
 
     /// Looks at the store again every [`LOOK_AGAIN`] while the window is open,
@@ -309,7 +425,7 @@ impl App {
         let Some(channel) = m.channel() else {
             return;
         };
-        let root = self.install.root.clone();
+        let root = self.install.builds.clone();
         let Some(lane) = self.lane_mut(channel) else {
             return;
         };
@@ -396,7 +512,7 @@ impl App {
 
     /// Checks every file of an installed build against its manifest.
     pub(crate) fn check_files(&mut self, m: &Manifest) {
-        let (root, m, key) = (self.install.root.clone(), m.clone(), m.key());
+        let (root, m, key) = (self.install.builds.clone(), m.clone(), m.key());
         self.files = Some(Files::Checking(
             key,
             Job::spawn("check files", move |r| {
@@ -455,7 +571,7 @@ impl App {
         else {
             return Files::Done(key.to_owned(), Err("the build is gone".into()));
         };
-        let root = self.install.root.clone();
+        let root = self.install.builds.clone();
         Files::Repairing(
             key.to_owned(),
             Job::spawn("repair", move |r| {
@@ -511,7 +627,7 @@ impl App {
             }
             Some(store) => {
                 let (store, root, build) =
-                    (store.clone(), self.install.root.clone(), build.clone());
+                    (store.clone(), self.install.builds.clone(), build.clone());
                 Job::spawn("replay build", move |r| {
                     r.stage("Downloading");
                     let m = store.manifest(&build).map_err(|e| e.to_string())?;

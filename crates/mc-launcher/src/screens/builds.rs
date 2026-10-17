@@ -168,7 +168,7 @@ pub(super) fn page(ui: &mut Ui, app: &mut App, view: Rect, top: f32) -> (f32, Op
         let any_busy = matches!(
             app.files,
             Some(Files::Checking(..)) | Some(Files::Repairing(..))
-        );
+        ) || app.folder.moving.is_some();
         if ui.button(
             id("check", i),
             check,
@@ -186,7 +186,7 @@ pub(super) fn page(ui: &mut Ui, app: &mut App, view: Rect, top: f32) -> (f32, Op
             remove,
             label,
             ButtonKind::Secondary,
-            !in_use && !busy,
+            !in_use && !busy && app.folder.moving.is_none(),
         ) {
             if confirming {
                 app.remove(&key);
@@ -211,6 +211,11 @@ pub(super) fn page(ui: &mut Ui, app: &mut App, view: Rect, top: f32) -> (f32, Op
 
     ui.p.section(view.x, y, view.w, "Folders");
     y += 22.0;
+    let (y2, a) = builds_folder(ui, app, view, y);
+    y = y2;
+    if a.is_some() {
+        action = a;
+    }
     let install = Rect::new(view.x, y, 220.0, 44.0);
     if ui.button(
         id("open-install", 0),
@@ -256,4 +261,108 @@ pub(super) fn page(ui: &mut Ui, app: &mut App, view: Rect, top: f32) -> (f32, Op
         y += 20.0;
     }
     (y - top + 12.0, action)
+}
+
+/// Where the builds are, opening it, and moving them somewhere else (with
+/// the move's progress in place of the path while it runs). Returns where
+/// the next row starts.
+fn builds_folder(ui: &mut Ui, app: &mut App, view: Rect, y: f32) -> (f32, Option<Action>) {
+    let mut action = None;
+    let bw = 108.0;
+    let change = Rect::new(view.right() - bw, y + 6.0, bw, 40.0);
+    let open = Rect::new(change.x - 8.0 - bw, y + 6.0, bw, 40.0);
+    let span = open.x - 20.0 - view.x;
+    ui.p.text(
+        view.x,
+        y + 12.0,
+        type_scale::MICRO,
+        rgb(palette::FAINT, 1.0),
+        "BUILDS GO IN",
+    );
+    let moving = app
+        .folder
+        .moving
+        .as_ref()
+        .map(|(to, job)| (to.clone(), job.meter()));
+    match moving {
+        Some((to, meter)) => {
+            let (head, tail) = meter_lines(&meter);
+            let to = super::home::fit_path(ui, &to, span * 0.6);
+            ui.p.text_fit(
+                view.x,
+                y + 32.0,
+                span,
+                type_scale::CAPTION,
+                rgb(palette::TEXT, 0.9),
+                &format!("{head} to {to}"),
+            );
+            ui.p.text_right(
+                open.x - 20.0,
+                y + 12.0,
+                type_scale::MICRO,
+                rgb(palette::DIM, 1.0),
+                &tail,
+            );
+            ui.progress(Rect::new(view.x, y + 46.0, span, 4.0), meter.fraction());
+            ui.busy = true;
+        }
+        None => {
+            let path = super::home::fit_path(ui, &app.install.builds, span);
+            ui.p.text_fit(
+                view.x,
+                y + 32.0,
+                span,
+                type_scale::VALUE,
+                rgb(palette::TEXT, 0.95),
+                &path,
+            );
+        }
+    }
+    if ui.button(
+        id("open-builds", 0),
+        open,
+        "Open",
+        ButtonKind::Secondary,
+        app.folder.moving.is_none(),
+    ) {
+        let dir = app.install.builds.clone();
+        let _ = std::fs::create_dir_all(&dir);
+        action = Some(Action::Open(dir.to_string_lossy().into_owned()));
+    }
+    if app.folder.moving.is_some() {
+        if ui.button(
+            id("cancel-move", 0),
+            change,
+            "Cancel",
+            ButtonKind::Secondary,
+            true,
+        ) {
+            app.cancel_move();
+        }
+    } else {
+        let asking = app.folder.asking.is_some();
+        let label = if asking { "Choosing\u{2026}" } else { "Change" };
+        if ui.button(
+            id("change-builds", 0),
+            change,
+            label,
+            ButtonKind::Secondary,
+            !app.builds_busy(),
+        ) {
+            app.choose_folder();
+        }
+    }
+    let note = if app.installed.0.is_empty() {
+        "New builds download here."
+    } else {
+        "Change moves the installed builds there; Play waits till they are in."
+    };
+    ui.p.text(
+        view.x,
+        y + 70.0,
+        type_scale::CAPTION,
+        rgb(palette::DIM, 1.0),
+        note,
+    );
+    (y + 90.0, action)
 }

@@ -11,6 +11,7 @@ use mc_builds::{Entry, Manifest, Store};
 use mc_core::Channel;
 
 use crate::app::{App, Files, Lane, Page, Remote, Replay, ReplayStep};
+use crate::folder::Room;
 use crate::install::Install;
 use crate::paint::{Backdrop, Painter};
 use crate::screens;
@@ -22,7 +23,7 @@ const NOTES_OLD: &str = "# Interface\n- Prefabs: save a block of structures and 
 const NOTES_OLDER: &str = "- The Last Harvest: a 24 km survival map for four defenders.\n- Site Repeat lays a half-built field again with one key.";
 
 /// The scenes, by file name.
-const SCENES: [&str; 8] = [
+const SCENES: [&str; 10] = [
     "1-home",
     "2-updating",
     "3-news",
@@ -31,6 +32,8 @@ const SCENES: [&str; 8] = [
     "6-offline",
     "7-replay",
     "8-release-soon",
+    "9-first-install",
+    "10-moving-builds",
 ];
 
 pub(crate) fn write_all(dir: &Path) -> Result<Vec<PathBuf>, String> {
@@ -133,6 +136,7 @@ fn stage(scene: &str, root: &Path) -> Result<App, String> {
         "4-builds" => vec![&r1603, &r1588, &r1561],
         "7-replay" => vec![&r1603],
         "8-release-soon" => vec![&p1622],
+        "9-first-install" => Vec::new(),
         _ => vec![&r1603, &r1588],
     };
     for m in &installed {
@@ -207,6 +211,35 @@ fn stage(scene: &str, root: &Path) -> Result<App, String> {
             app.files = Some(Files::Checking(
                 key,
                 running("Checking files", 286_000_000, 473_000_000, 0.0).unwrap(),
+            ));
+        }
+        // A first install, in a folder the player picked, before Install.
+        "5-playtest-install" | "9-first-install" => {
+            let newest = if scene == "9-first-install" {
+                &r1603
+            } else {
+                &p1622
+            };
+            if scene == "9-first-install" {
+                app.install.builds = PathBuf::from(r"D:\Games\Meridian Conflict");
+            }
+            let builds = app.install.builds.clone();
+            app.folder.set_room(
+                &builds,
+                newest,
+                Room {
+                    download: 252_800_000,
+                    needed: 726_000_000,
+                    free: Some(212_400_000_000),
+                },
+            );
+        }
+        "10-moving-builds" => {
+            app.page = Page::Builds;
+            app.reader.scroll = 200.0;
+            app.folder.moving = Some((
+                PathBuf::from(r"D:\Games\Meridian Conflict"),
+                running("Moving", 318_000_000, 473_000_000, 96_000_000.0).unwrap(),
             ));
         }
         "7-replay" => {

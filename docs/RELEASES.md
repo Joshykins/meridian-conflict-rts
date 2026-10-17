@@ -115,10 +115,13 @@ A new player gets the setup from the website's Play page
 launcher itself under that name (`crates/mc-launcher/src/setup.rs`). Run, it installs
 itself for that user, with no admin prompt, to `%LOCALAPPDATA%\Programs\Meridian
 Conflict`, puts shortcuts in the Start menu and on the desktop, lists the game in
-Settings > Apps, and starts the installed launcher, which finds nothing installed and
-downloads its channel's newest build at once. Settings > Apps > Uninstall runs
-`MeridianConflict --uninstall`: shortcuts, the Apps entry, the builds and the launcher
-go; the replays stay. The zip from `release.sh` is the same install for hand delivery.
+Settings > Apps, and starts the installed launcher. With nothing installed it downloads
+nothing yet: it shows where the builds will go (*Install to*, the install folder to
+begin with), what the download is and the room free on that drive, and waits for
+**Install**; *Change Folder* picks another folder first (the system's folder dialog;
+the builds go in a `Meridian Conflict` folder inside the one picked). Settings > Apps >
+Uninstall runs `MeridianConflict --uninstall`: shortcuts, the Apps entry, the builds
+(wherever they are) and the launcher go; the replays stay. The zip from `release.sh` is the same install for hand delivery.
 
 What an install holds:
 
@@ -127,7 +130,8 @@ MeridianConflict.exe      the launcher (crates/mc-launcher)
 versions/<build>/         each installed build, whole; a file shared with another
                           build is a hard link, so an old build costs only what changed
 versions/current-<channel>  the build the launcher starts on that channel
-launcher.json             the channel the player picked
+launcher.json             the channel the player picked, and the builds' folder if
+                          they picked one (then versions/ lives there instead)
 replays/                  the game runs here: recordings and marks
 launcher.log              what the last run of the launcher did
 ```
@@ -148,11 +152,13 @@ it must not need the GPU driver the game needs. The game never updates itself.
   panel takes what it gains.
 - **Updates:** on opening, and again every 10 minutes while it stays open, the
   launcher reads each channel's newest build and history and the news (what it shows
-  stays until the new answer is in). When the picked channel names a build that is not installed, it
-  downloads it at once and **Play** waits for it (a network match needs everyone on
-  one build); a failed download leaves Play on the installed build with *Try the
-  update again*. A channel with nothing installed offers **Install**. A channel the
-  store has nothing on yet (its `channels/<channel>/<platform>.json` answers 404, as
+  stays until the new answer is in). When the picked channel has a build installed and
+  the store names a later one, it downloads it at once and **Play** waits for it (a
+  network match needs everyone on one build); a failed download leaves Play on the
+  installed build with *Try the update again*. A channel with nothing installed offers
+  **Install** under where the build will go, and downloads nothing till it is pressed;
+  Install is off while the drive is too full for the download and its unpacked files.
+  A channel the store has nothing on yet (its `channels/<channel>/<platform>.json` answers 404, as
   Release does before it comes out) reads *Coming soon*, with Play off and no Retry. A finished
   update becomes its channel's current build; when it brings a different launcher
   (`launcher/MeridianConflict.exe` in the build) from a later build than the running
@@ -166,8 +172,12 @@ it must not need the GPU driver the game needs. The game never updates itself.
   are counted once). **Check Files** reads every file against the signed manifest and
   downloads the damaged or missing ones again (a repaired file gets a copy of its own:
   another build linked to the old one keeps it); **Remove** takes a build no channel
-  starts. Buttons open the install folder, the game's logs and crash reports
-  (`%APPDATA%\meridian-conflict`) and the replays.
+  starts. *Builds go in* shows the builds' folder: **Open** opens it, **Change** moves
+  every installed build to another (a rename on one drive; across drives a copy, a file
+  two builds share copied once, renamed into place whole before the old ones go), with
+  its progress and **Cancel** in place, and Play waits for it. Buttons open the install
+  folder, the game's logs and crash reports (`%APPDATA%\meridian-conflict`) and the
+  replays.
 - **Old replays:** Match History shows **Watch in Its Build** for a recording this
   build does not play as recorded (`docs/REPLAYS.md`, *Older builds*). That starts
   `MeridianConflict --replay FILE` and quits; the launcher fetches that build if it is

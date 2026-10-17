@@ -90,6 +90,8 @@ pub enum Error {
     /// This build was made without anywhere to send reports.
     NoReports,
     Cancelled,
+    /// A folder the builds cannot be moved to, and why.
+    Folder(String),
 }
 
 impl fmt::Display for Error {
@@ -106,6 +108,7 @@ impl fmt::Display for Error {
             Error::NoStore => f.write_str("this build has no build store to download from"),
             Error::NoReports => f.write_str("this build has nowhere to send reports"),
             Error::Cancelled => f.write_str("cancelled"),
+            Error::Folder(why) => f.write_str(why),
         }
     }
 }
