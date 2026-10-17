@@ -40,6 +40,9 @@ struct Hull {
     size_class: u8,
 }
 
+/// A tile run's outcome: the tile, whether it pushed, and the hulls it moved.
+type TileRun = (usize, bool, Vec<(usize, FxVec2)>);
+
 /// A tile, and the pairs of its hulls it could not hold.
 type Built = (Tile, Vec<(usize, usize)>);
 
@@ -117,7 +120,7 @@ impl World {
                 // tile first, each to the lightest batch so far.
                 let batches = batch_tiles(&live, |t| turn[t].pairs.len(), self.pool.thread_count());
                 drop(span);
-                let done: Vec<Vec<(usize, bool, Vec<(usize, FxVec2)>)>> =
+                let done: Vec<Vec<TileRun>> =
                     self.pool.parallel_map_chunks(batches.len(), 1, |b, _| {
                         let _work = mc_core::perf_span!("contacts.tile_work");
                         batches[b]
