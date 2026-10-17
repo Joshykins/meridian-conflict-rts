@@ -6,7 +6,7 @@ use super::{
 };
 use crate::audio::Sfx;
 use crate::netplay::NetLink;
-use crate::ui::{id, ink, palette, rgb, type_scale, ButtonKind, Rect, Response, Ui};
+use crate::ui::{id, palette, rgb, type_scale, ButtonKind, Rect, Response, Ui};
 use glam::Vec2;
 use icons::Glyph;
 
