@@ -202,7 +202,7 @@ pub struct World {
     /// Who drew materials out of what this tick, for the mirror's reclaim beams. Not state.
     pub reclaims: Vec<crate::reclaim::ReclaimWork>,
     /// Each unit's resource flows this tick, by row. Not state.
-    pub flows: Vec<crate::economy::UnitFlow>,
+    pub flows: crate::economy::Flows,
     /// Which buildings save which this tick (`adjacency.rs`). Not state.
     pub adjacency: crate::adjacency::Links,
     pub timings: TickTimings,
@@ -512,7 +512,7 @@ impl World {
             streams: Vec::new(),
             muzzles: Vec::new(),
             reclaims: Vec::new(),
-            flows: Vec::new(),
+            flows: Default::default(),
             adjacency: Default::default(),
             timings: TickTimings::default(),
             perf: mc_core::perf::Frame::default(),

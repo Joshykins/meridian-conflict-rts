@@ -75,6 +75,75 @@ pub struct UnitFlow {
     pub round: Fx,
 }
 
+impl UnitFlow {
+    /// No flow at all.
+    const NONE: UnitFlow = UnitFlow {
+        made: [Fx::ZERO; 2],
+        wanted: [Fx::ZERO; 2],
+        used: [Fx::ZERO; 2],
+        built: Fx::ZERO,
+        round: Fx::ZERO,
+    };
+}
+
+/// Every unit's `UnitFlow` this tick, by row. `clear` does not touch the rows: a row is
+/// zeroed the first time it is written in a tick, and one not written reads as no flow.
+/// Clearing and refilling every row each tick cost an army of a hundred thousand with
+/// no economy most of the phase.
+#[derive(Clone, Default)]
+pub struct Flows {
+    rows: Vec<UnitFlow>,
+    /// Per row, the `clear` it was last written after.
+    stamp: Vec<u64>,
+    now: u64,
+}
+
+impl Flows {
+    /// A new tick: every row reads as no flow until written.
+    pub(crate) fn clear(&mut self) {
+        self.now += 1;
+    }
+
+    pub fn len(&self) -> usize {
+        self.rows.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.rows.is_empty()
+    }
+
+    /// Room for rows up to `len`, each no flow.
+    pub(crate) fn resize(&mut self, len: usize, _: UnitFlow) {
+        if len > self.rows.len() {
+            self.rows.resize(len, UnitFlow::NONE);
+            self.stamp.resize(len, self.now);
+        }
+    }
+
+    /// The flows of `row` this tick, if it has any.
+    pub fn get(&self, row: usize) -> Option<&UnitFlow> {
+        (self.stamp.get(row) == Some(&self.now)).then(|| &self.rows[row])
+    }
+}
+
+impl std::ops::Index<usize> for Flows {
+    type Output = UnitFlow;
+    fn index(&self, row: usize) -> &UnitFlow {
+        self.get(row).unwrap_or(&UnitFlow::NONE)
+    }
+}
+
+impl std::ops::IndexMut<usize> for Flows {
+    fn index_mut(&mut self, row: usize) -> &mut UnitFlow {
+        self.resize(row + 1, UnitFlow::NONE);
+        if self.stamp[row] != self.now {
+            self.stamp[row] = self.now;
+            self.rows[row] = UnitFlow::NONE;
+        }
+        &mut self.rows[row]
+    }
+}
+
 /// One builder working on one target this tick.
 #[derive(Clone, Copy)]
 pub(crate) struct BuildJob {
@@ -120,7 +189,21 @@ impl World {
             if !self.state.units.is_active(row) {
                 continue;
             }
-            let mut e = self.bp(row).economy;
+            // Most of an army has no part in the economy: it adds nothing here, and is
+            // passed over without working out its upkeep.
+            let bp = self.bp(row);
+            let e = bp.economy;
+            if e.materials_income == Fx::ZERO
+                && e.energy_income == Fx::ZERO
+                && e.energy_upkeep == Fx::ZERO
+                && e.materials_storage == Fx::ZERO
+                && e.energy_storage == Fx::ZERO
+                && bp.mine.is_none()
+                && bp.gravitic.is_none()
+            {
+                continue;
+            }
+            let mut e = e;
             e.energy_upkeep = self.upkeep(row);
             let p = self.state.units.owner[row] as usize;
             income[p].0 += e.materials_income / DT;
